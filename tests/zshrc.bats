@@ -222,3 +222,29 @@ FNM
     return 1
   fi
 }
+
+@test "home/zshenv sources under zsh without errors" {
+  local tmp="$BATS_TEST_TMPDIR/zshenv-clean"
+  mkdir -p "$tmp/home"
+
+  run env -u NODE_EXTRA_CA_CERTS HOME="$tmp/home" PATH="/usr/bin:/bin" \
+    DOTFILES_CORPORATE_CA_BUNDLES="/nonexistent/a.pem:/nonexistent/b.pem" \
+    /bin/zsh -dfc 'source "$1"' zsh "$ZSHENV"
+
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "home/zshenv uses the first existing DOTFILES_CORPORATE_CA_BUNDLES entry" {
+  local tmp="$BATS_TEST_TMPDIR/zshenv-ca"
+  mkdir -p "$tmp/home"
+  : > "$tmp/second.pem"
+  : > "$tmp/third.pem"
+
+  run env -u NODE_EXTRA_CA_CERTS HOME="$tmp/home" PATH="/usr/bin:/bin" \
+    DOTFILES_CORPORATE_CA_BUNDLES="/nonexistent/first.pem:$tmp/second.pem:$tmp/third.pem" \
+    /bin/zsh -dfc 'source "$1"; print -r -- "$NODE_EXTRA_CA_CERTS"' zsh "$ZSHENV"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "$tmp/second.pem" ]
+}

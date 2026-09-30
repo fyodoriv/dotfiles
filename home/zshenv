@@ -52,17 +52,20 @@ export UV_PYTHON_PREFERENCE=only-managed
 # Candidates match lib/dotfiles-endpoint-paths.sh dotfiles_corporate_node_ca.
 if [ -z "${NODE_EXTRA_CA_CERTS:-}" ]; then
   # DOTFILES_CORPORATE_CA_BUNDLES: optional colon-separated extra candidates.
-  IFS=':' read -r -a _extra_ca <<< "${DOTFILES_CORPORATE_CA_BUNDLES:-}"
-  for _corp_ca in \
-    ${_extra_ca[@]+"${_extra_ca[@]}"} \
-    "$HOME/.config/ssl/corporate-combined-ca.pem" \
-    "$HOME/.config/ssl/macos-trust-bundle.pem"; do
-    if [ -f "$_corp_ca" ]; then
+  # Split with parameter expansion: zsh `read` has no `-a`.
+  _ca_list="${DOTFILES_CORPORATE_CA_BUNDLES:+$DOTFILES_CORPORATE_CA_BUNDLES:}$HOME/.config/ssl/corporate-combined-ca.pem:$HOME/.config/ssl/macos-trust-bundle.pem"
+  while [ -n "$_ca_list" ]; do
+    _corp_ca="${_ca_list%%:*}"
+    case "$_ca_list" in
+      *:*) _ca_list="${_ca_list#*:}" ;;
+      *) _ca_list="" ;;
+    esac
+    if [ -n "$_corp_ca" ] && [ -f "$_corp_ca" ]; then
       export NODE_EXTRA_CA_CERTS="$_corp_ca"
       break
     fi
   done
-  unset _corp_ca _extra_ca
+  unset _corp_ca _ca_list
 fi
 
 # Chezmoi-generated env vars (repos_dir, etc.)

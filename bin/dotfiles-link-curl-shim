@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/curl bash script with a symlink to adhoc-signed Homebrew curl
+# (keg-only opt/curl/bin/curl). endpoint agent flags script shims (unsigned,
+# Description: curl) even when adhoc-signed and exec'ing a signed Mach-O —
+# the invoked path must be Mach-O.
+#
+# Escape hatch for POSIX-only scripts: invoke /usr/bin/curl directly (never via shim).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SHIM="$SHIM_DIR/curl"
+
+_resolve_brew_curl() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    candidate="${DOTFILES_BREW_PREFIX}/opt/curl/bin/curl"
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  fi
+  for candidate in /opt/homebrew/opt/curl/bin/curl /usr/local/opt/curl/bin/curl; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+BREW_CURL="$(_resolve_brew_curl || true)"
+if [ -z "$BREW_CURL" ]; then
+  echo "curl: Homebrew curl not found — install via brew bundle / brew install curl (never use /usr/bin/curl on managed endpoints)" >&2
+  exit 1
+fi
+
+if [ -e "$SHIM" ] && [ ! -L "$SHIM" ]; then
+  rm -f "$SHIM"
+fi
+
+ln -sfn "$BREW_CURL" "$SHIM"
+chmod +x "$SHIM" 2>/dev/null || true

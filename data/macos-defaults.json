@@ -1,0 +1,1196 @@
+[
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticWindowAnimationsEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Performance: Animations",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSWindowResizeTime",
+    "type": "float",
+    "value": 0.001,
+    "section": "Performance: Animations",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSScrollAnimationEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Performance: Animations",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "autohide-time-modifier",
+    "type": "float",
+    "value": 0.12,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "autohide-delay",
+    "type": "float",
+    "value": 0.0,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "launchanim",
+    "type": "bool",
+    "value": false,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "expose-animation-duration",
+    "type": "float",
+    "value": 0.1,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "minimize-to-application",
+    "type": "bool",
+    "value": true,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "mineffect",
+    "type": "string",
+    "value": "scale",
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "mru-spaces",
+    "type": "bool",
+    "value": false,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "com.apple.springing.enabled",
+    "type": "bool",
+    "value": true,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "com.apple.springing.delay",
+    "type": "float",
+    "value": 0.1,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "KeyRepeat",
+    "type": "int",
+    "value": 1,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "InitialKeyRepeat",
+    "type": "int",
+    "value": 15,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "ApplePressAndHoldEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticSpellingCorrectionEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticCapitalizationEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticDashSubstitutionEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticPeriodSubstitutionEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticQuoteSubstitutionEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAutomaticTextCompletionEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Keyboard",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.desktopservices",
+    "key": "DSDontWriteNetworkStores",
+    "type": "bool",
+    "value": true,
+    "section": "Prevent .DS_Store on network & USB",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.desktopservices",
+    "key": "DSDontWriteUSBStores",
+    "type": "bool",
+    "value": true,
+    "section": "Prevent .DS_Store on network & USB",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.CrashReporter",
+    "key": "DialogType",
+    "type": "string",
+    "value": "none",
+    "section": "Crash reporter",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSAppSleepDisabled",
+    "type": "bool",
+    "value": true,
+    "section": "App Nap: global disable",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.TimeMachine",
+    "key": "DoNotOfferNewDisksForBackup",
+    "type": "bool",
+    "value": true,
+    "section": "Time Machine",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Safari",
+    "key": "IncludeDevelopMenu",
+    "type": "bool",
+    "value": true,
+    "section": "Safari (dev tools)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Safari",
+    "key": "WebKitDeveloperExtrasEnabledPreferenceKey",
+    "type": "bool",
+    "value": true,
+    "section": "Safari (dev tools)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Safari",
+    "key": "com.apple.Safari.ContentPageGroupIdentifier.WebKit2DeveloperExtrasEnabled",
+    "type": "bool",
+    "value": true,
+    "section": "Safari (dev tools)",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "WebKitDeveloperExtras",
+    "type": "bool",
+    "value": true,
+    "section": "Safari (dev tools)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ActivityMonitor",
+    "key": "ShowCategory",
+    "type": "int",
+    "value": 100,
+    "section": "Activity Monitor",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ActivityMonitor",
+    "key": "SortColumn",
+    "type": "string",
+    "value": "CPUUsage",
+    "section": "Activity Monitor",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ActivityMonitor",
+    "key": "SortDirection",
+    "type": "int",
+    "value": 0,
+    "section": "Activity Monitor",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ActivityMonitor",
+    "key": "UpdatePeriod",
+    "type": "int",
+    "value": 1,
+    "section": "Activity Monitor",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ActivityMonitor",
+    "key": "IconType",
+    "type": "int",
+    "value": 5,
+    "section": "Activity Monitor",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ActivityMonitor",
+    "key": "OpenMainWindow",
+    "type": "bool",
+    "value": true,
+    "section": "Activity Monitor",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.DiskUtility",
+    "key": "SidebarShowAllDevices",
+    "type": "bool",
+    "value": true,
+    "section": "Disk Utility",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.DiskUtility",
+    "key": "DUDebugMenuEnabled",
+    "type": "bool",
+    "value": true,
+    "section": "Disk Utility",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.screencapture",
+    "key": "location",
+    "type": "string",
+    "value": "$HOME/Desktop",
+    "section": "Screenshots",
+    "script": "core",
+    "expand_vars": true
+  },
+  {
+    "domain": "com.apple.screencapture",
+    "key": "type",
+    "type": "string",
+    "value": "png",
+    "section": "Screenshots",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.screencapture",
+    "key": "disable-shadow",
+    "type": "bool",
+    "value": true,
+    "section": "Screenshots",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.screencapture",
+    "key": "show-thumbnail",
+    "type": "bool",
+    "value": false,
+    "section": "Screenshots",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Terminal",
+    "key": "ShowLineMarks",
+    "type": "bool",
+    "value": false,
+    "section": "Terminal.app",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Terminal",
+    "key": "FocusFollowsMouse",
+    "type": "bool",
+    "value": true,
+    "section": "Terminal.app",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.appstore",
+    "key": "ShowDebugMenu",
+    "type": "bool",
+    "value": true,
+    "section": "App Store",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.appstore",
+    "key": "WebKitDeveloperExtras",
+    "type": "bool",
+    "value": true,
+    "section": "App Store",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.TextEdit",
+    "key": "RichText",
+    "type": "int",
+    "value": 0,
+    "section": "TextEdit: plain text by default",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.TextEdit",
+    "key": "PlainTextEncoding",
+    "type": "int",
+    "value": 4,
+    "section": "TextEdit: plain text by default",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.TextEdit",
+    "key": "PlainTextEncodingForWrite",
+    "type": "int",
+    "value": 4,
+    "section": "TextEdit: plain text by default",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "AppleShowAllFiles",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "ShowPathbar",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "ShowStatusBar",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "AppleShowAllExtensions",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "FXEnableExtensionChangeWarning",
+    "type": "bool",
+    "value": false,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "FXDefaultSearchScope",
+    "type": "string",
+    "value": "SCcf",
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "NewWindowTarget",
+    "type": "string",
+    "value": "PfHm",
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "FXRemoveOldTrashItems",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "FXPreferredViewStyle",
+    "type": "string",
+    "value": "clmv",
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "_FXSortFoldersFirst",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "_FXSortFoldersFirstOnDesktop",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "DisableAllAnimations",
+    "type": "bool",
+    "value": true,
+    "section": "Finder: developer-friendly",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Siri",
+    "key": "StatusMenuVisible",
+    "type": "bool",
+    "value": false,
+    "section": "Siri: disable background activity",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.Siri",
+    "key": "UserHasDeclinedEnable",
+    "type": "bool",
+    "value": true,
+    "section": "Siri: disable background activity",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.assistant.support",
+    "key": "Assistant Enabled",
+    "type": "bool",
+    "value": false,
+    "section": "Siri: disable background activity",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.SubmitDiagInfo",
+    "key": "AutoSubmit",
+    "type": "bool",
+    "value": false,
+    "section": "Analytics & diagnostics",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.CrashReporter",
+    "key": "AutoSubmit",
+    "type": "bool",
+    "value": false,
+    "section": "Analytics & diagnostics",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.assistant.support",
+    "key": "Siri Data Sharing Opt-In Status",
+    "type": "int",
+    "value": 2,
+    "section": "Analytics & diagnostics",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.controlcenter",
+    "key": "AirplayReceiver",
+    "type": "int",
+    "value": 0,
+    "section": "AirPlay Receiver: off",
+    "script": "core",
+    "currenthost": true
+  },
+  {
+    "domain": "com.apple.universalaccess",
+    "key": "reduceTransparency",
+    "type": "bool",
+    "value": true,
+    "section": "Transparency: off",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.ncprefs",
+    "key": "content_visibility",
+    "type": "int",
+    "value": 1,
+    "section": "Notifications",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.WindowManager",
+    "key": "EnableTilingByEdgeDrag",
+    "type": "bool",
+    "value": true,
+    "section": "Window management (Sequoia native tiling)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.WindowManager",
+    "key": "EnableTopTilingByEdgeDrag",
+    "type": "bool",
+    "value": true,
+    "section": "Window management (Sequoia native tiling)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.WindowManager",
+    "key": "EnableTilingOptionAccelerator",
+    "type": "bool",
+    "value": true,
+    "section": "Window management (Sequoia native tiling)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.WindowManager",
+    "key": "EnableStandardClickToShowDesktop",
+    "type": "bool",
+    "value": false,
+    "section": "Window management (Sequoia native tiling)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "expose-group-apps",
+    "type": "bool",
+    "value": true,
+    "section": "Mission Control",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.spaces",
+    "key": "spans-displays",
+    "type": "bool",
+    "value": false,
+    "section": "Mission Control",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.screensaver",
+    "key": "askForPassword",
+    "type": "int",
+    "value": 1,
+    "section": "Security",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.screensaver",
+    "key": "askForPasswordDelay",
+    "type": "int",
+    "value": 0,
+    "section": "Security",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.screensaver",
+    "key": "idleTime",
+    "type": "int",
+    "value": 900,
+    "section": "Security",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.menuextra.clock",
+    "key": "ShowSeconds",
+    "type": "bool",
+    "value": true,
+    "section": "Menu bar",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.menuextra.clock",
+    "key": "DateFormat",
+    "type": "string",
+    "value": "EEE MMM d  h:mm:ss a",
+    "section": "Menu bar",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.menuextra.battery",
+    "key": "ShowPercent",
+    "type": "string",
+    "value": "YES",
+    "section": "Menu bar",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSDocumentSaveNewDocumentsToCloud",
+    "type": "bool",
+    "value": false,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSNavPanelExpandedStateForSaveMode",
+    "type": "bool",
+    "value": true,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSNavPanelExpandedStateForSaveMode2",
+    "type": "bool",
+    "value": true,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "PMPrintingExpandedStateForPrint",
+    "type": "bool",
+    "value": true,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "PMPrintingExpandedStateForPrint2",
+    "type": "bool",
+    "value": true,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.print.PrintingPrefs",
+    "key": "Quit When Finished",
+    "type": "bool",
+    "value": true,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSQuitAlwaysKeepsWindows",
+    "type": "bool",
+    "value": false,
+    "section": "Dialogs & app behavior",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.universalaccess",
+    "key": "reduceTransparency",
+    "type": "bool",
+    "value": true,
+    "section": "Accessibility: reduce visual complexity",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.universalaccess",
+    "key": "reduceMotion",
+    "type": "bool",
+    "value": true,
+    "section": "Accessibility: reduce visual complexity",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "AppleFontSmoothing",
+    "type": "int",
+    "value": 0,
+    "section": "Font rendering (Retina optimized)",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "AppleReduceDesktopTinting",
+    "type": "bool",
+    "value": true,
+    "section": "Font rendering (Retina optimized)",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "AppleShowScrollBars",
+    "type": "string",
+    "value": "WhenScrolling",
+    "section": "Font rendering (Retina optimized)",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "AppleAccentColor",
+    "type": "int",
+    "value": 1,
+    "section": "Accent & highlight color",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "AppleHighlightColor",
+    "type": "string",
+    "value": "1.000000 0.874510 0.701961 Orange",
+    "section": "Accent & highlight color",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "NSTableViewDefaultSizeMode",
+    "type": "int",
+    "value": 2,
+    "section": "Sidebar icon size",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "autohide",
+    "type": "bool",
+    "value": true,
+    "section": "Dock appearance",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "tilesize",
+    "type": "int",
+    "value": 44,
+    "section": "Dock appearance",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "magnification",
+    "type": "bool",
+    "value": true,
+    "section": "Dock appearance",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "largesize",
+    "type": "int",
+    "value": 56,
+    "section": "Dock appearance",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "show-process-indicators",
+    "type": "bool",
+    "value": true,
+    "section": "Dock appearance",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "show-recents",
+    "type": "bool",
+    "value": false,
+    "section": "Dock appearance",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "SidebarWidth",
+    "type": "int",
+    "value": 180,
+    "section": "Finder sidebar",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.finder",
+    "key": "CreateDesktop",
+    "type": "bool",
+    "value": true,
+    "section": "Finder sidebar",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.WindowManager",
+    "key": "StandardHideDesktopIcons",
+    "type": "bool",
+    "value": false,
+    "section": "Finder sidebar",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "com.apple.mouse.scaling",
+    "type": "float",
+    "value": 3.0,
+    "section": "Mouse",
+    "script": "visual"
+  },
+  {
+    "domain": "NSGlobalDomain",
+    "key": "com.apple.trackpad.scaling",
+    "type": "float",
+    "value": 3.0,
+    "section": "Trackpad",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.AppleMultitouchTrackpad",
+    "key": "Clicking",
+    "type": "bool",
+    "value": true,
+    "section": "Trackpad",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.driver.AppleBluetoothMultitouch.trackpad",
+    "key": "Clicking",
+    "type": "bool",
+    "value": true,
+    "section": "Trackpad",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.AppleMultitouchTrackpad",
+    "key": "TrackpadThreeFingerDrag",
+    "type": "bool",
+    "value": true,
+    "section": "Trackpad",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.driver.AppleBluetoothMultitouch.trackpad",
+    "key": "TrackpadThreeFingerDrag",
+    "type": "bool",
+    "value": true,
+    "section": "Trackpad",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-tl-corner",
+    "type": "int",
+    "value": 0,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-tl-modifier",
+    "type": "int",
+    "value": 0,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-tr-corner",
+    "type": "int",
+    "value": 2,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-tr-modifier",
+    "type": "int",
+    "value": 0,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-bl-corner",
+    "type": "int",
+    "value": 5,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-bl-modifier",
+    "type": "int",
+    "value": 0,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-br-corner",
+    "type": "int",
+    "value": 4,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.apple.dock",
+    "key": "wvous-br-modifier",
+    "type": "int",
+    "value": 0,
+    "section": "Hot corners",
+    "script": "visual"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "BackgroundModeEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "TabFreezingEnabled",
+    "type": "bool",
+    "value": true,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "AppleEnableSwipeNavigateWithScrolls",
+    "type": "bool",
+    "value": false,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "AppleEnableMouseSwipeNavigateWithScrolls",
+    "type": "bool",
+    "value": false,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "ExternalProtocolDialogShowAlwaysOpenCheckbox",
+    "type": "bool",
+    "value": true,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "DisablePrintPreview",
+    "type": "bool",
+    "value": true,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "DevToolsAvailability",
+    "type": "int",
+    "value": 1,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "DeveloperToolsAvailability",
+    "type": "int",
+    "value": 1,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "ShowFullURLsInAddressBar",
+    "type": "bool",
+    "value": true,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "com.google.Chrome",
+    "key": "HomepageIsNewTabPage",
+    "type": "bool",
+    "value": true,
+    "section": "Chrome: performance + developer",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZAutoUpdate",
+    "type": "bool",
+    "value": false,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZDisableVideo",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "kZPSettingDualScreenOn",
+    "type": "bool",
+    "value": false,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "kZMSettingHDVideo",
+    "type": "bool",
+    "value": false,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "kZMSettingAlwaysMuteMyMicrophone",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMEnableMuteOnEntry",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "BounceApplicationSetting",
+    "type": "int",
+    "value": 0,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMSettingShowMeetingElapsedTime",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMEnableShowConnectedTime",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMSettingCopyMeetingURLWhenStart",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMEnableHideNonVideoParticipants",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "kZMSettingScreenShareOnlyWhenMaximize",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "kCaptureWithoutChatWindow",
+    "type": "bool",
+    "value": true,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMInputTextViewAutomaticSpellingCorrectionEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMInputTextViewContinuousSpellCheckingEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "us.zoom.xos",
+    "key": "ZMInputTextViewGrammarCheckingEnabled",
+    "type": "bool",
+    "value": false,
+    "section": "Zoom: performance + meeting UX",
+    "script": "apps"
+  },
+  {
+    "domain": "org.p0deje.Maccy",
+    "key": "historySize",
+    "type": "int",
+    "value": 200,
+    "section": "Maccy clipboard manager",
+    "script": "apps"
+  },
+  {
+    "domain": "org.p0deje.Maccy",
+    "key": "pasteByDefault",
+    "type": "bool",
+    "value": true,
+    "section": "Maccy clipboard manager",
+    "script": "apps"
+  },
+  {
+    "domain": "com.apple.LaunchServices",
+    "key": "LSQuarantine",
+    "type": "bool",
+    "value": false,
+    "section": "Gatekeeper: disable download quarantine (power-user, full-profile only)",
+    "script": "apps"
+  }
+]

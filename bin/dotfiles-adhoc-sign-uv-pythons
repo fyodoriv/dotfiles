@@ -1,0 +1,91 @@
+#!/bin/bash
+# dotfiles-adhoc-sign-uv-pythons — ad-hoc sign every unsigned uv-managed Mach-O.
+#
+# WHY: uv ships python-build-standalone binaries UNSIGNED ("code object is not
+# signed at all"). macOS treats unsigned binaries as "unsigned" and
+# endpoint agent fires a managed-workstation policy warning dialog on
+# every python3.1x spawn. Ad-hoc signing (`codesign --sign -`) gives the
+# binary `Signature=adhoc`, which endpoint agent accepts as signed.
+#
+# SCOPE (expanded 2026-07-17): sign the interpreter AND its loadable Mach-O
+# companions — `libpython*.dylib`, `lib-dynload/*.so`, and Tcl/Tk dylibs.
+# Signing only `python3.1?` left x86_64 (Rosetta) trees with unsigned
+# `libpython3.13.dylib`; endpoint agent dialogs still showed Description: python3.13
+# when those dylibs loaded.
+#
+# WHEN: runs (a) from .chezmoiscripts/run_after_uv-python-setup.sh after
+# `uv python install` (every `dotfiles apply`), (b) from the topgrade
+# [post_commands] block after `dotfiles upgrade` — whose `uv` step runs
+# `uv python upgrade`, which re-extracts (and thus re-UNSIGNS) pythons on a
+# patch bump, with no other re-sign in the upgrade flow — (c) on demand from
+# com.dotfiles.endpoint-bootstrap / run_after_endpoint-security.sh.
+#
+# IDEMPOTENT: re-signing an already-adhoc-signed binary is a no-op. The
+# check-then-sign loop only invokes codesign for binaries reporting
+# "code object is not signed at all".
+#
+# RELATED:
+#   - AGENTS.md rule #10 § "uv-python is unsigned"
+#   - bin/dotfiles-adhoc-sign-bottles — same pattern for Homebrew bottles
+#   - .chezmoiscripts/run_after_uv-python-setup.sh — sources this script
+#   - modules/security/doctor.sh § "uv-managed python must be ad-hoc signed"
+#   - dot_config/topgrade.toml [post_commands] — runs this after every upgrade
+
+set -uo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+_DOTFILES_FIND="$(dotfiles_resolve_find "$DOTFILES_DIR/bin")"
+
+UV_PYTHON_ROOT="${1:-$HOME/.local/share/uv/python}"
+QUIET="${DOTFILES_ADHOC_SIGN_QUIET:-0}"
+log() { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+
+if [ ! -d "$UV_PYTHON_ROOT" ]; then
+  log "→ No uv python root at $UV_PYTHON_ROOT — nothing to sign"
+  exit 0
+fi
+
+log "→ Scanning $UV_PYTHON_ROOT for unsigned uv Mach-O (python + libpython + .so/.dylib)"
+
+signed=0
+skipped_signed=0
+skipped_nonbin=0
+failed=0
+
+while IFS= read -r path; do
+  [ -f "$path" ] || continue
+  [ -L "$path" ] && continue   # skip symlinks; the target binary carries the signature
+  file_type="$(/usr/bin/file -b "$path" 2>/dev/null || true)"
+  case "$file_type" in
+    Mach-O*) ;;
+    *)
+      skipped_nonbin=$((skipped_nonbin + 1))
+      continue
+      ;;
+  esac
+  sig=$(codesign -dvv "$path" 2>&1 | grep -E "Signature=|not signed" | head -1 || true)
+  case "$sig" in
+    *"not signed"*)
+      if codesign --sign - --force "$path" 2>/dev/null; then
+        signed=$((signed + 1))
+      else
+        failed=$((failed + 1))
+      fi
+      ;;
+    *)
+      skipped_signed=$((skipped_signed + 1))
+      ;;
+  esac
+done < <(
+  "$_DOTFILES_FIND" "$UV_PYTHON_ROOT" -type f \( \
+    -name 'python3.*' -o \
+    -name 'libpython*.dylib' -o \
+    -name '*.dylib' -o \
+    -name '*.so' \
+  \) 2>/dev/null
+)
+
+log "✓ Ad-hoc signed $signed uv python Mach-O(s) (endpoint agent)"
+log "  (skipped: $skipped_signed already-signed, $skipped_nonbin non-Mach-O; failed: $failed)"
+exit 0

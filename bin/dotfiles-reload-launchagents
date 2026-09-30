@@ -1,0 +1,173 @@
+#!/bin/bash
+# Reload dotfiles-managed LaunchAgents after chezmoi apply or ship-it delivery.
+#
+# Bootouts each agent by label, then bootstraps from ~/Library/LaunchAgents/*.plist.
+# Use after plist template changes so launchd picks up new ProgramArguments/PATH.
+#
+# Usage:
+#   dotfiles-reload-launchagents              # bootout + bootstrap (default)
+#   dotfiles-reload-launchagents --kickstart  # lighter: restart job, plist unchanged
+#   dotfiles-reload-launchagents --kill-chrome  # pkill CDP Chromes before bootstrap
+#   dotfiles-reload-launchagents --dry-run    # print actions only
+#
+# Ship-it Step 13 runs this automatically after `dotfiles apply` on every
+# tooling/dotfiles delivery — not optional.
+
+set -o errexit -o nounset -o pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+# shellcheck source=../lib/dotfiles-source-dir.sh
+source "$DOTFILES_DIR/lib/dotfiles-source-dir.sh"
+
+# Only the checkout that chezmoi uses as its source may change launchd state
+# for the deployed Home LaunchAgents. Worktrees can inspect the script but
+# must not reload the machine's jobs.
+if ! dotfiles_is_applied_checkout "$DOTFILES_DIR"; then
+  echo "○ LaunchAgent reload is report-only outside the applied checkout" >&2
+  exit 0
+fi
+
+# Core agents ship-it must reload after every dotfiles/tooling delivery.
+# Order: gui-path first (launchctl PATH), then login/doctor, then CDP Chromes.
+readonly DOTFILES_LAUNCHAGENTS=(
+  com.dotfiles.gui-path
+  com.dotfiles.network-resilience
+  com.dotfiles.heal-stuck-agents
+  com.dotfiles.agent-keepawake
+  com.dotfiles.cursor-at-login
+  com.dotfiles.dotfiles-doctor
+  com.dotfiles.chrome-profile
+  com.dotfiles.agent-browser-chrome
+  com.dotfiles.debug-chrome
+  com.dotfiles.tooling-chrome
+  com.github.facebook.watchman
+)
+
+# CDP Chrome LaunchAgents — bootstrap can fail if launchd has not finished
+# bootout or an orphaned headless Chrome still holds the profile/port.
+cdp_chrome_port() {
+  case "$1" in
+    com.dotfiles.agent-browser-chrome)     printf '%s' 9223 ;;
+    com.dotfiles.debug-chrome)         printf '%s' 9224 ;;
+    com.dotfiles.tooling-chrome)           printf '%s' 9225 ;;
+    *) return 1 ;;
+  esac
+}
+
+kill_cdp_chrome_port() {
+  local port="$1"
+  pkill -f "Google Chrome --remote-debugging-port=${port}" 2>/dev/null || true
+}
+
+MODE=bootstrap
+DRY_RUN=0
+KILL_CHROME=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --kickstart)   MODE=kickstart ;;
+    --kill-chrome) KILL_CHROME=1 ;;
+    --dry-run)     DRY_RUN=1 ;;
+    --help|-h)     sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0 ;;
+    *)
+      printf 'dotfiles-reload-launchagents: unknown argument: %s\n' "$arg" >&2
+      printf '       run --help for usage\n' >&2
+      exit 64
+      ;;
+  esac
+done
+
+UID_NUM="$(id -u)"
+GUI_DOMAIN="gui/${UID_NUM}"
+
+run_cmd() {
+  if [ "$DRY_RUN" = "1" ]; then
+    info "[dry-run] $*"
+  else
+    "$@"
+  fi
+}
+
+if [ "$KILL_CHROME" = "1" ]; then
+  info "Stopping stale CDP Chrome processes (ports 9223–9225)…"
+  if [ "$DRY_RUN" = "1" ]; then
+    info "[dry-run] pkill -f 'Google Chrome --remote-debugging-port=922'"
+  else
+    pkill -f 'Google Chrome --remote-debugging-port=922' 2>/dev/null || true
+  fi
+fi
+
+bootstrap_agent() {
+  local label="$1" plist="$2"
+  local port bootstrap_err
+
+  run_cmd launchctl bootout "${GUI_DOMAIN}/${label}" 2>/dev/null || true
+
+  # launchd may still be tearing down the job; CDP Chrome may outlive bootout.
+  if port="$(cdp_chrome_port "$label" 2>/dev/null)"; then
+    if [ "$DRY_RUN" = "1" ]; then
+      info "[dry-run] sleep 0.5 before bootstrap $label"
+    else
+      sleep 0.5
+    fi
+  fi
+
+  if run_cmd launchctl bootstrap "$GUI_DOMAIN" "$plist"; then
+    return 0
+  fi
+
+  if port="$(cdp_chrome_port "$label" 2>/dev/null)"; then
+    warn "bootstrap failed for $label — killing stale CDP Chrome on port ${port} and retrying…"
+    if [ "$DRY_RUN" = "1" ]; then
+      info "[dry-run] pkill -f 'Google Chrome --remote-debugging-port=${port}'"
+      info "[dry-run] sleep 0.5"
+      info "[dry-run] launchctl bootstrap $GUI_DOMAIN $plist"
+      return 0
+    fi
+    kill_cdp_chrome_port "$port"
+    sleep 0.5
+  elif [ "$DRY_RUN" = "0" ]; then
+    sleep 0.5
+  fi
+
+  if run_cmd launchctl bootstrap "$GUI_DOMAIN" "$plist"; then
+    return 0
+  fi
+
+  bootstrap_err="$(launchctl bootstrap "$GUI_DOMAIN" "$plist" 2>&1)" || true
+  warn "bootstrap failed for $label${bootstrap_err:+ — ${bootstrap_err}}"
+  return 1
+}
+
+reloaded=0
+skipped=0
+
+for label in "${DOTFILES_LAUNCHAGENTS[@]}"; do
+  plist="$HOME/Library/LaunchAgents/${label}.plist"
+  if [ ! -f "$plist" ]; then
+    warn "skip $label — plist not deployed ($plist missing; run dotfiles apply first)"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  case "$MODE" in
+    kickstart)
+      info "kickstart $label"
+      run_cmd launchctl kickstart -k "${GUI_DOMAIN}/${label}" 2>/dev/null \
+        || warn "kickstart failed for $label (agent may not be loaded; try without --kickstart)"
+      ;;
+    bootstrap)
+      info "reload $label"
+      bootstrap_agent "$label" "$plist" || true
+      ;;
+  esac
+  reloaded=$((reloaded + 1))
+done
+
+ok "LaunchAgents: ${reloaded} reloaded, ${skipped} skipped (${MODE})"
+if [ "$skipped" -gt 0 ] && [ "$DRY_RUN" = "0" ]; then
+  info "Deploy missing plists: dotfiles apply"
+fi

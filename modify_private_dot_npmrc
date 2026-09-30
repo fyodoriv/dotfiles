@@ -1,0 +1,39 @@
+#!/bin/sh
+# Renders ~/.npmrc: repo-declared config, machine-local credentials preserved.
+#
+# npm writes registry credentials into ~/.npmrc itself — `npm login` appends a
+# line such as `//registry.npmjs.org/:_authToken=...`. A plain managed file
+# therefore cannot work: `chezmoi apply` would delete the token on every run,
+# and the token cannot live in the repo because this repo is hosted on GitHub.com.
+#
+# A `modify_` script reads the current target on stdin and writes the desired
+# contents to stdout, so the declared config stays authoritative while anything
+# npm added locally survives. `private_` keeps the file at 0600, which the
+# security module checks — the old plain file rendered it 0644 with a token in
+# it.
+#
+# Rotating a token needs no change here: `npm login` rewrites the credential
+# line and the next apply preserves whatever it finds.
+set -eu
+
+cat <<'MANAGED'
+# ── npm configuration ────────────────────────────────────────────────
+# Reduce noise during installs
+loglevel=warn
+# Don't create package-lock.json in global installs
+package-lock=true
+# Exact versions by default (no ^ or ~ surprises)
+save-exact=true
+# Faster installs
+prefer-offline=true
+fund=false
+audit=false
+MANAGED
+
+# Registry-scoped lines (`//host/path/:key=value`) are where npm stores
+# credentials, and `_auth`/`_password` cover the legacy unscoped forms. Both are
+# machine state, never repo state.
+preserved=$(grep -E '^(//|_auth|_password)' || true)
+[ -n "$preserved" ] && printf '\n%s\n' "$preserved"
+
+exit 0

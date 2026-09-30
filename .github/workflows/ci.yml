@@ -1,0 +1,148 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Shellcheck all scripts
+        run: make lint
+      - name: Validate TASKS.md
+        run: make lint-tasks
+      - name: Audit tasks-lint pin freshness
+        run: make lint-tasks-freshness
+        continue-on-error: true
+
+  test:
+    strategy:
+      matrix:
+        os: [macos-13, macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install dependencies
+        run: brew install bats-core parallel chezmoi jq fd
+      - name: Run tests
+        run: make test-all
+
+  doctor:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install chezmoi
+        run: brew install chezmoi jq fd
+      - name: Deploy configs
+        run: chezmoi apply --source "$PWD" --force
+      - name: Run doctor
+        env:
+          DOTFILES_CI: "1"
+        run: ./bin/dotfiles-doctor --report
+      - name: Shell startup benchmark
+        run: |
+          # Measure zsh startup time (interactive + login shell)
+          # Runs 5 iterations and reports the median
+          times=()
+          for i in $(seq 1 5); do
+            ms=$( { TIMEFORMAT='%3R'; time zsh -ic exit; } 2>&1 | tail -1 )
+            # Convert seconds to milliseconds
+            ms_int=$(echo "$ms * 1000" | bc | cut -d. -f1)
+            times+=("$ms_int")
+            echo "  Run $i: ${ms_int}ms"
+          done
+          # Sort and pick median (3rd of 5)
+          IFS=$'\n' sorted=($(printf '%s\n' "${times[@]}" | sort -n)); unset IFS
+          median=${sorted[2]}
+          echo ""
+          echo "Median shell startup: ${median}ms"
+          echo "## Shell Startup Time" >> "$GITHUB_STEP_SUMMARY"
+          echo "Median: **${median}ms** (threshold: 200ms)" >> "$GITHUB_STEP_SUMMARY"
+          # Fail if median exceeds threshold (200ms for CI — runners are slower)
+          threshold=200
+          if [ "$median" -gt "$threshold" ]; then
+            echo "::error::Shell startup ${median}ms exceeds ${threshold}ms threshold"
+            exit 1
+          fi
+          echo "OK (under ${threshold}ms threshold)"
+
+  audit:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Security audit
+        run: ./bin/dotfiles-audit
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq fd-find python3
+          sudo ln -sf "$(command -v fdfind)" /usr/local/bin/fd
+          # Install bats from source (apt version is often outdated)
+          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats
+          sudo /tmp/bats/install.sh /usr/local
+      - name: Run tests with coverage
+        env:
+          DOTFILES_CI: "1"
+        run: |
+          # bin/dotfiles-coverage uses BASH_ENV + set -x to capture line
+          # coverage portably (see lib/coverage-trap.sh and docs/ci-setup.md).
+          # We replaced kcov because kcov 43 produced empty JSON on macOS Tahoe
+          # local runs; the new harness works identically here and locally.
+          ./bin/dotfiles-coverage run tests/
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          if [ -f coverage/bats/coverage.json ]; then
+            pct=$(jq -r '.percent_covered' coverage/bats/coverage.json)
+            floor=$(sed -n '1p' .shell-coverage-floor)
+            echo "percent=$pct" >> "$GITHUB_OUTPUT"
+            echo "## Shell Script Coverage" >> "$GITHUB_STEP_SUMMARY"
+            echo "Line coverage: **${pct}%**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Coverage floor: **${floor}%**" >> "$GITHUB_STEP_SUMMARY"
+            echo ""
+            .github/scripts/check-shell-coverage.sh coverage/bats/coverage.json .shell-coverage-floor
+          else
+            echo "percent=unknown" >> "$GITHUB_OUTPUT"
+            echo "## Shell Script Coverage" >> "$GITHUB_STEP_SUMMARY"
+            echo "Coverage report not generated (dotfiles-coverage may have failed)" >> "$GITHUB_STEP_SUMMARY"
+            echo "Coverage report not found"
+            exit 1
+          fi
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main' && steps.coverage.outputs.percent != 'unknown'
+        env:
+          PERCENT: ${{ steps.coverage.outputs.percent }}
+        run: |
+          # Determine badge color based on coverage threshold
+          pct_int=${PERCENT%.*}
+          if [ "$pct_int" -ge 80 ]; then color="brightgreen"
+          elif [ "$pct_int" -ge 60 ]; then color="yellow"
+          else color="red"; fi
+
+          # Download badge SVG from shields.io
+          curl -fsL "https://img.shields.io/badge/coverage-${PERCENT}%25-${color}" \
+            -o /tmp/coverage.svg
+
+          # Push badge to dedicated orphan branch (force-push is intentional —
+          # this branch holds only the generated badge, no development work)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan badges
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/coverage.svg coverage.svg
+          git add coverage.svg
+          git commit -m "coverage: ${PERCENT}%"
+          git push -f origin badges
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shell-coverage
+          path: coverage/
+          retention-days: 14

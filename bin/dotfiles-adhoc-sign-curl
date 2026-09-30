@@ -1,0 +1,81 @@
+#!/bin/bash
+# dotfiles-adhoc-sign-curl — fast ad-hoc sign Homebrew curl keg (login bootstrap).
+#
+# curl is keg-only. Cursor agent sandbox PATH (/opt/homebrew/bin:/usr/bin:/bin)
+# falls through to /usr/bin/curl when the keg is unsigned or dotfiles/bin is
+# missing. Full Cellar sweep (dotfiles-adhoc-sign-bottles) is too slow for
+# RunAtLoad races — sign the curl keg at login.
+#
+# SCOPE (expanded 2026-07-17): sign the `curl` binary AND `libcurl*.dylib`.
+# libcurl is mode 444 (no +x), so `dotfiles-adhoc-sign-bottles` historically
+# skipped it (`-perm +111`). After `brew upgrade curl`, unsigned libcurl
+# loads as unsigned with Description: curl.
+set -uo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+_DOTFILES_FIND="$(dotfiles_resolve_find "$DOTFILES_DIR/bin")"
+QUIET="${DOTFILES_ADHOC_SIGN_QUIET:-0}"
+log() { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+
+_resolve_brew_curl() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    candidate="${DOTFILES_BREW_PREFIX}/opt/curl/bin/curl"
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  fi
+  for candidate in /opt/homebrew/opt/curl/bin/curl /usr/local/opt/curl/bin/curl; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+_sign_one() {
+  local path="$1"
+  local sig
+  [ -f "$path" ] || return 0
+  [ -L "$path" ] && return 0
+  case "$(/usr/bin/file -b "$path" 2>/dev/null || true)" in
+    Mach-O*) ;;
+    *) return 0 ;;
+  esac
+  sig="$(codesign -dvv "$path" 2>&1 | grep -E 'Signature=|not signed' | head -1 || true)"
+  case "$sig" in
+    *"not signed"*)
+      if codesign --sign - --force "$path" 2>/dev/null; then
+        log "✓ Ad-hoc signed $path"
+      else
+        log "⚠ Failed to ad-hoc sign $path" >&2
+        return 1
+      fi
+      ;;
+    *)
+      log "○ already signed: $path"
+      ;;
+  esac
+  return 0
+}
+
+CURL_BIN="$(_resolve_brew_curl || true)"
+if [ -z "$CURL_BIN" ]; then
+  log "→ Homebrew curl not found — skipping fast curl sign"
+  exit 0
+fi
+
+# Sign the binary first (fast path for Description: curl).
+_sign_one "$CURL_BIN" || exit 1
+
+# Sign libcurl + other Mach-O in the same keg (realpath → Cellar version).
+CURL_REAL="$(/bin/realpath "$CURL_BIN" 2>/dev/null || echo "$CURL_BIN")"
+CURL_KEG="$(cd "$(dirname "$CURL_REAL")/.." && pwd -P 2>/dev/null || true)"
+if [ -n "$CURL_KEG" ] && [ -d "$CURL_KEG" ]; then
+  while IFS= read -r path; do
+    _sign_one "$path" || true
+  done < <(
+    "$_DOTFILES_FIND" "$CURL_KEG" -type f \( \
+      -name 'curl' -o -name 'libcurl*.dylib' -o -name '*.dylib' -o -name '*.so' \
+    \) 2>/dev/null
+  )
+fi
+
+exit 0

@@ -1,0 +1,49 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/grep and bin/ggrep bash scripts with symlinks to adhoc-signed
+# Homebrew ggrep. endpoint agent flags script shims (unsigned, Description: grep
+# or ggrep) even when adhoc-signed and exec'ing a signed Mach-O — the invoked
+# path must be Mach-O. Direct `ggrep` calls must hit dotfiles/bin/ggrep, not
+# bare /opt/homebrew/bin/ggrep when PATH omits dotfiles/bin.
+#
+# Escape hatch for POSIX-only scripts: invoke /usr/bin/grep directly (never via shim).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+_resolve_brew_ggrep() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    for candidate in \
+      "${DOTFILES_BREW_PREFIX}/bin/ggrep" \
+      "${DOTFILES_BREW_PREFIX}/opt/grep/libexec/gnubin/grep"; do
+      [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+    done
+  fi
+  for candidate in \
+    /opt/homebrew/bin/ggrep \
+    /usr/local/bin/ggrep \
+    /opt/homebrew/opt/grep/libexec/gnubin/grep \
+    /usr/local/opt/grep/libexec/gnubin/grep; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+BREW_GREP="$(_resolve_brew_ggrep || true)"
+if [ -z "$BREW_GREP" ]; then
+  echo "grep: Homebrew ggrep not found — install via brew bundle / brew install grep (never use /usr/bin/grep on managed endpoints)" >&2
+  exit 1
+fi
+
+_link_shim() {
+  local shim="$1"
+  if [ -e "$shim" ] && [ ! -L "$shim" ]; then
+    rm -f "$shim"
+  fi
+  ln -sfn "$BREW_GREP" "$shim"
+  chmod +x "$shim" 2>/dev/null || true
+}
+
+_link_shim "$SHIM_DIR/grep"
+_link_shim "$SHIM_DIR/ggrep"

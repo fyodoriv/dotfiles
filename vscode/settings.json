@@ -1,0 +1,143 @@
+{
+  "editor.fontFamily": "'JetBrainsMono Nerd Font', 'JetBrains Mono', Menlo, monospace",
+  "editor.fontSize": 15,
+  "editor.lineHeight": 1.5,
+  "editor.fontLigatures": true,
+  "editor.fontWeight": "400",
+  "workbench.colorTheme": "IntelliJ IDEA New UI Dark",
+  "workbench.preferredDarkColorTheme": "IntelliJ IDEA New UI Dark",
+  "workbench.preferredLightColorTheme": "IntelliJ IDEA New UI Light",
+  "workbench.iconTheme": "vscode-jetbrains-icon-theme-2023-dark",
+  "workbench.productIconTheme": "Default",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.autoSave": "onFocusChange",
+  "files.eol": "\n",
+  "editor.detectIndentation": true,
+  "editor.insertSpaces": true,
+  "editor.tabSize": 2,
+  "editor.renderWhitespace": "selection",
+  "editor.parameterHints.enabled": true,
+  "editor.hover.delay": 300,
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.acceptSuggestionOnEnter": "on",
+  "editor.tabCompletion": "on",
+  "editor.inlineSuggest.enabled": true,
+  "editor.cursorBlinking": "smooth",
+  "editor.cursorSmoothCaretAnimation": "on",
+  "editor.cursorStyle": "line",
+  "editor.smoothScrolling": true,
+  "editor.scrollBeyondLastLine": false,
+  "editor.linkedEditing": true,
+  "editor.bracketPairColorization.enabled": false,
+  "editor.guides.bracketPairs": false,
+  "editor.guides.indentation": true,
+  "editor.stickyScroll.enabled": true,
+  "editor.matchBrackets": "always",
+  "editor.renderLineHighlight": "all",
+  "editor.minimap.enabled": false,
+  "editor.foldingHighlight": true,
+  "editor.codeLens": false,
+  "editor.wordWrap": "off",
+  "editor.rulers": [
+    120
+  ],
+  "editor.mouseWheelZoom": true,
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    }
+  },
+  "[plaintext]": {
+    "editor.wordWrap": "on"
+  },
+  "workbench.startupEditor": "none",
+  "workbench.editor.enablePreview": true,
+  "workbench.editor.tabActionLocation": "right",
+  "workbench.editor.tabSizing": "shrink",
+  "workbench.editor.wrapTabs": false,
+  "workbench.editor.highlightModifiedTabs": true,
+  "workbench.editor.closeOnFileDelete": true,
+  "workbench.tree.indent": 12,
+  "workbench.tree.renderIndentGuides": "always",
+  "workbench.list.smoothScrolling": true,
+  "workbench.layoutControl.enabled": false,
+  "workbench.activityBar.location": "default",
+  "workbench.sideBar.location": "left",
+  "window.density.editorTabHeight": "compact",
+  "window.commandCenter": true,
+  "window.titleBarStyle": "custom",
+  "breadcrumbs.enabled": true,
+  "breadcrumbs.filePath": "on",
+  "breadcrumbs.symbolPath": "on",
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "*.ts": "${capture}.js, ${capture}.js.map, ${capture}.d.ts, ${capture}.d.ts.map",
+    "*.tsx": "${capture}.js, ${capture}.js.map, ${capture}.jsx, ${capture}.d.ts",
+    "*.css": "${capture}.min.css, ${capture}.css.map",
+    "*.js": "${capture}.min.js, ${capture}.js.map, ${capture}.min.js.map",
+    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, .npmrc",
+    "tsconfig.json": "tsconfig.*.json",
+    "Cargo.toml": "Cargo.lock",
+    "pyproject.toml": "poetry.lock, uv.lock, pdm.lock",
+    "go.mod": "go.sum",
+    ".env": ".env.*, .envrc, .env.example"
+  },
+  "explorer.compactFolders": true,
+  "explorer.confirmDelete": true,
+  "explorer.confirmDragAndDrop": true,
+  "search.smartCase": true,
+  "search.showLineNumbers": true,
+  "search.followSymlinks": false,
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/.git": true,
+    "**/*.js.map": true
+  },
+  "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font', Menlo, monospace",
+  "terminal.integrated.fontSize": 14,
+  "terminal.integrated.lineHeight": 1.4,
+  "terminal.integrated.cursorStyle": "line",
+  "terminal.integrated.cursorBlinking": true,
+  "terminal.integrated.smoothScrolling": true,
+  "terminal.integrated.scrollback": 10000,
+  "terminal.integrated.copyOnSelection": true,
+  "git.decorations.enabled": true,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "diffEditor.renderSideBySide": true,
+  "diffEditor.ignoreTrimWhitespace": false,
+  "diffEditor.experimental.showMoves": true,
+  "[java]": {
+    "editor.tabSize": 4
+  },
+  "[kotlin]": {
+    "editor.tabSize": 4
+  },
+  "[python]": {
+    "editor.tabSize": 4
+  },
+  "[rust]": {
+    "editor.tabSize": 4
+  },
+  "[go]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+  "[makefile]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+  "[shellscript]": {
+    "editor.tabSize": 2
+  },
+  "http.proxyStrictSSL": false
+}

@@ -1,0 +1,134 @@
+#!/bin/bash
+# Re-raise Work Chrome after ChromeWork.app hands a URL off and exits.
+#
+# ChromeWork is a short-lived AppleScript applet (open location handler). When
+# routeURL returns, macOS restores the prior frontmost app on the old Space.
+# `--survive-handoff` keeps re-activating until Work Chrome is frontmost.
+#
+# Space switching requires `tell application "Google Chrome" to activate` when
+# Work Chrome has windows. System Events `frontmost` alone does not move across
+# Spaces, and its window count is 0 for Chrome on a background Space.
+#
+# Usage: chromework-activate                 # single attempt after 0.25s delay
+#        chromework-activate --now           # activate immediately (cold start)
+#        chromework-activate --survive-handoff  # retry until Chrome is frontmost
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+MODE="delay"
+case "${1:-}" in
+  --now) MODE="now" ;;
+  --survive-handoff) MODE="survive" ;;
+  "") ;;
+  *) echo "Usage: chromework-activate [--now|--survive-handoff]" >&2; exit 2 ;;
+esac
+
+[ "$MODE" = "delay" ] && sleep "0.25"
+
+CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-$HOME/Library/Application Support/Google/Chrome}"
+SURVIVE_ATTEMPTS="${CHROMEWORK_SURVIVE_ATTEMPTS:-40}"
+SURVIVE_SLEEP="${CHROMEWORK_SURVIVE_SLEEP:-0.05}"
+
+_is_automation_chrome_line() {
+  case "$1" in
+    *remote-debugging*|*playwright*|*agent-browser*|*AutomationControlled*|*--no-startup-window*|*"Chrome for Testing"*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+_find_work_chrome_pid() {
+  local line pid=""
+
+  while IFS= read -r line; do
+    _is_automation_chrome_line "$line" && continue
+    case "$line" in
+      *"--user-data-dir=${CHROME_USER_DATA_DIR}"*)
+        pid="${line%% *}"
+        break
+        ;;
+    esac
+  done < <(pgrep -lf '/MacOS/Google Chrome ' 2>/dev/null || true)
+
+  if [ -z "$pid" ]; then
+    while IFS= read -r line; do
+      _is_automation_chrome_line "$line" && continue
+      case "$line" in
+        */MacOS/Google\ Chrome)
+          pid="${line%% *}"
+          break
+          ;;
+      esac
+    done < <(pgrep -lf '/MacOS/Google Chrome$' 2>/dev/null || true)
+  fi
+
+  [ -n "$pid" ] && printf '%s' "$pid"
+}
+
+_chrome_is_frontmost() {
+  [ "$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || true)" = "Google Chrome" ]
+}
+
+_activate_via_applescript() {
+  osascript <<'APPLESCRIPT' 2>/dev/null
+tell application "Google Chrome"
+  if (count of windows) > 0 then
+    set index of window 1 to 1
+    activate
+    return "yes"
+  end if
+end tell
+return "no"
+APPLESCRIPT
+}
+
+_activate_pid() {
+  local pid="$1"
+  osascript <<EOF
+tell application "System Events"
+  set frontmost of (first process whose unix id is $pid) to true
+end tell
+EOF
+}
+
+_attempt_activate() {
+  local pid result
+
+  result="$(_activate_via_applescript || true)"
+  [ "$result" = "yes" ] && return 0
+
+  pid="$(_find_work_chrome_pid)"
+  [ -n "$pid" ] || return 1
+  _activate_pid "$pid"
+}
+
+_survive_handoff() {
+  local i
+  for ((i = 1; i <= SURVIVE_ATTEMPTS; i++)); do
+    _attempt_activate || true
+    _chrome_is_frontmost && return 0
+    sleep "$SURVIVE_SLEEP"
+  done
+  return 0
+}
+
+case "$MODE" in
+  survive)
+    _survive_handoff
+    ;;
+  now)
+    for _ in 1 2 3 4 5 6 8 10 12 15; do
+      _attempt_activate && exit 0
+      sleep 0.05
+    done
+    exit 0
+    ;;
+  delay)
+    _attempt_activate || exit 0
+    ;;
+esac

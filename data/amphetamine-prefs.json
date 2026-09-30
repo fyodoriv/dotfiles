@@ -1,0 +1,13 @@
+{
+  "Allow Closed-Display Sleep": 0,
+  "Allow Display Sleep": 1,
+  "Default Duration": 0,
+  "Enable Triggers": 0,
+  "End Session On Low Battery": 1,
+  "Ignore Battery on AC": 1,
+  "Low Battery Percent": 20,
+  "Restart DD Session on AC Reconnect": 0,
+  "Start Session At Launch": 0,
+  "Start Session On Wake": 0,
+  "Trigger Data": []
+}

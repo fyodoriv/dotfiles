@@ -1,0 +1,63 @@
+# Cursor extensions — managed by dotfiles
+# Source of truth for `modules/cursor/doctor.sh`. One extension ID per line.
+# Lines starting with `#` and blank lines are ignored.
+#
+# To add/remove: edit this file, run `dotfiles-doctor --fix --module cursor`.
+# The doctor installs missing extensions only; existing local extensions stay.
+#
+# Layered to match the same WebStorm/Ghostty parity goal as windsurf/extensions.txt,
+# while keeping Cursor's first-party AI surface owned by Cursor/agentbrew.
+
+# ── Keymap (replaces WebStorm "Mac OS X 10.5+ copy" keymap) ──────────────────
+k--kato.intellij-idea-keybindings
+
+# ── Vim (mirrors IdeaVim in WebStorm) ─────────────────────────────────────────
+vscodevim.vim
+
+# ── Formatting & linting (replaces WebStorm built-in formatter/linter integ) ──
+biomejs.biome
+esbenp.prettier-vscode
+dbaeumer.vscode-eslint
+charliermarsh.ruff
+editorconfig.editorconfig
+
+# ── Git integration (replaces WebStorm Git Log + Annotate) ────────────────────
+eamodio.gitlens
+github.vscode-pull-request-github
+github.vscode-github-actions
+
+# ── Inline diagnostics & spelling (replaces WebStorm typo + inspections UX) ──
+usernamehw.errorlens
+streetsidesoftware.code-spell-checker
+streetsidesoftware.code-spell-checker-british-english
+
+# ── Theme + icon parity with WebStorm "Islands Dark" + Atom Material Icons ──
+# Cursor cannot install Atom Material Icons here, so Material Icon Theme is the
+# closest available equivalent; settings pin folder colour to WebStorm's value.
+compassak.intellij-idea-new-ui
+pkief.material-icon-theme
+
+# ── Filetype + extra-language support ────────────────────────────────────────
+redhat.vscode-yaml
+tamasfe.even-better-toml
+mikestead.dotenv
+
+# ── Test / runner support (replaces WebStorm test runner gutter actions) ─────
+vitest.explorer
+firsttris.vscode-jest-runner
+
+# ── Markdown + docs (replaces WebStorm's bundled markdown plugin) ────────────
+yzhang.markdown-all-in-one
+bierner.markdown-mermaid
+davidanson.vscode-markdownlint
+
+# ── Productivity (replaces small WebStorm conveniences) ──────────────────────
+christian-kohler.npm-intellisense
+christian-kohler.path-intellisense
+alefragnani.bookmarks
+
+# ── Docker (replaces JetBrains Docker plugin) ────────────────────────────────
+ms-azuretools.vscode-docker
+
+# ── Remote SSH (Cursor-specific; already installed by user — keep) ───────────
+anysphere.remote-ssh

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.dotfiles.local-ai-warmup
+
+  Runs ~/bin/local-ai-warmup at user login (RunAtLoad=true) and again every 30
+  minutes (StartInterval=1800) as a health watchdog. Endpoint policy can block
+  engine publishers, so every invocation only checks local APIs and registries;
+  it never launches an engine or model.
+
+  Why one-shot (KeepAlive=false): the warmup script is short-lived. If it
+  exits with a non-zero status, launchd will NOT respawn it — we want the
+  next 30-min tick to re-try, not an immediate respawn loop.
+
+  Watch the log at ~/.local/share/dotfiles/logs/local-ai-warmup.log to debug.
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.dotfiles.local-ai-warmup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/bash</string>
+      <string>{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin/local-ai-warmup</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    <key>ExitTimeOut</key>
+    <integer>240</integer>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>LANG</key>
+      <string>C.UTF-8</string>
+      <key>HOME</key>
+      <string>{{ .chezmoi.homeDir }}</string>
+      <key>PATH</key>
+      <string>{{ template "launchagent-path" . }}</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/local-ai-warmup.launchagent.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/local-ai-warmup.launchagent.err.log</string>
+  </dict>
+</plist>

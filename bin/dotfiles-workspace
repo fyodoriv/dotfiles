@@ -1,0 +1,115 @@
+#!/bin/bash
+# dotfiles-workspace — host-level view across every declared workspace.
+#
+# Usage:
+#   dotfiles-workspace status                    Summarize all workspaces
+#   dotfiles-workspace status --workspace NAME   Scope to one workspace
+#
+# Discovery order: ~/.config/tasks-md/workspaces.json → workspaces.yaml →
+# sentinel/structure scan of $WORKSPACE_SCAN_ROOTS (default ~/apps); see
+# lib/workspace-discovery.sh and docs/workspace.md. Task counts are an
+# estimate: unchecked `- [ ]` lines minus `**Blocked**`/`**Blocked by**`
+# metadata lines (the same heuristic the cross-repo task picker uses).
+# Reads local state only — never fetches.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DOTFILES_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# shellcheck source=../lib/workspace-discovery.sh
+source "$DOTFILES_DIR/lib/workspace-discovery.sh"
+
+usage() {
+  sed -n '/^# Usage:/,/^[^#]/{/^# \{0,1\}/s/^# \{0,1\}//p;}' "$0"
+}
+
+cmd="${1:-status}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  --help|-h|help) usage; exit 0 ;;
+  status) ;;
+  *) echo "unknown command: $cmd" >&2; usage >&2; exit 64 ;;
+esac
+
+want=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --workspace)
+      want="${2:-}"
+      [ -n "$want" ] || { echo "--workspace needs a name" >&2; exit 64; }
+      shift
+      ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; usage >&2; exit 64 ;;
+  esac
+  shift
+done
+
+ws_lines="$(workspace_discover)"
+if [ -z "$ws_lines" ]; then
+  echo "no workspaces discovered — set WORKSPACE_SCAN_ROOTS, add a .tasks-md-workspace sentinel, or create ~/.config/tasks-md/workspaces.json (see docs/workspace.md)"
+  exit 0
+fi
+
+if [ -n "$want" ]; then
+  filtered="$(printf '%s\n' "$ws_lines" | awk -F'\t' -v w="$want" '$1 == w')"
+  if [ -z "$filtered" ]; then
+    echo "unknown workspace: $want" >&2
+    echo "discovered workspaces:" >&2
+    printf '%s\n' "$ws_lines" | awk -F'\t' '{print "  " $1}' >&2
+    exit 2
+  fi
+  ws_lines="$filtered"
+fi
+
+total_ws=0
+total_repos=0
+total_tasks=0
+
+while IFS=$'\t' read -r name root; do
+  [ -n "$name" ] || continue
+  [ -d "$root" ] || { echo "=== Workspace: $name ($root) === MISSING"; continue; }
+  total_ws=$((total_ws + 1))
+  echo "=== Workspace: $name ($root) ==="
+  ws_repos=0
+  ws_tasks=0
+  ws_unblocked=0
+  for dir in "$root"/*/; do
+    [ -d "$dir" ] || continue
+    dir="${dir%/}"
+    repo_name="$(basename "$dir")"
+    if [ -d "$dir/.git" ] || [ -f "$dir/.git" ]; then
+      ws_repos=$((ws_repos + 1))
+      # One broken checkout must not kill the host-level rollup: bare /
+      # worktree-container repos (e.g. a worktree-orchestrated checkout)
+      # fail `git status` with "must be run in a work tree" — surface
+      # them instead of crashing (observed: ~/apps/tooling/minsky).
+      if dirty_out="$(git -C "$dir" status --short 2>/dev/null)"; then
+        dirty="$(printf '%s\n' "$dirty_out" | grep -c '[^[:space:]]' || true)"
+        ahead="-"
+        if git -C "$dir" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+          ahead="+$(git -C "$dir" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+        fi
+        echo "  ✓ $repo_name  $dirty dirty  $ahead"
+      else
+        echo "  ✗ $repo_name  (git status failed — bare or worktree-container checkout?)"
+      fi
+    fi
+    if [ -f "$dir/TASKS.md" ]; then
+      unchecked="$(grep -c '^- \[ \]' "$dir/TASKS.md" 2>/dev/null || true)"
+      blocked="$(grep -cE '^[[:space:]]+- \*\*Blocked( by)?\*\*:' "$dir/TASKS.md" 2>/dev/null || true)"
+      unchecked="${unchecked:-0}"
+      blocked="${blocked:-0}"
+      unblocked=$((unchecked - blocked))
+      [ "$unblocked" -lt 0 ] && unblocked=0
+      ws_tasks=$((ws_tasks + unchecked))
+      ws_unblocked=$((ws_unblocked + unblocked))
+      echo "  $repo_name: $unchecked tasks ($unblocked unblocked)"
+    fi
+  done
+  echo "  Total: $ws_repos repos, $ws_tasks tasks, $ws_unblocked unblocked"
+  total_repos=$((total_repos + ws_repos))
+  total_tasks=$((total_tasks + ws_tasks))
+done <<< "$ws_lines"
+
+echo "=== All workspaces: $total_ws workspaces, $total_repos repos, $total_tasks tasks ==="

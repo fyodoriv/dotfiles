@@ -1,0 +1,705 @@
+#!/bin/sh
+# shellcheck disable=all
+# This shell/Python polyglot avoids the endpoint-blocked /usr/bin/env shebang.
+'''exec' "$(command -v python3)" "$0" "$@"
+' '''
+"""Discover repositories and select the next learn-repos batch.
+
+The memory MCP remains the progress manifest and the parent agent remains the
+memory writer. This command only makes local discovery and selection
+deterministic; it never writes inside a repository.
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+
+PRUNED_DIRS = frozenset(
+    {
+        ".cache",
+        ".git",
+        ".gradle",
+        ".idea",
+        ".next",
+        ".nx",
+        ".terraform",
+        ".turbo",
+        ".venv",
+        "Pods",
+        "__pycache__",
+        "build",
+        "coverage",
+        "dist",
+        "generated",
+        "gen",
+        "node_modules",
+        "out",
+        "target",
+        "vendor",
+        "venv",
+    }
+)
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_FINGERPRINT_TIMEOUT = 30.0
+DEFAULT_GIT_TIMEOUT = 10.0
+PROCEDURE_THRESHOLD = 3
+DOSSIER_MARKER = re.compile(r"Repository dossier:\s*(?:~\/)?apps\/([^\s`)>]+)")
+REVISION_FIELD = re.compile(r"(?:git_revision|revision)\s*:\s*([0-9a-fA-F]+|unknown)")
+FINGERPRINT_FIELD = re.compile(
+    r"(?:source_fingerprint|source-fingerprint)\s*:\s*([0-9a-fA-F]{16,})"
+)
+
+
+class InventoryError(Exception):
+    """A user-actionable inventory failure."""
+
+
+@dataclass
+class MemoryRecord:
+    path: str
+    kind: str
+    revision: Optional[str]
+    fingerprint_prefix: Optional[str]
+    content_len: int
+    confidence: str
+    quality_score: Optional[float]
+    identity: str
+
+
+@dataclass
+class RepoMemory:
+    dossiers: List[MemoryRecord] = field(default_factory=list)
+    procedures: List[MemoryRecord] = field(default_factory=list)
+
+    @property
+    def has_dossier(self) -> bool:
+        return bool(self.dossiers)
+
+
+def default_root() -> Path:
+    return Path(os.environ.get("LEARN_REPOS_ROOT", str(Path.home() / "apps"))).expanduser()
+
+
+def normalized_path(value: Any, root: Path) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip().strip("`'\"")
+    if not text:
+        return None
+    root_text = str(root)
+    for prefix in ("~/apps/", "$HOME/apps/"):
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
+    else:
+        if text == "~/apps" or text == "$HOME/apps":
+            return "."
+        if text == root_text:
+            return "."
+        if os.path.isabs(text):
+            try:
+                text = os.path.relpath(text, root)
+            except ValueError:
+                return None
+    text = text.replace("\\", "/")
+    while text.startswith("./"):
+        text = text[2:]
+    text = text.rstrip("/").strip()
+    if not text or text == ".":
+        return "."
+    if text == ".." or text.startswith("../"):
+        return None
+    return text
+
+
+def discover(root: Path) -> Tuple[List[str], List[str]]:
+    """Return sorted repo-relative paths and any traversal warnings."""
+
+    root = root.expanduser().resolve()
+    if not root.is_dir():
+        raise InventoryError("repository root is not a directory: {}".format(root))
+
+    paths = set()
+    warnings: List[str] = []
+
+    def onerror(error: OSError) -> None:
+        warnings.append("{}: {}".format(getattr(error, "filename", root), error))
+
+    for current, dirnames, filenames in os.walk(
+        str(root), topdown=True, followlinks=False, onerror=onerror
+    ):
+        # Detect .git before pruning. Worktrees use a .git file, normal
+        # repositories use a .git directory.
+        if ".git" in dirnames or ".git" in filenames:
+            relative = normalized_path(os.path.relpath(current, root), root)
+            if relative is not None:
+                paths.add(relative)
+
+        dirnames[:] = [name for name in dirnames if name not in PRUNED_DIRS]
+
+    return sorted(paths, key=lambda value: (value.casefold(), value)), warnings
+
+
+def run_command(
+    command: Sequence[str], timeout: float
+) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        completed = subprocess.run(
+            list(command),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return None, str(error)
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        return None, detail or "exit status {}".format(completed.returncode)
+    return completed.stdout, None
+
+
+def current_revision(repo: Path, timeout: float) -> Tuple[Optional[str], Optional[str]]:
+    output, error = run_command(
+        ["git", "-C", str(repo), "rev-parse", "--short=12", "HEAD"], timeout
+    )
+    return (output.strip(), None) if output is not None else (None, error)
+
+
+def memory_value(record: Dict[str, Any], names: Iterable[str]) -> Any:
+    containers = [record]
+    metadata = record.get("metadata")
+    if isinstance(metadata, dict):
+        containers.append(metadata)
+    for container in containers:
+        for name in names:
+            if name in container and container[name] is not None:
+                return container[name]
+    return None
+
+
+def text_content(record: Dict[str, Any]) -> str:
+    value = memory_value(record, ("content", "text", "body", "description"))
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, sort_keys=True)
+
+
+def tags_for(record: Dict[str, Any]) -> List[str]:
+    values: List[Any] = []
+    for container in (record, record.get("metadata")):
+        if not isinstance(container, dict):
+            continue
+        raw = container.get("tags")
+        if isinstance(raw, list):
+            values.extend(raw)
+        elif raw is not None:
+            values.append(raw)
+
+    tags: List[str] = []
+    for value in values:
+        if isinstance(value, dict):
+            value = value.get("name") or value.get("tag") or ""
+        if not value:
+            continue
+        if isinstance(value, str):
+            matches = re.findall(
+                r"(?:repo-docs|repo-procedure|repo|revision|source-fingerprint|domain):[^\s,]+"
+                r"|repo-docs|repo-procedure",
+                value,
+            )
+            tags.extend(matches or value.split())
+    return tags
+
+
+def tag_value(tags: Sequence[str], prefix: str) -> Optional[str]:
+    for tag in tags:
+        if tag.startswith(prefix):
+            value = tag[len(prefix) :].strip()
+            if value:
+                return value
+    return None
+
+
+def integer_value(value: Any, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def float_value(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def quality_value(record: Dict[str, Any]) -> Optional[float]:
+    direct = memory_value(
+        record, ("eval_quality", "quality_score", "evaluation_score", "quality")
+    )
+    if isinstance(direct, dict):
+        direct = direct.get("average") or direct.get("score")
+    return float_value(direct)
+
+
+def record_repo_path(record: Dict[str, Any], content: str, tags: Sequence[str], root: Path) -> Optional[str]:
+    tagged = tag_value(tags, "repo:")
+    if tagged:
+        return normalized_path(tagged, root)
+
+    explicit = memory_value(record, ("repo", "repo_path", "repository"))
+    if explicit:
+        return normalized_path(explicit, root)
+
+    marker = DOSSIER_MARKER.search(content)
+    if marker:
+        return normalized_path(marker.group(1), root)
+    return None
+
+
+def record_revision(record: Dict[str, Any], content: str, tags: Sequence[str]) -> Optional[str]:
+    tagged = tag_value(tags, "revision:")
+    if tagged:
+        return tagged
+    explicit = memory_value(record, ("git_revision", "revision"))
+    if explicit:
+        return str(explicit)
+    match = REVISION_FIELD.search(content)
+    return match.group(1) if match else None
+
+
+def record_fingerprint(
+    record: Dict[str, Any], content: str, tags: Sequence[str]
+) -> Optional[str]:
+    tagged = tag_value(tags, "source-fingerprint:")
+    if tagged:
+        return tagged[:16]
+    explicit = memory_value(record, ("source_fingerprint", "source-fingerprint"))
+    if explicit:
+        return str(explicit)[:16]
+    match = FINGERPRINT_FIELD.search(content)
+    return match.group(1)[:16] if match else None
+
+
+def confidence_value(record: Dict[str, Any], content: str) -> str:
+    explicit = memory_value(record, ("confidence",))
+    if explicit:
+        return str(explicit).lower()
+    match = re.search(r"confidence\s*:\s*(high|medium|low)", content, re.IGNORECASE)
+    return match.group(1).lower() if match else "low"
+
+
+def unwrap_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    nested = record.get("memory")
+    if not isinstance(nested, dict):
+        return record
+    merged = dict(nested)
+    merged.update({key: value for key, value in record.items() if key != "memory"})
+    return merged
+
+
+def parse_records(value: Any, root: Path, forced_kind: Optional[str] = None) -> List[MemoryRecord]:
+    if isinstance(value, list):
+        records: List[MemoryRecord] = []
+        for item in value:
+            records.extend(parse_records(item, root, forced_kind))
+        return records
+    if not isinstance(value, dict):
+        return []
+
+    if "dossiers" in value or "procedures" in value:
+        records = []
+        records.extend(parse_records(value.get("dossiers", []), root, "dossier"))
+        records.extend(parse_records(value.get("procedures", []), root, "procedure"))
+        return records
+
+    for key in ("memories", "results", "items"):
+        if key in value and isinstance(value[key], (list, dict)):
+            return parse_records(value[key], root, forced_kind)
+
+    if "data" in value and isinstance(value["data"], (list, dict)):
+        return parse_records(value["data"], root, forced_kind)
+
+    record = unwrap_record(value)
+    content = text_content(record)
+    tags = tags_for(record)
+    if forced_kind:
+        kind = forced_kind
+    elif "repo-docs" in tags:
+        kind = "dossier"
+    elif "repo-procedure" in tags:
+        kind = "procedure"
+    else:
+        return []
+
+    path = record_repo_path(record, content, tags, root)
+    if path is None:
+        return []
+
+    content_len_value = memory_value(record, ("content_len", "content_length"))
+    content_len = (
+        integer_value(content_len_value)
+        if content_len_value is not None
+        else len(content)
+    )
+    identity = str(
+        memory_value(record, ("content_hash", "hash", "id", "conversation_id"))
+        or content
+    )
+    return [
+        MemoryRecord(
+            path=path,
+            kind=kind,
+            revision=record_revision(record, content, tags),
+            fingerprint_prefix=record_fingerprint(record, content, tags),
+            content_len=content_len,
+            confidence=confidence_value(record, content),
+            quality_score=quality_value(record),
+            identity=identity,
+        )
+    ]
+
+
+def index_memories(payload: Any, root: Path) -> Dict[str, RepoMemory]:
+    records = parse_records(payload, root)
+    indexed: Dict[str, RepoMemory] = {}
+    seen = set()
+    for record in records:
+        identity = (record.path, record.kind, record.identity)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        state = indexed.setdefault(record.path, RepoMemory())
+        target = state.dossiers if record.kind == "dossier" else state.procedures
+        target.append(record)
+    return indexed
+
+
+def fingerprint(
+    helper: Path, repo: Path, timeout: float
+) -> Tuple[Optional[str], Optional[str]]:
+    output, error = run_command([str(helper), str(repo)], timeout)
+    if output is None:
+        return None, error
+    values: Dict[str, str] = {}
+    for line in output.splitlines():
+        key, separator, value = line.partition("\t")
+        if separator:
+            values[key] = value
+    full = values.get("source_fingerprint", "")
+    prefix = values.get("source_fingerprint_prefix", "") or full[:16]
+    if not prefix:
+        return None, "fingerprint helper returned no source_fingerprint"
+    return prefix[:16], None
+
+
+def fresh(record: MemoryRecord, revision: Optional[str], prefix: Optional[str]) -> bool:
+    return bool(
+        revision
+        and prefix
+        and record.revision == revision
+        and record.fingerprint_prefix == prefix
+    )
+
+
+def fresh_procedures(
+    state: RepoMemory, revision: Optional[str], prefix: Optional[str]
+) -> List[MemoryRecord]:
+    return [
+        record
+        for record in state.procedures
+        if fresh(record, revision, prefix)
+    ]
+
+
+def quality_key(
+    path: str, state: RepoMemory, revision: Optional[str], prefix: Optional[str]
+) -> Tuple[float, int, int, int, str]:
+    fresh_dossiers = [
+        record for record in state.dossiers if fresh(record, revision, prefix)
+    ]
+    procedures = fresh_procedures(state, revision, prefix)
+    scores = [
+        record.quality_score
+        for record in fresh_dossiers
+        if record.quality_score is not None
+    ]
+    dossier_length = min(
+        (record.content_len for record in fresh_dossiers), default=0
+    )
+    high_confidence = sum(
+        record.confidence == "high" for record in fresh_dossiers + procedures
+    )
+    # Stored eval scores win when present. Otherwise the documented proxy
+    # prioritizes sparse dossiers, fewer procedures, and less high-confidence
+    # material. The integer fields stay integers; no len(int) regression.
+    score = min(scores) if scores else 3.0
+    return (
+        score,
+        dossier_length,
+        len(procedures),
+        high_confidence,
+        path,
+    )
+
+
+def candidate(
+    path: str,
+    absolute: Path,
+    reason: str,
+    revision: Optional[str],
+    prefix: Optional[str],
+    state: RepoMemory,
+) -> Dict[str, Any]:
+    return {
+        "path": path,
+        "absolute_path": str(absolute),
+        "reason": reason,
+        "revision": revision or "unknown",
+        "source_fingerprint_prefix": prefix or None,
+        "fresh_procedure_count": len(fresh_procedures(state, revision, prefix)),
+    }
+
+
+def select_batch(
+    root: Path,
+    payload: Any,
+    batch_size: int,
+    helper: Path,
+    git_timeout: float,
+    fingerprint_timeout: float,
+    max_workers: int,
+) -> Dict[str, Any]:
+    root = root.expanduser().resolve()
+    paths, warnings = discover(root)
+    indexed = index_memories(payload, root)
+
+    revisions: Dict[str, Optional[str]] = {}
+    revision_errors: Dict[str, str] = {}
+
+    def read_revision(path: str) -> Tuple[str, Optional[str], Optional[str]]:
+        revision, error = current_revision(root / path, git_timeout)
+        return path, revision, error
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for path, revision, error in executor.map(read_revision, paths):
+            revisions[path] = revision
+            if error:
+                revision_errors[path] = error
+
+    missing: List[Dict[str, Any]] = []
+    stale_revision: List[Dict[str, Any]] = []
+    fingerprint_candidates: List[str] = []
+
+    for path in paths:
+        state = indexed.get(path, RepoMemory())
+        revision = revisions.get(path)
+        absolute = root / path
+        if not state.has_dossier:
+            missing.append(candidate(path, absolute, "missing_dossier", revision, None, state))
+        elif revision is None or not any(
+            record.revision == revision for record in state.dossiers
+        ):
+            stale_revision.append(
+                candidate(path, absolute, "stale_revision", revision, None, state)
+            )
+        else:
+            fingerprint_candidates.append(path)
+
+    selected: List[Dict[str, Any]] = []
+    counts = {
+        "missing_dossier": 0,
+        "stale_revision": 0,
+        "stale_fingerprint": 0,
+        "procedure_gap": 0,
+        "lowest_quality": 0,
+    }
+
+    def take(items: Sequence[Dict[str, Any]], reason: str) -> None:
+        remaining = batch_size - len(selected)
+        for item in items[:remaining]:
+            selected.append(item)
+            counts[reason] += 1
+
+    take(missing, "missing_dossier")
+    take(stale_revision, "stale_revision")
+
+    fingerprints: Dict[str, Optional[str]] = {}
+    fingerprint_errors: Dict[str, str] = {}
+    if len(selected) < batch_size and fingerprint_candidates:
+        helper = helper.expanduser().resolve()
+
+        def compute(path: str) -> Tuple[str, Optional[str], Optional[str]]:
+            prefix, error = fingerprint(helper, root / path, fingerprint_timeout)
+            return path, prefix, error
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for path, prefix, error in executor.map(compute, fingerprint_candidates):
+                fingerprints[path] = prefix
+                if error:
+                    fingerprint_errors[path] = error
+
+    stale_fingerprint: List[Dict[str, Any]] = []
+    procedure_gap: List[Dict[str, Any]] = []
+    quality: List[Tuple[Tuple[float, int, int, int, str], Dict[str, Any]]] = []
+
+    for path in fingerprint_candidates:
+        state = indexed[path]
+        revision = revisions[path]
+        prefix = fingerprints.get(path)
+        if prefix is None:
+            continue
+        if not any(fresh(record, revision, prefix) for record in state.dossiers):
+            stale_fingerprint.append(
+                candidate(path, root / path, "stale_fingerprint", revision, prefix, state)
+            )
+            continue
+        procedure_count = len(fresh_procedures(state, revision, prefix))
+        if procedure_count < PROCEDURE_THRESHOLD:
+            procedure_gap.append(
+                candidate(path, root / path, "procedure_gap", revision, prefix, state)
+            )
+        else:
+            quality.append(
+                (
+                    quality_key(path, state, revision, prefix),
+                    candidate(path, root / path, "lowest_quality", revision, prefix, state),
+                )
+            )
+
+    take(stale_fingerprint, "stale_fingerprint")
+    take(procedure_gap, "procedure_gap")
+    quality.sort(key=lambda item: item[0])
+    take([item[1] for item in quality], "lowest_quality")
+
+    blocked = [
+        {"path": path, "reason": "fingerprint_unavailable", "error": error}
+        for path, error in sorted(fingerprint_errors.items())
+    ]
+    blocked.extend(
+        {"path": path, "reason": "revision_unavailable", "error": error}
+        for path, error in sorted(revision_errors.items())
+        if path in indexed and indexed[path].has_dossier
+    )
+
+    dossier_paths = sorted(
+        (path for path, state in indexed.items() if state.has_dossier),
+        key=lambda value: (value.casefold(), value),
+    )
+    return {
+        "root": str(root),
+        "filesystem_repo_count": len(paths),
+        "indexed_dossier_count": len(dossier_paths),
+        "indexed_dossier_paths": dossier_paths,
+        "selection_counts": counts,
+        "next_batch": selected,
+        "blocked": blocked,
+        "warnings": warnings,
+    }
+
+
+def load_payload(path: str) -> Any:
+    if path == "-":
+        raw = sys.stdin.read()
+    else:
+        try:
+            raw = Path(path).read_text(encoding="utf-8")
+        except OSError as error:
+            raise InventoryError("cannot read memory index {}: {}".format(path, error))
+    if not raw.strip():
+        return []
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise InventoryError("memory index is not valid JSON: {}".format(error))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Discover repositories and select a deterministic learn-repos batch."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    discover_parser = subparsers.add_parser("discover", help="list Git repositories below a root")
+    discover_parser.add_argument("--root", type=Path, default=default_root())
+    discover_parser.add_argument("--format", choices=("lines", "json"), default="lines")
+
+    select_parser = subparsers.add_parser(
+        "select-batch", help="select the next batch from a memory-list JSON manifest"
+    )
+    select_parser.add_argument("--root", type=Path, default=default_root())
+    select_parser.add_argument("--memory-index", default="-")
+    select_parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
+    select_parser.add_argument(
+        "--fingerprint-helper",
+        type=Path,
+        default=Path(__file__).with_name("learn-repos-source-fingerprint"),
+    )
+    select_parser.add_argument(
+        "--git-timeout", type=float, default=DEFAULT_GIT_TIMEOUT
+    )
+    select_parser.add_argument(
+        "--fingerprint-timeout", type=float, default=DEFAULT_FINGERPRINT_TIMEOUT
+    )
+    select_parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=max(1, int(os.environ.get("LEARN_REPOS_MAX_WORKERS", "8"))),
+    )
+    return parser
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "discover":
+            paths, warnings = discover(args.root)
+            if args.format == "json":
+                print(json.dumps({"paths": paths, "warnings": warnings}, sort_keys=True))
+            else:
+                for path in paths:
+                    print(path)
+                for warning in warnings:
+                    print("warning: {}".format(warning), file=sys.stderr)
+            return 0
+
+        if args.batch_size < 1:
+            raise InventoryError("--batch-size must be at least 1")
+        if args.max_workers < 1:
+            raise InventoryError("--max-workers must be at least 1")
+        payload = load_payload(args.memory_index)
+        result = select_batch(
+            args.root,
+            payload,
+            args.batch_size,
+            args.fingerprint_helper,
+            args.git_timeout,
+            args.fingerprint_timeout,
+            args.max_workers,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    except InventoryError as error:
+        print("error: {}".format(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

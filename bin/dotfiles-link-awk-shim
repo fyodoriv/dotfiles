@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/awk with a symlink to adhoc-signed Homebrew gawk.
+# endpoint agent flags script shims (unsigned) — the invoked path must be Mach-O.
+#
+# Escape hatch for POSIX-only scripts: invoke /usr/bin/awk directly (never via shim).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SHIM="$SHIM_DIR/awk"
+
+_resolve_brew_gawk() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    for candidate in \
+      "${DOTFILES_BREW_PREFIX}/bin/gawk" \
+      "${DOTFILES_BREW_PREFIX}/opt/gawk/libexec/gnubin/awk"; do
+      [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+    done
+  fi
+  for candidate in \
+    /opt/homebrew/bin/gawk \
+    /usr/local/bin/gawk \
+    /opt/homebrew/opt/gawk/libexec/gnubin/awk \
+    /usr/local/opt/gawk/libexec/gnubin/awk; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+BREW_AWK="$(_resolve_brew_gawk || true)"
+if [ -z "$BREW_AWK" ]; then
+  echo "awk: Homebrew gawk not found — install via brew install gawk (never use /usr/bin/awk on managed endpoints)" >&2
+  exit 1
+fi
+
+if [ -e "$SHIM" ] && [ ! -L "$SHIM" ]; then
+  rm -f "$SHIM"
+fi
+
+ln -sfn "$BREW_AWK" "$SHIM"
+chmod +x "$SHIM" 2>/dev/null || true

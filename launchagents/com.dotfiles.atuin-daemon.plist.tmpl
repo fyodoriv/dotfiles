@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dotfiles.atuin-daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>rm -f {{ .chezmoi.homeDir }}/.local/share/atuin/atuin.sock &amp;&amp; exec {{ if eq .chezmoi.arch "arm64" }}/opt/homebrew/bin/atuin{{ else }}/usr/local/bin/atuin{{ end }} daemon</string>
+    </array>
+    <!-- Keep the daemon alive; launchd will restart it if it crashes -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/atuin-daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/atuin-daemon.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LANG</key>
+        <string>C.UTF-8</string>
+        <key>PATH</key>
+        <string>{{ template "launchagent-path" . }}</string>
+        <key>HOME</key>
+        <string>{{ .chezmoi.homeDir }}</string>
+        <key>XDG_CONFIG_HOME</key>
+        <string>{{ .chezmoi.homeDir }}/.config</string>
+        <key>XDG_DATA_HOME</key>
+        <string>{{ .chezmoi.homeDir }}/.local/share</string>
+    </dict>
+</dict>
+</plist>

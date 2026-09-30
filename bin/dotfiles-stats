@@ -1,0 +1,161 @@
+#!/bin/bash
+# Dotfiles time-saved statistics — shows how much time automation has saved you.
+# Usage: dotfiles-stats            Full stats dashboard
+#        dotfiles-stats --oneliner  Single line for embedding in other scripts
+#        dotfiles-stats --recalc   Recalculate historical data with current estimates
+
+# `declare -A` below requires Bash 4+; macOS /bin/bash is 3.2. Re-exec with
+# Homebrew bash without `#!/usr/bin/env bash` — endpoint agent blocks /usr/bin/env
+# when high-churn dotfiles scripts run on a corporate endpoint-security fleet.
+if (( BASH_VERSINFO[0] < 4 )); then
+  for _bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+    if [ -x "$_bash" ]; then
+      exec "$_bash" "$0" "$@"
+    fi
+  done
+  echo "dotfiles-stats requires Bash 4+ (brew install bash)" >&2
+  exit 1
+fi
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/stats.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
+
+STATS_FILE="$DOTFILES_STATS_FILE"
+
+if [ "${1:-}" = "--oneliner" ]; then
+  if [ ! -f "$STATS_FILE" ] || [ ! -s "$STATS_FILE" ]; then
+    echo "No automation runs recorded yet"
+    exit 0
+  fi
+  get_time_saved_summary
+  exit 0
+fi
+
+if [ "${1:-}" = "--recalc" ]; then
+  if [ ! -f "$STATS_FILE" ] || [ ! -s "$STATS_FILE" ]; then
+    echo "No stats file to recalculate."
+    exit 0
+  fi
+  tmp_file="${STATS_FILE}.tmp"
+  jq -c '
+    .seconds_saved = (
+      if .task == "sync" then (3 * (.units // 1))
+      elif .task == "doctor" then 2
+      elif .task == "cleanup" then (10 * (.units // 1))
+      elif .task == "git-maintain" then (5 * (.units // 1))
+      elif .task == "cursor-priority" then 0
+      elif .task == "morning" then (15 * (.units // 1))
+      else 0
+      end
+    ) |
+    if .task == "doctor" then .units = 1 else . end
+  ' "$STATS_FILE" > "$tmp_file"
+  mv "$tmp_file" "$STATS_FILE"
+  echo "Recalculated $(wc -l < "$STATS_FILE" | tr -d ' ') records with current estimates."
+  exit 0
+fi
+
+# ── Full stats dashboard ──────────────────────────────────────────
+
+if [ ! -f "$STATS_FILE" ] || [ ! -s "$STATS_FILE" ]; then
+  echo -e "${BLUE}📊 Dotfiles Automation Stats${NC}"
+  echo ""
+  echo -e "  ${DIM}No runs recorded yet. Stats will appear after automated tasks run.${NC}"
+  echo ""
+  echo -e "  Tracked tasks: sync, doctor, cleanup, git-maintain, cursor-priority, morning"
+  exit 0
+fi
+
+today=$(date -u +%Y-%m-%d)
+
+# Build list of last 7 days for jq recent-days filter
+seven_days=""
+for i in $(seq 0 6); do
+  day=$(date -u -j -f "%Y-%m-%d" -v-${i}d "$today" +%Y-%m-%d 2>/dev/null || date -u -d "$today - $i days" +%Y-%m-%d 2>/dev/null || echo "")
+  [ -n "$day" ] && seven_days="$seven_days $day"
+done
+
+# Single jq pass: compute all stats at once, read values safely (no eval)
+declare -A task_counts=()
+declare -A task_seconds=()
+
+{
+  IFS= read -r total_runs
+  IFS= read -r total_seconds
+  IFS= read -r first_date
+  IFS= read -r seven_days_runs
+  IFS= read -r seven_days_seconds
+  IFS= read -r unique_days
+} < <(jq -rs --arg recent "$seven_days" '
+  ($recent | split(" ") | map(select(. != "")) | INDEX(.) ) as $recent_set |
+  {
+    total_runs: length,
+    total_seconds: ([.[].seconds_saved // 0] | add),
+    first_date: (first.timestamp // "" | split("T")[0]),
+    seven_days_runs: [.[] | select((.timestamp // "" | split("T")[0]) | in($recent_set))] | length,
+    seven_days_seconds: ([.[] | select((.timestamp // "" | split("T")[0]) | in($recent_set)) | .seconds_saved // 0] | add // 0),
+    unique_days: ([.[].timestamp // "" | split("T")[0]] | unique | join(" "))
+  } |
+  .total_runs, .total_seconds, .first_date, .seven_days_runs, .seven_days_seconds, .unique_days
+' "$STATS_FILE")
+
+# Per-task stats: read tab-separated name/count/seconds safely
+while IFS=$'\t' read -r name count seconds; do
+  [ -z "$name" ] && continue
+  task_counts[$name]=$count
+  task_seconds[$name]=$seconds
+done < <(jq -rs '
+  group_by(.task) | .[] |
+  [first.task, (length | tostring), ([.[].seconds_saved // 0] | add | tostring)] |
+  join("\t")
+' "$STATS_FILE")
+
+# Streak: consecutive days back from today (computed in bash to avoid gawk dependency)
+streak=0
+check_date="$today"
+while [[ " $unique_days " == *" $check_date "* ]]; do
+  streak=$((streak + 1))
+  check_date=$(date -u -j -f "%Y-%m-%d" -v-1d "$check_date" +%Y-%m-%d 2>/dev/null || date -u -d "$check_date - 1 day" +%Y-%m-%d 2>/dev/null || echo "")
+  [ -z "$check_date" ] && break
+done
+
+# Format time
+format_time() {
+  local secs=$1
+  local hours=$((secs / 3600))
+  local minutes=$(( (secs % 3600) / 60 ))
+  if [ "$hours" -gt 0 ]; then
+    echo "${hours}h ${minutes}m"
+  else
+    echo "${minutes}m"
+  fi
+}
+
+total_time=$(format_time $total_seconds)
+seven_days_time=$(format_time $seven_days_seconds)
+
+echo -e "${BLUE}📊 Dotfiles Automation Stats${NC}"
+echo ""
+echo -e "  ${GREEN}Total time saved:  ~${total_time}${NC}"
+echo -e "  Total runs:       $total_runs"
+echo -e "  Active since:     $first_date"
+echo -e "  Current streak:   ${streak} day(s)"
+echo ""
+
+echo -e "  ${BLUE}Last 7 days:${NC}  $seven_days_runs runs, ~${seven_days_time} saved"
+echo ""
+
+echo -e "  ${BLUE}By task:${NC}"
+# Sort tasks by run count (descending)
+for task in $(for t in "${!task_counts[@]}"; do echo "$t ${task_counts[$t]}"; done | sort -k2 -rn | awk '{print $1}'); do
+  count=${task_counts[$task]}
+  secs=${task_seconds[$task]}
+  time_str=$(format_time "$secs")
+  printf "    %-20s %4d runs   ~%s saved\n" "$task" "$count" "$time_str"
+done
+
+echo ""
+echo -e "  ${DIM}Stats file: $STATS_FILE${NC}"

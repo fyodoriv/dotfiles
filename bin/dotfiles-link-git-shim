@@ -1,0 +1,34 @@
+#!/bin/bash
+set -euo pipefail
+
+# Ensure bin/git is the dotfiles push-guard wrapper (bash script), adhoc-signed for endpoint agent.
+# Apple /usr/bin/git (system-signed) and bare Homebrew git are blocked on high-churn
+# audit-hook spawns when sandbox PATH omits dotfiles/bin. We cannot symlink git to Mach-O
+# without losing the push --no-verify guard — prepend dotfiles/bin via hooks instead.
+#
+# This helper: (1) verifies the wrapper exists, (2) adhoc-signs it when unsigned.
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+GIT_WRAPPER="$SHIM_DIR/git"
+
+if [ ! -f "$GIT_WRAPPER" ]; then
+  echo "git: dotfiles/bin/git wrapper missing — restore from dotfiles source" >&2
+  exit 1
+fi
+
+if [ -L "$GIT_WRAPPER" ]; then
+  echo "git: bin/git must remain the bash push-guard wrapper, not a symlink — restore bin/git" >&2
+  exit 1
+fi
+
+chmod +x "$GIT_WRAPPER" 2>/dev/null || true
+
+if command -v codesign >/dev/null 2>&1; then
+  _sig="$( { codesign -dvv "$GIT_WRAPPER" 2>&1 || true; } | awk '/Signature=|not signed/ { print; exit }')"
+  case "$_sig" in
+    *"not signed"*)
+      codesign --sign - --force "$GIT_WRAPPER" 2>/dev/null || true
+      ;;
+  esac
+  unset _sig
+fi

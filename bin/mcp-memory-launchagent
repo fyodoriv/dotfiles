@@ -1,0 +1,10 @@
+#!/bin/bash
+# Retired compatibility entrypoint.
+#
+# AgentBrew owns the canonical com.agentbrew.mcp-memory LaunchAgent. This file
+# intentionally refuses to start a second daemon, even when an old plist or a
+# manual invocation still points at it.
+set -euo pipefail
+
+echo "error: the dotfiles memory daemon entrypoint is retired; run 'agentbrew memory fix' instead" >&2
+exit 1

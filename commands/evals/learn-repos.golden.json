@@ -1,0 +1,180 @@
+{
+  "schema": "learn-repos-golden-v1",
+  "description": "Generic golden questions for grounded repo-memory evals. Top-level defaults inherit to every question; /learn-repos populates revision, fingerprint, and tag values at runtime.",
+  "required_runtime_fields": [
+    "writer",
+    "written_at_utc",
+    "source_paths",
+    "git_revision",
+    "confidence",
+    "source_fingerprint"
+  ],
+  "freshness_required_tags": {
+    "templates": [
+      "repo:{repo_relative_path}",
+      "revision:{git_revision}",
+      "source-fingerprint:{source_fingerprint_prefix}"
+    ],
+    "populated_at": "runtime from indexed repo HEAD and computed source-document fingerprint"
+  },
+  "authoritative_search": {
+    "query_requirement": "non-empty semantic string derived from the question",
+    "modes_allowed": ["semantic", "ranked", "hybrid"],
+    "modes_forbidden": ["exact"],
+    "include_superseded": false,
+    "tag_match": "all"
+  },
+  "required_source_citation": {
+    "fields": ["source_paths", "git_revision"],
+    "min_source_paths": 1
+  },
+  "forbidden_recall": [
+    "exact",
+    "tag-only",
+    "include_superseded:true",
+    "tag_match:any",
+    "tag_match:omitted"
+  ],
+  "questions": [
+    {
+      "id": "arch-01",
+      "category": "architecture",
+      "repo_relative_path": "tooling/example-service",
+      "question": "What is the primary runtime and entrypoint for the example service?",
+      "pass_criteria": "Names runtime and entrypoint with source_paths citation from freshness-passing memory"
+    },
+    {
+      "id": "arch-02",
+      "category": "architecture",
+      "repo_relative_path": "tooling/example-service",
+      "question": "How do requests flow through the example service's main components?",
+      "pass_criteria": "Describes data/control flow with at least one architecture doc path cited"
+    },
+    {
+      "id": "arch-03",
+      "category": "architecture",
+      "repo_relative_path": "enterprise/widget-plugin",
+      "question": "What external systems does the widget plugin integrate with?",
+      "pass_criteria": "Lists integrations grounded in ARCHITECTURE or README sources"
+    },
+    {
+      "id": "arch-04",
+      "category": "architecture",
+      "repo_relative_path": "enterprise/widget-plugin",
+      "question": "Where is configuration loaded and what environment dimensions exist?",
+      "pass_criteria": "Explains config sources without inventing env vars absent from docs"
+    },
+    {
+      "id": "arch-05",
+      "category": "architecture",
+      "repo_relative_path": "platform/shared-library",
+      "question": "What are the published package boundaries and what must consumers not import?",
+      "pass_criteria": "States boundaries from AGENTS or CONTRIBUTING with citation"
+    },
+    {
+      "id": "arch-06",
+      "category": "architecture",
+      "repo_relative_path": "platform/shared-library",
+      "question": "How does state management or persistence work in the shared library?",
+      "pass_criteria": "Architecture answer from indexed dossier; rejects stale revision candidates"
+    },
+    {
+      "id": "arch-07",
+      "category": "architecture",
+      "repo_relative_path": "ops/deployment-repo",
+      "question": "Which environments does the deployment repo target and how are they separated?",
+      "pass_criteria": "Environment model cited from runbooks or ARCHITECTURE"
+    },
+    {
+      "id": "ops-01",
+      "category": "operations",
+      "repo_relative_path": "tooling/example-service",
+      "question": "What command installs dependencies and which Node or runtime version is required?",
+      "pass_criteria": "Procedure memory preferred; cites README or AGENTS install section"
+    },
+    {
+      "id": "ops-02",
+      "category": "operations",
+      "repo_relative_path": "tooling/example-service",
+      "question": "How do you run the unit test suite locally before committing?",
+      "pass_criteria": "Ordered steps from repo-procedure with verification step"
+    },
+    {
+      "id": "ops-03",
+      "category": "operations",
+      "repo_relative_path": "enterprise/widget-plugin",
+      "question": "What is the release or publish workflow for the widget plugin?",
+      "pass_criteria": "Release procedure with prerequisites and failure modes when documented"
+    },
+    {
+      "id": "ops-04",
+      "category": "operations",
+      "repo_relative_path": "enterprise/widget-plugin",
+      "question": "How do you serve or run the plugin locally for development?",
+      "pass_criteria": "Dev-server steps from procedure; freshness tags match current HEAD fingerprint"
+    },
+    {
+      "id": "ops-05",
+      "category": "operations",
+      "repo_relative_path": "platform/shared-library",
+      "question": "What lint and typecheck commands must pass before a PR?",
+      "pass_criteria": "CI/local gate commands cited from CONTRIBUTING or AGENTS"
+    },
+    {
+      "id": "ops-06",
+      "category": "operations",
+      "repo_relative_path": "ops/deployment-repo",
+      "question": "How is a change promoted from preview to production?",
+      "pass_criteria": "Promotion procedure with verification checkpoints"
+    },
+    {
+      "id": "ops-07",
+      "category": "operations",
+      "repo_relative_path": "ops/deployment-repo",
+      "question": "What secrets or credential tooling does deployment use and where must secrets never be stored?",
+      "pass_criteria": "Operational guidance without storing secret values in memory"
+    },
+    {
+      "id": "ts-01",
+      "category": "troubleshooting",
+      "repo_relative_path": "tooling/example-service",
+      "question": "What should you check when the local dev server fails to start?",
+      "pass_criteria": "Failure-mode procedure; dead-end triggers doc re-read if no fresh memory"
+    },
+    {
+      "id": "ts-02",
+      "category": "troubleshooting",
+      "repo_relative_path": "tooling/example-service",
+      "question": "How do you diagnose failing CI checks for this repository?",
+      "pass_criteria": "Troubleshooting steps with source citation; no stale-revision fallback"
+    },
+    {
+      "id": "ts-03",
+      "category": "troubleshooting",
+      "repo_relative_path": "enterprise/widget-plugin",
+      "question": "What are known pre-existing test or type failures called out in repo docs?",
+      "pass_criteria": "Quotes documented known issues; rejects invented failures"
+    },
+    {
+      "id": "ts-04",
+      "category": "troubleshooting",
+      "repo_relative_path": "enterprise/widget-plugin",
+      "question": "What doctor or health command validates the local toolchain for this plugin?",
+      "pass_criteria": "Verification command from runbook; mandatory source_paths in answer"
+    },
+    {
+      "id": "ts-05",
+      "category": "troubleshooting",
+      "repo_relative_path": "platform/shared-library",
+      "question": "What should you do when package version or lockfile conflicts block install?",
+      "pass_criteria": "Recovery procedure; quality score cannot accept stale fingerprint"
+    },
+    {
+      "id": "ts-06",
+      "category": "troubleshooting",
+      "repo_relative_path": "ops/deployment-repo",
+      "question": "How do you roll back a bad deployment according to repo runbooks?",
+      "pass_criteria": "Rollback steps with cross-repo isolation — answer scoped to ops/deployment-repo only"
+    }
+  ]
+}

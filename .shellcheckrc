@@ -1,0 +1,4 @@
+# ShellCheck configuration — used by editors and direct shellcheck invocations.
+# make lint uses explicit -S warning flag for reliable severity filtering.
+shell=bash
+external-sources=true

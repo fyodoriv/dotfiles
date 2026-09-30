@@ -1,0 +1,301 @@
+#!/opt/homebrew/bin/bash
+# Pre-commit hook — fails the commit if any staged file leaks private
+# identifiers or hardcoded secrets, or if the committer email is private.
+#
+# This hook is the FIRST line of defence. The pre-push hook is the SECOND
+# line. Nothing rewrites history after a push to GitHub.com, so a leak
+# must stop at one of these two hooks.
+#
+# After the leak gate, this hook ALSO delegates to a repo-local
+# `hooks/pre-commit` if one exists (typically a husky / lefthook /
+# project-specific hook). This is the canonical shape recovered after
+# PR #59 silently replaced this file with a pure lefthook stub via a
+# transitive `pnpm install` from a sister repo; the leak-blocking gate
+# was lost for a week, and private author emails leaked in that time.
+# Restoring this hook closes the hook layer of defence. The dotfiles-doctor
+# `git.pre_commit_hook_works` self-test catches the same regression class
+# going forward.
+#
+# Escape hatch: `git commit --no-verify` skips this hook. Use it only
+# for emergency fixups; the pre-push hook still blocks a private
+# committer email from reaching GitHub.com.
+#
+# Performance budget: <500ms on a typical 5-file commit. We only scan
+# staged files, never the whole tree.
+
+set -o errexit -o nounset -o pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$(cd "$HOOK_DIR/.." && pwd)"
+
+# Allow self-test mode (`pre-commit --self-test`) to validate the hook
+# without scanning anything. dotfiles-doctor `git.pre_commit_hook_works`
+# fires this path to confirm the hook is a real script, not a broken
+# lefthook stub.
+if [ "${1:-}" = "--self-test" ]; then
+  [ -f "$DOTFILES_DIR/lib/oss-readiness.sh" ] || { echo "missing lib/oss-readiness.sh"; exit 1; }
+  # shellcheck source=../lib/oss-readiness.sh
+  source "$DOTFILES_DIR/lib/oss-readiness.sh"
+  echo "pre-commit self-test OK"
+  exit 0
+fi
+
+# ── Repo-scope checks ───────────────────────────────────────────────
+# This hook is wired globally via `core.hooksPath = ~/apps/tooling/dotfiles/git-hooks`,
+# so it fires for EVERY git repo on the machine — not just dotfiles.
+# Different gates fire in different repos:
+#
+#   leak gates (private-ref + secret + author-email scans):
+#     fire when the repo has `lib/oss-readiness.sh` (today: dotfiles)
+#
+#   dotfiles-only gates (protected-dir deletion blocker + TASKS.md lint):
+#     fire when the repo has `bin/dotfiles-doctor`
+#     (unambiguous dotfiles-specific marker)
+#
+# Repos that match neither (third-party clones, scratch projects) fall
+# through silently to the delegation step.
+CURRENT_REPO="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
+has_leak_gate=0
+is_dotfiles_repo=0
+if [ -n "$CURRENT_REPO" ]; then
+  [ -f "$CURRENT_REPO/lib/oss-readiness.sh" ] && has_leak_gate=1
+  [ -f "$CURRENT_REPO/bin/dotfiles-doctor" ] && is_dotfiles_repo=1
+fi
+
+if [ "$has_leak_gate" -eq 0 ] && [ "$is_dotfiles_repo" -eq 0 ]; then
+  # Different repo entirely — delegate to repo-local hooks/pre-commit
+  # before exiting so husky / lefthook / custom hooks still fire.
+  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
+    exec "$CURRENT_REPO/hooks/pre-commit" "$@"
+  fi
+  exit 0
+fi
+
+# Source oss-readiness only when it's actually needed (leak-gate repos
+# carry the file; dotfiles-only-marker repos don't necessarily).
+if [ "$has_leak_gate" -eq 1 ] && [ -f "$DOTFILES_DIR/lib/oss-readiness.sh" ]; then
+  # shellcheck source=../lib/oss-readiness.sh
+  source "$DOTFILES_DIR/lib/oss-readiness.sh"
+  oss_readiness_load_private_env "$(basename "$CURRENT_REPO")" >/dev/null 2>&1 || true
+fi
+if [ "$has_leak_gate" -eq 1 ] && ! declare -F oss_readiness_email_is_safe >/dev/null; then
+  printf 'pre-commit: leak gates skipped — %s/lib/oss-readiness.sh not found\n' "$DOTFILES_DIR" >&2
+  has_leak_gate=0
+fi
+
+# Colour helpers — degrade to plain text when stdout isn't a tty.
+if [ -t 2 ]; then
+  RED=$'\033[31m'
+  YEL=$'\033[33m'
+  DIM=$'\033[2m'
+  RST=$'\033[0m'
+else
+  RED='' YEL='' DIM='' RST=''
+fi
+
+# ── Resolve list of staged files (Added, Copied, Modified, Renamed) ────
+# Deletions are NOT in this list — section 4 below uses its own diff-filter=D.
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR -z 2>/dev/null | tr '\0' '\n')
+
+# Total staged-change count (including deletions). If truly empty (no ACMR,
+# no deletions, no renames-only) we have nothing to do here.
+total_staged_count=$(git diff --cached --name-only -z 2>/dev/null | tr -cd '\0' | wc -c | tr -d ' ')
+if [ "$total_staged_count" -eq 0 ]; then
+  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
+    exec "$CURRENT_REPO/hooks/pre-commit" "$@"
+  fi
+  exit 0
+fi
+
+# ── 0. Mass deletions and forbidden file types ─────────────────────────
+# Worktree index corruption can stage hundreds of unrelated deletions, and
+# key or certificate files must never reach history in these repos.
+MAX_DELETES=50
+deleted_count=$(git diff --cached --diff-filter=D --name-only 2>/dev/null | wc -l | tr -d ' ')
+if [ "$deleted_count" -gt "$MAX_DELETES" ]; then
+  printf '%s✗ %d file deletions staged (limit: %d).%s\n' "$RED" "$deleted_count" "$MAX_DELETES" "$RST" >&2
+  printf '%sThis usually means git add picked up changes from another worktree.%s\n' "$YEL" "$RST" >&2
+  printf '  Fix: git reset HEAD && git add <specific-files>\n' >&2
+  printf '  Bypass: git commit --no-verify\n\n' >&2
+  exit 1
+fi
+
+FORBIDDEN_PATTERNS='(\.pem|\.key|\.p12|\.pfx|\.keystore|\.jks|id_rsa|id_ed25519|id_dsa|\.env\.local|\.env\.production)$'
+forbidden_files=()
+for f in "${STAGED[@]}"; do
+  [[ "$f" =~ $FORBIDDEN_PATTERNS ]] && forbidden_files+=("$f")
+done
+if [ "${#forbidden_files[@]}" -gt 0 ]; then
+  printf '%s✗ Sensitive file types staged:%s\n' "$RED" "$RST" >&2
+  for f in "${forbidden_files[@]}"; do
+    printf '%s  %s%s\n' "$DIM" "$f" "$RST" >&2
+  done
+  printf '%sAdd them to .gitignore or unstage them: git restore --staged <file>%s\n\n' "$YEL" "$RST" >&2
+  exit 1
+fi
+
+violations=0
+
+# Sections 1-3 (leak gates) only run when the repo carries
+# lib/oss-readiness.sh. Dotfiles-only-marker repos that don't carry
+# oss-readiness.sh skip straight to section 4 (protected-dir).
+if [ "$has_leak_gate" -eq 1 ]; then
+
+# ── 1. Configured private-identifier scan ──────────────────────────────
+# The hook only knows the regex. The PERMANENT_ALLOWLIST + TEMPORARY_ALLOWLIST
+# live in the bats test (`tests/no-internal-refs.bats` or the equivalent
+# vitest in agentbrew). Parsing those allowlists from bash is brittle,
+# so the hook emits a NOTICE (not a hard fail) and defers the
+# authoritative gate to `bats tests/no-internal-refs.bats` (run by
+# `make check` and CI). This stops the hook
+# from misfiring on PRs that intentionally add files to the allowlist
+# in the same commit.
+private_hits=()
+if [ -n "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
+  for f in "${STAGED[@]}"; do
+    [ -f "$f" ] || continue
+    if grep -lIiE -- "$OSS_READINESS_INTERNAL_PATTERN" "$f" >/dev/null 2>&1; then
+      private_hits+=("$f")
+    fi
+  done
+fi
+
+if [ "${#private_hits[@]}" -gt 0 ]; then
+  printf '%sNote: %d staged file(s) mention private identifiers:%s\n' "$YEL" "${#private_hits[@]}" "$RST" >&2
+  for f in "${private_hits[@]}"; do
+    printf '%s  %s%s\n' "$DIM" "$f" "$RST" >&2
+  done
+  printf '\n%sThe bats / vitest allowlist will decide if they pass. Run:%s\n' "$DIM" "$RST" >&2
+  if [ -f "$CURRENT_REPO/tests/no-internal-refs.bats" ]; then
+    printf '  bats tests/no-internal-refs.bats\n' >&2
+  else
+    printf '  npx vitest run src/oss/no-internal-refs.test.ts\n' >&2
+  fi
+  printf '\n' >&2
+fi
+
+# ── 2. Hardcoded secret scan ───────────────────────────────────────────
+secret_report="$(oss_readiness_scan_secrets "${STAGED[@]}" 2>/dev/null || true)"
+if [ -n "$secret_report" ]; then
+  printf '%s✗ Hardcoded secret pattern detected in staged files:%s\n' "$RED" "$RST" >&2
+  printf '%s\n' "$secret_report" | sed 's/^/  /' >&2
+  printf '\n%sIf the match is a false positive:%s\n' "$YEL" "$RST" >&2
+  printf '  - Add `# dotfiles-secret-allowlist: <reason>` to the matching line.\n' >&2
+  printf '  - Or move the fixture under tests/*fixture* / *.example.\n' >&2
+  printf '\n' >&2
+  violations=1
+fi
+
+# ── 3. Author email leak ───────────────────────────────────────────────
+# The committer email used for the IN-FLIGHT commit. Block when it's
+# a private (overlay-pattern) email and the user hasn't explicitly opted in.
+commit_email="$(git config user.email 2>/dev/null || echo "")"
+if ! oss_readiness_email_is_safe "$commit_email"; then
+  if [ "${ALLOW_PRIVATE_EMAIL:-0}" != "1" ]; then
+    printf '%s✗ Committer email is %s — it would reach git log on GitHub.com.%s\n' "$RED" "$commit_email" "$RST" >&2
+    printf '\n' >&2
+    printf '%sFix:%s set a public-safe email for this repo:\n' "$YEL" "$RST" >&2
+    printf '      git -C %s config user.email <your-public@email>\n' "$DOTFILES_DIR" >&2
+    printf '  ALLOW_PRIVATE_EMAIL=1 allows a local-only commit; the pre-push hook\n' >&2
+    printf '  still blocks pushing it.\n' >&2
+    printf '\n' >&2
+    violations=1
+  fi
+fi
+
+if [ "$violations" -ne 0 ]; then
+  printf '%scommit blocked by dotfiles pre-commit hook%s\n' "$RED" "$RST" >&2
+  printf '%s(override with `git commit --no-verify` — but the pre-push gate will still fire)%s\n' "$DIM" "$RST" >&2
+  exit 1
+fi
+
+fi  # end has_leak_gate
+
+# ── 4. Protected-directory deletion check (dotfiles repo only) ─────────
+# Reject commits that delete tracked files from `bin/`, `tests/`, `lib/`,
+# `modules/`, or `skills/` in the dotfiles repo. Multi-agent worktree
+# corruption, stray `git add -A` after a manual `rm`, and accidental
+# `git rm` all produce the same staged-deletion shape — so we detect via
+# `git diff --cached --diff-filter=D` rather than only catching `git rm`.
+# Marker for "this is the dotfiles repo" is `bin/dotfiles-doctor`: every
+# other repo (agentbrew, …) does NOT carry that file.
+if [ "$is_dotfiles_repo" -eq 1 ]; then
+  mapfile -t DELETED < <(git diff --cached --name-only --diff-filter=D -z 2>/dev/null | tr '\0' '\n')
+  PROTECTED_DIRS="^(bin/|tests/|lib/|modules/|skills/)"
+  protected_deletions=()
+  # The old memory library was retired when AgentBrew became the lifecycle
+  # owner. Keep the structural deletion guard intact for every other path,
+  # but allow this one reviewed retirement only while the executable
+  # AgentBrew compatibility shim is still present in the staged tree.
+  is_verified_retired_memory_library_delete() {
+    local shim_mode
+    [ "$1" = "lib/dotfiles-memory.sh" ] || return 1
+    git cat-file -e ":bin/dotfiles-memory" 2>/dev/null || return 1
+    shim_mode="$(git ls-files --stage -- bin/dotfiles-memory | cut -d ' ' -f1)"
+    [ "$shim_mode" = "100755" ] || return 1
+    git show ":bin/dotfiles-memory" 2>/dev/null |
+      grep -Fq 'exec "$agentbrew_bin" memory'
+  }
+  for f in "${DELETED[@]}"; do
+    if [[ "$f" =~ $PROTECTED_DIRS ]] && ! is_verified_retired_memory_library_delete "$f"; then
+      protected_deletions+=("$f")
+    fi
+  done
+
+  if [ "${#protected_deletions[@]}" -gt 0 ]; then
+    printf '%s✗ %d protected file(s) staged for deletion:%s\n' "$RED" "${#protected_deletions[@]}" "$RST" >&2
+    for f in "${protected_deletions[@]}"; do
+      printf '%s  %s%s\n' "$DIM" "$f" "$RST" >&2
+    done
+    printf '\n%sThese paths are part of dotfiles' "$YEL" >&2
+    printf 's structural surface — bin/, tests/, lib/, modules/, skills/.\n' >&2
+    printf 'Deletions here typically indicate a multi-agent worktree mishap or an\n' >&2
+    printf 'accidental `git add -A` after a stray `rm`. Confirm the deletion is intended.\n%s' "$RST" >&2
+    printf '\n%sIf intentional: %sgit commit --no-verify%s%s\n' "$YEL" "$RST" "$YEL" "$RST" >&2
+    printf '\n' >&2
+    exit 1
+  fi
+
+  # ── 5. TASKS.md format check (dotfiles repo only) ────────────────────
+  # When TASKS.md is staged, validate it against the @tasks-md/lint spec
+  # so malformed entries can't land. Same npx pinning as `make lint-tasks`.
+  if printf '%s\n' "${STAGED[@]}" | grep -qx 'TASKS.md' 2>/dev/null; then
+    node_path="$(command -v node 2>/dev/null || true)"
+    node_signature=""
+    if [ -n "$node_path" ] && command -v codesign >/dev/null 2>&1; then
+      node_signature="$(codesign -dvv "$node_path" 2>&1 || true)"
+    fi
+    if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$node_signature" \
+        && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
+      printf '%s⚠ TASKS.md npx lint deferred to CI: Node.js Foundation publisher is blocked.%s\n' "$YEL" "$RST" >&2
+      node_path=""
+    else
+    tasks_lint_version=""
+    if [ -f "$CURRENT_REPO/.tasks-lint-version" ]; then
+      tasks_lint_version="@$(tr -d '[:space:]' < "$CURRENT_REPO/.tasks-lint-version")"
+    fi
+    set +o errexit
+    lint_output="$(npx -y "@tasks-md/lint${tasks_lint_version}" "$CURRENT_REPO/TASKS.md" 2>&1)"
+    lint_status=$?
+    set -o errexit
+    if [ "$lint_status" -ne 0 ]; then
+      printf '%s✗ TASKS.md lint failed:%s\n' "$RED" "$RST" >&2
+      printf '%s\n' "$lint_output" | sed 's/^/  /' >&2
+      printf '\n%sFix the format and re-stage, or %sgit commit --no-verify%s for emergencies.%s\n' "$YEL" "$DIM" "$YEL" "$RST" >&2
+      exit 1
+    fi
+    fi
+    unset node_path node_signature
+  fi
+fi
+
+# ── 6. Delegate to repo-local hook ─────────────────────────────────────
+# After our leak gates pass, hand off to the repo's own pre-commit hook
+# if it has one. This is the seam where husky, lefthook (when properly
+# installed in the repo), and custom project hooks plug in. `exec`
+# replaces this process so the downstream hook's exit code becomes ours.
+if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
+  exec "$CURRENT_REPO/hooks/pre-commit" "$@"
+fi
+
+exit 0

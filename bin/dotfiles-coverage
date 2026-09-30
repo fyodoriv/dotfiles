@@ -1,0 +1,141 @@
+#!/bin/bash
+# bin/dotfiles-coverage — shell line-coverage harness that works on macOS
+# and Linux without depending on kcov's DYLD_INSERT_LIBRARIES (blocked by
+# SIP on macOS Tahoe 26.x). See `lib/coverage-trap.sh` and
+# `docs/ci-setup.md` for the rationale.
+#
+# Usage:
+#   dotfiles-coverage run [bats-args...]
+#       Run bats under coverage instrumentation. Defaults to `tests/` if no
+#       args given. Writes trace.<pid>.log files into coverage/trace/ and
+#       a kcov-compatible coverage/bats/coverage.json on success.
+#
+#   dotfiles-coverage report
+#       Re-aggregate coverage/trace/*.log into coverage/bats/coverage.json
+#       without re-running tests. Useful after a manual instrumented run.
+
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COVERAGE_DIR="${COVERAGE_DIR:-$DOTFILES_DIR/coverage}"
+TRACE_DIR="$COVERAGE_DIR/trace"
+REPORT_DIR="$COVERAGE_DIR/bats"
+REPORT_JSON="$REPORT_DIR/coverage.json"
+
+# Files matching any of these prefixes (relative to the repo root) are the
+# only ones that show up in the coverage report. Bats internals and
+# test_helper files are intentionally skipped — instrumenting them would
+# inflate coverage with code that never runs in production.
+#
+# Keep this list in sync with `$(SCRIPTS)` in the Makefile so coverage and
+# lint share the same maintained-shell surface. Currently included:
+#   bin/, lib/, modules/         — primary helpers and module checks
+#   macos*.sh, snapshot.sh       — root-level dotfiles entrypoints
+#   .chezmoiscripts/             — chezmoi lifecycle scripts
+#   .github/scripts/             — CI helpers (brew-audit, coverage check)
+#   git-hooks/                   — extension-less commit hooks
+#
+# A prefix can be a directory (recurse) or a single file path. Single-file
+# entries cover the four root-level shell scripts that don't fit a directory
+# prefix without picking up unrelated `.sh.tmpl` files at the repo root.
+INCLUDE_PREFIXES=(
+  "bin/" "lib/" "modules/"
+  "macos.sh" "macos-visual.sh" "macos-apps.sh" "snapshot.sh"
+  ".chezmoiscripts/" ".github/scripts/" "git-hooks/"
+)
+
+usage() {
+  sed -n '2,/^$/p' "$0" | sed -n 's/^# \{0,1\}//p'
+  exit "${1:-0}"
+}
+
+cmd_run() {
+  rm -rf "$COVERAGE_DIR"
+  mkdir -p "$TRACE_DIR" "$REPORT_DIR"
+
+  echo "═══ Running tests under coverage instrumentation ═══"
+  echo "Trace dir:  $TRACE_DIR"
+  echo ""
+
+  # Export tracing env so eligible bash subshells source
+  # lib/coverage-trap.sh on startup. Bats spawns child bash processes for
+  # each `run bash CMD` call; this is the only way to instrument them without
+  # ptrace.
+  #
+  # `--jobs 1` is mandatory: coverage instrumentation captures per-PID trace
+  # files, and the default test runner uses `--no-parallelize-within-files`
+  # which causes bats to skip the per-test bash fork (it inlines the runner
+  # for speed). With `--jobs 1` we trade a few seconds of wall time for
+  # clean, attributable traces.
+  local bats_status=0
+  COVERAGE_TRACE_DIR="$TRACE_DIR" \
+    BASH_ENV="$DOTFILES_DIR/lib/coverage-trap.sh" \
+    bats --jobs 1 "$@" || bats_status=$?
+
+  cmd_report
+
+  if [ "$bats_status" -ne 0 ]; then
+    echo "" >&2
+    echo "Tests failed (bats exit $bats_status) — coverage report still written." >&2
+    return "$bats_status"
+  fi
+}
+
+cmd_report() {
+  if [ ! -d "$TRACE_DIR" ]; then
+    echo "No trace directory at $TRACE_DIR — run \`dotfiles-coverage run\` first." >&2
+    return 1
+  fi
+
+  mkdir -p "$REPORT_DIR"
+
+  echo ""
+  echo "═══ Aggregating coverage ═══"
+
+  python3 "$DOTFILES_DIR/lib/coverage-report.py" \
+    --trace-dir "$TRACE_DIR" \
+    --repo-root "$DOTFILES_DIR" \
+    --include "${INCLUDE_PREFIXES[@]}" \
+    --output "$REPORT_JSON"
+
+  if [ ! -s "$REPORT_JSON" ]; then
+    echo "Coverage report not generated at $REPORT_JSON" >&2
+    return 1
+  fi
+
+  python3 -c "
+import json, sys
+with open('$REPORT_JSON') as fh:
+    data = json.load(fh)
+covered = data.get('covered_lines', 0)
+total = data.get('total_lines', 0)
+pct = data.get('percent_covered', '0')
+print(f'Coverage: {pct}% ({covered}/{total} executable lines)')
+print(f'Files measured: {len(data.get(\"files\", []))}')
+"
+}
+
+main() {
+  local subcmd="${1:-}"
+  case "$subcmd" in
+    run)
+      shift
+      if [ "$#" -eq 0 ]; then
+        set -- tests/
+      fi
+      cmd_run "$@"
+      ;;
+    report)
+      cmd_report
+      ;;
+    -h|--help|help|"")
+      usage 0
+      ;;
+    *)
+      echo "Unknown subcommand: $subcmd" >&2
+      usage 1
+      ;;
+  esac
+}
+
+main "$@"

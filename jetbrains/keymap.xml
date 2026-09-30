@@ -1,0 +1,71 @@
+<keymap version="1" name="Mac OS X 10.5+ copy" parent="Mac OS X 10.5+">
+  <action id="ActivateTerminalToolWindow">
+    <keyboard-shortcut first-keystroke="alt f12" />
+    <keyboard-shortcut first-keystroke="ctrl meta 4" />
+  </action>
+  <action id="Annotate">
+    <keyboard-shortcut first-keystroke="ctrl alt a" />
+  </action>
+  <action id="DatabaseView.PropertiesAction" />
+  <action id="EditorCloneCaretAbove">
+    <keyboard-shortcut first-keystroke="shift meta alt up" />
+  </action>
+  <action id="EditorCloneCaretBelow">
+    <keyboard-shortcut first-keystroke="shift meta alt down" />
+  </action>
+  <action id="EmmetNextEditPoint" />
+  <action id="FindUsages">
+    <keyboard-shortcut first-keystroke="alt f7" />
+    <keyboard-shortcut first-keystroke="shift meta l" />
+  </action>
+  <action id="GotoTest">
+    <keyboard-shortcut first-keystroke="shift ctrl t" />
+  </action>
+  <action id="GotoTypeDeclaration">
+    <keyboard-shortcut first-keystroke="shift meta b" />
+    <keyboard-shortcut first-keystroke="shift ctrl b" />
+    <mouse-shortcut keystroke="shift meta button1" />
+  </action>
+  <action id="HideAllWindows">
+    <keyboard-shortcut first-keystroke="shift meta f12" />
+  </action>
+  <action id="InsertLiveTemplate" />
+  <action id="Javascript.Linters.EsLint.Fix">
+    <keyboard-shortcut first-keystroke="alt s" />
+  </action>
+  <action id="Jdbc.OpenConsole.Scratch" />
+  <action id="MoveTabDown">
+    <keyboard-shortcut first-keystroke="shift ctrl alt j" />
+  </action>
+  <action id="MoveTabRight">
+    <keyboard-shortcut first-keystroke="shift ctrl alt l" />
+  </action>
+  <action id="QuickTypeDefinition">
+    <keyboard-shortcut first-keystroke="shift ctrl alt q" />
+  </action>
+  <action id="RecentFiles">
+    <keyboard-shortcut first-keystroke="meta e" />
+  </action>
+  <action id="RunClass">
+    <keyboard-shortcut first-keystroke="shift ctrl r" />
+  </action>
+  <action id="SplitHorizontally">
+    <keyboard-shortcut first-keystroke="shift ctrl meta h" />
+  </action>
+  <action id="SplitVertically">
+    <keyboard-shortcut first-keystroke="shift ctrl meta s" />
+  </action>
+  <action id="Unsplit">
+    <keyboard-shortcut first-keystroke="shift ctrl meta u" />
+  </action>
+  <action id="Vcs.Push.Force">
+    <keyboard-shortcut first-keystroke="shift ctrl meta k" />
+  </action>
+  <action id="WD.UploadCurrentRemoteFileAction" />
+  <action id="com.codeium.intellij.command.CommandAction">
+    <keyboard-shortcut first-keystroke="shift meta i" />
+    <keyboard-shortcut first-keystroke="meta back_slash" />
+  </action>
+  <action id="copilot.disposeInlays" />
+  <action id="org.intellij.plugins.markdown.ui.actions.styling.ToggleItalicAction" />
+</keymap>

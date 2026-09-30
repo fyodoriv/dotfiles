@@ -1,0 +1,44 @@
+# VS Code extensions — managed by dotfiles
+# Source of truth for `modules/vscode/doctor.sh`. One extension ID per line.
+# Lines starting with `#` and blank lines are ignored.
+#
+# Mirrors windsurf/extensions.txt for the WebStorm-parity layer; drops the
+# Cascade/Codeium-only entries (VS Code doesn't have them) and keeps the
+# MCP-relevant first-party tooling.
+
+# ── Keymap (replaces WebStorm "Mac OS X 10.5+ copy" keymap) ──────────────────
+k--kato.intellij-idea-keybindings
+
+# ── Theme parity with WebStorm "New UI Dark" ─────────────────────────────────
+compassak.intellij-idea-new-ui
+chadalen.vscode-jetbrains-icon-theme
+
+# ── Vim (mirrors IdeaVim in WebStorm) ────────────────────────────────────────
+vscodevim.vim
+
+# ── Formatting & linting (replaces WebStorm built-in Prettier + ESLint) ─────
+esbenp.prettier-vscode
+dbaeumer.vscode-eslint
+editorconfig.editorconfig
+
+# ── Git integration (replaces WebStorm Local History + Git Log + Annotate) ──
+eamodio.gitlens
+github.vscode-pull-request-github
+
+# ── Inline diagnostics (replaces WebStorm inspections inline UX) ─────────────
+usernamehw.errorlens
+
+# ── Filetype + extra-language support ────────────────────────────────────────
+redhat.vscode-yaml
+tamasfe.even-better-toml
+mikestead.dotenv
+
+# ── Test / runner support ────────────────────────────────────────────────────
+vitest.explorer
+
+# ── Markdown + docs ──────────────────────────────────────────────────────────
+yzhang.markdown-all-in-one
+davidanson.vscode-markdownlint
+
+# ── Docker (replaces JetBrains Docker plugin) ────────────────────────────────
+ms-azuretools.vscode-docker

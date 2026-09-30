@@ -1,0 +1,173 @@
+#!/bin/bash
+# cached-run — skip commands when the git working tree hasn't changed.
+#
+# Caches results by hashing: repo path + command + HEAD + diff + untracked files.
+# On cache hit, prints the cached status and exits 0.
+# On cache miss, runs the command and caches the result on success.
+#
+# Usage:
+#   cached-run make check
+#   cached-run npm test
+#   cached-run --clear          # clear cache for current repo
+#   cached-run --status         # show what's cached
+#   cached-run --clear-all      # clear entire cache
+
+set -euo pipefail
+
+CACHE_DIR="${CACHED_RUN_DIR:-$HOME/.cache/cached-run}"
+MAX_AGE_DAYS=30
+
+usage() {
+  echo "Usage: cached-run [options] <command...>"
+  echo ""
+  echo "Run a command only if the git working tree changed since last success."
+  echo ""
+  echo "Options:"
+  echo "  --clear       Clear cached results for the current repo"
+  echo "  --clear-all   Clear the entire cache"
+  echo "  --status      Show what's cached for the current repo"
+  echo "  --help, -h    Show this help"
+  echo ""
+  echo "Examples:"
+  echo "  cached-run make check"
+  echo "  cached-run npm test"
+  echo "  cached-run shellcheck bin/*"
+  echo ""
+  echo "Environment:"
+  echo "  CACHED_RUN_DIR   Cache directory (default: ~/.cache/cached-run)"
+}
+
+# Get the git repo root, or fail
+repo_root() {
+  git rev-parse --show-toplevel 2>/dev/null
+}
+
+# Compute a fingerprint of the current working tree state.
+# Includes: HEAD SHA, all tracked file changes (staged + unstaged),
+# and untracked file names (respects .gitignore).
+repo_hash() {
+  local root="$1"
+  (
+    cd "$root"
+    # HEAD commit (or "initial" for repos with no commits)
+    git rev-parse HEAD 2>/dev/null || echo "initial"
+    # All changes to tracked files (staged + unstaged vs HEAD)
+    git diff HEAD 2>/dev/null || true
+    # Untracked file names (a new file should invalidate)
+    git ls-files --others --exclude-standard 2>/dev/null | LC_ALL=C sort
+  ) | md5
+}
+
+# Compute cache key from repo + command + tree state
+cache_key() {
+  local root="$1"
+  shift
+  local cmd="$*"
+  local state_hash
+  state_hash=$(repo_hash "$root")
+  printf '%s\n%s\n%s\n' "$root" "$cmd" "$state_hash" | md5
+}
+
+# Stable repo-specific cache directory name
+# Uses basename + short hash of full path to avoid collisions
+repo_cache_dir() {
+  local root="$1"
+  local path_hash
+  path_hash=$(printf '%s' "$root" | md5 | head -c 8)
+  echo "$CACHE_DIR/$(basename "$root")-$path_hash"
+}
+
+# Clean cache entries older than MAX_AGE_DAYS
+clean_stale_cache() {
+  [ -d "$CACHE_DIR" ] || return 0
+  fd -t f -e result --changed-before "${MAX_AGE_DAYS}d" . "$CACHE_DIR" -x rm {} 2>/dev/null || true
+  # Remove empty repo directories
+  fd -t d --max-depth 1 . "$CACHE_DIR" -x rmdir {} 2>/dev/null || true
+}
+
+cmd_clear() {
+  local root
+  root=$(repo_root) || { echo "Error: not in a git repository" >&2; exit 1; }
+  local dir
+  dir=$(repo_cache_dir "$root")
+  if [ -d "$dir" ]; then
+    rm -rf "$dir"
+    echo "✓ Cache cleared for $(basename "$root")"
+  else
+    echo "No cache for $(basename "$root")"
+  fi
+}
+
+cmd_clear_all() {
+  if [ -d "$CACHE_DIR" ]; then
+    rm -rf "$CACHE_DIR"
+    echo "✓ Entire cache cleared"
+  else
+    echo "No cache directory"
+  fi
+}
+
+cmd_status() {
+  local root
+  root=$(repo_root) || { echo "Error: not in a git repository" >&2; exit 1; }
+  local dir
+  dir=$(repo_cache_dir "$root")
+  if [ -d "$dir" ] && [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
+    local count
+    count=$(fd -t f -e result . "$dir" | wc -l | tr -d ' ')
+    echo "Repo:    $(basename "$root")"
+    echo "Cache:   $dir"
+    echo "Entries: $count"
+    if [ "$count" -gt 0 ]; then
+      echo ""
+      for f in "$dir"/*.result; do
+        [ -f "$f" ] || continue
+        local cmd timestamp
+        cmd=$(sed -n '1p' "$f")
+        timestamp=$(sed -n '2p' "$f")
+        echo "  ✓ $cmd ($timestamp)"
+      done
+    fi
+  else
+    echo "No cached results for $(basename "$root")"
+  fi
+}
+
+# ── Main ─────────────────────────────────────────────────────────────
+case "${1:-}" in
+  --help|-h)  usage; exit 0 ;;
+  --clear)    cmd_clear; exit 0 ;;
+  --clear-all) cmd_clear_all; exit 0 ;;
+  --status)   cmd_status; exit 0 ;;
+  "")         usage; exit 1 ;;
+esac
+
+# Must be in a git repo
+root=$(repo_root) || { echo "Error: not in a git repository" >&2; exit 1; }
+
+# Compute cache key
+key=$(cache_key "$root" "$@")
+dir=$(repo_cache_dir "$root")
+cache_file="$dir/$key.result"
+
+# Check cache
+if [ -f "$cache_file" ]; then
+  cached_cmd=$(sed -n '1p' "$cache_file")
+  cached_time=$(sed -n '2p' "$cache_file")
+  echo "✓ $cached_cmd (cached — passed $cached_time)"
+  exit 0
+fi
+
+# Run the command
+exit_code=0
+"$@" || exit_code=$?
+
+# Cache on success only
+if [ "$exit_code" -eq 0 ]; then
+  mkdir -p "$dir"
+  printf '%s\n%s\n%s\n' "$*" "$(date '+%Y-%m-%d %H:%M')" "$key" > "$cache_file"
+  # Async stale cache cleanup
+  clean_stale_cache &
+fi
+
+exit "$exit_code"

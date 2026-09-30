@@ -1,0 +1,139 @@
+// ────────────────────────────────────────────────────────────────────────────
+// Cursor keybindings — managed by dotfiles
+// Symlinked to ~/Library/Application Support/Cursor/User/keybindings.json
+// by modules/cursor/doctor.sh. Round-trips: edit here OR in the Cursor UI;
+// either change persists into git via dotfiles-sync.
+//
+// Layering:
+//   1) k--kato.intellij-idea-keybindings provides the WebStorm/IntelliJ bundle.
+//   2) vscodevim.vim owns in-editor motion.
+//   3) This file preserves Cursor AI defaults plus custom jetbrains/keymap.xml.
+// ────────────────────────────────────────────────────────────────────────────
+[
+  // ─── Preserve Cursor AI shortcuts over IntelliJ extension defaults ─────────
+  { "key": "cmd+l", "command": "-workbench.action.gotoLine" },
+  {
+    "key": "ctrl+g",
+    "command": "workbench.action.gotoLine",
+    "when": "!terminalFocus"
+  },
+  {
+    "key": "cmd+k",
+    "command": "-git.commitAll",
+    "when": "!inDebugMode && !terminalFocus"
+  },
+  {
+    "key": "cmd+alt+k",
+    "command": "workbench.scm.focus",
+    "when": "!inDebugMode && !terminalFocus"
+  },
+  {
+    "key": "cmd+i",
+    "command": "-editor.action.goToImplementation",
+    "when": "editorHasImplementationProvider && editorTextFocus && !isInEmbeddedEditor"
+  },
+
+  // ─── Custom WebStorm keymap layer from jetbrains/keymap.xml ───────────────
+  { "key": "cmd+p", "command": "workbench.action.quickOpen", "when": "!terminalFocus" },
+  { "key": "cmd+shift+o", "command": "workbench.action.quickOpen", "when": "!terminalFocus" },
+  { "key": "cmd+e", "command": "workbench.action.openRecent" },
+  { "key": "cmd+e", "command": "-workbench.action.showCommands", "when": "false" },
+  {
+    "key": "cmd+alt+p",
+    "command": "workbench.action.tasks.runTask",
+    "args": "dotfiles: git pull latest main/master",
+    "when": "!terminalFocus"
+  },
+  {
+    "key": "cmd+alt+r",
+    "command": "workbench.action.tasks.runTask",
+    "args": "dotfiles: git rebase current branch onto main/master",
+    "when": "!terminalFocus"
+  },
+  {
+    "key": "alt+f7",
+    "command": "editor.action.referenceSearch.trigger",
+    "when": "editorHasReferenceProvider && !inReferenceSearchEditor"
+  },
+  {
+    "key": "shift+cmd+l",
+    "command": "editor.action.goToReferences",
+    "when": "editorHasReferenceProvider && !inReferenceSearchEditor"
+  },
+  {
+    "key": "shift+cmd+b",
+    "command": "editor.action.goToTypeDefinition",
+    "when": "editorHasTypeDefinitionProvider && editorTextFocus"
+  },
+  {
+    "key": "shift+ctrl+b",
+    "command": "editor.action.goToTypeDefinition",
+    "when": "editorHasTypeDefinitionProvider && editorTextFocus"
+  },
+  {
+    "key": "shift+ctrl+alt+q",
+    "command": "editor.action.peekTypeDefinition",
+    "when": "editorHasTypeDefinitionProvider && editorTextFocus"
+  },
+  {
+    "key": "shift+cmd+alt+up",
+    "command": "editor.action.insertCursorAbove",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "shift+cmd+alt+down",
+    "command": "editor.action.insertCursorBelow",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "shift+ctrl+t",
+    "command": "testing.runCurrentFile",
+    "when": "editorTextFocus"
+  },
+  { "key": "shift+ctrl+r", "command": "workbench.action.tasks.runTask" },
+  { "key": "shift+ctrl+cmd+h", "command": "workbench.action.splitEditorDown" },
+  { "key": "shift+ctrl+cmd+s", "command": "workbench.action.splitEditorRight" },
+  { "key": "shift+ctrl+cmd+u", "command": "workbench.action.joinAllGroups" },
+  { "key": "shift+ctrl+alt+j", "command": "workbench.action.moveEditorToBelowGroup" },
+  { "key": "shift+ctrl+alt+l", "command": "workbench.action.moveEditorToRightGroup" },
+  { "key": "shift+cmd+f12", "command": "workbench.action.maximizeEditor" },
+  {
+    "key": "alt+f12",
+    "command": "workbench.action.terminal.toggleTerminal",
+    "when": "terminal.active"
+  },
+  {
+    "key": "alt+f12",
+    "command": "workbench.action.terminal.focus",
+    "when": "!terminal.active"
+  },
+  { "key": "ctrl+cmd+4", "command": "workbench.action.terminal.toggleTerminal" },
+  {
+    "key": "alt+s",
+    "command": "eslint.executeAutofix",
+    "when": "editorTextFocus && !editorReadonly"
+  },
+  { "key": "shift+ctrl+cmd+k", "command": "git.pushForce" },
+  {
+    "key": "ctrl+alt+a",
+    "command": "gitlens.toggleFileBlame",
+    "when": "editorTextFocus"
+  },
+
+  // ─── WebStorm-style polish not covered by the IntelliJ extension ──────────
+  {
+    "key": "cmd+shift+/",
+    "command": "editor.action.blockComment",
+    "when": "editorTextFocus && !editorReadonly"
+  },
+  {
+    "key": "alt+f1",
+    "command": "workbench.files.action.showActiveFileInExplorer"
+  },
+  { "key": "cmd+shift+p", "command": "workbench.action.showCommands" },
+  {
+    "key": "j k",
+    "command": "extension.vim_escape",
+    "when": "editorTextFocus && vim.active && vim.mode == 'Insert'"
+  }
+]

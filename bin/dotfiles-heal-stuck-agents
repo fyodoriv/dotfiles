@@ -1,0 +1,151 @@
+#!/bin/bash
+# Self-heal stuck Cursor agent symptoms: hung git-upload-pack SSH sessions,
+# stale sandbox shells, runaway high-CPU helpers, and idle SSH mux sockets.
+# Never steals focus or opens GUI apps.
+#
+# Usage:
+#   dotfiles-heal-stuck-agents              Report counts (stdout)
+#   dotfiles-heal-stuck-agents --dry-run  Show actions without killing
+#   dotfiles-heal-stuck-agents --fix      Kill/reset stale resources
+#   dotfiles-heal-stuck-agents --quiet    Log to file only (LaunchAgent mode)
+#
+# Cursor cloud transport permanent-fail (THROW eoe, willRetry=false after DNS blip)
+# still requires Developer: Reload Window — dotfiles cannot restart Cursor.
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/heal-stuck-agents.sh
+source "$DOTFILES_DIR/lib/heal-stuck-agents.sh"
+
+DRY_RUN=false
+FIX_MODE=false
+QUIET=false
+KICK_NETWORK=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=true ;;
+    --fix) FIX_MODE=true ;;
+    --quiet) QUIET=true ;;
+    --kick-network) KICK_NETWORK=true ;;
+    --help|-h) exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+LOG_DIR="$HOME/.local/share/dotfiles/logs"
+LOG_FILE="$LOG_DIR/heal-stuck-agents.log"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+_heal_log() {
+  local msg
+  msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+  echo "$msg" >> "$LOG_FILE" 2>/dev/null || true
+  $QUIET || echo "$1"
+}
+
+_kill_pid() {
+  local pid="$1" reason="$2"
+  if $DRY_RUN; then
+    _heal_log "dry-run: would kill pid $pid ($reason)"
+    return 0
+  fi
+  if $FIX_MODE; then
+    kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+    _heal_log "killed pid $pid ($reason)"
+  fi
+}
+
+hung_git=0
+stale_shells=0
+runaway_helpers=0
+actions=0
+
+if [ "${HEAL_SKIP_PS:-0}" != "1" ]; then
+while IFS= read -r pid; do
+  [ -z "$pid" ] && continue
+  hung_git=$((hung_git + 1))
+  if $FIX_MODE || $DRY_RUN; then
+    _kill_pid "$pid" "hung git-upload-pack/GHE ssh"
+    actions=$((actions + 1))
+  fi
+done < <(dotfiles_heal_list_hung_git_session_pids || true)
+
+while IFS= read -r pid; do
+  [ -z "$pid" ] && continue
+  stale_shells=$((stale_shells + 1))
+  if $FIX_MODE || $DRY_RUN; then
+    _kill_pid "$pid" "stale Cursor agent shell"
+    actions=$((actions + 1))
+  fi
+done < <(dotfiles_heal_list_stale_agent_shell_pids || true)
+
+while IFS= read -r pid; do
+  [ -z "$pid" ] && continue
+  runaway_helpers=$((runaway_helpers + 1))
+  if $FIX_MODE || $DRY_RUN; then
+    _kill_pid "$pid" "runaway Cursor helper (>${HEAL_RUNAWAY_AGENT_MAX_CPU_PERCENT}% CPU for >${HEAL_RUNAWAY_AGENT_MIN_AGE_SEC}s)"
+    actions=$((actions + 1))
+  fi
+done < <(dotfiles_heal_list_runaway_agent_helper_pids || true)
+
+sock="$(dotfiles_heal_ssh_mux_socket 2>/dev/null || true)"
+if [ -n "$sock" ] && [ -S "$sock" ]; then
+  if $FIX_MODE || $DRY_RUN; then
+    if $DRY_RUN; then
+      _heal_log "dry-run: would reset idle SSH mux socket if no active sessions"
+      actions=$((actions + 1))
+    elif $FIX_MODE; then
+      if dotfiles_heal_reset_ssh_mux_if_idle; then
+        actions=$((actions + 1))
+        _heal_log "reset idle SSH mux socket (if any)"
+      fi
+    fi
+  fi
+fi
+fi
+
+if [ "${HEAL_SKIP_NETWORK:-0}" != "1" ] && ! dotfiles_heal_cursor_agent_dns_ok; then
+  if $FIX_MODE || $DRY_RUN || $KICK_NETWORK; then
+    if $DRY_RUN; then
+      _heal_log "dry-run: would flush DNS (Cursor agent API host unresolved)"
+      actions=$((actions + 1))
+    elif $FIX_MODE || $KICK_NETWORK; then
+      dotfiles_heal_flush_dns_cache
+      sleep 2
+      if dotfiles_heal_cursor_agent_dns_ok; then
+        _heal_log "DNS flush recovered Cursor agent API host"
+      else
+        _heal_log "Cursor agent API DNS still failing after flush (Reload Window may be required)"
+      fi
+      actions=$((actions + 1))
+    fi
+  fi
+fi
+
+if [ "${HEAL_SKIP_NETWORK:-0}" != "1" ] && { $KICK_NETWORK || { $FIX_MODE && ! dotfiles_heal_cursor_agent_dns_ok; }; }; then
+  if $DRY_RUN; then
+    _heal_log "dry-run: would kickstart com.dotfiles.network-resilience"
+  else
+    dotfiles_heal_kickstart_network_resilience
+    _heal_log "kickstarted com.dotfiles.network-resilience"
+  fi
+fi
+
+summary="hung_git=$hung_git stale_shells=$stale_shells runaway_helpers=$runaway_helpers actions=$actions"
+_heal_log "--- heal-stuck-agents: $summary ---"
+
+if ! $QUIET; then
+  echo "$summary"
+  if [ "$hung_git" -gt 0 ] || [ "$stale_shells" -gt 0 ] || [ "$runaway_helpers" -gt 0 ]; then
+    echo "Run with --fix to heal (or wait for com.dotfiles.heal-stuck-agents LaunchAgent)."
+    echo "Cursor agent permanent-fail after DNS blip still needs Developer: Reload Window."
+  fi
+fi
+
+if [ "$hung_git" -gt 0 ] || [ "$stale_shells" -gt 0 ] || [ "$runaway_helpers" -gt 0 ]; then
+  exit 1
+fi
+exit 0

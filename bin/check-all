@@ -1,0 +1,117 @@
+#!/bin/bash
+# check-all — run cached lint/test across all ~/apps repos.
+#
+# Discovers repos with Makefile (make check) or package.json (npm run verify / test).
+# Uses cached-run to skip repos that haven't changed since last pass.
+#
+# Usage:
+#   check-all              # check all repos
+#   check-all --force      # bypass cache, run everything
+#   check-all repo1 repo2  # check specific repos only
+
+set -euo pipefail
+
+APPS_DIR="${APPS_DIR:-$HOME/apps}"
+[ -d "$APPS_DIR" ] || { echo "Error: APPS_DIR not found: $APPS_DIR" >&2; exit 1; }
+if ! command -v jq &>/dev/null; then
+  echo "⚠ jq not found — JS repos without Makefile will be skipped (install: brew install jq)" >&2
+fi
+FORCE=false
+REPOS=()
+
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE=true ;;
+    --help|-h)
+      echo "Usage: check-all [--force] [repo1 repo2 ...]"
+      echo ""
+      echo "Run cached lint/test across all ~/apps repos."
+      echo "Uses cached-run to skip repos that haven't changed."
+      echo ""
+      echo "Options:"
+      echo "  --force    Bypass cache, run everything"
+      exit 0
+      ;;
+    *) REPOS+=("$arg") ;;
+  esac
+done
+
+# Resolve which command to run for a repo
+detect_check_cmd() {
+  local dir="$1"
+  if [ -f "$dir/Makefile" ] && grep -q '^check:' "$dir/Makefile" 2>/dev/null; then
+    echo "make check"
+  elif [ -f "$dir/package.json" ]; then
+    local scripts
+    scripts=$(jq -r '.scripts // {} | keys[]' "$dir/package.json" 2>/dev/null || echo "")
+    if echo "$scripts" | grep -qw "verify"; then
+      # Detect package manager
+      if [ -f "$dir/yarn.lock" ]; then
+        echo "yarn verify"
+      else
+        echo "npm run verify"
+      fi
+    elif echo "$scripts" | grep -qw "test"; then
+      if [ -f "$dir/yarn.lock" ]; then
+        echo "yarn test"
+      else
+        echo "npm test"
+      fi
+    fi
+  fi
+}
+
+passed=0
+failed=0
+errors=()
+
+# Build list of repos to check
+if [ ${#REPOS[@]} -gt 0 ]; then
+  dirs=()
+  for name in "${REPOS[@]}"; do
+    dir="$APPS_DIR/$name"
+    [ -d "$dir" ] && dirs+=("$dir") || echo "⚠ $name not found at $dir"
+  done
+else
+  dirs=()
+  for dir in "$APPS_DIR"/*/; do
+    [ -d "$dir/.git" ] && dirs+=("${dir%/}")
+  done
+fi
+
+for dir in "${dirs[@]}"; do
+  name=$(basename "$dir")
+  cmd=$(detect_check_cmd "$dir")
+
+  if [ -z "$cmd" ]; then
+    continue
+  fi
+
+  echo ""
+  echo "── $name ──"
+
+  if $FORCE; then
+    if (cd "$dir" && eval "$cmd"); then
+      passed=$((passed + 1))
+    else
+      failed=$((failed + 1))
+      errors+=("$name")
+    fi
+  else
+    # shellcheck disable=SC2086  # cmd is intentionally unquoted (multi-word command)
+    if (cd "$dir" && cached-run $cmd); then
+      passed=$((passed + 1))
+    else
+      failed=$((failed + 1))
+      errors+=("$name")
+    fi
+  fi
+done
+
+echo ""
+echo "═══════════════════════════════════"
+echo "✓ Passed: $passed"
+[ $failed -gt 0 ] && echo "✗ Failed: $failed (${errors[*]})"
+echo "═══════════════════════════════════"
+
+[ $failed -eq 0 ]

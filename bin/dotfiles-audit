@@ -1,0 +1,92 @@
+#!/bin/bash
+# Dotfiles Security Audit — checks SSH, secrets, permissions, and config safety.
+# Thin wrapper around the security doctor module.
+#
+# Usage:
+#   dotfiles-audit              Run all security checks
+#   dotfiles-audit --report     Output markdown report (for sharing)
+# shellcheck disable=SC2154  # counters (pass_count, fail_count, warn_count) defined in lib/output.sh
+
+# set +e: check() runs test commands that return non-zero on failure — that's expected, not an error
+set +e
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+REPORT_MODE=false
+[ "${1:-}" = "--report" ] && REPORT_MODE=true
+
+# shellcheck source=../lib/stats.sh
+source "$DOTFILES_DIR/lib/stats.sh"
+
+# shellcheck source=../lib/output.sh
+source "$DOTFILES_DIR/lib/output.sh"
+
+# Provide check()/check_advisory() for standalone use (doctor defines its own)
+# shellcheck disable=SC2034  # id accepted to match doctor signature, unused here
+check() {
+  local id="$1" desc="$2" test_cmd="$3"
+  if eval "$test_cmd" >/dev/null 2>&1; then
+    pass "$desc"
+  else
+    fail "$desc"
+  fi
+}
+
+# shellcheck disable=SC2034  # id accepted to match doctor signature, unused here
+check_advisory() {
+  local id="$1" desc="$2" test_cmd="$3" remediation="${4:-}"
+  if eval "$test_cmd" >/dev/null 2>&1; then
+    pass "$desc"
+  else
+    audit_warn "$desc" "$remediation"
+  fi
+}
+
+# Run security checks from the doctor module
+# shellcheck source=../modules/security/doctor.sh
+source "$DOTFILES_DIR/modules/security/doctor.sh"
+
+# ── Repo Hygiene ──────────────────────────────────────────────────
+
+stray_artifacts_found=0
+shopt -s nullglob
+
+for artifact in "$DOTFILES_DIR"/=[0-9]*; do
+  artifact_name="$(basename "$artifact")"
+  fail "Stray root-level pip redirect artifact: $artifact_name (remove with: rm $artifact_name)"
+  stray_artifacts_found=$((stray_artifacts_found + 1))
+done
+
+for artifact in "$DOTFILES_DIR"/*; do
+  [ -L "$artifact" ] || continue
+  target="$(readlink "$artifact" 2>/dev/null || true)"
+  case "$target" in
+    /*)
+      artifact_name="$(basename "$artifact")"
+      fail "Stray root-level absolute symlink: $artifact_name -> $target (remove with: rm $artifact_name)"
+      stray_artifacts_found=$((stray_artifacts_found + 1))
+      ;;
+  esac
+done
+
+shopt -u nullglob
+
+if [ "$stray_artifacts_found" -eq 0 ]; then
+  pass "No stray root-level agent artifacts"
+fi
+
+# ── Summary ─────────────────────────────────────────────────────
+echo ""
+total=$((pass_count + fail_count + warn_count))
+if $REPORT_MODE; then
+  echo "**Total**: $total checks — $pass_count passed, $fail_count failed, $warn_count warnings"
+else
+  echo -e "  ${GREEN}$pass_count passed${NC}  ${RED}$fail_count failed${NC}  ${YELLOW}$warn_count warnings${NC}  (${total} total)"
+fi
+
+log_run "audit"
+
+if [ "$fail_count" -gt 0 ]; then
+  exit 1
+fi

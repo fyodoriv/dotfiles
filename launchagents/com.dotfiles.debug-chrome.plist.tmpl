@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dotfiles.debug-chrome</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Applications/Google Chrome.app/Contents/MacOS/Google Chrome</string>
+    <string>--remote-debugging-port=9224</string>
+    <string>--user-data-dir={{ .chezmoi.homeDir }}/.agent-browser/debug-profile</string>
+    <string>--no-first-run</string>
+    <string>--no-default-browser-check</string>
+    <!-- Headless CDP at login — see com.dotfiles.agent-browser-chrome. -->
+    <string>--no-startup-window</string>
+    <string>--headless=new</string>
+    <string>--disable-sync</string>
+    <string>--disable-background-networking</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <!-- Second login-started Chrome on this host (port 9224), separate from
+       com.dotfiles.agent-browser-chrome on 9223. Holds long-lived
+       authenticated sessions for OUT-OF-BAND debug work — AWS console,
+       per-cluster kubectl flows, third-party SaaS dashboards — without
+       polluting the dashboard Chrome's tabs (corporate SSO tabs, Jenkins,
+       Splunk, …). Deliberately not KeepAlive: a quit for logout/shutdown
+       must stay closed. -->
+  <key>KeepAlive</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/debug-chrome.log</string>
+  <key>StandardErrorPath</key>
+  <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/debug-chrome.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>LANG</key>
+    <string>C.UTF-8</string>
+    <key>HOME</key>
+    <string>{{ .chezmoi.homeDir }}</string>
+  </dict>
+</dict>
+</plist>

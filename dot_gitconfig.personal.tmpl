@@ -1,0 +1,8 @@
+# ── Personal GitHub identity ──────────────────────────────────────────
+# Managed by chezmoi — values come from ~/.config/chezmoi/chezmoi.yaml.
+# Loaded via `includeIf` in ~/.gitconfig.local when the current repo
+# has any github.com remote. Work identity remains the global default.
+# Do not commit this file — it contains your personal identity.
+[user]
+	name = {{ .git_personal_name }}
+	email = {{ .git_personal_email }}

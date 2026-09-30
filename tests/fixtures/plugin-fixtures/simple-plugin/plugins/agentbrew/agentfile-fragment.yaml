@@ -1,0 +1,7 @@
+# Agentfile fragment shipped by the simple-plugin fixture.
+# `dotfiles plugin add` merges these entries into the user's global
+# Agentfile at ~/.config/agentbrew/Agentfile.yaml during the install.
+mcp:
+  - test-plugin-mcp
+skills:
+  - test-plugin-skill

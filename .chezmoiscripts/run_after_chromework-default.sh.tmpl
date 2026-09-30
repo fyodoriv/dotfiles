@@ -1,0 +1,15 @@
+#!/bin/bash
+# Reassert ChromeWork router + default browser on every chezmoi apply.
+# Profile: {{ .profile }} | Enterprise: {{ .is_enterprise }}
+#
+# Idempotent — chromework-install skips rebuild when up-to-date and only
+# calls defaultbrowser when LaunchServices has drifted.
+set -euo pipefail
+
+{{- if .is_enterprise }}
+if ! [ -d "/Applications/Google Chrome.app" ]; then
+  exit 0
+fi
+
+"{{ .chezmoi.sourceDir }}/bin/chromework-install"
+{{- end }}

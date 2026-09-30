@@ -1,0 +1,1 @@
+{{- define "launchagent-path" -}}{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin{{ if eq .chezmoi.arch "arm64" }}:/opt/homebrew/opt/curl/bin:/opt/homebrew/bin:/opt/homebrew/sbin{{ end }}:{{ .chezmoi.homeDir }}/.local/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:{{ .chezmoi.homeDir }}/bin{{- end -}}

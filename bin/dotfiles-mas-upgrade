@@ -1,0 +1,61 @@
+#!/bin/bash
+# dotfiles-mas-upgrade — upgrade Mac App Store apps, tolerating Xcode.
+#
+# WHY: `mas upgrade` (topgrade's built-in `mas` step) upgrades ALL outdated
+# apps and FAILS the whole step if any single app fails. Xcode (App Store id
+# 497799835) installs to /Applications/Xcode.app owned by root:wheel, so mas
+# can't write its _MASReceipt and errors "Operation not permitted" — which
+# fails every `dotfiles upgrade` whenever the App Store re-reports Xcode as
+# outdated, even though Xcode is current and is best updated via `xcodes` or
+# the App Store GUI. mas has no per-app exclude, so this wrapper upgrades each
+# outdated app individually and SKIPS Xcode (soft warning), letting the step
+# pass while still upgrading everything else (Tailscale, etc.).
+#
+# WHEN: replaces topgrade's built-in `mas` step — `mas` is in the `disable`
+# list in dot_config/topgrade.toml and this runs via the [commands] block.
+#
+# Env (for tests): MAS_BIN overrides the mas binary; XCODE_MAS_ID overrides
+# the skipped app id.
+
+set -uo pipefail
+
+MAS_BIN="${MAS_BIN:-mas}"
+XCODE_MAS_ID="${XCODE_MAS_ID:-497799835}"
+export MAS_NO_AUTO_INDEX=1   # suppress mas's Spotlight auto-reindex warning noise
+
+if ! command -v "$MAS_BIN" >/dev/null 2>&1; then
+  echo "⚠ mas not installed — skipping App Store upgrades"
+  exit 0
+fi
+
+# `mas outdated` lines look like: "497799835 Xcode (26.4 -> 26.5)". Take the
+# first field of lines whose first field is a numeric app id — this skips the
+# "Warning: ... not indexed in Spotlight" noise mas prints to stdout.
+ids="$("$MAS_BIN" outdated 2>/dev/null | awk '$1 ~ /^[0-9]+$/ {print $1}')"
+
+if [ -z "$ids" ]; then
+  echo "✓ App Store: nothing outdated"
+  exit 0
+fi
+
+upgraded=0
+skipped_xcode=0
+rc=0
+for id in $ids; do
+  if [ "$id" = "$XCODE_MAS_ID" ]; then
+    echo "⏭  Skipping Xcode (id $id) — update via 'xcodes' or the App Store GUI;"
+    echo "    'mas upgrade' can't write Xcode.app's root-owned _MASReceipt."
+    skipped_xcode=1
+    continue
+  fi
+  echo "→ Upgrading App Store app (id $id)..."
+  if "$MAS_BIN" upgrade "$id"; then
+    upgraded=$((upgraded + 1))
+  else
+    echo "✗ Failed to upgrade App Store app (id $id)"
+    rc=1
+  fi
+done
+
+echo "✓ App Store: upgraded $upgraded app(s); Xcode skipped: $skipped_xcode"
+exit "$rc"

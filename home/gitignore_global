@@ -1,0 +1,90 @@
+# ── macOS ────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ── Windows ──────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── JetBrains ────────────────────────────────────────────────────────
+# User-specific only (let .idea/.gitignore handle the rest)
+.idea/shelf/
+.idea/workspace.xml
+.idea/httpRequests/
+.idea/usage.statistics.xml
+.idea/sonarlint/
+*.iml
+
+# ── VS Code / Cursor / Windsurf ─────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.history/
+
+# ── Vim / Emacs ──────────────────────────────────────────────────────
+*.swp
+*.swo
+*~
+*.bak
+\#*\#
+.#*
+
+# ── Node ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ── Build & coverage ────────────────────────────────────────────────
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# ── Logs ─────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Caches ───────────────────────────────────────────────────────────
+.eslintcache
+.stylelintcache
+
+# ── Environment ──────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Dev tools ────────────────────────────────────────────────────────
+.yalc/
+yalc.lock
+*.orig
+
+# ── AI agent artifacts ───────────────────────────────────────────────
+.orchestrator/
+.worktrees/
+.cursor/
+.windsurf/
+.claude/
+.cursorignore
+.cursorindexingignore
+context/
+TASKS.md
+
+# ── Local IDE / browser-automation caches ────────────────────────────
+.playwright-cli/
+.playwright-mcp/
+.idea/

@@ -1,0 +1,14 @@
+#!/bin/bash
+# Re-run when bin/chromework-open-url changes.
+# installer hash: {{ output "shasum" "-a" "256" (joinPath .chezmoi.sourceDir "bin/chromework-open-url") }}
+# Profile: {{ .profile }} | Enterprise: {{ .is_enterprise }}
+#
+# Rebuilds ChromeWork.app so the router picks up open-url helper changes.
+set -euo pipefail
+
+if ! [ -d "/Applications/Google Chrome.app" ]; then
+  echo "⊘ Google Chrome not installed — skipping ChromeWork install"
+  exit 0
+fi
+
+"{{ .chezmoi.sourceDir }}/bin/chromework-install"

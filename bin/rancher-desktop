@@ -1,0 +1,32 @@
+#!/bin/bash
+# Start Rancher Desktop and wait for the Docker socket to be ready.
+# Used by the LaunchAgent so downstream tools (codegen, docker CLI) can
+# reliably connect after login without racing against the daemon startup.
+# Usage: rancher-desktop
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+SOCKET="$HOME/.rd/docker.sock"
+RDCTL="$HOME/.rd/bin/rdctl"
+TIMEOUT=120  # seconds
+
+if [ ! -x "$RDCTL" ]; then
+  echo "rdctl not found at $RDCTL — is Rancher Desktop installed?" >&2
+  exit 1
+fi
+
+"$RDCTL" start --application.start-in-background
+
+echo "Waiting for Docker socket at $SOCKET (timeout ${TIMEOUT}s)..."
+elapsed=0
+while [ ! -S "$SOCKET" ]; do
+  if [ "$elapsed" -ge "$TIMEOUT" ]; then
+    echo "Timed out waiting for Docker socket after ${TIMEOUT}s" >&2
+    exit 1
+  fi
+  sleep 2
+  elapsed=$((elapsed + 2))
+done
+
+echo "Docker socket ready after ${elapsed}s"

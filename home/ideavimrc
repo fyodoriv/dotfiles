@@ -1,0 +1,275 @@
+" ── IdeaVim Configuration (GENERATED — do not edit, edit editor/keymap.yml) ──
+" Leader key
+let mapleader = "<space>"
+
+" ── Plugins ──
+set surround
+set commentary
+set easymotion
+set highlightedyank
+set ReplaceWithRegister
+set argtextobj
+set textobj-entire
+set matchit
+set NERDTree
+set exchange
+set which-key
+set quickscope
+set multiple-cursors
+
+" ── Core Settings ──
+set scrolloff=8
+set sidescrolloff=8
+set incsearch
+set hlsearch
+set ignorecase
+set smartcase
+set number
+set relativenumber
+set showmode
+set showcmd
+set visualbell
+set clipboard+=unnamedplus
+set ideajoin
+set ideastatusicon=gray
+set idearefactormode=keep
+set notimeout
+let g:WhichKey_ShowVimActions = "true"
+let g:WhichKey_DefaultDelay = 300
+let g:qs_highlight_on_keys = ['f', 'F', 't', 'T']
+
+" ── Key Mappings ──
+sethandler <Esc> a:vim
+" Clear search highlight
+nnoremap <leader>/ :nohlsearch<CR>
+" Escape insert mode
+inoremap jk <Esc>
+" Escape insert mode (reverse)
+inoremap kj <Esc>
+" Yank to end of line
+nnoremap Y y$
+" Half page down + center
+nnoremap <C-d> <C-d>zz
+" Half page up + center
+nnoremap <C-u> <C-u>zz
+" Next search + center
+nnoremap n nzzzv
+" Prev search + center
+nnoremap N Nzzzv
+" Delete without yanking
+nnoremap <leader>d "_d
+" Delete without yanking (visual)
+vnoremap <leader>d "_d
+" Paste without losing register
+xnoremap <leader>p "_dP
+" Select all
+nnoremap <leader>a ggVG
+" Indent and stay in visual
+vnoremap > >gv
+" Outdent and stay in visual
+vnoremap < <gv
+" Move lines down
+vnoremap J <Action>(MoveLineDown)
+" Move lines up
+vnoremap K <Action>(MoveLineUp)
+" Move line down
+nnoremap <A-j> :m .+1<CR>==<CR>
+" Move line up
+nnoremap <A-k> :m .-2<CR>==<CR>
+" Find file
+nnoremap <leader>ff <Action>(GotoFile)
+" Find in files
+nnoremap <leader>fg <Action>(FindInPath)
+" Recent files
+nnoremap <leader>fr <Action>(RecentFiles)
+" Go to symbol
+nnoremap <leader>fs <Action>(GotoSymbol)
+" Go to action / command palette
+nnoremap <leader>fa <Action>(GotoAction)
+" Find usages
+nnoremap <leader>fu <Action>(FindUsages)
+" Find in current directory
+" Find in files (alt)
+" Go to definition
+nnoremap gd <Action>(GotoDeclaration)
+" Go to implementation
+nnoremap gi <Action>(GotoImplementation)
+" Go to test
+nnoremap gt <Action>(GotoTest)
+" Show usages / references
+nnoremap gr <Action>(ShowUsages)
+" Go to type definition
+nnoremap gT <Action>(GotoTypeDeclaration)
+" Previous error
+nnoremap g[ <Action>(GotoPreviousError)
+" Next error
+nnoremap g] <Action>(GotoNextError)
+" Open URL under cursor
+nnoremap gx <Action>(OpenAtCaret)
+" Quick fix / intentions
+nnoremap <leader>ca <Action>(ShowIntentionActions)
+" Rename
+nnoremap <leader>cr <Action>(RenameElement)
+" Format document
+nnoremap <leader>cf <Action>(ReformatCode)
+" Organize imports
+nnoremap <leader>ci <Action>(OptimizeImports)
+" ESLint fix
+nnoremap <leader>ce <Action>(Javascript.Linters.EsLint.Fix)
+" Extract method
+nnoremap <leader>cm <Action>(ExtractMethod)
+" Extract method (visual)
+vnoremap <leader>cm <Action>(ExtractMethod)
+" Introduce variable
+nnoremap <leader>cv <Action>(IntroduceVariable)
+" Introduce variable (visual)
+vnoremap <leader>cv <Action>(IntroduceVariable)
+" Extract class
+nnoremap <leader>cc <Action>(ExtractClass)
+" Refactoring menu
+nnoremap <leader>R <Action>(Refactorings.QuickListPopupAction)
+" Run
+nnoremap <leader>rr <Action>(Run)
+" Debug
+nnoremap <leader>rd <Action>(Debug)
+" Run test at cursor
+nnoremap <leader>rt <Action>(RunClass)
+" Stop
+nnoremap <leader>rs <Action>(Stop)
+" Run configuration
+nnoremap <leader>rc <Action>(RunConfiguration)
+" Toggle breakpoint
+nnoremap <leader>db <Action>(ToggleLineBreakpoint)
+" Toggle breakpoint enabled
+nnoremap <leader>dB <Action>(ToggleBreakpointEnabled)
+" View breakpoints
+nnoremap <leader>da <Action>(ViewBreakpoints)
+" Evaluate expression
+nnoremap <leader>de <Action>(EvaluateExpression)
+" Evaluate expression (visual)
+vnoremap <leader>de <Action>(EvaluateExpression)
+" Step over
+nnoremap <leader>dn <Action>(StepOver)
+" Step into
+nnoremap <leader>di <Action>(StepInto)
+" Step out
+nnoremap <leader>do <Action>(StepOut)
+" Resume
+nnoremap <leader>dc <Action>(Resume)
+" Add to watch
+nnoremap <leader>dw <Action>(Debugger.AddToWatch)
+" Mute breakpoints
+nnoremap <leader>dm <Action>(XDebugger.MuteBreakpoints)
+" Git blame / file blame toggle
+nnoremap <leader>gb <Action>(Git.Branches)
+" File history
+nnoremap <leader>gl <Action>(Vcs.ShowTabbedFileHistory)
+" Annotate / blame
+nnoremap <leader>ga <Action>(Annotate)
+" Diff with last commit
+nnoremap <leader>gd <Action>(Compare.SameVersion)
+" Rollback change at cursor
+nnoremap <leader>gr <Action>(Vcs.RollbackChangedLines)
+" VCS quick list
+nnoremap <leader>gg <Action>(Vcs.QuickListPopupAction)
+" Commit
+nnoremap <leader>gc <Action>(CheckinProject)
+" Push
+nnoremap <leader>gp <Action>(Vcs.Push)
+" Fetch
+nnoremap <leader>gf <Action>(Git.Fetch)
+" Merge
+nnoremap <leader>gm <Action>(Git.Merge)
+" Show shelf / stash
+nnoremap <leader>gs <Action>(Vcs.Show.Shelf)
+" Previous change
+nnoremap [c <Action>(VcsShowPrevChangeMarker)
+" Next change
+nnoremap ]c <Action>(VcsShowNextChangeMarker)
+" Previous method
+nnoremap [m <Action>(MethodUp)
+" Next method
+nnoremap ]m <Action>(MethodDown)
+" Split vertical
+nnoremap <leader>wv <Action>(SplitVertically)
+" Split horizontal
+nnoremap <leader>ws <Action>(SplitHorizontally)
+" Unsplit / join
+nnoremap <leader>wu <Action>(Unsplit)
+" Move tab to next group
+" Move tab to below group
+" Move to opposite group
+nnoremap <leader>wm <Action>(MoveEditorToOppositeTabGroup)
+" Focus left split
+nnoremap <C-h> <C-w>h
+" Focus right split
+nnoremap <C-l> <C-w>l
+" Focus below split
+nnoremap <C-j> <C-w>j
+" Focus above split
+nnoremap <C-k> <C-w>k
+" Previous tab
+nnoremap <S-h> <Action>(PreviousTab)
+" Next tab
+nnoremap <S-l> <Action>(NextTab)
+" Close tab
+nnoremap <leader>q <Action>(CloseContent)
+" Close all tabs
+nnoremap <leader>Q <Action>(CloseAllEditors)
+" File explorer
+nnoremap <leader>1 <Action>(ActivateProjectToolWindow)
+" Outline / structure
+nnoremap <leader>2 <Action>(ActivateStructureToolWindow)
+" Terminal
+nnoremap <leader>3 <Action>(ActivateTerminalToolWindow)
+" Version control
+nnoremap <leader>4 <Action>(ActivateVersionControlToolWindow)
+" Problems / errors
+nnoremap <leader>5 <Action>(ActivateProblemsViewToolWindow)
+" Hide all tool windows
+nnoremap <leader>0 <Action>(HideAllWindows)
+" Services
+nnoremap <leader>6 <Action>(ActivateServicesToolWindow)
+" Endpoints
+nnoremap <leader>7 <Action>(ActivateEndpointsToolWindow)
+" Debug tool window
+nnoremap <leader>8 <Action>(ActivateDebugToolWindow)
+" Toggle sidebar / file tree
+nnoremap <leader>e :NERDTreeToggle<CR><CR>
+" Reveal current file in tree
+nnoremap <leader>E :NERDTreeFind<CR><CR>
+" Hover docs
+nnoremap K <Action>(QuickJavaDoc)
+" Type definition preview
+nnoremap <leader>k <Action>(QuickTypeDefinition)
+" File structure / symbol outline
+nnoremap <leader>si <Action>(FileStructurePopup)
+" Parameter info
+nnoremap <leader>p <Action>(ParameterInfo)
+" Toggle fold
+nnoremap za <Action>(ExpandCollapseToggleAction)
+" Unfold all
+nnoremap zR <Action>(ExpandAllRegions)
+" Fold all
+nnoremap zM <Action>(CollapseAllRegions)
+" Zen mode
+nnoremap <leader>z <Action>(ToggleDistractionFreeMode)
+" Toggle bookmark
+nnoremap <leader>mm <Action>(ToggleBookmark)
+" Show bookmarks
+nnoremap <leader>ms <Action>(ShowBookmarks)
+" EasyMotion 2-char search
+nmap s <Plug>(easymotion-s2)
+" EasyMotion n-char search
+nmap S <Plug>(easymotion-sn)
+" Theme picker
+nnoremap <leader>T <Action>(ChangeLaf)
+" Generate
+nnoremap <leader>G <Action>(Generate)
+" New scratch file
+nnoremap <leader>ns <Action>(NewScratchFile)
+" Open in browser
+nnoremap <leader>ob <Action>(OpenInBrowser)
+" Run HTTP request
+nnoremap <leader>hr <Action>(RestService.RunRequest)
+

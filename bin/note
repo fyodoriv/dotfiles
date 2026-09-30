@@ -1,0 +1,58 @@
+#!/bin/bash
+# Quick developer notes — append timestamped notes to a daily file.
+# Usage: note "fixed the auth bug"        → append to today's notes
+#        note                              → view today's notes
+#        note --week                       → view this week's notes
+#        note --month                      → view this month's notes
+#        note --search <query>             → search all notes
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+NOTES_DIR="$HOME/.notes"
+mkdir -p "$NOTES_DIR"
+
+today=$(date +%Y-%m-%d)
+file="$NOTES_DIR/$today.md"
+
+case "${1:-}" in
+  --week)
+    for i in $(seq 0 6); do
+      d=$(date -v-"${i}"d +%Y-%m-%d)
+      f="$NOTES_DIR/$d.md"
+      if [ -f "$f" ]; then
+        echo "━━━ $d ━━━"
+        cat "$f"
+        echo ""
+      fi
+    done
+    ;;
+  --search)
+    shift
+    if [ -z "${1:-}" ]; then
+      echo "Usage: note --search <query>"
+      exit 1
+    fi
+    grep -rn --color=auto "$*" "$NOTES_DIR"/*.md 2>/dev/null | sed "s|$NOTES_DIR/||" || echo "No matches."
+    ;;
+  --month)
+    month=$(date +%Y-%m)
+    for f in "$NOTES_DIR/$month"*.md; do
+      [ ! -f "$f" ] && continue
+      d=$(basename "$f" .md)
+      echo "━━━ $d ━━━"
+      cat "$f"
+      echo ""
+    done
+    ;;
+  "")
+    if [ -f "$file" ]; then
+      cat "$file"
+    else
+      echo "No notes for $today"
+    fi
+    ;;
+  *)
+    echo "- $(date +%H:%M) $*" >> "$file"
+    echo "✓ Note saved to $today"
+    ;;
+esac

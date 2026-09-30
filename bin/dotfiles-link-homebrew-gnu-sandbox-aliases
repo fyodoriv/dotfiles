@@ -1,0 +1,71 @@
+#!/bin/bash
+# dotfiles-link-homebrew-gnu-sandbox-aliases — POSIX-name symlinks on Homebrew bin.
+#
+# Cursor agent sandbox PATH is /opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin).
+# GNU tools install as gfind/gsed/gawk/ggrep; without aliases, `command -v find`
+# hits /usr/bin/find (system-signed). This script links find/sed/awk/grep
+# in /opt/homebrew/bin to the adhoc-signed g* binaries so sandbox PATH is endpoint-safe
+# even before prepend-endpoint-path runs.
+#
+# Also links python3/python3.13 when uv-managed python is present (same class as jq).
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+
+QUIET="${DOTFILES_ADHOC_SIGN_QUIET:-0}"
+log() { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+
+# Only create/replace when missing or wrong. Blind `ln -sfn` refreshes mtime and
+# can re-trigger endpoint agent "install not allowed" (Description: curl/find/…,
+# unsigned) on every endpoint-security apply even when the target is already
+# adhoc-signed.
+_link_if_needed() {
+  local link_path="$1" target="$2" label="${3:-$2}"
+  if [ -e "$link_path" ] && [ ! -L "$link_path" ]; then
+    log "○ skip $(basename "$link_path") ($link_path is not a symlink)"
+    return 0
+  fi
+  if [ -L "$link_path" ]; then
+    local current
+    current="$(readlink "$link_path" 2>/dev/null || true)"
+    if [ "$current" = "$target" ]; then
+      log "○ already linked: $link_path -> $label"
+      return 0
+    fi
+  fi
+  ln -sfn "$target" "$link_path"
+  log "✓ $link_path -> $label"
+}
+
+_link_gnu_alias() {
+  local posix="$1" gnu="$2"
+  local brew_bin="${DOTFILES_BREW_PREFIX:-/opt/homebrew}/bin"
+  local gnu_path="$brew_bin/$gnu"
+  local link_path="$brew_bin/$posix"
+
+  [ -x "$gnu_path" ] || return 0
+  _link_if_needed "$link_path" "$gnu" "$gnu"
+}
+
+for pair in find:gfind sed:gsed awk:gawk grep:ggrep; do
+  _link_gnu_alias "${pair%%:*}" "${pair##*:}"
+done
+
+# curl keg lives under opt/curl/bin, not /opt/homebrew/bin — link for sandbox PATH.
+brew_bin="${DOTFILES_BREW_PREFIX:-/opt/homebrew}/bin"
+curl_keg="${DOTFILES_BREW_PREFIX:-/opt/homebrew}/opt/curl/bin/curl"
+if [ -x "$curl_keg" ]; then
+  _link_if_needed "$brew_bin/curl" "../opt/curl/bin/curl" "../opt/curl/bin/curl"
+fi
+
+# uv python on sandbox PATH (doctor security.sandbox_homebrew_only_python3_system)
+_py_target="$(dotfiles_resolve_python "$DOTFILES_DIR" "${HOME:-}" python3.13 2>/dev/null || true)"
+if [ -n "$_py_target" ] && [ -x "$_py_target" ]; then
+  brew_bin="${DOTFILES_BREW_PREFIX:-/opt/homebrew}/bin"
+  for name in python3.13 python3; do
+    _link_if_needed "$brew_bin/$name" "$_py_target" "$_py_target"
+  done
+fi
+
+exit 0

@@ -1,0 +1,203 @@
+#!/bin/bash
+# Chrome developer setup — applies all dev-friendly settings programmatically.
+# Usage: setup-chrome          Apply settings (Chrome must be closed)
+#        setup-chrome --ext    Show recommended extensions to install
+
+# set +e: commands may fail (Chrome not installed, prefs missing) — failures are handled inline
+set +e
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+
+# Read enterprise flag from chezmoi (non-enterprise users skip enterprise-specific settings)
+export IS_ENTERPRISE
+IS_ENTERPRISE="$(chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null || echo "false")"
+export WORK_EMAIL_DOMAIN
+WORK_EMAIL_DOMAIN="$(chezmoi execute-template '{{ .work_email_domain }}' 2>/dev/null || echo "example.com")"
+
+show_extensions() {
+  echo -e "${BLUE}Essential Chrome Extensions for Development${NC}"
+  echo -e "${DIM}(all free, open source or built-in)${NC}"
+  echo ""
+  echo -e "  ${GREEN}1.${NC} ${BLUE}React Developer Tools${NC}"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi${NC}"
+  echo ""
+  echo -e "  ${GREEN}2.${NC} ${BLUE}Redux DevTools${NC}"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd${NC}"
+  echo ""
+  echo -e "  ${GREEN}3.${NC} ${BLUE}JSON Formatter${NC}"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/json-formatter/bcjindcccaagfpapjjmafapmmgkkhgoa${NC}"
+  echo ""
+  echo -e "  ${GREEN}4.${NC} ${BLUE}Lighthouse${NC} (built into DevTools)"
+  echo -e "     ${DIM}Already available in DevTools → Lighthouse tab${NC}"
+  echo ""
+  echo -e "  ${GREEN}5.${NC} ${BLUE}axe DevTools - Web Accessibility Testing${NC}"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/axe-devtools-web-accessib/lhdoppojpmngadmnindnejefpokejbdd${NC}"
+  echo ""
+  echo -e "  ${GREEN}6.${NC} ${BLUE}uBlock Origin${NC}"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm${NC}"
+  echo ""
+  echo -e "  ${GREEN}7.${NC} ${BLUE}Visbug${NC} (visual CSS debugging)"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/visbug/cdockenadnadldjbbgcallicgledbeoc${NC}"
+  echo ""
+  echo -e "  ${GREEN}8.${NC} ${BLUE}Refined GitHub${NC}"
+  echo -e "     ${DIM}https://chrome.google.com/webstore/detail/refined-github/hlepfoohegkhhmjieoechaddaejaokhf${NC}"
+  echo ""
+  echo -e "${DIM}Tip: Right-click extension icons → 'Pin' the ones you use daily${NC}"
+  exit 0
+}
+
+[ "${1:-}" = "--ext" ] && show_extensions
+
+# ── Programmatic Chrome settings ─────────────────────────────────────
+
+echo -e "${BLUE}Setting up Chrome for development...${NC}"
+echo ""
+
+# DevTools always available
+defaults write com.google.Chrome DevToolsAvailability -int 1 2>/dev/null
+defaults write com.google.Chrome DeveloperToolsAvailability -int 1 2>/dev/null
+echo -e "  ${GREEN}✓${NC} DevTools always available"
+
+# Show full URLs (no hiding scheme/www)
+defaults write com.google.Chrome ShowFullURLsInAddressBar -bool true 2>/dev/null
+echo -e "  ${GREEN}✓${NC} Full URLs in address bar"
+
+# Homepage is new tab
+defaults write com.google.Chrome HomepageIsNewTabPage -bool true 2>/dev/null
+echo -e "  ${GREEN}✓${NC} Homepage: new tab page"
+
+# Disable background mode
+defaults write com.google.Chrome BackgroundModeEnabled -bool false 2>/dev/null
+echo -e "  ${GREEN}✓${NC} Background mode: off"
+
+# Tab freezing
+defaults write com.google.Chrome TabFreezingEnabled -bool true 2>/dev/null
+echo -e "  ${GREEN}✓${NC} Tab freezing: on"
+
+# Disable swipe navigation
+defaults write com.google.Chrome AppleEnableSwipeNavigateWithScrolls -bool false 2>/dev/null
+defaults write com.google.Chrome AppleEnableMouseSwipeNavigateWithScrolls -bool false 2>/dev/null
+echo -e "  ${GREEN}✓${NC} Swipe navigation: disabled"
+
+# External protocol dialog
+defaults write com.google.Chrome ExternalProtocolDialogShowAlwaysOpenCheckbox -bool true 2>/dev/null
+echo -e "  ${GREEN}✓${NC} External protocol 'always open' checkbox"
+
+# Disable print preview
+defaults write com.google.Chrome DisablePrintPreview -bool true 2>/dev/null
+echo -e "  ${GREEN}✓${NC} Print preview: disabled"
+
+# Apply chrome://flags
+echo ""
+echo -e "${BLUE}Applying performance flags...${NC}"
+
+LOCAL_STATE="$HOME/Library/Application Support/Google/Chrome/Local State"
+# Only the PERSONAL Chrome (default user-data-dir) writes to this Local State.
+# Agent-browser daemons run with --user-data-dir=<custom> and must be ignored —
+# otherwise this check blocks the flag-apply pass forever. See chrome-enforce-profile
+# for the same fix and rationale.
+_personal_chrome_running() {
+  ps -axww -o command= 2>/dev/null \
+    | awk '/\/MacOS\/Google Chrome($| )/ && !/--type=/ && !/--user-data-dir=/ {found=1; exit} END {exit !found}'
+}
+if [ -f "$LOCAL_STATE" ]; then
+  if ! _personal_chrome_running; then
+    if ! command -v python3 &>/dev/null; then
+      echo -e "  ${DIM}⊘ python3 not found — skipping flags (install Xcode CLI tools: xcode-select --install)${NC}"
+    else
+    cp "$LOCAL_STATE" "${LOCAL_STATE}.backup"
+    python3 << 'PYEOF'
+import json, os
+
+local_state_path = os.path.expanduser("~/Library/Application Support/Google/Chrome/Local State")
+
+with open(local_state_path, "r") as f:
+    data = json.load(f)
+
+flags_add = [
+    "enable-gpu-rasterization@1",
+    "enable-zero-copy@1",
+    "enable-parallel-downloading@1",
+]
+
+# Flags that caused problems and must be removed if present
+flags_remove = {
+    "smooth-scrolling@2",          # value 2 = disabled — makes scrolling feel choppy
+    "enable-quic@1",               # ships by default; explicit flag is redundant noise
+    "enable-lazy-image-loading@1", # deprecated; causes layout shift on some pages
+    "back-forward-cache@1",        # enabled by default; explicit flag can break auth flows
+    "enable-webrtc-hide-local-ips-with-mdns@1",  # breaks Google login + slows CDP tools
+}
+
+if "browser" not in data:
+    data["browser"] = {}
+
+existing = set(data["browser"].get("enabled_labs_experiments", []))
+existing -= flags_remove
+for flag in flags_add:
+    existing.add(flag)
+data["browser"]["enabled_labs_experiments"] = sorted(existing)
+
+# Enforce default profile — always open with the Work profile
+# Detect the Work profile by scanning info_cache for the company email
+# Only enforce for enterprise users; others keep their Chrome default
+is_enterprise = os.environ.get("IS_ENTERPRISE", "false") == "true"
+work_email_domain = os.environ.get("WORK_EMAIL_DOMAIN", "example.com")
+if is_enterprise:
+    profiles = data.get("profile", {}).get("info_cache", {})
+    work_profile = None
+    for pname, pinfo in profiles.items():
+        if work_email_domain in pinfo.get("user_name", ""):
+            work_profile = pname
+            break
+    if not work_profile:
+        print(
+            f"setup-chrome: no profile with user_name matching {work_email_domain!r} — skipping profile enforce",
+            file=sys.stderr,
+        )
+    else:
+        data.setdefault("profile", {})["last_used"] = work_profile
+        data["profile"]["last_active_profiles"] = [work_profile]
+        data["profile"]["show_picker_on_startup"] = False
+
+with open(local_state_path, "w") as f:
+    json.dump(data, f)
+PYEOF
+    echo -e "  ${GREEN}✓${NC} 3 performance flags applied, problematic flags removed"
+    if [ "$IS_ENTERPRISE" = "true" ]; then
+      echo -e "  ${GREEN}✓${NC} Default profile enforced (Work)"
+    fi
+    fi
+  else
+    echo -e "  ${DIM}⊘ Chrome is running — flags already applied from last run${NC}"
+  fi
+else
+  echo -e "  ${DIM}⊘ Chrome Local State not found — skipping flags${NC}"
+fi
+
+# Set up custom search engines via Preferences
+echo ""
+echo -e "${BLUE}Custom search engine shortcuts:${NC}"
+echo -e "${DIM}Add these in Chrome → Settings → Search engine → Manage:${NC}"
+echo ""
+echo -e "  ${GREEN}npm${NC}  → https://www.npmjs.com/search?q=%s"
+echo -e "  ${GREEN}mdn${NC}  → https://developer.mozilla.org/en-US/search?q=%s"
+echo -e "  ${GREEN}gh${NC}   → https://github.com/search?q=%s"
+echo -e "  ${GREEN}so${NC}   → https://stackoverflow.com/search?q=%s"
+echo -e "  ${GREEN}ciu${NC}  → https://caniuse.com/?search=%s"
+echo -e "  ${GREEN}tw${NC}   → https://tailwindcss.com/docs?q=%s"
+echo -e "  ${GREEN}bun${NC}  → https://bundlephobia.com/package/%s"
+
+echo ""
+echo -e "${BLUE}Remote debugging (CDP):${NC}"
+echo -e "${DIM}LaunchAgent com.dotfiles.chrome-debug runs Chrome with --remote-debugging-port=9222 on demand.${NC}"
+echo -e "${DIM}It's loaded but does not auto-start. Start with: launchctl start com.dotfiles.chrome-debug${NC}"
+echo -e "${DIM}Profile: ~/.local/share/chrome-debug${NC}"
+echo -e "${DIM}Connect with: agent-browser --auto-connect state save ./auth.json${NC}"
+echo -e "${DIM}Or check: curl -s http://localhost:9222/json/version${NC}"
+
+echo ""
+echo -e "${GREEN}Done!${NC} Restart Chrome to activate."
+echo -e "Run ${BLUE}setup-chrome --ext${NC} to see recommended extensions."

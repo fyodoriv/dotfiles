@@ -1,0 +1,17 @@
+# tasks-stability allowlist — stability-tagged tasks grandfathered at P2/P3.
+#
+# Enforced by .github/scripts/check-tasks-stability.sh, which reuses
+# agentbrew's scripts/lint-tasks-stability.mjs. Stability work belongs in
+# P0/P1 (see ~/.config/devin/AGENTS.md § Task queues). Each entry below is a
+# pre-existing stability-tagged task not yet promoted — promote it to P0/P1
+# with the 5 minsky HDD fields (then delete it here), or retag if the
+# stability tag is a false positive. The lint flags dead entries so this list
+# drains over time.
+#
+# One task ID per line.
+
+# Incomplete HDD — genuine stability work (observability / regression-risk),
+# promote once the 5 HDD fields are authored:
+doctor-json-fixed-status-leaks-on-fix-failure
+doctor-notification-content-test
+chrome-enforce-profile-bad-default-fallback

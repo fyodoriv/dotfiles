@@ -1,0 +1,39 @@
+#!/bin/bash
+# Create a PR from current branch — commits, pushes, and opens PR creation.
+# Usage: pr "feat: add login flow"
+#        pr                          (uses last commit message as PR title)
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+title="${1:-$(git log -1 --pretty=%s)}"
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "❌ Can't create PR from $branch. Create a feature branch first."
+  exit 1
+fi
+
+# Stage tracked changes and commit (use -u to avoid staging other agents' untracked files).
+status_output="$(git status --porcelain)"
+if [ -n "$status_output" ]; then
+  untracked="$(git status --porcelain | sed -n 's/^?? //p' || true)"
+  git add -u
+  if [ -n "$(git diff --cached --name-only)" ]; then
+    git commit -m "$title"
+  else
+    echo "ℹ No tracked or staged changes to commit."
+  fi
+  if [ -n "$untracked" ]; then
+    untracked_count=$(echo "$untracked" | wc -l | tr -d ' ')
+    echo "ℹ Leaving $untracked_count untracked file(s) untouched; stage them explicitly to include."
+  fi
+fi
+
+# Push to tracking remote, or first available
+remote=$(git config "branch.$branch.remote" 2>/dev/null || git remote | head -1)
+git push -u "$remote" "$branch" 2>/dev/null || git push --set-upstream "$remote" "$branch"
+
+# Create PR via gh
+echo ""
+gh pr create --title "$title" --body "" --draft 2>/dev/null || gh pr view --web

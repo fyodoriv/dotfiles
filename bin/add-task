@@ -1,0 +1,327 @@
+#!/bin/bash
+# add-task — append a properly-formatted task entry to TASKS.md.
+#
+# Use it from any local clone of this repo when you want to add a task
+# without remembering the format, and you want the result lint-clean.
+#
+# What it does (and does NOT do):
+#   - Generates a unique slug-style ID from the title.
+#   - Inserts a properly-formatted entry under `## P<N>`.
+#   - Runs `make lint-tasks` afterwards to confirm valid format.
+#   - PRINTS the next-steps (git add / commit / push) for you.
+#   - Does NOT auto-commit or push — you stay in control of the git ops.
+#
+# Usage
+#   bin/add-task                              # interactive prompts
+#   bin/add-task --title "Fix X" --priority P1 --tags bug,foo
+#   bin/add-task --help
+#
+# Flags
+#   --title <text>      task title (required if non-interactive)
+#   --priority P0..P3   priority section (default P2)
+#   --id <slug>         ID override (default: slugified title)
+#   --tags <csv>        comma-separated tags
+#   --details <text>    free-form description (escape newlines as \n)
+#   --files <csv>       comma-separated file paths the task touches
+#   --acceptance <text> acceptance criteria
+#   --hypothesis <text> required for P0/P1
+#   --success <text>    required for P0/P1
+#   --pivot <text>      required for P0/P1
+#   --measurement <text> required for P0/P1
+#   --anchor <text>     required for P0/P1
+#   --dry-run           preview the entry without modifying TASKS.md
+#   --help              this message
+#
+# Exit codes
+#   0  task appended (or dry-run printed)
+#   1  validation error (TASKS.md lint failed after write)
+#   2  bad args
+#
+
+set -o errexit -o nounset -o pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TASKS_FILE="$DOTFILES_DIR/TASKS.md"
+
+TITLE=""
+PRIORITY="P2"
+ID=""
+TAGS=""
+DETAILS=""
+FILES=""
+ACCEPTANCE=""
+HYPOTHESIS=""
+SUCCESS=""
+PIVOT=""
+MEASUREMENT=""
+ANCHOR=""
+DRY_RUN=0
+BACKEND="tasks-md"
+BACKEND_REPO=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --title)      TITLE="$2"; shift 2 ;;
+    --priority)   PRIORITY="$2"; shift 2 ;;
+    --id)         ID="$2"; shift 2 ;;
+    --tags)       TAGS="$2"; shift 2 ;;
+    --details)    DETAILS="$2"; shift 2 ;;
+    --files)      FILES="$2"; shift 2 ;;
+    --acceptance) ACCEPTANCE="$2"; shift 2 ;;
+    --hypothesis) HYPOTHESIS="$2"; shift 2 ;;
+    --success)    SUCCESS="$2"; shift 2 ;;
+    --pivot)      PIVOT="$2"; shift 2 ;;
+    --measurement) MEASUREMENT="$2"; shift 2 ;;
+    --anchor)     ANCHOR="$2"; shift 2 ;;
+    --dry-run)    DRY_RUN=1; shift ;;
+    --help|-h)
+      sed -n '/^# Usage/,/^# See/p' "$0" | sed 's/^# //; s/^#//'
+      exit 0
+      ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+# Validate priority
+case "$PRIORITY" in
+  P0|P1|P2|P3) ;;
+  *) echo "--priority must be one of P0 / P1 / P2 / P3 (got: $PRIORITY)" >&2; exit 2 ;;
+esac
+
+# Detect backend from .tasksmd.json if present
+detect_backend() {
+  local config_file="$DOTFILES_DIR/.tasksmd.json"
+  if [ -f "$config_file" ]; then
+    # Try to read with jq first (preferred), fall back to grep if jq is unavailable
+    if command -v jq >/dev/null 2>&1; then
+      BACKEND=$(jq -r '.backend // "tasks-md"' "$config_file" 2>/dev/null || echo "tasks-md")
+      BACKEND_REPO=$(jq -r '.repo // ""' "$config_file" 2>/dev/null || echo "")
+    else
+      # Fallback: use grep to extract backend field
+      BACKEND=$(grep -o '"backend"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null | sed 's/.*"\([^"]*\)".*/\1/' || echo "tasks-md")
+      BACKEND_REPO=$(grep -o '"repo"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
+    fi
+  fi
+}
+
+detect_backend
+
+# Interactive prompts for missing required fields
+if [ -z "$TITLE" ] && [ -t 0 ]; then
+  read -r -p "Title: " TITLE
+fi
+if [ -z "$TITLE" ]; then
+  echo "--title is required" >&2
+  exit 2
+fi
+
+if [ -z "$ID" ]; then
+  # Slugify: lowercase, replace non-alphanum with -, collapse repeats, trim
+  ID=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')
+fi
+
+# Verify ID is unique in current TASKS.md
+if grep -qE "^\s+- \*\*ID\*\*:\s+${ID}\s*$" "$TASKS_FILE" 2>/dev/null; then
+  echo "ID '$ID' already exists in $TASKS_FILE" >&2
+  echo "Pass --id <unique-slug> to override." >&2
+  exit 2
+fi
+
+if [ "$PRIORITY" = "P0" ] || [ "$PRIORITY" = "P1" ]; then
+  if [ -z "$HYPOTHESIS" ] && [ -t 0 ]; then read -r -p "Hypothesis: " HYPOTHESIS; fi
+  if [ -z "$SUCCESS" ] && [ -t 0 ]; then read -r -p "Success: " SUCCESS; fi
+  if [ -z "$PIVOT" ] && [ -t 0 ]; then read -r -p "Pivot: " PIVOT; fi
+  if [ -z "$MEASUREMENT" ] && [ -t 0 ]; then read -r -p "Measurement: " MEASUREMENT; fi
+  if [ -z "$ANCHOR" ] && [ -t 0 ]; then read -r -p "Anchor: " ANCHOR; fi
+  if [ -z "$HYPOTHESIS" ] || [ -z "$SUCCESS" ] || [ -z "$PIVOT" ] || [ -z "$MEASUREMENT" ] || [ -z "$ANCHOR" ]; then
+    echo "$PRIORITY tasks require --hypothesis, --success, --pivot, --measurement, and --anchor" >&2
+    exit 2
+  fi
+fi
+
+# Build the entry (dotfiles format: nested - **Field**:).
+# Use explicit `if` rather than `[ -n "$X" ] && ...` because the
+# short-circuit on an empty var returns 1, which triggers `set -e`.
+build_entry() {
+  printf -- '- [ ] %s\n' "$TITLE"
+  printf -- '  - **ID**: %s\n' "$ID"
+  if [ -n "$TAGS" ];       then printf -- '  - **Tags**: %s\n' "$TAGS";             fi
+  if [ -n "$DETAILS" ];    then printf -- '  - **Details**: %s\n' "$DETAILS";       fi
+  if [ -n "$FILES" ];      then printf -- '  - **Files**: %s\n' "$FILES";           fi
+  if [ -n "$ACCEPTANCE" ]; then printf -- '  - **Acceptance**: %s\n' "$ACCEPTANCE"; fi
+  if [ -n "$HYPOTHESIS" ]; then printf -- '  - **Hypothesis**: %s\n' "$HYPOTHESIS"; fi
+  if [ -n "$SUCCESS" ];    then printf -- '  - **Success**: %s\n' "$SUCCESS";       fi
+  if [ -n "$PIVOT" ];      then printf -- '  - **Pivot**: %s\n' "$PIVOT";           fi
+  if [ -n "$MEASUREMENT" ]; then printf -- '  - **Measurement**: %s\n' "$MEASUREMENT"; fi
+  if [ -n "$ANCHOR" ];     then printf -- '  - **Anchor**: %s\n' "$ANCHOR";         fi
+}
+
+# Handle github-issues backend: create a GitHub Issue instead of editing TASKS.md
+create_github_issue() {
+  local title="$1"
+  local priority="$2"
+  local tags="$3"
+  local details="$4"
+  local files="$5"
+  local acceptance="$6"
+  local hypothesis="$7"
+  local success="$8"
+  local pivot="$9"
+  local measurement="${10}"
+  local anchor="${11}"
+  local repo="${12}"
+  
+  # Build the issue body with metadata
+  local body="**Priority**: $priority"
+  [ -n "$tags" ] && body="$body"$'\n'"**Tags**: $tags"
+  [ -n "$details" ] && body="$body"$'\n'"**Details**: $details"
+  [ -n "$files" ] && body="$body"$'\n'"**Files**: $files"
+  [ -n "$acceptance" ] && body="$body"$'\n'"**Acceptance**: $acceptance"
+  [ -n "$hypothesis" ] && body="$body"$'\n'"**Hypothesis**: $hypothesis"
+  [ -n "$success" ] && body="$body"$'\n'"**Success**: $success"
+  [ -n "$pivot" ] && body="$body"$'\n'"**Pivot**: $pivot"
+  [ -n "$measurement" ] && body="$body"$'\n'"**Measurement**: $measurement"
+  [ -n "$anchor" ] && body="$body"$'\n'"**Anchor**: $anchor"
+  
+  # Resolve the tasks CLI (prefer an installed `tasks`, else npx). Delegating
+  # to `tasks create` — not a raw `gh issue create` — keeps the github-issues
+  # label/priority mapping in one place: it applies the marker label AND the
+  # `priority/PN` label so `tasks list`/`pick` can see and rank the issue.
+  local -a tasks_cmd
+  if command -v tasks >/dev/null 2>&1; then
+    tasks_cmd=(tasks)
+  else
+    tasks_cmd=(npx -y @tasks-md/cli)
+  fi
+
+  # Expand comma-separated tags into repeatable --tag flags.
+  local -a tag_args=()
+  if [ -n "$tags" ]; then
+    local -a _tags
+    IFS=',' read -ra _tags <<<"$tags"
+    local _t
+    for _t in "${_tags[@]}"; do
+      _t="$(printf '%s' "$_t" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+      [ -n "$_t" ] && tag_args+=(--tag "$_t")
+    done
+  fi
+
+  # Online path: delegate to `tasks create` from the repo root so it resolves
+  # the github-issues backend + repo from .tasksmd.json. On a no-network /
+  # no-SSO personal machine this fails — fall through to the issue-intent queue.
+  if (cd "$DOTFILES_DIR" && "${tasks_cmd[@]}" create "$title" --backend github-issues --priority "$priority" --body "$body" ${tag_args[@]+"${tag_args[@]}"}) >/dev/null 2>&1; then
+    echo "✓ created GitHub Issue in $repo: $title"
+    return 0
+  fi
+
+  # Offline fallback: queue an issue-intent file that keeps the fields.
+  # Nothing consumes it automatically; re-run add-task when online.
+  local intent_file
+  intent_file="$DOTFILES_DIR/.issue-intent-$(date +%s)"
+  cat >"$intent_file" <<EOF
+{
+  "title": "$title",
+  "priority": "$priority",
+  "tags": "$tags",
+  "details": "$details",
+  "files": "$files",
+  "acceptance": "$acceptance",
+  "hypothesis": "$hypothesis",
+  "success": "$success",
+  "pivot": "$pivot",
+  "measurement": "$measurement",
+  "anchor": "$anchor",
+  "repo": "$repo"
+}
+EOF
+  echo "✓ queued issue-intent file (no network): $intent_file"
+  echo "  Re-run bin/add-task with the same fields when online, then delete the file."
+  return 0
+}
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  if [ "$BACKEND" = "github-issues" ]; then
+    echo "Would create GitHub Issue in $BACKEND_REPO:"
+    echo "  Title: $TITLE"
+    echo "  Priority: $PRIORITY"
+    [ -n "$TAGS" ] && echo "  Tags: $TAGS"
+    [ -n "$DETAILS" ] && echo "  Details: $DETAILS"
+    [ -n "$FILES" ] && echo "  Files: $FILES"
+    [ -n "$ACCEPTANCE" ] && echo "  Acceptance: $ACCEPTANCE"
+    [ -n "$HYPOTHESIS" ] && echo "  Hypothesis: $HYPOTHESIS"
+    [ -n "$SUCCESS" ] && echo "  Success: $SUCCESS"
+    [ -n "$PIVOT" ] && echo "  Pivot: $PIVOT"
+    [ -n "$MEASUREMENT" ] && echo "  Measurement: $MEASUREMENT"
+    [ -n "$ANCHOR" ] && echo "  Anchor: $ANCHOR"
+  else
+    echo "Would insert under ## $PRIORITY in $TASKS_FILE:"
+    echo ""
+    build_entry | sed 's/^/  /'
+  fi
+  exit 0
+fi
+
+# Branch based on backend
+if [ "$BACKEND" = "github-issues" ]; then
+  # GitHub Issues backend: create an issue instead of editing TASKS.md
+  if [ -z "$BACKEND_REPO" ]; then
+    echo "✗ backend is github-issues but .tasksmd.json missing 'repo' field" >&2
+    exit 1
+  fi
+  create_github_issue "$TITLE" "$PRIORITY" "$TAGS" "$DETAILS" "$FILES" "$ACCEPTANCE" "$HYPOTHESIS" "$SUCCESS" "$PIVOT" "$MEASUREMENT" "$ANCHOR" "$BACKEND_REPO"
+  echo ""
+  echo "Next steps:"
+  echo "  cd $DOTFILES_DIR"
+  echo "  git status                   # verify no TASKS.md changes"
+  echo ""
+  echo "The GitHub Issue has been created (or an offline intent file was queued)."
+  echo "See: https://github.com/$BACKEND_REPO/issues"
+else
+  # Default tasks-md backend: insert into TASKS.md
+  # Insert the entry just after the `## P<N>` header line.
+  # awk does this with a small inline state machine: pass everything
+  # through, but after the matching header line + its blank line, insert
+  # our new block.
+  ENTRY="$(build_entry)"
+  ENTRY_FILE="$(mktemp)"
+  trap 'rm -f "$ENTRY_FILE"' EXIT
+  printf '\n%s\n' "$ENTRY" > "$ENTRY_FILE"
+
+  awk -v section="## $PRIORITY" -v insert_file="$ENTRY_FILE" '
+    $0 == section {
+      print
+      getline; print
+      while ((getline line < insert_file) > 0) print line
+      close(insert_file)
+      next
+    }
+    { print }
+  ' "$TASKS_FILE" > "$TASKS_FILE.tmp"
+
+  mv "$TASKS_FILE.tmp" "$TASKS_FILE"
+
+  echo "✓ inserted under ## $PRIORITY: $TITLE (id=$ID)"
+
+  # Validate against the lint spec
+  if [ -f "$DOTFILES_DIR/Makefile" ] && grep -q "^lint-tasks:" "$DOTFILES_DIR/Makefile"; then
+    echo ""
+    echo "Running make lint-tasks…"
+    if ! (cd "$DOTFILES_DIR" && make lint-tasks); then
+      echo ""
+      echo "✗ lint-tasks failed — check the inserted entry in $TASKS_FILE"
+      echo "  Revert: git checkout TASKS.md  (or fix manually)"
+      exit 1
+    fi
+  fi
+
+  # Print next steps for the user
+  echo ""
+  echo "Next steps:"
+  echo "  cd $DOTFILES_DIR"
+  echo "  git diff TASKS.md            # review the change"
+  echo "  git add TASKS.md"
+  echo "  git commit -m \"docs(tasks): add $PRIORITY task — $TITLE\""
+  echo "  git push"
+  echo ""
+  echo "Push to a feature branch and open a PR on GitHub.com to land it."
+fi

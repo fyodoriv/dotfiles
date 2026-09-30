@@ -1,0 +1,23 @@
+#!/bin/bash
+# Runs on macOS wake (via sleepwatcher).
+# Ensures network + security stack are ready before agent sessions resume.
+# Keep this fast — sleepwatcher blocks on this script.
+
+LOG="$HOME/.local/share/dotfiles/logs/sleepwatcher.log"
+mkdir -p "$(dirname "$LOG")"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] WAKE detected" >> "$LOG"
+
+# Small delay: WiFi needs a moment to reassociate after lid-open
+sleep 3
+
+# Run network watchdog in background so sleepwatcher returns immediately.
+# `network-watchdog` is on PATH because com.dotfiles.sleepwatcher.plist.tmpl
+# exports `{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin` — calling via PATH
+# keeps the script working when adopters pick a non-default `dotfiles_dir`.
+network-watchdog --quiet &
+
+# Heal stuck agents + kick resilience LaunchAgents after wake (no focus steal).
+dotfiles-agent-wake-recover --quiet &
+
+exit 0

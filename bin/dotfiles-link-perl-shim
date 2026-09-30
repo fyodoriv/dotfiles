@@ -1,0 +1,36 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/perl with a symlink to adhoc-signed Homebrew perl.
+# endpoint agent blocks Apple's /usr/bin/perl (system-signed,
+# Description: perl). The invoked path must be Mach-O, not a bash script.
+#
+# Escape hatch for POSIX-only scripts: invoke /usr/bin/perl directly (never via shim).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SHIM="$SHIM_DIR/perl"
+
+_resolve_brew_perl() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    candidate="${DOTFILES_BREW_PREFIX}/bin/perl"
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  fi
+  for candidate in /opt/homebrew/bin/perl /usr/local/bin/perl; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+BREW_PERL="$(_resolve_brew_perl || true)"
+if [ -z "$BREW_PERL" ]; then
+  echo "perl: Homebrew perl not found — install via brew bundle / brew install perl (never use /usr/bin/perl on managed endpoints)" >&2
+  exit 1
+fi
+
+if [ -e "$SHIM" ] && [ ! -L "$SHIM" ]; then
+  rm -f "$SHIM"
+fi
+
+ln -sfn "$BREW_PERL" "$SHIM"
+chmod +x "$SHIM" 2>/dev/null || true

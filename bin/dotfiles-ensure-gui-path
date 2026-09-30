@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+
+# Reload com.dotfiles.gui-path and verify launchctl getenv PATH prepends dotfiles/bin
+# before /usr/bin. GUI apps and IDE agents inherit this PATH when not sandboxed to
+# /usr/bin:/bin only.
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DOTFILES_DIR="$(cd "$SHIM_DIR/.." && pwd -P)"
+DOTFILES_BIN="$DOTFILES_DIR/bin"
+PLIST="${HOME}/Library/LaunchAgents/com.dotfiles.gui-path.plist"
+UID_NUM="$(id -u)"
+DOMAIN="gui/${UID_NUM}"
+
+if [ ! -f "$PLIST" ]; then
+  echo "✗ $PLIST missing — run: chezmoi apply" >&2
+  exit 1
+fi
+
+launchctl kickstart -k "$DOMAIN/com.dotfiles.gui-path" 2>/dev/null \
+  || launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null \
+  || launchctl load "$PLIST" 2>/dev/null \
+  || true
+
+sleep 0.5
+_lc_path="$(launchctl getenv PATH 2>/dev/null || true)"
+if [ -z "$_lc_path" ]; then
+  echo "✗ launchctl getenv PATH is empty after gui-path kickstart" >&2
+  exit 1
+fi
+
+_lc_df_idx="$(echo "$_lc_path" | tr ':' '\n' | grep -n "^${DOTFILES_BIN}\$" | head -1 | cut -d: -f1 || true)"
+_lc_ub_idx="$(echo "$_lc_path" | tr ':' '\n' | grep -n '^/usr/bin$' | head -1 | cut -d: -f1 || true)"
+
+if [ -z "$_lc_df_idx" ] || [ -z "$_lc_ub_idx" ] || [ "$_lc_df_idx" -ge "$_lc_ub_idx" ]; then
+  echo "✗ launchctl PATH missing dotfiles/bin before /usr/bin" >&2
+  echo "  PATH=${_lc_path}" >&2
+  exit 1
+fi
+
+echo "✓ launchctl PATH has dotfiles/bin before /usr/bin (gui-path active)"

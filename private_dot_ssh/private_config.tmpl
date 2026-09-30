@@ -1,0 +1,38 @@
+{{ if .is_enterprise -}}
+# ── Enterprise overlay ───────────────────────────────────────────────
+# The org overlay may deploy ~/.ssh/config.enterprise. The trailing `*` makes
+# OpenSSH treat the path as a glob, so a missing file is skipped without a
+# warning on every ssh invocation.
+Include config.enterprise*
+{{ end -}}
+
+# ── Defaults ─────────────────────────────────────────────────────────
+Host *
+    AddKeysToAgent yes
+    UseKeychain yes
+    IdentityFile ~/.ssh/id_ed25519
+    IdentityFile ~/.ssh/id_rsa
+    ConnectTimeout 15
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 300
+
+# ── GitHub ───────────────────────────────────────────────────────────
+Host github.com
+    HostName github.com
+    IdentityFile ~/.ssh/id_ed25519
+    IdentityFile ~/.ssh/id_rsa
+
+# ── GitHub Enterprise (optional — set chezmoi `ghe_ssh_host` or DOTFILES_GHE_SSH_HOST) ─
+{{ if and .is_enterprise (dig "ghe_ssh_host" "" .) -}}
+Host {{ dig "ghe_ssh_host" "" . }}
+    ConnectTimeout 15
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+    ControlPersist 300
+{{ end -}}
+
+# ── Local overrides ─────────────────────────────────────────────────
+Include ~/.ssh/config.local

@@ -1,0 +1,485 @@
+# ── Session logging (opt-in: export TERMINAL_LOG=1 in ~/.zshrc.local) ─
+# Logs full terminal I/O to ~/.local/share/terminal-logs/<date>/<time>.log
+# Enable:  export TERMINAL_LOG=1  (in ~/.zshrc.local or shell env)
+# View:    ls ~/.local/share/terminal-logs/$(date +%Y-%m-%d)/
+# Search:  rg "pattern" ~/.local/share/terminal-logs/
+if [[ "$TERMINAL_LOG" == "1" && -z "$SCRIPT_LOG_FILE" && -o interactive && -z "$INSIDE_EMACS" ]]; then
+  _logdir="$HOME/.local/share/terminal-logs/$(date +%Y-%m-%d)"
+  mkdir -p "$_logdir"
+  export SCRIPT_LOG_FILE="$_logdir/$(date +%H%M%S)-$$.log"
+  fd -e log --changed-before 30days "$HOME/.local/share/terminal-logs" -x rm {} 2>/dev/null &!
+  exec script -q "$SCRIPT_LOG_FILE"
+fi
+
+# ── JetBrains terminal fast path ────────────────────────────────────
+# WebStorm exposes this stable terminal identity. Claude Code needs PATH and
+# Node, but not shell completion while it starts in an embedded terminal.
+DOTFILES_IS_JETBRAINS_TERMINAL=0
+DOTFILES_JETBRAINS_FAST_SHELL=0
+if [[ "${TERMINAL_EMULATOR:-}" == "JetBrains-JediTerm" ]]; then
+  DOTFILES_IS_JETBRAINS_TERMINAL=1
+  if [[ -z "${DOTFILES_JETBRAINS_FULL_SHELL:-}" ]]; then
+    DOTFILES_JETBRAINS_FAST_SHELL=1
+  fi
+fi
+export DOTFILES_IS_JETBRAINS_TERMINAL DOTFILES_JETBRAINS_FAST_SHELL
+
+# ── Homebrew (arm64 at /opt/homebrew, x86 fallback at /usr/local) ─────
+# Guard on uname -m: when the shell runs under Rosetta (x86_64), skip the
+# arm64 Homebrew so its arm64-only binaries (e.g. python3) don't shadow the
+# universal /usr/local equivalents that the x86_64 shell expects.
+if (( DOTFILES_JETBRAINS_FAST_SHELL )); then
+  # Claude Code needs Homebrew tools on PATH, not the rest of brew shellenv.
+  if [ "$(uname -m)" = "arm64" ] && [ -d "/opt/homebrew/bin" ]; then
+    export PATH="$PATH:/opt/homebrew/bin:/opt/homebrew/sbin"
+  elif [ -d "/usr/local/bin" ]; then
+    export PATH="$PATH:/usr/local/bin:/usr/local/sbin"
+  fi
+elif [ "$(uname -m)" = "arm64" ] && [ -d "/opt/homebrew/bin" ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -x "/usr/local/bin/brew" ]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
+# Purge any inherited arm64 Homebrew entries from PATH when running under
+# Rosetta — the parent shell may have injected /opt/homebrew before exec.
+if [ "$(uname -m)" = "x86_64" ]; then
+  PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '^/opt/homebrew' | tr '\n' ':' | sed 's/:$//')"
+  export PATH
+fi
+
+# ── fnm: fast Node.js version manager (Rust, ~1ms init) ──────────────
+if (( $+commands[fnm] )) && (( ! DOTFILES_JETBRAINS_FAST_SHELL )); then
+  [ -f ~/.cache/zsh/fnm.zsh ] && source ~/.cache/zsh/fnm.zsh || \
+    eval "$(fnm env --arch "$(uname -m | sed 's/x86_64/x64/')" --use-on-cd --corepack-enabled --version-file-strategy=recursive --shell zsh)"
+fi
+
+# ── PATH ─────────────────────────────────────────────────────────────
+[ -d "$HOME/.rd/bin" ] && export PATH="$HOME/.rd/bin:$PATH"
+# XDG user-binary dir — always on PATH so shims (minsky, etc.) resolve
+# first-try even before the dir is populated. dotfiles apply mkdir's it.
+export PATH="$HOME/.local/bin:$PATH"
+# Homebrew keg-only overrides: prefer patched curl over /usr/bin/curl (endpoint policy).
+for _curl_keg in /opt/homebrew/opt/curl/bin /usr/local/opt/curl/bin; do
+  if [ -d "$_curl_keg" ]; then
+    export PATH="$_curl_keg:$PATH"
+    [ -x "$_curl_keg/curl" ] && export HOMEBREW_CURL_PATH="$_curl_keg/curl"
+    break
+  fi
+done
+unset _curl_keg
+# Derive dotfiles dir from this file's symlink target (works regardless of clone
+# location). When ~/.zshrc isn't a symlink (rare — chezmoi installs it as one
+# via symlink_dot_zshrc.tmpl), `readlink` returns empty, `_dotfiles_bin` stays
+# empty, and the `[ -d ]` test below falls through to the dotfiles-less PATH.
+_dotfiles_zshrc="$(readlink "$HOME/.zshrc" 2>/dev/null || true)"
+_dotfiles_bin="${_dotfiles_zshrc:+$(dirname "$(dirname "$_dotfiles_zshrc")")/bin}"
+[ -n "$_dotfiles_bin" ] && [ -d "$_dotfiles_bin" ] && export PATH="$_dotfiles_bin:$HOME/bin:$PATH" || export PATH="$HOME/bin:$PATH"
+unset _dotfiles_bin _dotfiles_zshrc
+
+# ── Shell history ────────────────────────────────────────────────────
+HISTFILE=~/.zsh_history
+HISTSIZE=100000
+SAVEHIST=100000
+setopt HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS HIST_SAVE_NO_DUPS
+setopt SHARE_HISTORY APPEND_HISTORY INC_APPEND_HISTORY HIST_REDUCE_BLANKS
+
+# ── Agent-context detection ─────────────────────────────────────────
+# IDE agent terminals (Windsurf, Cursor, Claude Code, Devin, Codex) are
+# real TTYs that source ~/.zshrc, but no human is present to answer
+# interactive prompts. Any blocking prompt (sudo password, zsh [nyae]?,
+# ssh host key, git credential) hangs the agent terminal indefinitely.
+# Detect once, apply all guards below.
+#
+# Detection signals (verified empirically):
+#   Windsurf Cascade: WINDSURF_CASCADE_TERMINAL_KIND=inherit
+#   Cursor Agent:     CURSOR_AGENT=1  (or TERM_PROGRAM=cursor)
+#   Claude Code:      CLAUDE_CODE_SSE_PORT=<port>
+#   Devin CLI:        DEVIN_SESSION_ID=<uuid>
+#   Codex CLI:        CODEX_AGENT=1
+#   VS Code tasks:    VSCODE_INJECTION=1 (catches generic IDE terminals)
+DOTFILES_IS_AGENT=0
+if [[ -n "${WINDSURF_CASCADE_TERMINAL_KIND:-}" \
+   || -n "${CURSOR_AGENT:-}" \
+   || -n "${CLAUDE_CODE_SSE_PORT:-}" \
+   || -n "${DEVIN_SESSION_ID:-}" \
+   || -n "${CODEX_AGENT:-}" \
+   || -n "${VSCODE_INJECTION:-}" ]]; then
+  DOTFILES_IS_AGENT=1
+fi
+export DOTFILES_IS_AGENT
+
+# ── Shell options ────────────────────────────────────────────────────
+setopt AUTO_CD
+setopt CORRECT
+(( DOTFILES_IS_AGENT )) && unsetopt CORRECT
+setopt NO_CASE_GLOB
+setopt GLOB_DOTS
+setopt AUTO_PUSHD PUSHD_IGNORE_DUPS PUSHD_SILENT
+
+# ── Non-TTY interactive bail-out ─────────────────────────────────────
+# IDEs (Windsurf, VS Code, Cursor) source ~/.zshrc via `zsh -i -c "..."`
+# piped without a TTY to inherit the operator's PATH and env vars at
+# startup. The "interactive" flag is set, but stdout isn't a TTY, so
+# every line-editor-touching block below (compinit, bindkey, zle, the
+# starship prompt's `zle -N` calls) writes errors to stderr:
+#
+#   compinit: initialization aborted
+#   .zshrc:107: command not found: compdef
+#   (eval):1: can't change option: zle
+#
+# That noise breaks the IDE's env resolver — it gives up with
+# "Unable to resolve your shell environment in a reasonable time"
+# and the integrated terminal loses inherited env (PATH, fnm, etc.).
+#
+# Bail out here when there's no TTY. PATH is already set from the
+# block above and from ~/.zshenv; aliases / completion / line bindings
+# are TTY-only and meaningless to a piped subshell anyway. Real
+# interactive shells (Ghostty, IDE terminals) have a TTY and continue.
+[[ -t 1 ]] || return 0
+
+# ── Agent-safe guards (prompt-hang prevention) ─────────────────────
+# Every guard makes a blocking interactive prompt fail-fast or auto-answer
+# instead of waiting for human input. Human shells (DOTFILES_IS_AGENT=0)
+# are completely unaffected.
+if (( DOTFILES_IS_AGENT )); then
+  # sudo: password prompt hangs → fail immediately with -n (non-interactive).
+  # A clear "sudo: a password is required" error beats a silent hang.
+  alias sudo='sudo -n'
+
+  # ssh: "Are you sure you want to continue connecting (yes/no)?" hangs.
+  # accept-new: auto-accept unknown hosts, reject changed fingerprints.
+  alias ssh="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+  alias scp="scp -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+
+  # git: credential/auth and editor prompts hang.
+  export GIT_TERMINAL_PROMPT=0
+  export GIT_EDITOR=true   # auto-accept rebase todo, merge messages, etc.
+
+  # Pager: less/more block on keypress → use cat.
+  export PAGER=cat
+  export GIT_PAGER=cat
+
+  # pip/brew/apt: confirmation prompts hang → auto-yes or non-interactive.
+  export PIP_NO_INPUT=1
+  export HOMEBREW_NO_AUTO_UPDATE=1
+
+  # rm/cp/mv: aliased to -i in some environments → force non-interactive.
+  alias rm='rm'
+  alias cp='cp'
+  alias mv='mv'
+
+  # Editor: anything that opens vim/nano hangs → use a no-op.
+  export EDITOR=true
+  export VISUAL=true
+fi
+
+# agentbrew shell hook
+[ -f ~/.config/agentbrew/shell-hook.sh ] && source ~/.config/agentbrew/shell-hook.sh
+
+# ── WebStorm Claude Code shell ───────────────────────────────────────
+if (( DOTFILES_JETBRAINS_FAST_SHELL )); then
+  # Keep the first prompt lean. A full shell restores completion, aliases,
+  # and per-directory Node switching when the operator needs them.
+  dotfiles-full-shell() {
+    DOTFILES_JETBRAINS_FULL_SHELL=1 exec zsh -l
+  }
+  export HOMEBREW_NO_AUTO_UPDATE=1
+  export HOMEBREW_NO_INSTALL_CLEANUP=1
+  export HOMEBREW_NO_ENV_HINTS=1
+  if [ -z "${NODE_OPTIONS:-}" ]; then
+    _mem_mb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 17179869184) / 1048576 / 2 ))
+    [ "$_mem_mb" -gt 8192 ] && _mem_mb=8192
+    export NODE_OPTIONS="--max-old-space-size=$_mem_mb"
+    unset _mem_mb
+  fi
+  export NODE_COMPILE_CACHE="$HOME/.cache/node-compile"
+  ulimit -n 65535
+  PROMPT='%F{blue}%~%f %F{green}❯%f '
+
+  # Claude-facing environment and browser routing remain available.
+  [ -f ~/.zshrc.ai-tools ] && source ~/.zshrc.ai-tools
+  [ -f ~/.zshrc.local ] && source ~/.zshrc.local
+  if [ -d /etc/profile.d ]; then
+    for _zia_f in /etc/profile.d/*.sh; do [ -f "$_zia_f" ] && . "$_zia_f"; done
+    unset _zia_f
+  fi
+  return 0
+fi
+
+# ── Completion ───────────────────────────────────────────────────────
+autoload -Uz compinit
+  # Rebuild completion dump once daily
+  if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
+    compinit
+  else
+    compinit -C
+  fi
+  zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+  zstyle ':completion:*' menu select
+  zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+  # dotfiles CLI completion
+  _dotfiles() {
+    local -a subcmds=(
+      'apply:Apply dotfiles (chezmoi apply)'
+      'init:Initialize on new machine'
+      'diff:Show pending changes'
+      'doctor:Audit configs (--fix auto-repairs)'
+      'audit:Security audit (SSH, secrets, permissions)'
+      'sync:Commit local changes and pull remote'
+      'edit:Open dotfiles repo in editor'
+      'cd:Print dotfiles directory'
+      'update:Pull latest and re-apply'
+      'managed:List all managed files'
+      'status:Show git status'
+      'stats:Show automation stats'
+      'cheat:Show commands and aliases'
+      'uninstall:Remove dotfiles from this machine'
+      'add:Add a config file'
+      'unmanage:Remove a managed file'
+      'new-module:Create a new doctor module'
+      'brew-add:Add a Homebrew package'
+      'defaults-add:Add a macOS default'
+      'profile:Show or switch profile'
+      'enterprise:Show or toggle enterprise mode'
+      'help:Show help'
+      'version:Show version'
+    )
+    if (( CURRENT == 2 )); then
+      _describe 'command' subcmds
+    else
+      case "${words[2]}" in
+        doctor)     compadd --fix --quiet --skip --list --module ;;
+        audit)      compadd --report ;;
+        add)        compadd --copy --module ;;
+        brew-add)   compadd --cask --full-only ;;
+        new-module) compadd --severity ;;
+        profile)    compadd core full ;;
+        enterprise) compadd on off ;;
+        uninstall)  compadd --dry-run ;;
+      esac
+    fi
+  }
+  compdef _dotfiles dotfiles
+
+# ── Key bindings ─────────────────────────────────────────────────────
+bindkey -e
+bindkey '^[[1;3D' backward-word
+bindkey '^[[1;3C' forward-word
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
+bindkey '^[[3~' delete-char
+bindkey '^[^?' backward-kill-word
+bindkey '^[[3;3~' kill-word
+
+# ── Editor ───────────────────────────────────────────────────────────
+export EDITOR="${EDITOR:-vim}"
+export VISUAL="$EDITOR"
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^X^E' edit-command-line
+
+# ── Aliases: git ─────────────────────────────────────────────────────
+alias g='git'
+alias gs='git status'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gl='git log --oneline -20'
+alias gp='git push'
+alias gpf='git push --force-with-lease'
+alias gc='git commit'
+alias gca='git commit --amend --no-edit'
+alias gco='git checkout'
+alias gb='git branch'
+alias gpl='git pull --rebase'
+alias gsw='git switch'
+alias gsc='git switch --create'
+alias gst='git stash'
+alias gstp='git stash pop'
+
+# ── Aliases: modern replacements ─────────────────────────────────────
+if (( $+commands[eza] )); then
+  alias ls='eza --group-directories-first'
+  alias ll='eza -la --group-directories-first --git --icons'
+  alias la='eza -a --group-directories-first'
+  alias lt='eza -la --tree --level=2 --group-directories-first --git --icons'
+else
+  alias ll='ls -lAh'
+  alias la='ls -A'
+fi
+
+if (( $+commands[bat] )); then
+  alias cat='bat --paging=never --style=plain'
+  alias catp='bat'
+  export BAT_THEME="Dracula"
+fi
+
+# `find` is handled by bin/find (symlink to adhoc-signed gfind (shadows /usr/bin/find on PATH).
+# No alias needed — the wrapper covers interactive shells, scripts, and agents.
+
+# ── Aliases: navigation & utilities ──────────────────────────────────
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias d='dirs -v'
+alias grep='grep --color=auto'
+alias ports='lsof -i -P -n | grep LISTEN'
+alias flushdns='sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder'
+alias reload='source ~/.zshrc'
+alias path='echo $PATH | tr ":" "\n" | cat -n'
+alias weather='curl -s "wttr.in?format=3"'
+alias ip='curl -s ifconfig.me'
+alias dsize='du -sh * | sort -rh | head -20'
+alias psjson='ps aux | head -1; ps aux | sort -rk 3 | head -10'
+
+# ── fzf: fuzzy finder ───────────────────────────────────────────────
+if (( $+commands[fzf] )); then
+  # Use cached init (regenerate: fzf --zsh > ~/.cache/zsh/fzf.zsh)
+  [ -f ~/.cache/zsh/fzf.zsh ] && source ~/.cache/zsh/fzf.zsh
+  export FZF_DEFAULT_OPTS="
+    --height=40%
+    --layout=reverse
+    --border=rounded
+    --info=inline
+    --margin=0,2
+    --padding=0
+    --color=fg:#f8f8f2,bg:-1,hl:#bd93f9
+    --color=fg+:#f8f8f2,bg+:#44475a,hl+:#bd93f9
+    --color=info:#ffb86c,prompt:#50fa7b,pointer:#ff79c6
+    --color=marker:#ff79c6,spinner:#ffb86c,header:#6272a4
+    --bind='ctrl-d:half-page-down,ctrl-u:half-page-up'
+  "
+  if (( $+commands[fd] )); then
+    export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
+  fi
+  if (( $+commands[bat] )); then
+    export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {}'"
+  fi
+fi
+
+
+# ── Prompt (starship: cross-shell, git/node/python info) ─────────────
+if (( $+commands[starship] )); then
+  [ -f ~/.cache/zsh/starship.zsh ] && source ~/.cache/zsh/starship.zsh || \
+    eval "$(starship init zsh)"
+else
+  autoload -Uz vcs_info
+  precmd() { vcs_info }
+  zstyle ':vcs_info:git:*' formats ' %F{magenta}(%b)%f'
+  zstyle ':vcs_info:*' enable git
+  setopt PROMPT_SUBST
+  PROMPT='%F{blue}%~%f${vcs_info_msg_0_} %F{green}❯%f '
+fi
+
+# ── Homebrew ─────────────────────────────────────────────────────────
+export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_CLEANUP=1
+export HOMEBREW_NO_ENV_HINTS=1
+
+# ── Node.js memory ───────────────────────────────────────────────────
+# Default to half of physical RAM (MB), capped at 8GB. Override in ~/.zshrc.local.
+if [ -z "${NODE_OPTIONS:-}" ]; then
+  _mem_mb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 17179869184) / 1048576 / 2 ))
+  [ "$_mem_mb" -gt 8192 ] && _mem_mb=8192
+  export NODE_OPTIONS="--max-old-space-size=$_mem_mb"
+  unset _mem_mb
+fi
+export NODE_COMPILE_CACHE="$HOME/.cache/node-compile"
+
+# ── Resource limits ──────────────────────────────────────────────────
+ulimit -n 65535
+
+# ── Dev functions ────────────────────────────────────────────────────
+killport() { lsof -ti:"$1" | xargs kill -9 2>/dev/null && echo "Killed port $1" || echo "Nothing on port $1"; }
+serve() { npx -y serve -l "${1:-3000}" .; }
+mkcd() { mkdir -p "$1" && cd "$1"; }
+gclone() { git clone "$1" && cd "$(basename "$1" .git)"; }
+
+# Quick project opener — cd + list
+p() {
+  local repos="${DOTFILES_REPOS_DIR:-$HOME/apps}"
+  local dir="$repos/${1}"
+  if [ -d "$dir" ]; then
+    cd "$dir" && ll
+  else
+    echo "Projects:" && ls "$repos"
+  fi
+}
+
+# Git branch cleanup — delete merged local branches
+gclean() {
+  git branch --merged | grep -v '\*\|main\|master' | xargs -n 1 git branch -d 2>/dev/null
+  echo "Cleaned merged branches"
+}
+
+# Quick grep in project
+search() { rg --color=always --line-number --no-heading "$@" | fzf --ansi; }
+
+# ── AI tooling (opt-in via chezmoi: use_ai_tools) ────────────────────
+[ -f ~/.zshrc.ai-tools ] && source ~/.zshrc.ai-tools
+
+# ── Task management aliases (GitHub Issues / tasks.md backend) ────────
+[ -f ~/.zshrc.tasks ] && source ~/.zshrc.tasks
+
+# ── Local overrides (not tracked in dotfiles) ──────────────────────
+[ -f ~/.zshrc.local ] && source ~/.zshrc.local
+
+# ── Deduplicate PATH ────────────────────────────────────────────────
+typeset -U PATH
+
+# ── Zsh plugins (deferred — load after first prompt for faster startup) ──
+# Registers a one-shot precmd hook. The first prompt renders fast; plugins
+# load before the second prompt (which is effectively instant since the user
+# is still reading the first prompt output). Saves ~75ms from initial display.
+_load_plugins() {
+  add-zsh-hook -d precmd _load_plugins
+  unfunction _load_plugins 2>/dev/null
+
+  # Syntax highlighting (must be before autosuggestions)
+  local fsh="/opt/homebrew/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+  [ ! -f "$fsh" ] && fsh="/usr/local/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+  [ ! -f "$fsh" ] && fsh="/opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  [ ! -f "$fsh" ] && fsh="/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  [ -f "$fsh" ] && source "$fsh"
+
+  # Autosuggestions
+  local as="/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  [ ! -f "$as" ] && as="/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  [ -f "$as" ] && source "$as"
+
+  # History substring search
+  local hs="/opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh"
+  [ ! -f "$hs" ] && hs="/usr/local/share/zsh-history-substring-search/zsh-history-substring-search.zsh"
+  if [ -f "$hs" ]; then
+    source "$hs"
+    bindkey '^[[A' history-substring-search-up
+    bindkey '^[[B' history-substring-search-down
+    bindkey -M emacs '^P' history-substring-search-up
+    bindkey -M emacs '^N' history-substring-search-down
+    HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND="bg=#44475a,fg=#50fa7b,bold"
+    HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND="bg=#44475a,fg=#ff5555,bold"
+  fi
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _load_plugins
+
+# ── zoxide: smarter cd (must be at end of .zshrc) ───────────────────
+export _ZO_DOCTOR=0  # suppress false-positive "must be at end" warning
+if (( $+commands[zoxide] )); then
+  [ -f ~/.cache/zsh/zoxide.zsh ] && source ~/.cache/zsh/zoxide.zsh
+fi
+
+# Rancher Desktop CLI tools. Set Rancher Desktop's PATH setting to "Manual":
+# in "Automatic" mode it writes a block with this machine's absolute home
+# path into ~/.zshrc, which is this tracked file.
+[ -d "$HOME/.rd/bin" ] && export PATH="$HOME/.rd/bin:$PATH"
+
+# ZIA-CERT-STORE-MANAGED profile.d sourcing
+if [ -d /etc/profile.d ]; then
+  for _zia_f in /etc/profile.d/*.sh; do [ -f "$_zia_f" ] && . "$_zia_f"; done
+  unset _zia_f
+fi
+# ZIA-CERT-STORE-MANAGED-END

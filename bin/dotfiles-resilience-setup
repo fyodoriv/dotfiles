@@ -1,0 +1,175 @@
+#!/bin/bash
+# dotfiles-resilience-setup — one-shot wizard for the laptop-resilience layer.
+#
+# Verifies (and installs) every piece of the "agents survive lid close +
+# network drops + terminal close" stack:
+#   1. tmux               — session persistence (already in Brewfile)
+#   2. sleepwatcher       — macOS sleep/wake hooks (already in Brewfile)
+#   3. mas                — App Store CLI (for Amphetamine install)
+#   4. Amphetamine        — manager-owned lid-closed persistence (App Store)
+#   5. agent-tmux         — tmux wrapper for agent CLIs
+#   6. network-resilience LaunchAgent — auto-heal wifi/VPN/DNS post-wake
+#   7. sleepwatcher LaunchAgent — fires ~/.wakeup → network-watchdog
+#
+# Idempotent — re-running is free. Prints a status table at the end.
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+# Color helpers (works with or without dotfiles colors.sh sourced).
+_RED=$'\033[0;31m'; _GRN=$'\033[0;32m'; _YEL=$'\033[0;33m'; _DIM=$'\033[2m'; _RST=$'\033[0m'
+ok()   { printf "  ${_GRN}✓${_RST} %s\n" "$1"; }
+warn() { printf "  ${_YEL}⚠${_RST} %s\n" "$1"; }
+err()  { printf "  ${_RED}✗${_RST} %s\n" "$1"; }
+hint() { printf "  ${_DIM}→ %s${_RST}\n" "$1"; }
+section() { printf "\n${_DIM}── %s${_RST}\n" "$1"; }
+
+AMPHETAMINE_APP_ID=937984704
+AMPHETAMINE_PATH=/Applications/Amphetamine.app
+
+# ── 1. tmux ───────────────────────────────────────────────────────────
+section "tmux (session persistence)"
+if command -v tmux >/dev/null 2>&1; then
+  ok "tmux $(tmux -V | awk '{print $2}') installed"
+else
+  err "tmux not found — install: brew install tmux"
+fi
+
+# ── 2. sleepwatcher ───────────────────────────────────────────────────
+section "sleepwatcher (macOS sleep/wake hooks)"
+if [ -x /opt/homebrew/sbin/sleepwatcher ] || [ -x /usr/local/sbin/sleepwatcher ]; then
+  ok "sleepwatcher binary present"
+else
+  err "sleepwatcher not found — install: brew install sleepwatcher"
+fi
+if launchctl list | grep -q com.dotfiles.sleepwatcher; then
+  ok "sleepwatcher LaunchAgent loaded"
+else
+  warn "sleepwatcher LaunchAgent not loaded"
+  hint "load: launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.sleepwatcher.plist"
+fi
+
+# ── 3. mas (App Store CLI) ────────────────────────────────────────────
+section "mas (App Store CLI — for Amphetamine install)"
+if command -v mas >/dev/null 2>&1; then
+  ok "mas $(mas version) installed"
+else
+  warn "mas not installed"
+  hint "installing now: brew install mas"
+  if brew install mas; then
+    ok "mas installed"
+  else
+    err "mas install failed — install manually: brew install mas"
+  fi
+fi
+
+# ── 4. Amphetamine ────────────────────────────────────────────────────
+section "Amphetamine (manager-owned lid-closed protection)"
+if [ -d "$AMPHETAMINE_PATH" ]; then
+  ok "Amphetamine.app installed"
+else
+  warn "Amphetamine.app not installed"
+  if command -v mas >/dev/null 2>&1; then
+    # mas install requires App Store sign-in. If the user isn't signed in,
+    # this errors with a helpful message — preferable to silently failing.
+    hint "installing via mas (requires App Store sign-in)..."
+    if mas install "$AMPHETAMINE_APP_ID" 2>&1; then
+      ok "Amphetamine installed via mas"
+    else
+      warn "mas install failed (likely not signed into App Store)"
+      hint "opening App Store page for one-click install..."
+      open "macappstore://apps.apple.com/app/amphetamine/id${AMPHETAMINE_APP_ID}" 2>/dev/null || true
+    fi
+  else
+    hint "opening App Store page for manual install..."
+    open "macappstore://apps.apple.com/app/amphetamine/id${AMPHETAMINE_APP_ID}" 2>/dev/null || true
+  fi
+fi
+
+# ── 4b. Amphetamine manager policy ───────────────────────────────────
+# Generic Trigger and automatic Default Duration sessions can outlive agent
+# work. The keepawake manager starts an owned session only while Cursor or
+# Claude Code is running on AC or battery at/above 20%, then ends it promptly.
+amphetamine_managed_policy_ready() {
+  local trigger_count triggers_enabled at_launch on_wake on_ac_reconnect
+  trigger_count=$(defaults read com.if.Amphetamine "Trigger Data" 2>/dev/null | { grep -c '{' || true; })
+  trigger_count=${trigger_count:-0}
+  triggers_enabled=$(defaults read com.if.Amphetamine "Enable Triggers" 2>/dev/null || echo 0)
+  at_launch=$(defaults read com.if.Amphetamine "Start Session At Launch" 2>/dev/null || echo 0)
+  on_wake=$(defaults read com.if.Amphetamine "Start Session On Wake" 2>/dev/null || echo 0)
+  on_ac_reconnect=$(defaults read com.if.Amphetamine "Restart DD Session on AC Reconnect" 2>/dev/null || echo 0)
+  [ "$trigger_count" -eq 0 ] && [ "$triggers_enabled" != "1" ] \
+    && [ "$at_launch" != "1" ] && [ "$on_wake" != "1" ] \
+    && [ "$on_ac_reconnect" != "1" ]
+}
+
+if [ -d "$AMPHETAMINE_PATH" ]; then
+  if amphetamine_managed_policy_ready; then
+    ok "Amphetamine has no generic trigger or automatic session"
+  else
+    warn "Amphetamine has a generic trigger or automatic session"
+    hint "restore the managed baseline: dotfiles-amphetamine-sync apply"
+  fi
+
+  echo "  ${_DIM}Lid-closed agent protection:${_RST}"
+  echo "  ${_DIM}  • Apply the managed baseline: dotfiles-amphetamine-sync apply${_RST}"
+  echo "  ${_DIM}  • In Amphetamine Preferences → Sessions, keep 'Allow System to Sleep When Display is Closed' off.${_RST}"
+  echo "  ${_DIM}  • Leave generic Triggers off. The process manager owns this lifecycle.${_RST}"
+  echo "  ${_DIM}  • Start Cursor or Claude Code. If macOS asks to allow osascript to control Amphetamine, choose Allow.${_RST}"
+  echo "  ${_DIM}  • The manager protects AC and battery at or above 20%, then releases after both processes exit.${_RST}"
+fi
+
+# ── 5. agent-tmux ─────────────────────────────────────────────────────
+section "agent-tmux (tmux wrapper for agent CLIs)"
+if command -v agent-tmux >/dev/null 2>&1; then
+  ok "agent-tmux on PATH ($(command -v agent-tmux))"
+  hint "run agents: \`tdv\` (Devin), \`tcc\` (Claude Code), \`tcur\` (Cursor), \`agents\` (list)"
+else
+  err "agent-tmux not on PATH — re-run \`dotfiles apply\`"
+fi
+
+# ── 6. network-resilience LaunchAgent ─────────────────────────────────
+section "network-resilience (auto-heal wifi/VPN/DNS post-wake)"
+if launchctl print "gui/$UID/com.dotfiles.network-resilience" 2>/dev/null | grep -q "last exit code = 0"; then
+  ok "network-resilience LaunchAgent running clean"
+elif launchctl print "gui/$UID/com.dotfiles.network-resilience" 2>/dev/null | grep -q "last exit code = 127"; then
+  warn "network-resilience returning 127 — stale path"
+  hint "reload: launchctl bootout gui/\$UID/com.dotfiles.network-resilience && launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist"
+elif launchctl list | grep -q com.dotfiles.network-resilience; then
+  ok "network-resilience LaunchAgent loaded (not yet executed)"
+else
+  warn "network-resilience LaunchAgent not loaded"
+  hint "load: launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist"
+fi
+
+# ── 7. Power settings ────────────────────────────────────────────────
+section "Power settings"
+ac_sleep=$(pmset -g | awk '/^ sleep/ {print $2; exit}')
+ac_disksleep=$(pmset -g | awk '/^ disksleep/ {print $2; exit}')
+if [ "$ac_sleep" = "1" ] && [ "$ac_disksleep" = "10" ]; then
+  ok "AC idle timers are normal (sleep=1 min, disksleep=10 min)"
+else
+  warn "AC idle timers are sleep=${ac_sleep:-?}, disksleep=${ac_disksleep:-?} (expected 1 and 10)"
+  hint "set: sudo pmset -c sleep 1 disksleep 10"
+fi
+
+# ── 8. ulimit ────────────────────────────────────────────────────────
+section "File descriptor limit (Chrome/Playwright/multi-agent)"
+fd_limit=$(ulimit -n 2>/dev/null || echo "?")
+if [ "$fd_limit" -ge 4096 ] 2>/dev/null; then
+  ok "ulimit -n = $fd_limit (sufficient for multi-agent workloads)"
+else
+  warn "ulimit -n = $fd_limit (low — Chrome/Playwright may exhaust)"
+  hint "add to ~/.zshrc: ulimit -n 8192"
+fi
+
+# ── Summary ──────────────────────────────────────────────────────────
+section "Next steps"
+echo "  After applying the managed Amphetamine policy:"
+echo "    • Test: start Cursor or Claude Code → close lid → wait → open lid → verify the same agent session is still running"
+echo "    • Test cleanup: exit both Cursor and Claude Code → dotfiles-agent-keepawake --dry-run reports release"
+echo "    • Test: toggle wifi off→on → tail ~/.local/share/dotfiles/logs/network-watchdog.log → see auto-recovery"
+echo "    • Diagnose: \`dotfiles doctor resilience\` for ongoing health checks"
+echo ""

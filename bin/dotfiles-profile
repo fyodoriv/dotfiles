@@ -1,0 +1,34 @@
+#!/bin/bash
+# Show or switch chezmoi profile.
+# Usage: dotfiles profile [core|full]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+command -v yq &>/dev/null || { echo "error: yq not found — run 'brew install yq'" >&2; exit 1; }
+
+chezmoi_config="$HOME/.config/chezmoi/chezmoi.yaml"
+if [ $# -eq 0 ]; then
+  if [ -f "$chezmoi_config" ]; then
+    current=$(yq '.data.profile // "unknown"' "$chezmoi_config" 2>/dev/null || echo "unknown")
+    echo "Current profile: $current"
+  else
+    echo "No chezmoi config found at $chezmoi_config"
+  fi
+else
+  new_profile="$1"
+  case "$new_profile" in
+    core|full) ;;
+    *) echo "Error: profile must be 'core' or 'full'" >&2; exit 1 ;;
+  esac
+  if [ ! -f "$chezmoi_config" ]; then
+    echo "Error: $chezmoi_config not found" >&2; exit 1
+  fi
+  yq -i ".data.profile = \"$new_profile\"" "$chezmoi_config"
+  echo "✓ Profile set to '$new_profile'"
+  echo "→ Applying changes..."
+  chezmoi apply --source "$DOTFILES_DIR"
+  echo "✓ Done"
+fi

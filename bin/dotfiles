@@ -1,0 +1,341 @@
+#!/bin/bash
+# Unified dotfiles CLI — delegates to chezmoi.
+#
+# Usage:
+#   dotfiles <command> [args]
+#   dotfiles --help
+
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+
+_check_for_updates() {
+  # Skip if not a git repo or no remote
+  [ -d "$DOTFILES_DIR/.git" ] || return 0
+  git -C "$DOTFILES_DIR" remote get-url origin &>/dev/null || return 0
+
+  # Throttle: only fetch if FETCH_HEAD is older than 1 hour (or missing)
+  local fetch_head="$DOTFILES_DIR/.git/FETCH_HEAD"
+  if [ -f "$fetch_head" ]; then
+    local fetch_age now_epoch file_epoch
+    now_epoch=$(date +%s)
+    file_epoch=$(stat -f %m "$fetch_head" 2>/dev/null) || return 0
+    fetch_age=$((now_epoch - file_epoch))
+    [ "$fetch_age" -gt 3600 ] || {
+      # Use cached fetch data to check if behind
+      local local_head remote_head branch
+      branch=$(git -C "$DOTFILES_DIR" branch --show-current 2>/dev/null) || return 0
+      local_head=$(git -C "$DOTFILES_DIR" rev-parse HEAD 2>/dev/null) || return 0
+      remote_head=$(git -C "$DOTFILES_DIR" rev-parse "origin/$branch" 2>/dev/null) || return 0
+      if [ "$local_head" != "$remote_head" ]; then
+        local behind
+        behind=$(git -C "$DOTFILES_DIR" rev-list --count "HEAD..origin/$branch" 2>/dev/null) || return 0
+        [ "$behind" -gt 0 ] && echo -e "${YELLOW}⬆ Update available ($behind commit(s) behind). Run: dotfiles update${NC}" >&2
+      fi
+      return 0
+    }
+  fi
+
+  # Background fetch (non-blocking)
+  git -C "$DOTFILES_DIR" fetch --quiet origin &>/dev/null &
+
+  # Check with pre-fetch data if available
+  local local_head remote_head branch
+  branch=$(git -C "$DOTFILES_DIR" branch --show-current 2>/dev/null) || return 0
+  local_head=$(git -C "$DOTFILES_DIR" rev-parse HEAD 2>/dev/null) || return 0
+  remote_head=$(git -C "$DOTFILES_DIR" rev-parse "origin/$branch" 2>/dev/null) || return 0
+  if [ "$local_head" != "$remote_head" ]; then
+    local behind
+    behind=$(git -C "$DOTFILES_DIR" rev-list --count "HEAD..origin/$branch" 2>/dev/null) || return 0
+    [ "$behind" -gt 0 ] && echo -e "\033[1;33m⬆ Update available ($behind commit(s) behind). Run: dotfiles update\033[0m" >&2
+  fi
+}
+
+show_help() {
+  cat <<EOF
+Usage: dotfiles <command> [options]
+
+Common:
+  apply [--pull] [--no-fix]   Apply dotfiles and self-heal (chezmoi + doctor --fix)
+                              --pull also git-pulls latest first
+                              --no-fix opts out of the auto-doctor pass
+  update [--dry-run] [--verbose]
+                              Update the whole machine (pull/apply/agents/packages/doctor)
+  doctor [--fix] [...]        Audit configs; --fix auto-repairs
+                              See \`doctor --help\` for all flags
+  sync                        Commit local changes and pull remote updates
+  upgrade [--dry-run]         Upgrade all software (brew, casks, macOS, tools)
+
+Scaffolding:
+  add <file> [--copy] [--module M]          Add a config file (symlink or copy mode)
+  brew-add <pkg> [--cask] [--full-only]     Add a Homebrew package
+  defaults-add <domain> <key> <val> <type>  Add a macOS default + doctor check
+  new-module <name> [--severity S]          Create a new doctor module
+  unmanage <file>                           Remove a managed file from the repo
+  profile [core|full]                       Show or switch chezmoi profile
+
+Advanced:
+  init                         Alias of \`apply\` (chezmoi init then apply)
+  diff                         Show pending changes (chezmoi diff)
+  managed                      List all managed files
+  status                       Show git status of dotfiles repo
+  stats                        Show automation stats (runs, time saved, streak)
+  cheat                        Show all available commands and aliases
+  edit                         Open the dotfiles repo in your editor
+  cd                           Print the dotfiles directory (use: cd \$(dotfiles cd))
+  audit [--report]             Security audit (SSH, secrets, permissions, git)
+                               (also runs as part of \`doctor\`)
+  validate [--quick]           Verify repo is safe to share (paths, secrets, lint, test)
+                               (also runs as part of \`doctor\`)
+  defaults-preview [--changed] Preview macOS defaults changes (no writes)
+  enterprise [on|off]          Show or toggle enterprise mode
+  quickstart [--check]         Interactive first-run wizard
+  uninstall [--dry-run] [--yes] Remove dotfiles from this machine
+
+Options:
+  --help, -h         Show this help
+  --version, -v      Show current dotfiles version
+
+Examples:
+  dotfiles update                 Whole-machine update (pull/apply/agents/packages/doctor)
+  dotfiles apply                  Apply + self-heal
+  dotfiles apply --pull           Pull latest from git, then apply + self-heal
+  dotfiles add ~/.tool-config     Add a config file (symlink mode)
+  dotfiles brew-add ripgrep       Add a Homebrew package
+  dotfiles profile full           Switch to full profile
+  dotfiles new-module mymod       Scaffold a new doctor module
+  dotfiles doctor --fix           Audit and auto-fix drift (also runs on \`apply\`)
+EOF
+}
+
+show_version() {
+  local version
+  if version=$(cd "$DOTFILES_DIR" && git rev-parse --short HEAD 2>/dev/null); then
+    echo "dotfiles $version ($(cd "$DOTFILES_DIR" && git log -1 --format='%cd' --date=short 2>/dev/null))"
+  else
+    echo "dotfiles (unknown version)"
+  fi
+}
+
+# Normalize: strip leading dashes from subcommands (e.g. --doctor → doctor, -h → h)
+cmd="${1:-}"
+cmd="${cmd#--}"
+cmd="${cmd#-}"
+
+# Check for updates (skip for commands that already update or need clean stdout)
+case "$cmd" in
+  update|upgrade|sync|cd|version|v) ;;
+  *) _check_for_updates ;;
+esac
+
+case "$cmd" in
+  help|h|"")
+    show_help
+    ;;
+
+  version|v)
+    show_version
+    ;;
+
+  apply)
+    # `dotfiles apply` is now the single command operators run. It:
+    #   1. Optionally git-pulls latest if --pull was passed (subsumes
+    #      `dotfiles update`'s primary purpose).
+    #   2. Runs chezmoi apply (the existing behavior).
+    #   3. Runs `dotfiles-doctor --fix --quiet` afterwards to self-heal any
+    #      drift the apply couldn't fix (extension installs, plugin
+    #      installs, login items, etc.). --no-fix opts out for the rare
+    #      case where the operator wants raw chezmoi behavior. Doctor's
+    #      --quiet means it only prints when something actually changed.
+    shift
+    _do_pull=0
+    _do_fix=1
+    _chezmoi_args=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --pull) _do_pull=1; shift ;;
+        --no-fix) _do_fix=0; shift ;;
+        *) _chezmoi_args+=("$1"); shift ;;
+      esac
+    done
+    if [ "$_do_pull" -eq 1 ]; then
+      echo "→ Pulling latest…"
+      git -C "$DOTFILES_DIR" pull --rebase || {
+        echo "✗ git pull failed; aborting apply" >&2
+        exit 1
+      }
+    fi
+    # Prevent concurrent doctor/sync/upgrade from racing chezmoi (shared ~/.dotfiles.lock).
+    # shellcheck source=../lib/lock.sh
+    source "$DOTFILES_DIR/lib/lock.sh"
+    wait_for_lock "apply" 120 || exit 1
+    _apply_lock_released=0
+    _release_apply_lock() {
+      if [ "${_apply_lock_released:-0}" -eq 0 ]; then
+        release_lock
+        _apply_lock_released=1
+      fi
+    }
+    trap _release_apply_lock EXIT
+    if [ "${#_chezmoi_args[@]}" -gt 0 ]; then
+      chezmoi apply --source "$DOTFILES_DIR" "${_chezmoi_args[@]}"
+    else
+      chezmoi apply --source "$DOTFILES_DIR"
+    fi
+    _apply_rc=$?
+    _release_apply_lock
+    trap - EXIT
+    if [ "$_apply_rc" -ne 0 ]; then
+      exit "$_apply_rc"
+    fi
+    if [ "$_do_fix" -eq 1 ] && [ -x "$DOTFILES_DIR/bin/dotfiles-doctor" ]; then
+      bash "$DOTFILES_DIR/bin/dotfiles-doctor" --fix --quiet || true
+    fi
+    exit 0
+    ;;
+
+  init)
+    # Backward-compat alias for first-time-on-a-machine. Equivalent to
+    # `dotfiles apply` once the repo is already cloned; chezmoi init clones
+    # the source and then applies, which we replicate by ensuring the repo
+    # is present then forwarding to apply.
+    shift
+    echo "→ \`dotfiles init\` is now an alias for \`dotfiles apply\`."
+    exec chezmoi init --source "$DOTFILES_DIR" --apply "$@"
+    ;;
+
+  diff)
+    shift
+    exec chezmoi diff --source "$DOTFILES_DIR" "$@"
+    ;;
+
+  doctor)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-doctor" "$@"
+    ;;
+
+  plugin)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-plugin" "$@"
+    ;;
+
+  audit)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-audit" "$@"
+    ;;
+
+  validate)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-validate" "$@"
+    ;;
+
+  sync)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-sync" "$@"
+    ;;
+
+  edit)
+    local_editor="${EDITOR:-code}"
+    exec "$local_editor" "$DOTFILES_DIR"
+    ;;
+
+  cd)
+    echo "$DOTFILES_DIR"
+    ;;
+
+  update)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-update" "$@"
+    ;;
+
+  managed)
+    shift
+    exec chezmoi managed --source "$DOTFILES_DIR" "$@"
+    ;;
+
+  status)
+    cd "$DOTFILES_DIR" || { echo "Error: cannot access dotfiles dir"; exit 1; }
+    echo "Branch: $(git branch --show-current)"
+    echo "Commit: $(git log -1 --format='%h %s (%cr)')"
+    echo ""
+    git status --short
+    ;;
+
+  stats)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-stats" "$@"
+    ;;
+
+  cheat)
+    exec bash "$DOTFILES_DIR/bin/cheat" "${@:2}"
+    ;;
+
+  add)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-add" "$@"
+    ;;
+
+  profile)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-profile" "$@"
+    ;;
+
+  enterprise)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-enterprise" "$@"
+    ;;
+
+  new-module)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-new-module" "$@"
+    ;;
+
+  brew-add)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-brew-add" "$@"
+    ;;
+
+  unmanage)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-unmanage" "$@"
+    ;;
+
+  defaults-add)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-defaults-add" "$@"
+    ;;
+
+  defaults-preview)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-defaults-preview" "$@"
+    ;;
+
+  uninstall)
+    shift
+    exec "$DOTFILES_DIR/bin/dotfiles-uninstall" "$@"
+    ;;
+
+  quickstart)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-quickstart" "$@"
+    ;;
+
+  upgrade)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-upgrade" "$@"
+    ;;
+
+  memory)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-memory" "$@"
+    ;;
+
+  *)
+    echo "Unknown command: $cmd" >&2
+    echo "" >&2
+    echo "Run 'dotfiles --help' for usage." >&2
+    exit 1
+    ;;
+esac

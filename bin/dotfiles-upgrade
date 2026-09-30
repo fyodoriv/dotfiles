@@ -1,0 +1,205 @@
+#!/bin/bash
+# Upgrade all installed software via topgrade.
+#
+# topgrade is the canonical "GET, don't IMPLEMENT" choice (AGENTS.md Rule 0):
+# it detects ~80+ package managers automatically (Homebrew, mas, npm, pipx,
+# uv, fnm, gh extensions, JetBrains, VS Code variants, Ollama, etc.) and
+# runs the right upgrade command for each. Replaces the prior 239-line
+# hand-rolled implementation that covered ~6 of those managers.
+#
+# This wrapper adds the dotfiles-specific glue topgrade can't do itself:
+#   - Lock acquisition (prevents concurrent runs with auto-sync launchagents)
+#   - Skip-if-grind-active safety (don't fight an in-flight minsky/Devin loop)
+#   - Logging to ~/.local/share/dotfiles/logs/dotfiles-upgrade.log
+#   - macOS notification on completion
+#   - last-upgrade timestamp file for `dotfiles stats`
+#
+# topgrade's own behaviour is configured via dot_config/topgrade.toml
+# (lands at ~/.config/topgrade.toml — topgrade reads the file directly,
+# not a subdir).
+# Run `topgrade --edit-config` to open + edit that file.
+#
+# Usage:
+#   dotfiles-upgrade              Run full upgrade
+#   dotfiles-upgrade --dry-run    Show what would be upgraded (no changes)
+#
+# Schedule: com.dotfiles.dotfiles-upgrade LaunchAgent (weekly, Sunday 09:00).
+
+# shellcheck disable=SC2154  # counters defined in lib/output.sh
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Topgrade discovers and executes Node/npm/fnm, Ollama, uv/Python, and editor
+# update CLIs. Do not run that unattended publisher fan-out while this managed
+# endpoint blocks the Node.js Foundation runtime.
+if [ -x "$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation" ]; then
+  "$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation" >/dev/null || true
+fi
+if [ -f "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
+    && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
+  echo "○ Software upgrade skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
+  exit 0
+fi
+
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+# shellcheck source=../lib/stats.sh
+source "$DOTFILES_DIR/lib/stats.sh"
+# shellcheck source=../lib/lock.sh
+source "$DOTFILES_DIR/lib/lock.sh"
+
+DRY_RUN=false
+[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
+
+LOG_DIR="$HOME/.local/share/dotfiles/logs"
+mkdir -p "$LOG_DIR"
+UPGRADE_LOG="$LOG_DIR/dotfiles-upgrade.log"
+LAST_UPGRADE_FILE="$HOME/.local/share/dotfiles/last-upgrade"
+
+# ── Safety: skip when a real autonomous loop is in flight ───────────
+# Original check was over-eager: it skipped on ANY process matching
+# `minsky` (would have matched a vim editing ~/apps/tooling/minsky/...)
+# AND on any `devin --permission-mode` process (would have matched an
+# interactive `dvb` session where the operator is at the keyboard).
+# Both cases triggered false-positive skips that confused operators.
+#
+# Sharper signal: `pgrep -f 'minsky run\b'` matches the iteration
+# process minsky's autonomous daemon spawns (`minsky run`, `minsky run
+# --hosts-dir <p>`, etc.). That's the actual "don't race brew upgrade
+# against an in-flight Cargo build / npm install" case. The minsky
+# launchd supervisor itself (`com.minsky.daemon`) doesn't match —
+# only an active iteration does.
+#
+# Interactive Devin sessions (including `dvb`) no longer trigger the
+# skip. The operator initiated the upgrade; they know what they're
+# doing. If they're mid-build and want to defer, they Ctrl-C.
+is_minsky_loop_active() {
+  pgrep -f 'minsky run\b' >/dev/null 2>&1
+}
+
+if is_minsky_loop_active; then
+  echo -e "${YELLOW}⚠${NC} Skipping upgrade — minsky autonomous iteration in flight"
+  echo -e "  Run \`minsky daemon status\` for details; retry once the loop completes."
+  exit 0
+fi
+
+# ── Ensure topgrade is installed ────────────────────────────────────
+if ! command -v topgrade >/dev/null 2>&1; then
+  echo -e "${RED}✗${NC} topgrade not installed."
+  echo -e "  Run \`dotfiles apply\` to install via Brewfile,"
+  echo -e "  or install directly: \`brew install topgrade\`"
+  exit 1
+fi
+
+# ── Acquire lock so the weekly launchagent + manual invocation can't race
+if ! $DRY_RUN; then
+  acquire_lock "upgrade" || exit 0
+fi
+
+echo -e "${BLUE}── dotfiles-upgrade $(date '+%Y-%m-%d %H:%M') ──${NC}" \
+  | tee -a "$UPGRADE_LOG"
+
+# ── Corporate CA for Node-based steps ───────────────────────────────
+# topgrade's cursor / windsurf / npm steps shell out to Node, whose bundled
+# Mozilla root store doesn't include a corporate TLS-inspection root CA.
+# Under launchd this script does NOT source
+# ~/.zshenv (where the same export lives for interactive shells — see
+# home/zshenv), so set it here too. Without it, `cursor --update-extensions`
+# and `windsurf --update-extensions` fail with "self signed certificate in
+# certificate chain". NODE_EXTRA_CA_CERTS only APPENDS to Node's built-in
+# roots. Guarded so a missing bundle doesn't point Node at a missing
+# file, and so an existing value (e.g. from ~/.zshenv.secrets) wins.
+if [ -z "${NODE_EXTRA_CA_CERTS:-}" ]; then
+  # DOTFILES_CORPORATE_CA_BUNDLES: optional colon-separated extra candidates.
+  IFS=':' read -r -a _extra_ca <<< "${DOTFILES_CORPORATE_CA_BUNDLES:-}"
+  for _corp_ca in \
+    ${_extra_ca[@]+"${_extra_ca[@]}"} \
+    "$HOME/.config/ssl/corporate-combined-ca.pem" \
+    "$HOME/.config/ssl/macos-trust-bundle.pem"; do
+    if [ -f "$_corp_ca" ]; then
+      export NODE_EXTRA_CA_CERTS="$_corp_ca"
+      break
+    fi
+  done
+  unset _corp_ca _extra_ca
+fi
+
+# ── Run topgrade ────────────────────────────────────────────────────
+# topgrade flags:
+#   --no-tmux      Don't auto-launch inside tmux — we want headless
+#                  (launchagent has no tty; user-shell tmux nesting is noisy)
+#   --yes          Don't prompt on retry; assume yes for everything
+#   --dry-run      When this wrapper's --dry-run is passed
+#
+# NOTE: we intentionally do NOT pass --cleanup. topgrade's global --cleanup
+# makes each step run its cache-prune phase inline, and the uv step's
+# `uv cache prune` then blocks on (and times out against) the cache lock
+# held by any live `uvx` / `uv tool run` MCP server — common on this machine
+# whenever a Devin/minsky session is up — which fails the whole upgrade
+# (the original symptom: "Timeout (300s) when waiting for lock on .../uv").
+# Cache pruning instead runs via the [post_commands] `cleanup` step
+# (bin/cleanup) in dot_config/topgrade.toml: it already covers brew / npm /
+# yarn and is lock-tolerant (errors swallowed; its uv prune uses a short
+# UV_LOCK_TIMEOUT so it skips fast when the cache is busy).
+#
+# Per-step configuration (which managers to run, brew greedy mode,
+# post-upgrade bottle re-signing + cache cleanup) lives in
+# dot_config/topgrade.toml — don't override via flags here.
+_args=(--no-tmux --yes)
+if $DRY_RUN; then
+  _args+=(--dry-run)
+fi
+
+if topgrade "${_args[@]}" 2>&1 | tee -a "$UPGRADE_LOG"; then
+  rc=0
+else
+  rc=$?
+fi
+
+# ── Re-sign bottles after brew upgrade (belt-and-suspenders) ─────────
+# topgrade [post_commands] also runs dotfiles-adhoc-sign-bottles; this covers
+# the case where post_commands fail silently or topgrade.toml path is stale.
+if ! $DRY_RUN && [ "$rc" -eq 0 ]; then
+  export DOTFILES_ADHOC_SIGN_QUIET=1
+  if [ -x "$DOTFILES_DIR/bin/dotfiles-adhoc-sign-bottles" ]; then
+    "$DOTFILES_DIR/bin/dotfiles-adhoc-sign-bottles" 2>&1 | tee -a "$UPGRADE_LOG" || true
+  fi
+  if [ -x "$DOTFILES_DIR/bin/dotfiles-adhoc-sign-uv-pythons" ]; then
+    "$DOTFILES_DIR/bin/dotfiles-adhoc-sign-uv-pythons" 2>&1 | tee -a "$UPGRADE_LOG" || true
+  fi
+  if [ -x "$DOTFILES_DIR/bin/dotfiles-link-jq-shim" ]; then
+    "$DOTFILES_DIR/bin/dotfiles-link-jq-shim" 2>&1 | tee -a "$UPGRADE_LOG" || true
+  fi
+fi
+
+# ── Record last-upgrade timestamp (used by `dotfiles stats` + the morning
+# script's "X days since last upgrade" hint).
+if ! $DRY_RUN; then
+  date '+%s' > "$LAST_UPGRADE_FILE"
+  log_run "upgrade" 1
+fi
+
+# ── Trim log to last 1000 lines — topgrade is verbose enough that the
+# old 500-line cap was rotating mid-run.
+if [ -f "$UPGRADE_LOG" ]; then
+  tail -1000 "$UPGRADE_LOG" > "$UPGRADE_LOG.tmp" \
+    && mv "$UPGRADE_LOG.tmp" "$UPGRADE_LOG"
+fi
+
+# ── Outcome notification ────────────────────────────────────────────
+if [ "$rc" -ne 0 ]; then
+  echo -e "${RED}✗${NC} Upgrade complete with failures (rc=$rc). See $UPGRADE_LOG" \
+    | tee -a "$UPGRADE_LOG"
+  if ! $DRY_RUN; then
+    notify "dotfiles-upgrade" "Upgrade finished with failures (see log)" "Basso"
+  fi
+  exit "$rc"
+fi
+
+echo -e "${GREEN}✓${NC} Upgrade complete." | tee -a "$UPGRADE_LOG"
+if ! $DRY_RUN; then
+  notify "dotfiles-upgrade" "All software upgraded successfully" ""
+fi

@@ -1,0 +1,37 @@
+name: OSS Readiness
+
+# Fast, dedicated job for the no-leak contract. Runs on every push and PR
+# so contributors get a clear, single-purpose status check called
+# "oss-readiness". The full `make test-all` matrix in ci.yml also runs
+# these tests via the bats suite, but THIS workflow is the cited gate
+# in SECURITY.md (layer L4) and is the one referenced when humans triage
+# a "why is my PR blocked?" question.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  no-leaks:
+    name: No private identity / content / secret leaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Run no-internal-refs bats
+        run: bats tests/no-internal-refs.bats
+
+      - name: Run oss-readiness-lib bats (regex + scanner contract)
+        run: bats tests/oss-readiness-lib.bats
+
+      - name: Pre-commit hook self-test
+        run: bash git-hooks/pre-commit --self-test
+
+      - name: Pre-push hook self-test
+        run: bash git-hooks/pre-push --self-test
+

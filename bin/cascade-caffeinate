@@ -1,0 +1,3 @@
+#!/bin/bash
+# Deprecated wrapper — use dotfiles-agent-keepawake.
+exec "$(cd "$(dirname "$0")/.." && pwd)/bin/dotfiles-agent-keepawake" "$@"

@@ -1,0 +1,129 @@
+#!/bin/bash
+# git-safe — guard against destructive git commands in multi-agent repos.
+#
+# Detects when multiple agents (Windsurf, Cursor, Claude Code, minsky pipelines)
+# may be working in the same repo and blocks commands that could wipe their work:
+#   - git reset --hard (wipes uncommitted changes)
+#   - git checkout . / git checkout -- <path> (reverts working tree)
+#   - git clean -fd (deletes untracked files)
+#   - git stash (captures other agents' changes)
+#   - git add -A / git add . (stages unrelated changes from worktrees)
+#
+# Usage: Set as git alias or source in shell profile.
+#   git config --global alias.safe '!git-safe'
+#
+# To bypass: GIT_SAFE_BYPASS=1 git <command>
+#   or: git --no-optional-locks <command>  (for programmatic use)
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+
+# Allow explicit bypass
+if [ "${GIT_SAFE_BYPASS:-}" = "1" ]; then
+  exec git "$@"
+fi
+
+is_multi_agent_repo() {
+  local repo_root
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+
+  # Check for active worktrees (minsky pipelines use these)
+  local worktree_count
+  worktree_count=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
+  [ "$worktree_count" -gt 1 ] && return 0
+
+  # Check for .orchestrator dir (minsky pipeline state)
+  [ -d "$repo_root/.orchestrator" ] && return 0
+
+  # Check for .worktrees dir
+  [ -d "$repo_root/.worktrees" ] && return 0
+
+  return 1
+}
+
+is_interactive() {
+  [ -t 0 ] && [ -t 1 ]
+}
+
+block() {
+  echo -e "${RED}❌ git-safe: blocked destructive command in multi-agent repo${NC}" >&2
+  echo -e "   Command: git $*" >&2
+  echo -e "   ${YELLOW}Other agents may have uncommitted work in this repo.${NC}" >&2
+  echo -e "" >&2
+  echo -e "   To bypass: GIT_SAFE_BYPASS=1 git $*" >&2
+  exit 1
+}
+
+# Parse the git command
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  reset)
+    # Block: git reset --hard (any form)
+    for arg in "$@"; do
+      if [ "$arg" = "--hard" ]; then
+        if is_multi_agent_repo; then
+          block "reset $*"
+        fi
+      fi
+    done
+    ;;
+
+  checkout)
+    # Block: git checkout . / git checkout -- . / git checkout HEAD -- .
+    # Allow: git checkout <branch>, git checkout -b <branch>
+    local_args=("$@")
+    has_dot=false
+    has_branch_flag=false
+    for arg in "${local_args[@]}"; do
+      [ "$arg" = "." ] && has_dot=true
+      [ "$arg" = "-b" ] || [ "$arg" = "-B" ] && has_branch_flag=true
+    done
+
+    if $has_dot && ! $has_branch_flag && is_multi_agent_repo; then
+      block "checkout $*"
+    fi
+    ;;
+
+  clean)
+    # Block: git clean with -f (force) in multi-agent repos
+    for arg in "$@"; do
+      case "$arg" in
+        -f|-fd|-ffd|-fdx|-fx|-fX)
+          if is_multi_agent_repo; then
+            block "clean $*"
+          fi
+          ;;
+      esac
+    done
+    ;;
+
+  stash)
+    # Warn (don't block) — stash captures all uncommitted changes
+    if is_multi_agent_repo && ! is_interactive; then
+      echo -e "${YELLOW}⚠️  git-safe: stashing in a multi-agent repo (non-interactive)${NC}" >&2
+      echo -e "   This will capture ALL uncommitted changes, including other agents' work." >&2
+    fi
+    ;;
+
+  add)
+    # Warn on git add -A / git add . in multi-agent repos
+    for arg in "$@"; do
+      if [ "$arg" = "-A" ] || [ "$arg" = "--all" ] || [ "$arg" = "." ]; then
+        if is_multi_agent_repo; then
+          echo -e "${YELLOW}⚠️  git-safe: 'git add $arg' stages ALL changes in a multi-agent repo${NC}" >&2
+          echo -e "   Use 'git add <specific-files>' to avoid staging other agents' work.${NC}" >&2
+        fi
+        break
+      fi
+    done
+    ;;
+esac
+
+# Pass through to real git
+exec git "$cmd" "$@"
+

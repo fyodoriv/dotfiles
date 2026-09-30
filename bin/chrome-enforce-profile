@@ -1,0 +1,76 @@
+#!/bin/bash
+# Enforce Chrome's default profile to the Work profile (enterprise only).
+# Designed to run unattended from a LaunchAgent — fast, idempotent, safe.
+# Only patches Local State when Chrome is NOT running; exits silently otherwise.
+# Exit codes: 0 = patched or already correct, 1 = error, 2 = skipped (not enterprise / Chrome running / not installed)
+
+set +e
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+IS_ENTERPRISE="$(chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null || echo "false")"
+[ "$IS_ENTERPRISE" = "true" ] || exit 2
+
+LOCAL_STATE="$HOME/Library/Application Support/Google/Chrome/Local State"
+[ -f "$LOCAL_STATE" ] || exit 2
+
+# Never patch while the PERSONAL Chrome is running — it overwrites Local State on quit.
+# Agent-browser Chromes (with their own --user-data-dir) never touch this Local State,
+# so they must be ignored here. Otherwise the launchagent's background daemons block
+# this script from ever running, which silently breaks the self-heal.
+# Personal Chrome = browser process (no --type=) using the default user-data-dir
+# (which means: no --user-data-dir flag at all on macOS).
+if ps -axww -o command= 2>/dev/null \
+  | awk '/\/MacOS\/Google Chrome($| )/ && !/--type=/ && !/--user-data-dir=/ {found=1; exit} END {exit !found}'; then
+  exit 2
+fi
+
+WORK_EMAIL_DOMAIN="$(chezmoi execute-template '{{ .work_email_domain }}' 2>/dev/null || echo "example.com")"
+
+python3 - "$LOCAL_STATE" "$WORK_EMAIL_DOMAIN" <<'PYEOF'
+import json, os, sys
+
+local_state_path = sys.argv[1]
+work_domain = sys.argv[2]
+
+try:
+    with open(local_state_path) as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    sys.exit(1)
+
+profile = data.get("profile", {})
+info_cache = profile.get("info_cache", {})
+
+# Find the work profile by scanning for the company email domain
+work_profile = None
+for pname, pinfo in info_cache.items():
+    if work_domain in pinfo.get("user_name", ""):
+        work_profile = pname
+        break
+
+if not work_profile:
+    print(
+        f"chrome-enforce-profile: no profile with user_name matching {work_domain!r} — skipping",
+        file=sys.stderr,
+    )
+    sys.exit(0)
+
+# Check if already correct — avoid unnecessary writes
+already_correct = (
+    profile.get("last_used") == work_profile
+    and profile.get("last_active_profiles") == [work_profile]
+    and profile.get("show_picker_on_startup") is False
+)
+if already_correct:
+    sys.exit(0)
+
+# Patch
+data.setdefault("profile", {})["last_used"] = work_profile
+data["profile"]["last_active_profiles"] = [work_profile]
+data["profile"]["show_picker_on_startup"] = False
+
+with open(local_state_path, "w") as f:
+    json.dump(data, f)
+
+print(f"Enforced Chrome work profile: {work_profile}")
+PYEOF

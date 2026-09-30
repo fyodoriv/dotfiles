@@ -1,0 +1,126 @@
+#!/bin/bash
+# Set up a developer-optimized Dock — only essential apps, in logical order.
+# Usage: setup-dock [--dry-run] [--yes]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+
+DRY_RUN=false
+SKIP_CONFIRM=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --yes|-y)  SKIP_CONFIRM=true ;;
+  esac
+done
+
+# ── Snapshot current Dock BEFORE any changes ─────────────────────────
+SNAPSHOTS_DIR="$HOME/.dotfiles-snapshots"
+mkdir -p "$SNAPSHOTS_DIR"
+DOCK_BACKUP="$SNAPSHOTS_DIR/dock-$(date +%Y%m%d_%H%M%S).plist"
+defaults export com.apple.dock "$DOCK_BACKUP"
+ok "Dock backed up to $DOCK_BACKUP"
+echo -e "  ${DIM}Restore with: defaults import com.apple.dock \"$DOCK_BACKUP\" && killall Dock${NC}"
+
+if $DRY_RUN; then
+  echo ""
+  info "[dry-run] Would clear Dock and add: WebStorm, Ghostty, Chrome, Slack, Zoom, Outlook, Settings"
+  info "[dry-run] Folders: Applications, ${DOTFILES_REPOS_DIR:-\$HOME/apps}, Downloads"
+  echo ""
+  echo -e "${GREEN}Done!${NC} No changes made (dry-run)."
+  exit 0
+fi
+
+# ── Confirm before wiping ────────────────────────────────────────────
+if ! $SKIP_CONFIRM; then
+  echo ""
+  warn "This will REPLACE your entire Dock with a developer-optimized layout."
+  if command -v gum &>/dev/null; then
+    gum confirm "Proceed?" || { info "Cancelled."; exit 0; }
+  else
+    read -r -t 30 -p "  Proceed? [y/N] " confirm || { echo ""; confirm="n"; }
+    [[ ! "$confirm" =~ ^[yY] ]] && { info "Cancelled."; exit 0; }
+  fi
+fi
+
+echo -e "\n${BLUE}Setting up developer Dock...${NC}"
+
+# Clear entire Dock
+defaults write com.apple.dock persistent-apps -array
+defaults write com.apple.dock persistent-others -array
+
+add_app() {
+  local app_path="$1"
+  if [ -d "$app_path" ]; then
+    defaults write com.apple.dock persistent-apps -array-add \
+      "<dict>
+        <key>tile-data</key>
+        <dict>
+          <key>file-data</key>
+          <dict>
+            <key>_CFURLString</key>
+            <string>$app_path</string>
+            <key>_CFURLStringType</key>
+            <integer>0</integer>
+          </dict>
+        </dict>
+      </dict>"
+    echo -e "  ${GREEN}✓${NC} $(basename "$app_path" .app)"
+  fi
+}
+
+add_folder() {
+  local folder_path="$1"
+  local display_as="$2"   # 1=fan, 2=grid, 3=list, 0=auto
+  local show_as="$3"      # 1=folder, 2=stack
+  if [ -d "$folder_path" ]; then
+    defaults write com.apple.dock persistent-others -array-add \
+      "<dict>
+        <key>tile-data</key>
+        <dict>
+          <key>displayas</key>
+          <integer>$display_as</integer>
+          <key>showas</key>
+          <integer>$show_as</integer>
+          <key>file-data</key>
+          <dict>
+            <key>_CFURLString</key>
+            <string>file://$folder_path</string>
+            <key>_CFURLStringType</key>
+            <integer>15</integer>
+          </dict>
+        </dict>
+      </dict>"
+    echo -e "  ${GREEN}✓${NC} 📁 $(basename "$folder_path")"
+  fi
+}
+
+echo -e "\n${BLUE}Apps (left to right):${NC}"
+
+# ── Primary workflow: IDE + Browser + Terminal ───────────────────────
+add_app "/Applications/WebStorm.app"
+add_app "/Applications/Ghostty.app"
+add_app "/Applications/Google Chrome.app"
+
+# ── Communication ────────────────────────────────────────────────────
+add_app "/Applications/Slack.app"
+add_app "/Applications/zoom.us.app"
+
+# ── Utilities ────────────────────────────────────────────────────────
+add_app "/Applications/Microsoft Outlook.app"
+add_app "/System/Applications/System Settings.app"
+
+# ── Dock folders (right side, after separator) ───────────────────────
+echo -e "\n${BLUE}Folders:${NC}"
+add_folder "/Applications" 2 1
+add_folder "${DOTFILES_REPOS_DIR:-$HOME/apps}" 3 1
+add_folder "$HOME/Downloads" 1 2
+
+# Restart Dock
+killall Dock
+
+echo ""
+echo -e "${GREEN}Done!${NC} Dock reset with dev-essential apps only."

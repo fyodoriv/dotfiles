@@ -1,0 +1,67 @@
+#!/bin/bash
+# Add a macOS defaults setting to the data file + doctor check.
+# Usage: dotfiles defaults-add <domain> <key> <value> <type> [--module MODULE] [--script SCRIPT] [--section SECTION]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+module="macos"
+script="core"
+section="General"
+if [ $# -lt 4 ]; then
+  echo "Usage: dotfiles defaults-add <domain> <key> <value> <type> [--module MODULE] [--script SCRIPT] [--section SECTION]" >&2
+  echo "  type: bool, int, float, string" >&2
+  echo "  script: core, visual, apps (default: core)" >&2
+  exit 1
+fi
+domain="$1"; key="$2"; value="$3"; dtype="$4"; shift 4
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --module) module="$2"; shift 2 ;;
+    --script) script="$2"; shift 2 ;;
+    --section) section="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+json_file="$DOTFILES_DIR/data/macos-defaults.json"
+
+# Build the JSON value (proper type)
+case "$dtype" in
+  bool)   json_value=$([ "$value" = "true" ] && echo "true" || echo "false") ;;
+  int)    json_value="$value" ;;
+  float)  json_value="$value" ;;
+  string) json_value="\"$value\"" ;;
+esac
+
+# Add entry to JSON data file
+tmp_file="${json_file}.tmp"
+if ! jq --arg domain "$domain" \
+   --arg key "$key" \
+   --arg dtype "$dtype" \
+   --arg section "$section" \
+   --arg script "$script" \
+   --argjson value "$json_value" \
+   '. += [{"domain": $domain, "key": $key, "type": $dtype, "value": $value, "section": $section, "script": $script}]' \
+   "$json_file" > "$tmp_file"; then
+  rm -f "$tmp_file"
+  echo "Error: jq failed to update $json_file" >&2
+  exit 1
+fi
+if [ ! -s "$tmp_file" ]; then
+  rm -f "$tmp_file"
+  echo "Error: jq produced empty output, preserving original $json_file" >&2
+  exit 1
+fi
+mv "$tmp_file" "$json_file"
+
+# Add doctor check
+check_id="${module}.${key//[^a-zA-Z0-9_]/_}"
+desc="$key = $value"
+echo "check_defaults \"$check_id\" \"$desc\" \"$domain\" \"$key\" \"$value\" \"$dtype\"" >> "$DOTFILES_DIR/modules/$module/doctor.sh"
+
+echo "✓ Added default: $domain $key -$dtype $value"
+echo "  Data:   data/macos-defaults.json (script: $script)"
+echo "  Doctor: modules/$module/doctor.sh"

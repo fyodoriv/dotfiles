@@ -1,0 +1,19 @@
+#!/bin/bash
+# Re-run when macOS defaults scripts or the defaults data file change.
+# macos.sh hash: {{ include "macos.sh" | sha256sum }}
+# macos-visual.sh hash: {{ include "macos-visual.sh" | sha256sum }}
+# macos-apps.sh hash: {{ include "macos-apps.sh" | sha256sum }}
+# data/macos-defaults.json hash: {{ include "data/macos-defaults.json" | sha256sum }}
+set -euo pipefail
+
+echo "→ Applying macOS defaults..."
+bash "{{ .chezmoi.sourceDir }}/macos.sh"
+
+{{ if eq .profile "full" -}}
+echo "→ Applying visual preferences..."
+bash "{{ .chezmoi.sourceDir }}/macos-visual.sh"
+echo "→ Applying app preferences..."
+bash "{{ .chezmoi.sourceDir }}/macos-apps.sh"
+{{- end }}
+
+echo "✓ macOS defaults applied"

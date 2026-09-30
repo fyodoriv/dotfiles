@@ -1,0 +1,63 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/otool with a symlink to the real Xcode/CLT llvm-otool Mach-O.
+#
+# endpoint agent blocks Apple's /usr/bin/otool xcode_select shim:
+#   Description: otool
+#   Bundle: tool-shim-public
+#   system-signed
+#   Identifier=com.apple.dt.xcode_select.tool-shim-public
+#
+# The real binary lives in the Xcode (or Command Line Tools) toolchain and has
+# Identifier=com.apple.llvm-otool — same Publisher, different Bundle. PATH-based
+# callers that resolve bare `otool` are fixed by this shim. Tools that hardcode
+# /usr/bin/otool still need an IT exception.
+#
+# Escape hatch / tests: set DOTFILES_OTOOL to an absolute Mach-O path.
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SHIM="$SHIM_DIR/otool"
+
+_resolve_real_otool() {
+  local candidate resolved
+  if [ -n "${DOTFILES_OTOOL:-}" ] && [ -x "${DOTFILES_OTOOL}" ]; then
+    printf '%s\n' "${DOTFILES_OTOOL}"
+    return 0
+  fi
+  for candidate in \
+    "${DOTFILES_XCODE_TOOLCHAIN:-}/usr/bin/llvm-otool" \
+    "${DOTFILES_XCODE_TOOLCHAIN:-}/usr/bin/otool" \
+    "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/llvm-otool" \
+    "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/otool" \
+    "/Library/Developer/CommandLineTools/usr/bin/llvm-otool" \
+    "/Library/Developer/CommandLineTools/usr/bin/otool"; do
+    [ -n "$candidate" ] || continue
+    [ -x "$candidate" ] || continue
+    # Prefer the Mach-O leaf (otool is often a symlink to llvm-otool).
+    # Use /bin/realpath — never python3 (also endpoint agent-flagged as tool-shim-public).
+    resolved="$(/bin/realpath "$candidate" 2>/dev/null || true)"
+    [ -z "$resolved" ] && resolved="$candidate"
+    [ -x "$resolved" ] || continue
+    # Never point at Apple's tool-shim-public (/usr/bin/otool).
+    case "$resolved" in
+      /usr/bin/otool|/bin/otool) continue ;;
+    esac
+    printf '%s\n' "$resolved"
+    return 0
+  done
+  return 1
+}
+
+REAL_OTOOL="$(_resolve_real_otool || true)"
+if [ -z "$REAL_OTOOL" ]; then
+  echo "otool: Xcode/CLT llvm-otool not found — install Xcode or Command Line Tools (never use /usr/bin/otool on managed endpoints)" >&2
+  exit 1
+fi
+
+if [ -e "$SHIM" ] && [ ! -L "$SHIM" ]; then
+  rm -f "$SHIM"
+fi
+
+ln -sfn "$REAL_OTOOL" "$SHIM"
+chmod +x "$SHIM" 2>/dev/null || true

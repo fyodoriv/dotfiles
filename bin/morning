@@ -1,0 +1,137 @@
+#!/bin/bash
+# Morning dev environment startup — run once when you start your day.
+# Usage: morning
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# Trim log to last 500 lines (prevents unbounded growth from LaunchAgent)
+_log="$HOME/.local/share/dotfiles/logs/morning.log"
+if [ -f "$_log" ]; then
+  tail -n 500 "$_log" > "$_log.tmp" && mv "$_log.tmp" "$_log" || rm -f "$_log.tmp"
+fi
+
+# shellcheck source=../lib/stats.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
+
+echo ""
+echo -e "${BLUE}☀ Good morning! Setting up your dev environment...${NC}"
+echo ""
+
+REPOS_DIR="${DOTFILES_REPOS_DIR:-$HOME/apps}"
+if [ ! -d "$REPOS_DIR" ]; then
+  echo -e "${YELLOW}⚠ DOTFILES_REPOS_DIR ($REPOS_DIR) not found. Set it in ~/.zshrc.local${NC}"
+fi
+
+# Portable timeout: prefer gtimeout/timeout (coreutils), fall back to perl, then no timeout
+_timeout() {
+  local secs="$1"; shift
+  if command -v gtimeout &>/dev/null; then
+    gtimeout "$secs" "$@"
+  elif command -v timeout &>/dev/null; then
+    timeout "$secs" "$@"
+  elif command -v perl &>/dev/null; then
+    perl -e "alarm $secs; exec @ARGV" "$@"
+  else
+    "$@"
+  fi
+}
+
+# Start macOS update check in background (slow network call)
+SWUPDATE_TMP=$(mktemp) || { echo "Error: mktemp failed" >&2; exit 1; }
+trap 'rm -f "$SWUPDATE_TMP"' EXIT
+if command -v softwareupdate &>/dev/null; then
+  { _timeout 30 softwareupdate -l > "$SWUPDATE_TMP" 2>&1 || true; } &
+  SWUPDATE_PID=$!
+else
+  SWUPDATE_PID=""
+fi
+
+# 1. Pull latest on all active repos
+repos_pulled=0
+echo -e "${BLUE}→ Pulling latest code...${NC}"
+for dir in "$REPOS_DIR"/*/; do
+  [ ! -d "$dir/.git" ] && continue
+  name="$(basename "$dir")"
+  branch=$(cd "$dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  [ "$branch" = "main" ] || [ "$branch" = "master" ] || continue
+  (cd "$dir" && _timeout 30 git pull --rebase --quiet 2>/dev/null) && echo -e "  ${GREEN}✓${NC} $name" && repos_pulled=$((repos_pulled + 1))
+done
+
+# 2. Run doctor (report only)
+echo ""
+echo -e "${BLUE}→ Health check...${NC}"
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Prefer dotfiles-doctor from PATH so tests can stub it; fall back to the
+# absolute path in dotfiles for unusual setups (PATH not yet rehashed).
+DOCTOR_BIN="$(command -v dotfiles-doctor 2>/dev/null || true)"
+[ -z "$DOCTOR_BIN" ] && DOCTOR_BIN="$DOTFILES_DIR/bin/dotfiles-doctor"
+bash "$DOCTOR_BIN" 2>/dev/null | tail -3 || true
+
+# 3. Show today's notes if any
+echo ""
+today_file="$HOME/.notes/$(date +%Y-%m-%d).md"
+if [ -f "$today_file" ] && [ -s "$today_file" ]; then
+  echo -e "${BLUE}→ Today's notes so far:${NC}"
+  cat "$today_file"
+else
+  echo -e "${DIM}No notes yet today. Use: note \"your first note\"${NC}"
+fi
+
+# 4. Show calendar/meetings reminder
+echo ""
+echo -e "${BLUE}→ Schedule:${NC}"
+# Use icalBuddy if available, otherwise just show the date
+if command -v icalBuddy &>/dev/null; then
+  icalBuddy -f -n -nc -npn -nrd -ea -b "  • " eventsToday 2>/dev/null || echo -e "  ${DIM}No calendar access${NC}"
+else
+  echo -e "  $(date '+%A, %B %d, %Y')"
+fi
+
+# 5. Disk space check
+echo ""
+free_gb=$(df -g / | tail -1 | awk '{print $4}')
+if [ "$free_gb" -lt 20 ]; then
+  echo -e "  ${YELLOW}⚠ Low disk: ${free_gb}GB free. Run: cleanup${NC}"
+else
+  echo -e "  ${GREEN}✓${NC} Disk: ${free_gb}GB free"
+fi
+
+# 6. Pending macOS / Xcode updates
+if [ -n "${SWUPDATE_PID:-}" ]; then
+  # Wait up to 5 seconds for the background check
+  for _ in 1 2 3 4 5; do
+    kill -0 "$SWUPDATE_PID" 2>/dev/null || break
+    sleep 1
+  done
+  kill -0 "$SWUPDATE_PID" 2>/dev/null && kill "$SWUPDATE_PID" 2>/dev/null
+  wait "$SWUPDATE_PID" 2>/dev/null || true
+
+  # grep -c exits 1 on 0 matches; || true prevents "0\n0" from || echo
+  updates=$(grep -c '^\*' "$SWUPDATE_TMP" 2>/dev/null) || true
+  updates="${updates:-0}"
+  if [ "$updates" -gt 0 ]; then
+    echo -e "  ${YELLOW}⚠ $updates macOS update(s) available. Run: softwareupdate -ia${NC}"
+    grep '^\*' "$SWUPDATE_TMP" | sed 's/^\* /    /' | head -5
+  else
+    echo -e "  ${GREEN}✓${NC} macOS: up to date"
+  fi
+  rm -f "$SWUPDATE_TMP"
+fi
+
+# 7. Show top CPU consumers (excluding expected ones)
+echo ""
+echo -e "${BLUE}→ Top resource usage:${NC}"
+# macOS ps doesn't support --sort; use -r for CPU-descending sort
+# Single invocation: print header, then top 3 non-system processes
+ps -eo pid,pcpu,pmem,comm -r | awk 'NR==1 { print; next } /WindowServer|kernel_task/ { next } printed<3 { print; printed++ }'
+
+# 8. Time saved summary
+echo ""
+time_saved_summary=$(get_time_saved_summary)
+echo -e "  ${GREEN}⏱${NC}  Dotfiles: $time_saved_summary"
+
+log_run morning "$repos_pulled"
+
+echo ""
+echo -e "${GREEN}Ready to code!${NC} 🚀"
+echo ""

@@ -1,0 +1,14 @@
+#!/bin/bash
+# Re-run when bin/chromework-activate changes.
+# installer hash: {{ output "shasum" "-a" "256" (joinPath .chezmoi.sourceDir "bin/chromework-activate") }}
+# Profile: {{ .profile }} | Enterprise: {{ .is_enterprise }}
+#
+# Rebuilds ChromeWork.app so the router picks up activate helper path/behavior.
+set -euo pipefail
+
+if ! [ -d "/Applications/Google Chrome.app" ]; then
+  echo "⊘ Google Chrome not installed — skipping ChromeWork install"
+  exit 0
+fi
+
+"{{ .chezmoi.sourceDir }}/bin/chromework-install"

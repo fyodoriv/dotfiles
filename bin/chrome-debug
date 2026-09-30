@@ -1,0 +1,63 @@
+#!/bin/bash
+# Start, stop, or check the on-demand chrome-debug LaunchAgent.
+# Thin wrapper around `launchctl start|stop com.dotfiles.chrome-debug`
+# so the debug Chrome (CDP on port 9222) is ergonomic to spin up.
+# Profile: ~/.local/share/chrome-debug
+# Usage: chrome-debug              Start it (no-op if already running)
+#        chrome-debug --stop       Stop it
+#        chrome-debug --status     Show running state + port
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+LABEL="com.dotfiles.chrome-debug"
+PORT=9222
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+
+is_running() {
+  # launchctl list prints "PID<TAB>Status<TAB>Label" — PID is "-" when not running.
+  local pid
+  pid="$(launchctl list 2>/dev/null | awk -v l="$LABEL" '$3 == l { print $1 }')"
+  [ -n "$pid" ] && [ "$pid" != "-" ]
+}
+
+cmd_start() {
+  if [ ! -f "$PLIST" ]; then
+    echo "⚠ LaunchAgent plist missing at $PLIST — run chezmoi apply first" >&2
+    exit 1
+  fi
+  if is_running; then
+    echo "✓ chrome-debug already running on port $PORT"
+    return 0
+  fi
+  launchctl start "$LABEL"
+  echo "✓ Started chrome-debug (CDP on port $PORT)"
+  echo "  Verify: curl -s http://localhost:$PORT/json/version"
+}
+
+cmd_stop() {
+  if ! is_running; then
+    echo "⊘ chrome-debug is not running"
+    return 0
+  fi
+  launchctl stop "$LABEL"
+  echo "✓ Stopped chrome-debug"
+}
+
+cmd_status() {
+  if is_running; then
+    echo "● chrome-debug is running (CDP on port $PORT)"
+  else
+    echo "○ chrome-debug is stopped"
+  fi
+}
+
+case "${1:-}" in
+  "" | start) cmd_start ;;
+  --stop | stop) cmd_stop ;;
+  --status | status) cmd_status ;;
+  *)
+    echo "Usage: chrome-debug [--stop|--status]" >&2
+    exit 2
+    ;;
+esac

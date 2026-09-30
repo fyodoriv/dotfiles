@@ -1,0 +1,59 @@
+#!/bin/bash
+# Open an http(s) URL in Work Chrome.
+#
+# Used by ChromeWork.app (LaunchServices) and available for direct invocation.
+# Space/focus switching: router passes --no-activate (inline AppleScript +
+# survive-handoff). Direct callers get chromework-activate by default.
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+NO_ACTIVATE=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-activate) NO_ACTIVATE=1; shift ;;
+    -*) echo "Usage: chromework-open-url [--no-activate] <url>" >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
+
+URL="${1:-}"
+[ -n "$URL" ] || { echo "Usage: chromework-open-url [--no-activate] <url>" >&2; exit 2; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ACTIVATE="${CHROMEWORK_ACTIVATE_HELPER:-$SCRIPT_DIR/chromework-activate}"
+CHROME_APP_DIR="${CHROME_APP_DIR:-/Applications/Google Chrome.app}"
+CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-$HOME/Library/Application Support/Google/Chrome}"
+CHROME_BIN="$CHROME_APP_DIR/Contents/MacOS/Google Chrome"
+
+[ -x "$CHROME_BIN" ] || exit 2
+
+PROFILE_DIR="Default"
+STATE="$CHROME_USER_DATA_DIR/Local State"
+if command -v chezmoi &>/dev/null && command -v jq &>/dev/null && [ -f "$STATE" ]; then
+  domain="$(chezmoi execute-template '{{ .work_email_domain }}' 2>/dev/null || true)"
+  if [ -n "$domain" ]; then
+    detected="$(jq -r --arg d "$domain" \
+      '.profile.info_cache | to_entries | map(select(.value.user_name | test($d))) | .[0].key // empty' \
+      "$STATE" 2>/dev/null || true)"
+    [ -n "$detected" ] && PROFILE_DIR="$detected"
+  fi
+fi
+
+export CHROME_USER_DATA_DIR
+
+if [ "$NO_ACTIVATE" -eq 0 ] && [ -x "$ACTIVATE" ]; then
+  "$ACTIVATE" --now >/dev/null 2>&1 || true
+fi
+
+"$CHROME_BIN" \
+  --user-data-dir="$CHROME_USER_DATA_DIR" \
+  --profile-directory="$PROFILE_DIR" \
+  "$URL" >/dev/null 2>&1 &
+
+if [ "$NO_ACTIVATE" -eq 0 ] && [ -x "$ACTIVATE" ]; then
+  nohup "$ACTIVATE" --survive-handoff >/dev/null 2>&1 &
+fi

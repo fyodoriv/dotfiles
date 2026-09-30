@@ -1,0 +1,251 @@
+#!/bin/bash
+# Build and install ~/Applications/ChromeWork.app — a tiny AppleScript URL
+# router that forces every http(s) link into Chrome's Work profile.
+#
+# Why this exists: macOS's default-browser handoff is ambiguous when multiple
+# Chrome processes (e.g. agent-browser daemons) share the same Google Chrome.app
+# bundle but run with different --user-data-dir flags. `open -a "Google Chrome"`
+# can deliver the URL to whichever Chrome the OS deems "frontmost", which on a
+# developer Mac is often the wrong one. This router invokes the Chrome binary
+# directly with an explicit --user-data-dir, sidestepping the ambiguity.
+#
+# Idempotent: rebuilds only when the rendered AppleScript drifts from what's
+# already inside the .app. Every successful install reasserts ChromeWork as the
+# system default http(s) handler on enterprise Macs (Slack/Mail/Cursor links).
+#
+# Exit codes: 0 = installed or already correct, 1 = error, 2 = skipped
+# (Chrome not installed locally; harmless on machines without Chrome).
+#
+# Usage: chromework-install            Build and install
+#        chromework-install --force    Rebuild even if up-to-date
+#        chromework-install --check    Print would-rebuild state, do nothing
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+MODE="install"
+case "${1:-}" in
+  --force) MODE="force" ;;
+  --check) MODE="check" ;;
+  "") ;;
+  *) echo "Usage: chromework-install [--force|--check]" >&2; exit 2 ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OPEN_URL_HELPER="${CHROMEWORK_OPEN_URL_HELPER:-$SCRIPT_DIR/chromework-open-url}"
+ACTIVATE_HELPER="${CHROMEWORK_ACTIVATE_HELPER:-$SCRIPT_DIR/chromework-activate}"
+CHROME_APP_DIR="${CHROME_APP_DIR:-/Applications/Google Chrome.app}"
+CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-$HOME/Library/Application Support/Google/Chrome}"
+APP_DIR="${CHROMEWORK_APP_DIR:-$HOME/Applications/ChromeWork.app}"
+LSREGISTER="${CHROMEWORK_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister}"
+
+# Skip silently when Chrome isn't installed (e.g. CI runners, fresh Mac before brew)
+[ -d "$CHROME_APP_DIR" ] || exit 2
+[ -x "$OPEN_URL_HELPER" ] || {
+  echo "chromework-install: missing executable open-url helper: $OPEN_URL_HELPER" >&2
+  exit 1
+}
+[ -x "$ACTIVATE_HELPER" ] || {
+  echo "chromework-install: missing executable activate helper: $ACTIVATE_HELPER" >&2
+  exit 1
+}
+
+# Resolve the work profile dir by scanning Chrome's Local State for the
+# configured work email domain. Falls back to "Default" if no match (e.g. on a
+# fresh Mac before Chrome has been signed in, or for non-enterprise users).
+detect_work_profile_dir() {
+  local state="$CHROME_USER_DATA_DIR/Local State"
+  local domain
+  domain="$(chezmoi execute-template '{{ .work_email_domain }}' 2>/dev/null || echo "")"
+  if [ -n "$domain" ] && [ -f "$state" ] && command -v jq &>/dev/null; then
+    local detected
+    detected="$(jq -r --arg d "$domain" \
+      '.profile.info_cache | to_entries | map(select(.value.user_name | test($d))) | .[0].key // empty' \
+      "$state" 2>/dev/null || true)"
+    if [ -n "$detected" ]; then
+      echo "$detected"
+      return
+    fi
+  fi
+  echo "Default"
+}
+
+PROFILE_DIR="$(detect_work_profile_dir)"
+
+# Refuse to bake bats/temp CHROME_* paths into the real ~/Applications router.
+# Observed failure mode: chromework-install run with CHROME_APP_DIR /
+# CHROME_USER_DATA_DIR exported from a bats temp dir but CHROMEWORK_APP_DIR
+# left at the default — poisons ~/Applications/ChromeWork.app with /var/folders/…
+# paths that break every link and can leave the Run/Quit startup dialog stuck.
+_chromework_paths_look_like_test() {
+  [[ "$CHROME_APP_DIR" == /var/folders/*/T/* ]] \
+    || [[ "$CHROME_APP_DIR" == /tmp/* ]] \
+    || [[ "$CHROME_USER_DATA_DIR" == /var/folders/*/T/* ]] \
+    || [[ "$CHROME_USER_DATA_DIR" == /tmp/* ]]
+}
+
+_chromework_is_production_router() {
+  [ "$APP_DIR" = "$HOME/Applications/ChromeWork.app" ] || return 1
+  # Bats redirects HOME under /var/folders/.../T/ — not a real user install.
+  [[ "$HOME" == /Users/* ]] && [[ "$HOME" != *"/T/"* ]]
+}
+
+if _chromework_paths_look_like_test && _chromework_is_production_router; then
+  echo "chromework-install: refusing to install — CHROME_APP_DIR or CHROME_USER_DATA_DIR" >&2
+  echo "  look like a bats/temp path but CHROMEWORK_APP_DIR is the production router:" >&2
+  echo "    CHROME_APP_DIR=$CHROME_APP_DIR" >&2
+  echo "    CHROME_USER_DATA_DIR=$CHROME_USER_DATA_DIR" >&2
+  echo "  Unset those vars and re-run, or pass CHROMEWORK_APP_DIR under the same temp tree." >&2
+  exit 1
+fi
+
+# Production router uses the real bundle id so LaunchServices maps http(s) here.
+# Test/temp installs use a separate id so bats runs don't pollute the operator's
+# default-browser database with stale /var/folders/… paths.
+if _chromework_is_production_router; then
+  BUNDLE_ID="local.chromework.browser"
+else
+  BUNDLE_ID="local.chromework.browser.test"
+fi
+
+# Reassert ChromeWork as the system default http(s) handler on enterprise Macs.
+# Links from Slack, Mail, Messages, and Cursor must hit ChromeWork.app directly —
+# no Finicky/Velja/manual browser-chooser setup required.
+_reassert_chromework_default() {
+  command -v defaultbrowser &>/dev/null || return 0
+  _chromework_is_production_router || return 0
+  local enterprise
+  enterprise="$(chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null || echo "false")"
+  [ "$enterprise" = "true" ] || return 0
+  local current
+  current="$(defaultbrowser 2>/dev/null | awk '/^\*/ {print $2; exit}')"
+  [ "$current" = "browser" ] && return 0
+  echo "→ Setting ChromeWork as default browser (macOS may show a confirmation dialog)"
+  defaultbrowser browser >/dev/null 2>&1 || true
+}
+
+# Generate the AppleScript source. The router invokes Chrome's binary
+# directly with --user-data-dir, NOT `open -a "Google Chrome"`, so it
+# ignores any agent-browser Chrome instances running with their own data dir.
+generate_applescript() {
+  cat <<EOF
+-- ChromeWork URL router
+-- Generated by ~/apps/dotfiles/bin/chromework-install — DO NOT EDIT IN PLACE.
+-- Routes every http(s) URL to Chrome's Work profile by invoking the Chrome
+-- binary directly with an explicit --user-data-dir. This sidesteps the macOS
+-- LaunchServices "which Chrome wins" ambiguity caused by agent-browser daemons
+-- running from the same Google Chrome.app bundle but with custom --user-data-dir.
+--
+-- Profile directory: $PROFILE_DIR
+
+on open location this_URL
+	my routeURL(this_URL)
+end open location
+
+on open theURLs
+	repeat with u in theURLs
+		my routeURL(u as text)
+	end repeat
+end open
+
+on run
+	-- Applet must not show the Script Editor Run/Quit startup screen when
+	-- launched headlessly (e.g. Cursor workbench.externalBrowser, open -a URL).
+end run
+
+on routeURL(this_URL)
+	-- Inline AppleScript activate runs in user-click context (Space switch).
+	-- chromework-activate --survive-handoff keeps Chrome frontmost after this
+	-- applet exits and macOS restores Slack/Cursor.
+	my activateWorkChrome()
+	do shell script quoted form of "$OPEN_URL_HELPER" & " --no-activate " & quoted form of this_URL
+	repeat 12 times
+		my activateWorkChrome()
+		delay 0.15
+	end repeat
+	do shell script quoted form of "$ACTIVATE_HELPER" & " --survive-handoff >/dev/null 2>&1 &"
+end routeURL
+
+on activateWorkChrome()
+	try
+		tell application "Google Chrome"
+			if (count of windows) > 0 then
+				set index of window 1 to 1
+				activate
+			end if
+		end tell
+	end try
+end activateWorkChrome
+EOF
+}
+
+# Decide whether the existing .app already matches what we'd generate.
+# osadecompile output isn't byte-identical to the source we feed osacompile
+# (AppleScript pretty-prints), so we compare distinguishing router strings.
+needs_rebuild() {
+  [ "$MODE" = "force" ] && return 0
+  [ -d "$APP_DIR" ] || return 0
+  local startup
+  startup="$(plutil -extract OSAAppletShowStartupScreen raw "$APP_DIR/Contents/Info.plist" 2>/dev/null || echo "missing")"
+  [ "$startup" = "false" ] || return 0
+  local ui_element
+  ui_element="$(plutil -extract LSUIElement raw "$APP_DIR/Contents/Info.plist" 2>/dev/null || echo "missing")"
+  [ "$ui_element" = "true" ] || return 0
+  local decompiled
+  decompiled="$(osadecompile "$APP_DIR" 2>/dev/null || true)"
+  echo "$decompiled" | grep -q -- "on routeURL" || return 0
+  echo "$decompiled" | grep -Fq "$OPEN_URL_HELPER" || return 0
+  echo "$decompiled" | grep -q 'chromework-open-url' || return 0
+  echo "$decompiled" | grep -q 'on activateWorkChrome' || return 0
+  echo "$decompiled" | grep -Fq "$ACTIVATE_HELPER" || return 0
+  echo "$decompiled" | grep -q 'chromework-activate' || return 0
+  echo "$decompiled" | grep -q -- '--survive-handoff' || return 0
+  echo "$decompiled" | grep -q -- '--no-activate' || return 0
+  echo "$decompiled" | grep -q -- "--user-data-dir=" && return 0
+  echo "$decompiled" | grep -q 'on workChromeHasVisibleWindows' && return 0
+  echo "$decompiled" | grep -q ' >/dev/null 2>&1 &' && return 0
+  return 1
+}
+
+if needs_rebuild; then
+  if [ "$MODE" = "check" ]; then
+    echo "would rebuild: ChromeWork.app (profile: $PROFILE_DIR)"
+    exit 0
+  fi
+  echo "→ Building ChromeWork.app (profile: $PROFILE_DIR)"
+  mkdir -p "$HOME/Applications"
+  TMP_SRC="$(mktemp -t chromework.XXXXXX).applescript"
+  trap 'rm -f "$TMP_SRC"' EXIT
+  generate_applescript > "$TMP_SRC"
+
+  # Always rebuild the full .app bundle. Recompiling only main.scpt leaves
+  # startup-screen metadata inside the .scpt that overrides Info.plist and
+  # forces the Run/Quit dialog on every URL open.
+  osacompile -o "$APP_DIR" "$TMP_SRC"
+
+  # Register http/https as URL types and set our bundle id + display name.
+  plutil -insert CFBundleURLTypes -json '[{"CFBundleURLName":"HTTP URL","CFBundleURLSchemes":["http","https"]}]' "$APP_DIR/Contents/Info.plist" 2>/dev/null \
+    || plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"HTTP URL","CFBundleURLSchemes":["http","https"]}]' "$APP_DIR/Contents/Info.plist"
+  plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP_DIR/Contents/Info.plist"
+  plutil -replace CFBundleName -string "ChromeWork" "$APP_DIR/Contents/Info.plist"
+  plutil -replace OSAAppletShowStartupScreen -bool false "$APP_DIR/Contents/Info.plist"
+  plutil -replace LSUIElement -bool true "$APP_DIR/Contents/Info.plist"
+
+  # Re-register so LaunchServices picks up the changes immediately.
+  "$LSREGISTER" -f "$APP_DIR" >/dev/null 2>&1 || true
+  echo "✓ Built ChromeWork.app at $APP_DIR"
+
+else
+  if [ "$MODE" = "check" ]; then
+    echo "up to date: ChromeWork.app (profile: $PROFILE_DIR)"
+  else
+    echo "✓ ChromeWork.app already up to date (profile: $PROFILE_DIR)"
+    # LaunchServices can lose registration without bundle changes — refresh.
+    "$LSREGISTER" -f "$APP_DIR" >/dev/null 2>&1 || true
+  fi
+fi
+
+# LaunchServices can drift after macOS or browser updates without changing the
+# router bundle. Reassert the intended handler on every mutating run so Slack,
+# Mail, Outlook, and Messages keep routing links through the Work profile.
+[ "$MODE" = "check" ] || _reassert_chromework_default

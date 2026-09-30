@@ -1,0 +1,133 @@
+#!/bin/bash
+# tooling-sync — safe, rate-limited pull/push for agentbrew and minsky
+#
+# Fetches origin for both tooling repos and fast-forward merges when the
+# working tree is clean. Commits and pushes uncommitted TASKS.md changes for
+# agentbrew (minsky manages its own task pushes via its agents). dotfiles is
+# not here: its own dotfiles-sync agent owns it, and one job per repo avoids
+# two agents pulling and pushing the same checkout.
+#
+# Rate-limited to at most once per INTERVAL seconds (default 3600 = 1 h).
+# Pass --force to bypass the rate limit (e.g. after a manual pull).
+#
+# Usage:
+#   tooling-sync [--force] [--dry-run] [--help]
+#
+# Flags:
+#   --force     Bypass the rate limit (default: once per hour).
+#   --dry-run   Show what would happen without actually fetching / pushing.
+#   --help, -h  Print this message.
+#
+# Security: This script pushes only to 'origin'. The global pre-push
+# hook (git-hooks/pre-push) runs the privacy gate on every push, so a
+# private author or committer email never reaches GitHub.com. Nothing
+# rewrites history later: what lands on origin is what the world sees.
+# See SECURITY.md.
+
+set -euo pipefail
+
+FORCE=0
+DRY_RUN=0
+for arg in "$@"; do
+    case "$arg" in
+        --force)   FORCE=1   ;;
+        --dry-run) DRY_RUN=1 ;;
+        --help|-h)
+            # Strip leading "# " (or "#") from the doc header (lines 2-25).
+            sed -n '2,25p' "$0" | sed -E 's/^# ?//'
+            exit 0
+            ;;
+        *)
+            echo "tooling-sync: unknown argument: $arg" >&2
+            echo "       run --help for usage" >&2
+            exit 64
+            ;;
+    esac
+done
+
+INTERVAL=3600
+STAMP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/tooling-sync"
+STAMP_FILE="$STAMP_DIR/last-run"
+LOG_FILE="$STAMP_DIR/sync.log"
+
+mkdir -p "$STAMP_DIR"
+
+# ── rate limit ───────────────────────────────────────────────────────────────
+if [[ "$FORCE" -eq 0 && -f "$STAMP_FILE" ]]; then
+    last=$(cat "$STAMP_FILE")
+    now=$(date +%s)
+    if (( now - last < INTERVAL )); then
+        exit 0  # too soon; the hourly LaunchAgent will pick it up
+    fi
+fi
+
+# Claim the slot immediately to prevent concurrent runs (skip on dry-run).
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    date +%s > "$STAMP_FILE"
+fi
+
+log() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "[DRY-RUN] $*" >&2
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+    fi
+}
+log "=== tooling-sync start (dry-run=$DRY_RUN force=$FORCE) ==="
+
+sync_repo() {
+    local dir="$1" push_tasks="${2:-false}"
+    [[ -d "$dir/.git" ]] || { log "SKIP $dir: not a git repo"; return 0; }
+
+    local branch
+    branch=$(git -C "$dir" branch --show-current 2>/dev/null || echo "main")
+
+    # Fetch (always safe — never modifies working tree)
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        log "would fetch  $dir"
+    elif git -C "$dir" fetch origin --quiet 2>/dev/null; then
+        log "OK   fetch  $dir"
+    else
+        log "FAIL fetch  $dir (network?)"
+        return 1
+    fi
+
+    # Push uncommitted TASKS.md if requested and dirty
+    if [[ "$push_tasks" == "true" ]] \
+        && ! git -C "$dir" diff --quiet -- TASKS.md 2>/dev/null; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            log "would push   $dir TASKS.md (commit + push origin HEAD)"
+        else
+            git -C "$dir" add -- TASKS.md
+            if git -C "$dir" commit -m "tasks: sync from $(hostname -s)" --quiet 2>/dev/null \
+                && git -C "$dir" push origin HEAD --quiet 2>/dev/null; then
+                log "OK   push   $dir TASKS.md"
+            else
+                log "FAIL push   $dir TASKS.md (diverged? run tooling-sync --force after rebase)"
+            fi
+        fi
+    fi
+
+    # Fast-forward pull — only when working tree + index are clean
+    if git -C "$dir" diff --quiet HEAD 2>/dev/null \
+        && git -C "$dir" diff --cached --quiet 2>/dev/null; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            log "would pull   $dir ($branch) — ff-only from origin/$branch"
+        elif git -C "$dir" merge --ff-only "origin/$branch" --quiet 2>/dev/null; then
+            log "OK   pull   $dir ($branch)"
+        else
+            log "INFO pull   $dir: already up to date or local commits ahead (ok)"
+        fi
+    else
+        log "SKIP pull   $dir: dirty working tree, skipping merge"
+    fi
+}
+
+TOOLING=~/apps/tooling
+
+# Run both repos in parallel; wait before exit so the caller sees a clean exit
+sync_repo "$TOOLING/agentbrew" true  &
+sync_repo "$TOOLING/minsky"    false &
+wait
+
+log "=== tooling-sync done ==="

@@ -1,0 +1,67 @@
+#!/bin/bash
+# Log when agent-browser left Chrome frontmost — never hide, activate, or switch Spaces.
+#
+# Hiding Chrome via System Events (set visible to false) or re-activating the prior
+# app both steal focus / jump Spaces when the user is fullscreen on another desktop.
+# Prevention is headless CDP (--headless=new on launchd Chromes + cold path). This
+# helper only records suspected steals for troubleshooting.
+#
+# Usage:
+#   dotfiles-restore-focus-after-chrome --log-if-chrome-frontmost [previous_app]
+#   dotfiles-restore-focus-after-chrome --capture-frontmost   # diagnostics only
+#
+# Opt out per invocation: AGENT_BROWSER_ALLOW_FOCUS=1
+# Opt out globally: export AGENT_BROWSER_ALLOW_FOCUS=1 in the shell profile.
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+FOCUS_STEAL_LOG="${DOTFILES_FOCUS_STEAL_LOG:-$HOME/.local/share/dotfiles/logs/focus-steal.log}"
+
+capture_frontmost_app() {
+  osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null \
+    || true
+}
+
+log_chrome_focus_steal() {
+  local previous_app="${1:-}"
+  local current_app="${2:-}"
+  [ -n "$current_app" ] || return 0
+  mkdir -p "$(dirname "$FOCUS_STEAL_LOG")" 2>/dev/null || true
+  printf '%s prev=%q current=%q caller=%q\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$previous_app" \
+    "$current_app" \
+    "${DOTFILES_FOCUS_STEAL_CALLER:-agent-browser}" \
+    >>"$FOCUS_STEAL_LOG" 2>/dev/null || true
+}
+
+log_if_chrome_frontmost() {
+  local previous_app="${1:-}"
+  [ -n "${AGENT_BROWSER_ALLOW_FOCUS:-}" ] && return 0
+
+  local current_app
+  current_app="$(capture_frontmost_app)"
+  [ "$current_app" = "Google Chrome" ] || return 0
+
+  log_chrome_focus_steal "$previous_app" "$current_app"
+}
+
+case "${1:-}" in
+  --capture-frontmost)
+    capture_frontmost_app
+    ;;
+  --check-chrome-frontmost)
+    [ "$(capture_frontmost_app)" = "Google Chrome" ]
+    ;;
+  --log-if-chrome-frontmost)
+    log_if_chrome_frontmost "${2:-}"
+    ;;
+  *)
+    # Legacy positional restore arg — no-op (never hide or activate).
+    log_if_chrome_frontmost "${1:-}"
+    ;;
+esac

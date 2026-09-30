@@ -1,0 +1,95 @@
+#!/bin/bash
+# agent-tmux — run an AI agent CLI inside a persistent tmux session.
+#
+# Purpose: the agent process survives terminal close, ssh disconnect,
+# Ghostty/iTerm quit, and even macOS sleep cycles (when Amphetamine /
+# pmset prevents lid-close sleep). Per the agent-tmux pattern used by
+# rusty-art/claude-tmux, amux, agentdock and others, this is the
+# standard solution for keeping long-running agent sessions alive.
+#
+# Usage:
+#   agent-tmux <agent> [args...]      Launch <agent> in tmux session
+#                                     named "<agent>-<cwd-basename>".
+#                                     Attaches if session already exists.
+#   agent-tmux --ls                   List active agent-tmux sessions.
+#   agent-tmux --kill <session>       Kill a specific session.
+#   agent-tmux --help                 Show this message.
+#
+# Examples:
+#   agent-tmux devin                  → session "devin-tooling" in cwd ~/apps/tooling
+#   agent-tmux devin -r               → resume most-recent Devin session
+#   agent-tmux claude                 → Claude Code in tmux
+#   agent-tmux cursor-agent           → Cursor Agent in tmux
+#
+# Reattach later: `tmux a -t devin-tooling` (or run agent-tmux again
+# with the same agent name in the same cwd — `tmux new -A` will attach).
+#
+# Why this script vs. raw `tmux new -A -s ... <cmd>`: (a) consistent
+# session naming (no collisions between repos), (b) refuses to nest
+# inside an existing tmux session (which silently fails or breaks
+# rendering for some agents), (c) sets terminal title for at-a-glance
+# session identification.
+set -euo pipefail
+
+# ── Argument parsing ──────────────────────────────────────────────────
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+# Refuse to nest. The TMUX env var is set by tmux itself; nesting causes
+# corrupt rendering for ink/React-based agent TUIs.
+if [ -n "${TMUX:-}" ]; then
+  echo "error: already inside a tmux session — refusing to nest" >&2
+  echo "       run \`tmux detach\` first, then re-run agent-tmux" >&2
+  exit 1
+fi
+
+if [ "${1:-}" = "--ls" ]; then
+  tmux ls 2>/dev/null | grep -E "^(devin|claude|cursor|codex|gemini|opencode|amp|cline|aider|goose|windsurf)" || {
+    echo "(no active agent-tmux sessions)" >&2
+    exit 0
+  }
+  exit 0
+fi
+
+if [ "${1:-}" = "--kill" ]; then
+  [ -z "${2:-}" ] && { echo "error: --kill requires a session name" >&2; exit 1; }
+  tmux kill-session -t "$2"
+  exit 0
+fi
+
+if [ $# -eq 0 ]; then
+  echo "error: no agent specified — see \`agent-tmux --help\`" >&2
+  exit 1
+fi
+
+# ── Resolve the agent binary ──────────────────────────────────────────
+AGENT="$1"
+shift
+
+# Verify the agent CLI exists on PATH before opening tmux (better error
+# than a blank pane that closes after `agent-tmux --help`).
+if ! command -v "$AGENT" >/dev/null 2>&1; then
+  echo "error: agent CLI \`$AGENT\` not found on PATH" >&2
+  echo "       check \`which $AGENT\` and ensure it's installed" >&2
+  exit 1
+fi
+
+# ── Compose a stable session name ─────────────────────────────────────
+# `<agent>-<cwd-basename>` collides only when two siblings have the same
+# basename, which is rare; if it happens the user can override with
+# AGENT_TMUX_SESSION env or pass --suffix as a future feature.
+CWD_BASE=$(basename "$PWD" | tr -c '[:alnum:]._-' '_')
+SESSION="${AGENT_TMUX_SESSION:-${AGENT}-${CWD_BASE}}"
+
+# ── Launch (create-or-attach) ─────────────────────────────────────────
+# `tmux new -A -s` attaches to existing session of that name, otherwise
+# creates a new one. The wrapped command is the agent + any passthrough
+# args. The agent runs in $PWD (tmux respects -c "$PWD" or inherits cwd).
+#
+# Why we don't use `caffeinate -s` here: Devin CLI already self-wraps
+# in `caffeinate -ms`, and Claude Code / Cursor don't need it for their
+# foreground operation. macOS lid-close sleep is handled by Amphetamine
+# (system-level), not per-process caffeinate.
+exec tmux new -A -s "$SESSION" -c "$PWD" "$AGENT" "$@"

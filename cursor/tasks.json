@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "shell",
+      "command": "bash",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "dotfiles-git-shortcuts",
+        "clear": true
+      },
+      "problemMatcher": [],
+      "label": "dotfiles: git pull latest main/master",
+      "args": [
+        "-lc",
+        "set -euo pipefail; branch=$(git branch --show-current); if [ -z \"$branch\" ]; then echo \"Not on a local branch.\" >&2; exit 1; fi; base=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true); if [ -z \"$base\" ]; then for candidate in main master; do if git ls-remote --exit-code --heads origin \"$candidate\" >/dev/null 2>&1; then base=$candidate; break; fi; done; fi; if [ -z \"$base\" ]; then echo \"Could not find origin main/master.\" >&2; exit 1; fi; if [ \"$branch\" = \"$base\" ]; then git pull --ff-only --prune origin \"$base\"; else git fetch --prune origin \"$base\"; echo \"Fetched origin/$base. Current branch is $branch; run the rebase shortcut to rebase onto origin/$base.\"; fi"
+      ]
+    },
+    {
+      "type": "shell",
+      "command": "bash",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "dotfiles-git-shortcuts",
+        "clear": true
+      },
+      "problemMatcher": [],
+      "label": "dotfiles: git rebase current branch onto main/master",
+      "args": [
+        "-lc",
+        "set -euo pipefail; branch=$(git branch --show-current); if [ -z \"$branch\" ]; then echo \"Not on a local branch.\" >&2; exit 1; fi; base=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true); if [ -z \"$base\" ]; then for candidate in main master; do if git ls-remote --exit-code --heads origin \"$candidate\" >/dev/null 2>&1; then base=$candidate; break; fi; done; fi; if [ -z \"$base\" ]; then echo \"Could not find origin main/master.\" >&2; exit 1; fi; git fetch --prune origin \"$base\"; if [ \"$branch\" = \"$base\" ]; then git pull --ff-only --prune origin \"$base\"; else git rebase \"origin/$base\"; fi"
+      ]
+    }
+  ]
+}

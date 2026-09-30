@@ -1,0 +1,64 @@
+# ── Atuin Shell History ──────────────────────────────────────────────
+# Only intentional settings — everything else uses atuin's sensible defaults.
+# Full reference: https://docs.atuin.sh/configuration/config/
+
+# Fuzzy search by default (most forgiving)
+search_mode = "fuzzy"
+
+# Show commands from all hosts by default, filter with Tab
+filter_mode = "global"
+
+# Up-arrow shows directory-scoped history (most useful context)
+filter_mode_shell_up_key_binding = "directory"
+
+# Compact UI — more space for commands
+style = "compact"
+
+# Show command preview for long commands
+show_preview = true
+max_preview_height = 4
+
+# Enter executes immediately, Tab puts in prompt for editing
+enter_accept = true
+
+# Enable workspace filtering (git repo = workspace)
+workspaces = true
+
+# ── Security ──────────────────────────────────────────────────────────
+# Built-in secrets filter (AWS keys, GitHub PATs, Slack tokens, Stripe keys)
+secrets_filter = true
+
+# Additional patterns to exclude from history
+history_filter = [
+  "^export (AWS|GITHUB|SLACK|STRIPE|JIRA|NPM|DOCKER)_",
+  "security add-generic-password",
+  "security find-generic-password",
+  "--password",
+  "--token",
+  "--secret",
+  "curl.*-H.*Authorization",
+]
+
+# ── Sync ──────────────────────────────────────────────────────────────
+[sync]
+records = true
+
+# ── Daemon ────────────────────────────────────────────────────────────
+# Run atuin in daemon mode: history writes go to a background socket rather
+# than blocking the shell's preexec hook. Eliminates the ~72ms per-command
+# cost measured in zprof. The daemon is started via LaunchAgent below.
+[daemon]
+enabled = true
+# Sync every 5 minutes in background instead of blocking on each command
+sync_frequency = 300
+
+# ── Stats ─────────────────────────────────────────────────────────────
+[stats]
+common_subcommands = ["git", "npm", "yarn", "docker", "kubectl", "brew", "cargo", "go"]
+common_prefix = ["sudo"]
+ignored_commands = ["cd", "ls", "ll", "la", "clear", "exit"]
+
+# ── UI ────────────────────────────────────────────────────────────────
+[ui]
+# Show exit code + duration + time + command
+columns = ["exit", "duration", "time", "command"]

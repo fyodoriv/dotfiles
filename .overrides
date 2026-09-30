@@ -1,0 +1,20 @@
+# Dotfiles Doctor Overrides
+# Lines here tell the doctor to skip specific checks.
+# Format: CHECK_ID
+# Example: skip "macos.reduce_transparency" if you want transparency on.
+#
+# To add an override: dotfiles-doctor --skip <check-id>
+# To list all checks: dotfiles-doctor --list
+
+# 2026-05-12 — cbrwizard (off-VPN personal Mac, 32GB arm64)
+# local-ai-warmup would auto-start LM Studio at login + every 30min.
+# Per operator rule: local models must not run without explicit approval.
+local-ai.warmup_agent_loaded
+
+# Ollama is managed by Ollama.app on this machine (not the dotfiles plist).
+# Plist is installed at com.dotfiles.ollama.plist.disabled for reference.
+local-ai.ollama_agent_loaded
+
+macos.pmset_display_sleep_15
+macos.pmset_battery_sleep_15
+macos.pmset_battery_disk_sleep_15

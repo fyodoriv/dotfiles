@@ -1,0 +1,47 @@
+# ── Tig Configuration ────────────────────────────────────────────────
+
+# General
+set main-view-date = relative
+set main-view-author = abbreviated
+set main-view-id = yes
+set main-view-id-width = 8
+set blame-view-date = relative
+set tab-size = 2
+set line-graphics = utf-8
+set truncation-delimiter = utf-8
+set mouse = true
+set refresh-mode = auto
+
+# Diff
+set diff-options = --stat --summary
+set diff-highlight = true
+
+# Dracula colors
+color cursor white "#44475a" bold
+color title-focus white "#44475a" bold
+color title-blur white "#282a36"
+color status white default
+color id "#bd93f9" default
+color date "#8be9fd" default
+color author "#50fa7b" default
+color main-head "#ff79c6" default bold
+color main-tag "#ffb86c" default
+color main-ref "#bd93f9" default
+color main-remote "#8be9fd" default
+color diff-header "#f8f8f2" "#282a36"
+color diff-chunk "#8be9fd" default
+color "diff-add" "#50fa7b" default
+color "diff-del" "#ff5555" default
+
+# Key bindings
+bind generic g move-first-line
+bind generic G move-last-line
+bind main B !git rebase -i %(commit)
+bind diff B !git rebase -i %(commit)
+bind main C !git cherry-pick %(commit)
+bind main ! !git revert %(commit)
+bind status P !git push
+bind status D !@?rm %(file)
+bind stash A !?git stash apply %(stash)
+bind stash ! !?git stash drop %(stash)
+bind refs N !@git branch "%(prompt New branch name: )"

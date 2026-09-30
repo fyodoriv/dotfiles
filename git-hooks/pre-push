@@ -1,0 +1,217 @@
+#!/opt/homebrew/bin/bash
+# Pre-push hook — second line of defence after pre-commit.
+#
+# GitHub.com is the only canonical home of dotfiles and agentbrew. Pushes
+# to those repositories go straight to `origin`; nothing rewrites history
+# later. So this hook blocks, before the push:
+#
+#   - any commit whose author or committer email matches the private-email
+#     pattern (an org overlay supplies it through `oss-readiness.env`), and
+#   - any file changed in the pushed range (read at the pushed commit) that
+#     matches the private-identifier pattern. The message lists paths only.
+#
+# With no overlay, both patterns are empty and the checks have nothing to
+# match. After the gate, this hook delegates to a repo-local
+# `hooks/pre-push` if one exists (husky / lefthook / project-specific hook).
+#
+# History: PR #59 once replaced this file with a pure lefthook stub via a
+# transitive `pnpm install` from a sister repo, and private author emails
+# leaked for a week. Keep this hook tracked and self-tested.
+
+set -o errexit -o nounset -o pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$(cd "$HOOK_DIR/.." && pwd)"
+
+remote_name="${1:-}"
+remote_url="${2:-}"
+
+# Self-test mode for CI / dotfiles-doctor `git.pre_push_hook_works`.
+if [ "$remote_name" = "--self-test" ]; then
+  [ -f "$DOTFILES_DIR/lib/oss-readiness.sh" ] || { echo "missing lib/oss-readiness.sh"; exit 1; }
+  echo "pre-push self-test OK"
+  exit 0
+fi
+
+# ── Repo-scope check ────────────────────────────────────────────────
+# This hook is wired globally via `core.hooksPath`, so it fires for
+# EVERY git repo on the machine — not just dotfiles. The privacy gate
+# applies to dotfiles itself (it carries lib/oss-readiness.sh) and to any
+# push whose destination is github.com/fyodoriv/{dotfiles,agentbrew}.
+# Any other repo defers to its own gates.
+CURRENT_REPO="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
+gated_repo=0
+case "$remote_url" in
+  *github.com[:/]fyodoriv/dotfiles | *github.com[:/]fyodoriv/dotfiles.git | *github.com[:/]fyodoriv/dotfiles/) gated_repo=1 ;;
+  *github.com[:/]fyodoriv/agentbrew | *github.com[:/]fyodoriv/agentbrew.git | *github.com[:/]fyodoriv/agentbrew/) gated_repo=1 ;;
+esac
+if [ -n "$CURRENT_REPO" ] && [ -f "$CURRENT_REPO/lib/oss-readiness.sh" ]; then
+  gated_repo=1
+fi
+
+if [ "$gated_repo" -eq 0 ]; then
+  # Different repo — defer. Delegate to repo-local hooks/pre-push so
+  # husky / lefthook / custom project hooks still fire here.
+  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
+    exec "$CURRENT_REPO/hooks/pre-push" "$@"
+  fi
+  exit 0
+fi
+
+# shellcheck source=../lib/oss-readiness.sh
+source "$DOTFILES_DIR/lib/oss-readiness.sh"
+oss_readiness_load_private_env "$(basename "$CURRENT_REPO")" >/dev/null 2>&1 || true
+
+if [ -t 2 ]; then
+  RED=$'\033[31m'
+  YEL=$'\033[33m'
+  RST=$'\033[0m'
+else
+  RED='' YEL='' RST=''
+fi
+
+# ── Read stdin: per-ref pre-push payload ───────────────────────────────
+# Format: <local ref> <local sha> <remote ref> <remote sha>\n …
+# We only scan refs we're actually about to push.
+
+scan_failed=0
+# Stdin payload format: <local ref> <local sha> <remote ref> <remote sha>
+# We don't use remote_ref ourselves (the local sha + range covers our
+# scan), but it must be read to advance past the field.
+while read -r local_ref local_sha _remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+  # Branch deletion (local_sha is 0000…) — nothing to scan.
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;;
+  esac
+
+  # Range of NEW commits being pushed.
+  zero_sha=0000000000000000000000000000000000000000
+  scan_whole_tree=0
+  if [ "$remote_sha" = "$zero_sha" ]; then
+    # New remote branch: only commits no remote-tracking ref has yet.
+    if [ -n "$(git -C "$CURRENT_REPO" rev-list -n1 "$local_sha" --not "--remotes=$remote_name" 2>/dev/null || true)" ]; then
+      range_args=("$local_sha" --not "--remotes=$remote_name")
+    else
+      # Nothing new to diff (or unsupported): scan the whole pushed tree.
+      range_args=("$local_sha")
+      scan_whole_tree=1
+    fi
+  else
+    range_args=("$remote_sha..$local_sha")
+  fi
+
+  # 1. Content scan: files changed in the pushed range, read AT THE PUSHED
+  # COMMIT (not the working tree). A match blocks the push. The output
+  # names file paths only; it never prints the matched text or the pattern.
+  if [ -n "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
+    private_hits=()
+    if [ "$scan_whole_tree" -eq 1 ]; then
+      while IFS= read -r f; do
+        # git grep prints <sha>:<path>; keep the path only.
+        [ -n "$f" ] && private_hits+=("${f#*:}")
+      done < <(git -C "$CURRENT_REPO" grep -I -i -E -l -e "$OSS_READINESS_INTERNAL_PATTERN" "$local_sha" 2>/dev/null || true)
+    else
+      pathspecs=()
+      while IFS= read -r f; do
+        [ -n "$f" ] && pathspecs+=(":(literal)$f")
+      done < <(git -C "$CURRENT_REPO" log --format= --name-only --diff-filter=ACMR --root -m "${range_args[@]}" 2>/dev/null | sort -u)
+      if [ "${#pathspecs[@]}" -gt 0 ]; then
+        while IFS= read -r f; do
+          [ -n "$f" ] && private_hits+=("${f#*:}")
+        done < <(git -C "$CURRENT_REPO" grep -I -i -E -l -e "$OSS_READINESS_INTERNAL_PATTERN" "$local_sha" -- "${pathspecs[@]}" 2>/dev/null || true)
+      fi
+    fi
+
+    if [ "${#private_hits[@]}" -gt 0 ]; then
+      printf '%s✗ %d file(s) in the push match the private-reference pattern:%s\n' "$RED" "${#private_hits[@]}" "$RST" >&2
+      printf '   %s\n' "${private_hits[@]}" >&2
+      printf '\n%sRemove or generalize those references, then amend the commits.%s\n' "$YEL" "$RST" >&2
+      scan_failed=1
+    fi
+  fi
+
+  # 1b. History scan: a commit in the range may add a private reference
+  # that a later commit removed, so the pushed tip looks clean. Check the
+  # lines each pushed commit adds. Print commit ids only, never the text.
+  if [ -n "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
+    history_hits=()
+    while IFS= read -r commit; do
+      [ -n "$commit" ] || continue
+      if git -C "$CURRENT_REPO" show --format= --no-color --no-ext-diff -m "$commit" 2>/dev/null \
+        | grep -E '^\+' | grep -Ev '^\+\+\+ ' \
+        | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN"; then
+        history_hits+=("$(git -C "$CURRENT_REPO" rev-parse --short "$commit")")
+        [ "${#history_hits[@]}" -ge 20 ] && break
+      fi
+    done < <(git -C "$CURRENT_REPO" rev-list "${range_args[@]}" 2>/dev/null || true)
+
+    if [ "${#history_hits[@]}" -gt 0 ]; then
+      printf '%s✗ %d commit(s) in the push add lines that match the private-reference pattern:%s\n' "$RED" "${#history_hits[@]}" "$RST" >&2
+      printf '   %s\n' "${history_hits[@]}" >&2
+      printf '\n%sRewrite those commits so no pushed commit carries the reference.%s\n' "$YEL" "$RST" >&2
+      scan_failed=1
+    fi
+  fi
+
+  # 1c. Root check: when the private env lists the approved root commits
+  # (OSS_READINESS_ALLOWED_ROOTS, space-separated), a push may only carry
+  # history that starts at one of them. This stops an old, pre-public
+  # history from reaching the public repo.
+  if [ -n "${OSS_READINESS_ALLOWED_ROOTS:-}" ]; then
+    while IFS= read -r root; do
+      [ -n "$root" ] || continue
+      case " $OSS_READINESS_ALLOWED_ROOTS " in
+        *" $root "*) ;;
+        *)
+          printf '%s✗ The push carries history from an unapproved root commit %s.%s\n' "$RED" "${root:0:12}" "$RST" >&2
+          printf '%sPush only branches built on the public history.%s\n' "$YEL" "$RST" >&2
+          scan_failed=1
+          ;;
+      esac
+    done < <(git -C "$CURRENT_REPO" rev-list --max-parents=0 "$local_sha" 2>/dev/null || true)
+  fi
+
+  # 2. Author/committer scan: no commit in the range may carry a private
+  # email. Nothing rewrites history after the push, so a private email
+  # would reach GitHub.com as-is. Run against CURRENT_REPO (the repo being
+  # pushed FROM), not DOTFILES_DIR (where this hook lives).
+  bad_emails=()
+  while IFS= read -r email; do
+    [ -z "$email" ] && continue
+    if ! oss_readiness_email_is_safe "$email"; then
+      bad_emails+=("$email")
+    fi
+  done < <(git -C "$CURRENT_REPO" log --format='%ae%n%ce' "${range_args[@]}" 2>/dev/null | sort -u)
+
+  if [ "${#bad_emails[@]}" -gt 0 ]; then
+    printf '%s✗ Private author or committer emails cannot reach GitHub.com:%s\n' "$RED" "$RST" >&2
+    printf '   %s\n' "${bad_emails[@]}" >&2
+    printf '\n' >&2
+    printf '%sUse a public identity, then amend the affected commits before pushing.%s\n' "$YEL" "$RST" >&2
+    scan_failed=1
+  fi
+done
+
+if [ "$scan_failed" -ne 0 ]; then
+  printf '\n%spush blocked by dotfiles pre-push hook%s\n' "$RED" "$RST" >&2
+  exit 1
+fi
+
+# ── Delegate to repo-local hook ────────────────────────────────────────
+# After our leak gates pass, hand off to the repo's own pre-push hook
+# if it has one. `exec` replaces this process so the downstream hook's
+# exit code becomes ours.
+#
+# IMPORTANT: stdin was consumed by the scan loop above. For repo-local
+# hooks that need the per-ref payload, document that the global hook
+# is positional: the local hook receives <remote_name> <remote_url> via
+# argv but NOT the per-ref payload via stdin. That's a limitation of
+# chaining pre-push hooks via exec. Most repo-local hooks don't need
+# stdin (husky / lefthook / project commit checks operate on the
+# working tree), so this is acceptable.
+if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
+  exec "$CURRENT_REPO/hooks/pre-push" "$@"
+fi
+
+exit 0

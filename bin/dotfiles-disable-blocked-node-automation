@@ -1,0 +1,66 @@
+#!/bin/bash
+# Disable unattended Node.js jobs when enterprise endpoint policy blocks the
+# Node.js Foundation publisher. Explicit/interactive Node remains available
+# after the machine-scoped exception is approved.
+
+set -uo pipefail
+
+# shellcheck source=/dev/null
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/dotfiles-endpoint-paths.sh"
+
+BLOCKED_TEAM_ID="HX7739G8FX"
+STATE_DIR="$HOME/.local/state/dotfiles"
+SENTINEL="$STATE_DIR/endpoint-node-publisher-blocked"
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  exit 0
+fi
+if ! dotfiles_managed_endpoint; then
+  exit 0
+fi
+
+if [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" = "1" ]; then
+  rm -f "$SENTINEL"
+  echo "○ Node publisher exception opt-in enabled; leaving automation unchanged"
+  exit 0
+fi
+
+node_path="$(command -v node 2>/dev/null || true)"
+[ -n "$node_path" ] && [ -x "$node_path" ] || exit 0
+
+signature="$(codesign -dvv "$node_path" 2>&1 || true)"
+if ! grep -q "TeamIdentifier=$BLOCKED_TEAM_ID" <<<"$signature"; then
+  exit 0
+fi
+
+mkdir -p "$STATE_DIR"
+printf 'path=%s\nteam_id=%s\ndetected_at=%s\n' \
+  "$node_path" "$BLOCKED_TEAM_ID" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >"$SENTINEL"
+
+disabled=0
+for plist in "$HOME"/Library/LaunchAgents/com.agentbrew.*.plist; do
+  [ -f "$plist" ] || continue
+  label="$(basename "$plist" .plist)"
+  # The shared-memory daemon is uvx/Python-owned, not Node-owned. AgentBrew
+  # reconciles this required cold-start dependency independently.
+  [ "$label" = "com.agentbrew.mcp-memory" ] && continue
+  launchctl disable "gui/$(id -u)/$label" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+  disabled=$((disabled + 1))
+done
+
+echo "✓ Disabled $disabled unattended agentbrew job(s): Node.js Foundation publisher is blocked"
+
+# Topgrade auto-detects Node/npm/fnm plus other publisher-sensitive runtimes.
+# Keep the weekly unattended upgrade off while Node itself is blocked; the
+# wrapper also checks the sentinel in case launchd's disabled state drifts.
+upgrade_disabled=0
+label="com.dotfiles.dotfiles-upgrade"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+if [ -f "$plist" ]; then
+  launchctl disable "gui/$(id -u)/$label" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+  upgrade_disabled=1
+fi
+
+echo "✓ Disabled $upgrade_disabled unattended publisher-sensitive upgrade job(s)"

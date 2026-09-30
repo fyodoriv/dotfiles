@@ -1,0 +1,73 @@
+#!/bin/bash
+# System health dashboard — fastfetch for system info + custom dotfiles sections.
+# Usage: status
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/stats.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# ── System info via fastfetch ────────────────────────────────────────
+if command -v fastfetch &>/dev/null; then
+  fastfetch
+else
+  echo -e "${YELLOW}⚠${NC} fastfetch not installed — run: brew install fastfetch"
+  echo -e "  macOS $(sw_vers -productVersion) | $(sysctl -n machdep.cpu.brand_string)"
+fi
+
+# ── Dotfiles ─────────────────────────────────────────────────────────
+section "Dotfiles"
+df_ref=$(cd "$DOTFILES_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+df_branch=$(cd "$DOTFILES_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+df_dirty=$(cd "$DOTFILES_DIR" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+df_last_sync=$(cd "$DOTFILES_DIR" && git log -1 --format='%ar' 2>/dev/null || echo "unknown")
+df_modules=$(fd -t d -d 1 . "$DOTFILES_DIR/modules" 2>/dev/null | wc -l | tr -d ' ')
+echo -e "  Version:   $df_ref ($df_branch)$([ "$df_dirty" -gt 0 ] && echo -e " ${YELLOW}+${df_dirty} uncommitted${NC}")"
+echo -e "  Last sync: $df_last_sync"
+echo -e "  Modules:   $df_modules available"
+echo -e "  Stats:     $(get_time_saved_summary)"
+
+# ── Git (current dir) ────────────────────────────────────────────────
+section "Git (current dir)"
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  # shellcheck disable=SC1083 # @{u} is valid git upstream syntax
+  ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo "?")
+  # shellcheck disable=SC1083
+  behind=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo "?")
+  echo -e "  Branch:    $branch"
+  [ "$dirty" -gt 0 ] && echo -e "  Changes:   ${YELLOW}$dirty uncommitted${NC}" || echo -e "  Changes:   ${GREEN}clean${NC}"
+  [ "$ahead" != "0" ] && [ "$ahead" != "?" ] && echo -e "  Ahead:     ${YELLOW}$ahead commits${NC}"
+  [ "$behind" != "0" ] && [ "$behind" != "?" ] && echo -e "  Behind:    ${YELLOW}$behind commits${NC}"
+else
+  echo -e "  ${DIM}Not in a git repo${NC}"
+fi
+
+# ── LaunchAgents (auto-discovered from launchagents/) ────────────────
+section "Agents"
+user_id=$(id -u)
+for plist in "$DOTFILES_DIR"/launchagents/*.plist "$DOTFILES_DIR"/launchagents/*.plist.tmpl; do
+  [ ! -f "$plist" ] && continue
+  label="$(basename "$plist" .plist.tmpl)"
+  label="$(basename "$label" .plist)"
+  agent_name="${label#com.dotfiles.}"
+  if launchctl print "gui/$user_id/$label" >/dev/null 2>&1; then
+    echo -e "  ${GREEN}●${NC} $agent_name"
+  else
+    echo -e "  ${RED}○${NC} $agent_name ${DIM}(not loaded)${NC}"
+  fi
+done
+
+# ── Listening ports ──────────────────────────────────────────────────
+section "Ports in use"
+listening=$(lsof -i -P -n 2>/dev/null | grep LISTEN | awk '{print $9}' | sort -u | head -8 || true)
+if [ -n "$listening" ]; then
+  echo "$listening" | while IFS= read -r port; do echo "  $port"; done
+else
+  echo -e "  ${DIM}No listening ports${NC}"
+fi
+
+echo ""

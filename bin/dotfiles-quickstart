@@ -1,0 +1,217 @@
+#!/bin/bash
+# Dotfiles Quickstart — interactive first-run wizard.
+#
+# Guides new users through the full onboarding flow:
+# prerequisites check, clone/fork setup, chezmoi init, and doctor.
+#
+# Usage:
+#   dotfiles-quickstart              Run the interactive wizard
+#   dotfiles-quickstart --check      Only check prerequisites
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+
+CHECK_ONLY=false
+[ "${1:-}" = "--check" ] && CHECK_ONLY=true
+
+trap 'echo ""; echo "Interrupted. Run dotfiles quickstart to resume."; exit 130' INT
+
+# ── Prerequisites ────────────────────────────────────────────────
+check_prerequisites() {
+  section "Prerequisites"
+  local missing=0
+
+  # Xcode CLT
+  if xcode-select -p &>/dev/null; then
+    ok "Xcode Command Line Tools"
+  else
+    fail "Xcode Command Line Tools not installed"
+    missing=$((missing + 1))
+  fi
+
+  # Homebrew
+  if command -v brew &>/dev/null; then
+    ok "Homebrew"
+  else
+    fail "Homebrew not installed"
+    missing=$((missing + 1))
+  fi
+
+  # chezmoi
+  if command -v chezmoi &>/dev/null; then
+    ok "chezmoi"
+  else
+    fail "chezmoi not installed"
+    missing=$((missing + 1))
+  fi
+
+  # Git
+  if command -v git &>/dev/null; then
+    ok "Git"
+  else
+    fail "Git not installed"
+    missing=$((missing + 1))
+  fi
+
+  # jq (required by apply-defaults.sh during chezmoi apply)
+  if command -v jq &>/dev/null; then
+    ok "jq"
+  else
+    fail "jq not installed"
+    missing=$((missing + 1))
+  fi
+
+  echo ""
+  return "$missing"
+}
+
+install_prerequisites() {
+  local missing_list=()
+
+  xcode-select -p &>/dev/null || missing_list+=("xcode-clt")
+  command -v brew &>/dev/null || missing_list+=("homebrew")
+  command -v chezmoi &>/dev/null || missing_list+=("chezmoi")
+  command -v jq &>/dev/null || missing_list+=("jq")
+
+  if [ ${#missing_list[@]} -eq 0 ]; then
+    return 0
+  fi
+
+  echo -e "${YELLOW}Missing: ${missing_list[*]}${NC}"
+  echo ""
+  read -rp "Install missing prerequisites? [Y/n] " install_answer
+  case "${install_answer:-Y}" in
+    [nN]*) echo "Skipping. Install manually and re-run."; exit 1 ;;
+  esac
+
+  for item in "${missing_list[@]}"; do
+    case "$item" in
+      xcode-clt)
+        info "Installing Xcode Command Line Tools..."
+        xcode-select --install 2>/dev/null || true
+        echo "  Waiting for Xcode CLT installer to complete..."
+        local retries=0 max_retries=60
+        until xcode-select -p &>/dev/null; do
+          sleep 5
+          retries=$((retries + 1))
+          if [ "$retries" -ge "$max_retries" ]; then
+            fail "Xcode CLT install timed out after $((max_retries * 5 / 60)) minutes"
+            echo "  Install manually: xcode-select --install"
+            echo "  Then re-run: dotfiles quickstart"
+            exit 1
+          fi
+        done
+        ok "Xcode CLT installed"
+        ;;
+      homebrew)
+        info "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        if [ -d "/opt/homebrew/bin" ]; then
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+        fi
+        ok "Homebrew installed"
+        ;;
+      chezmoi)
+        info "Installing chezmoi..."
+        brew install chezmoi
+        ok "chezmoi installed"
+        ;;
+      jq)
+        info "Installing jq..."
+        brew install jq
+        ok "jq installed"
+        ;;
+    esac
+  done
+}
+
+# ── Main wizard ──────────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Dotfiles Quickstart${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+prereq_missing=0
+check_prerequisites || prereq_missing=$?
+
+if $CHECK_ONLY; then
+  if [ "$prereq_missing" -eq 0 ]; then
+    ok "All prerequisites met"
+    exit 0
+  else
+    fail "$prereq_missing prerequisite(s) missing"
+    exit 1
+  fi
+fi
+
+if [ "$prereq_missing" -gt 0 ]; then
+  install_prerequisites
+  echo ""
+fi
+
+# ── Setup type ───────────────────────────────────────────────────
+section "Setup"
+
+# Check if dotfiles are already applied
+if [ -L "$HOME/.zshrc" ] && readlink "$HOME/.zshrc" 2>/dev/null | grep -q dotfiles; then
+  ok "Dotfiles already applied"
+  echo ""
+  read -rp "Re-run chezmoi apply? [y/N] " reapply
+  case "${reapply:-N}" in
+    [yY]*)
+      info "Re-applying dotfiles..."
+      chezmoi apply --source "$DOTFILES_DIR"
+      ok "Dotfiles re-applied"
+      ;;
+    *)
+      info "Skipping apply"
+      ;;
+  esac
+else
+  # Fresh setup
+  echo "This will initialize your dotfiles and apply all configurations."
+  echo "  (Tip: run 'dotfiles defaults-preview' afterward to review macOS system changes)"
+  echo ""
+  read -rp "Continue with setup? [Y/n] " continue_answer
+  case "${continue_answer:-Y}" in
+    [nN]*) echo "Aborted."; exit 0 ;;
+  esac
+
+  info "Running chezmoi init + apply..."
+  echo "  You'll be prompted for profile, enterprise, and other options."
+  echo ""
+  chezmoi init --source "$DOTFILES_DIR" --apply
+  ok "Dotfiles applied"
+fi
+
+# ── Doctor ───────────────────────────────────────────────────────
+section "Health check"
+echo "Running dotfiles doctor to verify configuration..."
+echo ""
+
+if bash "$DOTFILES_DIR/bin/dotfiles-doctor" --fix; then
+  ok "All checks passed"
+else
+  warn "Some checks need attention (see above)"
+fi
+
+# ── Summary ──────────────────────────────────────────────────────
+echo ""
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  Setup complete!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo "  Next steps:"
+echo "    1. Open a new terminal to load the new shell config"
+echo "    2. Run 'dotfiles doctor' to see your config health"
+echo "    3. Edit ~/.gitconfig.local with your name and email"
+echo "    4. Edit ~/.zshrc.local for personal aliases"
+echo "    5. See docs/verify-setup.md for the full verification checklist"
+echo ""
+echo -e "  ${DIM}Docs: dotfiles --help  |  Health: dotfiles doctor${NC}"

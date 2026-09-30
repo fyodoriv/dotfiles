@@ -1,0 +1,108 @@
+#!/bin/bash
+{{- if dig "use_local_ai" false . }}
+set -euo pipefail
+
+{{- if dig "is_enterprise" false . }}
+# pipx and Hugging Face CLIs execute uv Python. python-build-standalone has no
+# publisher authority, so never run this apply-time installer until the
+# machine-scoped exception is approved.
+if [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" != "1" ]; then
+  _managed_python="$(uv python find 3.13 2>/dev/null || true)"
+  _managed_signature=""
+  [ -n "$_managed_python" ] \
+    && _managed_signature="$(codesign -dvv "$_managed_python" 2>&1 || true)"
+  if ! grep -q '^Authority=' <<<"$_managed_signature"; then
+    echo "○ Local-LLM Python setup skipped (endpoint-policy safe mode)"
+    exit 0
+  fi
+  unset _managed_python _managed_signature
+fi
+{{- end }}
+
+_LL_SENTINEL="${LOCAL_LLM_SENTINEL:-$HOME/.config/dotfiles/.local-llm-bootstrap-confirmed}"
+_LL_MODEL_REPO="${LOCAL_LLM_MODEL_REPO:-Qwen/Qwen3-Coder-30B-A3B-Instruct-MLX-4bit}"
+_LL_HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
+
+_resolve_uv_python() {
+  if ! command -v uv &>/dev/null; then
+    echo "⚠ uv not on PATH — skipping local-LLM pipx installs"
+    return 1
+  fi
+
+  local uv_python
+  uv_python="$(uv python find 3.13 2>/dev/null || echo "")"
+  if [ -z "$uv_python" ] || [ ! -x "$uv_python" ]; then
+    uv python install 3.13 >/dev/null 2>&1 || {
+      echo "⚠ uv python 3.13 unavailable — run: uv python install 3.13"
+      return 1
+    }
+    uv_python="$(uv python find 3.13 2>/dev/null || echo "")"
+  fi
+
+  [ -n "$uv_python" ] && [ -x "$uv_python" ] || return 1
+  printf '%s' "$uv_python"
+}
+
+_pipx_package_present() {
+  local app="$1"
+  pipx list --short 2>/dev/null | grep -Eq "^${app}[[:space:]]"
+}
+
+_pipx_install_if_missing() {
+  local app="$1" spec="$2"
+  if _pipx_package_present "$app"; then
+    echo "✓ pipx ${app} already installed"
+    return 0
+  fi
+  echo "→ pipx install --python ${UV_PYTHON} '${spec}'..."
+  pipx install --python "$UV_PYTHON" "$spec" >/dev/null
+  echo "✓ pipx ${app} installed"
+}
+
+UV_PYTHON="$(_resolve_uv_python || echo "")"
+if [ -z "$UV_PYTHON" ]; then
+  exit 0
+fi
+
+if ! command -v pipx &>/dev/null; then
+  echo "⚠ pipx not on PATH — run dotfiles apply after Homebrew finishes installing pipx"
+  exit 0
+fi
+
+_pipx_install_if_missing "huggingface-hub" "huggingface_hub[cli]" || true
+_pipx_install_if_missing "aider-chat" "aider-chat" || true
+
+if [ ! -f "$_LL_SENTINEL" ]; then
+  echo "→ Sentinel absent ($_LL_SENTINEL) — skipping ${_LL_MODEL_REPO} download."
+  echo "  To opt in: mkdir -p \"$(dirname "$_LL_SENTINEL")\" && touch \"$_LL_SENTINEL\""
+  echo "  Then re-run: dotfiles apply"
+  exit 0
+fi
+
+_LL_MODEL_CACHE="$_LL_HF_HOME/hub/models--${_LL_MODEL_REPO//\//--}"
+if [ -d "$_LL_MODEL_CACHE" ]; then
+  echo "✓ Model weights already cached at $_LL_MODEL_CACHE"
+  exit 0
+fi
+
+HF_CLI=""
+if command -v hf &>/dev/null; then
+  HF_CLI="hf"
+elif command -v huggingface-cli &>/dev/null; then
+  HF_CLI="huggingface-cli"
+else
+  echo "⚠ Neither 'hf' nor 'huggingface-cli' on PATH — skipping model download"
+  exit 0
+fi
+
+echo "→ Downloading model weights: ${_LL_MODEL_REPO} (~30 GB; resumable)..."
+if "$HF_CLI" download "$_LL_MODEL_REPO" >/dev/null; then
+  echo "✓ Model weights cached at $_LL_HF_HOME/hub"
+else
+  echo "⚠ ${_LL_MODEL_REPO} download failed — retry manually with: $HF_CLI download $_LL_MODEL_REPO"
+fi
+{{- else }}
+echo "→ Local-LLM stack opt-out (use_local_ai=false in chezmoi data). Skipping pipx + model installs."
+echo "  To enable: re-run \`chezmoi init\` or edit ~/.config/chezmoi/chezmoi.yaml to set use_local_ai: true"
+exit 0
+{{- end }}

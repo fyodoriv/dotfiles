@@ -1,0 +1,44 @@
+#!/bin/bash
+# Review a PR — checkout, show diff, run tests.
+# Usage: review 123          (PR number)
+#        review               (list open PRs to pick)
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+if [ -z "${1:-}" ]; then
+  echo "Open PRs:"
+  gh pr list
+  echo ""
+  echo "Usage: review <PR-number>"
+  exit 0
+fi
+
+pr_number="${1:?Usage: review <PR-number>}"
+
+echo "→ Checking out PR #$pr_number..."
+gh pr checkout "$pr_number"
+
+echo ""
+echo "→ Files changed:"
+gh pr diff "$pr_number" --stat
+
+echo ""
+echo "→ Run tests? (y/n)"
+read -r -t 30 answer || answer="n"
+if [ "$answer" = "y" ]; then
+  if [ -f "Makefile" ] && grep -q '^test:' Makefile; then
+    make test
+  elif [ -f "package.json" ]; then
+    npm test 2>/dev/null || yarn test 2>/dev/null || echo "No test script found"
+  else
+    echo "No test runner detected (Makefile or package.json)"
+  fi
+fi
+
+echo ""
+echo "→ Open in browser? (y/n)"
+read -r -t 30 answer || answer="n"
+if [ "$answer" = "y" ]; then
+  gh pr view "$pr_number" --web
+fi

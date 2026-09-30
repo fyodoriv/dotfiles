@@ -1,0 +1,182 @@
+{
+  "command_name": "learn-repos",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/learn-repos",
+      "expected_output": "Without asking for parameters, the agent resumes from shared memory, selects a bounded deterministic batch, refreshes dossiers with source fingerprints, extracts procedures, validates freshness-gated retrieval, runs grounded evals, ships safe evidence-backed repairs, and reports the next batch.",
+      "expectations": [
+        "Uses bin/learn-repos-inventory to discover actual repositories before pruning dependencies and compares exact repo-docs markers, revision tags, and source-fingerprint tags",
+        "Processes at most the default batch with disjoint parallel agents",
+        "Skips unchanged repositories instead of rereading the entire fleet",
+        "Stores both a repository dossier and reusable procedures with required metadata fields",
+        "Runs architecture, operations, and troubleshooting evals on every invocation",
+        "Evaluates demonstrated drift for healing without inventing repository work",
+        "Reports freshness-passing vs rejected-stale retrieval counts plus the next deterministic batch",
+        "Uses tag_match all on authoritative memory_search when combining repo, revision, and source-fingerprint tags"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/learn-repos when one selected repo is dirty and another had reflog activity today",
+      "expected_output": "The agent leaves both active repositories untouched, indexes their current local documentation read-only if selected, and only fast-forwards eligible inactive base branches.",
+      "expectations": [
+        "Never mutates active repositories and keeps learning phases read-only",
+        "Skips pulling dirty repositories",
+        "Skips pulling repositories with reflog activity within 48 hours",
+        "Uses only git pull --ff-only for eligible clean tracked main or master branches"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/learn-repos with a procedure-poor enterprise plugin repository in the next batch",
+      "expected_output": "The agent extracts source-backed enterprise configuration procedures as part of the normal run, stores them with domain tags and fingerprints, and tests a realistic how-to question through the freshness gate.",
+      "expectations": [
+        "Prefers specific runbooks and skills over placeholder README content",
+        "Stores question-shaped ordered procedures with prerequisites, failure modes, verification, source paths, revision, and source_fingerprint",
+        "Tags procedure memories with repo-procedure, domain tag, revision, and source-fingerprint",
+        "Validates that a hybrid search with tag_match all, include_superseded false, and current revision/fingerprint tags retrieves the procedure"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/learn-repos after the selected batch has been indexed",
+      "expected_output": "The agent always runs grounded memory-first evals through the freshness gate, independently verifies answers against current docs, corrects demonstrated gaps, and reruns failures.",
+      "expectations": [
+        "Tests at least architecture, operations, and troubleshooting knowledge",
+        "Scores correctness, completeness, provenance, and usefulness from 1 to 5",
+        "Does not grade memory answers against memory itself",
+        "Stores corrected procedures only after current-document verification with updated fingerprint",
+        "Reruns failed evals and reports before-and-after scores"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "/learn-repos when built-in memory MCP discovery is stale but the daemon can be repaired",
+      "expected_output": "The agent diagnoses the configured shared-memory endpoint, runs the bounded dotfiles and agentbrew repair ladder, retries discovery and protocol tools, and continues only against the same SQLite-backed MCP.",
+      "expectations": [
+        "Verifies the shared memory endpoint before inventory or writes",
+        "Runs agentbrew memory doctor/fix/enable and synchronizes agentbrew before retrying",
+        "Allows direct Streamable HTTP only when the configured endpoint exposes all required tools",
+        "Does not create a second database, transcript archive, or ad hoc state file",
+        "Stops before scanning with exact diagnostics when the bounded retry still fails"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "/learn-repos encounters duplicate sibling names and stale dossiers",
+      "expected_output": "The agent scopes reads and writes by exact relative path and revision/fingerprint, validates replacements before deleting old hashes, and never performs a broad concurrent delete.",
+      "expectations": [
+        "Uses both repo-docs and exact repo path tags with tag_match=all",
+        "Uses unique path-revision-fingerprint conversation IDs for template siblings",
+        "Validates a replacement before deleting only the previous exact content hash",
+        "Never deletes by repo-docs alone or runs overlapping parallel deletion"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "/learn-repos finds a reproduced stale runbook in an inactive user-owned tooling repository",
+      "expected_output": "The agent finishes read-only learning, verifies ownership and repository policy, applies one minimal source-backed repair, and uses /ship-it through PR, CI, merge, machine refresh, and re-indexing.",
+      "expectations": [
+        "Activates ship-it only after memory validation and the healing eligibility gate",
+        "Checks status, reflog, ownership, CODEOWNERS, VISION or ROADMAP, and existing PRs",
+        "Requires a reproducible before and after check for a minimal logical repair",
+        "Runs verification, explicit-file commit, PR, substantive CI, allowed merge, and post-merge apply or sync",
+        "Re-indexes and validates the merged revision with a new source fingerprint instead of claiming an open PR is healed",
+        "Leaves generated mirrors and non-owned or active repositories read-only"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "/learn-repos when indexed memory has an older git revision but higher semantic score than current docs",
+      "expected_output": "The agent rejects the stale-revision candidate, re-reads current documentation, re-indexes at the current revision and fingerprint, and only then answers or passes evals.",
+      "expectations": [
+        "Requires memory_search with tag_match all, include_superseded false, and current revision and fingerprint tags",
+        "Discards stale-revision hits even when ranked first",
+        "Does not use exact mode or tag-only recall for authoritative answers",
+        "Reports rejected-stale count in the run summary"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "/learn-repos when HEAD is unchanged but AGENTS.md and a runbook changed since last index",
+      "expected_output": "The agent detects fingerprint drift at the same revision, supersedes the dossier and affected procedures, and validates retrieval against the new source-fingerprint tag.",
+      "expectations": [
+        "Computes source_fingerprint from the sorted source-document set",
+        "Treats fingerprint mismatch as stale even when revision tag matches HEAD",
+        "Writes replacement memories before deleting the prior exact content hash",
+        "Validates hybrid retrieval with tag_match all and the new source-fingerprint prefix"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "/learn-repos after superseding a dossier with memory_update or a validated replacement",
+      "expected_output": "Freshness-gated search returns the current dossier only; superseded entries do not satisfy authoritative answers when include_superseded is false.",
+      "expectations": [
+        "Uses include_superseded false and tag_match all for authoritative repository answers",
+        "Does not rely on exact mode to retrieve superseded content",
+        "Confirms the active dossier carries current revision and fingerprint tags"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "/learn-repos answers a question about tooling/example-service while tooling/example-service-api is also indexed",
+      "expected_output": "Retrieval stays scoped to the exact repo tag; sibling-prefix repositories do not pollute answers or validation.",
+      "expectations": [
+        "Uses exact repo:<relative-path> tag with tag_match all without prefix wildcarding",
+        "Includes a negative isolation check when sibling repo names share a prefix",
+        "Cites source_paths from the matching repository only"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "/learn-repos produces an architecture answer from memory",
+      "expected_output": "The answer includes source_paths and git_revision from the winning freshness-passing memory or from live docs after re-indexing.",
+      "expectations": [
+        "Treats missing source citation as a failed eval",
+        "Re-reads docs and stores a correction when citation is missing",
+        "Does not cite episodic or decision-layer notes as authoritative sources"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "/learn-repos when freshness search returns zero candidates for a selected repo",
+      "expected_output": "The agent follows dead-end recovery: no exact or tag-only fallback, read current docs, store indexed memory, validate freshness retrieval, rerun the eval.",
+      "expectations": [
+        "Does not fall back to exact mode, tag-only search, or tag_match any",
+        "Does not answer from superseded memories when include_superseded is false",
+        "Stores a new dossier or procedure with full metadata before claiming success"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "/learn-repos when a high-quality stale procedure would answer faster than re-indexing",
+      "expected_output": "The agent still rejects the stale procedure, re-indexes at current revision and fingerprint, and demonstrates that quality cannot override freshness.",
+      "expectations": [
+        "Rejects candidates missing current revision or source-fingerprint tags regardless of score",
+        "Reorders only among freshness-passing candidates",
+        "Documents the rejection in freshness-pass vs rejected-stale counts"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "/learn-repos with four parallel repository-reading subagents",
+      "expected_output": "Subagents only return source-backed extracts and canonical fingerprint output; the parent serializes all memory writes, supersession/deletion, validation, and the single session commit.",
+      "expectations": [
+        "Subagents do not call memory_store, memory_update, memory_delete, or commit_session_legacy",
+        "The parent lists stale and current records with exact repo plus tier tags and tag_match all before superseding",
+        "The parent calls commit_session_legacy exactly once after all lanes finish"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "/learn-repos when two agents would choose different source-document subsets for the same repository",
+      "expected_output": "Both use the canonical learn-repos-source-fingerprint helper, fully read every emitted source_path, and produce the same fingerprint and stored source_paths set.",
+      "expectations": [
+        "Does not accept an agent-invented source-document list or partial fingerprint",
+        "Uses tracked and untracked non-ignored human-authored docs so same-revision edits are detected",
+        "Stores exactly the helper-emitted sorted source_paths"
+      ]
+    }
+  ]
+}

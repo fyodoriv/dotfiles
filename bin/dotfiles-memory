@@ -1,0 +1,29 @@
+#!/bin/bash
+# Deprecated compatibility shim — memory lifecycle is owned by AgentBrew.
+# Forwards all subcommands to `agentbrew memory`.
+#
+# Usage:
+#   dotfiles memory status
+#   dotfiles memory doctor
+#   dotfiles memory fix
+#   dotfiles memory backup
+#   dotfiles memory verify-backup [path]
+#   dotfiles memory dashboard
+#   dotfiles memory stop-dashboard
+#   dotfiles memory maintain [--deep]
+#   dotfiles memory pack list|install|update|verify|uninstall
+
+set -euo pipefail
+agentbrew_bin="${DOTFILES_MEMORY_AGENTBREW_BIN:-agentbrew}"
+
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  echo "dotfiles memory — delegates to agentbrew memory (see: agentbrew memory --help)"
+  exit 0
+}
+
+if ! command -v "$agentbrew_bin" >/dev/null 2>&1; then
+  echo "error: agentbrew not found on PATH — install tooling/agentbrew first" >&2
+  exit 1
+fi
+
+exec "$agentbrew_bin" memory "$@"

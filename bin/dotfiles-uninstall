@@ -1,0 +1,90 @@
+#!/bin/bash
+# Cleanly remove dotfiles from this machine.
+#
+# Usage: dotfiles uninstall [--dry-run] [--yes]
+#
+# Removes chezmoi-managed symlinks, unloads LaunchAgents, and cleans up.
+# Preserves ~/.zshrc.local, ~/.gitconfig.local, and ~/.zshenv.secrets.
+# Prompts for confirmation unless --dry-run or --yes is given.
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DRY_RUN=false
+FORCE=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --yes|--force) FORCE=true ;;
+  esac
+done
+
+run() {
+  if $DRY_RUN; then
+    echo "  [dry-run] $*"
+  else
+    "$@"
+  fi
+}
+
+echo "Dotfiles uninstall"
+echo "=================="
+$DRY_RUN && echo "(dry-run mode — no changes will be made)"
+echo ""
+
+# Prompt for confirmation unless --dry-run or --yes/--force
+if ! $DRY_RUN && ! $FORCE; then
+  echo "This will unload all LaunchAgents and remove dotfiles symlinks."
+  read -rp "Are you sure? [y/N] " confirm
+  case "${confirm:-N}" in
+    [yY]*) ;;
+    *) echo "Aborted."; exit 0 ;;
+  esac
+  echo ""
+fi
+
+# ── 1. Unload and remove LaunchAgents ──────────────────────────────
+echo "Unloading LaunchAgents..."
+for plist in "$HOME"/Library/LaunchAgents/com.dotfiles.*.plist; do
+  [ -f "$plist" ] || continue
+  label=$(basename "$plist" .plist)
+  echo "  $label"
+  run launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+  run rm "$plist"
+done
+echo ""
+
+# ── 2. Remove chezmoi-managed symlinks ─────────────────────────────
+echo "Removing symlinks that point to this repo..."
+count=0
+while IFS= read -r target; do
+  full="$HOME/$target"
+  # Only remove symlinks that point into the dotfiles repo
+  if [ -L "$full" ]; then
+    link_target=$(readlink "$full" 2>/dev/null || true)
+    case "$link_target" in
+      "$DOTFILES_DIR"/*|*/apps/dotfiles/*)
+        echo "  rm $full -> $link_target"
+        run rm "$full"
+        count=$((count + 1))
+        ;;
+    esac
+  fi
+done < <(chezmoi managed --source "$DOTFILES_DIR" 2>/dev/null)
+echo "  Removed $count symlink(s)"
+echo ""
+
+# ── 3. Preserved files ────────────────────────────────────────────
+echo "Preserved (not touched):"
+for f in ~/.zshrc.local ~/.gitconfig.local ~/.zshenv.secrets; do
+  [ -f "$f" ] && echo "  $f"
+done
+echo ""
+
+if $DRY_RUN; then
+  echo "Re-run without --dry-run to apply."
+else
+  echo "Done. The dotfiles repo is still at $DOTFILES_DIR."
+  echo "To fully remove: rm -rf $DOTFILES_DIR"
+fi

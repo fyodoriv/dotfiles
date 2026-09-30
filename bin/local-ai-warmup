@@ -1,0 +1,100 @@
+#!/bin/bash
+# local-ai-warmup — endpoint-safe health check for the local-AI stack.
+#
+# Probes LM Studio, Ollama, and opencode over localhost with Apple-signed nc.
+# It intentionally never launches an engine or generates a model response:
+# endpoint policy can block the engine publisher and every automatic model
+# load creates an `ollama runner` process.
+#
+# RUN AT LOGIN VIA:
+#   ~/Library/LaunchAgents/com.dotfiles.local-ai-warmup.plist
+#
+# RUN MANUALLY:
+#   ~/bin/local-ai-warmup
+#
+# IDEMPOTENT: re-running costs ~1 s when healthy. The accompanying
+# LaunchAgent fires this every 30 min as a self-healing watchdog.
+
+set -uo pipefail
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  printf 'Usage: local-ai-warmup\nCheck local-AI engines and opencode registries without spawning models.\n'
+  exit 0
+fi
+
+_warmup_dir="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/dotfiles-endpoint-paths.sh
+source "$_warmup_dir/lib/dotfiles-endpoint-paths.sh"
+dotfiles_prepend_endpoint_tool_paths "$_warmup_dir/bin"
+unset _warmup_dir
+
+LOG="$HOME/.local/share/dotfiles/logs/local-ai-warmup.log"
+LMSTUDIO_API="http://127.0.0.1:1234/v1"
+OLLAMA_API="http://127.0.0.1:11434"
+
+mkdir -p "$(dirname "$LOG")"
+log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+
+# Minimal GET-only localhost HTTP client built on Apple's signed nc.
+http_local() {
+  local url="$1" timeout="${2:-5}"
+  local rest authority host port path response status
+  rest="${url#http://}"
+  authority="${rest%%/*}"
+  host="${authority%%:*}"
+  port="${authority##*:}"
+  [ "$port" != "$authority" ] || port=80
+  if [[ "$rest" == */* ]]; then
+    path="/${rest#*/}"
+  else
+    path="/"
+  fi
+
+  response="$(
+    printf 'GET %s HTTP/1.0\r\nHost: %s:%s\r\nConnection: close\r\n\r\n' \
+      "$path" "$host" "$port" \
+      | /usr/bin/nc -w "$timeout" "$host" "$port" 2>>"$LOG"
+  )" || return 1
+
+  status="${response%%$'\n'*}"
+  status="${status%$'\r'}"
+  [[ "$status" == HTTP/*\ 2[0-9][0-9]\ * ]]
+}
+
+log "health check start (pid=$$)"
+
+# ── 1. Detect LM Studio without launching it ────────────────────────
+LMSTUDIO_UP=false
+if http_local "$LMSTUDIO_API/models" 2; then
+  LMSTUDIO_UP=true
+  log "LM Studio API already reachable on :1234"
+fi
+
+# ── 2. Detect Ollama without launching models ───────────────────────
+OLLAMA_UP=false
+if http_local "$OLLAMA_API/api/tags" 2; then
+  OLLAMA_UP=true
+  log "Ollama API already reachable on :11434"
+fi
+
+if [ "$LMSTUDIO_UP" = false ] && [ "$OLLAMA_UP" = false ]; then
+  log "WARN: no inference engine reachable"
+  log "  (install: brew install ollama  OR  brew install --cask lm-studio)"
+  exit 0
+fi
+
+log "model generation disabled: engine publishers must only run on explicit user action"
+
+# ── 3. Probe the opencode-serve daemon if running ────────────────────
+if http_local http://127.0.0.1:4096/ 2; then
+  log "opencode-serve detected on :4096"
+  http_local http://127.0.0.1:4096/agent 5 && log "  /agent reachable"
+  http_local http://127.0.0.1:4096/config 5 && log "  /config reachable"
+else
+  log "opencode-serve not reachable on :4096"
+fi
+
+up_engines=""
+[ "$LMSTUDIO_UP" = true ] && up_engines="${up_engines}lmstudio "
+[ "$OLLAMA_UP" = true ]   && up_engines="${up_engines}ollama"
+log "health check complete (engines: ${up_engines:-none})"

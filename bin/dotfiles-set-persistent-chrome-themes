@@ -1,0 +1,152 @@
+#!/bin/bash
+# Apply distinct Material You theme colors to each persistent agent Chrome
+# (9223 dashboard / 9224 debug / 9225 tooling) so the user can tell
+# them apart at a glance. Idempotent — re-running on a profile that already has
+# the right keys is a no-op. Safe to run multiple times.
+#
+# Why this exists: when three Chromes are tab-strip-identical, agents and
+# humans both pick the wrong one. Theming the new-tab page + accent color via
+# the user-color preference is the lowest-friction visual cue that survives
+# session restore and doesn't touch existing tabs.
+#
+# How it works:
+#   1. launchctl unload the plist (Chrome must be off so the new prefs aren't
+#      clobbered when Chrome flushes on exit).
+#   2. Merge `browser.theme.*` keys into the profile's Preferences via jq.
+#      The critical key is `follows_system_colors: false` — without it Chrome
+#      ignores `user_color` and uses the system accent. `*2` siblings cover
+#      the newer key path Chrome migrates to on first launch.
+#   3. launchctl load — Chrome starts back up with the new theme.
+#
+# Usage:
+#   dotfiles-set-persistent-chrome-themes              apply all three
+#   dotfiles-set-persistent-chrome-themes --check      report current state, no writes
+#   dotfiles-set-persistent-chrome-themes <port>       apply just one (9223|9224|9225)
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+CHECK_ONLY=false
+TARGET_PORT=""
+case "${1:-}" in
+  --check) CHECK_ONLY=true ;;
+  9223|9224|9225) TARGET_PORT="$1" ;;
+  "") ;;
+  *) echo "usage: $(basename "$0") [--check | 9223 | 9224 | 9225]" >&2; exit 2 ;;
+esac
+
+# Per-port config — colors are signed int32 of ARGB uint32 (alpha 0xFF), the
+# encoding Chrome stores in Preferences. Variant 2 = Vibrant (most saturated,
+# easiest to spot in macOS dark mode).
+#   9223 dashboard      → dashboard blue   #0077C5  → 0xFF0077C5 → -16746043
+#   9224 debug          → debug orange  #FF9800  → 0xFFFF9800 → -355840
+#   9225 tooling        → tooling purple #9C27B0 → 0xFF9C27B0 → -6543440
+config_for_port() {
+  case "$1" in
+    9223)
+      PLIST_LABEL="com.dotfiles.agent-browser-chrome"
+      PROFILE_DIR="chrome-profile"
+      PROFILE_NAME="🟦 DASHBOARD (SSO)"
+      COLOR_INT="-16746043"
+      ;;
+    9224)
+      PLIST_LABEL="com.dotfiles.debug-chrome"
+      PROFILE_DIR="debug-profile"
+      PROFILE_NAME="🟧 DEBUG"
+      COLOR_INT="-355840"
+      ;;
+    9225)
+      PLIST_LABEL="com.dotfiles.tooling-chrome"
+      PROFILE_DIR="tooling-profile"
+      PROFILE_NAME="🟪 TOOLING (dotfiles / agentbrew / minsky / authproxy)"
+      COLOR_INT="-6543440"
+      ;;
+    *)
+      echo "internal: unknown port $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+apply_theme() {
+  local port="$1"
+  config_for_port "$port"
+  local prefs="$HOME/.agent-browser/$PROFILE_DIR/Default/Preferences"
+  local plist="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
+
+  if [ ! -f "$prefs" ]; then
+    echo "⊘ $port — profile not yet initialized ($prefs missing); skip"
+    return 0
+  fi
+
+  # Already correct? Skip if user_color / user_color2 / color_variant match.
+  # We deliberately do NOT include `follows_system_colors` in the drift check:
+  # Chrome 148 writes it back to `true` on exit regardless of what we set,
+  # but the theme renders correctly anyway — the `*2` key path is the source
+  # of truth for the Material You renderer.
+  local current want
+  current="$(jq -r '
+    [
+      (.browser.theme.user_color // 0),
+      (.browser.theme.user_color2 // 0),
+      (.browser.theme.color_variant // -1)
+    ] | @tsv
+  ' "$prefs")"
+  want="${COLOR_INT}	${COLOR_INT}	2"
+  if [ "$current" = "$want" ]; then
+    echo "✓ $port — already themed ($PROFILE_NAME); skip"
+    return 0
+  fi
+
+  if $CHECK_ONLY; then
+    echo "× $port — drift ($PROFILE_NAME); want: $want, got: $current"
+    return 0
+  fi
+
+  echo "→ $port — apply $PROFILE_NAME"
+  launchctl unload "$plist" 2>/dev/null || true
+  # Wait for Chrome process to actually exit (otherwise our prefs write races
+  # the Chrome-on-exit prefs flush and gets clobbered).
+  local tries=0
+  while pgrep -f "$PROFILE_DIR" >/dev/null 2>&1 && [ "$tries" -lt 20 ]; do
+    sleep 0.5
+    tries=$((tries + 1))
+  done
+
+  local tmp="$prefs.tmp.$$"
+  jq --argjson color "$COLOR_INT" '
+    .browser.theme.user_color = $color |
+    .browser.theme.user_color2 = $color |
+    .browser.theme.color_variant = 2 |
+    .browser.theme.color_variant2 = 2 |
+    .browser.theme.color_scheme = 0 |
+    .browser.theme.color_scheme2 = 0 |
+    .browser.theme.follows_system_colors = false |
+    .browser.theme.is_grayscale = false |
+    .browser.theme.is_grayscale2 = false |
+    .extensions.theme.id = "" |
+    .extensions.theme.use_system = false
+  ' "$prefs" > "$tmp" && mv "$tmp" "$prefs"
+
+  launchctl load "$plist"
+
+  # Wait for CDP port to be back.
+  tries=0
+  while ! curl -sS -o /dev/null --max-time 1 "http://localhost:$port/json/version" 2>/dev/null; do
+    sleep 0.5
+    tries=$((tries + 1))
+    if [ "$tries" -gt 20 ]; then
+      echo "  ⚠ $port — CDP not back after 10s (check $plist)"
+      return 1
+    fi
+  done
+  echo "  ✓ $port — themed and back up"
+}
+
+if [ -n "$TARGET_PORT" ]; then
+  apply_theme "$TARGET_PORT"
+else
+  for port in 9223 9224 9225; do
+    apply_theme "$port"
+  done
+fi

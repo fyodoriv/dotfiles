@@ -1,0 +1,39 @@
+#!/bin/bash
+# Show or toggle enterprise mode in chezmoi.
+# Usage: dotfiles enterprise [on|off]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+command -v yq &>/dev/null || { echo "error: yq not found — run 'brew install yq'" >&2; exit 1; }
+
+chezmoi_config="$HOME/.config/chezmoi/chezmoi.yaml"
+if [ $# -eq 0 ]; then
+  if [ -f "$chezmoi_config" ]; then
+    current=$(yq '.data.is_enterprise // false' "$chezmoi_config" 2>/dev/null || echo "unknown")
+    if [ "$current" = "true" ]; then
+      echo "Enterprise mode: on"
+    else
+      echo "Enterprise mode: off"
+    fi
+  else
+    echo "No chezmoi config found at $chezmoi_config"
+  fi
+else
+  action="$1"
+  case "$action" in
+    on)  new_val="true" ;;
+    off) new_val="false" ;;
+    *) echo "Error: must be 'on' or 'off'" >&2; exit 1 ;;
+  esac
+  if [ ! -f "$chezmoi_config" ]; then
+    echo "Error: $chezmoi_config not found" >&2; exit 1
+  fi
+  yq -i ".data.is_enterprise = $new_val" "$chezmoi_config"
+  echo "Enterprise mode: $action"
+  echo "Applying changes..."
+  chezmoi apply --source "$DOTFILES_DIR"
+  echo "Done"
+fi

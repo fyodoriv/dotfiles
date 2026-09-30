@@ -1,0 +1,99 @@
+#!/bin/bash
+# Graceful restart — waits for all important processes to finish, then restarts.
+# Usage: graceful-restart [--now]   Skip confirmation
+#        graceful-restart           Ask before restarting
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+
+
+echo -e "${BLUE}Graceful Restart${NC}"
+echo ""
+
+# Blocker definitions: "pattern|label" (single source of truth)
+BLOCKERS=(
+  "[y]arn install|Yarn install"
+  "[y]arn build|Yarn build"
+  "[w]ebpack serve|Webpack dev server"
+  "[t]sc --build|TypeScript compile"
+  "[j]est --|Jest tests"
+  "[v]itest|Vitest tests"
+  "[./]gradlew |Gradle build"
+  "[n]pm install|npm install"
+  "[n]pm run build|npm build"
+  "[g]it rebase|Git rebase"
+  "[g]it merge|Git merge"
+  "[b]rew install|Homebrew install"
+  "[b]rew upgrade|Homebrew upgrade"
+  "[d]otfiles-sync|Dotfiles sync"
+  "[d]otfiles-doctor|Dotfiles doctor"
+)
+
+found_blockers=0
+check_blocker() {
+  local pattern="$1" label="$2"
+  if ps aux | grep -v -E "cursor.agent|claude-bg|devin|grep|graceful-restart" | grep -q "$pattern"; then
+    echo -e "  ${YELLOW}⏳${NC} ${label} is still running"
+    found_blockers=1
+  fi
+}
+
+check_all_blockers() {
+  found_blockers=0
+  for entry in "${BLOCKERS[@]}"; do
+    check_blocker "${entry%%|*}" "${entry#*|}"
+  done
+}
+
+check_all_blockers
+
+# Check for unsaved git changes across repos dir
+REPOS_DIR="${DOTFILES_REPOS_DIR:-$HOME/apps}"
+dirty_repos=()
+if [ -d "$REPOS_DIR" ]; then
+for repo in "$REPOS_DIR"/*/; do
+  if [ -d "$repo/.git" ] && [ -n "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
+    dirty_repos+=("$(basename "$repo")")
+  fi
+done
+fi
+
+if [ ${#dirty_repos[@]} -gt 0 ]; then
+  echo -e "  ${YELLOW}⚠${NC}  Uncommitted changes in: ${dirty_repos[*]}"
+  found_blockers=1
+fi
+
+if [ "$found_blockers" -eq 0 ]; then
+  echo -e "  ${GREEN}✓${NC} No blocking processes or unsaved work"
+fi
+
+echo ""
+
+# Wait for blockers if any
+if [ "$found_blockers" -eq 1 ]; then
+  echo -e "${BLUE}Waiting for processes to finish...${NC}"
+  while true; do
+    check_all_blockers 2>/dev/null
+    [ "$found_blockers" -eq 0 ] && break
+    echo -ne "  ${DIM}Still waiting...\r${NC}"
+    sleep 3
+  done
+  echo -e "  ${GREEN}✓${NC} All processes finished"
+  echo ""
+fi
+
+# Confirm unless --now
+if [ "${1:-}" != "--now" ]; then
+  echo -ne "${YELLOW}Restart now? [y/N]:${NC} "
+  read -r -t 30 answer || { echo ""; answer="n"; }
+  if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+    echo "Cancelled."
+    exit 0
+  fi
+fi
+
+echo -e "${GREEN}Restarting...${NC}"
+osascript -e 'tell app "System Events" to restart'

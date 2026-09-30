@@ -1,0 +1,215 @@
+#!/bin/bash
+# Re-run when Brewfile content changes (chezmoi re-runs when rendered output changes).
+# Profile: {{ .profile }} | Enterprise: {{ .is_enterprise }}
+set -euo pipefail
+
+if ! command -v brew &>/dev/null; then
+  echo "⚠ Homebrew not installed — skipping brew bundle"
+  exit 0
+fi
+
+echo "→ Running brew bundle..."
+RENDERED="$(mktemp)"
+trap 'rm -f "$RENDERED"' EXIT
+cat > "$RENDERED" << 'BREWFILE_EOF'
+# NOTE: poetry, httpie, jrnl, awscli are intentionally NOT brew-managed. The brew
+# formulae pull python@3.x, whose binaries endpoint agents flag on every
+# spawn. They are installed as user-dir tools instead — poetry/httpie/jrnl via
+# `.chezmoiscripts/run_after_uv-tools.sh` (uv tools), awscli via the AWS CLI v2 user pkg
+# (see TASKS.md "user-dir-installers-for-aws-gcloud"). See AGENTS.md rule #10. Do NOT re-add.
+# ── Core: Git ────────────────────────────────────────────────────
+brew "git-delta"
+brew "gh"
+# Git-hook runner the git-hooks/ wrappers delegate to (pre-commit, pre-push).
+# Without it those wrappers are silent no-ops — see git-hooks/pre-push.
+brew "lefthook"
+
+# ── Core: Shell ──────────────────────────────────────────────────
+brew "atuin"
+brew "direnv"
+brew "fnm"
+brew "fzf"
+brew "pyenv"
+brew "pipx"
+brew "uv"
+brew "yarn"
+brew "zoxide"
+brew "zsh-autosuggestions"
+brew "zsh-fast-syntax-highlighting"
+brew "zsh-history-substring-search"
+# zsh-syntax-highlighting kept as fallback for minimal/non-full profiles
+brew "zsh-syntax-highlighting"
+
+# ── Core: Tools ──────────────────────────────────────────────────
+brew "bat"
+brew "bats-core"
+brew "btop"
+brew "eza"
+brew "fastfetch"
+brew "fd"
+brew "fswatch"
+brew "gum"
+brew "htop"
+brew "jq"
+brew "findutils"         # GNU find as gfind — bin/find shim (endpoint agents may block /usr/bin/find)
+brew "gnu-sed"           # GNU sed as gsed — bin/sed shim (endpoint agents may block /usr/bin/sed)
+brew "gawk"              # GNU awk as gawk — bin/awk shim (endpoint agents may block /usr/bin/awk)
+brew "grep"              # GNU grep as ggrep — bin/grep shim routes here (endpoint-safe after ad-hoc sign)
+brew "perl"              # user-dir perl — bin/perl shim routes here (endpoint agents may block /usr/bin/perl)
+brew "curl"              # keg-only patched curl — bin/curl shim + HOMEBREW_CURL_PATH (endpoint agent)
+brew "mas"               # App Store CLI — used by dotfiles-resilience-setup to install Amphetamine
+brew "defaultbrowser"    # CLI to set the macOS default browser — used by bin/chromework-install
+brew "ripgrep"
+brew "shellcheck"
+brew "sleepwatcher"
+brew "terminal-notifier"
+brew "tealdeer"          # tldr-compatible client; avoids deprecated tldr formula/link conflicts
+brew "tree"
+brew "yq"
+
+# ── Core: Prompt ─────────────────────────────────────────────────
+brew "starship"
+
+{{ if eq .profile "full" -}}
+# ── Full: Terminal ───────────────────────────────────────────────
+brew "tmux"
+cask "ghostty"
+cask "font-jetbrains-mono-nerd-font"
+
+# ── Full: Notes & Knowledge ───────────────────────────────────────
+cask "obsidian"
+
+# ── Full: Extras ─────────────────────────────────────────────────
+brew "difftastic"
+brew "dockutil"
+brew "duf"
+brew "dust"
+brew "duti"
+brew "git-trim"
+brew "hyperfine"
+brew "lazygit"
+brew "poppler"
+brew "procs"
+brew "tig"
+# topgrade: canonical unified upgrader. Detects ~80+ package managers
+# (Homebrew, mas, npm, pipx, uv, fnm, gh extensions, JetBrains, VS Code
+# family, Ollama, etc.) and runs the right upgrade command for each.
+# Replaces the 239-line hand-rolled bin/dotfiles-upgrade (PR #126).
+# Config: dot_config/topgrade.toml (chezmoi → ~/.config/topgrade.toml).
+# Schedule: com.dotfiles.dotfiles-upgrade launchagent (weekly, Sunday 09:00).
+brew "topgrade"
+brew "watchexec"
+brew "yazi"
+cask "hiddenbar"
+cask "maccy"
+
+# ── Full: Modern CLI replacements (2026 cohort) ──────────────────
+# Each fills a gap not covered by the core set above.
+brew "sd"            # sed replacement — intuitive regex syntax (Python/JS style, no escape hell)
+brew "xh"            # httpie replacement in Rust — 2–3× faster startup, drop-in compatible
+brew "bottom"        # btop alternative with TOML custom layouts (dotfiles-friendly)
+brew "glow"          # markdown viewer for terminal
+brew "hexyl"         # pretty hex viewer
+brew "bandwhich"     # per-process network bandwidth monitor (sudo bandwhich)
+brew "git-absorb"    # auto-fixup: git add -p && git absorb && git rebase -i --autosquash → one command
+brew "git-cliff"     # changelog generator from conventional commits
+brew "presenterm"    # terminal slideshow from markdown — version-controlled presentations
+
+# ── Full: gh extension CLI tools ─────────────────────────────────
+# Installed as a gh extension (separate from brew). The doctor module
+# in modules/tools/doctor.sh checks `gh extension list | grep gh-dash`.
+# To install manually: gh extension install dlvhdr/gh-dash
+
+{{ end -}}
+
+{{ if .is_enterprise -}}
+# ── Enterprise ───────────────────────────────────────────────────
+tap "cloudflare/cloudflare"
+brew "cloudflared"
+brew "gradle"
+brew "kubernetes-cli"
+brew "openjdk@21"
+brew "tailscale"
+cask "temurin@21"
+{{ end -}}
+
+BREWFILE_EOF
+
+# Filter out packages the user opted to skip via brew_skip config
+{{ range .brew_skip -}}
+sed -i.bak '/^brew "{{ . }}"/d;/^cask "{{ . }}"/d' "$RENDERED" && rm -f "$RENDERED.bak"
+{{ end -}}
+
+brew bundle --no-upgrade --file="$RENDERED"
+echo "✓ Homebrew packages up to date"
+
+{{ if dig "use_local_ai" false . -}}
+# ── Local-LLM stack: mlx-lm on Apple Silicon only ────────────────
+# mlx-lm requires native arm64 (Metal). Installing on Rosetta or x86_64
+# silently succeeds at brew level but fails at import time. Detect at
+# runtime so x86 Mac + Linux operators skip cleanly.
+#
+# pipx-managed installs (aider-chat, huggingface_hub[cli]) and the
+# ~30 GB model-weights download live in run_after_install_local_llm.sh
+# so they only fire on opt-in (sentinel file). brew install for mlx-lm
+# is idempotent — running on every brew bundle is safe.
+if [[ "$(uname -m)" = "arm64" && "$(sysctl -n sysctl.proc_translated 2>/dev/null)" != "1" ]]; then
+  if ! brew list mlx-lm &>/dev/null 2>&1; then
+    echo "→ Installing mlx-lm (Apple Silicon)..."
+    brew install mlx-lm 2>/dev/null || echo "⚠ mlx-lm install failed — retry manually with: brew install mlx-lm"
+  fi
+else
+  echo "→ Skipping mlx-lm (requires native Apple Silicon arm64; current uname=$(uname -m))"
+fi
+{{ end -}}
+
+# ── Optional overlay Brewfile ────────────────────────────────────
+# Organisation-specific overlays (a private repo at ~/apps/dotfiles-<org>/)
+# can plug an additional Brewfile in via $EXTRA_BREWFILE. Set explicitly
+# as an env var, or via chezmoi data key `extra_brewfile`. Skip silently
+# when neither is set or the file does not exist. Mirrors the
+# $EXTRA_DOCTOR_DIR convention in bin/dotfiles-doctor.
+#
+# Alternatively, $EXTRA_OVERLAY_ROOT (single-path) auto-derives the Brewfile
+# path as $EXTRA_OVERLAY_ROOT/brewfile/Brewfile when $EXTRA_BREWFILE is not
+# set explicitly. Colon-separated $EXTRA_OVERLAY_ROOT is rejected — one
+# overlay at a time. See docs/user-stories/10-fork-for-your-company.md.
+EXTRA_BREWFILE="${EXTRA_BREWFILE:-{{ dig "extra_brewfile" "" . }}}"
+if [ -z "$EXTRA_BREWFILE" ]; then
+  _overlay_root="${EXTRA_OVERLAY_ROOT:-{{ dig "extra_overlay_root" "" . }}}"
+  if [ -n "$_overlay_root" ]; then
+    if [[ "$_overlay_root" == *:* ]]; then
+      echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
+      exit 1
+    fi
+    EXTRA_BREWFILE="$_overlay_root/brewfile/Brewfile"
+  fi
+fi
+if [ -n "$EXTRA_BREWFILE" ] && [ -f "$EXTRA_BREWFILE" ]; then
+  echo "→ Running overlay brew bundle from $EXTRA_BREWFILE..."
+  brew bundle --no-upgrade --file="$EXTRA_BREWFILE"
+  echo "✓ Overlay Brewfile applied"
+fi
+
+# ── Ad-hoc sign Homebrew bottles (endpoint agent) ────────────────
+# Homebrew ships pre-built bottles UNSIGNED ("code object is not signed at
+# all"). endpoint agent reads that as "unsigned" and fires the policy
+# dialog on every spawn of any brew-installed binary (jq, fd, atuin, chezmoi,
+# ...). Ad-hoc signing (`codesign --sign -`) gives each binary
+# `Signature=adhoc` which endpoint agent accepts as signed. Idempotent — re-running is a
+# no-op for already-signed binaries. See AGENTS.md rule #10 § "Homebrew
+# bottles are unsigned".
+_dotfiles_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../bin" 2>/dev/null && pwd || echo "")"
+# Fast sign high-churn sandbox PATH tools before full Cellar sweep (ggrep/jq/curl race).
+for _fast_sign in dotfiles-adhoc-sign-jq dotfiles-adhoc-sign-curl dotfiles-adhoc-sign-ggrep; do
+  if [ -x "$_dotfiles_bin_dir/$_fast_sign" ]; then
+    DOTFILES_ADHOC_SIGN_QUIET=1 "$_dotfiles_bin_dir/$_fast_sign"
+  elif [ -x "$HOME/apps/tooling/dotfiles/bin/$_fast_sign" ]; then
+    DOTFILES_ADHOC_SIGN_QUIET=1 "$HOME/apps/tooling/dotfiles/bin/$_fast_sign"
+  fi
+done
+if [ -x "$_dotfiles_bin_dir/dotfiles-adhoc-sign-bottles" ]; then
+  "$_dotfiles_bin_dir/dotfiles-adhoc-sign-bottles"
+elif [ -x "$HOME/apps/tooling/dotfiles/bin/dotfiles-adhoc-sign-bottles" ]; then
+  "$HOME/apps/tooling/dotfiles/bin/dotfiles-adhoc-sign-bottles"
+fi

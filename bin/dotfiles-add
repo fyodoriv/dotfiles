@@ -1,0 +1,63 @@
+#!/bin/bash
+# Add a config file to dotfiles (symlink or copy mode).
+# Usage: dotfiles add <file> [--copy] [--module MODULE]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+copy_mode=false
+module=""
+target_file=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --copy) copy_mode=true; shift ;;
+    --module) module="$2"; shift 2 ;;
+    *) target_file="$1"; shift ;;
+  esac
+done
+if [ -z "$target_file" ]; then
+  echo "Usage: dotfiles add <file> [--copy] [--module MODULE]" >&2; exit 1
+fi
+target_file="${target_file/#\~/$HOME}"
+if [ ! -f "$target_file" ]; then
+  echo "Error: $target_file does not exist" >&2; exit 1
+fi
+target_file="$(cd "$(dirname "$target_file")" && pwd)/$(basename "$target_file")"
+base="$(basename "$target_file")"
+if [ -z "$module" ]; then
+  case "$target_file" in
+    */.git*) module="git" ;;
+    */.ssh*) module="ssh" ;;
+    */.config/atuin*|*/.zsh*|*/.bash*) module="shell" ;;
+    *) module="tools" ;;
+  esac
+fi
+# Validate module name: only alphanumeric, underscore, hyphen
+if [[ ! "$module" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "Error: invalid module name '$module' — only alphanumeric, _, - allowed" >&2; exit 1
+fi
+if [ ! -d "$DOTFILES_DIR/modules/$module" ]; then
+  echo "Error: module '$module' not found. Create it: dotfiles new-module $module" >&2; exit 1
+fi
+check_id_base="${base//[^a-zA-Z0-9_]/_}"
+if $copy_mode; then
+  chezmoi add "$target_file" --source "$DOTFILES_DIR"
+  src_path=$(chezmoi source-path "$target_file" --source "$DOTFILES_DIR" 2>/dev/null)
+  echo "check_managed \"managed.$check_id_base\" \"$src_path\" \"$target_file\"" >> "$DOTFILES_DIR/modules/$module/doctor.sh"
+  echo "✓ Added $target_file (copy mode) → module '$module'"
+else
+  stripped="${base#.}"
+  cp "$target_file" "$DOTFILES_DIR/home/$stripped"
+  src_path="$DOTFILES_DIR/home/$stripped"
+  # Create chezmoi symlink template so `chezmoi apply` deploys the symlink
+  tmpl_name="symlink_dot_${stripped}.tmpl"
+  echo '{{ .chezmoi.sourceDir }}/home/'"$stripped" > "$DOTFILES_DIR/$tmpl_name"
+  echo "check_symlink \"symlink.$check_id_base\" \"$src_path\" \"$target_file\"" >> "$DOTFILES_DIR/modules/$module/doctor.sh"
+  echo "✓ Added $target_file (symlink mode) → module '$module'"
+fi
+echo "  Source: $src_path"
+echo "  Doctor: modules/$module/doctor.sh"
+echo ""
+echo "Next: dotfiles apply"

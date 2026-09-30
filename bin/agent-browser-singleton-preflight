@@ -1,0 +1,155 @@
+#!/bin/bash
+set -euo pipefail
+
+_dotfiles_dir="${DOTFILES_DIR:-$HOME/apps/tooling/dotfiles}"
+if [ -f "$_dotfiles_dir/lib/dotfiles-endpoint-paths.sh" ]; then
+  # shellcheck source=../lib/dotfiles-endpoint-paths.sh
+  source "$_dotfiles_dir/lib/dotfiles-endpoint-paths.sh"
+  dotfiles_prepend_endpoint_tool_paths "$_dotfiles_dir/bin"
+fi
+unset _dotfiles_dir
+
+usage() {
+  cat <<'EOF'
+Usage:
+  agent-browser-singleton-preflight --profile <path> -- [agent-browser args...]
+  agent-browser-singleton-preflight --print-cdp <path>
+EOF
+}
+
+normalize_profile() {
+  local profile="$1"
+  local tilde_prefix
+  tilde_prefix="$(printf '\176/')"
+  if [ "$profile" = "~" ]; then
+    profile="$HOME"
+  elif [[ "$profile" == "$tilde_prefix"* ]]; then
+    profile="$HOME/${profile#"$tilde_prefix"}"
+  elif [ "$profile" = '$HOME' ]; then
+    profile="$HOME"
+  elif [[ "$profile" == '$HOME/'* ]]; then
+    profile="$HOME/${profile#\$HOME/}"
+  fi
+  while [ "${profile%/}" != "$profile" ]; do
+    profile="${profile%/}"
+  done
+  printf '%s\n' "$profile"
+}
+
+managed_port_for_profile() {
+  local profile
+  profile="$(normalize_profile "$1")"
+  case "$profile" in
+    "$HOME/.agent-browser/chrome-profile") echo "9223" ;;
+    "$HOME/.agent-browser/debug-profile") echo "9224" ;;
+    "$HOME/.agent-browser/tooling-profile") echo "9225" ;;
+    *) return 1 ;;
+  esac
+}
+
+cdp_responsive() {
+  local port="$1"
+  curl -sf --max-time "${AGENT_BROWSER_CDP_PROBE_TIMEOUT:-2}" \
+    "http://127.0.0.1:${port}/json/version" >/dev/null 2>&1
+}
+
+restore_focus_script() {
+  local dotfiles_dir="${DOTFILES_DIR:-$HOME/apps/tooling/dotfiles}"
+  if [ -x "$dotfiles_dir/bin/dotfiles-restore-focus-after-chrome" ]; then
+    printf '%s\n' "$dotfiles_dir/bin/dotfiles-restore-focus-after-chrome"
+    return 0
+  fi
+  if [ -x "$HOME/apps/dotfiles/bin/dotfiles-restore-focus-after-chrome" ]; then
+    printf '%s\n' "$HOME/apps/dotfiles/bin/dotfiles-restore-focus-after-chrome"
+  fi
+}
+
+should_restore_focus() {
+  [ -z "${AGENT_BROWSER_ALLOW_FOCUS:-}" ] || return 1
+  local arg
+  for arg in "$@"; do
+    [ "$arg" = "--headed" ] && return 1
+  done
+  return 0
+}
+
+run_agent_browser_with_focus_restore() {
+  local restore_script rc using_cdp=0 arg
+  restore_script="$(restore_focus_script || true)"
+  for arg in "$@"; do
+    [ "$arg" = "--cdp" ] && using_cdp=1 && break
+  done
+  if [ "$using_cdp" = "1" ]; then
+    env -u AGENT_BROWSER_ARGS command agent-browser "$@"
+  else
+    AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---headless=new}" \
+      command agent-browser "$@"
+  fi
+  rc=$?
+  if [ -n "$restore_script" ] && should_restore_focus "$@"; then
+    DOTFILES_FOCUS_STEAL_CALLER=agent-browser-preflight \
+      "$restore_script" --log-if-chrome-frontmost || true
+  fi
+  return "$rc"
+}
+
+profile=""
+print_cdp=""
+agent_args=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --profile)
+      [ -n "${2:-}" ] || { usage >&2; exit 2; }
+      profile="$2"
+      shift 2
+      ;;
+    --print-cdp)
+      [ -n "${2:-}" ] || { usage >&2; exit 2; }
+      print_cdp="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      agent_args=("$@")
+      break
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -n "$print_cdp" ]; then
+  managed_port_for_profile "$print_cdp"
+  exit $?
+fi
+
+[ -n "$profile" ] || { usage >&2; exit 2; }
+
+normalized_profile="$(normalize_profile "$profile")"
+if port="$(managed_port_for_profile "$normalized_profile")"; then
+  if cdp_responsive "$port"; then
+    unset AGENT_BROWSER_PROFILE
+    run_agent_browser_with_focus_restore --cdp "$port" "${agent_args[@]}"
+    exit $?
+  fi
+
+  lock_note=""
+  [ -e "$normalized_profile/SingletonLock" ] && lock_note=" SingletonLock exists."
+  {
+    printf 'Refusing to launch Chrome against launchd-owned profile: %s\n' "$normalized_profile"
+    printf 'Attach to the managed Chrome with: agent-browser --cdp %s\n' "$port"
+    printf 'CDP on port %s is not responsive.%s\n' "$port" "$lock_note"
+  } >&2
+  exit 2
+fi
+
+export AGENT_BROWSER_PROFILE="$normalized_profile"
+run_agent_browser_with_focus_restore "${agent_args[@]}"
+exit $?

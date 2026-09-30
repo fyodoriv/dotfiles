@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/jq bash script with a symlink to adhoc-signed Homebrew jq.
+# endpoint agent flags the script itself (unsigned, Description: jq) even when
+# adhoc-signed and exec'ing a signed Mach-O — the invoked path must be Mach-O.
+#
+# Escape hatch for debugging Apple jq: invoke /usr/bin/jq directly (never via shim).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SHIM="$SHIM_DIR/jq"
+
+_resolve_brew_jq() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    candidate="${DOTFILES_BREW_PREFIX}/bin/jq"
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  fi
+  for candidate in /opt/homebrew/bin/jq /usr/local/bin/jq; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+BREW_JQ="$(_resolve_brew_jq || true)"
+if [ -z "$BREW_JQ" ]; then
+  echo "jq: Homebrew jq not found — install via brew bundle / brew install jq (never use /usr/bin/jq on managed endpoints)" >&2
+  exit 1
+fi
+
+if [ -e "$SHIM" ] && [ ! -L "$SHIM" ]; then
+  rm -f "$SHIM"
+fi
+
+ln -sfn "$BREW_JQ" "$SHIM"
+chmod +x "$SHIM" 2>/dev/null || true
+
+# ~/.local/bin is in dotfiles_agent_path_prefix and bash-env.sh — gives codeassist
+# hooks (audit-logger, verify-before-completion) a signed Mach-O jq when Cursor
+# hook subprocesses omit launchctl PATH and only see sandbox /opt/homebrew/bin.
+LOCAL_JQ="${HOME:-}/.local/bin/jq"
+if [ -n "${HOME:-}" ]; then
+  mkdir -p "${HOME}/.local/bin"
+  ln -sfn "$BREW_JQ" "$LOCAL_JQ"
+  chmod +x "$LOCAL_JQ" 2>/dev/null || true
+fi

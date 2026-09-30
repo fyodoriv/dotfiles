@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+_agentbrew_resolve_path() {
+  local path="$1" path_dir target
+  while [ -L "$path" ]; do
+    path_dir="$(cd "$(dirname "$path")" && pwd -P)"
+    target="$(readlink "$path")"
+    case "$target" in
+      /*) path="$target" ;;
+      *) path="$path_dir/$target" ;;
+    esac
+  done
+  path_dir="$(cd "$(dirname "$path")" && pwd -P)"
+  printf '%s/%s' "$path_dir" "$(basename "$path")"
+}
+
+SCRIPT_PATH="$(_agentbrew_resolve_path "${BASH_SOURCE[0]}")"
+DOTFILES_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd -P)"
+
+# shellcheck source=../lib/agentbrew-locate.sh
+source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+
+if agentbrew_dir="$(agentbrew_locate)"; then
+  if [ -x "$agentbrew_dir/dist/cli.js" ] && ! grep -Fq "exec $agentbrew_dir/dist/cli.js" "$agentbrew_dir/dist/cli.js"; then
+    exec "$agentbrew_dir/dist/cli.js" "$@"
+  fi
+  if [ -x "$agentbrew_dir/node_modules/.bin/tsx" ]; then
+    exec "$agentbrew_dir/node_modules/.bin/tsx" "$agentbrew_dir/src/cli.ts" "$@"
+  fi
+  echo "agentbrew shim: found $agentbrew_dir, but no runnable CLI (dist/cli.js or node_modules/.bin/tsx)" >&2
+  exit 127
+fi
+
+SELF_PATH="$SCRIPT_PATH"
+IFS=':' read -r -a path_parts <<< "$PATH"
+for path_dir in "${path_parts[@]}"; do
+  [ -n "$path_dir" ] || path_dir="."
+  candidate="$path_dir/agentbrew"
+  [ -x "$candidate" ] || continue
+  candidate_path="$(_agentbrew_resolve_path "$candidate")"
+  [ "$candidate_path" = "$SELF_PATH" ] && continue
+  exec "$candidate" "$@"
+done
+
+echo "agentbrew shim: agentbrew checkout not found under \$DOTFILES_REPOS_DIR, ~/apps, or ~/apps/tooling" >&2
+exit 127

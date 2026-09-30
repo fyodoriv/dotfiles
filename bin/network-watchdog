@@ -1,0 +1,239 @@
+#!/bin/bash
+# Network watchdog — verify and restore network connectivity after sleep/wake.
+# Called by: sleepwatcher wake hook, LaunchAgent on network change, or manually.
+# Usage: network-watchdog [--quiet]
+#        network-watchdog --check-only    → fast 0/1 exit, no sudo, no VPN check
+# Exit 0 = network ready, Exit 1 = still down after retries.
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+_watchdog_dir="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/dotfiles-endpoint-paths.sh
+source "$_watchdog_dir/lib/dotfiles-endpoint-paths.sh"
+dotfiles_prepend_endpoint_tool_paths "$_watchdog_dir/bin"
+unset _watchdog_dir
+
+# ── Configurable targets ──────────────────────────────────────────────
+# Override via DOTFILES_NETWORK_TARGETS env var (space-separated URLs)
+# or ~/.config/dotfiles/network-targets.txt (one URL per line, # comments)
+_load_targets() {
+  if [ -n "${DOTFILES_NETWORK_TARGETS:-}" ]; then
+    echo "$DOTFILES_NETWORK_TARGETS"
+    return
+  fi
+  local config="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/network-targets.txt"
+  if [ -f "$config" ]; then
+    while IFS= read -r line; do
+      line="${line%%#*}"
+      line="${line#"${line%%[! ]*}"}"
+      line="${line%"${line##*[! ]}"}"
+      [ -n "$line" ] && echo "$line"
+    done < "$config"
+    return
+  fi
+  echo "https://github.com https://1.1.1.1"
+}
+read -ra TARGETS <<< "$(_load_targets | tr '\n' ' ')"
+DNS_HOST="${TARGETS[0]#https://}"
+DNS_HOST="${DNS_HOST#http://}"
+DNS_HOST="${DNS_HOST%%/*}"
+CURSOR_AGENT_DNS_HOST="${DOTFILES_CURSOR_AGENT_DNS_HOST:-agentn.us.api5.cursor.sh}"
+
+# Use Apple's signed TCP probe instead of curl. The network watchdog runs in
+# the background and may be triggered repeatedly by launchd; ad-hoc-signed
+# Homebrew curl has no publisher identity and can trigger endpoint-agent prompts
+# dialogs even when its code signature is otherwise valid.
+probe_target() {
+  local url="$1" authority host port
+  authority="${url#*://}"
+  authority="${authority%%/*}"
+  host="${authority%%:*}"
+  if [[ "$authority" == *:* ]]; then
+    port="${authority##*:}"
+  elif [[ "$url" == http://* ]]; then
+    port=80
+  else
+    port=443
+  fi
+  [ -n "$host" ] && /usr/bin/nc -z -w 5 "$host" "$port" >/dev/null 2>&1
+}
+
+# ── Fast check-only mode ─────────────────────────────────────────────
+# Returns 0/1 with no output, no sudo, no VPN wait, no notifications.
+# Designed for minsky's non-interactive network checks.
+if [[ "${1:-}" == "--check-only" ]]; then
+  # WiFi: any interface has an IP?
+  for iface in en0 en1 en2 en3 en4; do
+    ip=$(ipconfig getifaddr "$iface" 2>/dev/null || true)
+    [[ -n "$ip" ]] && break
+  done
+  [[ -z "${ip:-}" ]] && exit 1
+  # DNS: can resolve?
+  host -W 2 "$DNS_HOST" >/dev/null 2>&1 || exit 1
+  # TCP: at least one endpoint reachable?
+  check_ok=false
+  for url in "${TARGETS[@]}"; do
+    probe_target "$url" && { check_ok=true; break; }
+  done
+  $check_ok || exit 1
+  exit 0
+fi
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+
+QUIET=false
+[ "${1:-}" = "--quiet" ] && QUIET=true
+
+LOG_DIR="$HOME/.local/share/dotfiles/logs"
+LOG_FILE="$LOG_DIR/network-watchdog.log"
+mkdir -p "$LOG_DIR" || { echo "Error: cannot create log directory: $LOG_DIR" >&2; exit 1; }
+
+log() {
+  local msg
+  msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+  echo "$msg" >> "$LOG_FILE" 2>/dev/null
+  $QUIET || echo -e "$1"
+}
+
+# Trim log to last 500 lines (clean up leftover .tmp on failure)
+if [ -f "$LOG_FILE" ]; then
+  tail -n 500 "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE" || rm -f "$LOG_FILE.tmp"
+fi
+
+# ── Phase 1: Wait for WiFi association ───────────────────────────────
+wait_for_wifi() {
+  local max_wait=30
+  local waited=0
+  while [ $waited -lt $max_wait ]; do
+    # Check if any network interface has an IPv4 address
+    local ip
+    ip=$(ipconfig getifaddr en0 2>/dev/null || true)
+    if [ -n "$ip" ]; then
+      log "$(ok "WiFi connected: $ip (${waited}s)")"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  # Try secondary interfaces (Ethernet adapters, USB)
+  for iface in en1 en2 en3 en4 en5 en6 en7 en8; do
+    local ip
+    ip=$(ipconfig getifaddr "$iface" 2>/dev/null || true)
+    if [ -n "$ip" ]; then
+      log "$(ok "Network on $iface: $ip")"
+      return 0
+    fi
+  done
+  log "$(warn "No network after ${max_wait}s")"
+  return 1
+}
+
+# ── Phase 2: Wait for DNS resolution ────────────────────────────────
+wait_for_dns() {
+  local max_wait=15
+  local waited=0
+  while [ $waited -lt $max_wait ]; do
+    if host -W 2 "$DNS_HOST" >/dev/null 2>&1; then
+      log "$(ok "DNS resolving (${waited}s)")"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  # DNS still failing — flush and retry
+  log "$(warn "DNS stale — flushing cache")"
+  sudo -n dscacheutil -flushcache 2>/dev/null || true
+  sudo -n killall -HUP mDNSResponder 2>/dev/null || true
+  sleep 2
+  if host -W 3 "$DNS_HOST" >/dev/null 2>&1; then
+    log "$(ok "DNS recovered after flush")"
+    return 0
+  fi
+  log "$(fail "DNS still failing")"
+  return 1
+}
+
+# ── Phase 2b: Cursor agent API DNS (transient blip → permanent agent fail) ─
+check_cursor_agent_dns() {
+  if [ ! -d "/Applications/Cursor.app" ]; then
+    return 0
+  fi
+  if host -W 2 "$CURSOR_AGENT_DNS_HOST" >/dev/null 2>&1; then
+    log "$(ok "Cursor agent API DNS OK ($CURSOR_AGENT_DNS_HOST)")"
+    return 0
+  fi
+  log "$(warn "Cursor agent API DNS failing — flushing cache")"
+  sudo -n dscacheutil -flushcache 2>/dev/null || true
+  sudo -n killall -HUP mDNSResponder 2>/dev/null || true
+  sleep 2
+  if host -W 3 "$CURSOR_AGENT_DNS_HOST" >/dev/null 2>&1; then
+    log "$(ok "Cursor agent API DNS recovered after flush")"
+    return 0
+  fi
+  log "$(warn "Cursor agent API DNS still failing — Reload Window may be required")"
+  return 1
+}
+
+# ── Phase 3: Optional VPN process check ─────────────────────────────
+# Set NETWORK_WATCHDOG_VPN_PROCESS to a process name to wait for it. Empty
+# (the default) skips the check.
+check_vpn_process() {
+  local proc="${NETWORK_WATCHDOG_VPN_PROCESS:-}"
+  [ -n "$proc" ] || return 0
+  if pgrep -x "$proc" >/dev/null 2>&1; then
+    log "$(ok "VPN process $proc active")"
+    return 0
+  fi
+  log "$(warn "VPN process $proc not running — waiting for auto-recovery")"
+  local waited=0
+  while [ $waited -lt 15 ]; do
+    if pgrep -x "$proc" >/dev/null 2>&1; then
+      log "$(ok "VPN process $proc recovered (${waited}s)")"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  log "$(warn "VPN process $proc still down — may need manual restart")"
+  return 1
+}
+
+# ── Phase 4: End-to-end connectivity check ──────────────────────────
+check_connectivity() {
+  local ok_count=0
+  for url in "${TARGETS[@]}"; do
+    if probe_target "$url"; then
+      ok_count=$((ok_count + 1))
+    fi
+  done
+  if [ $ok_count -ge 2 ]; then
+    log "$(ok "Internet connectivity verified ($ok_count/${#TARGETS[@]} endpoints)")"
+    return 0
+  fi
+  log "$(warn "Only $ok_count/${#TARGETS[@]} endpoints reachable")"
+  return 1
+}
+
+# ── Main ─────────────────────────────────────────────────────────────
+log "--- network-watchdog start ---"
+
+failures=0
+
+wait_for_wifi   || failures=$((failures + 1))
+wait_for_dns    || failures=$((failures + 1))
+check_cursor_agent_dns || failures=$((failures + 1))
+check_vpn_process || true  # non-fatal: the VPN may be intentionally off
+check_connectivity || failures=$((failures + 1))
+
+if [ $failures -eq 0 ]; then
+  log "$(ok "Network fully ready")"
+  # Send notification only if not quiet mode
+  $QUIET || notify "Network Ready" "All connectivity checks passed" 2>/dev/null || true
+  exit 0
+else
+  log "$(warn "Network partially ready ($failures issues)")"
+  notify "Network Issues" "$failures connectivity check(s) failed" 2>/dev/null || true
+  exit 1
+fi

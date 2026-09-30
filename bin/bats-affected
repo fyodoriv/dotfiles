@@ -1,0 +1,283 @@
+#!/bin/bash
+# bats-affected — print bats test files affected by git changes.
+#
+# Uses git diff to find changed files, then resolves each to the test
+# files that cover it.  Falls back to running all tests when changes
+# touch shared infrastructure (test_helper, Makefile, etc.).
+#
+# Usage:
+#   bats-affected              # changed vs HEAD (unstaged + staged)
+#   bats-affected --cached     # staged only
+#   bats-affected HEAD~3       # changed in last 3 commits
+#   bats-affected main          # changed vs main branch
+#
+# Output: newline-separated list of test file paths (deduped, sorted).
+# Exits 0 with no output when nothing is affected.
+
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TESTS_DIR="$DOTFILES_DIR/tests"
+# shellcheck source=tests/verify-counts-doc-paths.sh
+source "$DOTFILES_DIR/tests/verify-counts-doc-paths.sh"
+
+# ── Parse args ───────────────────────────────────────────────────────
+diff_args=()
+case "${1:-}" in
+  --help|-h)
+    sed -n '2,/^$/s/^# //p' "$0"
+    exit 0
+    ;;
+  --cached)
+    diff_args=(--cached)
+    ;;
+  "")
+    # Default: all uncommitted changes (staged + unstaged) vs HEAD
+    diff_args=(HEAD)
+    ;;
+  *)
+    diff_args=("$1")
+    ;;
+esac
+
+# ── Collect changed files (relative to repo root) ───────────────────
+changed_files=()
+while IFS= read -r file; do
+  [ -n "$file" ] && changed_files+=("$file")
+done < <(git -C "$DOTFILES_DIR" diff --name-only "${diff_args[@]}" 2>/dev/null || true)
+
+# Also include untracked files (only for default/HEAD mode)
+if [ "${#diff_args[@]}" -eq 1 ] && [ "${diff_args[0]}" = "HEAD" ]; then
+  while IFS= read -r file; do
+    [ -n "$file" ] && changed_files+=("$file")
+  done < <(git -C "$DOTFILES_DIR" ls-files --others --exclude-standard 2>/dev/null || true)
+fi
+
+# Nothing changed → nothing to test
+if [ "${#changed_files[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+# ── Mapping tables ───────────────────────────────────────────────────
+
+# bin/dotfiles-X → tests/X.bats  (strip "dotfiles-" prefix)
+# bin/X          → tests/X.bats  (direct name)
+# Special: bin/dotfiles → tests/cli.bats
+#          bin/cheat    → tests/cli.bats
+#          bin/gh       → tests/gh-wrapper.bats
+#          bin/git      → tests/git-wrapper.bats
+#          bin/dotfiles-add + bin/dotfiles-unmanage → tests/add-unmanage.bats
+#          bin/dotfiles-new-module, bin/dotfiles-brew-add,
+#          bin/dotfiles-defaults-add, bin/dotfiles-profile → tests/scaffolding.bats
+#          plus a focused tests/dotfiles-*.bats file when one exists
+#          bin/dotfiles-audit → tests/audit.bats
+#          bin/dotfiles-stats → tests/stats.bats
+#          bin/dotfiles-doctor → tests/doctor.bats
+#          bin/dotfiles-enterprise → tests/enterprise.bats
+#          bin/dotfiles-uninstall → tests/uninstall.bats
+#          bin/dotfiles-sync → tests/dotfiles-sync.bats
+
+# lib dependencies (lib file → test files that depend on it)
+# Built by grepping which bin/ scripts source each lib file,
+# then mapping those bin scripts to their tests.
+
+# Files that trigger ALL tests
+run_all_patterns=(
+  "tests/test_helper.bash"
+)
+
+# Files that trigger smoke tests
+smoke_patterns=(
+  "modules/"
+  "macos.sh"
+  "macos-visual.sh"
+  "macos-apps.sh"
+  "launchagents/"
+  ".chezmoiscripts/"
+  "symlink_dot_"
+  "dot_"
+  "private_dot_"
+  "home/"
+)
+
+affected=()
+
+for file in "${changed_files[@]}"; do
+  # ── Run-all triggers ─────────────────────────────────────────────
+  for pattern in "${run_all_patterns[@]}"; do
+    if [[ "$file" == "$pattern" || "$file" == "$pattern"* ]]; then
+      # Output all test files and exit
+      printf '%s\n' "$TESTS_DIR"/*.bats | sort
+      exit 0
+    fi
+  done
+
+  # ── Test files themselves ────────────────────────────────────────
+  if [[ "$file" == tests/*.bats ]]; then
+    [ -f "$DOTFILES_DIR/$file" ] && affected+=("$DOTFILES_DIR/$file")
+    continue
+  fi
+
+  # ── Source-owned agent skills ─────────────────────────────────────
+  if [[ "$file" == skills/update-tooling/* ]]; then
+    affected+=("$TESTS_DIR/update-tooling-skill.bats")
+    continue
+  fi
+
+  if [[ "$file" == Agentfile.yaml ]]; then
+    affected+=("$TESTS_DIR/agent-artifact-coverage.bats")
+    affected+=("$TESTS_DIR/update-tooling-skill.bats")
+    continue
+  fi
+
+  # ── bin/ scripts ─────────────────────────────────────────────────
+  if [[ "$file" == bin/* ]]; then
+    local_name="$(basename "$file")"
+
+    case "$local_name" in
+      dotfiles)
+        affected+=("$TESTS_DIR/cli.bats")
+        ;;
+      cheat)
+        affected+=("$TESTS_DIR/cli.bats")
+        ;;
+      gh)
+        affected+=("$TESTS_DIR/gh-wrapper.bats")
+        ;;
+      git)
+        affected+=("$TESTS_DIR/git-wrapper.bats")
+        ;;
+      dotfiles-add|dotfiles-unmanage)
+        affected+=("$TESTS_DIR/add-unmanage.bats")
+        ;;
+      dotfiles-new-module|dotfiles-brew-add|dotfiles-defaults-add|dotfiles-profile)
+        affected+=("$TESTS_DIR/scaffolding.bats")
+        [ -f "$TESTS_DIR/$local_name.bats" ] && affected+=("$TESTS_DIR/$local_name.bats")
+        ;;
+      dotfiles-*)
+        # Strip "dotfiles-" prefix → tests/<name>.bats
+        short="${local_name#dotfiles-}"
+        if [ -f "$TESTS_DIR/$short.bats" ]; then
+          affected+=("$TESTS_DIR/$short.bats")
+        elif [ -f "$TESTS_DIR/$local_name.bats" ]; then
+          affected+=("$TESTS_DIR/$local_name.bats")
+        fi
+        ;;
+      *)
+        # Direct mapping: bin/X → tests/X.bats
+        if [ -f "$TESTS_DIR/$local_name.bats" ]; then
+          affected+=("$TESTS_DIR/$local_name.bats")
+        fi
+        ;;
+    esac
+
+    # Every bin/ change also triggers smoke tests
+    affected+=("$TESTS_DIR/smoke.bats")
+    continue
+  fi
+
+  # ── lib/ files ───────────────────────────────────────────────────
+  if [[ "$file" == lib/* ]]; then
+    local_name="$(basename "$file" .sh)"
+
+    # Direct test for the lib itself (e.g. lib/output.sh → tests/output.bats)
+    if [ -f "$TESTS_DIR/$local_name.bats" ]; then
+      affected+=("$TESTS_DIR/$local_name.bats")
+    fi
+
+    # Find bin/ scripts that source this lib file, then map to their tests
+    while IFS= read -r bin_script; do
+      [ -n "$bin_script" ] || continue
+      bin_name="$(basename "$bin_script")"
+      # Reuse the same bin→test mapping
+      case "$bin_name" in
+        dotfiles)        affected+=("$TESTS_DIR/cli.bats") ;;
+        cheat)           affected+=("$TESTS_DIR/cli.bats") ;;
+        gh)              affected+=("$TESTS_DIR/gh-wrapper.bats") ;;
+        git)             affected+=("$TESTS_DIR/git-wrapper.bats") ;;
+        dotfiles-add|dotfiles-unmanage)    affected+=("$TESTS_DIR/add-unmanage.bats") ;;
+        dotfiles-new-module|dotfiles-brew-add|dotfiles-defaults-add|dotfiles-profile)
+          affected+=("$TESTS_DIR/scaffolding.bats")
+          [ -f "$TESTS_DIR/$bin_name.bats" ] && affected+=("$TESTS_DIR/$bin_name.bats")
+          ;;
+        dotfiles-*)
+          short="${bin_name#dotfiles-}"
+          [ -f "$TESTS_DIR/$short.bats" ] && affected+=("$TESTS_DIR/$short.bats")
+          [ -f "$TESTS_DIR/$bin_name.bats" ] && affected+=("$TESTS_DIR/$bin_name.bats")
+          ;;
+        *)
+          [ -f "$TESTS_DIR/$bin_name.bats" ] && affected+=("$TESTS_DIR/$bin_name.bats")
+          ;;
+      esac
+    done < <(grep -rl "$(basename "$file")" "$DOTFILES_DIR/bin/" 2>/dev/null || true)
+    continue
+  fi
+
+  # ── git-hooks/ ───────────────────────────────────────────────────
+  if [[ "$file" == git-hooks/* ]]; then
+    case "$file" in
+      git-hooks/pre-commit) affected+=("$TESTS_DIR/pre-commit.bats") ;;
+      git-hooks/commit-msg) affected+=("$TESTS_DIR/commit-msg.bats") ;;
+      git-hooks/pre-push)   affected+=("$TESTS_DIR/pre-push.bats") ;;
+      *)                    affected+=("$TESTS_DIR/pre-commit.bats") ;;
+    esac
+    affected+=("$TESTS_DIR/smoke.bats")
+    continue
+  fi
+
+  # ── Doc paths scanned by tests/verify-counts.bats ─────────────────
+  if is_verify_counts_doc_path "$file"; then
+    affected+=("$TESTS_DIR/verify-counts.bats")
+    continue
+  fi
+
+  # ── CI helpers and make gates ─────────────────────────────────────
+  case "$file" in
+    .github/scripts/brew-audit-manifest.sh|.github/workflows/brew-audit.yml)
+      affected+=("$TESTS_DIR/brew-audit.bats")
+      continue
+      ;;
+    .github/scripts/check-shell-coverage.sh|.shell-coverage-floor)
+      affected+=("$TESTS_DIR/coverage.bats")
+      continue
+      ;;
+    .github/workflows/ci.yml)
+      affected+=("$TESTS_DIR/coverage.bats")
+      affected+=("$TESTS_DIR/tasks-lint.bats")
+      continue
+      ;;
+    .tasks-lint-version)
+      affected+=("$TESTS_DIR/tasks-lint.bats")
+      continue
+      ;;
+    Makefile)
+      affected+=("$TESTS_DIR/coverage.bats")
+      affected+=("$TESTS_DIR/tasks-lint.bats")
+      affected+=("$TESTS_DIR/verify-counts.bats")
+      continue
+      ;;
+  esac
+
+  # ── Smoke-test triggers (modules, macos, templates, home/) ───────
+  for pattern in "${smoke_patterns[@]}"; do
+    if [[ "$file" == "$pattern"* ]]; then
+      affected+=("$TESTS_DIR/smoke.bats")
+      # home/ and chezmoi template changes also affect chezmoi tests
+      if [[ "$file" == home/* || "$file" == symlink_dot_* || "$file" == dot_* || "$file" == private_dot_* ]]; then
+        affected+=("$TESTS_DIR/chezmoi.bats")
+      fi
+      # module changes affect doctor tests
+      if [[ "$file" == modules/* ]]; then
+        affected+=("$TESTS_DIR/doctor.bats")
+      fi
+      break
+    fi
+  done
+done
+
+# ── Deduplicate and sort ─────────────────────────────────────────────
+if [ "${#affected[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+printf '%s\n' "${affected[@]}" | sort -u

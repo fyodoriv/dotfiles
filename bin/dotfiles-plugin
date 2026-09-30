@@ -1,0 +1,751 @@
+#!/bin/bash
+# Tooling-app plugin manager — see docs/plugin-system.md for the full spec.
+#
+# A tooling-app at <path>/plugins/<target>/manifest.yaml can contribute
+# doctor checks, validate scripts, brewfile fragments, shell fragments,
+# agentbrew skills, MCP servers, etc. via one declarative folder.
+#
+# Usage:
+#   dotfiles-plugin add <path> [--no-sync] [--no-doctor]
+#   dotfiles-plugin remove <name> [--no-sync]
+#   dotfiles-plugin heal <name> [--no-doctor]
+#   dotfiles-plugin list
+#   dotfiles-plugin status <name>
+#
+# This file is the canonical entrypoint. `dotfiles plugin` dispatches here.
+
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SUPPORTED_SCHEMA_VERSION=1
+PLUGINS_DIR="${HOME}/.config/dotfiles/plugins"
+LOG_DIR="${HOME}/.local/share/dotfiles/logs/plugins"
+
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh" 2>/dev/null || {
+  # Stand-alone fallback if colors.sh missing (e.g. tests using a tmpdir HOME).
+  # shellcheck disable=SC2034  # RED/BLUE/etc reserved for future colored output.
+  RED='' GREEN='' YELLOW='' BLUE='' DIM='' NC=''
+}
+
+# Tracks how many symlinks the current `add` invocation actually created
+# (vs how many were already correct). Used to distinguish "fresh install"
+# from "no-op re-run" in the user-facing summary.
+SYMLINKS_CREATED_THIS_RUN=0
+
+# Devin-present detection result cache. Set by `devin_present` on first
+# call, reused for the rest of the invocation so we don't shell out to
+# `command -v` repeatedly. The `DOTFILES_PLUGIN_DEVIN_PRESENT` env var
+# overrides detection (1 = force present, 0 = force absent) so callers
+# can dry-run "what would I install on a Devin-less machine" and so
+# tests don't depend on the operator's real PATH.
+DEVIN_DETECTION_CACHED=""
+
+devin_present() {
+  if [ -z "$DEVIN_DETECTION_CACHED" ]; then
+    if [ "${DOTFILES_PLUGIN_DEVIN_PRESENT:-}" = "0" ]; then
+      DEVIN_DETECTION_CACHED=no
+    elif [ "${DOTFILES_PLUGIN_DEVIN_PRESENT:-}" = "1" ]; then
+      DEVIN_DETECTION_CACHED=yes
+    elif command -v devin >/dev/null 2>&1; then
+      DEVIN_DETECTION_CACHED=yes
+    else
+      DEVIN_DETECTION_CACHED=no
+    fi
+  fi
+  [ "$DEVIN_DETECTION_CACHED" = yes ]
+}
+
+show_help() {
+  cat <<EOF
+Usage: dotfiles-plugin <command> [args]
+
+Commands:
+  add <path>      Install a plugin from a local source path. Idempotent.
+  remove <name>   Remove an installed plugin. Inverse of add.
+  heal <name>     Restore drift in an installed plugin. Idempotent.
+  list            Show installed plugins + their source paths.
+  status <name>   Health report for one plugin (used by dotfiles-doctor).
+
+Flags:
+  --no-sync       Skip auto-running dotfiles apply / agentbrew sync after the action.
+  --no-doctor     Skip auto-running dotfiles-doctor on the touched plugin.
+  --help, -h      Show this message.
+
+Plugin layout (see docs/plugin-system.md):
+  <plugin-root>/plugins/dotfiles/    contributions to dotfiles (optional)
+  <plugin-root>/plugins/agentbrew/   contributions to agentbrew (optional)
+EOF
+}
+
+# ── helpers ─────────────────────────────────────────────────────────
+
+# Parse a single top-level scalar key from a YAML file. The plugin
+# manifest is intentionally simple — schemaVersion / name / version /
+# description are all unquoted scalars. Bash-only so the script works
+# without yq during early tests.
+yaml_scalar() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 1
+  awk -v k="$key" '
+    $0 ~ "^"k":" {
+      sub("^"k":[[:space:]]*", "", $0)
+      gsub(/^"|"$/, "", $0)
+      print $0
+      exit
+    }
+  ' "$file"
+}
+
+# Read the manifest at plugin-root/plugins/<target>/manifest.yaml and
+# echo `name<TAB>version`. Returns non-zero if missing or schema bad.
+read_manifest() {
+  local plugin_root="$1" target="$2"
+  local mf="$plugin_root/plugins/$target/manifest.yaml"
+  [ -f "$mf" ] || { echo "manifest missing at $mf" >&2; return 1; }
+  local sv name ver
+  sv="$(yaml_scalar "$mf" schemaVersion)"
+  name="$(yaml_scalar "$mf" name)"
+  ver="$(yaml_scalar "$mf" version)"
+  if [ "$sv" != "$SUPPORTED_SCHEMA_VERSION" ]; then
+    echo "unsupported schemaVersion in $mf: got '${sv:-<empty>}', need $SUPPORTED_SCHEMA_VERSION" >&2
+    return 1
+  fi
+  if [ -z "$name" ]; then
+    echo "manifest at $mf is missing required 'name'" >&2
+    return 1
+  fi
+  printf '%s\t%s\n' "$name" "${ver:-0.0.0}"
+}
+
+# Detect targets present in a plugin root: prints "dotfiles", "agentbrew",
+# both, or none (returns non-zero if none).
+detect_targets() {
+  local plugin_root="$1"
+  local found=0
+  if [ -d "$plugin_root/plugins/dotfiles" ]; then echo dotfiles; found=1; fi
+  if [ -d "$plugin_root/plugins/agentbrew" ]; then echo agentbrew; found=1; fi
+  [ "$found" -eq 1 ]
+}
+
+# Append a timestamped entry to the per-plugin log.
+plog() {
+  local name="$1" msg="$2"
+  mkdir -p "$LOG_DIR"
+  printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$msg" >> "$LOG_DIR/$name.log"
+}
+
+# Install state file lives at:
+#   ~/.config/dotfiles/plugins/<name>/install-state.json
+state_path() {
+  local name="$1"
+  echo "$PLUGINS_DIR/$name/install-state.json"
+}
+
+# Append a symlink path to the install state's symlinks array (creating
+# the file if missing). Pure jq, no external state.
+state_record_symlink() {
+  local name="$1" link_path="$2"
+  local state
+  state="$(state_path "$name")"
+  mkdir -p "$(dirname "$state")"
+  if [ ! -f "$state" ]; then
+    echo '{"symlinks":[]}' > "$state"
+  fi
+  local tmp="$state.tmp.$$"
+  jq --arg link "$link_path" '.symlinks += [$link] | .symlinks |= unique' "$state" > "$tmp" && mv "$tmp" "$state"
+}
+
+state_set() {
+  # state_set <name> <jq-expression-with-$ARGS>
+  local name="$1"; shift
+  local state
+  state="$(state_path "$name")"
+  mkdir -p "$(dirname "$state")"
+  [ -f "$state" ] || echo '{"symlinks":[]}' > "$state"
+  local tmp="$state.tmp.$$"
+  jq "$@" "$state" > "$tmp" && mv "$tmp" "$state"
+}
+
+# ── core install ────────────────────────────────────────────────────
+
+# Create a symlink, recording it in install-state. Idempotent: if the
+# link already points at the right target, do nothing. If a non-symlink
+# file is in the way, error out (we never overwrite operator content).
+link_in() {
+  local name="$1" source="$2" dest="$3"
+  mkdir -p "$(dirname "$dest")"
+  if [ -L "$dest" ]; then
+    local existing
+    existing="$(readlink "$dest")"
+    if [ "$existing" = "$source" ]; then
+      return 0  # already correct — no-op
+    fi
+    ln -sfn "$source" "$dest"
+  elif [ -e "$dest" ]; then
+    echo "refusing to overwrite non-symlink file at $dest" >&2
+    return 1
+  else
+    ln -s "$source" "$dest"
+  fi
+  state_record_symlink "$name" "$dest"
+  SYMLINKS_CREATED_THIS_RUN=$((SYMLINKS_CREATED_THIS_RUN + 1))
+}
+
+# Install the dotfiles-target contributions from a plugin root.
+install_dotfiles_target() {
+  local plugin_root="$1" name="$2"
+  local plugin_target="$plugin_root/plugins/dotfiles"
+  local dest_root="$PLUGINS_DIR/$name"
+
+  # Doctor modules: each subfolder under plugins/dotfiles/doctor/<m>/
+  # gets symlinked to ~/.config/dotfiles/plugins/<name>/modules/<m>/.
+  # Note: the trailing slash from `*/` is intentional (filters to dirs),
+  # but it would create double-slash paths if we used "$module/doctor.sh";
+  # strip the trailing slash first so symlink targets stay canonical.
+  if [ -d "$plugin_target/doctor" ]; then
+    local module module_dir module_name doctor_sh dest
+    for module in "$plugin_target/doctor"/*/; do
+      [ -d "$module" ] || continue
+      module_dir="${module%/}"
+      module_name="$(basename "$module_dir")"
+      doctor_sh="$module_dir/doctor.sh"
+      [ -f "$doctor_sh" ] || continue
+      dest="$dest_root/modules/$module_name/doctor.sh"
+      link_in "$name" "$doctor_sh" "$dest"
+    done
+  fi
+
+  # Validate scripts: each *.sh under plugins/dotfiles/validate/.
+  if [ -d "$plugin_target/validate" ]; then
+    local v dest
+    for v in "$plugin_target/validate"/*.sh; do
+      [ -f "$v" ] || continue
+      dest="$dest_root/validate/$(basename "$v")"
+      link_in "$name" "$v" "$dest"
+    done
+  fi
+}
+
+# Register a single skill source in agentbrew's state.yaml under a
+# given label. Idempotent: if an entry with this label already exists,
+# do nothing. Records the label in install-state.json under the given
+# state field name so `remove` knows what to drop.
+#
+# Args: <plugin-name> <label> <path-to-skills-dir> <install-state-field>
+register_skill_source() {
+  local name="$1" label="$2" skills_path="$3" state_field="$4"
+  local state="$HOME/.config/agentbrew/state.yaml"
+
+  if [ ! -f "$state" ]; then
+    printf 'schemaVersion: 1\nmcpServers: []\nskillSourceDirs: []\n' > "$state"
+  fi
+
+  local existing
+  existing="$(yq -r ".skillSourceDirs[] | select(.label == \"$label\") | .label" "$state" 2>/dev/null || true)"
+  if [ -z "$existing" ]; then
+    yq -i ".skillSourceDirs += [{\"label\": \"$label\", \"path\": \"$skills_path\"}]" "$state"
+    SYMLINKS_CREATED_THIS_RUN=$((SYMLINKS_CREATED_THIS_RUN + 1))
+    plog "$name" "agentbrew: registered skill source '$label' → $skills_path"
+  else
+    plog "$name" "agentbrew: skill source '$label' already registered — no-op"
+  fi
+
+  # shellcheck disable=SC2016
+  state_set "$name" --arg label "$label" --arg field "$state_field" '.[$field] = $label'
+}
+
+# Install the agentbrew-target contributions from a plugin root:
+#   1. plugins/agentbrew/skills/        → state.yaml skillSourceDirs entry
+#   2. plugins/agentbrew/agentfile-fragment.yaml  → merged into ~/.config/agentbrew/Agentfile.yaml
+#   3. plugins/agentbrew/rules-fragment.md        → appended to shared-rules.md inside markers
+#
+# Everything is idempotent: re-running on an installed plugin merges
+# nothing new (label already present, entry already in list, markers
+# already enclosing the same content).
+install_agentbrew_target() {
+  local plugin_root="$1" name="$2"
+  local plugin_target="$plugin_root/plugins/agentbrew"
+  local agentbrew_dir="$HOME/.config/agentbrew"
+  mkdir -p "$agentbrew_dir"
+
+  # 1a. Regular skill source — symlink-style registration via skillSourceDirs.
+  if [ -d "$plugin_target/skills" ]; then
+    register_skill_source "$name" "${name}-plugin" "$plugin_target/skills" skillSourceLabel
+  fi
+
+  # 1b. Devin-only skill source under .devin/skills/. Registered only
+  # when the Devin CLI is detected on the user's machine. The
+  # `devinSkipped` flag in install-state lets `remove` know whether
+  # the devin-skills label was ever created (so cleanup doesn't try
+  # to drop something that was never there).
+  if [ -d "$plugin_target/.devin/skills" ]; then
+    if devin_present; then
+      register_skill_source "$name" "${name}-devin-skills" "$plugin_target/.devin/skills" devinSkillSourceLabel
+      # shellcheck disable=SC2016
+      state_set "$name" '.devinSkipped = false'
+    else
+      plog "$name" "agentbrew: skipped .devin/skills/ (Devin CLI not present)"
+      echo "  ${DIM}Devin contributions skipped (Devin CLI not detected on PATH)${NC}"
+      # shellcheck disable=SC2016
+      state_set "$name" '.devinSkipped = true'
+    fi
+  fi
+
+  # 2. Agentfile fragment merge.
+  local fragment="$plugin_target/agentfile-fragment.yaml"
+  if [ -f "$fragment" ]; then
+    local global_agentfile="$agentbrew_dir/Agentfile.yaml"
+    if [ ! -f "$global_agentfile" ]; then
+      printf 'mcp: []\nskills: []\n' > "$global_agentfile"
+    fi
+    local added_mcp_csv=""
+    local added_skill_csv=""
+
+    # Read fragment's mcp + skills arrays (each may be absent).
+    local mcp_entries skill_entries
+    mcp_entries="$(yq -r '.mcp[]?' "$fragment" 2>/dev/null || true)"
+    skill_entries="$(yq -r '.skills[]?' "$fragment" 2>/dev/null || true)"
+
+    local entry
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      local present
+      present="$(yq -r ".mcp[]? | select(. == \"$entry\")" "$global_agentfile" 2>/dev/null || true)"
+      if [ -z "$present" ]; then
+        yq -i ".mcp += [\"$entry\"]" "$global_agentfile"
+        added_mcp_csv="${added_mcp_csv:+$added_mcp_csv,}$entry"
+        SYMLINKS_CREATED_THIS_RUN=$((SYMLINKS_CREATED_THIS_RUN + 1))
+        plog "$name" "agentbrew: added mcp '$entry' to global Agentfile"
+      fi
+    done <<< "$mcp_entries"
+
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      local present
+      present="$(yq -r ".skills[]? | select(. == \"$entry\")" "$global_agentfile" 2>/dev/null || true)"
+      if [ -z "$present" ]; then
+        yq -i ".skills += [\"$entry\"]" "$global_agentfile"
+        added_skill_csv="${added_skill_csv:+$added_skill_csv,}$entry"
+        SYMLINKS_CREATED_THIS_RUN=$((SYMLINKS_CREATED_THIS_RUN + 1))
+        plog "$name" "agentbrew: added skill '$entry' to global Agentfile"
+      fi
+    done <<< "$skill_entries"
+
+    # Persist the LISTS of mcp + skill entries this plugin contributes
+    # (not just the newly-added ones — we need the full set for clean
+    # remove regardless of which run added them).
+    local all_mcp all_skills
+    all_mcp="$(yq -r '.mcp[]?' "$fragment" 2>/dev/null | jq -R . | jq -s .)"
+    all_skills="$(yq -r '.skills[]?' "$fragment" 2>/dev/null | jq -R . | jq -s .)"
+    # shellcheck disable=SC2016
+    state_set "$name" --argjson m "$all_mcp" --argjson s "$all_skills" \
+      '.agentfileMcpEntries = $m | .agentfileSkillEntries = $s'
+  fi
+
+  # 3. Rules fragment append (marker-bounded for idempotent replace).
+  local rules_fragment="$plugin_target/rules-fragment.md"
+  if [ -f "$rules_fragment" ]; then
+    local shared="$agentbrew_dir/shared-rules.md"
+    local start_marker="<!-- plugin:${name}:start -->"
+    local end_marker="<!-- plugin:${name}:end -->"
+    touch "$shared"
+
+    # Remove any existing marker pair for this plugin (idempotent replace).
+    if grep -q "$start_marker" "$shared" 2>/dev/null; then
+      local tmp="$shared.tmp.$$"
+      awk -v start="$start_marker" -v end="$end_marker" '
+        $0 == start { skip = 1; next }
+        $0 == end   { skip = 0; next }
+        !skip       { print }
+      ' "$shared" > "$tmp" && mv "$tmp" "$shared"
+      plog "$name" "agentbrew: replaced existing rules-fragment markers"
+    else
+      SYMLINKS_CREATED_THIS_RUN=$((SYMLINKS_CREATED_THIS_RUN + 1))
+      plog "$name" "agentbrew: appending rules-fragment for first time"
+    fi
+
+    # Append a fresh marker pair with the current fragment content.
+    {
+      printf '\n%s\n' "$start_marker"
+      cat "$rules_fragment"
+      printf '%s\n' "$end_marker"
+    } >> "$shared"
+    # shellcheck disable=SC2016
+    state_set "$name" '.rulesMarkered = true'
+  fi
+}
+
+# ── commands ────────────────────────────────────────────────────────
+
+cmd_add() {
+  local plugin_root="" no_sync=false no_doctor=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-sync) no_sync=true ;;
+      --no-doctor) no_doctor=true ;;
+      --help|-h) show_help; return 0 ;;
+      -*) echo "unknown flag: $1" >&2; return 2 ;;
+      *)
+        if [ -z "$plugin_root" ]; then
+          plugin_root="$1"
+        else
+          echo "usage: dotfiles-plugin add <path> [--no-sync] [--no-doctor]" >&2
+          return 2
+        fi
+        ;;
+    esac
+    shift
+  done
+
+  if [ -z "$plugin_root" ]; then
+    echo "usage: dotfiles-plugin add <path> [--no-sync] [--no-doctor]" >&2
+    return 2
+  fi
+
+  # Resolve to an absolute path (canonical form for install-state).
+  plugin_root="$(cd "$plugin_root" 2>/dev/null && pwd)" || {
+    echo "no such directory: $plugin_root" >&2
+    return 1
+  }
+
+  # Discover targets.
+  local targets
+  if ! targets="$(detect_targets "$plugin_root")"; then
+    echo "not a plugin: no plugins/dotfiles/ or plugins/agentbrew/ folder under $plugin_root" >&2
+    return 1
+  fi
+
+  # Validate each manifest (schemaVersion + name).
+  local name="" version=""
+  local target
+  for target in $targets; do
+    local meta
+    meta="$(read_manifest "$plugin_root" "$target")" || return 1
+    local t_name t_ver
+    t_name="$(echo "$meta" | cut -f1)"
+    t_ver="$(echo "$meta" | cut -f2)"
+    if [ -n "$name" ] && [ "$name" != "$t_name" ]; then
+      echo "manifest name mismatch: dotfiles target says '$name', $target target says '$t_name'" >&2
+      return 1
+    fi
+    name="$t_name"
+    if [ -n "$version" ] && [ "$version" != "$t_ver" ]; then
+      echo "${YELLOW}warning${NC}: manifest version mismatch between targets ($version vs $t_ver) — using $t_ver" >&2
+    fi
+    version="$t_ver"
+  done
+
+  echo "Installing plugin '$name' (v$version) from $plugin_root"
+  plog "$name" "add: starting install from $plugin_root (v$version)"
+
+  # Per target, run the install routine.
+  local installed_anything=false
+  for target in $targets; do
+    case "$target" in
+      dotfiles)
+        install_dotfiles_target "$plugin_root" "$name"
+        installed_anything=true
+        ;;
+      agentbrew)
+        install_agentbrew_target "$plugin_root" "$name"
+        installed_anything=true
+        ;;
+    esac
+  done
+
+  if ! $installed_anything; then
+    echo "no targets installed (plugin folder present but empty contributions)" >&2
+    return 1
+  fi
+
+  # Record source path + manifest hash for drift detection (heal/status).
+  # shellcheck disable=SC2016  # $src/$ver/$ts are jq vars passed via --arg, not shell.
+  state_set "$name" --arg src "$plugin_root" --arg ver "$version" --arg ts "$(date -u +%FT%TZ)" \
+    '.sourcePath = $src | .version = $ver | .installedAt = (.installedAt // $ts) | .lastUpdatedAt = $ts'
+
+  plog "$name" "add: completed (created $SYMLINKS_CREATED_THIS_RUN symlink(s) this run)"
+
+  local total_links
+  total_links="$(jq '.symlinks | length' "$(state_path "$name")")"
+  if [ "$SYMLINKS_CREATED_THIS_RUN" -eq 0 ]; then
+    # Idempotent re-run — every symlink the plugin needs was already in
+    # place. Surface this explicitly so the user knows the command did
+    # nothing harmful, just verified existing state.
+    echo "  ${GREEN}✓${NC} $name already installed — no-op (${total_links} symlink(s) unchanged)"
+  else
+    echo "  ${GREEN}✓${NC} $name installed (${SYMLINKS_CREATED_THIS_RUN} new symlink(s), ${total_links} total tracked)"
+  fi
+
+  # Auto-run downstream syncs (US default) unless overridden.
+  if ! $no_sync; then
+    plog "$name" "add: auto-sync skipped (downstream sync not yet implemented in slice 1)"
+  fi
+  if ! $no_doctor; then
+    plog "$name" "add: auto-doctor skipped (not yet implemented in slice 1)"
+  fi
+}
+
+cmd_list() {
+  if [ ! -d "$PLUGINS_DIR" ]; then
+    echo "No plugins installed."
+    return 0
+  fi
+  local found=0 dir
+  for dir in "$PLUGINS_DIR"/*/; do
+    [ -d "$dir" ] || continue
+    local state
+    state="$dir/install-state.json"
+    [ -f "$state" ] || continue
+    found=1
+    local name src ver
+    name="$(basename "${dir%/}")"
+    src="$(jq -r '.sourcePath // "<unknown>"' "$state")"
+    ver="$(jq -r '.version // "?"' "$state")"
+    printf '  %s  v%s  →  %s\n' "$name" "$ver" "$src"
+  done
+  if [ "$found" -eq 0 ]; then
+    echo "No plugins installed."
+  fi
+}
+
+# ── remove (US-2) ───────────────────────────────────────────────────
+
+cmd_remove() {
+  local name="" no_sync=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-sync) no_sync=true ;;
+      --help|-h) show_help; return 0 ;;
+      -*) echo "unknown flag: $1" >&2; return 2 ;;
+      *)
+        if [ -z "$name" ]; then
+          name="$1"
+        else
+          echo "usage: dotfiles-plugin remove <name> [--no-sync]" >&2
+          return 2
+        fi
+        ;;
+    esac
+    shift
+  done
+
+  if [ -z "$name" ]; then
+    echo "usage: dotfiles-plugin remove <name> [--no-sync]" >&2
+    return 2
+  fi
+
+  local state plugin_dir
+  state="$(state_path "$name")"
+  plugin_dir="$PLUGINS_DIR/$name"
+  if [ ! -f "$state" ]; then
+    echo "plugin not installed: '$name' (no install-state at $state)" >&2
+    return 1
+  fi
+
+  plog "$name" "remove: starting"
+
+  # 1. Drop the skill source(s) from state.yaml (regular + Devin-only,
+  # whichever were registered). Reads BOTH `skillSourceLabel` and
+  # `devinSkillSourceLabel` from install-state — present only when the
+  # corresponding registration happened.
+  local skill_label devin_label state_yaml
+  state_yaml="$HOME/.config/agentbrew/state.yaml"
+  skill_label="$(jq -r '.skillSourceLabel // empty' "$state")"
+  devin_label="$(jq -r '.devinSkillSourceLabel // empty' "$state")"
+  if [ -f "$state_yaml" ]; then
+    if [ -n "$skill_label" ]; then
+      yq -i "del(.skillSourceDirs[] | select(.label == \"$skill_label\"))" "$state_yaml"
+      plog "$name" "remove: dropped skillSourceDirs label '$skill_label'"
+    fi
+    if [ -n "$devin_label" ]; then
+      yq -i "del(.skillSourceDirs[] | select(.label == \"$devin_label\"))" "$state_yaml"
+      plog "$name" "remove: dropped skillSourceDirs label '$devin_label' (Devin-only)"
+    fi
+  fi
+
+  # 2. Drop Agentfile fragment entries (mcp + skills).
+  local global_agentfile="$HOME/.config/agentbrew/Agentfile.yaml"
+  if [ -f "$global_agentfile" ]; then
+    local entry
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      yq -i "del(.mcp[] | select(. == \"$entry\"))" "$global_agentfile"
+      plog "$name" "remove: dropped Agentfile mcp entry '$entry'"
+    done < <(jq -r '.agentfileMcpEntries[]? // empty' "$state")
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      yq -i "del(.skills[] | select(. == \"$entry\"))" "$global_agentfile"
+      plog "$name" "remove: dropped Agentfile skill entry '$entry'"
+    done < <(jq -r '.agentfileSkillEntries[]? // empty' "$state")
+  fi
+
+  # 3. Strip the rules-fragment marker pair (and content between).
+  local rules_markered
+  rules_markered="$(jq -r '.rulesMarkered // false' "$state")"
+  local shared="$HOME/.config/agentbrew/shared-rules.md"
+  if [ "$rules_markered" = "true" ] && [ -f "$shared" ]; then
+    local start_marker="<!-- plugin:${name}:start -->"
+    local end_marker="<!-- plugin:${name}:end -->"
+    local tmp="$shared.tmp.$$"
+    awk -v start="$start_marker" -v end="$end_marker" '
+      $0 == start { skip = 1; next }
+      $0 == end   { skip = 0; next }
+      !skip       { print }
+    ' "$shared" > "$tmp" && mv "$tmp" "$shared"
+    plog "$name" "remove: stripped rules-fragment marker pair"
+  fi
+
+  # 4. Remove every recorded symlink (only — never the symlink TARGET).
+  local link
+  while IFS= read -r link; do
+    [ -n "$link" ] || continue
+    if [ -L "$link" ]; then
+      rm "$link"
+      plog "$name" "remove: deleted symlink $link"
+    fi
+  done < <(jq -r '.symlinks[]? // empty' "$state")
+
+  # 5. Drop the plugin state directory (also catches log files, empty
+  #    subdirectories from the symlinks, and the install-state.json
+  #    itself).
+  if [ -d "$plugin_dir" ]; then
+    rm -rf "$plugin_dir"
+  fi
+
+  echo "  ${GREEN}✓${NC} $name removed"
+
+  if ! $no_sync; then
+    plog "$name" "remove: auto-sync skipped (downstream sync not yet implemented in slice 3)"
+  fi
+}
+
+# ── heal (US-3) ─────────────────────────────────────────────────────
+
+cmd_heal() {
+  local name="" no_doctor=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-doctor) no_doctor=true ;;
+      --help|-h) show_help; return 0 ;;
+      -*) echo "unknown flag: $1" >&2; return 2 ;;
+      *)
+        if [ -z "$name" ]; then
+          name="$1"
+        else
+          echo "usage: dotfiles-plugin heal <name> [--no-doctor]" >&2
+          return 2
+        fi
+        ;;
+    esac
+    shift
+  done
+
+  if [ -z "$name" ]; then
+    echo "usage: dotfiles-plugin heal <name> [--no-doctor]" >&2
+    return 2
+  fi
+
+  local state source_path
+  state="$(state_path "$name")"
+  if [ ! -f "$state" ]; then
+    echo "plugin not installed: '$name' (no install-state to heal from)" >&2
+    return 1
+  fi
+  source_path="$(jq -r '.sourcePath // empty' "$state")"
+  if [ -z "$source_path" ] || [ ! -d "$source_path" ]; then
+    echo "cannot heal '$name': sourcePath in install-state is missing or invalid (was: '$source_path')" >&2
+    return 1
+  fi
+
+  plog "$name" "heal: re-running install from $source_path"
+
+  # Reset the per-run counter so we can tell if heal actually had work to do.
+  SYMLINKS_CREATED_THIS_RUN=0
+
+  # Delegate to add — same source, idempotent semantics. Suppress sync/doctor
+  # in the inner call; this outer command's --no-doctor flag controls the
+  # doctor invocation after restoration.
+  cmd_add "$source_path" --no-sync --no-doctor > /dev/null
+
+  if [ "$SYMLINKS_CREATED_THIS_RUN" -eq 0 ]; then
+    echo "  ${GREEN}✓${NC} $name already healthy — no-op"
+  else
+    echo "  ${GREEN}✓${NC} $name healed (${SYMLINKS_CREATED_THIS_RUN} item(s) restored)"
+  fi
+}
+
+# ── status (US-3 / doctor integration) ──────────────────────────────
+
+cmd_status() {
+  local name="${1:-}"
+  if [ -z "$name" ]; then
+    echo "usage: dotfiles-plugin status <name>" >&2
+    return 2
+  fi
+
+  local state
+  state="$(state_path "$name")"
+  if [ ! -f "$state" ]; then
+    echo "plugin not installed: '$name'" >&2
+    return 1
+  fi
+
+  local source_path total broken=0
+  source_path="$(jq -r '.sourcePath // empty' "$state")"
+  total="$(jq '.symlinks | length' "$state")"
+
+  # Verify each recorded symlink still exists and points where install-state expects.
+  local link missing
+  while IFS= read -r link; do
+    [ -n "$link" ] || continue
+    if [ ! -L "$link" ]; then
+      broken=$((broken + 1))
+      echo "  ${YELLOW}✗${NC} missing symlink: $link"
+      continue
+    fi
+    # The target should be a path inside the recorded source.
+    local target
+    target="$(readlink "$link")"
+    if [ ! -e "$target" ]; then
+      broken=$((broken + 1))
+      echo "  ${YELLOW}✗${NC} broken target (file gone): $link → $target"
+    fi
+  done < <(jq -r '.symlinks[]? // empty' "$state")
+
+  # skillSourceDirs entry — verify still present if registered.
+  local skill_label state_yaml
+  skill_label="$(jq -r '.skillSourceLabel // empty' "$state")"
+  state_yaml="$HOME/.config/agentbrew/state.yaml"
+  if [ -n "$skill_label" ] && [ -f "$state_yaml" ]; then
+    missing="$(yq -r ".skillSourceDirs[] | select(.label == \"$skill_label\") | .label" "$state_yaml" 2>/dev/null || true)"
+    if [ -z "$missing" ]; then
+      broken=$((broken + 1))
+      echo "  ${YELLOW}✗${NC} missing state.yaml skillSourceDirs entry: $skill_label"
+    fi
+  fi
+
+  if [ "$broken" -eq 0 ]; then
+    echo "  ${GREEN}✓${NC} $name healthy ($total symlink(s) tracked, source: $source_path)"
+    return 0
+  fi
+  echo "  ${RED}✗${NC} $name has $broken drift item(s) — run: dotfiles plugin heal $name"
+  return 1
+}
+
+# ── dispatch ────────────────────────────────────────────────────────
+
+cmd="${1:-help}"
+case "$cmd" in
+  --help|-h|help) show_help ;;
+  add)            shift; cmd_add "$@" ;;
+  remove)         shift; cmd_remove "$@" ;;
+  heal)           shift; cmd_heal "$@" ;;
+  list)           shift; cmd_list "$@" ;;
+  status)         shift; cmd_status "$@" ;;
+  *)
+    echo "unknown command: $cmd" >&2
+    show_help
+    exit 2
+    ;;
+esac

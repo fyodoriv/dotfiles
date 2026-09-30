@@ -1,0 +1,5 @@
+# Merged into the canonical agentbrew Agentfile when use_cursor=false
+# (chezmoi data). agentbrew then treats Cursor as not installed and writes
+# nothing under ~/.cursor/. See .chezmoiscripts/run_after_agentbrew-sync.sh.
+excludeAgents:
+  - cursor

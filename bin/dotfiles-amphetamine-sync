@@ -1,0 +1,274 @@
+#!/bin/bash
+# dotfiles-amphetamine-sync — capture & restore Amphetamine power policy across machines.
+#
+# Why this exists: Amphetamine's managed preferences live in the app's
+# sandboxed UserDefaults at
+# ~/Library/Containers/com.if.Amphetamine/Data/Library/Preferences/.
+# This tool captures the small policy subset that supports manager-owned
+# closed-lid sessions on every machine.
+#
+# Synced keys are narrow enough that machine-personal prefs (notification
+# sounds, status bar appearance, recent sessions, hotkey bindings) DON'T
+# leak, but broad enough that a fresh machine running `dotfiles apply` ends
+# up with the same safe power policy.
+#
+# The managed safe baseline never auto-starts a Default Duration or Trigger
+# session. `dotfiles-agent-keepawake` starts an owned session only while
+# Cursor or Claude Code is running and removes it when their process set no
+# longer qualifies.
+#
+# Storage: dotfiles/data/amphetamine-prefs.json — human-readable JSON
+# subset committed to git. Distinct from data/macos-defaults.json
+# (which only handles scalar types — Trigger Data is an array of dicts).
+#
+# Usage:
+#   dotfiles-amphetamine-sync export   Capture local Amphetamine config → dotfiles
+#   dotfiles-amphetamine-sync apply    Write dotfiles config → local Amphetamine
+#   dotfiles-amphetamine-sync diff     Show drift between local and dotfiles
+#   dotfiles-amphetamine-sync status   Print summary (default)
+#   dotfiles-amphetamine-sync --help   Show this message
+#
+# Lifecycle: chezmoi runs `apply` automatically when data/amphetamine-prefs.json
+# changes (see .chezmoiscripts/run_onchange_after_amphetamine-prefs.sh.tmpl).
+# Run `export` MANUALLY after you reconfigure the managed preferences, then
+# `dotfiles sync` to push to git. Export refuses generic trigger or automatic
+# session settings because they defeat process-scoped sleep protection.
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PREFS_FILE="$DOTFILES_DIR/data/amphetamine-prefs.json"
+DOMAIN="com.if.Amphetamine"
+
+# The exact keys to sync. Ordering matters for stable diffs.
+# Grouped by Amphetamine Preferences tab so it's obvious which checkbox
+# each key corresponds to.
+SYNCED_KEYS=(
+  # ── General tab ─────────────────────────────────────────────────
+  "Start Session At Launch"          # bool — safe baseline: 0 (no unbounded auto-start)
+  "Start Session On Wake"            # bool — safe baseline: 0 (no unbounded auto-start)
+
+  # ── Session Defaults tab ────────────────────────────────────────
+  "Default Duration"                 # int — 0 = Indefinitely; safe while auto-start stays off
+  "Allow Display Sleep"              # bool — 1 = permit display sleep during a session
+  "Allow Closed-Display Sleep"       # bool — 0 = STAY AWAKE when lid closed (the key fix)
+  "End Session On Low Battery"       # bool — 1 = auto-end below threshold
+  "Low Battery Percent"              # int — threshold (20 for "low battery" policy)
+  "Ignore Battery on AC"             # bool — 1 = threshold inactive while plugged in
+  "Restart DD Session on AC Reconnect"  # bool — safe baseline: 0 (no unbounded auto-start)
+
+  # ── Triggers tab ────────────────────────────────────────────────
+  "Enable Triggers"                  # bool — 0: generic trigger sessions are forbidden
+  "Trigger Data"                     # array of dicts — empty: manager owns session lifecycle
+)
+# jq filter built from SYNCED_KEYS — used to slice the full plist down
+# to just the synced subset before writing to disk.
+# Result example: 'with_entries(select(.key == "Enable Triggers" or .key == "Trigger Data"))'
+JQ_SUBSET_FILTER='with_entries(select('
+for i in "${!SYNCED_KEYS[@]}"; do
+  [ "$i" -gt 0 ] && JQ_SUBSET_FILTER+=' or '
+  JQ_SUBSET_FILTER+=".key == \"${SYNCED_KEYS[$i]}\""
+done
+JQ_SUBSET_FILTER+='))'
+
+# ── ANSI helpers (work standalone — don't require lib/colors.sh) ─────
+_RED=$'\033[0;31m'; _GRN=$'\033[0;32m'; _YEL=$'\033[0;33m'; _DIM=$'\033[2m'; _RST=$'\033[0m'
+ok()   { printf "  ${_GRN}✓${_RST} %s\n" "$1"; }
+warn() { printf "  ${_YEL}⚠${_RST} %s\n" "$1"; }
+err()  { printf "  ${_RED}✗${_RST} %s\n" "$1" >&2; }
+hint() { printf "  ${_DIM}→ %s${_RST}\n" "$1"; }
+
+amphetamine_installed() { [ -d /Applications/Amphetamine.app ]; }
+
+managed_policy_is_safe() {
+  jq -e '
+    ((."Enable Triggers" // false) != true and (."Enable Triggers" // 0) != 1)
+    and ((."Trigger Data" // []) | length == 0)
+    and ((."Start Session At Launch" // false) != true and (."Start Session At Launch" // 0) != 1)
+    and ((."Start Session On Wake" // false) != true and (."Start Session On Wake" // 0) != 1)
+    and ((."Restart DD Session on AC Reconnect" // false) != true and (."Restart DD Session on AC Reconnect" // 0) != 1)
+  ' >/dev/null
+}
+
+# Read all live prefs as JSON, then keep only the synced keys.
+# Returns JSON on stdout; non-zero exit on failure.
+capture_local_subset() {
+  local tmp_plist
+  tmp_plist=$(mktemp -t amphetamine-export.XXXXXX.plist)
+  # `defaults export <domain> -` writes the entire plist to stdout as XML.
+  # plutil converts to JSON, jq filters to the synced subset.
+  if ! defaults export "$DOMAIN" "$tmp_plist" 2>/dev/null; then
+    rm -f "$tmp_plist"
+    return 1
+  fi
+  plutil -convert json -o - "$tmp_plist" | jq "$JQ_SUBSET_FILTER"
+  local rc=$?
+  rm -f "$tmp_plist"
+  return $rc
+}
+
+# Apply one synced key from the JSON file. Uses plutil to convert that
+# key's JSON value to an XML plist fragment, then `defaults write` with
+# the fragment — works uniformly for bools, arrays, dicts, etc.
+apply_one_key() {
+  local json_file="$1" key="$2"
+
+  # Skip silently when the key isn't in the JSON (so we can ship a JSON
+  # with only the keys the source machine has, no `null` placeholders).
+  local has_key
+  has_key=$(jq --arg k "$key" 'has($k)' "$json_file")
+  if [ "$has_key" != "true" ]; then return 0; fi
+
+  # Build a single-key plist with just this key, then extract the value.
+  local tmp_plist tmp_xml
+  tmp_plist=$(mktemp -t amphetamine-apply.XXXXXX.plist)
+  tmp_xml=$(mktemp -t amphetamine-val.XXXXXX.xml)
+  jq --arg k "$key" '{($k): .[$k]}' "$json_file" | plutil -convert xml1 -o "$tmp_plist" -
+
+  # plutil -extract emits the inner value (not the wrapping dict), in
+  # XML plist format — exactly what `defaults write` accepts as a value.
+  if ! plutil -extract "$key" xml1 -o "$tmp_xml" "$tmp_plist" 2>/dev/null; then
+    err "plutil could not extract \`$key\`"
+    rm -f "$tmp_plist" "$tmp_xml"
+    return 1
+  fi
+
+  if defaults write "$DOMAIN" "$key" "$(cat "$tmp_xml")" 2>/dev/null; then
+    printf '    applied %s\n' "$key"
+  else
+    err "defaults write failed for \`$key\` — Amphetamine may be running with locked prefs"
+  fi
+  rm -f "$tmp_plist" "$tmp_xml"
+}
+
+# ── Subcommands ──────────────────────────────────────────────────────
+
+cmd_export() {
+  amphetamine_installed || { err "Amphetamine.app not installed — nothing to export"; return 1; }
+  command -v plutil >/dev/null
+  command -v jq     >/dev/null || { err "jq missing — brew install jq"; return 1; }
+
+  echo "Capturing Amphetamine prefs: local → $PREFS_FILE"
+  local subset
+  subset=$(capture_local_subset) || { err "capture failed"; return 1; }
+  if ! printf '%s\n' "$subset" | managed_policy_is_safe; then
+    err "generic Amphetamine trigger or automatic session settings are not allowed"
+    hint "restore the manager-owned baseline first: dotfiles-amphetamine-sync apply"
+    return 1
+  fi
+
+  mkdir -p "$(dirname "$PREFS_FILE")"
+  # Pretty-print + sort keys for stable diffs.
+  echo "$subset" | jq -S '.' > "$PREFS_FILE"
+  ok "wrote $PREFS_FILE"
+
+  # Surface the captured config in a one-line summary so the user can
+  # eyeball that what they configured in the GUI matches the manager-owned
+  # policy that landed in dotfiles.
+  local trigger_count triggers_on cdm_sleep low_batt_end auto_launch auto_wake ac_reconnect
+  trigger_count=$(jq -r '."Trigger Data" // [] | length' "$PREFS_FILE")
+  triggers_on=$(jq -r '."Enable Triggers" // false' "$PREFS_FILE")
+  cdm_sleep=$(jq -r '."Allow Closed-Display Sleep" // null' "$PREFS_FILE")
+  low_batt_end=$(jq -r '."End Session On Low Battery" // null' "$PREFS_FILE")
+  auto_launch=$(jq -r '."Start Session At Launch" // 0' "$PREFS_FILE")
+  auto_wake=$(jq -r '."Start Session On Wake" // 0' "$PREFS_FILE")
+  ac_reconnect=$(jq -r '."Restart DD Session on AC Reconnect" // 0' "$PREFS_FILE")
+
+  printf '\n  %sCaptured policy:%s\n' "$_DIM" "$_RST"
+  printf '    triggers:                 enable=%s, count=%d\n' "$triggers_on" "$trigger_count"
+  printf '    closed-display awake:     %s (1 = lid close keeps awake)\n' "$([ "$cdm_sleep" = "0" ] && echo "YES" || echo "NO")"
+  printf '    auto-end on low battery:  %s\n' "$([ "$low_batt_end" = "1" ] && echo "YES (threshold=$(jq -r '."Low Battery Percent" // "?"' "$PREFS_FILE")%)" || echo "no")"
+  printf '    auto-start:               launch=%s, wake=%s, AC-reconnect=%s\n' "$auto_launch" "$auto_wake" "$ac_reconnect"
+
+  ok "manager-owned baseline — no generic Trigger or automatic session will start"
+  hint "commit to share across machines: cd '$DOTFILES_DIR' && dotfiles sync"
+}
+
+cmd_apply() {
+  amphetamine_installed || { warn "Amphetamine.app not installed — skipping apply"; return 0; }
+  command -v jq >/dev/null || { err "jq missing — brew install jq"; return 1; }
+  [ -f "$PREFS_FILE" ] || { warn "$PREFS_FILE not found — run \`export\` first on the source machine"; return 0; }
+
+  local key_count
+  key_count=$(jq -r 'keys | length' "$PREFS_FILE")
+  if [ "$key_count" -eq 0 ]; then
+    warn "$PREFS_FILE is empty — nothing to apply"
+    hint "run \`export\` on the machine where you configured the managed policy, then \`dotfiles sync\`"
+    return 0
+  fi
+
+  echo "Applying Amphetamine prefs: $PREFS_FILE → local"
+  for key in "${SYNCED_KEYS[@]}"; do
+    apply_one_key "$PREFS_FILE" "$key"
+  done
+  ok "apply complete"
+  # Amphetamine reads its prefs at session-start (and on prefs-change
+  # notifications from the OS). For policy changes to take effect
+  # immediately, the app needs to re-read — restart is the safe path.
+  if pgrep -x Amphetamine >/dev/null; then
+    hint "restart Amphetamine to pick up managed policy changes immediately:"
+    hint "  killall Amphetamine && open -gj -a Amphetamine"
+  fi
+}
+
+cmd_diff() {
+  amphetamine_installed || { warn "Amphetamine.app not installed"; return 0; }
+  [ -f "$PREFS_FILE" ] || { warn "$PREFS_FILE not found — run \`export\` first"; return 1; }
+
+  local local_tmp
+  local_tmp=$(mktemp -t amphetamine-local.XXXXXX.json)
+  capture_local_subset | jq -S '.' > "$local_tmp"
+
+  if diff -u "$PREFS_FILE" "$local_tmp" 2>/dev/null; then
+    ok "no drift — local matches dotfiles"
+    rm -f "$local_tmp"
+    return 0
+  fi
+  # diff returned non-zero — drift exists. The diff is already on stdout.
+  warn "drift detected (diff above: '-' is dotfiles, '+' is local)"
+  hint "capture local → dotfiles: dotfiles-amphetamine-sync export"
+  hint "restore dotfiles → local: dotfiles-amphetamine-sync apply"
+  rm -f "$local_tmp"
+  return 1
+}
+
+cmd_status() {
+  if amphetamine_installed; then
+    ok "Amphetamine.app installed"
+  else
+    warn "Amphetamine.app NOT installed"
+  fi
+
+  local local_triggers_on local_trigger_count
+  local_triggers_on=$(defaults read "$DOMAIN" "Enable Triggers" 2>/dev/null || echo "(absent)")
+  # `grep -c` exits 1 when there are zero matches, so the `|| true` keeps
+  # set -e happy. The `|| echo 0` pattern in earlier drafts produced
+  # `0\n0` because grep printed "0" AND the fallback printed "0".
+  local_trigger_count=$(defaults read "$DOMAIN" "Trigger Data" 2>/dev/null | { grep -c '{' || true; })
+  local_trigger_count=${local_trigger_count:-0}
+  printf '\n  %sLocal:%s Enable Triggers=%s, %d trigger(s)\n' "$_DIM" "$_RST" "$local_triggers_on" "$local_trigger_count"
+
+  if [ -f "$PREFS_FILE" ]; then
+    local repo_triggers_on repo_trigger_count
+    repo_triggers_on=$(jq -r '."Enable Triggers" // false' "$PREFS_FILE")
+    repo_trigger_count=$(jq -r '."Trigger Data" // [] | length' "$PREFS_FILE")
+    printf '  %sRepo: %s Enable Triggers=%s, %d trigger(s)\n' "$_DIM" "$_RST" "$repo_triggers_on" "$repo_trigger_count"
+    printf '         path: %s\n' "$PREFS_FILE"
+  else
+    # Single quotes around the example command keep the backticks literal
+    # so the user sees `export`, not the shell trying to execute it.
+    printf "  %sRepo:%s (not yet synced — run 'export')\n" "$_DIM" "$_RST"
+  fi
+}
+
+# ── Dispatch ──────────────────────────────────────────────────────────
+case "${1:-status}" in
+  export)  cmd_export ;;
+  apply)   cmd_apply ;;
+  diff)    cmd_diff ;;
+  status)  cmd_status ;;
+  *) err "unknown subcommand: $1 (try --help)"; exit 1 ;;
+esac

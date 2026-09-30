@@ -1,0 +1,199 @@
+#!/bin/bash
+# Re-run when LaunchAgent plist files change.
+# launchagents hash: {{ range $path := (joinPath .chezmoi.sourceDir "launchagents" "*.plist*" | glob) }}{{ $rel := trimPrefix (print $.chezmoi.sourceDir "/") $path }}{{ $rel }}={{ include $rel | sha256sum }};{{ end }}
+# use_cursor: {{ dig "use_cursor" true . }}
+# duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
+set -euo pipefail
+
+SOURCE_DIR="{{ .chezmoi.sourceDir }}"
+PROFILE="{{ .profile }}"
+AUTO_UPGRADE="{{ dig "auto_upgrade" "false" . }}"
+USE_CURSOR="{{ dig "use_cursor" true . }}"
+
+# Tool-presence / profile check — skip agents that shouldn't load
+# Core profile only gets essential agents: sync, doctor, git-maintain,
+# capslock-control, gui-path, network-resilience. Everything else requires full.
+should_skip_agent() {
+  local short="$1"
+  case "$short" in
+    # CDP debug ports are a localhost attack vector — require full profile
+    agent-browser-chrome|debug-chrome|tooling-chrome|chrome-debug)
+      [ "$PROFILE" != "full" ] && return 0 ;;
+    # Silent system-wide upgrades require explicit opt-in
+    dotfiles-upgrade)
+      [ "$AUTO_UPGRADE" != "true" ] && return 0 ;;
+    # Personal productivity agents — full profile only
+    cursor-at-login)
+      [ "$USE_CURSOR" = "false" ] && return 0
+      [ "$PROFILE" != "full" ] && return 0
+      [ ! -d "/Applications/Cursor.app" ] && return 0 ;;
+    heal-stuck-agents)
+      [ "$USE_CURSOR" = "false" ] && return 0
+      [ "$PROFILE" != "full" ] && return 0
+      [ ! -d "/Applications/Cursor.app" ] && return 0 ;;
+    agent-keepawake)
+      [ "$PROFILE" != "full" ] && return 0
+      [ ! -d "/Applications/Cursor.app" ] \
+        && [ ! -x "$HOME/.local/bin/claude" ] \
+        && ! command -v claude >/dev/null 2>&1 \
+        && return 0 ;;
+    cascade-caffeinate)
+      return 0 ;;
+    cursor-priority)
+      [ "$PROFILE" != "full" ] && return 0
+      ! command -v cursor &>/dev/null \
+        && ! pgrep -x "Windsurf" &>/dev/null \
+        && ! pgrep -x "ghostty" &>/dev/null \
+        && ! pgrep -x "WebStorm" &>/dev/null \
+        && [ ! -d "/Applications/Ghostty.app" ] \
+        && [ ! -d "/Applications/WebStorm.app" ] \
+        && return 0 ;;
+    morning)
+      [ "$PROFILE" != "full" ] && return 0 ;;
+    # Retired: AgentBrew owns com.agentbrew.mcp-memory and maintenance.
+    mcp-memory|mcp-memory-maintain)
+      return 0 ;;
+    sleepwatcher)
+      [ "$PROFILE" != "full" ] && return 0
+      ! command -v sleepwatcher &>/dev/null && return 0 ;;
+    rancher-desktop)
+      ! [ -d "/Applications/Rancher Desktop.app" ] && return 0 ;;
+    atuin-daemon)
+      ! command -v atuin &>/dev/null && return 0 ;;
+  esac
+  return 1
+}
+
+# Unload and delete an installed copy of an agent that should not run here.
+# A skip alone would leave an older install loaded: the upgrade agent kept
+# running after auto_upgrade was turned off. Returns 1 when none is installed.
+remove_skipped_agent() {
+  local short="$1" dst_name="$2"
+  local dst="$HOME/Library/LaunchAgents/$dst_name"
+  [ -f "$dst" ] || return 1
+  launchctl unload "$dst" 2>/dev/null || true
+  rm -f "$dst"
+  echo "⊘ Removed $short (not applicable for current profile/config)"
+}
+
+if ! command -v launchctl &>/dev/null; then
+  echo "⚠ launchctl not found — skipping LaunchAgent load"
+  exit 0
+fi
+
+mkdir -p "$HOME/Library/LaunchAgents"
+mkdir -p "$HOME/.local/share/dotfiles/logs"
+
+# Remove legacy dotfiles-owned memory agents even though their protected source
+# templates remain as compatibility documentation.
+for retired_label in com.dotfiles.mcp-memory com.dotfiles.mcp-memory-maintain; do
+  retired_plist="$HOME/Library/LaunchAgents/$retired_label.plist"
+  launchctl unload "$retired_plist" 2>/dev/null || true
+  rm -f "$retired_plist"
+done
+
+failed=0
+
+# Fast endpoint bootstrap MUST load (and run once) before other RunAtLoad agents
+# so jq/python shims exist before minsky tick-loop / daemon spawn jq.
+_run_endpoint_bootstrap_now() {
+  local script="$SOURCE_DIR/.chezmoiscripts/run_at_login_endpoint-bootstrap.sh"
+  [ -x "$script" ] || return 0
+  echo "→ Running endpoint-bootstrap synchronously (closes post-reboot jq race)..."
+  HOME="$HOME" bash "$script" || true
+}
+
+install_plist() {
+  local src="$1" dst_name="$2" name="$3" short="$4"
+
+  if should_skip_agent "$short"; then
+    remove_skipped_agent "$short" "$dst_name" && return 0
+    echo "⊘ Skipping $short (not applicable for current profile/config)"
+    return 0
+  fi
+
+  local dst="$HOME/Library/LaunchAgents/$dst_name"
+  launchctl unload "$dst" 2>/dev/null || true
+
+  if [[ "$src" == *.tmpl ]]; then
+    if ! chezmoi execute-template < "$src" > "$dst.tmp"; then
+      echo "⚠ Could not render template for: $name"
+      rm -f "$dst.tmp" 2>/dev/null
+      failed=$((failed + 1))
+      return 1
+    fi
+  else
+    cp "$src" "$dst.tmp"
+  fi
+
+  mv "$dst.tmp" "$dst"
+
+  if launchctl load "$dst" 2>/dev/null; then
+    echo "✓ $name"
+  else
+    echo "⚠ Could not load: $name"
+    failed=$((failed + 1))
+  fi
+}
+
+# Phase 0: endpoint bootstrap before other agents
+_endpoint_bootstrap="$SOURCE_DIR/launchagents/com.dotfiles.endpoint-bootstrap.plist.tmpl"
+if [ -f "$_endpoint_bootstrap" ]; then
+  install_plist "$_endpoint_bootstrap" "com.dotfiles.endpoint-bootstrap.plist" \
+    "com.dotfiles.endpoint-bootstrap" "endpoint-bootstrap"
+  _run_endpoint_bootstrap_now
+fi
+
+# Process .plist.tmpl files (chezmoi-templated)
+for plist in "$SOURCE_DIR"/launchagents/*.plist.tmpl; do
+  [ ! -f "$plist" ] && continue
+  name="$(basename "$plist" .plist.tmpl)"
+  [ "$name" = "com.dotfiles.endpoint-bootstrap" ] && continue
+  short="${name#com.dotfiles.}"
+  install_plist "$plist" "$name.plist" "$name" "$short"
+done
+
+# Process plain .plist files (no templating needed)
+for plist in "$SOURCE_DIR"/launchagents/*.plist; do
+  [ ! -f "$plist" ] && continue
+  name="$(basename "$plist" .plist)"
+  short="${name#com.dotfiles.}"
+  install_plist "$plist" "$(basename "$plist")" "$name" "$short"
+done
+
+# ── Orphan unload — remove launchagents whose source is gone ────────
+# Without this, deleting a launchagents/com.dotfiles.X.plist.tmpl from
+# the source leaves the live ~/Library/LaunchAgents/com.dotfiles.X.plist
+# loaded forever. Scan every active com.dotfiles.* plist and unload +
+# delete any that no longer have a matching source file.
+#
+# Source-of-truth glob: launchagents/com.dotfiles.<short>.{plist,plist.tmpl}.
+# An active plist with NO match is an orphan from a deleted PR (e.g. PR
+# #128 removing com.dotfiles.cleanup).
+for active in "$HOME"/Library/LaunchAgents/com.dotfiles.*.plist; do
+  [ ! -f "$active" ] && continue
+  name="$(basename "$active" .plist)"
+  if [ -f "$SOURCE_DIR/launchagents/$name.plist.tmpl" ] \
+      || [ -f "$SOURCE_DIR/launchagents/$name.plist" ]; then
+    continue  # source still present, keep loaded
+  fi
+  echo "⊘ Unloading orphan: $name (source removed)"
+  launchctl unload "$active" 2>/dev/null || true
+  rm -f "$active"
+done
+
+# ── Duplicate unload — one LaunchAgent per job ──────────────────────
+# An older install under another label prefix, or a hand-installed copy,
+# runs a managed job twice. lib/launchagent-duplicates.sh defines which
+# agents count; it never touches an agent that only shares a name.
+# shellcheck source=/dev/null
+source "$SOURCE_DIR/lib/launchagent-duplicates.sh"
+launchagent_remove_duplicates "$HOME/Library/LaunchAgents" "$SOURCE_DIR"
+launchagent_remove_renamed_debug_chrome "$HOME/Library/LaunchAgents"
+
+if [ "$failed" -eq 0 ]; then
+  echo "✓ All LaunchAgents active"
+else
+  echo "⚠ $failed LaunchAgent(s) need manual follow-up"
+  exit 1
+fi

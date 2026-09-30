@@ -1,0 +1,87 @@
+#!/bin/bash
+# Keep macOS awake only while Cursor or Claude Code is running.
+#
+# The manager creates one caffeinate -ims child per tracked process. It also
+# owns a short-lived Amphetamine session for reliable lid-closed work. Both are
+# released when no tracked process remains or battery falls below the policy
+# threshold. Display sleep, screen lock, and explicit shutdown/restart remain
+# available.
+#
+# Usage:
+#   dotfiles-agent-keepawake              # reconcile manager state (LaunchAgent mode)
+#   dotfiles-agent-keepawake --dry-run    # print the decision without changes
+#
+# macOS cannot run local processes while the system is truly asleep.
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/agent-keepawake.sh
+source "$DOTFILES_DIR/lib/agent-keepawake.sh"
+
+DRY_RUN=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --help|-h) exit 0 ;;
+    *)
+      printf 'dotfiles-agent-keepawake: unknown argument: %s\n' "$arg" >&2
+      exit 64
+      ;;
+  esac
+done
+
+tracked_pids=()
+tracked_processes=()
+while IFS=$'\t' read -r tracked_pid tracked_path; do
+  [ -n "$tracked_pid" ] || continue
+  tracked_pids+=("$tracked_pid")
+  tracked_processes+=("$tracked_pid ($tracked_path)")
+done < <(dotfiles_agent_list_tracked_processes)
+
+if [ "$DRY_RUN" = true ]; then
+  if [ "${#tracked_pids[@]}" -eq 0 ]; then
+    echo "dry-run: no tracked Cursor or Claude Code process — would release manager-owned sleep protection"
+    exit 0
+  fi
+
+  if dotfiles_agent_power_qualifies; then
+    printf 'dry-run: would protect %d tracked process(es) on %s\n' \
+      "${#tracked_pids[@]}" "$REPLY_POWER_DESCRIPTION"
+    printf 'dry-run: would run manager-owned caffeinate -ims -w for: %s\n' \
+      "$(IFS=', '; printf '%s' "${tracked_processes[*]}")"
+    if dotfiles_agent_amphetamine_available; then
+      echo "dry-run: would maintain an owned Amphetamine lid-closed session unless a user session exists"
+    else
+      echo "dry-run: Amphetamine is unavailable; lid-closed protection would need setup or Automation approval"
+    fi
+  else
+    echo "dry-run: $REPLY_POWER_DESCRIPTION — would release manager-owned sleep protection"
+  fi
+  exit 0
+fi
+
+# Launchd normally serializes this job. The lock also keeps manual runs from
+# racing its state files or ending the same owned Amphetamine session twice.
+dotfiles_agent_acquire_manager_lock || exit 0
+trap dotfiles_agent_release_manager_lock EXIT
+
+manager_failed=0
+if [ "${#tracked_pids[@]}" -eq 0 ]; then
+  dotfiles_agent_reconcile_caffeinate || manager_failed=1
+  # An Amphetamine Automation denial is recorded and reported by doctor. Do
+  # not turn it into a LaunchAgent failure: normal caffeinate protection must
+  # continue and the next five-second pass should be able to retry cleanup.
+  dotfiles_agent_reconcile_amphetamine 0 || true
+  exit "$manager_failed"
+fi
+
+if dotfiles_agent_power_qualifies; then
+  dotfiles_agent_reconcile_caffeinate "${tracked_pids[@]}" || manager_failed=1
+  dotfiles_agent_reconcile_amphetamine 1 || true
+else
+  dotfiles_agent_reconcile_caffeinate || manager_failed=1
+  dotfiles_agent_reconcile_amphetamine 0 || true
+fi
+
+exit "$manager_failed"

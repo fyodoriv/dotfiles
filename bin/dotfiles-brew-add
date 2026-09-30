@@ -1,0 +1,68 @@
+#!/bin/bash
+# Add a Homebrew package to the brew file.
+# Usage: dotfiles brew-add <package> [--cask] [--full-only] [--enterprise]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+cask_mode=false
+full_only=false
+enterprise=false
+pkg=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --cask) cask_mode=true; shift ;;
+    --full-only) full_only=true; shift ;;
+    --enterprise) enterprise=true; shift ;;
+    *) pkg="$1"; shift ;;
+  esac
+done
+if [ -z "$pkg" ]; then
+  echo "Usage: dotfiles brew-add <package> [--cask] [--full-only] [--enterprise]" >&2; exit 1
+fi
+# Validate package name: only alphanumeric, @, _, ., -, /
+if [[ ! "$pkg" =~ ^[a-zA-Z0-9@_./-]+$ ]]; then
+  echo "Error: invalid package name '$pkg' — only alphanumeric, @, _, ., -, / allowed" >&2; exit 1
+fi
+brew_file="$DOTFILES_DIR/.chezmoiscripts/run_onchange_brew.sh.tmpl"
+if $cask_mode; then
+  brew_line="cask \"$pkg\""
+else
+  brew_line="brew \"$pkg\""
+fi
+if grep -qF "\"$pkg\"" "$brew_file"; then
+  echo "Error: '$pkg' already exists in brew file" >&2; exit 1
+fi
+if $enterprise; then
+  marker='{{ if .is_enterprise'
+  grep -q "^$marker" "$brew_file" || { echo "Error: enterprise section not found in brew file" >&2; exit 1; }
+  sed -i '' "/^{{ if .is_enterprise/,/^{{ end/{ /^{{ end/i\\
+$brew_line
+  }" "$brew_file"
+  section="enterprise"
+elif $full_only; then
+  marker='{{ if eq .profile "full"'
+  grep -q "^$marker" "$brew_file" || { echo "Error: full-only section not found in brew file" >&2; exit 1; }
+  sed -i '' "/^{{ if eq .profile \"full\"/,/^{{ end/{ /^{{ end/i\\
+$brew_line
+  }" "$brew_file"
+  section="full-only"
+else
+  if $cask_mode; then
+    marker="# ── Full: Terminal"
+  else
+    marker="# ── Core: Prompt"
+  fi
+  grep -qF "$marker" "$brew_file" || { echo "Error: marker '$marker' not found in brew file" >&2; exit 1; }
+  sed -i '' "/$marker/i\\
+$brew_line" "$brew_file"
+  section="core"
+fi
+# Verify the insertion actually landed
+grep -qF "\"$pkg\"" "$brew_file" || { echo "Error: insertion failed — '$pkg' not found after sed" >&2; exit 1; }
+echo "✓ Added $brew_line to $section section"
+echo "  File: .chezmoiscripts/run_onchange_brew.sh.tmpl"
+echo ""
+echo "Next: dotfiles apply"

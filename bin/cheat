@@ -1,0 +1,194 @@
+#!/bin/bash
+# Quick cheatsheet for all custom commands and shortcuts.
+# Usage: cheat           → show all
+#        cheat git       → show git section
+#        cheat vim       → show vim/ideavim section
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+
+cmd() { printf "  ${GREEN}%-28s${NC} %s\n" "$1" "$2"; }
+
+show_shell() {
+  section "Shell Commands"
+  cmd "p <project>"          "cd ~/apps/<project> + list"
+  cmd "killport <port>"      "Kill process on port"
+  cmd "serve [port]"         "Quick HTTP server (default :3000)"
+  cmd "mkcd <dir>"           "mkdir + cd"
+  cmd "search <pattern>"     "rg → fzf → bat preview"
+  cmd "reload"               "Re-source .zshrc"
+  cmd "path"                 "Show PATH entries numbered"
+  cmd "cleanup [--dry-run]"  "Clean npm/brew/gradle/Docker caches"
+  cmd "note \"text\""        "Quick note (daily markdown file)"
+  cmd "note --search \"x\""  "Full-text search across all notes"
+  cmd "note --week/--month"  "View recent notes"
+  cmd "timer [min] [label]"  "Countdown timer (Ctrl+C safe)"
+  cmd "cheat [topic]"        "This cheatsheet"
+  cmd "morning"              "Daily startup: pull repos, health check, notes, disk"
+  cmd "status"               "System dashboard + dotfiles version + last sync"
+  cmd "git-maintain"         "git maintenance across all repos"
+  cmd "new-project <t> <n>"  "Scaffold react/node/lib/python project"
+  cmd "cached-run <cmd>"     "Skip command if git tree unchanged (cached)"
+  cmd "check-all [--fix]"    "Run doctor across all ~/apps repos"
+  cmd "minsky run [--budget=N]" "Multi-session autonomous task loop"
+  cmd "graceful-restart"       "Wait for processes to finish, then restart"
+  cmd "network-watchdog"       "Verify + restore network after sleep/wake"
+  section "Dotfiles Management (chezmoi)"
+  cmd "chezmoi apply"          "Apply all dotfiles from source"
+  cmd "chezmoi diff"           "Preview what would change"
+  cmd "chezmoi update"         "Pull latest + re-apply"
+  cmd "chezmoi add <file>"     "Track a new file"
+  cmd "chezmoi add --encrypt"  "Track + encrypt with age"
+  cmd "chezmoi edit <file>"    "Edit source of a managed file"
+  cmd "chezmoi managed"        "List all managed files"
+  cmd "chezmoi verify"         "Check all files match source"
+  cmd "dotfiles doctor"        "Auto-discovered health audit"
+  cmd "dotfiles doctor --fix"  "Auto-repair config drift"
+  cmd "dotfiles audit"         "Security audit (SSH, secrets, git creds)"
+  cmd "dotfiles add <file>"    "Track a new config file"
+  cmd "dotfiles unmanage <f>"  "Stop tracking a managed file"
+  cmd "dotfiles new-module <n>" "Create a new doctor module"
+  cmd "dotfiles brew-add <pkg>" "Add a Homebrew package to Brewfile"
+  cmd "dotfiles profile [c|f]" "Show or switch profile (core/full)"
+  cmd "dotfiles enterprise"    "Toggle enterprise mode (on/off)"
+  cmd "dotfiles uninstall"     "Remove dotfiles from this machine"
+  cmd "dotfiles-stats"         "Time saved: runs, streak, per-task breakdown"
+  cmd "dotfiles-sync"          "Auto commit + push dotfiles changes"
+}
+
+show_git() {
+  section "Git Commands"
+  cmd "pr \"message\""       "Commit + push + create draft PR"
+  cmd "hotfix \"message\""   "Branch from main for quick fix"
+  cmd "review [PR#]"         "Checkout + diff + test a PR"
+  cmd "git-safe <cmd>"        "Guard against destructive git commands"
+  cmd "gclean"               "Delete merged local branches"
+  cmd "gclone <url>"         "Clone + cd into repo"
+  section "Git Aliases (shell)"
+  cmd "gs / gd / gds"        "status / diff / diff --staged"
+  cmd "gl / gp / gpf"        "log / push / push --force-with-lease"
+  cmd "gc / gca"             "commit / commit --amend --no-edit"
+  cmd "gpl / gst / gstp"     "pull --rebase / stash / stash pop"
+  cmd "gsw / gsc"            "switch / switch --create"
+  section "Git Aliases (git)"
+  cmd "git s / git d / git l"  "status / diff / log graph"
+  cmd "git undo"             "Soft reset last commit"
+  cmd "git wip"              "Commit staged changes as wip"
+  cmd "git recent"           "Branches sorted by recency"
+  cmd "git prune-merged"     "Delete local branches gone from remote"
+}
+
+show_vim() {
+  section "IdeaVim — Leader is Space"
+  cmd "Space ff / fg / fr"   "Go to file / grep / recent files"
+  cmd "Space fa / fs / fu"   "Go to action / symbol / find usages"
+  cmd "gd / gi / gt / gr"    "Declaration / impl / test / usages"
+  cmd "g[ / g]"              "Prev / next error"
+  cmd "Space ca / cr / cf"   "Quick fix / rename / reformat"
+  cmd "Space ci / ce"        "Optimize imports / ESLint fix"
+  cmd "Space cm / cv / cc"   "Extract method / variable / class"
+  cmd "Space R"              "Full refactoring menu"
+  cmd "Space rr / rd / rt"   "Run / debug / run file"
+  cmd "Space db / dB / da"   "Toggle / disable breakpoint / view all"
+  cmd "Space de / dn / di"   "Evaluate expr / step over / step into"
+  cmd "Space do / dc / dm"   "Step out / resume / mute breakpoints"
+  cmd "Space dw"              "Add to watch"
+  cmd "Space gg / gb / gc"   "Git popup / branches / commit"
+  cmd "Space gr"              "Rollback change at cursor"
+  cmd "Space wv / ws / wu"   "Split vert / horiz / unsplit"
+  cmd "Ctrl+h/j/k/l"        "Navigate splits"
+  cmd "Shift+H / Shift+L"   "Prev / next tab"
+  cmd "Space q / Space Q"    "Close tab / close all"
+  cmd "Space 1-5 / Space 0"  "Project/Structure/Term/VCS/Problems / hide all"
+  cmd "Space e / Space E"    "NERDTree toggle / find file"
+  cmd "s / S"                "EasyMotion 2-char / n-char search"
+  cmd "Ctrl+n"               "Multi-cursor next occurrence"
+  cmd "gcc"                  "Toggle comment line"
+  cmd "cs\"'"                "Change surrounding quotes"
+  cmd "jk / kj"              "Escape from insert mode"
+  cmd "Alt+j / Alt+k"        "Move line up/down"
+  cmd "K"                    "Quick documentation"
+  cmd "Space ns"              "New scratch file"
+  cmd "Space hr"              "Run HTTP request (.http file)"
+  cmd "Space ob"              "Open in browser (Chrome)"
+  cmd "Space z"               "Zen mode (distraction-free)"
+  cmd "Space 6/7/8"           "Services / Endpoints / Debug window"
+  cmd "[c / ]c"               "Prev / next VCS change"
+  cmd "[m / ]m"               "Prev / next method"
+  cmd "za / zR / zM"          "Toggle / expand all / collapse all"
+}
+
+show_fzf() {
+  section "fzf Shortcuts"
+  cmd "Ctrl+R"               "Fuzzy search command history"
+  cmd "Ctrl+T"               "Fuzzy find files (with bat preview)"
+  cmd "Alt+C"                "Fuzzy cd into directory"
+}
+
+show_keys() {
+  section "Line Editing (zle/emacs mode)"
+  cmd "Ctrl+A / Ctrl+E"      "Jump to start / end of line"
+  cmd "Ctrl+W"               "Delete word backward"
+  cmd "Ctrl+U"               "Cut from cursor to start of line"
+  cmd "Ctrl+K"               "Cut from cursor to end of line"
+  cmd "Ctrl+Y"               "Yank (paste) last cut text"
+  cmd "Alt+B / Alt+F"        "Move back / forward one word"
+  cmd "Alt+D"                "Delete word forward"
+  cmd "Alt+Backspace"        "Delete word backward (Alt+BS)"
+  cmd "Ctrl+X Ctrl+E"        "Open current command in \$EDITOR"
+  cmd "fc"                   "Edit + re-run last command in \$EDITOR"
+  cmd "Ctrl+R"               "Reverse history search (fzf)"
+  cmd "Ctrl+G"               "Send line to Devin"
+}
+
+show_tools() {
+  section "Modern CLI Tools"
+  cmd "ll / lt"              "eza list / tree view with git + icons"
+  cmd "cat / catp"           "bat plain / bat with paging"
+  cmd "find <pattern>"       "fd (fast find)"
+  cmd "rg <pattern>"         "ripgrep (fast grep)"
+  cmd "lg"                   "lazygit — full TUI for git (Dracula + delta)"
+  cmd "tig"                  "Terminal git log/diff/blame UI"
+  cmd "difft <a> <b>"        "difftastic — structural syntax-aware diff"
+  cmd "tldr <cmd>"           "Simplified man pages with examples"
+  cmd "btop"                 "System monitor with GPU (M3 Max)"
+  cmd "htop"                 "Interactive process viewer"
+  cmd "n"                    "nnn file manager (cd on quit)"
+  cmd "http / https"          "HTTPie — human-readable HTTP client"
+  cmd "hyperfine 'a' 'b'"    "Benchmark and compare commands"
+  cmd "dsize / dust"         "Directory size (dust)"
+  cmd "psjson / procs"       "Process list sorted by CPU (procs)"
+  cmd "duf"                  "Modern df replacement"
+  cmd "watchexec -e ts cmd"  "Run command on file changes"
+  cmd "jq / yq"              "JSON / YAML processor"
+  section "Chrome & Dev"
+  cmd "chrome-debug"         "Start debug Chrome (CDP on port 9222)"
+  cmd "chrome-debug --stop"  "Stop debug Chrome instance"
+  cmd "chrome-debug --status" "Show whether debug Chrome is running"
+  cmd "setup-chrome"         "Full Chrome dev setup (flags, search engines, extensions)"
+  cmd "setup-chrome --ext"   "Show recommended extensions"
+  cmd "setup-dock"           "Reset Dock to dev-essential layout"
+  cmd "rancher-desktop"      "Start Rancher Desktop + wait for Docker socket"
+}
+
+case "${1:-}" in
+  git)   show_git ;;
+  vim)   show_vim ;;
+  fzf)   show_fzf ;;
+  key*)  show_keys ;;
+  shell) show_shell ;;
+  tool*) show_tools ;;
+  *)
+    show_shell
+    show_git
+    show_vim
+    show_fzf
+    show_keys
+    show_tools
+    echo ""
+    echo -e "${DIM}Filter: cheat [shell|git|vim|fzf|keys|tools]${NC}"
+    ;;
+esac

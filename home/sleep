@@ -1,0 +1,11 @@
+#!/bin/bash
+# Runs on macOS sleep (via sleepwatcher).
+# Logs the sleep event for debugging network issues.
+# Keep this minimal — the system is about to sleep.
+
+LOG="$HOME/.local/share/dotfiles/logs/sleepwatcher.log"
+mkdir -p "$(dirname "$LOG")"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] SLEEP detected" >> "$LOG"
+
+exit 0

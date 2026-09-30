@@ -1,0 +1,3 @@
+#!/bin/bash
+# Repair http(s) link routing to Work Chrome — rebuild router + reassert default.
+exec "$(cd "$(dirname "$0")" && pwd)/chromework-install" "$@"

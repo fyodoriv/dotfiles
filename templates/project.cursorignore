@@ -1,0 +1,51 @@
+# Cursor agent context exclusions — copy to repo root as .cursorignore
+# Template: dotfiles/templates/project.cursorignore (see docs/cursor-token-playbook.md)
+
+# Dependencies and build output
+node_modules/
+**/node_modules/**
+dist/
+**/dist/**
+build/
+out/
+.next/
+.nuxt/
+.turbo/
+target/
+vendor/
+**/vendor/**
+
+# VCS (history not useful in agent context)
+.git/
+
+# Large fixtures and snapshots (add project-specific paths below)
+**/__fixtures__/**
+**/fixtures/**
+**/*.snap
+**/__snapshots__/**
+
+# Caches and virtualenvs
+.cache/
+**/.cache/**
+.venv/
+**/venv/**
+__pycache__/
+**/__pycache__/**
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Logs and lockfiles (also in Cursor global ignore via dotfiles settings)
+**/*.log
+**/logs/**
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Orchestrator / worktree isolation
+.worktrees/
+.orchestrator/
+
+# --- Project-specific (uncomment or add) ---
+# **/testdata/**
+# **/coverage/**

@@ -1,0 +1,300 @@
+#!/bin/bash
+# git wrapper — keeps agent-shaped publication inside approved destinations.
+#
+# Public GitHub pushes are limited to exact user-owned tooling repos from
+# config/public-mirror-remotes.txt. Enterprise GitHub pushes pass through.
+# `git push --no-verify` still requires a separate current-session approval.
+# Human and read-only invocations pass through unchanged.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+PUBLIC_MIRROR_ALLOWLIST="${DOTFILES_PUBLIC_MIRROR_ALLOWLIST:-$SCRIPT_DIR/../config/public-mirror-remotes.txt}"
+
+if [ -n "${DOTFILES_REAL_GIT:-}" ] && [ -x "$DOTFILES_REAL_GIT" ]; then
+  REAL_GIT="$DOTFILES_REAL_GIT"
+elif [ -x /usr/bin/git ]; then
+  REAL_GIT="/usr/bin/git"
+else
+  self_realpath=$(readlink -f "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0" 2>/dev/null || printf '%s' "$0")
+  REAL_GIT=""
+  IFS=':' read -r -a path_parts <<< "$PATH"
+  for p in "${path_parts[@]}"; do
+    cand="$p/git"
+    if [ -x "$cand" ]; then
+      cand_realpath=$(readlink -f "$cand" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$cand" 2>/dev/null || printf '%s' "$cand")
+      if [ "$cand_realpath" != "$self_realpath" ]; then
+        REAL_GIT="$cand"
+        break
+      fi
+    fi
+  done
+  if [ -z "$REAL_GIT" ]; then
+    echo "git wrapper: could not locate the real git binary" >&2
+    exit 127
+  fi
+fi
+
+_git_wrapper_is_agent_context() {
+  [ -n "${AGENT_PUBLIC_WRITE_GUARD:-}" ] ||
+    [ -n "${DEVIN_MODEL:-}" ] ||
+    [ -n "${DEVIN_SESSION_ID:-}" ] ||
+    [ -n "${CLAUDE_CODE_SSE_PORT:-}" ] ||
+    [ -n "${CURSOR_AGENT:-}" ] ||
+    [ -n "${WINDSURF_AGENT:-}" ] ||
+    [ -n "${CODEX_AGENT:-}" ]
+}
+
+_git_remote_host() {
+  local url="$1" rest host
+  url="$(printf '%s' "$url" | tr '[:upper:]' '[:lower:]')"
+  case "$url" in
+    *://*)
+      rest="${url#*://}"
+      rest="${rest#*@}"
+      case "$rest" in
+        */*) host="${rest%%/*}" ;;
+        *) host="$rest" ;;
+      esac
+      ;;
+    *@*:*)
+      rest="${url#*@}"
+      host="${rest%%:*}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  host="${host%%:*}"
+  printf '%s\n' "$host"
+}
+
+_git_public_repository_key() {
+  local url="$1" rest host remote_path owner name
+  url="$(printf '%s' "$url" | tr '[:upper:]' '[:lower:]')"
+  case "$url" in
+    *://*)
+      rest="${url#*://}"
+      rest="${rest#*@}"
+      case "$rest" in
+        */*) host="${rest%%/*}"; remote_path="${rest#*/}" ;;
+        *) return 1 ;;
+      esac
+      ;;
+    *@*:*)
+      rest="${url#*@}"
+      host="${rest%%:*}"
+      remote_path="${rest#*:}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  host="${host%%:*}"
+  remote_path="${remote_path%%\?*}"
+  remote_path="${remote_path%%#*}"
+  remote_path="${remote_path#/}"
+  remote_path="${remote_path%/}"
+  remote_path="${remote_path%.git}"
+
+  case "$remote_path" in
+    */*) owner="${remote_path%%/*}"; name="${remote_path#*/}" ;;
+    *) return 1 ;;
+  esac
+  case "$name" in
+    ''|*/*) return 1 ;;
+  esac
+  [ -n "$owner" ] || return 1
+  printf '%s/%s/%s\n' "$host" "$owner" "$name"
+}
+
+_git_public_repository_allowed() {
+  local url="$1" key line
+  key="$(_git_public_repository_key "$url" 2>/dev/null || true)"
+  [ -n "$key" ] || return 1
+  [ -r "$PUBLIC_MIRROR_ALLOWLIST" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line//[[:space:]]/}"
+    [ -n "$line" ] || continue
+    [ "$line" = "$key" ] && return 0
+  done < "$PUBLIC_MIRROR_ALLOWLIST"
+  return 1
+}
+
+_git_push_target() {
+  local idx="$((git_command_index + 1))" arg
+  while [ "$idx" -lt "${#args[@]}" ]; do
+    arg="${args[$idx]}"
+    case "$arg" in
+      --receive-pack|--repo|--signed|--push-option|--recurse-submodules|-o|--exec)
+        idx=$((idx + 2))
+        continue
+        ;;
+      -*)
+        idx=$((idx + 1))
+        continue
+        ;;
+      *)
+        printf '%s\n' "$arg"
+        return 0
+        ;;
+    esac
+  done
+  return 0
+}
+
+_git_run_git() {
+  if [ "${#git_prefix[@]}" -eq 0 ]; then
+    "$REAL_GIT" "$@"
+  else
+    "$REAL_GIT" "${git_prefix[@]}" "$@"
+  fi
+}
+
+_git_push_urls() {
+  local target="$1" branch remote_name
+  if [ -z "$target" ]; then
+    branch="$(_git_run_git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    [ -n "$branch" ] || return 1
+    remote_name="$(_git_run_git config --get "branch.${branch}.remote" 2>/dev/null || true)"
+    [ -n "$remote_name" ] || return 1
+    target="$remote_name"
+  fi
+
+  case "$target" in
+    *://*|*@*:*)
+      printf '%s\n' "$target"
+      ;;
+    *)
+      _git_run_git remote get-url --push --all "$target" 2>/dev/null
+      ;;
+  esac
+}
+
+_check_agent_public_push_target() {
+  local target url host saw_url=0
+  target="$(_git_push_target)"
+  while IFS= read -r url; do
+    [ -n "$url" ] || continue
+    saw_url=1
+    host="$(_git_remote_host "$url" 2>/dev/null || true)"
+    if [ "$host" = "github.com" ] &&
+      ! _git_public_repository_allowed "$url"; then
+      echo "git wrapper: blocked agent-authored push to unapproved public repository." >&2
+      echo "git wrapper: target a listed tooling repo or an approved enterprise remote." >&2
+      exit 1
+    fi
+  done <<EOF
+$(_git_push_urls "$target" || true)
+EOF
+
+  if [ "$saw_url" -eq 0 ]; then
+    echo "git wrapper: blocked agent-authored push because its destination could not be resolved." >&2
+    exit 1
+  fi
+}
+
+args=("$@")
+git_command=""
+git_command_index=-1
+git_cwd=""
+git_dir=""
+git_work_tree=""
+idx=0
+while [ "$idx" -lt "${#args[@]}" ]; do
+  arg="${args[$idx]}"
+  case "$arg" in
+    -C)
+      git_cwd="${args[$((idx + 1))]:-}"
+      idx=$((idx+2))
+      continue
+      ;;
+    --git-dir)
+      git_dir="${args[$((idx + 1))]:-}"
+      idx=$((idx+2))
+      continue
+      ;;
+    --work-tree)
+      git_work_tree="${args[$((idx + 1))]:-}"
+      idx=$((idx+2))
+      continue
+      ;;
+    -c|--namespace)
+      idx=$((idx+2))
+      continue
+      ;;
+    --git-dir=*)
+      git_dir="${arg#*=}"
+      idx=$((idx+1))
+      continue
+      ;;
+    --work-tree=*)
+      git_work_tree="${arg#*=}"
+      idx=$((idx+1))
+      continue
+      ;;
+    --namespace=*)
+      idx=$((idx+1))
+      continue
+      ;;
+    -*)
+      idx=$((idx+1))
+      continue
+      ;;
+    *)
+      git_command="$arg"
+      git_command_index="$idx"
+      break
+      ;;
+  esac
+done
+
+git_prefix=()
+[ -n "$git_dir" ] && git_prefix+=(--git-dir="$git_dir")
+[ -n "$git_work_tree" ] && git_prefix+=(--work-tree="$git_work_tree")
+[ -n "$git_cwd" ] && git_prefix+=(-C "$git_cwd")
+
+if _git_wrapper_is_agent_context && [ "$git_command" = "push" ]; then
+  _check_agent_public_push_target
+
+  has_no_verify=0
+  for arg in "${args[@]:$git_command_index}"; do
+    if [ "$arg" = "--no-verify" ]; then
+      has_no_verify=1
+      break
+    fi
+  done
+
+  if [ "$has_no_verify" = "1" ]; then
+    remote=""
+    ref=""
+    ref_start=$((git_command_index+1))
+    for arg in "${args[@]:$ref_start}"; do
+      case "$arg" in
+        -*)
+          continue
+          ;;
+      esac
+      if [ -z "$remote" ]; then
+        remote="$arg"
+      elif [ -z "$ref" ]; then
+        ref="$arg"
+        break
+      fi
+    done
+    remote="${remote:-origin}"
+    approval="${AGENT_PUBLIC_WRITE_APPROVAL:-}"
+    if ! printf '%s' "$approval" | grep -Fq "command=git push --no-verify" ||
+       ! printf '%s' "$approval" | grep -Fq "remote=$remote" ||
+       { [ -n "$ref" ] && ! printf '%s' "$approval" | grep -Fq "ref=$ref"; }; then
+      echo "git wrapper: blocked agent-authored 'git push --no-verify' without current-session approval." >&2
+      echo "git wrapper: set AGENT_PUBLIC_WRITE_APPROVAL to include:" >&2
+      echo "  command=git push --no-verify remote=$remote ref=$ref" >&2
+      exit 1
+    fi
+  fi
+fi
+
+exec "$REAL_GIT" "$@"

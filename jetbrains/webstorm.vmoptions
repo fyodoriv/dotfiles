@@ -1,0 +1,10 @@
+-Xms512m
+-Xmx8192m
+-XX:ReservedCodeCacheSize=1024m
+-XX:CICompilerCount=4
+# Use ZGC — low-pause GC, eliminates stop-the-world freezes during indexing on large heaps
+-XX:+UseZGC
+-XX:+ZGenerational
+-XX:+UseStringDeduplication
+# Pre-allocate heap pages at startup to avoid CPU spikes mid-session
+-XX:+AlwaysPreTouch

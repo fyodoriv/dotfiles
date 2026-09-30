@@ -1,0 +1,58 @@
+#!/bin/bash
+# Remove a managed file from the dotfiles repo.
+# Usage: dotfiles unmanage <file>
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+target_file="${1:-}"
+if [ -z "$target_file" ]; then
+  echo "Usage: dotfiles unmanage <file>" >&2
+  echo "" >&2
+  echo "Removes a managed file from the dotfiles repo:" >&2
+  echo "  - Removes the chezmoi source entry" >&2
+  echo "  - Removes associated doctor check (if found)" >&2
+  echo "  - Leaves the target file in place" >&2
+  exit 1
+fi
+target_file="${target_file/#\~/$HOME}"
+target_file="$(cd "$(dirname "$target_file")" && pwd)/$(basename "$target_file")"
+base="$(basename "$target_file")"
+check_id_base="${base//[^a-zA-Z0-9_]/_}"
+
+# Try chezmoi forget first (handles copy-mode files)
+src_path=$(chezmoi source-path "$target_file" --source "$DOTFILES_DIR" 2>/dev/null || true)
+if [ -n "$src_path" ] && [ -f "$src_path" ]; then
+  chezmoi forget "$target_file" --source "$DOTFILES_DIR" 2>/dev/null || true
+  echo "✓ Removed chezmoi source: $src_path"
+fi
+
+# Also remove symlink-mode source in home/
+stripped="${base#.}"
+home_src="$DOTFILES_DIR/home/$stripped"
+if [ -f "$home_src" ]; then
+  rm "$home_src"
+  echo "✓ Removed symlink source: home/$stripped"
+fi
+
+# Remove doctor check lines referencing this file
+removed_checks=0
+for doctor_file in "$DOTFILES_DIR"/modules/*/doctor.sh; do
+  [ ! -f "$doctor_file" ] && continue
+  if grep -q "$check_id_base" "$doctor_file" 2>/dev/null; then
+    sed -i '' "/$check_id_base/d" "$doctor_file"
+    echo "✓ Removed doctor check from $(basename "$(dirname "$doctor_file")")/doctor.sh"
+    removed_checks=$((removed_checks + 1))
+  fi
+done
+
+if [ "$removed_checks" -eq 0 ] && [ -z "$src_path" ]; then
+  echo "⚠ File '$target_file' does not appear to be managed" >&2
+  exit 1
+fi
+
+echo ""
+echo "File left in place at $target_file"
+echo "Next: dotfiles apply"

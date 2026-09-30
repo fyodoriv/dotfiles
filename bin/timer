@@ -1,0 +1,50 @@
+#!/bin/bash
+# Pomodoro-style focus timer with macOS notification.
+# Usage: timer 25 "deep work"     → 25 min timer
+#        timer 5                   → 5 min break
+#        timer                     → default 25 min
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+minutes="${1:-25}"
+label="${2:-Focus}"
+
+if ! [[ "$minutes" =~ ^[0-9]+$ ]]; then
+  echo "Usage: timer [minutes] [label]"
+  echo "  minutes must be a positive integer (default: 25)"
+  exit 1
+fi
+
+# Sanitize label for safe osascript interpolation
+label="${label//\\/}"
+label="${label//\"/}"
+
+total_seconds=$((minutes * 60))
+
+# Clean Ctrl+C handling
+trap 'echo ""; echo "⏹  $label — cancelled after $((elapsed / 60))m $((elapsed % 60))s"; exit 0' INT
+
+echo "⏱  $label — $minutes min ($(date +%H:%M) → $(date -v+"${minutes}"M +%H:%M))"
+
+elapsed=0
+while [ $elapsed -lt $total_seconds ]; do
+  sleep 1
+  elapsed=$((elapsed + 1))
+  remaining=$((total_seconds - elapsed))
+  # Show progress every 60 seconds
+  if [ $((elapsed % 60)) -eq 0 ] && [ $remaining -gt 0 ]; then
+    printf "\r  %dm remaining...  " $((remaining / 60))
+  fi
+done
+
+printf "\r                        \r"
+# Use terminal-notifier when available — it has proper notification authorization
+# on macOS 14+ (osascript/Script Editor may show empty banners without auth)
+if command -v terminal-notifier &>/dev/null; then
+  terminal-notifier -title "⏱ $label" -message "$minutes min timer done" -sound default 2>/dev/null || true
+else
+  osascript -e "display notification \"$minutes min timer done\" with title \"⏱ $label\" sound name \"Hero\"" 2>/dev/null
+fi
+say "$label timer complete" 2>/dev/null &
+echo "✅ $label — done!"

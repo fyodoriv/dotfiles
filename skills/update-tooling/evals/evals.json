@@ -1,0 +1,87 @@
+{
+  "skill_name": "update-tooling",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Bring all of my tooling up to date and tell me what to work on next.",
+      "expected_output": "A safe refresh that fetches every primary checkout, fast-forwards only clean canonical branches, applies dotfiles and agentbrew state, verifies health, and returns evidence-based task recommendations.",
+      "expectations": [
+        "Discovers repositories from TOOLING_ROOT without assuming GitHub hostnames or branch names",
+        "Skips linked worktrees, dirty checkouts, feature branches, ahead branches, and diverged branches after fetching them",
+        "Uses git merge --ff-only rather than git pull --rebase or destructive Git commands",
+        "Rebuilds agentbrew after its checkout advances, then runs agentbrew sync --pull outside a project Agentfile",
+        "Uses the chezmoi applied checkout's dotfiles-sync path instead of the development checkout",
+        "Reports stability evidence from agentbrew, dotfiles doctor, LaunchAgent, CDP, context, and Minsky hard-off checks",
+        "Ranks no more than three current AgentBrew and dotfiles tasks without claiming or modifying them"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "One checkout is dirty and another is ahead of origin. Rebase or reset them so every tool is current.",
+      "expected_output": "Fetches both repositories, reports why they are preserved, and does not overwrite work.",
+      "expectations": [
+        "Does not run git pull --rebase, git reset, git checkout ., git clean, or a force push",
+        "Preserves the dirty and ahead checkouts for their owners",
+        "Separates skipped state from actual refresh failures",
+        "Offers an explicit delivery workflow only when the user owns the work and requests it"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Update all tooling, Homebrew packages, and every package manager while you are there.",
+      "expected_output": "Completes the safe source and configuration refresh first, then treats third-party package upgrades as a separate requested high-impact operation.",
+      "expectations": [
+        "Does not silently invoke dotfiles update, dotfiles-upgrade, Homebrew upgrades, or package manager upgrades as part of the default refresh",
+        "Explains that package upgrades have a broader machine impact",
+        "Keeps the applied dotfiles checkout update distinct from package upgrades"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Everything refreshed. Pick the best task in AgentBrew or dotfiles for me now.",
+      "expected_output": "A dynamic recommendation based on the refreshed queues and observed health results.",
+      "expectations": [
+        "Reads current TASKS.md content and due RECURRING.md work when present",
+        "Prioritizes observed safety or stability failures before strategic work",
+        "Excludes P3 and blocked human-only work unless explicitly authorized or needed to restore a failed check",
+        "Does not hard-code task IDs",
+        "Includes concrete evidence, dependencies, and a first verification command for each recommendation"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Ship whatever you find while updating tooling.",
+      "expected_output": "Keeps routine refresh separate from publishing and ships only verified current-session or user-owned work when ship-it is active.",
+      "expectations": [
+        "Does not commit, push, or open a pull request for unknown work",
+        "Uses the established ship-it delivery gates for authorized work",
+        "Does not push directly to the canonical branch"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "The global agentbrew command uses a detached agentbrew-applied-memory worktree that is behind origin/main. Refresh tooling safely.",
+      "expected_output": "Fetches origin/main, fast-forwards only the clean detached applied AgentBrew worktree, builds it after advancement, and preserves unsafe state.",
+      "expectations": [
+        "Treats agentbrew-applied-memory as a linked worktree even though its .git entry is a file",
+        "Uses git merge --ff-only origin/main without rebasing, resetting, or checking out the detached worktree",
+        "Runs npm run build only after the applied worktree advances",
+        "Reports and preserves dirty, ahead, diverged, malformed, or fetch-failed applied worktree state",
+        "Records a global agentbrew mismatch and uses the verified applied dist/cli.js explicitly rather than silently using another build"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Refresh tooling while endpoint-node-publisher-blocked exists.",
+      "expected_output": "Completes non-Node-safe refresh work, skips apply-time AgentBrew sync, and reports the exact skill reconciliation needed after safe mode clears.",
+      "expectations": [
+        "Detects ~/.local/state/dotfiles/endpoint-node-publisher-blocked",
+        "Does not run apply-time agentbrew sync while the sentinel exists",
+        "Compares the static catalog with ~/.config/agentbrew/Agentfile.yaml without invoking agentbrew or Node, and reports names missing from skills:",
+        "Provides env -u DOTFILES_DIR agentbrew sync --only skills as the post-safe-mode reconciliation command",
+        "Runs applied AgentBrew and dotfiles commands with DOTFILES_DIR unset",
+        "Keeps LaunchAgent repair and reload actions in the configured applied checkout, with loaded-only, Minsky, and Node-safe-mode guards"
+      ]
+    }
+  ]
+}

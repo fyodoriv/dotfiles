@@ -1,0 +1,165 @@
+#!/bin/bash
+set -euo pipefail
+
+# Remove python.org framework installs that trigger endpoint agent
+# policy popups. Homebrew Python is unaffected.
+#
+# Usage: dotfiles-remove-framework-python
+#   (prompts for sudo password once)
+
+# DOTFILES_PYTHON_ROOT prefixes every system path so tests can use a fake tree.
+readonly ROOT="${DOTFILES_PYTHON_ROOT:-}"
+readonly FRAMEWORK="$ROOT/Library/Frameworks/Python.framework"
+
+# Print each python.org install path that exists, one per line.
+_framework_install_paths() {
+  local path
+  for path in "$ROOT"/Library/Frameworks/Python*.framework "$ROOT"/Applications/Python\ */ \
+    "$ROOT"/usr/local/bin/python3*-intel64; do
+    [[ -e "$path" || -L "$path" ]] && printf '%s\n' "${path%/}"
+  done
+  return 0
+}
+
+# Bail early in agent terminals — sudo can't prompt for a password there.
+if [[ "${DOTFILES_IS_AGENT:-0}" == "1" ]]; then
+  echo "❌ This script requires sudo — run it in a human terminal (Ghostty/iTerm), not an agent terminal."
+  exit 1
+fi
+
+if [[ ! -d "$FRAMEWORK" ]]; then
+  echo "✓ No python.org framework install found — nothing to do."
+  exit 0
+fi
+
+echo "Found python.org framework install:"
+# Do NOT execute the framework python — endpoint agent blocks it.
+# Show version from directory name instead.
+for v in "$FRAMEWORK"/Versions/*/; do
+  [[ -d "$v" ]] && echo "  $v"
+done
+
+echo ""
+echo "Homebrew Python (kept):"
+command -v python3 &>/dev/null && echo "  $(python3 --version) at $(command -v python3)"
+echo ""
+
+# Single sudo prompt — cache for the rest
+if ! sudo -v 2>/dev/null; then
+  echo "❌ No admin rights — running USER-MODE patch instead."
+  echo ""
+  echo "Without admin we can't delete the root-owned framework binary, but we"
+  echo "can patch every user-controlled invoker so nothing actually invokes it:"
+  echo ""
+
+  # ── User-mode patch: rebuild any pipx venvs hardcoded to framework python
+  uv_py="$(uv python find 3.13 2>/dev/null || true)"
+  if [[ -z "$uv_py" || ! -x "$uv_py" ]]; then
+    echo "  ⚠ uv python find 3.13 failed — install uv first (brew install uv)."
+  elif command -v pipx &>/dev/null && [[ -d "$HOME/.local/pipx/venvs" ]]; then
+    echo "  Step 1: rebuild pipx venvs that hardcode framework python"
+    rebuilt=0
+    for cfg in "$HOME"/.local/pipx/venvs/*/pyvenv.cfg; do
+      [[ -f "$cfg" ]] || continue
+      if grep -q "Python.framework" "$cfg" 2>/dev/null; then
+        pkg="$(basename "$(dirname "$cfg")")"
+        echo "    → rebuilding $pkg with $uv_py..."
+        if pipx reinstall --python "$uv_py" "$pkg" 2>&1 | tail -1; then
+          rebuilt=$((rebuilt + 1))
+        fi
+      fi
+    done
+    if [[ "$rebuilt" -eq 0 ]]; then
+      echo "    ✓ no framework-using pipx venvs found"
+    else
+      echo "    ✓ rebuilt $rebuilt pipx venv(s)"
+    fi
+  fi
+
+  # ── User-mode patch: launchctl-wide UV_PYTHON_PREFERENCE
+  echo ""
+  echo "  Step 2: ensure launchctl env var is set (covers LaunchAgents)"
+  current="$(launchctl getenv UV_PYTHON_PREFERENCE 2>/dev/null || true)"
+  if [[ "$current" == "only-managed" ]]; then
+    echo "    ✓ launchctl: UV_PYTHON_PREFERENCE=only-managed (already set)"
+  else
+    if launchctl setenv UV_PYTHON_PREFERENCE only-managed 2>/dev/null; then
+      echo "    ✓ launchctl: UV_PYTHON_PREFERENCE=only-managed (now set)"
+    else
+      echo "    ⚠ launchctl setenv failed"
+    fi
+  fi
+
+  # ── User-mode patch: scan small targeted dirs for hardcoded framework refs
+  # Intentionally narrow: $HOME/.local has pipx + uv installs (huge; covered by step 1)
+  # and $HOME/.local/share/devin / .npm / .yarn (multi-GB caches we don't want to walk).
+  # Each candidate dir is checked independently with a short per-dir timeout so a
+  # single slow directory can't hang the whole step.
+  echo ""
+  echo "  Step 3: scan targeted config dirs for files that hardcode the framework path"
+  declare -a scan_dirs=(
+    "$HOME/.config"
+    "$HOME/Library/LaunchAgents"
+    "$HOME/.company-mcp-marketplace"
+  )
+  hits_total=""
+  for d in "${scan_dirs[@]}"; do
+    [[ -d "$d" ]] || continue
+    # grep exits 1 on no-match — `|| true` keeps the loop alive under set -e
+    h="$( { grep -rln --max-count=1 "Library/Frameworks/Python.framework" "$d" 2>/dev/null || true; } | head -10)"
+    [[ -n "$h" ]] && hits_total="$hits_total"$'\n'"$h"
+  done
+  hits_total="$(printf '%s\n' "$hits_total" | sed '/^$/d')"
+  if [[ -z "$hits_total" ]]; then
+    echo "    ✓ no residual hardcoded framework refs in scanned dirs"
+  else
+    echo "    ⚠ files still hardcoding the framework path:"
+    printf '      %s\n' $hits_total
+    echo "    Patch each manually (typically: replace with \$(uv python find 3.13))"
+  fi
+
+  echo ""
+  echo "──────────────────────────────────────────────────────────────────"
+  echo "User-mode patch done. The framework binary at $FRAMEWORK"
+  echo "still exists (we can't delete it without admin), but with the patches"
+  echo "above + UV_PYTHON_PREFERENCE=only-managed, nothing under our control"
+  echo "should invoke it. If policy popups still fire, run:"
+  echo ""
+  echo "  ps -ef | grep Python.framework | grep -v grep"
+  echo ""
+  echo "during the next popup window to identify the invoker, then patch that"
+  echo "tool's python config."
+  echo ""
+  echo "Plan B — if the residual popup is unacceptable, ask an administrator"
+  echo "to remove these python.org install paths:"
+  _framework_install_paths | while IFS= read -r path; do
+    echo "    $path"
+  done
+  echo "Keep Homebrew and uv-managed Python (under /opt/homebrew, /usr/local/Cellar,"
+  echo "and ~/.local/share/uv)."
+  echo ""
+  exit 0
+fi
+
+# 1. Framework
+sudo rm -rf "$FRAMEWORK"
+echo "✓ Removed $FRAMEWORK"
+
+# 2. Applications
+for app in "$ROOT"/Applications/Python*/; do
+  [[ -d "$app" ]] && sudo rm -rf "$app" && echo "✓ Removed $app"
+done
+
+# 3. Symlinks to framework
+for link in "$ROOT"/usr/local/bin/python3*-intel64; do
+  [[ -L "$link" ]] && sudo rm -f "$link" && echo "✓ Removed $link"
+done
+
+# 4. Installer receipts
+pkgutil --pkgs 2>/dev/null | grep '^org\.python\.' | while read -r pkg; do
+  sudo pkgutil --forget "$pkg" >/dev/null 2>&1 && echo "✓ Forgot receipt $pkg"
+done
+
+echo ""
+echo "Done. Verify: python3 --version"
+command -v python3 &>/dev/null && echo "  $(python3 --version)"

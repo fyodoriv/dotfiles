@@ -1,0 +1,49 @@
+#!/bin/bash
+# Emit the canonical source-document set and deterministic fingerprint for one repo.
+set -euo pipefail
+
+repo="${1:-.}"
+root="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "error: not a Git repository: $repo" >&2
+  exit 2
+}
+
+rows_file="$(mktemp "${TMPDIR:-/tmp}/learn-repos-rows.XXXXXX")"
+paths_file="$(mktemp "${TMPDIR:-/tmp}/learn-repos-paths.XXXXXX")"
+trap 'rm -f "$rows_file" "$paths_file"' EXIT
+
+shopt -s nocasematch
+
+is_source_document() {
+  local path="$1" base="${1##*/}"
+  if [[ "$path" != */* ]]; then
+    [[ "$base" =~ \.(md|mdx|rst|adoc|asciidoc)$ ]] ||
+      [[ "$base" =~ ^(README|AGENTS|CLAUDE|VISION|ROADMAP|MILESTONES|ARCHITECTURE|TASKS|CONTRIBUTING|CHANGELOG|SECURITY)$ ]]
+    return
+  fi
+  case "$path" in
+    docs/*|doc/*|runbooks/*|skills/*|.agents/skills/*|.claude/skills/*)
+      [[ "$base" =~ \.(md|mdx|rst|adoc|asciidoc)$ ]]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+while IFS= read -r -d '' relative_path; do
+  is_source_document "$relative_path" || continue
+  source_path="$root/$relative_path"
+  [ -f "$source_path" ] || continue
+  content_hash="$(shasum -a 256 "$source_path" | awk '{print $1}')"
+  size="$(wc -c < "$source_path" | tr -d ' ')"
+  printf '%s\0%s\0%s\n' "$relative_path" "$content_hash" "$size" >> "$rows_file"
+  printf '%s\n' "$relative_path" >> "$paths_file"
+done < <(git -C "$root" ls-files --cached --others --exclude-standard -z)
+
+fingerprint="$(LC_ALL=C sort "$rows_file" | shasum -a 256 | awk '{print $1}')"
+printf 'source_fingerprint\t%s\n' "$fingerprint"
+printf 'source_fingerprint_prefix\t%s\n' "${fingerprint:0:16}"
+LC_ALL=C sort "$paths_file" | while IFS= read -r relative_path; do
+  printf 'source_path\t%s\n' "$relative_path"
+done

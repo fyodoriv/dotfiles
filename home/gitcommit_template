@@ -1,0 +1,10 @@
+
+# <type>(<scope>): <description>
+#
+# Types: feat fix docs style refactor perf test build ci chore revert
+# Scope: optional, e.g. (auth), (api), (ui)
+# Description: imperative mood, no period, max 72 chars
+#
+# Body: explain what and why (not how), wrap at 72 chars
+#
+# Footer: BREAKING CHANGE: ..., Closes #123, Co-authored-by: ...

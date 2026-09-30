@@ -1,0 +1,54 @@
+# ── Task management aliases (GitHub Issues / tasks.md backend) ──────────
+# Thin wrappers around the `tasks` CLI from @tasks-md/cli.
+# Resolves via `command -v tasks` (if installed) or falls back to `npx -y @tasks-md/cli`.
+#
+# Usage:
+#   task-next              → pick the top open unclaimed task
+#   task-list [options]    → list open tasks (pass through options like --json)
+#   task-new "title" ...   → create a new task (pass through options like --priority P1)
+#   task-done <id>         → mark a task complete
+#   task-mine              → list tasks assigned to the current gh user (best-effort)
+
+# Resolve the tasks CLI — prefer installed, fall back to npx
+_tasks_resolve() {
+  if command -v tasks >/dev/null 2>&1; then
+    command tasks "$@"
+  else
+    npx -y @tasks-md/cli "$@"
+  fi
+}
+
+# task-next: pick the top open unclaimed task
+task-next() {
+  _tasks_resolve pick
+}
+
+# task-list: list open tasks with optional arguments
+task-list() {
+  _tasks_resolve list "$@"
+}
+
+# task-new: create a new task with optional arguments
+task-new() {
+  _tasks_resolve create "$@"
+}
+
+# task-done: mark a task complete
+task-done() {
+  _tasks_resolve complete "$@"
+}
+
+# task-mine: list tasks assigned to the current gh user (best-effort)
+# Falls back to `tasks list` if jq or gh are unavailable.
+task-mine() {
+  if command -v jq >/dev/null 2>&1 && command -v gh >/dev/null 2>&1; then
+    local current_user
+    current_user=$(gh api user --jq '.login' 2>/dev/null) || {
+      _tasks_resolve list
+      return
+    }
+    _tasks_resolve list --json | jq -r ".[] | select(.assignee == \"$current_user\") | \"\(.id): \(.title)\""
+  else
+    _tasks_resolve list
+  fi
+}

@@ -1,0 +1,98 @@
+# ── Personal git overrides ────────────────────────────────────────────
+# Copy this to ~/.gitconfig.local and fill in your details.
+# The installer will do this for you interactively.
+
+[user]
+	name = Your Name
+	email = your@email.com
+
+# Uncomment if you use the bundled commit-msg hook:
+# (find your dotfiles path with: dotfiles cd)
+# [core]
+# 	hooksPath = <dotfiles-dir>/git-hooks
+
+# Uncomment if you use the bundled commit template:
+# [commit]
+# 	template = <dotfiles-dir>/home/gitcommit_template
+
+# Org-specific URL rewrites (SSH instead of HTTPS):
+# [url "git@github.com:"]
+# 	insteadOf = https://github.com/
+
+# ── Split identity: work default + personal for github.com ───────────
+# The simpler setup is to enable the `git_personal_enabled` chezmoi
+# prompt — see ~/apps/dotfiles/docs/architecture.md for the list of
+# prompts. When enabled, chezmoi:
+#   1. Writes ~/.gitconfig.personal from `git_personal_name` + `git_personal_email`
+#   2. Runs a hook that injects a managed `# BEGIN/END git-personal-includeif`
+#      block into this file (~/.gitconfig.local) with the includeIf stanzas
+#      that route any github.com remote to ~/.gitconfig.personal.
+# Toggle the prompt answer with `chezmoi init` or by editing the `data:`
+# key in ~/.config/chezmoi/chezmoi.yaml, then run `chezmoi apply`.
+#
+# Manual alternative (if you prefer not to use the chezmoi prompts):
+#
+# Create ~/.gitconfig.personal with your personal identity:
+#   [user]
+#   	name = your-personal-handle
+#   	email = your-personal@email.com
+#
+# Then uncomment these lines (git 2.36+ required):
+# [includeIf "hasconfig:remote.*.url:https://github.com/*/*"]
+# 	path = ~/.gitconfig.personal
+# [includeIf "hasconfig:remote.*.url:git@github.com:*/*"]
+# 	path = ~/.gitconfig.personal
+# [includeIf "hasconfig:remote.*.url:ssh://git@github.com/*/*"]
+# 	path = ~/.gitconfig.personal
+#
+# Patterns use `*/*` (not `**`) because git's wildmatch treats `**`
+# as a path-segment token only when bounded by `/`; after `:` in
+# scp-style SSH URLs it degrades to single-segment matching.
+#
+# Verify with: git -C <personal-repo> config user.email
+
+# Delta syntax theme (default: terminal theme; popular: Dracula, Nord, gruvbox-dark):
+# [delta]
+# 	syntax-theme = Dracula
+
+# ── Credential helpers for non-GitHub hosts ──────────────────────────
+# The bundled gitconfig sets up gh-based credential helpers for github.com.
+# If you use GitLab, Bitbucket, or other hosts, add their helpers here.
+
+# GitLab (uses glab CLI — install: brew install glab):
+# [credential "https://gitlab.com"]
+# 	helper =
+# 	helper = !/bin/bash -c 'command -v glab >/dev/null && glab auth git-credential "$@"' --
+
+# Bitbucket (uses app passwords — generate at bitbucket.org/account/settings/app-passwords):
+# [credential "https://bitbucket.org"]
+# 	helper = store
+
+# GitHub Enterprise (uses gh CLI with custom host):
+# [credential "https://github.yourcompany.com"]
+# 	helper =
+# 	helper = !/bin/bash -c 'command -v gh >/dev/null && gh auth git-credential "$@"' --
+
+# ── Commit signing ───────────────────────────────────────────────────
+# Uncomment to enable signed commits. Generate a key first:
+#   gpg --full-generate-key    # choose RSA 4096, set email to match [user] above
+#   gpg --list-secret-keys --keyid-format=long   # copy the key ID after "sec rsa4096/"
+#
+# SSH signing (simpler — reuse your existing SSH key):
+#   Set format to ssh, signingkey to your public key file.
+
+# GPG signing:
+# [user]
+# 	signingkey = YOUR_GPG_KEY_ID
+# [commit]
+# 	gpgsign = true
+# [gpg]
+# 	format = openpgp
+
+# SSH signing (alternative — no GPG needed):
+# [user]
+# 	signingkey = ~/.ssh/id_ed25519.pub
+# [commit]
+# 	gpgsign = true
+# [gpg]
+# 	format = ssh

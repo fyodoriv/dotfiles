@@ -1,0 +1,78 @@
+{{- $choices := list "full" "core" -}}
+{{- $profile := promptChoiceOnce . "profile" "Installation profile (full = all modules, core = essential only)" $choices "full" -}}
+{{- $enterprise := promptBoolOnce . "is_enterprise" "Enable enterprise configs (AWS, K8s, Gradle)" false -}}
+{{- $workEmailDomain := "example.com" -}}
+{{- $gheHost := "github.example.com" -}}
+{{- if $enterprise -}}
+{{-   $workEmailDomain = promptStringOnce . "work_email_domain" "Work email domain for Chrome profile detection" "example.com" -}}
+{{-   $gheHost = promptStringOnce . "github_enterprise_host" "GitHub Enterprise hostname" "github.example.com" -}}
+{{- end -}}
+{{- $useAiTools := promptBoolOnce . "use_ai_tools" "Enable AI agent tooling (Devin CLI, ANTHROPIC_MODEL, agent-browser)" false -}}
+{{- $useLocalAi := promptBoolOnce . "use_local_ai" "Enable local-LLM stack (pipx + aider + mlx-lm on Apple Silicon; ~30 GB model weights require explicit opt-in via ~/.config/dotfiles/.local-llm-bootstrap-confirmed sentinel)" false -}}
+{{- $useCursor := promptBoolOnce . "use_cursor" "Manage Cursor (settings, extensions, launch agents, agentbrew Cursor config)" true -}}
+{{- $dotfilesDir := promptStringOnce . "dotfiles_dir" "Dotfiles directory relative to home (e.g. apps/dotfiles, dotfiles)" "apps/dotfiles" -}}
+{{- $reposDir := promptStringOnce . "repos_dir" "Repos directory relative to home (e.g. apps, repos, src)" "apps" -}}
+{{- $brewSkip := list -}}
+{{- if hasKey . "brew_skip" -}}
+{{-   $brewSkip = .brew_skip -}}
+{{- end -}}
+{{- $autoUpgrade := promptBoolOnce . "auto_upgrade" "Enable auto-upgrade LaunchAgent (brew upgrade at 3am Sunday)" false -}}
+{{- $useEncryption := promptBoolOnce . "use_encryption" "Enable age encryption (requires ~/.config/chezmoi/key.txt)" false -}}
+{{- $ageRecipient := "unused-no-encryption-configured" -}}
+{{- if $useEncryption -}}
+{{-   $ageRecipient = promptStringOnce . "age_recipient" "age public key (recipient)" "" -}}
+{{- end -}}
+{{- $morningHour := 8 -}}
+{{- $morningMinute := 30 -}}
+{{- if eq $profile "full" -}}
+{{-   $morningHour = promptIntOnce . "morning_hour" "Morning briefing hour (0-23)" 8 -}}
+{{-   $morningMinute = promptIntOnce . "morning_minute" "Morning briefing minute (0-59)" 30 -}}
+{{- end -}}
+
+{{/* ── Git identity ────────────────────────────────────────────────── */ -}}
+{{- $gitWorkName := promptStringOnce . "git_work_name" "Git commit name for work/default identity" "" -}}
+{{- $gitWorkEmailDefault := "" -}}
+{{- if $enterprise -}}
+{{-   $gitWorkEmailDefault = printf "your.username@%s" $workEmailDomain -}}
+{{- end -}}
+{{- $gitWorkEmail := promptStringOnce . "git_work_email" "Git commit email for work/default identity" $gitWorkEmailDefault -}}
+{{- $gitPersonalEnabled := promptBoolOnce . "git_personal_enabled" "Enable split identity: personal identity for github.com remotes (work identity stays default elsewhere)" false -}}
+{{- $gitPersonalName := "" -}}
+{{- $gitPersonalEmail := "" -}}
+{{- if $gitPersonalEnabled -}}
+{{-   $gitPersonalName = promptStringOnce . "git_personal_name" "Git commit name for personal identity (github.com)" "" -}}
+{{-   $gitPersonalEmail = promptStringOnce . "git_personal_email" "Git commit email for personal identity (github.com) — consider <username>@users.noreply.github.com" "" -}}
+{{- end -}}
+
+sourceDir: {{ .chezmoi.sourceDir | quote }}
+
+encryption: age
+age:
+  identity: {{ joinPath .chezmoi.homeDir ".config/chezmoi/key.txt" | quote }}
+  recipient: {{ $ageRecipient }}
+
+data:
+  profile: {{ $profile | quote }}
+  is_enterprise: {{ $enterprise }}
+  work_email_domain: {{ $workEmailDomain | quote }}
+  github_enterprise_host: {{ $gheHost | quote }}
+  dotfiles_dir: {{ $dotfilesDir | quote }}
+  repos_dir: {{ $reposDir | quote }}
+  brew_skip:
+{{- range $brewSkip }}
+    - {{ . | quote }}
+{{- else }}
+    []
+{{- end }}
+  auto_upgrade: {{ $autoUpgrade }}
+  use_ai_tools: {{ $useAiTools }}
+  use_local_ai: {{ $useLocalAi }}
+  use_cursor: {{ $useCursor }}
+  use_encryption: {{ $useEncryption }}
+  morning_hour: {{ $morningHour }}
+  morning_minute: {{ $morningMinute }}
+  git_work_name: {{ $gitWorkName | quote }}
+  git_work_email: {{ $gitWorkEmail | quote }}
+  git_personal_enabled: {{ $gitPersonalEnabled }}
+  git_personal_name: {{ $gitPersonalName | quote }}
+  git_personal_email: {{ $gitPersonalEmail | quote }}

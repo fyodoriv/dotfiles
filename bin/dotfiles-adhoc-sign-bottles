@@ -1,0 +1,95 @@
+#!/bin/bash
+# dotfiles-adhoc-sign-bottles — ad-hoc sign every unsigned Homebrew bottle.
+#
+# WHY: Homebrew ships pre-built "bottles" that are NOT code-signed. macOS
+# treats unsigned binaries as "unsigned" and endpoint agent flags
+# every spawn of an unsigned binary with a managed-workstation policy
+# warning dialog. Adding any signature — even self-signed
+# (`codesign --sign -`) — gives the binary `Signature=adhoc` which endpoint agent accepts as signed.
+#
+# WHEN: Runs (a) inline from the chezmoi `.chezmoiscripts/run_onchange_brew.sh.tmpl`
+# after `brew bundle`, (b) on-demand from the operator, (c) from the doctor
+# module's --fix path (NOT YET — checks are advisory).
+#
+# IDEMPOTENT: re-signing an already-adhoc-signed binary is a no-op
+# (`Signature=adhoc` stays `Signature=adhoc`). The check-then-sign loop
+# only invokes `codesign` for binaries that currently report
+# `code object is not signed at all`.
+#
+# SCOPE: signs every Mach-O binary under /usr/local/Cellar (Intel/Rosetta
+# Homebrew) and /opt/homebrew/Cellar (arm64 Homebrew). Includes:
+#   - executable bottles (`-perm +111`)
+#   - non-executable dylibs/so (`*.dylib`, `*.so`) — e.g. libcurl.4.dylib
+#     is mode 444; skipping it left Description: curl / unsigned after
+#     brew upgrade even when bin/curl was signed
+# Skips non-Mach-O files (shell scripts, configs, docs). Skips symlinks
+# (the target binary carries the signature). Skips already-signed binaries.
+#
+# RELATED:
+#   - AGENTS.md rule #10 § "Homebrew bottles are unsigned"
+#   - .chezmoiscripts/run_after_uv-python-setup.sh — same pattern for uv pythons
+#   - modules/security/doctor.sh § "endpoint agent: brew bottles"
+#   - bin/dotfiles-adhoc-sign-curl — fast login path for curl + libcurl
+#   - agentbrew skill endpoint-security-block-triage § "Unsigned user-dir binaries"
+
+set -uo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+# shellcheck source=../lib/brew-bottle-audit.sh
+source "$DOTFILES_DIR/lib/brew-bottle-audit.sh"
+_DOTFILES_FIND="$(dotfiles_resolve_find "$DOTFILES_DIR/bin")"
+
+QUIET="${DOTFILES_ADHOC_SIGN_QUIET:-0}"
+log() { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+
+signed=0
+skipped_signed=0
+skipped_nonbin=0
+failed=0
+
+_sign_macho() {
+  local bin="$1"
+  local file_type
+  file_type="$(/usr/bin/file -b "$bin" 2>/dev/null || true)"
+  case "$file_type" in
+    Mach-O*) ;;
+    *)
+      skipped_nonbin=$((skipped_nonbin + 1))
+      return 0
+      ;;
+  esac
+  if codesign -dvv "$bin" >/dev/null 2>&1; then
+    skipped_signed=$((skipped_signed + 1))
+  elif codesign --sign - --force "$bin" 2>/dev/null; then
+    signed=$((signed + 1))
+  else
+    failed=$((failed + 1))
+  fi
+}
+
+IFS=':' read -r -a _bottle_prefixes <<< "${DOTFILES_BREW_BOTTLE_AUDIT_PREFIXES:-/usr/local/Cellar:/opt/homebrew/Cellar}"
+for prefix in "${_bottle_prefixes[@]}"; do
+  [ -d "$prefix" ] || continue
+  log "→ Scanning $prefix"
+  # Executables (historical bottles path)
+  while IFS= read -r bin; do
+    [ -x "$bin" ] || continue
+    _sign_macho "$bin"
+  done < <(_dotfiles_brew_bottle_audit_executable_files "$_DOTFILES_FIND" "$prefix")
+  # Non-executable shared libraries (libcurl, libpython companions, etc.)
+  while IFS= read -r bin; do
+    # Skip if already visited via +111 (avoid double codesign -dvv)
+    [ -x "$bin" ] && continue
+    _sign_macho "$bin"
+  done < <("$_DOTFILES_FIND" "$prefix" -maxdepth 6 -type f \( -name '*.dylib' -o -name '*.so' \) 2>/dev/null)
+done
+
+# A no-op daily signer did not change the prior audit result. A repair or
+# failure may have changed signature state, so make the next doctor re-audit.
+if [ "$signed" -gt 0 ] || [ "$failed" -gt 0 ]; then
+  dotfiles_brew_bottle_audit_cache_invalidate
+fi
+log "✓ Ad-hoc signed $signed Homebrew bottle binaries (endpoint agent)"
+log "  (skipped: $skipped_signed already-signed, $skipped_nonbin non-Mach-O; failed: $failed)"
+exit 0

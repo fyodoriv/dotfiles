@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dotfiles.gui-path</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>FNM_DIR="$HOME/.local/share/fnm"; NODE_VER=$(cat "$HOME/.node-version" 2>/dev/null | sed 's/^v//'); NODE_BIN="$FNM_DIR/node-versions/v${NODE_VER}/installation/bin"; GUI_PATH="$NODE_BIN:{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin{{ if eq .chezmoi.arch "arm64" }}:/opt/homebrew/opt/curl/bin:/opt/homebrew/bin{{ end }}:$HOME/.local/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/bin"; launchctl setenv PATH "$GUI_PATH"; launchctl setenv BASH_ENV "$HOME/.config/dotfiles/bash-env.sh"; launchctl setenv ENV "$HOME/.config/dotfiles/bash-env.sh"; if [ -z "$(launchctl getenv NODE_EXTRA_CA_CERTS)" ]; then for CA in "$HOME/.config/ssl/corporate-combined-ca.pem" "$HOME/.config/ssl/macos-trust-bundle.pem"; do if [ -f "$CA" ]; then launchctl setenv NODE_EXTRA_CA_CERTS "$CA"; break; fi; done; fi</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/gui-path.log</string>
+  <key>StandardErrorPath</key>
+  <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/gui-path.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>LANG</key>
+    <string>C.UTF-8</string>
+    <key>HOME</key>
+    <string>{{ .chezmoi.homeDir }}</string>
+  </dict>
+</dict>
+</plist>

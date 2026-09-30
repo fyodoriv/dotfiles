@@ -1,0 +1,151 @@
+#!/bin/bash
+# Dotfiles Defaults Preview — show what macOS defaults would change without writing anything.
+#
+# Reads defaults from data/macos-defaults.json and compares
+# intended values against current system state.
+#
+# Usage:
+#   dotfiles-defaults-preview            Show all changes
+#   dotfiles-defaults-preview --changed  Show only settings that would change
+# shellcheck disable=SC2154  # counters defined in lib/output.sh
+
+set +e
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+
+CHANGED_ONLY=false
+[ "${1:-}" = "--changed" ] && CHANGED_ONLY=true
+
+JSON_FILE="$DOTFILES_DIR/data/macos-defaults.json"
+if [ ! -f "$JSON_FILE" ]; then
+  echo "Error: $JSON_FILE not found" >&2
+  exit 1
+fi
+
+echo -e "${BLUE}macOS Defaults Preview — what would change${NC}"
+echo ""
+
+match_count=0
+change_count=0
+current_section=""
+current_script=""
+
+# Script display names
+script_label() {
+  case "$1" in
+    core)   echo "macos.sh — all profiles" ;;
+    visual) echo "macos-visual.sh — full profile only" ;;
+    apps)   echo "macos-apps.sh — full profile only" ;;
+    *)      echo "$1" ;;
+  esac
+}
+
+# Preview a single default entry
+preview_default() {
+  local domain="$1" key="$2" dtype="$3" value="$4" script="$5" section="$6" currenthost="$7" expand_vars="$8"
+
+  # Expand variables if needed
+  if [ "$expand_vars" = "true" ]; then
+    value="${value//\$HOME/$HOME}"
+  fi
+
+  # Print script header on change
+  if [ "$script" != "$current_script" ]; then
+    if ! $CHANGED_ONLY; then
+      echo ""
+      echo -e "${BLUE}$(script_label "$script"):${NC}"
+    fi
+    current_script="$script"
+    current_section=""
+  fi
+
+  # Print section header on change
+  if [ "$section" != "$current_section" ]; then
+    if ! $CHANGED_ONLY; then
+      echo ""
+      echo -e "  ${BLUE}─── $section ───${NC}"
+    fi
+    current_section="$section"
+  fi
+
+  # Read current value
+  local current
+  if [ "$currenthost" = "true" ]; then
+    current=$(defaults -currentHost read "$domain" "$key" 2>/dev/null) || current="(not set)"
+  else
+    current=$(defaults read "$domain" "$key" 2>/dev/null) || current="(not set)"
+  fi
+
+  # Normalize for comparison
+  local expected="$value"
+  case "$dtype" in
+    bool)
+      if [ "$value" = "true" ]; then expected="1"; else expected="0"; fi
+      ;;
+  esac
+
+  match_count=$((match_count + 1))
+
+  local ch_suffix=""
+  [ "$currenthost" = "true" ] && ch_suffix=" (currentHost)"
+
+  if [ "$current" = "$expected" ]; then
+    $CHANGED_ONLY || echo -e "    ${GREEN}=${NC} ${DIM}$domain $key${NC}${ch_suffix} = $current"
+  else
+    if $CHANGED_ONLY; then
+      # Print headers on first change in section
+      if [ "$script" != "$current_script" ]; then
+        echo ""
+        echo -e "${BLUE}$(script_label "$script"):${NC}"
+        current_script="$script"
+      fi
+      if [ "$section" != "$current_section" ]; then
+        echo ""
+        echo -e "  ${BLUE}─── $section ───${NC}"
+        current_section="$section"
+      fi
+    fi
+    echo -e "    ${YELLOW}~${NC} $domain $key${ch_suffix}"
+    echo -e "      current: ${RED}$current${NC}"
+    echo -e "      intended: ${GREEN}$expected${NC}"
+    change_count=$((change_count + 1))
+  fi
+}
+
+# ── Read all defaults from JSON and preview ──────────────────────────
+while IFS=$'\t' read -r domain key dtype value script section currenthost expand_vars; do
+  preview_default "$domain" "$key" "$dtype" "$value" "$script" "$section" "$currenthost" "$expand_vars"
+done < <(jq -r '
+  sort_by(
+    if .script == "core" then "0"
+    elif .script == "visual" then "1"
+    else "2" end
+  ) | .[] |
+  [
+    .domain,
+    .key,
+    .type,
+    (.value | tostring),
+    .script,
+    .section,
+    (.currenthost // false | tostring),
+    (.expand_vars // false | tostring)
+  ] | @tsv
+' "$JSON_FILE")
+
+# ── Summary ──────────────────────────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [ "$change_count" -gt 0 ]; then
+  echo -e "  ${YELLOW}~ $change_count setting(s) would change${NC}  │  $match_count total reviewed"
+else
+  echo -e "  ${GREEN}= All $match_count settings already match${NC}"
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "  ${DIM}This is a preview — no changes were made.${NC}"
+echo -e "  ${DIM}Run 'chezmoi apply' to apply all defaults.${NC}"

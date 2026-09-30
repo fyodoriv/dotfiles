@@ -1,0 +1,255 @@
+#!/bin/bash
+# Dotfiles Validate — pre-share verification for repo integrity.
+#
+# Checks the repo is safe and correct to share with teammates:
+# no hardcoded paths, no secrets, scripts are well-formed, and lint+tests pass.
+#
+# Usage:
+#   dotfiles-validate            Run all validation checks
+#   dotfiles-validate --quick    Skip lint+test (fast mode)
+# shellcheck disable=SC2154  # counters (pass_count, fail_count, etc.) defined in lib/output.sh
+
+set +e
+for arg in "$@"; do
+  { [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+done
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+QUICK_MODE=false
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --quick)
+      QUICK_MODE=true
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Run: dotfiles-validate --help" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+# shellcheck source=../lib/output.sh
+source "$DOTFILES_DIR/lib/output.sh"
+# shellcheck source=../lib/secret-scan.sh
+source "$DOTFILES_DIR/lib/secret-scan.sh"
+
+echo -e "${BLUE}Validating dotfiles repo for sharing…${NC}"
+echo ""
+
+# ── Hardcoded paths ──────────────────────────────────────────────
+
+echo -e "  ${BLUE}─── Hardcoded paths ───${NC}"
+
+_hardcoded_user_path_re='/Users/[[:alnum:]_.-]+'
+
+_is_shared_path_scan_target() {
+  case "$1" in
+    Agentfile.yaml | bin/* | lib/* | modules/* | home/* | launchagents/* | git-hooks/* | .chezmoiscripts/*)
+      return 0
+      ;;
+    dot_config/* | private_dot_* | symlink_dot_* | dot_* | macos.sh | macos-*.sh | snapshot.sh)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+hardcoded_path=0
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  _is_shared_path_scan_target "$rel" || continue
+  [ -f "$DOTFILES_DIR/$rel" ] || continue
+  if grep -qE "$_hardcoded_user_path_re" "$DOTFILES_DIR/$rel" 2>/dev/null; then
+    fail "Hardcoded user path in $rel"
+    hardcoded_path=$((hardcoded_path + 1))
+  fi
+done < <(git -C "$DOTFILES_DIR" ls-files -co --exclude-standard 2>/dev/null)
+[ "$hardcoded_path" -eq 0 ] && pass "No hardcoded user paths in shared config"
+
+# ── Enterprise hostname leakage ──────────────────────────────────
+
+echo -e "  ${BLUE}─── Enterprise references ───${NC}"
+
+# Enterprise hostnames should only appear in docs/ and tests/, not in
+# deployed code (bin/, lib/, modules/, home/).  Templates (.tmpl) are
+# excluded because they use chezmoi variables, not literal hostnames.
+_enterprise_pattern='company\.com\|github\.company\.'
+enterprise_leak=0
+for dir in bin lib modules home; do
+  [ ! -d "$DOTFILES_DIR/$dir" ] && continue
+  while IFS= read -r match_file; do
+    [ -z "$match_file" ] && continue
+    # Skip chezmoi template files (they use {{ .variables }}, not literals)
+    case "$match_file" in *.tmpl|*.example) continue ;; esac
+    rel="${match_file#"$DOTFILES_DIR"/}"
+    fail "Enterprise hostname in: $rel"
+    enterprise_leak=$((enterprise_leak + 1))
+  done < <(grep -rl "$_enterprise_pattern" "$DOTFILES_DIR/$dir" 2>/dev/null)
+done
+[ "$enterprise_leak" -eq 0 ] && pass "No enterprise hostnames in deployed code"
+
+# ── Secrets scan ─────────────────────────────────────────────────
+
+echo -e "  ${BLUE}─── Secrets scan ───${NC}"
+
+secrets_found=0
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  fail "Possible secret in: $rel"
+  secrets_found=$((secrets_found + 1))
+done < <(dotfiles_scan_tracked_secrets "$DOTFILES_DIR")
+
+[ "$secrets_found" -eq 0 ] && pass "No secrets in tracked files"
+
+env_tracked=0
+while IFS= read -r line; do
+  case "$line" in
+    *.env|*.env.*) fail "Tracked .env file: $line"; env_tracked=$((env_tracked + 1)) ;;
+  esac
+done < <(git -C "$DOTFILES_DIR" ls-files 2>/dev/null)
+[ "$env_tracked" -eq 0 ] && pass "No .env files tracked"
+
+# ── Script hygiene ───────────────────────────────────────────────
+
+echo -e "  ${BLUE}─── Script hygiene ───${NC}"
+
+missing_exec=0
+for script in "$DOTFILES_DIR"/bin/*; do
+  [ ! -f "$script" ] && continue
+  if [ ! -x "$script" ]; then
+    fail "Not executable: bin/$(basename "$script")"
+    missing_exec=$((missing_exec + 1))
+  fi
+done
+[ "$missing_exec" -eq 0 ] && pass "All bin/ scripts are executable"
+
+missing_shebang=0
+for script in "$DOTFILES_DIR"/bin/*; do
+  [ ! -f "$script" ] && continue
+  first_line=$(head -1 "$script")
+  if [[ ! "$first_line" =~ ^#! ]]; then
+    fail "Missing shebang: bin/$(basename "$script")"
+    missing_shebang=$((missing_shebang + 1))
+  fi
+done
+[ "$missing_shebang" -eq 0 ] && pass "All bin/ scripts have shebang"
+
+world_writable=0
+for script in "$DOTFILES_DIR"/bin/*; do
+  [ ! -f "$script" ] && continue
+  perms=$(stat -f '%Lp' "$script" 2>/dev/null || stat -c '%a' "$script" 2>/dev/null)
+  # Check if others-write bit is set (last digit is 2, 3, 6, or 7)
+  case "${perms: -1}" in
+    2|3|6|7)
+      fail "World-writable: bin/$(basename "$script") (mode $perms)"
+      world_writable=$((world_writable + 1))
+      ;;
+  esac
+done
+[ "$world_writable" -eq 0 ] && pass "No world-writable bin/ scripts"
+
+# ── Share gates ──────────────────────────────────────────────────
+
+if ! $QUICK_MODE; then
+  echo -e "  ${BLUE}─── Share gates ───${NC}"
+
+  if make -C "$DOTFILES_DIR" lint-tasks >/dev/null 2>&1; then
+    pass "TASKS.md lint passes"
+  else
+    fail "TASKS.md lint failed (run: make lint-tasks)"
+  fi
+
+  if make -C "$DOTFILES_DIR" lint >/dev/null 2>&1; then
+    pass "shellcheck passes"
+  else
+    fail "shellcheck found issues (run: make lint)"
+  fi
+
+  if make -C "$DOTFILES_DIR" test-all >/dev/null 2>&1; then
+    pass "All tests pass"
+  else
+    fail "Tests failed (run: make test-all)"
+  fi
+else
+  audit_warn "Skipped TASKS.md lint, shellcheck, and tests (--quick mode)"
+fi
+
+# ── Overlay validate scripts ─────────────────────────────────────
+# An organisation-specific overlay (a private repo at ~/apps/dotfiles-<org>/)
+# can plug additional validation checks in via $EXTRA_VALIDATE_DIR. Every
+# *.sh file in that directory is sourced in the same shell so it can call
+# pass/fail/audit_warn from lib/output.sh and contribute to the totals.
+# Mirrors the $EXTRA_DOCTOR_DIR convention in bin/dotfiles-doctor.
+#
+# Alternatively, EXTRA_OVERLAY_ROOT=<path> can be set to derive EXTRA_VALIDATE_DIR
+# from <path>/validate/. This is the single-path approach for company overlays.
+# Existing EXTRA_VALIDATE_DIR takes precedence if explicitly set.
+_resolve_extra_validate_dir() {
+  local overlay_root
+  overlay_root="${EXTRA_OVERLAY_ROOT:-}"
+  
+  # Reject colon-separated paths (one overlay at a time)
+  if [ -n "$overlay_root" ] && [[ "$overlay_root" == *:* ]]; then
+    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
+    return 1
+  fi
+  
+  # Derive EXTRA_VALIDATE_DIR from EXTRA_OVERLAY_ROOT if set
+  if [ -n "$overlay_root" ]; then
+    echo "$overlay_root/validate"
+  fi
+}
+
+EXTRA_VALIDATE_DIR="${EXTRA_VALIDATE_DIR:-}"
+# If EXTRA_VALIDATE_DIR is not set, try to derive it from EXTRA_OVERLAY_ROOT
+if [ -z "$EXTRA_VALIDATE_DIR" ]; then
+  EXTRA_VALIDATE_DIR="$(_resolve_extra_validate_dir)" || exit 1
+fi
+
+if [ -n "$EXTRA_VALIDATE_DIR" ] && [ -d "$EXTRA_VALIDATE_DIR" ]; then
+  shopt -s nullglob
+  overlay_scripts=("$EXTRA_VALIDATE_DIR"/*.sh)
+  shopt -u nullglob
+  if [ "${#overlay_scripts[@]}" -gt 0 ]; then
+    echo -e "  ${BLUE}─── Overlay validate scripts ───${NC}"
+    for overlay_script in "${overlay_scripts[@]}"; do
+      [ -f "$overlay_script" ] || continue
+      overlay_script_name="$(basename "$overlay_script")"
+      # Relax shell options BEFORE sourcing so an overlay's strict mode
+      # can't kill the run; reset AFTER so the next overlay starts clean.
+      # Counters update because we source in the current shell.
+      set +e +u
+      # shellcheck disable=SC1090
+      source "$overlay_script"
+      overlay_source_status=$?
+      set +e +u
+      if [ "$overlay_source_status" -ne 0 ]; then
+        fail "Overlay validate script failed (exit $overlay_source_status): $overlay_script_name"
+      fi
+    done
+  fi
+fi
+
+# ── Summary ──────────────────────────────────────────────────────
+
+local_total=$((pass_count + fail_count + warn_count))
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if (( fail_count > 0 )); then
+  echo -e "  ${RED}✗ $fail_count issue(s) found${NC}  ${GREEN}✓ $pass_count passed${NC}  │  $local_total total"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo -e "  Fix the issues above before sharing this repo."
+  exit 1
+else
+  echo -e "  ${GREEN}✓ All $pass_count checks passed${NC}  │  $local_total total"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo -e "  ${GREEN}Repo is safe to share.${NC}"
+  exit 0
+fi

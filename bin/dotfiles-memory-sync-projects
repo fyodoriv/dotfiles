@@ -1,0 +1,17 @@
+#!/bin/bash
+# Compatibility shim for AgentBrew-managed Claude project-memory ingestion.
+#
+# Keep this stable command because the daily LaunchAgent and /ship-it use it.
+# AgentBrew owns the Streamable HTTP client, session lifecycle, and sync
+# evidence, so dotfiles must not retain a second raw JSON-RPC implementation.
+
+set -uo pipefail
+
+agentbrew_bin="${DOTFILES_MEMORY_AGENTBREW_BIN:-agentbrew}"
+
+if ! command -v "$agentbrew_bin" >/dev/null 2>&1; then
+  echo "memory sync skipped: agentbrew is not available" >&2
+  exit 0
+fi
+
+exec "$agentbrew_bin" memory sync-projects "$@"

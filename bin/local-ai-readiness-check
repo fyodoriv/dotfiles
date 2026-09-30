@@ -1,0 +1,153 @@
+#!/bin/bash
+# local-ai-readiness-check
+#
+# Verifies the engine-agnostic local-AI stack is reboot-ready. Supports both
+# LM Studio (port 1234, MLX backend) and Ollama (port 11434, GGUF/Metal),
+# whichever is installed and running. At least ONE inference engine must be
+# present for the stack to be useful.
+#
+# RUN:   ~/bin/local-ai-readiness-check
+# EXIT:  0 = ready for reboot, 1+ = fix something first
+
+set -uo pipefail
+
+PASS=0
+FAIL=0
+
+ok()   { printf "  ✓ %s\n" "$*"; PASS=$((PASS+1)); }
+fail() { printf "  ✗ %s\n" "$*"; FAIL=$((FAIL+1)); }
+warn() { printf "  ⚠ %s\n" "$*"; }
+sec()  { printf "\n── %s ──\n" "$*"; }
+
+UID_NUM=$(id -u)
+
+_lmstudio_installed() { [ -d "/Applications/LM Studio.app" ] && [ -x "$HOME/.lmstudio/bin/lms" ]; }
+_ollama_installed()   { command -v ollama >/dev/null 2>&1; }
+_lmstudio_up() { curl -sf -m 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1; }
+_ollama_up()   { curl -sf -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; }
+
+sec "1. inference engine installed (LM Studio preferred, Ollama fallback)"
+ENGINES=""
+if _lmstudio_installed; then
+  ok "LM Studio.app + lms CLI installed"
+  ENGINES="${ENGINES}lmstudio "
+fi
+if _ollama_installed; then
+  ok "Ollama CLI on PATH"
+  ENGINES="${ENGINES}ollama"
+fi
+if [ -z "$ENGINES" ]; then
+  fail "neither LM Studio nor Ollama installed (\`brew install --cask lm-studio\` OR \`brew install ollama\`)"
+fi
+
+sec "2. opencode binary"
+if command -v opencode >/dev/null 2>&1 || [ -x "$HOME/.opencode/bin/opencode" ]; then
+  ok "opencode binary present"
+else
+  fail "opencode missing — curl -fsSL https://opencode.ai/install | bash"
+fi
+
+sec "3. LaunchAgents bootstrapped (will fire on next login)"
+for label in com.dotfiles.local-ai-warmup com.dotfiles.opencode-serve; do
+  if launchctl print "gui/$UID_NUM/$label" >/dev/null 2>&1; then
+    ok "$label is registered"
+  else
+    fail "$label NOT bootstrapped"
+  fi
+done
+# Ollama supervised LaunchAgent only matters if Ollama is the chosen engine
+if _ollama_installed; then
+  if launchctl print "gui/$UID_NUM/com.dotfiles.ollama" >/dev/null 2>&1; then
+    ok "com.dotfiles.ollama is registered (Ollama installed)"
+  else
+    warn "com.dotfiles.ollama NOT bootstrapped — Ollama installed but not supervised by launchd"
+  fi
+fi
+
+sec "4. plist files exist + parseable"
+PLISTS=(
+  "$HOME/Library/LaunchAgents/com.dotfiles.local-ai-warmup.plist"
+  "$HOME/Library/LaunchAgents/com.dotfiles.opencode-serve.plist"
+)
+_ollama_installed && PLISTS+=("$HOME/Library/LaunchAgents/com.dotfiles.ollama.plist")
+for plist in "${PLISTS[@]}"; do
+  if [ -f "$plist" ]; then
+    if plutil -lint -s "$plist" 2>/dev/null; then
+      ok "$(basename "$plist") exists + valid"
+    else
+      fail "$plist exists but FAILS plutil -lint"
+    fi
+  else
+    fail "$plist MISSING"
+  fi
+done
+
+sec "5. live runtime state"
+if _lmstudio_up; then
+  ok "LM Studio API responding on :1234"
+elif _ollama_up; then
+  ok "Ollama API responding on :11434"
+else
+  fail "neither inference API reachable — run ~/bin/local-ai-warmup"
+fi
+
+if curl -sf -m 2 http://127.0.0.1:4096/ >/dev/null 2>&1; then
+  ok "opencode-serve responding on :4096"
+else
+  fail "opencode-serve not reachable on :4096"
+fi
+
+sec "6. models on disk (whichever engine is up)"
+mem_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
+if   [ "$mem_gb" -le 32 ]; then BUCKET="14b"
+elif [ "$mem_gb" -le 64 ]; then BUCKET="coder-30b"
+else                            BUCKET="32b"
+fi
+
+if _lmstudio_up; then
+  EXPECTED_PRIMARY="qwen/qwen3-${BUCKET}"
+  EXPECTED_SMALL="qwen/qwen3-0.6b"
+  if "$HOME/.lmstudio/bin/lms" ls 2>/dev/null | grep -q "$EXPECTED_PRIMARY"; then
+    ok "LM Studio: $EXPECTED_PRIMARY (primary) on disk"
+  else
+    fail "LM Studio: $EXPECTED_PRIMARY NOT on disk — \`lms get qwen3-${BUCKET} --mlx -y\`"
+  fi
+  if "$HOME/.lmstudio/bin/lms" ls 2>/dev/null | grep -q "$EXPECTED_SMALL"; then
+    ok "LM Studio: $EXPECTED_SMALL (small_model) on disk"
+  else
+    fail "LM Studio: $EXPECTED_SMALL NOT on disk — \`lms get qwen3-0.6b --mlx -y\`"
+  fi
+elif _ollama_up; then
+  EXPECTED_PRIMARY="qwen3:${BUCKET}"
+  EXPECTED_SMALL="qwen3:0.6b"
+  if ollama list 2>/dev/null | grep -q "^$EXPECTED_PRIMARY"; then
+    ok "Ollama: $EXPECTED_PRIMARY (primary) on disk"
+  else
+    fail "Ollama: $EXPECTED_PRIMARY NOT on disk — \`ollama pull $EXPECTED_PRIMARY\`"
+  fi
+  if ollama list 2>/dev/null | grep -q "^$EXPECTED_SMALL"; then
+    ok "Ollama: $EXPECTED_SMALL (small_model) on disk"
+  else
+    fail "Ollama: $EXPECTED_SMALL NOT on disk — \`ollama pull $EXPECTED_SMALL\`"
+  fi
+fi
+
+sec "7. shell config"
+if grep -q "alias oc=" "$HOME/.zshrc.ai-tools" 2>/dev/null \
+   || grep -q "alias oc=" "$HOME/.zshrc.local" 2>/dev/null \
+   || grep -q "alias oc=" "$HOME/.zshrc" 2>/dev/null; then
+  ok "'oc' alias found in shell config"
+else
+  fail "'oc' alias not in any shell config"
+fi
+
+printf "\n══════════════════════════════════════════════════════\n"
+if [ "$FAIL" -eq 0 ]; then
+  printf "  ✓ %d checks passed (engines: %s).  Local-AI stack is reboot-ready.\n" "$PASS" "${ENGINES:-none}"
+  printf "══════════════════════════════════════════════════════\n"
+  exit 0
+else
+  printf "  ✗ %d failures (out of %d checks).  Fix them before relying on the stack.\n" "$FAIL" "$((PASS + FAIL))"
+  printf "══════════════════════════════════════════════════════\n"
+  exit 1
+fi

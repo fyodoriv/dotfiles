@@ -1,0 +1,34 @@
+#!/bin/bash
+# Re-run when data/amphetamine-prefs.json changes.
+# amphetamine-prefs hash: {{ joinPath .chezmoi.sourceDir "data" "amphetamine-prefs.json" | sha256sum }}
+#
+# Restores the synced Amphetamine power policy on `dotfiles apply`.
+# Source of truth: data/amphetamine-prefs.json (managed by
+# `dotfiles-amphetamine-sync export` on the machine where the user
+# configured triggers via GUI).
+#
+# Idempotent: when local Amphetamine prefs already match the synced
+# config, `defaults write` is a no-op for unchanged values. Safe to
+# re-run on every `dotfiles apply`.
+#
+# Skipped automatically when:
+#   - Amphetamine.app is not installed (corporate machines without App Store)
+#   - data/amphetamine-prefs.json is missing (fresh install, nothing to apply)
+#   - data/amphetamine-prefs.json is empty {} (placeholder before first export)
+set -euo pipefail
+
+DOTFILES_DIR="{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}"
+
+if [ ! -d /Applications/Amphetamine.app ]; then
+  echo "⊘ Amphetamine.app not installed — skipping Amphetamine prefs sync"
+  exit 0
+fi
+
+if [ ! -x "$DOTFILES_DIR/bin/dotfiles-amphetamine-sync" ]; then
+  echo "⚠ dotfiles-amphetamine-sync not executable — re-run \`dotfiles apply\`"
+  exit 0
+fi
+
+# Delegate to the tool — it handles the empty-file and missing-file
+# cases gracefully (just warns + exits 0).
+"$DOTFILES_DIR/bin/dotfiles-amphetamine-sync" apply

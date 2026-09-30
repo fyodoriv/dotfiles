@@ -1,0 +1,80 @@
+# Non-dotfile repo files (never deployed to $HOME)
+.claude
+.github
+.gitignore
+.idea
+.orchestrator
+.overrides
+.shell-coverage-floor
+.shellcheckrc
+.sync-protect
+.tasks-lint-version
+.windsurf
+.worktrees
+AGENTS.md
+ARCHITECTURE.md
+Agentfile.yaml
+CHANGELOG.md
+CLAUDE.md
+CONTRIBUTING.md
+LICENSE
+Makefile
+README.md
+ROADMAP.md
+SECURITY.md
+TASKS.md
+VISION.md
+agent-hooks
+bin
+commands
+config
+coverage
+cursor
+data
+docs
+git-hooks
+gitconfig.local.example
+home
+jetbrains
+launchagents
+lib
+macos-apps.sh
+macos-visual.sh
+macos.sh
+modules
+scripts
+skills
+snapshot.sh
+templates
+tests
+vscode
+windsurf
+
+# Profile-based ignoring (target paths, not source paths)
+{{- if ne .profile "full" }}
+.ideavimrc
+.tmux.conf
+.config/ghostty
+.config/lazygit
+.config/fastfetch
+{{- end }}
+
+# AI tooling (opt-in)
+{{- if not (dig "use_ai_tools" false .) }}
+.zshrc.ai-tools
+{{- end }}
+
+# Enterprise-only files (target paths)
+{{- if not .is_enterprise }}
+.ssh/config.enterprise
+{{- end }}
+
+# Personal git identity (opt-in — values from chezmoi prompts)
+{{- if not (dig "git_personal_enabled" false .) }}
+.gitconfig.personal
+{{- end }}
+
+# Skip encrypted files when age encryption is not configured
+{{- if not (dig "use_encryption" false .) }}
+.ssh/config.enterprise
+{{- end }}

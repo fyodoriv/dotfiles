@@ -1,0 +1,26 @@
+# JetBrains recommended plugins — managed by dotfiles
+# Used by `modules/jetbrains/doctor.sh` (informational check) and
+# `bin/jetbrains-install-plugins` (one-shot installer).
+#
+# Lines starting with `#` and blank lines are ignored.
+# Format: <plugin-id>  # purpose, marketplace URL
+#
+# To install all: bin/jetbrains-install-plugins
+# To install one: /Applications/WebStorm.app/Contents/MacOS/webstorm installPlugins <id>
+#
+# Ownership boundary (intentional):
+#   - dotfiles RECOMMENDS plugins via this file (lint-style "you should have these")
+#   - dotfiles ENFORCES disabling of plugins via disabled_plugins.txt
+#   - dotfiles does NOT enforce installation — JetBrains plugins update on their
+#     own schedule and forced reinstall is more friction than value.
+#
+# Operator preference: NO in-IDE AI plugins (Junie, Copilot, Codeium, Continue.dev,
+# Augment) — these are in disabled_plugins.txt by design. External AI agents
+# (Claude Code / Cursor / Windsurf / Devin / Codex) own the AI integration.
+# Don't add AI plugins here without re-checking that preference.
+
+Key Promoter X                       # Key Promoter X — surfaces keyboard shortcuts when you click a button
+izhangzhihao.rainbow.brackets        # Rainbow Brackets — colorize nested brackets/parens; eases deep React JSX
+zielu.gittoolbox                     # GitToolBox — inline blame, branch status, auto-fetch
+com.intellij.mermaid                 # Mermaid — render mermaid diagrams in the editor preview
+ru.adelf.idea.dotenv                 # .env files — syntax highlighting + completion

@@ -1,0 +1,61 @@
+{
+  "command_name": "research-url",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/research-url https://example.com/new-mcp-tool",
+      "expected_output": "The agent researches the URL, checks dotfiles, agentbrew, and minsky, then files only evidence-backed TASKS.md entries and delivers scoped PRs/merges under the standing approval.",
+      "expectations": [
+        "Researches the primary URL rather than making a decision from the URL text alone",
+        "Produces an explicit verdict for dotfiles, agentbrew, and minsky",
+        "Requires local repo file:line evidence before filing any task",
+        "Lints each modified TASKS.md and reports the exact command/result",
+        "Treats scoped TASKS.md-only commits, branch pushes, PR creation, PR merge, and repo-local deploy/sync as pre-approved for canonical target repos"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/research-url \"look into browser-harness for my tooling repos\"",
+      "expected_output": "The agent treats the product name as research input, discovers canonical sources, deduplicates existing tasks, and only files real fits.",
+      "expectations": [
+        "Uses focused web searches to resolve a product name when no URL is supplied",
+        "Asks one clarifying question if the product name is ambiguous after search",
+        "Searches existing TASKS.md files and catalogs for duplicate product/task names",
+        "Skips repos where the source is only weakly adjacent"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/research-url \"This newsletter lists Tool A, Tool B, and Tool C: https://example.com/ai-weekly\"",
+      "expected_output": "The agent recognizes an aggregator, follows underlying links before making fit calls, and caps the analysis to substantive items.",
+      "expectations": [
+        "Classifies the URL as an aggregator/newsletter before fit assessment",
+        "Fetches underlying sources for substantive items instead of relying on blurbs",
+        "Caps aggregator follow-up to the highest-signal items",
+        "Treats zero filed tasks as valid when no item clears the evidence bar"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/research-url https://example.com/vendor-marketing-page",
+      "expected_output": "The agent researches the page, identifies missing reproducible evidence, and reports skip reasons rather than padding task queues.",
+      "expectations": [
+        "Rejects marketing-only or unverifiable claims as insufficient for TASKS.md entries",
+        "Still gives a per-repo verdict for all three canonical targets",
+        "Does not file generic adoption tasks without local file:line evidence",
+        "Ends with the required Source, Per-repo verdicts, Tasks filed, and Verification summary"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "/research-url https://example.com/agent-methodology",
+      "expected_output": "The agent creates isolated worktrees when needed, files scoped TASKS.md changes, and proceeds through push/PR/merge/deploy unless a real repo-local blocker appears.",
+      "expectations": [
+        "Does not stop at a local-only commit solely because the edit is in a sibling tooling repo",
+        "Pushes a normal feature branch and opens a PR for scoped canonical-repo TASKS.md edits",
+        "Watches required checks and merges when substantive checks are green",
+        "Reports exact blockers instead of asking for routine push/merge/deploy approval"
+      ]
+    }
+  ]
+}

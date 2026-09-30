@@ -1,0 +1,82 @@
+gui:
+  showIcons: true
+  nerdFontsVersion: "3"
+  theme:
+    activeBorderColor:
+      - "#bd93f9"
+      - bold
+    inactiveBorderColor:
+      - "#6272a4"
+    selectedLineBgColor:
+      - "#44475a"
+    searchingActiveBorderColor:
+      - "#50fa7b"
+      - bold
+    optionsTextColor:
+      - "#8be9fd"
+    defaultFgColor:
+      - "#f8f8f2"
+  showBottomLine: false
+  showCommandLog: false
+  mouseEvents: true
+  sidePanelWidth: 0.25
+  expandFocusedSidePanel: true
+  showRandomTip: false
+  showFileTree: true
+  showListFooter: false
+  animateExplosion: false
+git:
+  paging:
+    colorArg: always
+    pager: delta --dark --paging=never --side-by-side
+  autoFetch: true
+  autoRefresh: true
+  fetchAll: false
+  branchLogCmd: "git log --graph --color=always --abbrev-commit --decorate --date=relative --pretty=medium {{branchName}} --"
+  allBranchesLogCmd: "git log --graph --all --color=always --abbrev-commit --decorate --date=relative --pretty=medium"
+  parseEmoji: true
+  log:
+    showGraph: always
+    order: date-order
+os:
+  editPreset: "nvim"
+  openCommand: "open {{filename}}"
+promptToReturnFromSubprocess: false
+customCommands:
+  - key: "<c-p>"
+    description: "Push with --force-with-lease"
+    command: "git push --force-with-lease"
+    context: "global"
+    loadingText: "Force pushing..."
+  - key: "b"
+    description: "Checkout new branch from origin/main"
+    command: "git fetch origin main && git checkout -b {{.PromptResponse}} origin/main"
+    context: "localBranches"
+    prompts:
+      - type: "input"
+        title: "Branch name:"
+  - key: "C"
+    description: "Conventional commit"
+    command: >
+      bash -c '
+        TYPE=$(gum choose feat fix docs style refactor perf test build ci chore revert)
+        SCOPE=$(gum input --placeholder "scope (optional)")
+        MSG=$(gum input --placeholder "description")
+        [ -n "$SCOPE" ] && git commit -m "${TYPE}(${SCOPE}): ${MSG}" || git commit -m "${TYPE}: ${MSG}"
+      '
+    context: "files"
+    subprocess: true
+  - key: "P"
+    description: "Create PR"
+    command: "gh pr create --fill --draft"
+    context: "localBranches"
+    loadingText: "Creating PR..."
+    subprocess: true
+  - key: "O"
+    description: "Open PR in browser"
+    command: "gh pr view --web"
+    context: "localBranches"
+    subprocess: true
+keybinding:
+  universal:
+    quit: "q"

@@ -1,0 +1,75 @@
+#!/bin/bash
+# Heal Chrome Work-profile routing end-to-end for enterprise Macs.
+#
+# Two complementary axes (same as modules/chrome/doctor.sh):
+#   1. chrome-enforce-profile — patch Local State so cold launches open Work
+#   2. chromework-install     — rebuild/keep ChromeWork.app + reassert it as
+#                               the system default http(s) handler
+#
+# Why this wrapper exists: com.dotfiles.chrome-profile used to run only (1).
+# LaunchServices drifts back to raw Google Chrome after Chrome/macOS updates
+# (or a "Use Chrome" prompt), and Slack/Outlook/Mail then open links in the
+# wrong Chrome (often an agent-browser daemon) — which shows up as "wrong Slack".
+# Running chromework-install on the same cadence heals that without waiting for
+# the weekly doctor LaunchAgent.
+#
+# Designed for unattended LaunchAgent use — fast, idempotent, safe.
+# Exit codes: 0 = healed or already correct, 1 = hard error, 2 = skipped
+# (not enterprise / Chrome not installed).
+
+set +e
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG_TS="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+
+_log() {
+  printf '%s chrome-heal: %s\n' "$LOG_TS" "$*"
+}
+
+IS_ENTERPRISE="$(chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null || echo "false")"
+if [ "$IS_ENTERPRISE" != "true" ]; then
+  _log "skip — not enterprise"
+  exit 2
+fi
+
+if ! [ -d "/Applications/Google Chrome.app" ] && ! [ -d "${CHROME_APP_DIR:-}" ]; then
+  _log "skip — Google Chrome not installed"
+  exit 2
+fi
+
+# (1) Local State — may exit 2 when personal Chrome is running; that is fine.
+"$SCRIPT_DIR/chrome-enforce-profile"
+enforce_rc=$?
+case "$enforce_rc" in
+  0) _log "chrome-enforce-profile: ok" ;;
+  2) _log "chrome-enforce-profile: skipped (rc=2)" ;;
+  *) _log "chrome-enforce-profile: failed (rc=$enforce_rc)" ;;
+esac
+
+# (2) Router + default browser — always attempt; idempotent when already correct.
+"$SCRIPT_DIR/chromework-install"
+install_rc=$?
+case "$install_rc" in
+  0) _log "chromework-install: ok" ;;
+  2) _log "chromework-install: skipped (rc=2)" ;;
+  *)
+    _log "chromework-install: failed (rc=$install_rc)"
+    exit 1
+    ;;
+esac
+
+# Soft verify — log drift so LaunchAgent logs show when macOS still needs a
+# confirmation click (defaultbrowser cannot silently override in that case).
+if command -v defaultbrowser &>/dev/null; then
+  current="$(defaultbrowser 2>/dev/null | awk '/^\*/ {print $2; exit}')"
+  if [ "$current" = "browser" ]; then
+    _log "default browser: ChromeWork (browser)"
+  else
+    _log "default browser still '$current' — run 'defaultbrowser browser' and confirm if macOS prompts"
+  fi
+fi
+
+# Prefer chromework success; Local State skip while Chrome is open is not a failure.
+[ "$install_rc" -eq 0 ] || [ "$install_rc" -eq 2 ] || exit 1
+exit 0

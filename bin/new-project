@@ -1,0 +1,300 @@
+#!/bin/bash
+# Scaffold a new project with best-practice defaults.
+# Usage: new-project react my-app
+#        new-project node my-api
+#        new-project lib my-lib
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+
+template="${1:-}"
+name="${2:-}"
+
+if [ -z "$template" ] || [ -z "$name" ]; then
+  echo "Usage: new-project <template> <name>"
+  echo ""
+  echo "Templates:"
+  echo "  react   — React + TypeScript + Vite + Vitest + ESLint + Prettier"
+  echo "  node    — Node.js + TypeScript + ESLint + Prettier + Vitest"
+  echo "  lib     — Library + TypeScript + tsup + Vitest"
+  echo "  python  — Python + uv + pytest + ruff + mypy"
+  exit 1
+fi
+
+REPOS_DIR="${DOTFILES_REPOS_DIR:-$HOME/apps}"
+dir="$REPOS_DIR/$name"
+if [ -d "$dir" ]; then
+  echo "❌ $dir already exists"
+  exit 1
+fi
+
+mkdir -p "$dir" && cd "$dir" || { echo "❌ Cannot create or enter $dir"; exit 1; }
+
+init_git() {
+  git init --quiet
+  cat > .gitignore << 'EOF'
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+EOF
+  echo -e "${GREEN}✓${NC} Git initialized"
+}
+
+init_prettier() {
+  cat > .prettierrc << 'EOF'
+{
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "tabWidth": 2
+}
+EOF
+  cat > .prettierignore << 'EOF'
+dist
+coverage
+node_modules
+EOF
+  echo -e "${GREEN}✓${NC} Prettier configured"
+}
+
+init_eslint() {
+  cat > eslint.config.js << 'EOF'
+import js from '@eslint/js'
+import tseslint from 'typescript-eslint'
+
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  { ignores: ['dist/', 'coverage/'] },
+)
+EOF
+  echo -e "${GREEN}✓${NC} ESLint configured"
+}
+
+init_vitest() {
+  cat > vitest.config.ts << 'EOF'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    coverage: { provider: 'v8', reporter: ['text', 'lcov'] },
+  },
+})
+EOF
+  mkdir -p src/__tests__
+  echo -e "${GREEN}✓${NC} Vitest configured"
+}
+
+case "$template" in
+  react)
+    if ! command -v npm &>/dev/null; then
+      echo -e "${RED}✗${NC} npm not found. Install Node.js first: brew install fnm && fnm install --lts"
+      exit 1
+    fi
+    echo -e "${BLUE}→${NC} Scaffolding React + TypeScript + Vite project..."
+    npm create vite@latest . -- --template react-ts --yes 2>/dev/null
+    init_git
+    init_prettier
+    cat > vitest.config.ts << 'EOF'
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test-setup.ts'],
+    coverage: { provider: 'v8', reporter: ['text', 'lcov'] },
+  },
+})
+EOF
+    cat > src/test-setup.ts << 'EOF'
+import '@testing-library/jest-dom/vitest'
+EOF
+    npm install -D vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom @eslint/js typescript-eslint prettier 2>/dev/null
+    mkdir -p src/__tests__
+    npx --yes json -I -f package.json -e 'this.scripts.test="vitest"; this.scripts.coverage="vitest run --coverage"; this.scripts.lint="eslint src"; this.scripts.format="prettier --write src"' 2>/dev/null
+    echo -e "${GREEN}✓${NC} React project ready"
+    ;;
+  node)
+    echo -e "${BLUE}→${NC} Scaffolding Node.js + TypeScript project..."
+    cat > package.json << EOF
+{
+  "name": "$name",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "format": "prettier --write src"
+  }
+}
+EOF
+    cat > tsconfig.json << 'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
+EOF
+    mkdir -p src
+    cat > src/index.ts << EOF
+console.log('Hello from $name')
+EOF
+    init_git
+    init_prettier
+    init_eslint
+    init_vitest
+    npm install -D typescript tsx vitest @eslint/js typescript-eslint prettier @types/node 2>/dev/null
+    echo -e "${GREEN}✓${NC} Node project ready"
+    ;;
+  lib)
+    echo -e "${BLUE}→${NC} Scaffolding library + TypeScript + tsup project..."
+    cat > package.json << EOF
+{
+  "name": "$name",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "import": "./dist/index.js", "require": "./dist/index.cjs" }
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "format": "prettier --write src",
+    "prepublishOnly": "npm run build"
+  }
+}
+EOF
+    cat > tsconfig.json << 'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
+EOF
+    cat > tsup.config.ts << 'EOF'
+import { defineConfig } from 'tsup'
+
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['esm', 'cjs'],
+  dts: true,
+  clean: true,
+})
+EOF
+    mkdir -p src
+    cat > src/index.ts << 'EOF'
+export function hello(name: string): string {
+  return \`Hello, \${name}!\`
+}
+EOF
+    init_git
+    init_prettier
+    init_eslint
+    init_vitest
+    npm install -D typescript tsup vitest @eslint/js typescript-eslint prettier 2>/dev/null
+    echo -e "${GREEN}✓${NC} Library project ready"
+    ;;
+  python)
+    echo -e "${BLUE}→${NC} Scaffolding Python + uv project..."
+    cat > pyproject.toml << EOF
+[project]
+name = "$name"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+EOF
+    mkdir -p src tests
+    cat > "src/__init__.py" << 'EOF'
+EOF
+    cat > "src/main.py" << EOF
+def main() -> None:
+    print("Hello from $name")
+
+if __name__ == "__main__":
+    main()
+EOF
+    cat > "tests/__init__.py" << 'EOF'
+EOF
+    cat > "tests/test_main.py" << 'EOF'
+from src.main import main
+
+def test_main(capsys):
+    main()
+    captured = capsys.readouterr()
+    assert "Hello" in captured.out
+EOF
+    init_git
+    if command -v uv &>/dev/null; then
+      uv sync 2>/dev/null && ok "Dependencies installed via uv"
+    else
+      warn "uv not installed — run: brew install uv && uv sync"
+    fi
+    echo -e "${GREEN}✓${NC} Python project ready"
+    ;;
+  *)
+    echo "❌ Unknown template: $template"
+    echo "Available: react, node, lib, python"
+    exit 1
+    ;;
+esac
+
+echo ""
+echo -e "${GREEN}🎉 Project created at $dir${NC}"
+echo "   cd $dir"

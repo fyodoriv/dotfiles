@@ -1,0 +1,63 @@
+#!/bin/bash
+# Manage the `# BEGIN/END git-personal-includeif` block in ~/.gitconfig.local.
+#
+# When git_personal_enabled is true, inject/refresh the includeIf stanzas
+# that route any github.com remote to ~/.gitconfig.personal. When false,
+# remove the block. Idempotent — safe to run on every chezmoi apply.
+#
+# chezmoi re-runs this script automatically when the template content
+# (including the data values below) changes.
+
+set -euo pipefail
+
+LOCAL_CONFIG="$HOME/.gitconfig.local"
+MARK_START="# BEGIN git-personal-includeif (managed by dotfiles — do not edit)"
+MARK_END="# END git-personal-includeif"
+
+# chezmoi injects these as template values so the script hash changes
+# whenever the user flips the opt-in or changes the identity — triggering
+# a re-run. They are not used as shell inputs.
+#
+# git_personal_enabled = {{ dig "git_personal_enabled" false . }}
+# git_personal_name    = {{ dig "git_personal_name" "" . | quote }}
+# git_personal_email   = {{ dig "git_personal_email" "" . | quote }}
+
+# No-op if ~/.gitconfig.local does not exist yet. The git module doctor
+# bootstraps it from gitconfig.local.example on fresh installs.
+[ -f "$LOCAL_CONFIG" ] || exit 0
+
+# Strip any existing block first — always, regardless of enabled state.
+if grep -qF "$MARK_START" "$LOCAL_CONFIG"; then
+  # Use awk to delete lines between markers (inclusive). Works on BSD sed too.
+  awk -v start="$MARK_START" -v end="$MARK_END" '
+    $0 == start { skip = 1 }
+    !skip { print }
+    $0 == end { skip = 0; next }
+  ' "$LOCAL_CONFIG" > "$LOCAL_CONFIG.tmp"
+  # Also trim trailing blank lines left behind by the stripped block.
+  awk 'NR==FNR{a[NR]=$0; n=NR; next} END{
+    while (n > 0 && a[n] == "") n--
+    for (i = 1; i <= n; i++) print a[i]
+  }' "$LOCAL_CONFIG.tmp" "$LOCAL_CONFIG.tmp" > "$LOCAL_CONFIG"
+  rm -f "$LOCAL_CONFIG.tmp"
+fi
+
+{{ if dig "git_personal_enabled" false . -}}
+# Append the managed block.
+cat >> "$LOCAL_CONFIG" <<'EOF'
+
+# BEGIN git-personal-includeif (managed by dotfiles — do not edit)
+# Load personal identity from ~/.gitconfig.personal when the current repo
+# has any github.com remote. Enterprise remotes keep the default identity.
+# Patterns use */* instead of ** because git's wildmatch treats ** as a
+# path-segment token only when bounded by /; after : in scp-style SSH URLs
+# it degrades to single-segment matching and misses org/repo paths.
+[includeIf "hasconfig:remote.*.url:https://github.com/*/*"]
+	path = ~/.gitconfig.personal
+[includeIf "hasconfig:remote.*.url:git@github.com:*/*"]
+	path = ~/.gitconfig.personal
+[includeIf "hasconfig:remote.*.url:ssh://git@github.com/*/*"]
+	path = ~/.gitconfig.personal
+# END git-personal-includeif
+EOF
+{{- end }}

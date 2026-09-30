@@ -1,0 +1,72 @@
+# Windsurf extensions — managed by dotfiles
+# Source of truth for `modules/windsurf/doctor.sh`. One extension ID per line.
+# Lines starting with `#` and blank lines are ignored.
+#
+# To add/remove: edit this file, run `dotfiles-doctor --fix`. The doctor module
+# calls `windsurf --install-extension <id>` for missing entries; existing
+# extensions stay untouched (no churn, no version pin needed here).
+#
+# Do NOT pin versions — Windsurf's update.mode=manual + extensions.autoUpdate=false
+# in settings.json already prevent surprise updates. Pin only if you hit a regression.
+#
+# Layer rationale: each block replaces a specific WebStorm built-in.
+
+# ── Keymap (replaces WebStorm "Mac OS X 10.5+ copy" keymap) ──────────────────
+k--kato.intellij-idea-keybindings
+
+# ── Vim (matches IdeaVim in WebStorm — already installed by user) ────────────
+vscodevim.vim
+
+# ── Formatting & linting (replaces WebStorm built-in Prettier + ESLint integ) ─
+esbenp.prettier-vscode
+dbaeumer.vscode-eslint
+editorconfig.editorconfig
+
+# ── Git integration (replaces WebStorm's Local History + Git Log + Annotate) ─
+eamodio.gitlens
+github.vscode-pull-request-github
+github.vscode-github-actions
+
+# ── Inline diagnostics & spelling (replaces WebStorm typo + inspections UX) ──
+usernamehw.errorlens
+streetsidesoftware.code-spell-checker
+
+# ── Theme parity with WebStorm "New UI Dark" ─────────────────────────────────
+# IDs match windsurf/settings.json {workbench.colorTheme, workbench.iconTheme}
+# so the labels resolve without manual selection on first launch.
+compassak.intellij-idea-new-ui
+chadalen.vscode-jetbrains-icon-theme
+
+# ── Filetype + extra-language support ────────────────────────────────────────
+# material-icon-theme stays installed but is no longer selected; the JetBrains
+# icon theme is the canonical one (see workbench.iconTheme in settings.json).
+pkief.material-icon-theme
+redhat.vscode-yaml
+tamasfe.even-better-toml
+mikestead.dotenv
+
+# ── Test / runner support (replaces WebStorm test runner gutter actions) ─────
+vitest.explorer
+firsttris.vscode-jest-runner
+
+# ── Markdown + docs (replaces WebStorm's bundled markdown plugin) ────────────
+yzhang.markdown-all-in-one
+bierner.markdown-mermaid
+davidanson.vscode-markdownlint
+
+# ── Productivity (replaces small WebStorm conveniences) ──────────────────────
+christian-kohler.npm-intellisense
+christian-kohler.path-intellisense
+# IntelliCode (visualstudioexptteam.*) is MS-proprietary, not on Open VSX —
+# omitted; tsserver's built-in completions cover ~90% of the value anyway.
+
+
+# ── Docker (replaces JetBrains Docker plugin) ────────────────────────────────
+ms-azuretools.vscode-docker
+
+# Microsoft Remote-Containers is exclusive to the MS marketplace; install
+# manually if needed. Most enterprise dev-container workflows happen in minsky
+# worktrees rather than VS Code Remote-Containers, so this isn't a regression.
+
+# ── Spelling dictionaries (extra word lists for cSpell) ──────────────────────
+streetsidesoftware.code-spell-checker-british-english

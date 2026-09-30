@@ -1,0 +1,76 @@
+# Make Node available in all shells (including non-interactive IDE terminals).
+# WebStorm's terminal identifies itself before zshrc loads. Its fast path needs
+# the default Node for Claude Code, but does not need fnm's per-directory setup.
+_dotfiles_fast_jetbrains=0
+if [[ "${TERMINAL_EMULATOR:-}" == "JetBrains-JediTerm" \
+   && -z "${DOTFILES_JETBRAINS_FULL_SHELL:-}" ]]; then
+  _dotfiles_fast_jetbrains=1
+fi
+
+if (( _dotfiles_fast_jetbrains )); then
+  _dotfiles_node_version=""
+  [[ -r "$HOME/.node-version" ]] && _dotfiles_node_version="$(<"$HOME/.node-version")"
+  _dotfiles_node_version="${_dotfiles_node_version#v}"
+  _dotfiles_node_bin="$HOME/.local/share/fnm/node-versions/v${_dotfiles_node_version}/installation/bin"
+
+  if [[ -n "$_dotfiles_node_version" && -x "$_dotfiles_node_bin/node" ]]; then
+    export PATH="$_dotfiles_node_bin:$PATH"
+  elif command -v fnm &>/dev/null; then
+    eval "$(fnm env --arch "$(uname -m | sed 's/x86_64/x64/')" --corepack-enabled --version-file-strategy=recursive --shell zsh 2>/dev/null)"
+  fi
+  unset _dotfiles_node_version _dotfiles_node_bin
+elif command -v fnm &>/dev/null; then
+  eval "$(fnm env --arch "$(uname -m | sed 's/x86_64/x64/')" --corepack-enabled --version-file-strategy=recursive --shell zsh 2>/dev/null)"
+fi
+unset _dotfiles_fast_jetbrains
+
+# uv: only-managed python discovery.
+#
+# Endpoint-security policy flags any Python binary whose resolved
+# path contains "Python.framework". Both the python.org installer at
+# /Library/Frameworks/Python.framework/... and brew's python@3.13 cellar
+# binary at /usr/local/Cellar/python@3.13/.../Frameworks/Python.framework/...
+# have the framework path and trigger the policy block dialog on invocation.
+#
+# Setting UV_PYTHON_PREFERENCE=only-managed makes uv ignore non-uv-installed
+# pythons entirely — it won't enumerate, probe, or fall back to them. Every
+# uv invocation (whether from our dotfiles/bin/python3 shim, pipx, or any
+# other process) will only ever touch ~/.local/share/uv/python/... binaries,
+# which have no Python.framework path and are endpoint-safe.
+export UV_PYTHON_PREFERENCE=only-managed
+
+# Corporate CA for Node-based tools.
+#
+# A TLS-inspecting proxy may present certs signed by a corporate root CA. Node's bundled Mozilla root store doesn't include it, so npm / cursor / windsurf CLIs fail with "self
+# signed certificate in certificate chain" on any HTTPS call (e.g. `cursor
+# --update-extensions` during `dotfiles upgrade`). NODE_EXTRA_CA_CERTS only
+# APPENDS this CA to Node's built-in roots — it never replaces them, so it
+# can only add trust. Guarded so a missing bundle doesn't point Node
+# at a missing file (Node warns on every spawn if the path is absent), and so
+# an existing value (e.g. from ~/.zshenv.secrets) wins. The LaunchAgent path
+# sets the same var in bin/dotfiles-upgrade (it doesn't source this file).
+# Candidates match lib/dotfiles-endpoint-paths.sh dotfiles_corporate_node_ca.
+if [ -z "${NODE_EXTRA_CA_CERTS:-}" ]; then
+  # DOTFILES_CORPORATE_CA_BUNDLES: optional colon-separated extra candidates.
+  IFS=':' read -r -a _extra_ca <<< "${DOTFILES_CORPORATE_CA_BUNDLES:-}"
+  for _corp_ca in \
+    ${_extra_ca[@]+"${_extra_ca[@]}"} \
+    "$HOME/.config/ssl/corporate-combined-ca.pem" \
+    "$HOME/.config/ssl/macos-trust-bundle.pem"; do
+    if [ -f "$_corp_ca" ]; then
+      export NODE_EXTRA_CA_CERTS="$_corp_ca"
+      break
+    fi
+  done
+  unset _corp_ca _extra_ca
+fi
+
+# Chezmoi-generated env vars (repos_dir, etc.)
+[ -f "${HOME}/.config/dotfiles/env.sh" ] && source "${HOME}/.config/dotfiles/env.sh"
+
+# Enterprise and secret env vars live in ~/.zshenv.secrets — never tracked in git.
+# See home/zshenv.secrets.example for all available vars.
+# Create this file manually or via: agentbrew mcp setup
+if [[ -f "${HOME}/.zshenv.secrets" ]]; then
+  source "${HOME}/.zshenv.secrets"
+fi

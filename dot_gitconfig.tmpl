@@ -1,0 +1,105 @@
+# ── Git config (universal) ────────────────────────────────────────────
+# Personal overrides (name, email, org-specific urls) go in ~/.gitconfig.local
+[include]
+	path = ~/.gitconfig.local
+
+[core]
+	excludesfile = ~/.gitignore_global
+	pager = "delta 2>/dev/null || less"
+	editor = ~/.git-editor
+	# watchman is installed; fsmonitor + untrackedCache make git status/diff
+	# dramatically faster in large monorepos by avoiding full directory scans.
+	untrackedCache = true
+	fsmonitor = false
+	hooksPath = {{ .chezmoi.sourceDir }}/git-hooks
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	side-by-side = true
+	line-numbers = true
+	hyperlinks = true
+
+[init]
+	defaultBranch = main
+
+[pull]
+	rebase = true
+
+[push]
+	autoSetupRemote = true
+	default = current
+
+[fetch]
+	prune = true
+	pruneTags = true
+	parallel = 0
+
+[pack]
+	threads = 0
+
+[checkout]
+	workers = 0
+
+[index]
+	threads = true
+
+[maintenance]
+	auto = true
+	strategy = incremental
+
+[rebase]
+	autoStash = true
+	autoSquash = true
+
+[merge]
+	conflictstyle = zdiff3
+
+[rerere]
+	enabled = true
+
+[diff]
+	algorithm = histogram
+	colorMoved = default
+	renames = copies
+
+[branch]
+	sort = -committerdate
+
+[tag]
+	sort = -version:refname
+
+[alias]
+	s = status --short --branch
+	d = diff
+	ds = diff --staged
+	l = log --oneline -20 --graph --decorate
+	la = log --oneline --all --graph --decorate -30
+	co = checkout
+	sw = switch
+	sc = switch --create
+	cm = commit
+	ca = commit --amend --no-edit
+	cp = cherry-pick
+	unstage = restore --staged
+	undo = reset --soft HEAD~1
+	wip = commit -m wip
+	gone = !git branch -vv | grep ': gone]' | awk '{print $1}'
+	prune-merged = !git gone | xargs -r git branch -D
+	recent = branch --sort=-committerdate --format='%(committerdate:relative)%09%(refname:short)'
+
+[filter "lfs"]
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+[credential "https://github.com"]
+	helper =
+	helper = !/bin/bash -c 'command -v gh >/dev/null && gh auth git-credential "$@"' --
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/bin/bash -c 'command -v gh >/dev/null && gh auth git-credential "$@"' --
+[http]
+	postBuffer = 524288000

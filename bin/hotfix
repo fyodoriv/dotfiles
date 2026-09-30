@@ -1,0 +1,51 @@
+#!/bin/bash
+# Quick hotfix workflow: branch from main, commit, push, PR.
+# Usage: hotfix "fix: resolve crash on startup"
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+if [ -z "${1:-}" ]; then
+  echo "Usage: hotfix \"fix: description\""
+  exit 1
+fi
+
+message="${1:?Usage: hotfix \"fix: description\"}"
+# Sanitize the message into a branch slug:
+#   1. Collapse every run of non-alphanumeric chars into a single dash so
+#      conventional-commit-style messages like "fix: foo" yield clean
+#      "fix-foo" branches (was "fix--foo" with the literal-char regex).
+#   2. Lowercase, then truncate to 50 chars to keep branch names short.
+branch_name="hotfix/$(echo "$message" | sed -E 's/[^a-zA-Z0-9]+/-/g' | tr '[:upper:]' '[:lower:]' | head -c 50)"
+
+# Detect the default branch (main or master)
+if git symbolic-ref refs/remotes/origin/HEAD &>/dev/null; then
+  default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+else
+  default_branch="main"
+fi
+
+original_branch=$(git branch --show-current 2>/dev/null || git rev-parse --short HEAD)
+stashed=false
+if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+  git stash --include-untracked 2>/dev/null || true
+  stashed=true
+fi
+
+cleanup() {
+  if $stashed; then
+    git checkout "$original_branch" 2>/dev/null || true
+    git stash pop 2>/dev/null || true
+  fi
+}
+trap cleanup ERR
+
+git checkout "$default_branch"
+git pull --rebase
+git checkout -b "$branch_name"
+trap - ERR
+$stashed && git stash pop 2>/dev/null || true
+
+echo ""
+echo "✓ On branch: $branch_name"
+echo "  Make your fix, then run: pr \"$message\""

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.dotfiles.agent-keepawake — process-scoped protection for Cursor and
+  Claude Code. It protects AC and battery at or above 20%, then releases its
+  own caffeinate/Amphetamine state within a few seconds after the processes end.
+  Display sleep / screen lock still allowed.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dotfiles.agent-keepawake</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin/dotfiles-agent-keepawake</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>5</integer>
+    <key>ThrottleInterval</key>
+    <integer>2</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- Keep manager-owned caffeinate children alive between short reconciliation runs. -->
+    <key>AbandonProcessGroup</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/agent-keepawake.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/agent-keepawake.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LANG</key>
+        <string>C.UTF-8</string>
+        <key>PATH</key>
+        <string>{{ template "launchagent-path" . }}</string>
+        <key>HOME</key>
+        <string>{{ .chezmoi.homeDir }}</string>
+        <key>DOTFILES_AGENT_KEEPAWAKE_BATTERY</key>
+        <string>1</string>
+        <key>DOTFILES_AGENT_KEEPAWAKE_BATTERY_MIN_PERCENT</key>
+        <string>20</string>
+    </dict>
+</dict>
+</plist>

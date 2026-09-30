@@ -1,0 +1,6 @@
+# Exact normalized public repositories that agent-shaped git pushes may target.
+# Keep this list repository-specific. Do not add github.com or an owner wildcard.
+github.com/fyodoriv/agentbrew
+github.com/fyodoriv/dotfiles
+github.com/fyodoriv/dev-skills
+github.com/fyodoriv/minsky

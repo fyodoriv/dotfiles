@@ -1,0 +1,107 @@
+#!/bin/bash
+# Run git maintenance across all repos in ~/apps.
+# Prunes stale branches, runs gc, fetches, and reports status.
+# Usage: git-maintain           → all repos
+#        git-maintain --quick   → gc only, no fetch
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# Trim log to last 500 lines (prevents unbounded growth from LaunchAgent)
+_log="$HOME/.local/share/dotfiles/logs/git-maintain.log"
+if [ -f "$_log" ]; then
+  tail -n 500 "$_log" > "$_log.tmp" && mv "$_log.tmp" "$_log" || rm -f "$_log.tmp"
+fi
+
+# shellcheck source=../lib/stats.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
+
+quick=false
+[ "${1:-}" = "--quick" ] && quick=true
+
+REPOS_DIR="${DOTFILES_REPOS_DIR:-$HOME/apps}"
+if [ ! -d "$REPOS_DIR" ]; then
+  echo "⚠ DOTFILES_REPOS_DIR ($REPOS_DIR) not found. Set it in ~/.zshrc.local"
+  exit 0
+fi
+
+echo "🔧 Git maintenance across $REPOS_DIR..."
+echo ""
+
+maintained=0
+
+for dir in "$REPOS_DIR"/*/; do
+  [ ! -d "$dir/.git" ] && continue
+  # Skip worktree checkouts (their .git is a file, not a directory)
+  [ -f "$dir/.git" ] && continue
+  name="$(basename "$dir")"
+
+  (
+    cd "$dir" || exit
+    issues=""
+
+    if ! $quick; then
+      git fetch --prune --quiet 2>/dev/null
+    fi
+
+    # ── Worktree health ──────────────────────────────────────────────
+    worktree_count=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
+
+    # Prune stale worktree references (deleted directories)
+    pruned=$(git worktree prune -v 2>&1 | grep -c "Removing" || true)
+    [ "$pruned" -gt 0 ] && issues="${issues}pruned $pruned stale worktrees, "
+
+    # Disable fsmonitor on repos with multiple worktrees (known index corruption risk)
+    if [ "$worktree_count" -gt 1 ]; then
+      fsmon=$(git config --local core.fsmonitor 2>/dev/null || echo "unset")
+      if [ "$fsmon" != "false" ]; then
+        git fsmonitor--daemon stop 2>/dev/null || true
+        git config --local core.fsmonitor false
+        issues="${issues}disabled fsmonitor (${worktree_count} worktrees), "
+      fi
+    fi
+
+    # ── Index health ─────────────────────────────────────────────────
+    # Detect truncated index (< 1KB usually means corruption)
+    index_file=".git/index"
+    if [ -f "$index_file" ]; then
+      index_size=$(wc -c < "$index_file" | tr -d ' ')
+      if [ "$index_size" -lt 1024 ]; then
+        echo -e "  ${YELLOW}⚠${NC} $name — index looks truncated (${index_size}B), rebuilding..."
+        rm -f "$index_file"
+        git reset 2>/dev/null
+        issues="${issues}rebuilt index, "
+      fi
+    fi
+
+    # Clean up stale sharedindex files (leftover from splitIndex)
+    shared_cleaned=0
+    for f in .git/sharedindex.* .git/worktrees/*/sharedindex.*; do
+      [ -f "$f" ] && rm -f "$f" && shared_cleaned=$((shared_cleaned + 1))
+    done
+    [ "$shared_cleaned" -gt 0 ] && issues="${issues}removed $shared_cleaned stale sharedindex files, "
+
+    git gc --quiet 2>/dev/null
+
+    # ── Stale branches ──────────────────────────────────────────────
+    default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    [ -z "$default_branch" ] && default_branch="main"
+    stale=$(git branch --merged "$default_branch" 2>/dev/null | grep -v "\*\|$default_branch\|master" | wc -l | tr -d ' ')
+
+    if [ "$stale" -gt 0 ]; then
+      git branch --merged "$default_branch" 2>/dev/null | grep -v "\*\|$default_branch\|master" | xargs -n 1 git branch -d 2>/dev/null
+      issues="${issues}cleaned $stale stale branches, "
+    fi
+
+    if [ -n "$issues" ]; then
+      echo -e "  ${YELLOW}⚠${NC} $name — ${issues%, }"
+    else
+      echo -e "  ${GREEN}✓${NC} $name"
+    fi
+  ) || true
+
+  maintained=$((maintained + 1))
+done
+
+echo ""
+echo -e "${GREEN}Done!${NC} Maintained $maintained repos."
+log_run git-maintain "$maintained"

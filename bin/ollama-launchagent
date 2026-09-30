@@ -1,0 +1,48 @@
+#!/bin/bash
+# Collision-safe owner for the local Ollama API.
+#
+# Ollama.app may already own port 11434. Executing a second `ollama serve`
+# every ten seconds both fails to bind and repeatedly trips endpoint policy.
+
+set -uo pipefail
+
+# shellcheck source=/dev/null
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/dotfiles-endpoint-paths.sh"
+
+LOG="$HOME/.local/share/dotfiles/logs/ollama-launchagent.log"
+OLLAMA_BIN="${OLLAMA_BIN:-/opt/homebrew/bin/ollama}"
+NC_BIN="${NC_BIN:-/usr/bin/nc}"
+BLOCKED_TEAM_ID="3MU9H2V9Y9"
+
+mkdir -p "$(dirname "$LOG")"
+log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
+
+response="$(
+  printf 'GET /api/tags HTTP/1.0\r\nHost: 127.0.0.1:11434\r\nConnection: close\r\n\r\n' \
+    | "$NC_BIN" -w 2 127.0.0.1 11434 2>/dev/null
+)" || response=""
+first_line="${response%%$'\n'*}"
+first_line="${first_line%$'\r'}"
+
+if [[ "$first_line" == HTTP/*\ 2[0-9][0-9]\ * ]]; then
+  log "API already healthy on :11434; another owner is active, skipping duplicate serve"
+  exit 0
+fi
+
+if [ ! -x "$OLLAMA_BIN" ]; then
+  log "WARN: Ollama executable not found at $OLLAMA_BIN; not retrying"
+  exit 0
+fi
+
+if [ "$(uname -s)" = "Darwin" ] \
+    && dotfiles_managed_endpoint \
+    && [ "${DOTFILES_ALLOW_BLOCKED_OLLAMA_PUBLISHER:-0}" != "1" ]; then
+  signature="$(codesign -dvv "$OLLAMA_BIN" 2>&1 || true)"
+  if grep -q "TeamIdentifier=$BLOCKED_TEAM_ID" <<<"$signature"; then
+    log "Publisher Infra Technologies, Inc ($BLOCKED_TEAM_ID) is blocked; server start skipped"
+    exit 0
+  fi
+fi
+
+log "API unavailable; starting one Ollama server"
+exec "$OLLAMA_BIN" serve

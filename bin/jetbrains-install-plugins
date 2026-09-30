@@ -1,0 +1,142 @@
+#!/bin/bash
+# Install the recommended JetBrains plugins listed in jetbrains/recommended_plugins.txt.
+#
+# Uses the JetBrains IDE CLI (`installPlugins <plugin-id>`) which works headlessly
+# since 2023.x. Runs once per detected IDE (matches modules/jetbrains/doctor.sh
+# IDE detection — latest version of each detected IDE slug).
+#
+# To install ALL recommended plugins for ALL detected JetBrains IDEs:
+#     bin/jetbrains-install-plugins
+#
+# To install a single plugin (any IDE):
+#     /Applications/<IDE>.app/Contents/MacOS/<binary> installPlugins <plugin-id>
+#
+# Idempotent: re-running on an already-installed plugin is a no-op.
+# Safe to add to a launchd cron — running daily at idle won't churn anything.
+
+set -euo pipefail
+
+# Resolve dotfiles dir from this script's location.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PLUGIN_LIST="$DOTFILES_DIR/jetbrains/recommended_plugins.txt"
+
+if [ ! -f "$PLUGIN_LIST" ]; then
+  echo "ERROR: $PLUGIN_LIST not found" >&2
+  exit 1
+fi
+
+# Strip comments and inline notes, keep just plugin IDs.
+# JetBrains plugin IDs occasionally contain literal spaces (e.g. "Key Promoter X"),
+# so we strip the inline `<2+ spaces>#<comment>` suffix instead of taking the
+# first whitespace-delimited token. Trailing whitespace stripped too.
+plugins="$(grep -v '^#' "$PLUGIN_LIST" | grep -v '^$' | sed -E 's/[[:space:]]{2,}#.*$//; s/[[:space:]]+$//')"
+
+if [ -z "$plugins" ]; then
+  echo "No plugins listed in $PLUGIN_LIST"
+  exit 0
+fi
+
+# Detect installed JetBrains IDEs by their app bundle.
+declare -a IDE_BINARIES=()
+for app in /Applications/WebStorm.app \
+           /Applications/IntelliJ\ IDEA.app \
+           /Applications/IntelliJ\ IDEA\ Ultimate.app \
+           /Applications/IntelliJ\ IDEA\ Community\ Edition.app \
+           /Applications/PyCharm.app \
+           /Applications/PyCharm\ Professional\ Edition.app \
+           /Applications/PyCharm\ Community\ Edition.app \
+           /Applications/GoLand.app \
+           /Applications/Rider.app \
+           /Applications/CLion.app \
+           /Applications/RubyMine.app \
+           /Applications/PhpStorm.app \
+           /Applications/DataGrip.app \
+           /Applications/Aqua.app; do
+  [ -d "$app" ] || continue
+  binary="$app/Contents/MacOS"
+  # Each IDE's binary inside MacOS/ is the lowercased product name.
+  for b in "$binary"/*; do
+    if [ -x "$b" ] && [ ! -d "$b" ]; then
+      IDE_BINARIES+=("$b")
+      break
+    fi
+  done
+done
+
+if [ "${#IDE_BINARIES[@]}" -eq 0 ]; then
+  echo "No JetBrains IDEs detected in /Applications"
+  exit 0
+fi
+
+# Partition IDEs into runnable (closed) vs running. `installPlugins` fails fast
+# with "Only one instance of <IDE> can be run at a time." when the IDE is open,
+# so we skip running IDEs upfront and produce a clean summary instead of a
+# noisy per-plugin failure dump. Doctor --fix relies on exit 0 to count as
+# "fixed"; we exit 0 even when all detected IDEs are running (with a clear
+# advisory) so a busy operator's running IDE doesn't keep the doctor permanently
+# red.
+declare -a RUNNABLE_BINARIES=()
+declare -a SKIPPED_RUNNING=()
+for b in "${IDE_BINARIES[@]}"; do
+  ide_name="$(basename "$b")"
+  if pgrep -fl "$b" >/dev/null 2>&1; then
+    SKIPPED_RUNNING+=("$ide_name")
+  else
+    RUNNABLE_BINARIES+=("$b")
+  fi
+done
+
+echo "Detected JetBrains IDEs:"
+for b in "${IDE_BINARIES[@]}"; do
+  ide_name="$(basename "$b")"
+  if pgrep -fl "$b" >/dev/null 2>&1; then
+    echo "  $b  (running — will skip)"
+  else
+    echo "  $b"
+  fi
+done
+echo ""
+
+if [ "${#SKIPPED_RUNNING[@]}" -gt 0 ]; then
+  echo "⚠ Skipped (close to install):"
+  for n in "${SKIPPED_RUNNING[@]}"; do
+    echo "    $n  ─  quit via 'osascript -e \"tell application \\\"${n}\\\" to quit\"' then re-run"
+  done
+  echo ""
+fi
+
+if [ "${#RUNNABLE_BINARIES[@]}" -eq 0 ]; then
+  echo "All detected IDEs are running; nothing to install right now."
+  echo "Re-run this script after closing the IDEs."
+  # Exit 0 — doctor --fix should not stay red just because the user has
+  # WebStorm open. The advisory check will re-flag missing plugins on the
+  # next doctor run; the operator closes the IDE and runs --fix again.
+  exit 0
+fi
+
+# Install each plugin in each runnable IDE. installPlugins on a closed IDE
+# is reliable; we still track per-plugin failures (wrong ID, network, etc.).
+fail=0
+for b in "${RUNNABLE_BINARIES[@]}"; do
+  ide_name="$(basename "$b")"
+  echo "─── $ide_name ──────────────────────────────────────────"
+  while IFS= read -r plugin; do
+    [ -z "$plugin" ] && continue
+    echo "  installPlugins $plugin"
+    if "$b" installPlugins "$plugin" 2>&1 | tail -3; then
+      :
+    else
+      echo "    (failed — wrong ID? check jetbrains/recommended_plugins.txt)"
+      fail=$((fail + 1))
+    fi
+  done <<< "$plugins"
+  echo ""
+done
+
+if [ "$fail" -gt 0 ]; then
+  echo "⚠ $fail plugin install(s) failed (not because of running IDEs — check the IDs)."
+  exit 1
+fi
+
+echo "✓ All recommended JetBrains plugins installed."

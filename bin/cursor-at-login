@@ -1,0 +1,36 @@
+#!/bin/bash
+# Start Cursor after the shared memory MCP has finished binding its loopback port.
+set -euo pipefail
+
+wait_for_memory="${CURSOR_LOGIN_WAIT_FOR_MEMORY:-false}"
+wait_seconds="${CURSOR_LOGIN_MEMORY_WAIT_SECONDS:-120}"
+memory_host="${CURSOR_LOGIN_MEMORY_HOST:-127.0.0.1}"
+memory_port="${CURSOR_LOGIN_MEMORY_PORT:-18765}"
+agentbrew_bin="${CURSOR_LOGIN_AGENTBREW_BIN:-agentbrew}"
+nc_bin="${CURSOR_LOGIN_NC_BIN:-/usr/bin/nc}"
+open_bin="${CURSOR_LOGIN_OPEN_BIN:-/usr/bin/open}"
+sleep_bin="${CURSOR_LOGIN_SLEEP_BIN:-/bin/sleep}"
+
+memory_is_ready() {
+  "$nc_bin" -z "$memory_host" "$memory_port" >/dev/null 2>&1 &&
+    command -v "$agentbrew_bin" >/dev/null 2>&1 &&
+    "$agentbrew_bin" memory doctor --ready >/dev/null 2>&1
+}
+
+if [ "$wait_for_memory" = "true" ] && ! memory_is_ready; then
+  if command -v "$agentbrew_bin" >/dev/null 2>&1; then
+    "$agentbrew_bin" memory fix --json >/dev/null 2>&1 || true
+  fi
+
+  deadline=$((SECONDS + wait_seconds))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    memory_is_ready && break
+    "$sleep_bin" 1
+  done
+
+  if ! memory_is_ready; then
+    echo "warning: memory MCP did not become ready within ${wait_seconds}s; launching Cursor without it" >&2
+  fi
+fi
+
+exec "$open_bin" -g -a Cursor

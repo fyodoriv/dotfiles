@@ -1,0 +1,766 @@
+#!/bin/bash
+# gh wrapper — filters tool-specific agent attribution out of every
+# `gh pr/issue/release` body that gets posted to GitHub under the
+# user's identity.
+#
+# Why this file exists:
+#   PR descriptions, issue bodies, and review comments are sent via
+#   `gh pr create --body`, `gh issue create --body-file`, etc., which
+#   bypass git hooks entirely. Without this wrapper, agents like
+#   Devin and Claude Code can land `Generated with [<Agent>](...)`
+#   footers in PR descriptions even when the underlying commits are
+#   clean. This wrapper intercepts those calls, strips vendor
+#   attribution from the body content, and (if any was stripped)
+#   appends the canonical tool-neutral Fyodor footer before handing
+#   off to the real `gh` binary. In agent-shaped sessions, PR creation
+#   also fails closed unless the body is attributed and explains why the
+#   PR is needed. Cross-repo PR creation still requires exact approval.
+#
+# Scope of interception:
+#   - gh pr     create | edit | comment | review | close | reopen
+#   - gh issue  create | edit | comment | close | reopen
+#   - gh release create | edit
+#   Flags handled: --body / -b / --body-file, --notes / --notes-file,
+#   --comment / -c (close|reopen subcommands — `gh` accepts string only,
+#   no `--comment-file` form, so the wrapper substitutes the filtered
+#   value back inline), including their `--flag=value` forms.
+#   `--body-file -` (stdin) is also handled.
+#
+# Closure-comment coverage exists because `gh pr close --comment "..."`
+# posts a comment under the user's identity at the same time it closes
+# the PR. Without this scope, agent-authored close comments would skip
+# the strip + footer pipeline entirely (regression observed during
+# orchestrator-driven PR closures).
+#
+# Pass-through: every other `gh` invocation is exec'd verbatim with
+# zero overhead — `gh auth status`, `gh pr view`, `gh repo clone`, …
+# all behave exactly like upstream `gh`.
+#
+# Bypass: set MINSKY_PIPELINE=1 (set by the minsky orchestrator when it
+# spawns unattended pipeline runs) to preserve attribution for
+# pipeline-to-PR linkage.
+#
+# Per-repo agent PR allowlist:
+#   The cross-repo approval gate that fires when `gh pr create --repo X`
+#   targets a repo other than $PWD's git remote can be permanently
+#   skipped per-repo by listing the repo slug in:
+#     ~/.config/agent-gh-allowlist.txt
+#   One slug per line ("owner/repo"), `#` starts a comment, whitespace
+#   ignored. Per-machine, not chezmoi-managed — each contributor decides
+#   which repos to grant agent blanket PR authority on. Override path
+#   with $AGENT_GH_ALLOWLIST_FILE.
+
+set -euo pipefail
+
+# Resolve the real `gh`: skip any `gh` shim that lives earlier in
+# PATH (this file). We hard-prefer the Homebrew location so a Devin
+# session in a sandbox without /usr/local/bin in PATH still finds it.
+if [ -n "${DOTFILES_REAL_GH:-}" ] && [ -x "$DOTFILES_REAL_GH" ]; then
+  REAL_GH="$DOTFILES_REAL_GH"
+elif [ -x /usr/local/bin/gh ]; then
+  REAL_GH="/usr/local/bin/gh"
+elif [ -x /opt/homebrew/bin/gh ]; then
+  REAL_GH="/opt/homebrew/bin/gh"
+else
+  # Last resort: search PATH but skip ourselves.
+  self_realpath=$(readlink -f "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0" 2>/dev/null || printf '%s' "$0")
+  REAL_GH=""
+  IFS=':' read -r -a path_parts <<< "$PATH"
+  for p in "${path_parts[@]}"; do
+    cand="$p/gh"
+    if [ -x "$cand" ]; then
+      cand_realpath=$(readlink -f "$cand" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$cand" 2>/dev/null || printf '%s' "$cand")
+      if [ "$cand_realpath" != "$self_realpath" ]; then
+        REAL_GH="$cand"
+        break
+      fi
+    fi
+  done
+  if [ -z "$REAL_GH" ]; then
+    echo "gh wrapper: could not locate the real gh binary" >&2
+    exit 127
+  fi
+fi
+
+# Minsky pipelines preserve attribution — exec straight through.
+if [ -n "${MINSKY_PIPELINE:-}" ]; then
+  exec "$REAL_GH" "$@"
+fi
+
+# Decide whether this invocation needs body filtering. We only
+# intercept body-bearing subcommands; everything else is a no-op
+# pass-through.
+needs_filter=0
+# is_comment_subcommand=1 marks subcommands whose user-attributable text
+# rides on `--comment` / `-c` (no `--*-file` form). The argv walker
+# filters those values inline rather than substituting `--body-file <tmp>`.
+is_comment_subcommand=0
+# is_api_body=1 marks `gh api` invocations whose user-attributable text
+# rides on `-f body=…` / `--field body=…` / `-F body=…` /
+# `--raw-field body=…` (or their `=body=…` equals forms). Same inline-
+# substitution shape as `--comment`. Without this, agents can post
+# comment / review replies via `gh api -X POST repos/.../comments` and
+# bypass the strip+footer pipeline entirely (regression observed on
+# workspace-capabilities#1952 review-comment reply).
+is_api_body=0
+if [ $# -ge 2 ]; then
+  case "$1 $2" in
+    "pr create"|"pr edit"|"pr comment"|"pr review")
+      needs_filter=1 ;;
+    "pr close"|"pr reopen")
+      needs_filter=1 ; is_comment_subcommand=1 ;;
+    "issue create"|"issue edit"|"issue comment")
+      needs_filter=1 ;;
+    "issue close"|"issue reopen")
+      needs_filter=1 ; is_comment_subcommand=1 ;;
+    "release create"|"release edit")
+      needs_filter=1 ;;
+  esac
+fi
+
+# `gh api` body detection: any -f / --field / -F / --raw-field whose
+# value starts with `body=` is a candidate. We don't gate on the
+# endpoint URL — the strip is always safe (no false positives on
+# vendor-footer regexes), and the canonical Fyodor footer is only
+# appended in agent context, so a non-comment `gh api -f body=…` call
+# from a human is still left alone.
+#
+# `--input <file>` / `--input -` / `--input=<file>` send a full JSON
+# document as the request body — agents could bypass the strip + footer
+# pipeline by writing a JSON body to a file and posting it that way.
+# We catch it here and let the walker route it through the JSON-aware
+# input-file handler (needs jq).
+if [ "${1:-}" = "api" ]; then
+  for api_arg in "$@"; do
+    case "$api_arg" in
+      body=*)
+        # Bare body= as a positional after -f / --field / -F /
+        # --raw-field — covered by the walker.
+        needs_filter=1 ; is_api_body=1 ; break ;;
+      -f=body=*|--field=body=*|-F=body=*|--raw-field=body=*)
+        needs_filter=1 ; is_api_body=1 ; break ;;
+      --input|--input=*)
+        needs_filter=1 ; is_api_body=1 ; break ;;
+    esac
+  done
+fi
+
+if [ "$needs_filter" = "0" ]; then
+  exec "$REAL_GH" "$@"
+fi
+
+# Source the shared strip library so the wrapper, the global
+# commit-msg hook, and the husky init.sh all share one regex set
+# and one footer policy.
+# Resolve relative to this script's location so the wrapper works
+# from any user's clone (no hardcoded $HOME).
+self_dir="$(cd "$(dirname "$0")" && pwd)"
+strip_lib="$self_dir/../lib/strip-agent-attribution.sh"
+if [ ! -f "$strip_lib" ]; then
+  # Defense-in-depth: if the lib disappears, fall back to plain gh
+  # rather than blocking the user.
+  exec "$REAL_GH" "$@"
+fi
+# shellcheck source=lib/strip-agent-attribution.sh
+. "$strip_lib"
+
+_gh_wrapper_is_agent_context() {
+  [ -n "${AGENT_PUBLIC_WRITE_GUARD:-}" ] ||
+    [ -n "${DEVIN_MODEL:-}" ] ||
+    [ -n "${DEVIN_SESSION_ID:-}" ] ||
+    [ -n "${CLAUDE_CODE_SSE_PORT:-}" ] ||
+    [ -n "${CURSOR_AGENT:-}" ] ||
+    [ -n "${WINDSURF_AGENT:-}" ] ||
+    [ -n "${CODEX_AGENT:-}" ]
+}
+
+_body_has_rationale() {
+  local body_file
+  body_file="$1"
+  # `/ship-it` opens every PR with `## Summary`, which must say why the PR is needed.
+  grep -qiE '^##[[:space:]]+Summary[[:space:]]*$' "$body_file" ||
+    grep -qiE '(^|[[:space:]#*_>-])(why this is needed|why needed|rationale|motivation|context)[[:space:]:#*_>-]*' "$body_file"
+}
+
+_body_has_validation_sections() {
+  local body_file missing=0
+  body_file="$1"
+  grep -qiE '^##[[:space:]]+(Requirements checklist|What this change is about)[[:space:]]*$' "$body_file" || missing=1
+  grep -qiE '^##[[:space:]]+(Previous state|How to see previous state)[[:space:]]*$' "$body_file" || missing=1
+  grep -qiE '^##[[:space:]]+(Validation steps|How to validate)' "$body_file" || missing=1
+  [ "$missing" -eq 0 ]
+}
+
+_body_has_stacked_skill_sections() {
+  local body_file missing=0
+  body_file="$1"
+  grep -qiE '^##[[:space:]]+Summary[[:space:]]*$' "$body_file" || missing=1
+  grep -qiE '^##[[:space:]]+Delivery plan[[:space:]]*$' "$body_file" || missing=1
+  grep -qiE '^##[[:space:]]+Test plan[[:space:]]*$' "$body_file" || missing=1
+  [ "$missing" -eq 0 ]
+}
+
+_body_has_pr_validation() {
+  local body_file="$1"
+  _body_has_validation_sections "$body_file" || _body_has_stacked_skill_sections "$body_file"
+}
+
+_normalize_markdown_body() {
+  awk '
+    function flush_para() {
+      if (para == "") return
+      print para
+      para = ""
+    }
+    function is_special(line) {
+      return line ~ /^([[:space:]]*$|[[:space:]]*(```|~~~)|[[:space:]]{0,3}#{1,6}[[:space:]]|[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]|[[:space:]]*>|[[:space:]]*\||[[:space:]]*---[[:space:]]*$)/
+    }
+    {
+      if ($0 ~ /^[[:space:]]*(```|~~~)/) {
+        flush_para()
+        print
+        in_code = !in_code
+        next
+      }
+      if (in_code || is_special($0)) {
+        flush_para()
+        print
+        next
+      }
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      if (para == "") para = line
+      else para = para " " line
+    }
+    END { flush_para() }
+  ' "$1"
+}
+
+_sha256_file() {
+  local path
+  path="$1"
+  shasum -a 256 "$path" | awk '{print $1}'
+}
+
+_sha256_text() {
+  local text
+  text="$1"
+  printf '%s' "$text" | shasum -a 256 | awk '{print $1}'
+}
+
+_current_repo_slug() {
+  local remote_url slug
+  remote_url=$(git config --get remote.origin.url 2>/dev/null || true)
+  if [ -z "$remote_url" ]; then
+    printf 'current'
+    return 0
+  fi
+  case "$remote_url" in
+    git@*:*)
+      slug="${remote_url#*:}"
+      ;;
+    ssh://git@*/*)
+      slug=$(printf '%s' "$remote_url" | sed -E 's#^ssh://git@[^/]+/##')
+      ;;
+    http://*/*|https://*/*)
+      slug=$(printf '%s' "$remote_url" | sed -E 's#^https?://[^/]+/##')
+      ;;
+    *)
+      slug="$remote_url"
+      ;;
+  esac
+  printf '%s' "$slug" | sed -E 's#\.git$##'
+}
+
+_normalize_repo_slug() {
+  local repo slug
+  repo="$1"
+  case "$repo" in
+    git@*:*)
+      slug="${repo#*:}"
+      ;;
+    ssh://git@*/*)
+      slug=$(printf '%s' "$repo" | sed -E 's#^ssh://git@[^/]+/##')
+      ;;
+    http://*/*|https://*/*)
+      slug=$(printf '%s' "$repo" | sed -E 's#^https?://[^/]+/##')
+      ;;
+    */*/*)
+      # gh's HOST/OWNER/REPO form.
+      slug="${repo#*/}"
+      ;;
+    *)
+      slug="$repo"
+      ;;
+  esac
+  printf '%s' "$slug" | sed -E 's#\.git$##'
+}
+
+# Host of a remote URL or HOST/OWNER/REPO; empty for a bare OWNER/REPO.
+_repo_host() {
+  case "$1" in
+    git@*:*) printf '%s' "${1#git@}" | sed -E 's#:.*$##' ;;
+    ssh://*/*|http://*/*|https://*/*) printf '%s' "$1" | sed -E 's#^[a-z]+://([^@/]*@)?([^/:]+).*$#\2#' ;;
+    */*/*) printf '%s' "${1%%/*}" ;;
+  esac
+}
+
+_ensure_agent_footer() {
+  local body_file tmp_file
+  body_file="$1"
+  # Strip any agent footer with a non-canonical name (e.g., GitHub username
+  # like "the-owner" injected by a stale agent rule template) along with
+  # its preceding "---" divider. Regression path: a manual footer added by
+  # an agent rule used to stack on top of the wrapper's canonical Fyodor
+  # footer. We normalize to one canonical footer regardless of what the
+  # caller passed in. Idempotent: if only the canonical footer is present
+  # the awk pass is a no-op.
+  tmp_file=$(mktemp -t gh-wrapper-strip.XXXXXX)
+  awk '
+    /^---[[:space:]]*$/ { divider = $0; have_divider = 1; next }
+    /Written by an agent, not Fyodor/ {
+      if (have_divider) { print divider; have_divider = 0 }
+      print
+      next
+    }
+    /Written by an agent, not / {
+      # Foreign agent footer -- drop this line AND the divider we buffered.
+      have_divider = 0
+      next
+    }
+    {
+      if (have_divider) { print divider; have_divider = 0 }
+      print
+    }
+    END { if (have_divider) print divider }
+  ' "$body_file" > "$tmp_file"
+  mv "$tmp_file" "$body_file"
+
+  # If the canonical Fyodor footer is already present, nothing more to do.
+  if grep -qE 'Written by an agent, not Fyodor' "$body_file"; then
+    return 0
+  fi
+
+  tmp_file=$(mktemp -t gh-wrapper-footer.XXXXXX)
+  awk 'BEGIN{n=0} {a[++n]=$0} END{
+    while (n>0 && a[n] ~ /^[[:space:]]*$/) n--
+    for (i=1;i<=n;i++) print a[i]
+  }' "$body_file" > "$tmp_file"
+  {
+    cat "$tmp_file"
+    printf '\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  } > "$body_file"
+  rm -f "$tmp_file"
+}
+
+_arg_value() {
+  local needle arg idx
+  needle="$1"
+  idx=0
+  while [ "$idx" -lt "$nargs" ]; do
+    arg="${argv[$idx]}"
+    case "$arg" in
+      "$needle")
+        idx=$((idx+1))
+        if [ "$idx" -lt "$nargs" ]; then
+          printf '%s' "${argv[$idx]}"
+          return 0
+        fi
+        ;;
+      "$needle"=*)
+        printf '%s' "${arg#*=}"
+        return 0
+        ;;
+    esac
+    idx=$((idx+1))
+  done
+  return 1
+}
+
+_validate_pr_create_body() {
+  local body_file repo_arg repo_norm current_repo_norm repo_host current_host allow_host base_arg title_arg body_sha title_sha required approval allowlist_file allow_line
+  body_file="$1"
+  if ! _body_has_rationale "$body_file"; then
+    echo "gh wrapper: blocked agent-authored PR create — body must include a clear 'Why this is needed' / rationale section." >&2
+    exit 1
+  fi
+  if ! _body_has_pr_validation "$body_file"; then
+    echo "gh wrapper: blocked agent-authored PR create — body must include either (1) ## Requirements checklist, ## Previous state, and ## Validation steps, or (2) stacked-skill trio: ## Summary, ## Delivery plan, and ## Test plan (task-command-center IRON LAW)." >&2
+    exit 1
+  fi
+
+  repo_arg="$(_arg_value --repo || true)"
+  if [ -z "$repo_arg" ]; then
+    repo_arg="$(_arg_value -R || true)"
+  fi
+  if [ -z "$repo_arg" ]; then
+    repo_arg="$(_current_repo_slug)"
+  fi
+  if [ -n "$repo_arg" ]; then
+    repo_norm="$(_normalize_repo_slug "$repo_arg")"
+    current_repo_norm="$(_normalize_repo_slug "$(_current_repo_slug)")"
+    repo_host="$(_repo_host "$repo_arg")"
+    current_host="$(_repo_host "$(git config --get remote.origin.url 2>/dev/null || true)")"
+    if [ "$repo_norm" = "$current_repo_norm" ] &&
+       { [ -z "$repo_host" ] || [ "$repo_host" = "$current_host" ]; }; then
+      return 0
+    fi
+    # Per-repo, per-machine allowlist. When $repo_norm is listed in
+    # the allowlist file, skip the per-PR approval gate. The file is
+    # per-machine (not chezmoi-managed) so each contributor decides
+    # which repos they grant blanket agent PR-create authority on.
+    # Format: one repo slug per line ("owner/repo"); `#` starts a
+    # comment; whitespace is ignored. Override the path with
+    # $AGENT_GH_ALLOWLIST_FILE for tests.
+    allowlist_file="${AGENT_GH_ALLOWLIST_FILE:-$HOME/.config/agent-gh-allowlist.txt}"
+    if [ -f "$allowlist_file" ]; then
+      while IFS= read -r allow_line || [ -n "$allow_line" ]; do
+        allow_line="${allow_line%%#*}"
+        allow_line="${allow_line//[[:space:]]/}"
+        [ -z "$allow_line" ] && continue
+        allow_host="$(_repo_host "$allow_line")"
+        # A host-less entry covers the checkout's host only, never another host.
+        if [ "$(_normalize_repo_slug "$allow_line")" = "$repo_norm" ] &&
+           { [ "$allow_host" = "$repo_host" ] ||
+             { [ -z "$allow_host" ] && [ "$repo_host" = "$current_host" ]; }; }; then
+          return 0
+        fi
+      done < "$allowlist_file"
+    fi
+    base_arg="$(_arg_value --base || true)"
+    title_arg="$(_arg_value --title || true)"
+    if [ -z "$title_arg" ]; then
+      title_arg="$(_arg_value -t || true)"
+    fi
+    body_sha="$(_sha256_file "$body_file")"
+    title_sha="$(_sha256_text "$title_arg")"
+    required="repo=$repo_arg base=$base_arg title=$title_arg title_sha256=$title_sha body_sha256=$body_sha"
+    approval="${AGENT_PUBLIC_WRITE_APPROVAL:-}"
+    if ! printf '%s' "$approval" | grep -Fq "repo=$repo_arg" ||
+       ! printf '%s' "$approval" | grep -Fq "base=$base_arg" ||
+       ! printf '%s' "$approval" | grep -Fq "title=$title_arg" ||
+       ! printf '%s' "$approval" | grep -Fq "body_sha256=$body_sha"; then
+      echo "gh wrapper: blocked agent-authored PR create without current-session approval." >&2
+      echo "gh wrapper: set AGENT_PUBLIC_WRITE_APPROVAL to include:" >&2
+      echo "  $required" >&2
+      exit 1
+    fi
+  fi
+}
+
+_prepare_body_tmp() {
+  local tmp normalized
+  tmp="$1"
+  # Outside agent context: leave human-authored bodies alone (no
+  # auto-footer, no rationale validation). The strip already ran in
+  # the caller — we don't add Fyodor's footer to a human's PR body.
+  if ! _gh_wrapper_is_agent_context; then
+    return 0
+  fi
+  # PR create: full treatment — markdown normalisation, footer, and
+  # rationale validation. PR-create remains the strictest gate because
+  # a missing rationale on a fresh PR means the agent shipped without
+  # explaining why.
+  if [ "${argv[0]} ${argv[1]}" = "pr create" ]; then
+    normalized=$(mktemp -t gh-wrapper-normalized.XXXXXX)
+    _normalize_markdown_body "$tmp" > "$normalized"
+    mv "$normalized" "$tmp"
+    _ensure_agent_footer "$tmp"
+    _validate_pr_create_body "$tmp"
+    return 0
+  fi
+  # All other body-bearing subcommands the wrapper intercepts —
+  # `pr edit`, `pr comment`, `pr review`, `issue create`, `issue edit`,
+  # `issue comment`, `release create`, `release edit`. Append the
+  # canonical footer so agent-authored content posted under Fyodor's
+  # identity is always attributed. This closes the footer-
+  # missing regression observed during orchestrator-driven PR closures
+  # plus the corrective `gh pr comment` follow-ups that ALSO went out
+  # without the footer because `_ensure_agent_footer` was previously
+  # gated on `pr create` only.
+  _ensure_agent_footer "$tmp"
+}
+
+# Track temp files so we clean up on exit.
+WRAPPER_TMPS=()
+cleanup() {
+  for t in "${WRAPPER_TMPS[@]:-}"; do
+    [ -n "${t:-}" ] && [ -f "$t" ] && rm -f "$t"
+  done
+  return 0
+}
+trap cleanup EXIT INT TERM
+
+# Filter a body string and write it to a fresh temp file. Echo the
+# temp file path on stdout (the caller substitutes it into argv).
+_make_filtered_tmp() {
+  body="$1"
+  tmp=$(mktemp -t gh-wrapper-body.XXXXXX)
+  printf '%s' "$body" | _strip_agent_attribution_in_stream > "$tmp"
+  _prepare_body_tmp "$tmp"
+  WRAPPER_TMPS+=("$tmp")
+  printf '%s' "$tmp"
+}
+
+# Filter a comment string for `gh pr close|reopen --comment` and `gh
+# issue close|reopen --comment`. These subcommands have no
+# `--comment-file` form, so the wrapper has to filter inline and emit
+# the substituted value back as a string. The strip + footer pipeline is
+# the same as for body-bearing subcommands; only the substitution shape
+# differs. Footer is appended only in agent context — humans running
+# `gh pr close --comment "thanks"` keep their original text.
+_filter_comment_string() {
+  local input tmp filtered
+  input="$1"
+  tmp=$(mktemp -t gh-wrapper-comment.XXXXXX)
+  WRAPPER_TMPS+=("$tmp")
+  printf '%s' "$input" | _strip_agent_attribution_in_stream > "$tmp"
+  if _gh_wrapper_is_agent_context; then
+    _ensure_agent_footer "$tmp"
+  fi
+  filtered=$(cat "$tmp")
+  printf '%s' "$filtered"
+}
+
+# Filter a JSON document submitted to `gh api` via --input.
+#
+# Reads JSON from "$1" (or /dev/stdin if "$1" is "-"), and re-emits it
+# with any top-level string-valued `body` / `note` fields run through
+# the same strip + footer pipeline as --comment / --body-file. Nested
+# objects are deliberately left alone — GitHub's REST API only puts
+# user-attributable text in top-level `body` (issues, PRs, comments,
+# review comments, releases) or `note` (project cards). The wrapper
+# refuses to touch deeper fields because the strip regex is conservative
+# and could miss a vendor footer embedded in unrelated content.
+#
+# Writes the transformed JSON to a temp file (which the caller routes
+# to `gh api --input <tmpfile>`) and prints the tmp path on stdout.
+# Returns 0 on success, 1 if jq is missing.
+_filter_api_input_json() {
+  local src="$1" tmp body filtered_body note filtered_note transformed
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "gh wrapper: --input requires jq for safe agent-attribution filtering; jq not found on PATH. Either install jq (brew install jq) or use -f body=… for body-bearing requests." >&2
+    return 1
+  fi
+  tmp=$(mktemp -t gh-wrapper-api-input.XXXXXX)
+  if [ "$src" = "-" ]; then
+    cat > "$tmp"
+  else
+    cat "$src" > "$tmp"
+  fi
+  # If the file isn't valid JSON, leave it alone — gh's own error
+  # message is more helpful than ours would be.
+  if ! jq -e . < "$tmp" >/dev/null 2>&1; then
+    printf '%s' "$tmp"
+    return 0
+  fi
+  # Top-level body
+  body=$(jq -r 'if (.body? | type) == "string" then .body else empty end' < "$tmp")
+  if [ -n "$body" ] || jq -e 'has("body") and (.body | type) == "string"' < "$tmp" >/dev/null 2>&1; then
+    filtered_body=$(_filter_comment_string "$body")
+    transformed=$(jq --arg val "$filtered_body" '.body = $val' < "$tmp") \
+      && printf '%s' "$transformed" > "$tmp"
+  fi
+  # Top-level note (project cards)
+  note=$(jq -r 'if (.note? | type) == "string" then .note else empty end' < "$tmp")
+  if [ -n "$note" ] || jq -e 'has("note") and (.note | type) == "string"' < "$tmp" >/dev/null 2>&1; then
+    filtered_note=$(_filter_comment_string "$note")
+    transformed=$(jq --arg val "$filtered_note" '.note = $val' < "$tmp") \
+      && printf '%s' "$transformed" > "$tmp"
+  fi
+  printf '%s' "$tmp"
+}
+
+# Walk argv. For body-bearing flags, replace the value with a
+# filtered temp file; everything else is forwarded verbatim. The
+# uniform replacement is `--body-file <tmp>` (or `--notes-file
+# <tmp>` for releases) so we don't have to track which flag form
+# the caller used.
+new_args=()
+i=0
+argv=("$@")
+nargs=${#argv[@]}
+
+# Determine whether this is a release subcommand (uses --notes /
+# --notes-file) vs a pr/issue subcommand (uses --body / --body-file).
+if [ "${argv[0]}" = "release" ]; then
+  body_flag_target="--notes-file"
+else
+  body_flag_target="--body-file"
+fi
+
+while [ "$i" -lt "$nargs" ]; do
+  arg="${argv[$i]}"
+  case "$arg" in
+    --body|-b|--notes)
+      i=$((i+1))
+      if [ "$i" -lt "$nargs" ]; then
+        tmp=$(_make_filtered_tmp "${argv[$i]}")
+        new_args+=("$body_flag_target" "$tmp")
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    --body=*|-b=*|--notes=*)
+      val="${arg#*=}"
+      tmp=$(_make_filtered_tmp "$val")
+      new_args+=("$body_flag_target" "$tmp")
+      ;;
+    --comment|-c)
+      # Only intercept --comment for the close/reopen subcommands —
+      # other subcommands may use -c for unrelated flags. For the
+      # comment-flavoured subcommands we filter inline (no
+      # --comment-file form exists in upstream gh).
+      if [ "$is_comment_subcommand" = "1" ]; then
+        i=$((i+1))
+        if [ "$i" -lt "$nargs" ]; then
+          filtered=$(_filter_comment_string "${argv[$i]}")
+          new_args+=("--comment" "$filtered")
+        else
+          new_args+=("$arg")
+        fi
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    --comment=*|-c=*)
+      if [ "$is_comment_subcommand" = "1" ]; then
+        val="${arg#*=}"
+        filtered=$(_filter_comment_string "$val")
+        new_args+=("--comment" "$filtered")
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    -f|--field|-F|--raw-field)
+      # `gh api` field flags. When the next argv element is `body=…`,
+      # filter inline through the same strip+footer pipeline as
+      # `--comment`. Outside `gh api` (is_api_body=0) we pass through
+      # without consuming the next arg, preserving prior wrapper
+      # behaviour (these flags previously fell through to `*`).
+      if [ "$is_api_body" = "1" ]; then
+        i=$((i+1))
+        if [ "$i" -lt "$nargs" ]; then
+          next_val="${argv[$i]}"
+          case "$next_val" in
+            body=*)
+              raw_val="${next_val#body=}"
+              filtered=$(_filter_comment_string "$raw_val")
+              new_args+=("$arg" "body=$filtered")
+              ;;
+            *)
+              new_args+=("$arg" "$next_val")
+              ;;
+          esac
+        else
+          new_args+=("$arg")
+        fi
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    -f=body=*|--field=body=*|-F=body=*|--raw-field=body=*)
+      if [ "$is_api_body" = "1" ]; then
+        flag_prefix="${arg%%=body=*}"
+        raw_val="${arg#*=body=}"
+        filtered=$(_filter_comment_string "$raw_val")
+        new_args+=("$flag_prefix" "body=$filtered")
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    --body-file|--notes-file)
+      i=$((i+1))
+      if [ "$i" -lt "$nargs" ]; then
+        path="${argv[$i]}"
+        if [ "$path" = "-" ]; then
+          # Read from stdin, filter, write to temp.
+          tmp=$(mktemp -t gh-wrapper-body.XXXXXX)
+          _strip_agent_attribution_in_stream < /dev/stdin > "$tmp"
+          _prepare_body_tmp "$tmp"
+          WRAPPER_TMPS+=("$tmp")
+          new_args+=("$body_flag_target" "$tmp")
+        elif [ -f "$path" ]; then
+          tmp=$(mktemp -t gh-wrapper-body.XXXXXX)
+          _strip_agent_attribution_in_stream < "$path" > "$tmp"
+          _prepare_body_tmp "$tmp"
+          WRAPPER_TMPS+=("$tmp")
+          new_args+=("$body_flag_target" "$tmp")
+        else
+          # Let gh handle the error itself.
+          new_args+=("$arg" "$path")
+        fi
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    --body-file=*|--notes-file=*)
+      val="${arg#*=}"
+      if [ -f "$val" ]; then
+        tmp=$(mktemp -t gh-wrapper-body.XXXXXX)
+        _strip_agent_attribution_in_stream < "$val" > "$tmp"
+        _prepare_body_tmp "$tmp"
+        WRAPPER_TMPS+=("$tmp")
+        new_args+=("$body_flag_target" "$tmp")
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    --input)
+      # `gh api --input <file>` / `--input -` — JSON-aware filter for
+      # `body` / `note` string fields. Only fires inside `gh api`
+      # (is_api_body=1); for other gh subcommands --input is unrecognised
+      # anyway, so a fall-through is fine.
+      i=$((i+1))
+      if [ "$is_api_body" = "1" ] && [ "$i" -lt "$nargs" ]; then
+        path="${argv[$i]}"
+        if tmp=$(_filter_api_input_json "$path") && [ -n "$tmp" ]; then
+          WRAPPER_TMPS+=("$tmp")
+          new_args+=("--input" "$tmp")
+        else
+          # jq missing or filter failed — pass through verbatim and let
+          # gh emit any errors against the original path.
+          new_args+=("$arg" "$path")
+        fi
+      elif [ "$i" -lt "$nargs" ]; then
+        new_args+=("$arg" "${argv[$i]}")
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    --input=*)
+      if [ "$is_api_body" = "1" ]; then
+        path="${arg#*=}"
+        if tmp=$(_filter_api_input_json "$path") && [ -n "$tmp" ]; then
+          WRAPPER_TMPS+=("$tmp")
+          new_args+=("--input" "$tmp")
+        else
+          new_args+=("$arg")
+        fi
+      else
+        new_args+=("$arg")
+      fi
+      ;;
+    *)
+      new_args+=("$arg")
+      ;;
+  esac
+  i=$((i+1))
+done
+
+if _gh_wrapper_is_agent_context && [ "${argv[0]} ${argv[1]}" = "pr create" ]; then
+  has_body_file=0
+  for arg in "${new_args[@]}"; do
+    if [ "$arg" = "--body-file" ] || [[ "$arg" == --body-file=* ]]; then
+      has_body_file=1
+      break
+    fi
+  done
+  if [ "$has_body_file" = "0" ]; then
+    echo "gh wrapper: blocked agent-authored PR create — use --body/--body-file with a rationale and attribution footer." >&2
+    exit 1
+  fi
+fi
+
+"$REAL_GH" "${new_args[@]}"

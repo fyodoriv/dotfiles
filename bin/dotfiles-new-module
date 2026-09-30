@@ -1,0 +1,39 @@
+#!/bin/bash
+# Create a new doctor module.
+# Usage: dotfiles new-module <name> [--severity critical|important|performance|cosmetic]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+severity="cosmetic"
+mod_name=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --severity) severity="$2"; shift 2 ;;
+    *) mod_name="$1"; shift ;;
+  esac
+done
+if [ -z "$mod_name" ]; then
+  echo "Usage: dotfiles new-module <name> [--severity critical|important|performance|cosmetic]" >&2; exit 1
+fi
+mod_dir="$DOTFILES_DIR/modules/$mod_name"
+if [ -d "$mod_dir" ]; then
+  echo "Error: module '$mod_name' already exists" >&2; exit 1
+fi
+mkdir -p "$mod_dir"
+cat > "$mod_dir/doctor.sh" << DOCTOR_EOF
+#!/bin/bash
+# Doctor checks for $mod_name module
+# check "$mod_name.example"     "Example check"      "[ -f /path/to/file ]"    "echo fix command"
+# check_symlink "symlink.file"   "\$DOTFILES_DIR/home/file" "\$HOME/.file"
+# check_defaults "$mod_name.key" "Description" "domain" "key" "value" "type"
+DOCTOR_EOF
+echo "$severity" > "$mod_dir/severity"
+echo "✓ Created module '$mod_name' (severity: $severity)"
+echo "  Directory: modules/$mod_name/"
+echo "  Doctor:    modules/$mod_name/doctor.sh"
+echo "  Severity:  modules/$mod_name/severity"
+echo ""
+echo "Next: edit modules/$mod_name/doctor.sh and add your checks"

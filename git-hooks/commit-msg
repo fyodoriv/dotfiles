@@ -1,0 +1,101 @@
+#!/bin/bash
+# Global commit-msg hook — enforces conventional commits format.
+# Format: type(scope): description
+# Examples: feat(auth): add login flow, fix: resolve crash on startup
+
+set -euo pipefail
+
+commit_msg=$(cat "$1")
+REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+# Skip merge commits and fixup commits
+if echo "$commit_msg" | grep -qE "^(Merge|fixup!|squash!|amend!|Revert)"; then
+  exit 0
+fi
+
+# Skip auto-generated commits (sync, wip)
+if echo "$commit_msg" | grep -qE "^(sync:|wip)"; then
+  exit 0
+fi
+
+# Conventional commits pattern
+pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo ""
+  echo "❌ Commit message does not follow conventional commits format."
+  echo ""
+  echo "  Format: type(scope): description"
+  echo "  Types:  feat fix docs style refactor perf test build ci chore revert"
+  echo ""
+  echo "  Your message: $commit_msg"
+  echo ""
+  exit 1
+fi
+
+# Enforce 72-character header limit
+header=$(echo "$commit_msg" | head -1)
+if [ ${#header} -gt 72 ]; then
+  echo ""
+  echo "❌ Commit header exceeds 72 characters (${#header} chars)."
+  echo ""
+  echo "  Your message: $header"
+  echo ""
+  exit 1
+fi
+
+# ── Enterprise: JIRA ticket validation ──────────────────────────────
+# When enterprise mode is active, require a JIRA ticket (e.g. PROJ-123)
+# in the commit header. Skippable repos can set git config
+# hooks.skipTicketCheck = true.
+_is_enterprise() {
+  chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null | grep -q "true"
+}
+
+if _is_enterprise; then
+  # Allow per-repo opt-out
+  skip_ticket=$(git config --local hooks.skipTicketCheck 2>/dev/null || echo "false")
+  if [ "$skip_ticket" != "true" ]; then
+    ticket_pattern='[A-Z][A-Z0-9]+-[0-9]+'
+    if ! echo "$header" | grep -qE "$ticket_pattern"; then
+      echo ""
+      echo "⚠️  Enterprise: commit header should include a JIRA ticket (e.g. PROJ-123)."
+      echo ""
+      echo "  Your message: $header"
+      echo ""
+      echo "  Opt out per-repo: git config hooks.skipTicketCheck true"
+      echo "  Bypass once:      git commit --no-verify"
+      echo ""
+      # Warn but don't block — teams can enforce stricter policies
+      # Change 'exit 0' to 'exit 1' to make this a hard requirement
+    fi
+  fi
+fi
+
+# ── Strip tool-specific agent attribution trailers ───────────────────
+# Enforces the agent-attribution-footer rule deterministically. Agents
+# (Devin, Claude Code, Cursor, Windsurf, Copilot, …) occasionally
+# auto-insert attribution lines that bind the user's public identity
+# to whichever specific vendor happened to run the command. The shared
+# library below removes both vendor `Co-Authored-By:` trailers and
+# `Generated with [<Agent>](...)` footers, then appends the
+# tool-neutral Fyodor footer so the commit is still marked as
+# agent-authored.
+#
+# Repos that override core.hooksPath via Husky also enforce the same
+# rule — see ~/.config/husky/init.sh which sources the same library.
+#
+# Orchestrator pipelines (e.g. minsky) bypass this rewrite entirely
+# so the orchestrator stays in control of attribution; set
+# MINSKY_PIPELINE=1 to bypass (the library handles this internally).
+hook_dir="$(cd "$(dirname "$0")" && pwd)"
+strip_lib="$hook_dir/../lib/strip-agent-attribution.sh"
+if [ -f "$strip_lib" ]; then
+  # shellcheck source=../lib/strip-agent-attribution.sh
+  . "$strip_lib"
+  _strip_agent_attribution_in_file "$1"
+fi
+
+if [ -n "$REPO_DIR" ] && [ -x "$REPO_DIR/hooks/commit-msg" ]; then
+  (cd "$REPO_DIR" && "$REPO_DIR/hooks/commit-msg" "$1")
+fi

@@ -1,0 +1,157 @@
+# topgrade configuration — see https://github.com/topgrade-rs/topgrade
+#
+# Managed by dotfiles. Edit `dot_config/topgrade.toml` in the dotfiles
+# source repo (chezmoi copies it to ~/.config/topgrade.toml — topgrade
+# reads the file directly under .config, NOT a subdir).
+# Running `topgrade --edit-config` opens this same file.
+#
+# topgrade is the canonical unified upgrader (chosen via the "GET, don't
+# IMPLEMENT" decision discipline — see AGENTS.md § Rule 0). It detects
+# ~80+ package managers automatically and runs the right upgrade command
+# for each. Invoked via `bin/dotfiles-upgrade` (the dotfiles-specific glue:
+# lock acquisition, grind-active safety check, logging, macOS notification)
+# OR directly as `topgrade` for ad-hoc runs.
+
+[misc]
+# ── Headless-friendly defaults ──────────────────────────────────────
+# bin/dotfiles-upgrade and the com.dotfiles.dotfiles-upgrade LaunchAgent
+# both run without a tty. No prompts, no tmux, just go.
+run_in_tmux       = false
+assume_yes        = true
+no_retry          = false  # ask topgrade to auto-retry transient failures
+display_time      = true
+no_self_update    = false  # let topgrade self-update — pairs with brew's topgrade formula
+
+# ── Deliberately disabled steps ─────────────────────────────────────
+# Each of these has a dedicated dotfiles lifecycle that already owns the
+# update path. Letting topgrade ALSO run them would either double-pull
+# (chezmoi), race against in-flight launchagent runs, or fail noisily
+# when an optional daemon isn't running.
+disable = [
+  # dotfiles auto-sync launchagent runs `chezmoi update --apply` every 30
+  # minutes. Letting topgrade ALSO run `chezmoi update` would double-pull
+  # and could race the in-flight launchagent run mid-apply.
+  "chezmoi",
+
+  # Managed by ~/bin/claude wrapper + agentbrew sync's auto-install of
+  # recommended skills/MCP. topgrade's `claude update` path is redundant
+  # and racy against the wrapper.
+  "claude_code",
+
+  # Agent skills are owned by agentbrew, whose auto-repair launchagent
+  # re-syncs them every 30 min by delegating to this very `npx skills` CLI.
+  # Running topgrade's weekly `skills` step on top is redundant and can race
+  # agentbrew's sync (both mutate ~/.agents/skills/). Same single-owner
+  # rationale as claude_code above. NOTE: the "Failed to update" for
+  # claude-automation-recommender / next-task on the 2026-05-29 run was NOT
+  # a skills-vs-agentbrew conflict — it was a self-signed-cert
+  # issue (fixed via NODE_EXTRA_CA_CERTS in bin/dotfiles-upgrade + home/
+  # zshenv); `skills update` works fine once the CA is trusted. Disabling
+  # here just drops the redundant weekly pass; agentbrew keeps skills fresh.
+  "skills",
+
+  # topgrade would `git pull` EVERY repo on disk including in-flight
+  # feature branches with uncommitted work. Operator pulls manually as
+  # needed (or via `dotfiles apply --pull` for the dotfiles repo itself).
+  "git_repos",
+
+  # Requires Docker daemon to be running. Rancher Desktop is usually off
+  # on this machine; topgrade reports the step as FAILED and pollutes
+  # the dry-run summary.
+  "containers",
+
+  # macOS softwareupdate prompts for password and reboots, neither of
+  # which works in a headless launchagent context. Operator runs Software
+  # Update from System Settings when there's a planned downtime window.
+  "system",
+
+  # The built-in `mas` step runs `mas upgrade` (all apps) and fails the whole
+  # step if ANY app fails. Xcode (id 497799835) lives at root-owned
+  # /Applications/Xcode.app, so mas can't write its _MASReceipt and errors
+  # "Operation not permitted" — failing every upgrade when the App Store
+  # re-reports Xcode as outdated. mas has no per-app exclude, so we replace it
+  # with the Xcode-tolerant wrapper in [commands] below (upgrades each app
+  # individually, skips Xcode). Xcode itself is updated via `xcodes` / the GUI.
+  "mas",
+
+  # `helm` here is Rancher Desktop's bundled binary (~/.rd/bin/helm) with zero
+  # chart repositories configured, so topgrade's `helm repo update` errors with
+  # "no repositories found. You must add one before updating" on every run —
+  # pure noise (topgrade still marks the step OK, but the ERROR line is
+  # alarming in the log). Disable until/unless we actually manage helm chart
+  # repos on this machine; re-enable by deleting this line once `helm repo
+  # list` shows ≥1 repo.
+  "helm",
+]
+
+[brew]
+# Include casks marked "auto-update" (Discord, Slack, Notion, Obsidian, …).
+# Without `greedy_cask`, brew skips upgrading them entirely on the theory
+# that they self-update — but in practice their bundled binaries drift
+# (the cask's pinned version stays stale while the app silently updates).
+# Greedy mode brings them in line with the cask metadata.
+greedy_cask   = true
+greedy_latest = true
+# NOTE: `greedy_*` upgrades every installed cask, not just dotfiles-managed
+# ones. Do NOT `brew install --cask raycast` (or lunar) on EPE-managed Macs
+# machines — install/upgrade requires Application Elevation. If present,
+# remove with `brew uninstall --cask raycast` and add to chezmoi `brew_skip`.
+
+[git]
+# Defense in depth: empty list belt-and-suspenders against `git_repos`
+# being re-enabled by mistake.
+repos = []
+
+[python]
+# uv-managed Python is self-updated by the `uv` step. Don't ALSO run
+# pip3 against the legacy system pip — it's not what we want patched.
+enable_pip_review       = false
+poetry_force_self_update = false
+
+# ── Custom steps (run during the main sequence) ─────────────────────
+[commands]
+
+# Xcode-tolerant Mac App Store upgrade. Replaces the built-in `mas` step
+# (disabled above): upgrades each outdated app individually and skips Xcode,
+# whose root-owned _MASReceipt makes `mas upgrade` fail and would otherwise
+# fail the whole run. See bin/dotfiles-mas-upgrade.
+"App Store (mas, Xcode-tolerant)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-mas-upgrade"
+
+# ── Post-upgrade fixups ─────────────────────────────────────────────
+# These run AFTER every successful topgrade run, regardless of how
+# topgrade was invoked (`dotfiles upgrade`, direct `topgrade`, or the
+# weekly LaunchAgent). Centralising here means a direct `topgrade`
+# call still gets the dotfiles-specific safety + housekeeping that
+# used to live in bin/dotfiles-upgrade.
+[post_commands]
+
+# Re-sign new Homebrew bottles for endpoint agent. `brew upgrade` (run
+# by topgrade's brew_formula + brew_cask steps) installs new bottles
+# unsigned; endpoint agent fires the policy dialog on every spawn of an
+# unsigned binary. The helper is idempotent — re-signing an already-
+# ad-hoc-signed binary is a no-op. See AGENTS.md rule #10.
+"Re-sign new Homebrew bottles (endpoint agent)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-adhoc-sign-bottles"
+
+# Re-sign uv-managed pythons for endpoint agent. The `uv` step runs
+# `uv python upgrade`, which re-extracts python-build-standalone binaries
+# on a patch bump — re-extracted binaries are UNSIGNED, so endpoint agent fires the
+# policy dialog on every python3.1x spawn until they're re-signed. Without this
+# the weekly upgrade silently re-introduces the dialog storm AGENTS.md rule
+# #10 removed (run_after_uv-python-setup.sh only re-signs on `dotfiles apply`,
+# not on `dotfiles upgrade`). Same idempotent helper run_after sources.
+"Re-sign uv-managed pythons (endpoint agent)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-adhoc-sign-uv-pythons"
+
+# Refresh endpoint shims + LaunchAgent PATH after brew upgrades (grep/curl/jq/sed/awk
+# symlinks can point at stale cellar paths until chezmoi apply). Same script as
+# run_after_endpoint-security.sh — idempotent link + adhoc-sign + LA PATH repair.
+"Refresh endpoint shims + LaunchAgent PATH" = "$HOME/apps/tooling/dotfiles/.chezmoiscripts/run_after_endpoint-security.sh"
+
+# Dev-cache cleanup after the upgrade has downloaded new artifacts. Owns ALL
+# cache pruning (brew, npm, yarn, uv) plus the dotfiles-specific cleanups
+# (gradle caches >30d, /tmp/node_modules, ~/Library/Caches, etc.). bin/
+# dotfiles-upgrade deliberately does NOT pass topgrade's --cleanup — its
+# inline `uv cache prune` blocks on the cache lock held by live `uvx` MCP
+# servers and fails the run; doing every prune here is lock-tolerant.
+# Safelist-protected via the script's is_safe_path guard. Replaces the
+# standalone com.dotfiles.cleanup LaunchAgent (deleted PR #128).
+"Dev cache cleanup (gradle, tmp/node_modules, Library/Caches)" = "$HOME/apps/tooling/dotfiles/bin/cleanup"

@@ -1,0 +1,74 @@
+# ── Ghostty Configuration ────────────────────────────────────────────
+# Docs: https://ghostty.org/docs/config
+
+# ── Font ─────────────────────────────────────────────────────────────
+font-family = JetBrainsMono Nerd Font
+font-size = 14
+font-thicken = true
+adjust-cell-height = 35%
+
+# ── Theme & Colors ───────────────────────────────────────────────────
+# Follow the macOS appearance: Latte for light mode, Mocha for dark mode.
+theme = light:Catppuccin Latte,dark:Catppuccin Mocha
+background-opacity = 0.92
+minimum-contrast = 1.1
+
+# ── Window ───────────────────────────────────────────────────────────
+window-padding-x = 12
+window-padding-y = 8
+window-padding-balance = true
+window-decoration = true
+macos-titlebar-style = tabs
+macos-titlebar-proxy-icon = hidden
+macos-option-as-alt = true
+window-save-state = always
+confirm-close-surface = false
+
+# ── Cursor ───────────────────────────────────────────────────────────
+cursor-style = block
+cursor-style-blink = false
+shell-integration-features = cursor,sudo,title
+
+# ── Mouse ────────────────────────────────────────────────────────────
+mouse-hide-while-typing = true
+copy-on-select = clipboard
+focus-follows-mouse = true
+link-url = true
+
+# ── Splits ───────────────────────────────────────────────────────────
+unfocused-split-opacity = 0.85
+
+# ── Performance ──────────────────────────────────────────────────────
+# resize-overlay=never avoids a distracting dimensions overlay on every resize.
+# Ghostty uses Metal natively so no extra GPU config needed.
+resize-overlay = never
+
+# ── Scrollback ───────────────────────────────────────────────────────
+# Ghostty keeps this buffer in memory for each terminal surface.
+# Keep the upstream 10 MB default so verbose commands cannot retain 100 MB per tab.
+scrollback-limit = 10000000
+
+# ── Keybindings ──────────────────────────────────────────────────────
+keybind = super+t=new_tab
+keybind = super+w=close_surface
+keybind = super+shift+]=next_tab
+keybind = super+shift+[=previous_tab
+keybind = super+d=new_split:right
+keybind = super+shift+d=new_split:down
+keybind = super+]=goto_split:next
+keybind = super+[=goto_split:previous
+keybind = super+enter=unbind
+keybind = super+k=clear_screen
+keybind = super+comma=open_config
+keybind = super+plus=increase_font_size:1
+keybind = super+minus=decrease_font_size:1
+keybind = super+zero=reset_font_size
+# Pass Ctrl+G through to the shell so the _devin_send_buffer zsh widget works.
+# Without this, Ghostty may intercept it before zsh sees it.
+keybind = ctrl+g=unbind
+# Jump to tab N by number (Cmd+1..5)
+keybind = super+1=goto_tab:1
+keybind = super+2=goto_tab:2
+keybind = super+3=goto_tab:3
+keybind = super+4=goto_tab:4
+keybind = super+5=goto_tab:5

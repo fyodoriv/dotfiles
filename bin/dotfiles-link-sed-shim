@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/sed with a symlink to adhoc-signed Homebrew gsed (gnu-sed).
+# endpoint agent flags script shims (unsigned) — the invoked path must be Mach-O.
+#
+# Escape hatch for POSIX-only scripts: invoke /usr/bin/sed directly (never via shim).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SHIM="$SHIM_DIR/sed"
+
+_resolve_brew_gsed() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    for candidate in \
+      "${DOTFILES_BREW_PREFIX}/bin/gsed" \
+      "${DOTFILES_BREW_PREFIX}/opt/gnu-sed/libexec/gnubin/sed"; do
+      [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+    done
+  fi
+  for candidate in \
+    /opt/homebrew/bin/gsed \
+    /usr/local/bin/gsed \
+    /opt/homebrew/opt/gnu-sed/libexec/gnubin/sed \
+    /usr/local/opt/gnu-sed/libexec/gnubin/sed; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+BREW_SED="$(_resolve_brew_gsed || true)"
+if [ -z "$BREW_SED" ]; then
+  echo "sed: Homebrew gsed not found — install via brew install gnu-sed (never use /usr/bin/sed on managed endpoints)" >&2
+  exit 1
+fi
+
+if [ -e "$SHIM" ] && [ ! -L "$SHIM" ]; then
+  rm -f "$SHIM"
+fi
+
+ln -sfn "$BREW_SED" "$SHIM"
+chmod +x "$SHIM" 2>/dev/null || true

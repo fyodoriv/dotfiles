@@ -1,0 +1,16 @@
+#!/bin/bash
+# Re-run when bin/chromework-install changes.
+# installer hash: {{ output "shasum" "-a" "256" (joinPath .chezmoi.sourceDir "bin/chromework-install") }}
+# Profile: {{ .profile }} | Enterprise: {{ .is_enterprise }}
+#
+# Builds ~/Applications/ChromeWork.app — a tiny AppleScript URL router that
+# forces every http(s) link into Chrome's Work profile. See bin/chromework-install
+# for the full rationale.
+set -euo pipefail
+
+if ! [ -d "/Applications/Google Chrome.app" ]; then
+  echo "⊘ Google Chrome not installed — skipping ChromeWork install"
+  exit 0
+fi
+
+"{{ .chezmoi.sourceDir }}/bin/chromework-install"

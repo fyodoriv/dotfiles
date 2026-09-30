@@ -1,0 +1,60 @@
+#!/bin/bash
+# Post-wake recovery for Cursor agents and dotfiles resilience stack.
+# Called from ~/.wakeup (sleepwatcher). Never steals focus.
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/agent-keepawake.sh
+source "$DOTFILES_DIR/lib/agent-keepawake.sh"
+# shellcheck source=../lib/heal-stuck-agents.sh
+source "$DOTFILES_DIR/lib/heal-stuck-agents.sh"
+
+DRY_RUN=false
+QUIET=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --quiet) QUIET=true ;;
+    --help|-h) exit 0 ;;
+    *)
+      printf 'dotfiles-agent-wake-recover: unknown argument: %s\n' "$arg" >&2
+      exit 64
+      ;;
+  esac
+done
+
+LOG_DIR="$HOME/.local/share/dotfiles/logs"
+LOG_FILE="$LOG_DIR/agent-wake-recover.log"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+_recover_log() {
+  local msg
+  msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+  echo "$msg" >> "$LOG_FILE" 2>/dev/null || true
+  $QUIET || echo "$1"
+}
+
+if $DRY_RUN; then
+  _recover_log "dry-run: would run dotfiles-heal-stuck-agents --fix --quiet"
+  _recover_log "dry-run: would kickstart com.dotfiles.network-resilience"
+  _recover_log "dry-run: would kickstart com.dotfiles.agent-keepawake (if loaded)"
+  _recover_log "dry-run: would verify CDP LaunchAgents (9223–9225)"
+  exit 0
+fi
+
+"$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents" --fix --quiet || true
+dotfiles_heal_kickstart_network_resilience
+dotfiles_agent_kickstart_keepawake_agent
+
+domain="gui/$(id -u)"
+for label in com.dotfiles.agent-browser-chrome com.dotfiles.debug-chrome com.dotfiles.tooling-chrome; do
+  if launchctl print "$domain/$label" >/dev/null 2>&1; then
+    _recover_log "ok: $label loaded"
+  else
+    _recover_log "warn: $label not loaded (run dotfiles apply + dotfiles-reload-launchagents)"
+  fi
+done
+
+_recover_log "wake-recover complete"
+exit 0

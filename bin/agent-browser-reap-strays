@@ -1,0 +1,90 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: agent-browser-reap-strays [--dry-run] [--quiet] [--port PORT ...]
+EOF
+}
+
+dry_run=false
+quiet=false
+ports=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dry-run)
+      dry_run=true
+      shift
+      ;;
+    --quiet)
+      quiet=true
+      shift
+      ;;
+    --port)
+      [ -n "${2:-}" ] || { usage >&2; exit 2; }
+      ports+=("$2")
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ "${#ports[@]}" -eq 0 ]; then
+  ports=(9223 9224 9225)
+fi
+
+total=0
+
+for port in "${ports[@]}"; do
+  if ! targets_json="$(curl -sf --max-time "${AGENT_BROWSER_CDP_PROBE_TIMEOUT:-2}" "http://127.0.0.1:${port}/json/list" 2>/dev/null)"; then
+    $quiet || printf '%s: skipped (CDP unreachable)\n' "$port"
+    continue
+  fi
+
+  target_ids=()
+  while IFS= read -r target_id; do
+    [ -n "$target_id" ] && target_ids+=("$target_id")
+  done < <(
+    printf '%s\n' "$targets_json" | jq -r '
+      .[]
+      | select(.type == "page")
+      | select(((.url // "") == "") or (.url == "about:blank") or (.url == "chrome://newtab") or (.url == "chrome://newtab/"))
+      | .id
+    '
+  )
+
+  count="${#target_ids[@]}"
+  total=$((total + count))
+
+  if $dry_run; then
+    if [ "$count" -gt 0 ]; then
+      $quiet || printf '%s: %s stray target(s)\n' "$port" "$count"
+    else
+      $quiet || printf '%s: 0 stray target(s)\n' "$port"
+    fi
+    continue
+  fi
+
+  for target_id in "${target_ids[@]}"; do
+    curl -sf --max-time "${AGENT_BROWSER_CDP_PROBE_TIMEOUT:-2}" \
+      "http://127.0.0.1:${port}/json/close/${target_id}" >/dev/null
+  done
+
+  if [ "$count" -gt 0 ]; then
+    $quiet || printf '%s: closed %s stray target(s)\n' "$port" "$count"
+  else
+    $quiet || printf '%s: 0 stray target(s)\n' "$port"
+  fi
+done
+
+if $dry_run && [ "$total" -gt 0 ]; then
+  exit 1
+fi

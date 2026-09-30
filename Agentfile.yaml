@@ -1,0 +1,212 @@
+# Agentfile.yaml — declarative AI agent configuration for this machine
+# Bootstrap: agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml
+# Lifecycle: dotfiles apply runs .chezmoiscripts/run_after_agentbrew-sync.sh,
+# which syncs this file through agentbrew. Do not edit generated agent config
+# under ~/.claude, ~/.cursor, ~/.config/devin, or other installed mirrors.
+# See: https://www.npmjs.com/package/agentbrew
+
+# Keep this manifest explicit. Hidden recommended sets can add optional MCP servers
+# with required env vars and make unattended dotfiles sync fail noisy.
+
+hooks:
+  - event: PreToolUse
+    matcher: Bash
+    command: "~/.config/dotfiles/hooks/block-dangerous-git.sh"
+  - event: PreToolUse
+    matcher: Shell
+    command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
+  - event: PreToolUse
+    matcher: Bash
+    command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
+  - event: PreToolUse
+    matcher: Task
+    command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
+  - event: SessionStart
+    matcher: "*"
+    command: "~/.config/dotfiles/hooks/session-endpoint-path.sh"
+
+mcp:
+  - context7
+  - playwright
+  - tasks-mcp
+  # github: catalog @modelcontextprotocol/server-github, token from ${GITHUB_TOKEN}.
+  - github
+  # figma: official remote MCP (https://mcp.figma.com/mcp). Design context,
+  # variables, components and code-connect mappings straight from a Figma file.
+  # Per-client OAuth — the first tool call opens Figma's consent screen, so no
+  # token lives here. Chosen over the desktop server (127.0.0.1:3845), which
+  # only answers while the Figma app is open in Dev Mode on a paid Dev/Full seat.
+  - figma
+  # atlassian (uvx mcp-atlassian) removed from base — some orgs block OAuth MCP
+  # plugins; use your team overlay for token-based jira-mcp instead. Re-add here
+  # only for forks that want uvx mcp-atlassian with JIRA_* env vars directly.
+  # jenkins removed permanently: the jenkins MCP needs JENKINS_URL/USER/
+  # API_TOKEN, but the Jenkins API token is not obtainable here. Jenkins
+  # access is browser-only — use the jenkins-troubleshooting skill
+  # (persistent agent-browser dashboard), not an MCP. Do not re-add.
+  # chrome-devtools-mcp: Google ChromeDevTools team's official MCP.
+  # Gives agents Lighthouse, performance traces, accessibility audits, live
+  # DOM, console errors, and network logs in-loop — closes the "design that
+  # performs" gap (Core Web Vitals + a11y) that screenshot-only tools miss.
+  # No API key. Free. https://github.com/ChromeDevTools/chrome-devtools-mcp
+  - name: chrome-devtools
+    command: npx
+    args:
+      - "-y"
+      - chrome-devtools-mcp@latest
+  # shadcn-mcp (CLI 3.0, zero-config since Aug 2025; May 2026 added registry
+  # include + validate): lets agents browse, search, view, and install
+  # components from any shadcn-compatible registry via natural language.
+  # Works across namespaced registries — no per-project components.json
+  # required upfront. https://ui.shadcn.com/docs/registry/mcp
+  - name: shadcn-mcp
+    command: npx
+    args:
+      - "-y"
+      - shadcn@latest
+      - mcp
+# Semantic memory runtime — AgentBrew owns daemon, MCP URL, and pack reconciliation.
+memory:
+  enabled: true
+# Org-specific MCP servers (Google Drive, internal observability, etc.) live
+# in the overlay Agentfile at ~/apps/<overlay>/Agentfile.yaml. The post-sync
+# lifecycle script (.chezmoiscripts/run_after_agentbrew-sync.sh) automatically
+# layers the overlay on top of this file when the overlay path is present.
+
+skills:
+  - agent-browser
+  - systematic-debugging
+  - task-command-center
+  - update-tooling
+  - writing-plans
+  - finishing-a-development-branch
+  - requesting-code-review
+  - receiving-code-review
+  - iterate
+  - semgrep
+  - codeql
+  - playwright-best-practices
+  - property-based-testing
+  - supply-chain-risk-auditor
+  # ── Recommended additions (agentbrew install --recommended) ─────
+  - find-skills              # discover + install skills from agentskills.io
+  - verification-before-completion  # require evidence before claiming "done"
+  - code-smells-aware        # 50+ TS/React static-analysis audits
+  - shadcn                   # shadcn/ui component patterns
+  - effective-ui-design      # WCAG/OKLCH/8pt/forms technical layer
+  # local-llm-warmup removed: skill doesn't exist in any registered source
+  # ── dev workflow skills ──────────────────────────────────────────
+  - grill-with-docs
+  - improve-codebase-architecture
+  - doubt-driven-development
+  - handoff
+  - spec-driven-development
+  - prototype
+  - test-driven-development
+  - to-issues
+  - analyze
+  - ubiquitous-language
+  - caveman
+  # ── context budget / token hygiene (agentbrew dev plugins) ───────
+  - context-budget           # metrics-driven trim via agentbrew measure context
+  - cursor-token-playbook    # daily Cursor habits — model mix, new chat, @ scoping
+  # ── web design quality skills ───────────────────────────────────
+  # frontend-design (anthropics/skills): Anthropic's official creative
+  # design guidance for distinctive, production-grade frontend. Bold
+  # aesthetics for landing pages and artifacts; complements `taste`
+  # (rule-based dashboard UI) and `effective-ui-design` (technical layer).
+  - frontend-design
+  # ── MCP Apps (SEP-1865, stabilized 2026-01-26) ──────────────────
+  # The first official MCP extension — tools can render interactive
+  # UIs inline in Claude, ChatGPT, VS Code, Goose, Postman, MCPJam.
+  - create-mcp-app          # scaffold a new MCP App from scratch
+  - migrate-oai-app         # port OpenAI Apps SDK → MCP Apps
+  - add-app-to-server       # retrofit existing MCP server with UI
+  - convert-web-app         # web app → hybrid web + MCP App
+  # ── Anthropic plugin marketplace skills (claude-plugins-official) ─
+  # Subset that's broadly useful across agents and architectures.
+  - build-mcp-server        # canonical Anthropic MCP server guidance
+  - build-mcp-app           # sister to create-mcp-app, post-deployment
+  - build-mcpb              # MCP bundles
+  - session-report          # HTML usage/skills/cost report from session
+  - writing-hookify-rules   # author hooks-based rules
+  # Claude-Code plugin authoring (useful for any plugin/skill author)
+  - skill-development
+  - command-development
+  - agent-development
+  - hook-development
+  - plugin-structure
+  - plugin-settings
+  - mcp-integration
+
+commands:
+  - ./commands
+
+sources:
+  - vercel-labs/skills
+  - obra/superpowers
+  - anthropics/skills
+  - trailofbits/skills
+  - supabase/agent-skills
+  # currents-dev/playwright-best-practices-skill: source for the
+  # playwright-best-practices skill (comprehensive Playwright guide:
+  # E2E, component, API, visual, accessibility, security, Electron).
+  - currents-dev/playwright-best-practices-skill
+  # shadcn/ui: source for the shadcn skill (component patterns)
+  - shadcn/ui
+  # sebastian-software/effective-ui-design-skill: closes the technical
+  # layer the `frontend-design` skill leaves open — WCAG 2.1 AA contrast,
+  # OKLCH palettes, `light-dark()`, 8pt spacing grid, fluid typography
+  # with clamp(), container queries, subgrid, `:user-valid`/`:user-invalid`
+  # form patterns, dark mode + reduced motion, SEO meta + JSON-LD, Core
+  # Web Vitals targets, favicon spec. Concrete values, not creative direction.
+  - sebastian-software/effective-ui-design-skill
+  # anthropics/claude-plugins-official: Anthropic's curated plugin marketplace
+  # (23.8k stars, 403+ commits, May 2026: hundreds of plugins, official
+  # distribution channel for Claude Code). Surfaces many marketplace skills including the
+  # canonical Anthropic frontend-design, build-mcp-app, mcp-server-dev,
+  # hookify, code-modernization, ralph-loop, pr-review-toolkit, skill-creator,
+  # session-report, agent-sdk-dev, 11 LSP integrations, and more. Listed in
+  # the docs as the official discoverable marketplace alongside the community
+  # one. https://github.com/anthropics/claude-plugins-official
+  - anthropics/claude-plugins-official
+  # modelcontextprotocol/ext-apps: official repo for the MCP Apps protocol
+  # (SEP-1865, stabilized 2026-01-26). MCP tools can now declare ui://
+  # resources that render as interactive UIs inside Claude, ChatGPT, VS Code,
+  # Goose, Postman, and MCPJam — the first official MCP extension. Source
+  # provides skills such as create-mcp-app (scaffold), migrate-oai-app (port from
+  # OpenAI Apps SDK), add-app-to-server (retrofit existing MCP), and
+  # convert-web-app (hybrid web/MCP). 2.3k stars, 650+ commits, very active.
+  # https://github.com/modelcontextprotocol/ext-apps
+  - modelcontextprotocol/ext-apps
+  - mattpocock/skills
+  - addyosmani/agent-skills
+  - fyodoriv/dev-skills
+
+rules: |
+  Keep TASKS.md in tasks.md format and remove completed task blocks entirely.
+  Agentfile.yaml is the source; generated agent config is owned by agentbrew.
+  At session start, when the memory MCP is available, call get_bootstrap_profile with this agent's ID and current task_summary, then search ranked memory and mistake notes before consequential decisions.
+  Before answering questions about local repositories, architecture, configuration, operations, or domain workflows, automatically search memory with the task and relevant repo/topic tags. Prefer current-revision repo-procedure and pattern memories over generic repo-docs dossiers; if grounded memory is missing or stale, read the current source docs, answer from them, and store the reusable correction with source paths and revision.
+  Before the final response after substantive work, call commit_session_legacy once; encode decisions as {what, why}, errors as {error, tool, resolution}, and user corrections as {original, corrected_to}.
+  Store only reusable context under project/topic/agent tags; never secrets, credentials, raw transcripts, or transient logs.
+  Never put live authentication material or customer payload snapshots in tests,
+  logs, screenshots, pull request descriptions, or committed files. Use safe
+  placeholders and fixtures instead.
+  Name the lifecycle scope of mutable state in code, documentation, and pull
+  requests. Use a precise name such as module, provider-instance, Redux-store,
+  browser-page, or `globalThis` registry scope.
+  Do not use unqualified terms such as `globalState`, "global state", or
+  `singleton`. Name the state owner and lifecycle scope.
+  Access `globalThis` or `Symbol.for` in one named owner module only. Document
+  its lifecycle, cleanup, and deletion condition in that module.
+  Every PR needs uncommitted visual proof: use a browser screenshot for UI work
+  and a pasted terminal transcript for non-UI work, name the covered case and
+  result, and never commit the image. A transcript is copyable and diffable, so
+  it beats a picture of the same text; a terminal image is an equal alternative,
+  never a requirement. Drag and drop any image into the PR description.
+  Never drive AppleScript, keystrokes, or window activation to stage a terminal
+  image; that steals focus and can type into whatever is frontmost.
+  Approved-family /ship-it delivery and org-overlay IRON LAW: see shared-rules.md sections "Git and delivery" and "Org-overlay routing" (full text in ship-it command + templates/AGENTS.md).
+  Broad sibling delivery remains limited to approved repo families.
+  Within those families, never bypass-merge someone else's PR.

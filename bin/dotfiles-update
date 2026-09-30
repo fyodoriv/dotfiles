@@ -1,0 +1,81 @@
+#!/bin/bash
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -f "$DOTFILES_DIR/lib/agentbrew-locate.sh" ]; then
+  source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+else
+  agentbrew_locate() { return 1; }
+fi
+DRY_RUN=0
+VERBOSE=0
+
+usage() {
+  cat <<USAGE
+Usage: dotfiles-update [--dry-run] [--verbose]
+
+Update the whole machine: pull/apply/agentbrew/packages/doctor.
+
+Options:
+  --dry-run   Print phases without running them
+  --verbose   Print command detail while running
+  --help      Show this help
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --verbose) VERBOSE=1; shift ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+phase() {
+  local name="$1" rc
+  shift
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf 'DRY-RUN: %s\n' "$*"
+    return 0
+  fi
+  if [ "$VERBOSE" -eq 1 ]; then
+    printf '→ Phase: %s — %s\n' "$name" "$*"
+  else
+    printf '→ Phase: %s\n' "$name"
+  fi
+  set +e
+  "$@"
+  rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
+    printf '✓ Phase complete: %s\n' "$name"
+    return 0
+  fi
+  printf '✗ Phase failed: %s (exit %s)\n' "$name" "$rc" >&2
+  exit "$rc"
+}
+
+agentbrew_phase() {
+  if [ "$DRY_RUN" -eq 1 ]; then
+    phase agents agentbrew sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"
+    return 0
+  fi
+  local agentbrew_path
+  if agentbrew_locate >/dev/null 2>&1 && [ -x "$DOTFILES_DIR/bin/agentbrew" ]; then
+    phase agents "$DOTFILES_DIR/bin/agentbrew" sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"
+    return 0
+  fi
+  agentbrew_path="$(command -v agentbrew 2>/dev/null || true)"
+  if [ -n "$agentbrew_path" ] && [ "$agentbrew_path" != "$DOTFILES_DIR/bin/agentbrew" ]; then
+    phase agents agentbrew sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"
+    return 0
+  fi
+  printf '○ agentbrew not available — skipping agent config refresh\n'
+}
+
+phase pull git -C "$DOTFILES_DIR" pull --rebase
+phase apply dotfiles apply
+agentbrew_phase
+phase packages dotfiles-upgrade
+phase doctor dotfiles-doctor --fix

@@ -1,0 +1,69 @@
+#!/bin/bash
+set -euo pipefail
+
+# Replace bin/python3 and bin/python3.13 bash scripts with symlinks to adhoc-signed
+# uv-managed python 3.13. endpoint agent flags the script itself (unsigned,
+# Description: python3 / python3.13) even when adhoc-signed and exec'ing a signed
+# Mach-O — the invoked path must be Mach-O.
+#
+# Escape hatch for debugging: invoke ~/.local/bin/python3.13 or
+# "$(uv python find 3.13)" directly (never /usr/bin/python3 on managed endpoints).
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+_resolve_uv_python() {
+  local candidate arch platform
+  if [ -n "${DOTFILES_UV_PYTHON:-}" ]; then
+    [ -x "$DOTFILES_UV_PYTHON" ] && printf '%s\n' "$DOTFILES_UV_PYTHON" && return 0
+    return 1
+  fi
+  export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-managed}"
+  if command -v uv &>/dev/null; then
+    candidate="$(uv python find 3.13 2>/dev/null || true)"
+    [ -n "$candidate" ] && [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  fi
+  if [ -e "${HOME}/.local/bin/python3.13" ]; then
+    if [ -L "${HOME}/.local/bin/python3.13" ]; then
+      candidate="$(readlink "${HOME}/.local/bin/python3.13" 2>/dev/null || true)"
+      if [ -n "$candidate" ] && [ "${candidate#/}" = "$candidate" ]; then
+        candidate="${HOME}/.local/bin/$candidate"
+      fi
+    else
+      candidate="${HOME}/.local/bin/python3.13"
+    fi
+    if [ -n "$candidate" ] && [ -x "$candidate" ] && echo "$candidate" | grep -q '.local/share/uv/python'; then
+      printf '%s\n' "$candidate" && return 0
+    fi
+  fi
+  arch="$(uname -m)"
+  case "$arch" in
+    arm64)  platform="macos-aarch64-none" ;;
+    x86_64) platform="macos-x86_64-none" ;;
+    *)      platform="" ;;
+  esac
+  if [ -n "$platform" ] && [ -d "${HOME}/.local/share/uv/python" ]; then
+    for candidate in "${HOME}"/.local/share/uv/python/cpython-3.13*-"$platform"/bin/python3.13; do
+      [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+    done
+  fi
+  return 1
+}
+
+UV_PYTHON="$(_resolve_uv_python || true)"
+if [ -z "$UV_PYTHON" ]; then
+  echo "python3: uv-managed python 3.13 not found — run: chezmoi apply  # installs, signs, and symlinks uv python" >&2
+  echo "  (never use /usr/bin/python3 or Python.framework paths on managed endpoints)" >&2
+  exit 1
+fi
+
+_link_shim() {
+  local shim="$1"
+  if [ -e "$shim" ] && [ ! -L "$shim" ]; then
+    rm -f "$shim"
+  fi
+  ln -sfn "$UV_PYTHON" "$shim"
+  chmod +x "$shim" 2>/dev/null || true
+}
+
+_link_shim "$SHIM_DIR/python3"
+_link_shim "$SHIM_DIR/python3.13"

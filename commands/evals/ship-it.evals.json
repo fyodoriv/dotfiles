@@ -1,0 +1,131 @@
+{
+  "command_name": "ship-it",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/ship-it",
+      "expected_output": "The agent treats ship-it as current-session auto-ship approval: inventories pending session work in the current repo, explicitly named current-task repos, and approved approved repo families; then verifies, commits scoped files, pushes feature branches, opens or updates PRs, watches CI, merges when allowed, reconciles canonical branches, runs release only where allowlisted, and applies tooling Steps 12–13 — without asking to commit or push unless a dangerous blocker applies.",
+      "expectations": [
+        "Inventories all pending session work — git status, diffs, logs, worktrees, PR state, TASKS.md P0/P1 — across approved repo families before cleanup or publication",
+        "Does not ask 'want me to commit?' or 'should I push?' for approved actions; proceeds until done or a dangerous blocker",
+        "Stages explicit files only and never uses git add -A, git add ., git add -u, hook bypasses, or unleased force pushes",
+        "Pushes normal feature branches and opens or updates PRs in the current repo, explicitly named current-task repos, and approved repo families without asking again",
+        "Watches CI/checks, reads failures, fixes root causes, and only reports green after checks and mergeability are verified",
+        "Admin/bypass merges user-owned or current-session PRs in approved approved repo families when green checks are blocked only by branch/review policy",
+        "Runs documented dotfiles apply and agentbrew recommended-update refresh steps after tooling delivery",
+        "Executes Steps 12–13 via Shell (dotfiles apply, bin/dotfiles-reload-launchagents, CDP curl verify, optional token-tool install, agentbrew sync/build, agentbrew measure context, doctor) and includes command output as proof — never tells the user to run these manually",
+        "Proactively tells the user to start a new chat in every delivery report after Step 12 sync; mentions cursor-token-playbook when headroom low or rules/MCP changed",
+        "Reports Merged N/M PRs honestly — never Ship-it complete when session PRs remain open for required_pull_request_reviews"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/ship-it with duplicate PRs for the same change",
+      "expected_output": "The agent prefers the PR that already has human review history, moves the intended branch content onto that reviewed PR, and only closes a duplicate after the reviewed PR is complete and the closure includes a reason plus replacement links.",
+      "expectations": [
+        "Does not pick the newer or cleaner duplicate PR by default when another PR already has human review context",
+        "Verifies PR author and head owner before updating, merging, or bypass-merging",
+        "Preserves the reviewed PR URL/thread as the winning delivery surface",
+        "Closes duplicate PRs only with an explanatory closing comment and branch deletion when allowed"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/ship-it when a PR branch is behind the base",
+      "expected_output": "For any verified user-owned or current-session PR branch in active scope, the agent preserves the old remote head, verifies PR/head ownership, rebases or reconstructs the branch on the latest base, verifies locally, then publishes with an explicit force-with-lease scoped to that PR branch.",
+      "expectations": [
+        "Saves the old remote OID or backup ref before rewriting the PR branch",
+        "Uses git rebase or a documented equivalent instead of direct protected-branch pushes",
+        "Publishes rewritten PR branches only with --force-with-lease and the saved expected OID",
+        "Does not rewrite someone else's branch or use plain --force"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/ship-it in an approved tooling repo when a required-review branch protection rule blocks PR #584 after green CI",
+      "expected_output": "The agent tries normal merge, --admin merge, and auto-merge on the green PR, records each failure when required_pull_request_reviews cannot be bypassed, continues rebase/CI on review-blocked PRs in the same session, merges every PR that CAN merge, and reports Merged N/M with pending-review PR URLs — never 'Ship-it complete' while PRs remain open.",
+      "expectations": [
+        "Tries the full merge ladder (normal, --admin, auto-merge) before treating review as the blocker",
+        "Does not ask 'should I merge?' — ship-it is standing approval",
+        "Does not report Ship-it complete or Delivery complete when PRs remain open for required_pull_request_reviews",
+        "Reports Merged N/M with PR URLs for every open review-blocked PR",
+        "Continues rebase/CI fixes on review-blocked PRs in the same session instead of stopping after the first review failure",
+        "Surfaces one human action: teammate write-access approval on listed PRs when all merge APIs fail"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "/ship-it when Cursor hook blocks git push with 'Pushing source code to this remote has to be done manually'",
+      "expected_output": "The agent retries push with unrestricted Shell permissions and explicit git/gh context, continues PR delivery, and never tells the user to push manually for verified user-owned/current-session work in the current repo, an explicitly named current-task repo, or an approved approved-family repo.",
+      "expectations": [
+        "Does not stop ship-it or delegate push to the user on the first Cursor beforeShellExecution hook rejection",
+        "Retries git push with unrestricted permissions and explicit repo cwd/remote before reporting failure",
+        "Continues through PR create/update, CI watch, and merge after a successful push",
+        "Only reports a hard blocker after exhausting the /ship-it Step 5 retry ladder with evidence"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "/ship-it after dotfiles merge when CDP Chrome bootstrap fails",
+      "expected_output": "The agent runs bin/dotfiles-reload-launchagents via Shell, escalates to --kill-chrome when bootstrap still fails, verifies CDP ports 9223–9225 with curl, and never ends ship-it by telling the user to reload launchagents manually.",
+      "expectations": [
+        "Runs bin/dotfiles-reload-launchagents after dotfiles apply without delegating to the user",
+        "Escalates to --kill-chrome when bootstrap fails after script auto-retry",
+        "Verifies CDP9223/9224/9225 with curl and records output in the delivery report",
+        "Does not use --kickstart as default when bootstrap is the correct reload mode",
+        "Does not skip reload because plists look unchanged or the PR was docs-only"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "/ship-it for my user-owned product-repo PR; rebase it onto master and push the update",
+      "expected_output": "The agent verifies the PR author and head owner, preserves the old remote head, rebases the owned branch onto origin/master, runs the repository's required checks, and pushes with an explicit force-with-lease. Product-repo status does not require another rebase or push prompt, but it does not grant admin/bypass merge or release permission.",
+      "expectations": [
+        "Treats rebase of verified user-owned/current-session work as pre-approved even outside approved repo families",
+        "Preserves the old remote OID before rewriting and uses explicit --force-with-lease",
+        "Retries a Cursor source-push guard from the absolute checkout with explicit remote/ref instead of delegating the push",
+        "Polls substantive CI after the rewritten push",
+        "Does not use admin/bypass merge or release merely because normal product-repo delivery was approved"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "/ship-it: plan a cross-platform host-state bridge before implementation",
+      "expected_output": "The agent uses the installed writing-plans and task-command-center planning workflow to produce a source-backed architecture plan before any product implementation.",
+      "expectations": [
+        "Reads writing-plans and the task-command-center implementation-plan template before authoring",
+        "Starts with the overall goal, vision, why now, alternatives, and a fact-versus-proposal evidence ledger",
+        "Defines a versioned HostBootstrapPayload with source ownership, transport, validation, update/reset behavior, and Redux ownership versus state provenance",
+        "Uses numbered tasks that state why, dependencies or parallelism, owner/boundary, acceptance evidence, and exact verification",
+        "Includes rollout, security, and unit/contract/integration/end-to-end coverage while not treating a planning request as authorization to implement product code"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "/ship-it after a backend-only fix",
+      "expected_output": "The agent proves each changed behavior with a pasted terminal transcript in a fenced code block, showing the command and its real output, and records the case, action, expected result, and observed result under Visual proof before handoff. It does not drive GUI automation to stage a terminal image.",
+      "expectations": [
+        "Requires visual proof for every PR, including non-UI and documentation-only changes",
+        "Uses a live browser screenshot for UI behavior and prefers a pasted terminal transcript for non-UI behavior",
+        "Treats a terminal image as an equal alternative to a transcript, never a requirement",
+        "Never drives AppleScript, keystrokes, or window activation to stage a terminal image",
+        "Captures Network request details when a browser call proves the behavior",
+        "Uses drag and drop to attach images to the PR description",
+        "Does not commit screenshots, secrets, session data, or customer data",
+        "Keeps a PR unready when safe proof is blocked and records the exact blocker"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "/ship-it for a linked Jira ticket after the final PR becomes ready and then merges",
+      "expected_output": "The agent updates the one linked Jira ticket only after each successful final delivery event: it discovers the available review transition when the non-draft PR becomes ready, then discovers the available terminal transition after merge. It does not transition draft stack work, an ambiguous ticket, or an epic.",
+      "expectations": [
+        "Uses the configured Jira MCP to inspect available transitions before each status change",
+        "Moves the ticket to In Review or the project's review-equivalent state after the final non-draft PR opens or becomes ready",
+        "Moves the ticket to Done or the project's terminal equivalent after that final PR merges, including required resolution fields",
+        "Does not transition for drafts, blocked stack children, partial delivery, ambiguous or unrelated keys, or epics",
+        "Does not add a Jira comment unless the user explicitly requests one"
+      ]
+    }
+  ]
+}

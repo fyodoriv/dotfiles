@@ -1,0 +1,105 @@
+#!/bin/bash
+# local-ai-record-lesson — append a new failure-mode entry to
+# docs/audits/local-ai-failure-modes.md.
+#
+# The failure-modes file is loaded into bin/local-ai-agent's system
+# prompt on every run (see lib/local-ai-agent.py:_load_failure_modes).
+# That means every recurring mistake we catch becomes a permanent
+# in-context guardrail for future runs — but only if we actually
+# RECORD the lesson when we see it. This script is the one-command
+# capture path so we don't have to remember the file layout.
+#
+# Usage:
+#   local-ai-record-lesson "Heading line (becomes ## H2)" \
+#     "Body paragraph(s). May be multi-line."
+#
+# Or for quick capture without a fixed heading:
+#   local-ai-record-lesson --pattern "what the model did wrong" \
+#     --fix "what it should do instead"
+#
+# Examples:
+#   local-ai-record-lesson \
+#     "Don't write absolute paths in dotfiles" \
+#     "Use chezmoi templates or \$HOME-relative paths so the docs work \
+#      on machines with different dotfiles_dir."
+#
+#   local-ai-record-lesson --pattern "bash test loop on macOS" \
+#     --fix "Use \`run -127\` form when testing exit codes; older bats \
+#            warns otherwise."
+#
+# After every call, opens the file in \$EDITOR (unless --no-edit) so
+# you can polish the appended block before committing.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+FM="$REPO_ROOT/docs/audits/local-ai-failure-modes.md"
+
+if [ ! -f "$FM" ]; then
+  echo "error: failure-modes file not found at $FM" >&2
+  exit 1
+fi
+
+HEADING=""
+BODY=""
+PATTERN=""
+FIX=""
+NO_EDIT=false
+
+usage() {
+  sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | head -30
+  exit "${1:-0}"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --pattern) PATTERN="$2"; shift 2 ;;
+    --fix) FIX="$2"; shift 2 ;;
+    --no-edit) NO_EDIT=true; shift ;;
+    --help|-h) usage 0 ;;
+    --*) echo "unknown flag: $1" >&2; usage 1 ;;
+    *)
+      if [ -z "$HEADING" ]; then
+        HEADING="$1"
+      elif [ -z "$BODY" ]; then
+        BODY="$1"
+      else
+        echo "too many positional args" >&2
+        usage 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+# If --pattern/--fix used, synthesize a heading + body.
+if [ -n "$PATTERN" ] || [ -n "$FIX" ]; then
+  if [ -z "$HEADING" ]; then
+    HEADING="$PATTERN"
+  fi
+  if [ -z "$BODY" ]; then
+    BODY="Observed: $PATTERN
+
+Fix: $FIX"
+  fi
+fi
+
+if [ -z "$HEADING" ] || [ -z "$BODY" ]; then
+  echo "error: need either positional 'HEADING BODY' or --pattern/--fix" >&2
+  usage 1
+fi
+
+# Append. Two newlines before the heading so it sits as its own H2 block.
+{
+  echo ""
+  echo "## $HEADING"
+  echo ""
+  echo "$BODY"
+} >> "$FM"
+
+echo "✓ Appended lesson to $FM"
+echo "  Heading: $HEADING"
+
+if ! $NO_EDIT && [ -n "${EDITOR:-}" ]; then
+  echo "→ Opening in \$EDITOR to polish before commit ($EDITOR)..."
+  exec "$EDITOR" "$FM"
+fi

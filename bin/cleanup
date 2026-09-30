@@ -1,0 +1,191 @@
+#!/bin/bash
+# Dev environment cleanup — reclaim disk space from caches, logs, and build artifacts.
+#
+# Invocation paths:
+#   - topgrade [post_commands] block (every `dotfiles upgrade` /
+#     `topgrade` / weekly LaunchAgent run) — primary path post-PR #128.
+#   - Direct: `cleanup` or `cleanup --dry-run` — ad-hoc operator runs.
+#
+# The standalone com.dotfiles.cleanup LaunchAgent was deleted in PR #128;
+# topgrade's weekly Sunday 09:00 run now drives both upgrade + cleanup in
+# the correct order (download new bottles, THEN purge old caches).
+#
+# This script owns ALL post-upgrade cache pruning: the package-manager
+# caches (brew, npm, yarn, uv) PLUS the dotfiles-specific cleanups (Gradle
+# caches >30d, /tmp/node_modules, ~/Library/Caches, Xcode DerivedData, etc.).
+# dotfiles-upgrade deliberately does NOT pass topgrade's global --cleanup:
+# its inline `uv cache prune` blocks on the cache lock held by live `uvx`
+# MCP servers and fails the run. Doing every prune here keeps it lock-
+# tolerant (clean() swallows non-zero exits; the uv prune uses a short
+# UV_LOCK_TIMEOUT). is_safe_path safelist prevents accidental rm -rf
+# outside cache directories.
+#
+# Usage: cleanup [--dry-run]
+
+set -euo pipefail
+
+# shellcheck source=../lib/colors.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/colors.sh"
+# shellcheck source=../lib/stats.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/stats.sh"
+
+DRY_RUN=false
+
+# Safelist of parent directories allowed for rm -rf.
+# Paths outside these are rejected to prevent accidental data loss.
+SAFE_CLEANUP_PARENTS=(
+  "$HOME/.gradle"
+  "$HOME/.npm"
+  "$HOME/.yarn"
+  "$HOME/.cache"
+  "$HOME/Library/Caches"
+  "$HOME/Library/Logs"
+  "$HOME/Library/Developer"
+  "$HOME/.dotfiles-snapshots"
+  "/tmp"
+)
+
+is_safe_path() {
+  local target
+  target="$(realpath "$1" 2>/dev/null)" || return 1
+  [ -z "$target" ] && return 1
+  for safe_parent in "${SAFE_CLEANUP_PARENTS[@]}"; do
+    local resolved_parent
+    resolved_parent="$(realpath "$safe_parent" 2>/dev/null)" || continue
+    case "$target" in
+      "$resolved_parent" | "$resolved_parent"/*) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+clean() {
+  local label="$1" path="$2" cmd="${3:-}"
+  if [ -d "$path" ] || [ -n "$cmd" ]; then
+    local size
+    if [ -d "$path" ]; then
+      size=$(du -sh "$path" 2>/dev/null | cut -f1)
+    else
+      size="?"
+    fi
+    if $DRY_RUN; then
+      echo -e "${YELLOW}[dry-run]${NC} Would clean $label ($size)"
+    else
+      if [ -n "$cmd" ]; then
+        bash -c "$cmd" 2>/dev/null || true
+      elif is_safe_path "$path"; then
+        rm -rf "$path" 2>/dev/null || true
+      else
+        warn "Refused to rm -rf '$path' — not under a known cache directory"
+        return
+      fi
+      echo -e "${GREEN}✓${NC} Cleaned $label ($size)"
+      cleaned_count=$((${cleaned_count:-0} + 1))
+    fi
+  fi
+}
+
+# Prune old items: only remove those BOTH over count limit AND older than 30 days
+MIN_AGE_DAYS=30
+
+prune_old_dirs() {
+  local label="$1" dir="$2" keep="$3"
+  [ ! -d "$dir" ] && return
+  local count
+  count=$(fd -t d -d 1 . "$dir" 2>/dev/null | wc -l | tr -d ' ')
+  [ "$count" -le "$keep" ] && return
+
+  local candidates pruned=0
+  candidates=$(fd -t d -d 1 . "$dir" 2>/dev/null | sort | head -n "$((count - keep))")
+  [ -z "$candidates" ] && return
+
+  if $DRY_RUN; then
+    local would_prune=0
+    while IFS= read -r item; do
+      fd -t d -d 0 --changed-before "${MIN_AGE_DAYS}d" "$item" 2>/dev/null | grep -q . && would_prune=$((would_prune + 1))
+    done <<< "$candidates"
+    [ "$would_prune" -gt 0 ] && echo -e "${YELLOW}[dry-run]${NC} Would prune $would_prune old $label (>${MIN_AGE_DAYS}d)"
+  else
+    while IFS= read -r item; do
+      if fd -t d -d 0 --changed-before "${MIN_AGE_DAYS}d" "$item" 2>/dev/null | grep -q .; then
+        rm -rf "$item"
+        pruned=$((pruned + 1))
+      fi
+    done <<< "$candidates"
+    [ "$pruned" -gt 0 ] && echo -e "${GREEN}✓${NC} Pruned $pruned old $label (>${MIN_AGE_DAYS}d, kept $keep)"
+  fi
+}
+
+cleanup_main() {
+  { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; return 0; }
+
+  DRY_RUN=false
+  [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
+
+  # Trim log to last 500 lines (prevents unbounded growth from LaunchAgent)
+  local _log="$HOME/.local/share/dotfiles/logs/cleanup.log"
+  if [ -f "$_log" ]; then
+    tail -n 500 "$_log" > "$_log.tmp" && mv "$_log.tmp" "$_log" || rm -f "$_log.tmp"
+  fi
+
+  cleaned_count=0
+
+  echo "🧹 Cleaning dev environment..."
+  echo ""
+
+  # npm cache (usually the biggest offender)
+  clean "npm cache" "$HOME/.npm/_cacache" "npm cache clean --force"
+
+  # Yarn cache
+  clean "Yarn cache" "" "yarn cache clean"
+
+  # Homebrew cache
+  clean "Homebrew cache" "$(brew --cache 2>/dev/null)" "brew cleanup --prune=7"
+
+  # uv cache — best-effort. A live `uvx` / `uv tool run` (e.g. an MCP server
+  # from a Devin/minsky session) holds the cache lock; UV_LOCK_TIMEOUT=10
+  # makes prune give up fast instead of blocking the default 300s, and
+  # clean() swallows the resulting non-zero exit so a busy cache never fails
+  # cleanup. Replaces topgrade's --cleanup uv prune (see bin/dotfiles-upgrade).
+  command -v uv >/dev/null 2>&1 && clean "uv cache" "" "UV_LOCK_TIMEOUT=10 uv cache prune"
+
+  # Gradle caches (old daemons + build cache)
+  clean "Gradle daemon logs" "$HOME/.gradle/daemon"
+  clean "Gradle caches (>30d)" "" "fd -t d -d 1 --changed-before 30d . $HOME/.gradle/caches --exec rm -rf {} 2>/dev/null"
+
+  # Xcode derived data (if exists)
+  clean "Xcode derived data" "$HOME/Library/Developer/Xcode/DerivedData"
+
+  # macOS system logs (user-level)
+  clean "User logs" "$HOME/Library/Logs" "fd -e log --changed-before 14d . $HOME/Library/Logs --exec rm -f {} 2>/dev/null"
+
+  # Old crash reports
+  clean "Crash reports" "$HOME/Library/Logs/DiagnosticReports"
+
+  # WebStorm caches (old versions)
+  for dir in "$HOME/Library/Caches/JetBrains"/WebStorm*; do
+    [ -d "$dir" ] && clean "$(basename "$dir") cache" "$dir/tmp"
+  done
+
+  # Node modules in temp/test projects
+  clean "node_modules in /tmp" "" "fd -t d -d 3 '^node_modules$' /tmp --exec rm -rf {} 2>/dev/null"
+
+  # Docker dangling images/containers (if Docker is running)
+  if docker info &>/dev/null 2>&1; then
+    clean "Docker dangling" "" "docker system prune -f"
+  fi
+
+  prune_old_dirs "snapshot(s)" "$HOME/.dotfiles-snapshots" 10
+
+  echo ""
+  if $DRY_RUN; then
+    echo -e "${GREEN}Done!${NC} Run without --dry-run to actually clean."
+  else
+    echo -e "${GREEN}Done!${NC} Cleanup complete."
+    log_run cleanup "$cleaned_count"
+  fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  cleanup_main "$@"
+fi

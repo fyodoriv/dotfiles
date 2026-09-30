@@ -1,0 +1,39 @@
+#!/bin/bash
+# local-ai-loop — drive bin/local-ai-agent through TASKS.md until empty
+# or a deadline passes.
+#
+# A thin alternative to minsky, narrower in scope:
+#   - Local-AI backend only (qwen3-coder:30b via Ollama).
+#   - Reads TASKS.md per the tasks.md spec used in this repo.
+#   - Skips tasks tagged secrets / machine / manual / interactive / auth.
+#   - Each picked task gets a focused prompt + 14-turn budget.
+#   - On agent success + task-block removed from TASKS.md, the loop
+#     commits the staged changes with a chore(local-ai-loop) message.
+#
+# Usage:
+#   local-ai-loop                        # 8h, this repo
+#   local-ai-loop --deadline 30m         # 30 minutes
+#   local-ai-loop --max-tasks 3          # at most 3 tasks
+#   local-ai-loop --dry-run              # show what would run, no agent
+#   local-ai-loop --queue tasks-queue/   # one-task-per-file specs instead
+#                                        # of TASKS.md (overnight grind);
+#                                        # a spec is deleted only after the
+#                                        # full close gates pass
+#
+# Launch an overnight grind:
+#   nohup local-ai-loop --deadline 8h > ~/.cache/local-ai-loop.log 2>&1 &
+#
+# Caveats:
+#   - Local model can't supply secrets or do OAuth flows; tagging those
+#     tasks with `secrets` / `machine` / `auth` / `manual` keeps the loop
+#     from picking them.
+#   - The loop never pushes; commits stay local. Push from the next
+#     waking session after eyeballing the diff.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIB="$SCRIPT_DIR/../lib/local-ai-loop.py"
+# shellcheck source=../lib/dotfiles-endpoint-paths.sh
+source "$SCRIPT_DIR/../lib/dotfiles-endpoint-paths.sh"
+PYTHON="$(dotfiles_resolve_python "$SCRIPT_DIR/.." "${HOME:-}")"
+exec "$PYTHON" "$LIB" "$@"

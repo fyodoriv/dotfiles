@@ -1,0 +1,45 @@
+#!/bin/bash
+# dotfiles-adhoc-sign-ggrep — fast ad-hoc sign Homebrew ggrep only (login bootstrap).
+#
+# Cursor agent sandbox PATH is /opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin).
+# grep/ggrep on that PATH exec bare Homebrew ggrep (unsigned when unsigned
+# after brew upgrade grep). Full Cellar sweep (dotfiles-adhoc-sign-bottles) is too
+# slow for RunAtLoad / post-brew races with high-churn agent subshells.
+set -uo pipefail
+
+QUIET="${DOTFILES_ADHOC_SIGN_QUIET:-0}"
+log() { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+
+_resolve_brew_ggrep() {
+  local candidate
+  if [ -n "${DOTFILES_BREW_PREFIX:-}" ]; then
+    candidate="${DOTFILES_BREW_PREFIX}/bin/ggrep"
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  fi
+  for candidate in /opt/homebrew/bin/ggrep /usr/local/bin/ggrep; do
+    [ -x "$candidate" ] && printf '%s\n' "$candidate" && return 0
+  done
+  return 1
+}
+
+GGREP_BIN="$(_resolve_brew_ggrep || true)"
+if [ -z "$GGREP_BIN" ]; then
+  log "→ Homebrew ggrep not found — skipping fast ggrep sign"
+  exit 0
+fi
+
+sig="$(codesign -dvv "$GGREP_BIN" 2>&1 | awk '/Signature=|not signed/ { print; exit }')"
+case "$sig" in
+  *"not signed"*)
+    if codesign --sign - --force "$GGREP_BIN" 2>/dev/null; then
+      log "✓ Ad-hoc signed ggrep at $GGREP_BIN"
+    else
+      log "⚠ Failed to ad-hoc sign ggrep at $GGREP_BIN" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    log "○ ggrep already signed at $GGREP_BIN"
+    ;;
+esac
+exit 0

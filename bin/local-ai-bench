@@ -1,0 +1,208 @@
+#!/bin/bash
+# local-ai-bench — short reproducible benchmark for the local-AI stack.
+#
+# Prints cold-load + warm latency + tok/s for qwen3-coder:30b on Ollama,
+# and confirms KV cache reuse is reducing prompt-eval time across calls
+# with the same system+tools prefix. Use this to catch regressions after
+# Ollama upgrades or env-var changes.
+#
+# Usage:
+#   local-ai-bench [--model MODEL] [--cold] [--backend=ollama|llamacpp]
+#
+# Flags:
+#   --model MODEL   model to bench (default qwen3-coder:30b)
+#   --cold          force-unload the model first so the first call measures
+#                   true cold-load time
+#   --backend       backend to use (default ollama, or llamacpp)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/dotfiles-endpoint-paths.sh
+source "$SCRIPT_DIR/../lib/dotfiles-endpoint-paths.sh"
+PYTHON="$(dotfiles_resolve_python "$SCRIPT_DIR/.." "${HOME:-}")"
+
+MODEL="qwen3-coder:30b"
+COLD=false
+BACKEND="ollama"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model) MODEL="$2"; shift 2 ;;
+    --cold) COLD=true; shift ;;
+    --backend) BACKEND="$2"; shift 2 ;;
+    --help|-h) sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | head -20; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [ "$BACKEND" = "llamacpp" ]; then
+  # Probe for llama-server binary
+  if ! command -v llama-server >/dev/null 2>&1 && ! [ -x "/usr/local/bin/llama-server" ]; then
+    echo "llama-server not installed (skip: brew install llama.cpp OR git clone https://github.com/ggml-org/llama.cpp && make -j)" >&2
+    exit 1
+  fi
+
+  # Use llama.cpp endpoint
+  "$PYTHON" - "$MODEL" <<'PY'
+import json, sys, time, urllib.request
+
+MODEL = sys.argv[1]
+LLAMACPP = "http://127.0.0.1:8080"
+SYSTEM = (
+    "You are a shell agent. Always call the bash tool with a single "
+    "concrete command. Never explain."
+)
+TOOLS = [{
+    "type": "function",
+    "function": {
+        "name": "bash",
+        "description": "Run a bash command.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "cmd"},
+            },
+            "required": ["command"],
+        },
+    },
+}]
+
+
+def call(messages, num_predict=50):
+    body = json.dumps({
+        "model": MODEL,
+        "messages": messages,
+        "tools": TOOLS,
+        "stream": False,
+        "keep_alive": "24h",
+        "options": {"temperature": 0, "num_ctx": 8192, "num_predict": num_predict},
+    }).encode()
+    req = urllib.request.Request(
+        f"{LLAMACPP}/v1/chat/completions",
+        data=body,
+        headers={"Content-Type": "application/json"},
+    )
+    t0 = time.time()
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        d = json.loads(resp.read())
+    return time.time() - t0, d
+
+
+print(f"model:       {MODEL}")
+print(f"backend:     llamacpp @ {LLAMACPP}")
+print()
+print(f"{'#':>2}  {'wall_ms':>8}  {'prompt_eval_ms':>14}  {'eval_ms':>8}  {'eval_count':>10}  {'tok/s':>7}")
+print(f"{'─'*2:>2}  {'─'*8:>8}  {'─'*14:>14}  {'─'*8:>8}  {'─'*10:>10}  {'─'*7:>7}")
+for i, q in enumerate([
+    "What is the date?",
+    "What is the hostname?",
+    "What is uname?",
+    "How many .md files are in this directory?",
+], 1):
+    elapsed, d = call([
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": q},
+    ])
+    prompt_ms = (d.get("prompt_eval_duration", 0) or 0) / 1e6
+    eval_ms = (d.get("eval_duration", 0) or 0) / 1e6
+    eval_count = d.get("eval_count", 0)
+    tps = (eval_count * 1000 / eval_ms) if eval_ms else 0
+    print(f"{i:>2}  {elapsed*1000:8.0f}  {prompt_ms:14.0f}  {eval_ms:8.0f}  {eval_count:10}  {tps:7.0f}")
+
+print()
+print("Interpretation:")
+print("  - Call #1 prompt_eval_ms is the cold prefix processing time.")
+print("  - Calls #2-N prompt_eval_ms drops to ~50ms or less => KV cache")
+print("    reuse is working (system prompt + tools prefix reused).")
+print("  - eval_ms / eval_count should sit around 85 tok/s on M3 Max.")
+PY
+  exit 0
+fi
+
+# Default Ollama backend. OLLAMA_HOST lets the bats fixture point us at
+# a mock server on a fresh port (default real Ollama runs on :11434).
+OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
+if ! curl -sf -m 2 "$OLLAMA_HOST/v1/models" >/dev/null 2>&1; then
+  echo "Ollama is not reachable on $OLLAMA_HOST — start it first (launchctl bootstrap …com.dotfiles.ollama)." >&2
+  exit 1
+fi
+
+if $COLD; then
+  echo "→ unloading $MODEL (true cold-load measurement)"
+  curl -s -X POST "$OLLAMA_HOST/api/generate" \
+    -d "{\"model\":\"$MODEL\",\"keep_alive\":0}" >/dev/null
+  sleep 2
+fi
+
+"$PYTHON" - "$MODEL" "$OLLAMA_HOST" <<'PY'
+import json, sys, time, urllib.request
+
+MODEL = sys.argv[1]
+OLLAMA = sys.argv[2]
+SYSTEM = (
+    "You are a shell agent. Always call the bash tool with a single "
+    "concrete command. Never explain."
+)
+TOOLS = [{
+    "type": "function",
+    "function": {
+        "name": "bash",
+        "description": "Run a bash command.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "cmd"},
+            },
+            "required": ["command"],
+        },
+    },
+}]
+
+
+def call(messages, num_predict=50):
+    body = json.dumps({
+        "model": MODEL,
+        "messages": messages,
+        "tools": TOOLS,
+        "stream": False,
+        "keep_alive": "24h",
+        "options": {"temperature": 0, "num_ctx": 8192, "num_predict": num_predict},
+    }).encode()
+    req = urllib.request.Request(
+        f"{OLLAMA}/api/chat",
+        data=body,
+        headers={"Content-Type": "application/json"},
+    )
+    t0 = time.time()
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        d = json.loads(resp.read())
+    return time.time() - t0, d
+
+
+print(f"model:       {MODEL}")
+print(f"backend:     ollama @ {OLLAMA}")
+print()
+print(f"{'#':>2}  {'wall_ms':>8}  {'prompt_eval_ms':>14}  {'eval_ms':>8}  {'eval_count':>10}  {'tok/s':>7}")
+print(f"{'─'*2:>2}  {'─'*8:>8}  {'─'*14:>14}  {'─'*8:>8}  {'─'*10:>10}  {'─'*7:>7}")
+for i, q in enumerate([
+    "What is the date?",
+    "What is the hostname?",
+    "What is uname?",
+    "How many .md files are in this directory?",
+], 1):
+    elapsed, d = call([
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": q},
+    ])
+    prompt_ms = (d.get("prompt_eval_duration", 0) or 0) / 1e6
+    eval_ms = (d.get("eval_duration", 0) or 0) / 1e6
+    eval_count = d.get("eval_count", 0)
+    tps = (eval_count * 1000 / eval_ms) if eval_ms else 0
+    print(f"{i:>2}  {elapsed*1000:8.0f}  {prompt_ms:14.0f}  {eval_ms:8.0f}  {eval_count:10}  {tps:7.0f}")
+
+print()
+print("Interpretation:")
+print("  - Call #1 prompt_eval_ms is the cold prefix processing time.")
+print("  - Calls #2-N prompt_eval_ms drops to ~50ms or less => KV cache")
+print("    reuse is working (system prompt + tools prefix reused).")
+print("  - eval_ms / eval_count should sit around 85 tok/s on M3 Max.")
+PY

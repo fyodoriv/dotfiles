@@ -1,0 +1,972 @@
+#!/bin/bash
+# Dotfiles Doctor — audits all configs against best practices, auto-fixes drift.
+#
+# Usage:
+#   dotfiles-doctor              Run audit (report only)
+#   dotfiles-doctor --fix        Auto-fix all issues (respects .overrides)
+#   dotfiles-doctor --fix-all    Non-interactive auto-fix (alias for --fix, for CI/scripts)
+#   dotfiles-doctor --list       List all check IDs
+#   dotfiles-doctor --quiet      One-line summary (for prompts, scripts, morning embed)
+#   dotfiles-doctor --skip ID    Add a check to .overrides (skip it permanently)
+#   dotfiles-doctor --validate-overrides  Verify all .overrides entries are valid check IDs
+#   dotfiles-doctor --severity LEVEL  Run only modules at or above LEVEL (critical|important|performance|cosmetic)
+#   dotfiles-doctor --json       Output JSON array of check results (for scripts)
+#   dotfiles-doctor --report     Output markdown report (for sharing)
+#   dotfiles-doctor --watch      Re-run checks every 5s with clear screen (Ctrl-C to stop)
+#   dotfiles-doctor --module X   Run only the named module
+#   dotfiles-doctor --trends     Show pass/fail/fix trend over time
+#
+# macOS end-of-run banners are opt-in (default off). Set DOTFILES_DOCTOR_NOTIFY=1
+# in ~/.zshrc.local or the LaunchAgent EnvironmentVariables to re-enable.
+# shellcheck disable=SC2154  # counters (pass_count, fail_count, etc.) defined in lib/output.sh
+
+# set +e: check() runs test commands that return non-zero on failure — that's expected, not an error
+set +e
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+# This process configures its own endpoint-safe PATH below. Do not run an
+# inherited shell startup hook again for every check subprocess.
+unset BASH_ENV ENV
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+OVERRIDES_FILE="$DOTFILES_DIR/.overrides"
+
+# Home links point into chezmoi's source checkout, even when this doctor runs
+# from another checkout of the repo.
+# shellcheck source=../lib/dotfiles-source-dir.sh
+source "$DOTFILES_DIR/lib/dotfiles-source-dir.sh"
+DOTFILES_LINK_DIR="$(dotfiles_link_root "$DOTFILES_DIR")"
+# Security checks inspect deployed machine state from the configured chezmoi
+# source. Standalone dotfiles-audit continues to inspect the checkout it runs
+# from, which keeps repository-audit use and its isolated tests deterministic.
+# shellcheck disable=SC2034 # used by sourced security doctor module
+DOTFILES_SECURITY_USE_APPLIED_ROOT=1
+
+# Prefer deployed shims (curl/jq/grep/find) and keg-only Homebrew curl so
+# checks represent the machine's applied checkout when doctor runs elsewhere.
+# shellcheck source=../lib/dotfiles-endpoint-paths.sh
+source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+dotfiles_prepend_endpoint_tool_paths "$DOTFILES_LINK_DIR/bin"
+
+# Trim log to last 500 lines (prevents unbounded growth from LaunchAgent)
+_log="$HOME/.local/share/dotfiles/logs/dotfiles-doctor.log"
+if [ -f "$_log" ]; then
+  tail -n 500 "$_log" > "$_log.tmp" && mv "$_log.tmp" "$_log" || rm -f "$_log.tmp"
+fi
+
+# Read chezmoi data for module gating (enterprise, profile)
+# shellcheck disable=SC2034  # used by sourced doctor modules
+IS_ENTERPRISE="$(chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null || echo "false")"
+# shellcheck disable=SC2034  # used by sourced doctor modules
+DOTFILES_PROFILE="$(chezmoi execute-template '{{ .profile }}' 2>/dev/null || echo "full")"
+# shellcheck disable=SC2034  # used by sourced doctor modules
+USE_CURSOR="${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo "true")}"
+
+# ── Module discovery roots ───────────────────────────────────────────
+# Modules live under "$DOTFILES_DIR/modules/" by default. An optional overlay
+# repo (private organisation extension layered on top of dotfiles) can plug
+# in additional modules via $EXTRA_DOCTOR_DIR — set explicitly as an env var,
+# or via chezmoi data key `extra_doctor_dir`. Overlay modules use the same
+# `severity` file convention as in-repo modules; missing severity defaults
+# to "cosmetic" (handled by `module_severity` below).
+#
+# Alternatively, EXTRA_OVERLAY_ROOT=<path> can be set to derive EXTRA_DOCTOR_DIR
+# from <path>/modules/. This is the single-path approach for company overlays.
+# Existing EXTRA_DOCTOR_DIR takes precedence if explicitly set.
+_resolve_extra_doctor_dir() {
+  local overlay_root
+  # shellcheck source=../lib/overlay-locate.sh
+  source "$DOTFILES_DIR/lib/overlay-locate.sh"
+  overlay_root="$(overlay_locate 2>/dev/null || true)"
+  
+  # Reject colon-separated paths (one overlay at a time)
+  if [ -n "$overlay_root" ] && [[ "$overlay_root" == *:* ]]; then
+    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
+    return 1
+  fi
+  
+  # Derive EXTRA_DOCTOR_DIR from overlay root when set
+  if [ -n "$overlay_root" ]; then
+    echo "$overlay_root/modules"
+  fi
+}
+
+EXTRA_DOCTOR_DIR="${EXTRA_DOCTOR_DIR:-$(chezmoi execute-template '{{ dig "extra_doctor_dir" "" . }}' 2>/dev/null || echo "")}"
+# If EXTRA_DOCTOR_DIR is not set, try to derive it from EXTRA_OVERLAY_ROOT
+if [ -z "$EXTRA_DOCTOR_DIR" ]; then
+  EXTRA_DOCTOR_DIR="$(_resolve_extra_doctor_dir)" || exit 1
+fi
+
+MODULE_DIRS=("$DOTFILES_DIR/modules")
+if [ -n "$EXTRA_DOCTOR_DIR" ] && [ -d "$EXTRA_DOCTOR_DIR" ]; then
+  MODULE_DIRS+=("$EXTRA_DOCTOR_DIR")
+fi
+
+# shellcheck source=../lib/lock.sh
+source "$DOTFILES_DIR/lib/lock.sh"
+
+# shellcheck source=../lib/stats.sh
+source "$DOTFILES_DIR/lib/stats.sh"
+
+collect_known_check_ids() {
+  _known_ids=()
+  _collect_id() { _known_ids+=("$1"); }
+  # Override check functions to just collect IDs.
+  check()          { _collect_id "$1"; }
+  check_symlink()  { _collect_id "$1"; }
+  check_managed()  { _collect_id "$1"; }
+  check_defaults() { _collect_id "$1"; }
+  check_advisory() { _collect_id "$1"; }
+
+  for parent in "${MODULE_DIRS[@]}"; do
+    for module_dir in "$parent"/*/; do
+      [ ! -d "$module_dir" ] && continue
+      doctor_file="$module_dir/doctor.sh"
+      [ ! -f "$doctor_file" ] && continue
+      # shellcheck source=/dev/null
+      source "$doctor_file"
+    done
+  done
+}
+
+is_known_check_id() {
+  local check_id="$1" kid
+  for kid in "${_known_ids[@]}"; do
+    if [ "$kid" = "$check_id" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Acquire lock to prevent concurrent sync/doctor runs (skip in list/quiet modes)
+case "${1:-}" in
+  --list|--skip|--module|--validate-overrides|--severity|--json|--watch) ;; # no lock needed for read-only/filtered operations
+  *) acquire_lock "doctor" || exit 0 ;;
+esac
+
+FIX_MODE=false
+LIST_MODE=false
+REPORT_MODE=false
+QUIET_MODE=false
+JSON_MODE=false
+WATCH_MODE=false
+VALIDATE_OVERRIDES_MODE=false
+SEVERITY_FILTER=""
+MODULE_FILTER=""
+MODULE_FILTER_PATH=""
+
+# Track failing check IDs so the end-of-run notification can name them.
+# Populated by check() and check_advisory() on the FAIL branch.
+failed_check_ids=()
+fixed_check_ids=()
+
+# Parse args (loop so multiple flags work, e.g. `--module cursor --quiet`)
+TRENDS_MODE=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --fix)  FIX_MODE=true ;;
+    --fix-all) FIX_MODE=true ;;  # alias for --fix (non-interactive, for CI/scripted onboarding)
+    --list) LIST_MODE=true ;;
+    --report) REPORT_MODE=true ;;
+    --quiet) QUIET_MODE=true ;;
+    --json)  JSON_MODE=true; QUIET_MODE=true ;;
+    --watch) WATCH_MODE=true ;;
+    --trends) TRENDS_MODE=true ;;
+    --validate-overrides) VALIDATE_OVERRIDES_MODE=true ;;
+    --severity)
+      if [ -z "${2:-}" ]; then echo "Usage: dotfiles-doctor --severity <critical|important|performance|cosmetic>"; exit 1; fi
+      SEVERITY_FILTER="$2"
+      case "$SEVERITY_FILTER" in
+        critical|important|performance|cosmetic) ;;
+        *) echo "Invalid severity: $SEVERITY_FILTER (valid: critical, important, performance, cosmetic)"; exit 1 ;;
+      esac
+      shift
+      ;;
+    --module)
+      if [ -z "${2:-}" ]; then echo "Usage: dotfiles-doctor --module <name>"; exit 1; fi
+      MODULE_FILTER="$2"
+      MODULE_FILTER_PATH=""
+      for parent in "${MODULE_DIRS[@]}"; do
+        if [ -d "$parent/$MODULE_FILTER" ]; then
+          MODULE_FILTER_PATH="$parent/$MODULE_FILTER"
+          break
+        fi
+      done
+      if [ -z "$MODULE_FILTER_PATH" ]; then
+        echo "Module not found: $MODULE_FILTER"
+        _avail=()
+        for parent in "${MODULE_DIRS[@]}"; do
+          [ -d "$parent" ] || continue
+          while IFS= read -r m; do _avail+=("$m"); done < <(ls "$parent" 2>/dev/null)
+        done
+        echo "Available: ${_avail[*]}"
+        exit 1
+      fi
+      shift
+      ;;
+    --skip)
+      if [ -z "${2:-}" ]; then echo "Usage: dotfiles-doctor --skip <check-id>"; exit 1; fi
+      collect_known_check_ids
+      if ! is_known_check_id "$2"; then
+        echo "Unknown check ID: $2"
+        echo "Run dotfiles-doctor --list to discover valid check IDs."
+        exit 1
+      fi
+      if grep -qxF "$2" "$OVERRIDES_FILE" 2>/dev/null; then
+        echo "Override already exists: $2"
+      else
+        echo "$2" >> "$OVERRIDES_FILE"
+        echo "Added override: $2"
+      fi
+      exit 0
+      ;;
+    --help|-h) ;;  # handled later
+    "") ;;
+    *) ;;  # unknown flag — silently ignored for backward compat
+  esac
+  shift
+done
+
+# shellcheck source=../lib/output.sh
+source "$DOTFILES_DIR/lib/output.sh"
+
+# Only the checkout that chezmoi configured as its source may mutate machine
+# state. A development checkout or linked worktree remains useful for auditing,
+# but `--fix` must be report-only there.
+REPORT_ONLY_FIX_MODE=false
+DOCTOR_APPLIED_ROOT=""
+if $FIX_MODE && ! dotfiles_is_applied_checkout "$DOTFILES_DIR"; then
+  DOCTOR_APPLIED_ROOT="$(dotfiles_applied_root 2>/dev/null || true)"
+  if [ -n "$DOCTOR_APPLIED_ROOT" ]; then
+    printf '○ Doctor --fix is report-only outside the applied checkout; run %s/bin/dotfiles-doctor --fix\n' \
+      "$DOCTOR_APPLIED_ROOT" >&2
+  else
+    printf '○ Doctor --fix is report-only because chezmoi has no configured applied source checkout\n' >&2
+  fi
+  FIX_MODE=false
+  REPORT_ONLY_FIX_MODE=true
+fi
+
+# Doctor-specific notify gate — lib/colors.sh notify() is shared with upgrade/timer/etc.
+doctor_notify() {
+  [ "${DOTFILES_DOCTOR_NOTIFY:-0}" = "1" ] || return 0
+  notify "$@"
+}
+
+# ── Watch mode: re-run doctor every 5s with clear screen ─────────────
+# WATCH_MAX_ITERATIONS=N exits after N iterations (default 0 = infinite).
+# Tests use WATCH_MAX_ITERATIONS=1 for a deterministic single-iteration run
+# rather than relying on alarm/timeout/SIGTERM tricks.
+if $WATCH_MODE; then
+  _watch_interval="${WATCH_INTERVAL:-5}"
+  _watch_max="${WATCH_MAX_ITERATIONS:-0}"
+  _watch_count=0
+  trap 'printf "\n"; echo "Watch stopped."; exit 0' INT TERM
+  # Forward --module to the inner doctor call so `--watch --module foo` only
+  # rechecks one module each iteration (used by tests for speed).
+  _watch_inner_args=()
+  [ -n "$MODULE_FILTER" ] && _watch_inner_args+=(--module "$MODULE_FILTER")
+  while true; do
+    clear
+    echo -e "  ${BLUE}dotfiles doctor${NC}  $(date '+%H:%M:%S')  ${DIM}(watching — Ctrl-C to stop)${NC}"
+    echo ""
+    "$0" "${_watch_inner_args[@]}" 2>/dev/null || true
+    echo ""
+    _watch_count=$((_watch_count + 1))
+    if [ "$_watch_max" -gt 0 ] && [ "$_watch_count" -ge "$_watch_max" ]; then
+      exit 0
+    fi
+    echo -e "  ${DIM}Next check in ${_watch_interval}s…${NC}"
+    sleep "$_watch_interval"
+  done
+  exit 0
+fi
+
+# ── JSON mode state ───────────────────────────────────────────────────
+_json_results=()
+_json_current_module=""
+
+_json_add() {
+  local id="$1" status="$2" desc="$3" fix_cmd="${4:-}"
+  # Escape double quotes and backslashes in strings for JSON
+  id="${id//\\/\\\\}"; id="${id//\"/\\\"}"
+  desc="${desc//\\/\\\\}"; desc="${desc//\"/\\\"}"
+  fix_cmd="${fix_cmd//\\/\\\\}"; fix_cmd="${fix_cmd//\"/\\\"}"
+  local module="${_json_current_module//\\/\\\\}"; module="${module//\"/\\\"}"
+  local entry="{\"id\":\"$id\",\"status\":\"$status\",\"module\":\"$module\",\"message\":\"$desc\""
+  if [ -n "$fix_cmd" ]; then
+    entry+=",\"fix\":\"$fix_cmd\""
+  fi
+  entry+="}"
+  _json_results+=("$entry")
+}
+
+DOCTOR_TRENDS_FILE="${DOTFILES_STATS_FILE:-$HOME/.dotfiles-stats.jsonl}"
+
+if $TRENDS_MODE; then
+  if [ ! -f "$DOCTOR_TRENDS_FILE" ] || [ ! -s "$DOCTOR_TRENDS_FILE" ]; then
+    echo "No doctor runs recorded yet."
+    exit 0
+  fi
+  echo -e "${BLUE}📊 Doctor Trend (last 12 runs)${NC}"
+  echo ""
+  printf "  %-12s  %5s  %5s  %5s\n" "Date" "Pass" "Fail" "Fixed"
+  printf "  %-12s  %5s  %5s  %5s\n" "────────────" "─────" "─────" "─────"
+  jq -r 'select(.task == "doctor") | [
+    (.timestamp // "" | split("T")[0]),
+    (.pass // "-" | tostring),
+    (.fail // "-" | tostring),
+    (.fixed // "-" | tostring)
+  ] | @tsv' "$DOCTOR_TRENDS_FILE" | tail -12 | while IFS=$'\t' read -r ts p f x; do
+    if [ "$f" != "-" ] && [ "$f" -gt 0 ] 2>/dev/null; then
+      printf "  %-12s  %5s  ${RED}%5s${NC}  %5s\n" "$ts" "$p" "$f" "$x"
+    else
+      printf "  %-12s  ${GREEN}%5s${NC}  %5s  %5s\n" "$ts" "$p" "$f" "$x"
+    fi
+  done
+  echo ""
+  total_runs=$(jq -s '[.[] | select(.task == "doctor")] | length' "$DOCTOR_TRENDS_FILE" 2>/dev/null || echo 0)
+  echo -e "  ${DIM}Total doctor runs: $total_runs${NC}"
+  exit 0
+fi
+
+# ── Validate overrides against known check IDs ───────────────────────
+if $VALIDATE_OVERRIDES_MODE; then
+  if [ ! -f "$OVERRIDES_FILE" ]; then
+    echo "No .overrides file found."
+    exit 0
+  fi
+
+  # Collect all known check IDs by running modules in list mode.
+  collect_known_check_ids
+
+  # Validate each override line
+  _unknown=()
+  _valid=0
+  while IFS= read -r line; do
+    # Skip comments and blank lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+
+    if is_known_check_id "$line"; then
+      _valid=$((_valid + 1))
+    else
+      _unknown+=("$line")
+    fi
+  done < "$OVERRIDES_FILE"
+
+  if [ ${#_unknown[@]} -gt 0 ]; then
+    echo "Unknown check IDs in .overrides:"
+    for uid in "${_unknown[@]}"; do
+      echo "  - $uid"
+    done
+    echo ""
+    echo "${#_unknown[@]} unknown override(s), $_valid valid."
+    exit 1
+  else
+    echo "All overrides are valid ($_valid override(s) checked against ${#_known_ids[@]} known IDs)."
+    exit 0
+  fi
+fi
+
+is_overridden() {
+  grep -qxF "$1" "$OVERRIDES_FILE" 2>/dev/null
+}
+
+
+CI_MODE="${DOTFILES_CI:-false}"
+[ "$CI_MODE" = "1" ] || [ "$CI_MODE" = "true" ] && CI_MODE=true || CI_MODE=false
+
+# Check IDs skipped in CI (require macOS runtime, LaunchAgents, or external tools)
+CI_SKIP_PREFIXES="agent\. spotlight\. security\. git\.pager_delta git\.gh_protocol git\.worktree_fsmon shell\.fzf shell\.zoxide shell\.direnv"
+
+ci_should_skip() {
+  if ! $CI_MODE; then return 1; fi
+  local id="$1"
+  for prefix in $CI_SKIP_PREFIXES; do
+    if echo "$id" | grep -qE "^$prefix"; then return 0; fi
+  done
+  return 1
+}
+
+FIX_TIMEOUT="${FIX_TIMEOUT:-30}"
+
+# Portable timeout: prefer gtimeout/timeout (coreutils), fall back to perl, then no timeout
+_timeout() {
+  local secs="$1"; shift
+  if command -v gtimeout &>/dev/null; then
+    gtimeout "$secs" "$@"
+  elif command -v timeout &>/dev/null; then
+    timeout "$secs" "$@"
+  elif command -v perl &>/dev/null; then
+    perl -e "alarm $secs; exec @ARGV" "$@"
+  else
+    "$@"
+  fi
+}
+
+_fix() {
+  local desc="$1" cmd="$2"
+  $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "  ${DIM}⟳ %s…${NC}\r" "$desc" >&2
+  if _timeout "$FIX_TIMEOUT" bash -c "$cmd" >/dev/null 2>&1; then
+    $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
+    fixed "$desc"
+  else
+    $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
+    fail "$desc ${DIM}(fix failed or timed out)${NC}"
+  fi
+}
+
+check() {
+  local id="$1" desc="$2" test_cmd="$3" fix_cmd="$4"
+
+  if $LIST_MODE; then
+    printf "  %-45s %s\n" "$id" "$desc"
+    return
+  fi
+
+  if ci_should_skip "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc (CI)"
+    return
+  fi
+
+  if is_overridden "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc"
+    return
+  fi
+
+  if eval "$test_cmd" >/dev/null 2>&1; then
+    $JSON_MODE && _json_add "$id" "pass" "$desc"
+    pass "$desc"
+  elif $FIX_MODE && [ -n "$fix_cmd" ]; then
+    local _f0=$fix_count _x0=$fail_count
+    _fix "$desc" "$fix_cmd"
+    if (( fix_count > _f0 )); then
+      $JSON_MODE && _json_add "$id" "fixed" "$desc" "$fix_cmd"
+      fixed_check_ids+=("$id")
+    elif (( fail_count > _x0 )); then
+      $JSON_MODE && _json_add "$id" "fail" "$desc" "$fix_cmd"
+      failed_check_ids+=("$id")
+    fi
+  else
+    $JSON_MODE && _json_add "$id" "fail" "$desc" "$fix_cmd"
+    fail "$desc"
+    failed_check_ids+=("$id")
+  fi
+}
+
+check_advisory() {
+  local id="$1" desc="$2" test_cmd="$3" remediation="${4:-}"
+
+  if $LIST_MODE; then
+    printf "  %-45s %s\n" "$id" "$desc"
+    return
+  fi
+
+  if ci_should_skip "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc (CI)"
+    return
+  fi
+
+  if is_overridden "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc"
+    return
+  fi
+
+  if eval "$test_cmd" >/dev/null 2>&1; then
+    $JSON_MODE && _json_add "$id" "pass" "$desc"
+    pass "$desc"
+  else
+    $JSON_MODE && _json_add "$id" "warn" "$desc" "$remediation"
+    audit_warn "$desc" "$remediation"
+  fi
+}
+
+check_symlink() {
+  local id="$1" src="$2" dst="$3"
+  local desc="$dst → dotfiles"
+  src="$(dotfiles_link_target "$DOTFILES_DIR" "${DOTFILES_LINK_DIR:-$DOTFILES_DIR}" "$src")"
+
+  if $LIST_MODE; then
+    printf "  %-45s %s\n" "$id" "$desc"
+    return
+  fi
+
+  if is_overridden "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc"
+    return
+  fi
+
+  if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
+    $JSON_MODE && _json_add "$id" "pass" "$desc"
+    pass "$desc"
+  elif $FIX_MODE; then
+    local _f0=$fix_count _x0=$fail_count
+    _fix "$desc" "mkdir -p '$(dirname "$dst")'; [ -f '$dst' ] && mv '$dst' '${dst}.backup' 2>/dev/null; [ -L '$dst' ] && rm '$dst'; ln -s '$src' '$dst'"
+    if (( fix_count > _f0 )); then
+      $JSON_MODE && _json_add "$id" "fixed" "$desc"
+      fixed_check_ids+=("$id")
+    elif (( fail_count > _x0 )); then
+      $JSON_MODE && _json_add "$id" "fail" "$desc"
+      failed_check_ids+=("$id")
+    fi
+  else
+    $JSON_MODE && _json_add "$id" "fail" "$desc"
+    fail "$desc ${DIM}(not symlinked)${NC}"
+    failed_check_ids+=("$id")
+  fi
+}
+
+check_managed() {
+  local id="$1" src="$2" dst="$3"
+  local desc="$dst → dotfiles"
+  local link_dir="${DOTFILES_LINK_DIR:-$DOTFILES_DIR}"
+  src="$(dotfiles_link_target "$DOTFILES_DIR" "$link_dir" "$src")"
+
+  if $LIST_MODE; then
+    printf "  %-45s %s\n" "$id" "$desc"
+    return
+  fi
+
+  if is_overridden "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc"
+    return
+  fi
+
+  if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
+    $JSON_MODE && _json_add "$id" "pass" "$desc (symlink)"
+    pass "$desc (symlink)"
+  elif [ -f "$dst" ] && [ -z "$(chezmoi diff "$dst" --source "$link_dir" 2>/dev/null)" ]; then
+    $JSON_MODE && _json_add "$id" "pass" "$desc (managed)"
+    pass "$desc (managed)"
+  elif $FIX_MODE; then
+    local _f0=$fix_count _x0=$fail_count
+    _fix "$desc" "chezmoi apply '$dst' --source '$link_dir'"
+    if (( fix_count > _f0 )); then
+      $JSON_MODE && _json_add "$id" "fixed" "$desc"
+      fixed_check_ids+=("$id")
+    elif (( fail_count > _x0 )); then
+      $JSON_MODE && _json_add "$id" "fail" "$desc"
+      failed_check_ids+=("$id")
+    fi
+  else
+    $JSON_MODE && _json_add "$id" "fail" "$desc"
+    fail "$desc ${DIM}(not managed)${NC}"
+    failed_check_ids+=("$id")
+  fi
+}
+
+check_defaults() {
+  local id="$1" desc="$2" domain="$3" key="$4" expected="$5" type="$6"
+
+  if $LIST_MODE; then
+    printf "  %-45s %s\n" "$id" "$desc"
+    return
+  fi
+
+  if $CI_MODE; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc (CI)"
+    return
+  fi
+
+  if is_overridden "$id"; then
+    $JSON_MODE && _json_add "$id" "skip" "$desc"
+    skipped "$desc"
+    return
+  fi
+
+  local fix_value="$expected"
+  if [ "$type" = "bool" ]; then
+    case "$expected" in
+      1) fix_value="true" ;;
+      0) fix_value="false" ;;
+    esac
+  fi
+
+  local current
+  current=$(defaults read "$domain" "$key" 2>/dev/null)
+  if [ "$current" = "$expected" ]; then
+    $JSON_MODE && _json_add "$id" "pass" "$desc"
+    pass "$desc"
+  elif $FIX_MODE; then
+    local fix_cmd="defaults write '$domain' '$key' '-${type}' '$fix_value'"
+    local _f0=$fix_count _x0=$fail_count
+    _fix "$desc" "$fix_cmd"
+    if (( fix_count > _f0 )); then
+      $JSON_MODE && _json_add "$id" "fixed" "$desc" "$fix_cmd"
+      fixed_check_ids+=("$id")
+    elif (( fail_count > _x0 )); then
+      $JSON_MODE && _json_add "$id" "fail" "$desc" "$fix_cmd"
+      failed_check_ids+=("$id")
+    fi
+  else
+    $JSON_MODE && _json_add "$id" "fail" "$desc" "defaults write '$domain' '$key' '-${type}' '$fix_value'"
+    fail "$desc ${DIM}(is: $current, want: $expected)${NC}"
+    failed_check_ids+=("$id")
+  fi
+}
+
+# ── Module severity classification ────────────────────────────────────
+# Each module declares its severity in modules/<name>/severity (one word).
+# Valid values: critical, important, performance, cosmetic (default).
+# Numeric rank: lower = more severe.
+_severity_rank() {
+  case "$1" in
+    critical)    echo 0 ;;
+    important)   echo 1 ;;
+    performance) echo 2 ;;
+    cosmetic)    echo 3 ;;
+    *)           echo 3 ;;
+  esac
+}
+
+module_severity() {
+  # Accept either a module name (looked up under $DOTFILES_DIR/modules/) or
+  # a full module directory path. The full-path form is used when iterating
+  # over $MODULE_DIRS so overlay modules read their own severity file.
+  local arg="$1" severity_file
+  if [ -d "$arg" ]; then
+    severity_file="$arg/severity"
+  else
+    severity_file="$DOTFILES_DIR/modules/$arg/severity"
+  fi
+  if [ -f "$severity_file" ]; then
+    cat "$severity_file"
+  else
+    echo "cosmetic"
+  fi
+}
+
+severity_included() {
+  if [ -z "$SEVERITY_FILTER" ]; then return 0; fi
+  local mod_rank filter_rank
+  mod_rank=$(_severity_rank "$1")
+  filter_rank=$(_severity_rank "$SEVERITY_FILTER")
+  [ "$mod_rank" -le "$filter_rank" ]
+}
+
+run_module_doctor() {
+  local module_dir="$1"
+  local module_name
+  module_name="$(basename "$module_dir")"
+  local doctor_file="$module_dir/doctor.sh"
+  [ ! -f "$doctor_file" ] && return
+
+  # agentbrew and the resilience architecture check execute fnm Node. Current
+  # enterprise policy blocks the Node.js Foundation TeamIdentifier regardless
+  # of its user-directory path, producing one policy dialog per spawn. Keep those
+  # modules off unattended doctor runs until the machine-scoped exception is
+  # approved.
+  if [ "$IS_ENTERPRISE" = "true" ] \
+      && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ] \
+      && command -v codesign >/dev/null 2>&1; then
+    case "$module_name" in
+      agentbrew|agentbrew-*|resilience)
+        _doctor_node="$(command -v node 2>/dev/null || true)"
+        _doctor_node_signature=""
+        [ -n "$_doctor_node" ] \
+          && _doctor_node_signature="$(codesign -dvv "$_doctor_node" 2>&1 || true)"
+        if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_doctor_node_signature"; then
+          skip_count=$((skip_count + 1))
+          $QUIET_MODE || echo "  ⊘ $module_name skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
+          unset _doctor_node _doctor_node_signature
+          return
+        fi
+        unset _doctor_node _doctor_node_signature
+        ;;
+    esac
+  fi
+
+  # Several settings doctors use Python for JSON/SQLite inspection. uv's
+  # python-build-standalone has no publisher authority, and current enterprise
+  # endpoint policy displays an policy dialog on every spawn even when ad-hoc
+  # signed. Skip those modules until the machine-scoped publisher exception is
+  # approved; explicit opt-in preserves the full checks for approved machines.
+  if [ "$IS_ENTERPRISE" = "true" ] \
+      && [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" != "1" ] \
+      && command -v codesign >/dev/null 2>&1; then
+    case "$module_name" in
+      claude-*|cursor|devin|local-ai|local-llm|mcp-orchestrator|vscode|windsurf)
+        _doctor_python="$(command -v python3 2>/dev/null || true)"
+        _doctor_python_signature=""
+        [ -n "$_doctor_python" ] \
+          && _doctor_python_signature="$(codesign -dvv "$_doctor_python" 2>&1 || true)"
+        if ! grep -q '^Authority=' <<<"$_doctor_python_signature"; then
+          skip_count=$((skip_count + 1))
+          $QUIET_MODE || echo "  ⊘ $module_name skipped: python3 has no publisher authority (endpoint-policy safe mode)"
+          unset _doctor_python _doctor_python_signature
+          return
+        fi
+        unset _doctor_python _doctor_python_signature
+        ;;
+    esac
+  fi
+
+  _json_current_module="$module_name"
+
+  if $QUIET_MODE; then :
+  elif $REPORT_MODE; then
+    echo ""
+    echo "#### $module_name"
+  elif ! $LIST_MODE; then
+    echo -e "  ${BLUE}─── $module_name ───${NC}"
+  fi
+  # shellcheck source=/dev/null
+  source "$doctor_file"
+}
+
+# ── Proactive heal for stuck Cursor agents (before module checks) ────
+if $FIX_MODE && ! $LIST_MODE && ! $JSON_MODE && [ -x "$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents" ]; then
+  _heal_args=(--fix)
+  $QUIET_MODE && _heal_args+=(--quiet)
+  "$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents" "${_heal_args[@]}" >> "$HOME/.local/share/dotfiles/logs/dotfiles-doctor.log" 2>&1 || true
+fi
+
+# ── Auto-discover module checks ──────────────────────────────────────
+if [ -n "$MODULE_FILTER" ]; then
+  # Single-module mode: run just the requested module (resolved from MODULE_DIRS
+  # in the --module arg parser above).
+  run_module_doctor "$MODULE_FILTER_PATH"
+elif $LIST_MODE; then
+  echo "All check IDs (auto-discovered from modules/):"
+  echo ""
+  for parent in "${MODULE_DIRS[@]}"; do
+    for module_dir in "$parent"/*/; do
+      [ ! -d "$module_dir" ] && continue
+      doctor_file="$module_dir/doctor.sh"
+      [ ! -f "$doctor_file" ] && continue
+      module_name="$(basename "$module_dir")"
+      echo -e "${BLUE}═══ $module_name ═══${NC}"
+      # shellcheck source=/dev/null
+      source "$doctor_file"
+    done
+  done
+else
+  # Run checks grouped by severity
+  for severity in critical important performance cosmetic; do
+    # Skip this severity group if filtered out
+    severity_included "$severity" || continue
+
+    if ! $QUIET_MODE; then
+      case "$severity" in
+        critical)
+          if $REPORT_MODE; then echo ""; echo "### 🚨 Critical (security & safety)"
+          else echo ""; echo -e "${YELLOW}═══ Critical (security & safety) ═══${NC}"; fi ;;
+        important)
+          if $REPORT_MODE; then echo ""; echo "### ⚙️ Important (core config)"
+          else echo ""; echo -e "${YELLOW}═══ Important (core config) ═══${NC}"; fi ;;
+        performance)
+          if $REPORT_MODE; then echo ""; echo "### ⚡ Performance"
+          else echo ""; echo -e "${BLUE}═══ Performance ═══${NC}"; fi ;;
+        cosmetic)
+          if $REPORT_MODE; then echo ""; echo "### 💅 Cosmetic (personal preference)"
+          else echo ""; echo -e "${DIM}═══ Cosmetic (personal preference) ═══${NC}"; fi ;;
+      esac
+    fi
+
+    for parent in "${MODULE_DIRS[@]}"; do
+      for module_dir in "$parent"/*/; do
+        [ ! -d "$module_dir" ] && continue
+        if [ "$(module_severity "$module_dir")" = "$severity" ]; then
+          run_module_doctor "$module_dir"
+        fi
+      done
+    done
+  done
+fi
+
+# ── Chezmoi health checks ────────────────────────────────────────────
+if command -v chezmoi &>/dev/null && ! $LIST_MODE; then
+  _json_current_module="chezmoi"
+  if $QUIET_MODE; then :
+  elif $REPORT_MODE; then echo ""; echo "### 🔧 Chezmoi"
+  else echo ""; echo -e "${BLUE}═══ Chezmoi ═══${NC}"; fi
+
+  chezmoi_output=$(chezmoi doctor --source "$DOTFILES_DIR" 2>&1 || true)
+  while IFS= read -r line; do
+    result=$(echo "$line" | awk '{print $1}')
+    check_name=$(echo "$line" | awk '{print $2}')
+    message="${line#*"$check_name"}"
+    message="${message# }"
+    case "$result" in
+      ok)      $JSON_MODE && _json_add "chezmoi.$check_name" "pass" "chezmoi $check_name: $message"; pass "chezmoi $check_name: $message" ;;
+      error)   $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message" ;;
+      failed)  $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message" ;;
+      warning) $JSON_MODE && _json_add "chezmoi.$check_name" "pass" "chezmoi $check_name: $message (warning)"; pass "chezmoi $check_name: $message ${DIM}(warning)${NC}" ;;
+    esac
+  done <<< "$chezmoi_output"
+elif ! $LIST_MODE; then
+  fail "chezmoi not installed"
+fi
+
+# ── AgentBrew health checks ─────────────────────────────────────────
+_agentbrew_runtime_allowed=true
+if [ "$IS_ENTERPRISE" = "true" ] \
+    && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ] \
+    && command -v codesign >/dev/null 2>&1; then
+  _agentbrew_node="$(command -v node 2>/dev/null || true)"
+  _agentbrew_node_signature=""
+  [ -n "$_agentbrew_node" ] \
+    && _agentbrew_node_signature="$(codesign -dvv "$_agentbrew_node" 2>&1 || true)"
+  grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_agentbrew_node_signature" \
+    && _agentbrew_runtime_allowed=false
+  unset _agentbrew_node _agentbrew_node_signature
+fi
+if $_agentbrew_runtime_allowed \
+    && command -v agentbrew &>/dev/null \
+    && ! $LIST_MODE \
+    && ! $CI_MODE \
+    && { [ -z "$MODULE_FILTER" ] || [ "$MODULE_FILTER" = "agentbrew" ]; }; then
+  _json_current_module="agentbrew"
+  if $QUIET_MODE; then :
+  elif $REPORT_MODE; then echo ""; echo "### 🤖 AgentBrew"
+  else echo ""; echo -e "${BLUE}═══ AgentBrew ═══${NC}"; fi
+
+  if _timeout 15 agentbrew status --ci >/dev/null 2>&1; then
+    $JSON_MODE && _json_add "agentbrew.status" "pass" "agentbrew status --ci — clean"
+    pass "agentbrew status --ci — clean"
+  else
+    $JSON_MODE && _json_add "agentbrew.status" "fail" "agentbrew status --ci — drift detected" "agentbrew status --fix"
+    fail "agentbrew status --ci — drift detected (run: agentbrew status --fix)"
+  fi
+fi
+unset _agentbrew_runtime_allowed
+
+# ── Summary ──────────────────────────────────────────────────────────
+if $JSON_MODE; then
+  # Output JSON array
+  printf "["
+  for i in "${!_json_results[@]}"; do
+    [ "$i" -gt 0 ] && printf ","
+    printf "%s" "${_json_results[$i]}"
+  done
+  printf "]\n"
+  if (( fail_count > 0 )); then exit 1; else exit 0; fi
+elif $QUIET_MODE; then
+  if (( fail_count > 0 )); then
+    echo -e "${GREEN}✓ $pass_count${NC}  ${RED}✗ $fail_count${NC}  ${DIM}⊘ $skip_count${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}✓ $pass_count passed${NC}  ${DIM}⊘ $skip_count skipped${NC}"
+    exit 0
+  fi
+elif $REPORT_MODE; then
+  local_total=$((pass_count + fail_count + fix_count + warn_count + skip_count))
+  echo ""
+  echo "---"
+  echo ""
+  echo "## Summary"
+  echo ""
+  echo "| Status | Count |"
+  echo "|--------|-------|"
+  echo "| ✅ Passed | $pass_count |"
+  echo "| ❌ Failed | $fail_count |"
+  echo "| ⚡ Fixed | $fix_count |"
+  echo "| ⚠️ Warned | $warn_count |"
+  echo "| ⊘ Skipped | $skip_count |"
+  echo "| **Total** | **$local_total** |"
+  if [ ${#report_failures[@]} -gt 0 ]; then
+    echo ""
+    echo "## Failures"
+    echo ""
+    for f in "${report_failures[@]}"; do
+      echo "- $f"
+    done
+  fi
+  echo ""
+  echo "*Generated by \`dotfiles-doctor --report\` on $(date '+%Y-%m-%d %H:%M')*"
+  if (( fail_count > 0 )); then
+    exit 1
+  fi
+elif ! $LIST_MODE; then
+  local_total=$((pass_count + fail_count + fix_count + warn_count + skip_count))
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  summary="  ${GREEN}✓ $pass_count passed${NC}  ${RED}✗ $fail_count failed${NC}  ${GREEN}⚡ $fix_count fixed${NC}"
+  if (( warn_count > 0 )); then
+    summary+="  ${YELLOW}⚠ $warn_count warned${NC}"
+  fi
+  summary+="  ${DIM}⊘ $skip_count skipped${NC}  │  $local_total total"
+  echo -e "$summary"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  if (( fail_count > 0 )) && ! $FIX_MODE; then
+    echo ""
+    if $REPORT_ONLY_FIX_MODE && [ -n "$DOCTOR_APPLIED_ROOT" ]; then
+      echo -e "  Fixes are report-only here; run ${YELLOW}$DOCTOR_APPLIED_ROOT/bin/dotfiles-doctor --fix${NC}"
+    elif $REPORT_ONLY_FIX_MODE; then
+      echo -e "  Fixes are report-only here until chezmoi has a configured source checkout"
+    else
+      echo -e "  Run ${YELLOW}dotfiles-doctor --fix${NC} to auto-repair"
+    fi
+  fi
+
+  # Log detailed doctor run for trend tracking
+  local_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1}" >> "$DOCTOR_TRENDS_FILE"
+
+  # Build a top-N preview of failing check IDs so the notification names
+  # the actual problems instead of just a count. macOS notification text
+  # truncates around 256 chars in practice; 5 IDs fits well.
+  _ids_preview() {
+    local -a ids=("$@")
+    local n=${#ids[@]}
+    if (( n == 0 )); then echo ""; return; fi
+    local top=("${ids[@]:0:5}")
+    # "${arr[*]}" with IFS uses only the first IFS character, so build
+    # ", "-separated output via printf and trim the trailing separator.
+    local joined
+    joined=$(printf '%s, ' "${top[@]}")
+    joined="${joined%, }"
+    if (( n > 5 )); then
+      echo "${joined} +$((n - 5)) more"
+    else
+      echo "${joined}"
+    fi
+  }
+
+  if (( fail_count > 0 )); then
+    _fail_preview=$(_ids_preview "${failed_check_ids[@]+"${failed_check_ids[@]}"}")
+    if $FIX_MODE; then
+      if [ -n "$_fail_preview" ]; then
+        doctor_notify "Dotfiles Doctor" "$fail_count need manual fix: $_fail_preview" Basso
+      else
+        doctor_notify "Dotfiles Doctor" "$fail_count issues need manual attention" Basso
+      fi
+    else
+      if [ -n "$_fail_preview" ]; then
+        if $REPORT_ONLY_FIX_MODE; then
+          doctor_notify "Dotfiles Doctor" "$fail_count failing: $_fail_preview. Fixes need the applied checkout" Basso
+        else
+          doctor_notify "Dotfiles Doctor" "$fail_count failing: $_fail_preview. Run with --fix" Basso
+        fi
+      else
+        if $REPORT_ONLY_FIX_MODE; then
+          doctor_notify "Dotfiles Doctor" "$fail_count issues found. Fixes need the applied checkout" Basso
+        else
+          doctor_notify "Dotfiles Doctor" "$fail_count issues found. Run dotfiles-doctor --fix" Basso
+        fi
+      fi
+    fi
+    exit 1
+  elif $FIX_MODE && (( fix_count > 0 )); then
+    _fix_preview=$(_ids_preview "${fixed_check_ids[@]+"${fixed_check_ids[@]}"}")
+    if [ -n "$_fix_preview" ]; then
+      doctor_notify "Dotfiles Doctor" "Auto-repaired $fix_count: $_fix_preview"
+    else
+      doctor_notify "Dotfiles Doctor" "Auto-repaired $fix_count issues"
+    fi
+    exit 0
+  else
+    exit 0
+  fi
+fi

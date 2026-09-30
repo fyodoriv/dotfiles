@@ -1,0 +1,201 @@
+#!/bin/bash
+set -euo pipefail
+
+# Prepend dotfiles/bin (and ~/.local/bin) to deployed LaunchAgent PATH keys that
+# omit endpoint shims. Stale com.agentbrew.* / com.minsky.* / com.github.facebook.watchman
+# plists resolve jq or ggrep to /usr/bin/* or bare Homebrew until PATH matches
+# launchagent-path. Also rewrites other checkout bins (legacy ~/apps/dotfiles/bin,
+# a dev ~/apps/tooling/dotfiles/bin, ~/dotfiles/bin) → the applied checkout's bin.
+# It only changes deployed plists when it runs from chezmoi's configured source
+# checkout; development checkouts and worktrees are report-only.
+
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DOTFILES_DIR="$(cd "$SHIM_DIR/.." && pwd -P)"
+RUNNING_BIN="$DOTFILES_DIR/bin"
+source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+# shellcheck source=../lib/launchctl-timeout.sh
+source "$DOTFILES_DIR/lib/launchctl-timeout.sh"
+# shellcheck source=../lib/dotfiles-source-dir.sh
+source "$DOTFILES_DIR/lib/dotfiles-source-dir.sh"
+DOTFILES_LINK_DIR="$(dotfiles_link_root "$DOTFILES_DIR")"
+DOTFILES_BIN="$DOTFILES_LINK_DIR/bin"
+_DOTFILES_FIND="$(dotfiles_resolve_find "$RUNNING_BIN")"
+LA_AGENTS_DIR="${HOME}/Library/LaunchAgents"
+
+# Home LaunchAgents belong to chezmoi's applied source checkout. A dev checkout
+# and every linked worktree may audit their state, but must never change it.
+if ! dotfiles_is_applied_checkout "$DOTFILES_DIR"; then
+  echo "○ LaunchAgent PATH repair is report-only outside the applied checkout ($DOTFILES_LINK_DIR)" >&2
+  exit 0
+fi
+
+if [ ! -d "$LA_AGENTS_DIR" ]; then
+  exit 0
+fi
+
+_path_has_dir() {
+  local path="$1"
+  local dir="$2"
+  local entry
+  IFS=':' read -r -a _path_has_dir_parts <<< "$path"
+  for entry in "${_path_has_dir_parts[@]}"; do
+    [ "$entry" = "$dir" ] && return 0
+  done
+  return 1
+}
+
+_prepend_endpoint_prefix() {
+  local path="$1"
+  local prefix="$DOTFILES_BIN"
+  if [ -d "${HOME}/.local/bin" ] && ! _path_has_dir "$path" "${HOME}/.local/bin"; then
+    prefix="${prefix}:${HOME}/.local/bin"
+  fi
+  printf '%s:%s\n' "$prefix" "$path"
+}
+
+_rewrite_stale_dotfiles_paths() {
+  local path="$1"
+  local entry seen="" new_path=""
+  IFS=':' read -r -a _rewrite_parts <<< "$path"
+  for entry in "${_rewrite_parts[@]}"; do
+    [ -n "$entry" ] || continue
+    # Other checkout locations: the legacy chezmoi default, and a dev checkout
+    # when DOTFILES_DIR is a separate applied checkout.
+    case "$entry" in
+      "${HOME}/apps/dotfiles/bin" | "${HOME}/apps/tooling/dotfiles/bin" | "${HOME}/dotfiles/bin" | "$RUNNING_BIN")
+        entry="$DOTFILES_BIN" ;;
+    esac
+    # Collapse duplicate entries after rewrite.
+    case ":$seen:" in
+      *:"$entry":*) continue ;;
+    esac
+    seen="${seen:+$seen:}$entry"
+    new_path="${new_path:+$new_path:}$entry"
+  done
+  printf '%s\n' "$new_path"
+}
+
+_blocked_node_job() {
+  local label="$1"
+  case "$label" in
+    com.agentbrew.mcp-memory) return 1 ;;
+    com.agentbrew.*|com.dotfiles.dotfiles-upgrade) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_reload_permitted() {
+  local label="$1"
+  if [[ "$label" == com.minsky.* ]] \
+    && [ ! -e "${MINSKY_STATE_DIR:-$HOME/.minsky}/autostart-enabled" ]; then
+    return 1
+  fi
+  if [ -e "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
+    && _blocked_node_job "$label"; then
+    return 1
+  fi
+  return 0
+}
+
+_was_loaded_before_repair() {
+  local label="$1"
+  launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1
+}
+
+_reload_plist() {
+  local plist="$1" label="$2" was_loaded="$3"
+  [ "$was_loaded" = "1" ] || return 2
+  # Recheck immediately before bootstrap. The endpoint safe-mode sentinel or
+  # Minsky marker can change between the initial loaded-state probe and reload.
+  _reload_permitted "$label" || return 2
+  local domain uid
+  uid="$(id -u)"
+  domain="gui/${uid}"
+  launchctl bootout "$domain" "$plist" 2>/dev/null \
+    || launchctl unload "$plist" 2>/dev/null \
+    || true
+  launchctl bootstrap "$domain" "$plist" 2>/dev/null \
+    || launchctl load "$plist" 2>/dev/null \
+    || true
+}
+
+_plist_valid() {
+  local plist="$1"
+  /usr/libexec/PlistBuddy -c 'Print :Label' "$plist" >/dev/null 2>&1
+}
+
+fixed=0
+_watchman_label="com.github.facebook.watchman"
+_watchman_plist="${LA_AGENTS_DIR}/${_watchman_label}.plist"
+_watchman_was_loaded=0
+if [ -f "$_watchman_plist" ] \
+  && launchctl print "gui/$(id -u)/$_watchman_label" >/dev/null 2>&1; then
+  _watchman_was_loaded=1
+fi
+
+while IFS= read -r plist; do
+  [ -f "$plist" ] || continue
+  if ! _plist_valid "$plist"; then
+    echo "⚠ Skipping invalid LaunchAgent plist (not XML): $(basename "$plist")" >&2
+    continue
+  fi
+  path="$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:PATH' "$plist" 2>/dev/null || true)"
+  [ -n "$path" ] || continue
+
+  label="$(/usr/libexec/PlistBuddy -c 'Print :Label' "$plist" 2>/dev/null || true)"
+  [ -n "$label" ] || continue
+  was_loaded=0
+  _was_loaded_before_repair "$label" && was_loaded=1
+
+  new_path="$(_rewrite_stale_dotfiles_paths "$path")"
+  changed=0
+  if [ "$new_path" != "$path" ]; then
+    path="$new_path"
+    changed=1
+  fi
+  if ! _path_has_dir "$path" "$DOTFILES_BIN"; then
+    path="$(_prepend_endpoint_prefix "$path")"
+    changed=1
+  fi
+  if [ "$changed" -eq 0 ]; then
+    continue
+  fi
+  /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PATH $path" "$plist"
+  reloaded=0
+  _reload_plist "$plist" "$label" "$was_loaded" && reloaded=1
+  fixed=$((fixed + 1))
+  if [ "$reloaded" = "1" ]; then
+    echo "✓ Fixed and reloaded PATH in $(basename "$plist") (dotfiles/bin before /usr/bin)"
+  elif [ "$was_loaded" = "1" ]; then
+    echo "✓ Fixed PATH in $(basename "$plist") (reload skipped by current safety policy)"
+  else
+    echo "✓ Fixed PATH in $(basename "$plist") (job was not reloaded)"
+  fi
+done < <("$_DOTFILES_FIND" "$LA_AGENTS_DIR" -maxdepth 1 -name '*.plist' 2>/dev/null | sort -u)
+
+if [ "$fixed" -eq 0 ]; then
+  echo "✓ LaunchAgent PATH keys already include dotfiles/bin"
+fi
+
+# Watchman keeps stale PATH in the long-lived process until kickstart even when
+# the plist is already correct (common after PR #241 watchman PATH repair).
+# kickstart blocks until the job is running — skip when the Program binary is
+# missing (orphan plist after brew uninstall) and cap wait time so chezmoi apply
+# cannot hang for minutes.
+if [ -f "$_watchman_plist" ] && [ "$_watchman_was_loaded" = "1" ]; then
+  _watchman_program="$(launchagent_program_path "$_watchman_plist")"
+  _watchman_uid="$(id -u)"
+  _watchman_domain="gui/${_watchman_uid}/${_watchman_label}"
+  if [ ! -e "$_watchman_program" ] || [ ! -x "$_watchman_program" ]; then
+    warn "watchman binary unavailable ($_watchman_program) — unloading orphan LaunchAgent"
+    launchctl bootout "$_watchman_domain" 2>/dev/null \
+      || launchctl unload "$_watchman_plist" 2>/dev/null \
+      || true
+  elif [ -n "$_watchman_program" ]; then
+    if launchctl_kickstart_with_timeout "$_watchman_domain" 15; then
+      echo "✓ Kickstarted com.github.facebook.watchman (refreshed process PATH)"
+    else
+      warn "watchman kickstart did not complete — apply continues (check $(_watchman_program))"
+    fi
+  fi
+fi

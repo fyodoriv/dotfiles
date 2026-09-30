@@ -1,0 +1,28 @@
+// ────────────────────────────────────────────────────────────────────────────
+// VS Code keybindings — managed by dotfiles
+// Symlinked to ~/Library/Application Support/Code/User/keybindings.json
+// by modules/vscode/doctor.sh.
+//
+// The IntelliJ Keybindings extension (k--kato.intellij-idea-keybindings,
+// declared in extensions.txt) ships the WebStorm Mac OS X 10.5+ keymap.
+// The overrides below polish a few gaps the extension doesn't cover.
+// ────────────────────────────────────────────────────────────────────────────
+[
+  // Block comment (WebStorm: Cmd+Shift+/)
+  {
+    "key": "cmd+shift+/",
+    "command": "editor.action.blockComment",
+    "when": "editorTextFocus && !editorReadonly"
+  },
+  // Reveal active file in Explorer (WebStorm: "Select Opened File")
+  {
+    "key": "alt+f1",
+    "command": "workbench.files.action.showActiveFileInExplorer"
+  },
+  // Terminal toggle (WebStorm: Alt+F12)
+  {
+    "key": "alt+f12",
+    "command": "workbench.action.terminal.toggleTerminal",
+    "when": "terminal.active"
+  }
+]

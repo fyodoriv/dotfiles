@@ -1,0 +1,276 @@
+#!/bin/bash
+# Dotfiles auto-sync — commits and pushes any local changes, then pulls remote.
+# In chezmoi's applied checkout it only fast-forwards and re-applies chezmoi.
+# Designed to run periodically via LaunchAgent.
+# Usage: dotfiles-sync [--dry-run]
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DRY_RUN=false
+if [ "${1:-}" = "--dry-run" ]; then
+  DRY_RUN=true
+fi
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Trim log to last 500 lines (prevents unbounded growth from LaunchAgent).
+# Trim in place: launchd opens this file for stdout/stderr before the script
+# starts, so replacing it with mv would send this run's output to a deleted file.
+_log="$HOME/.local/share/dotfiles/logs/dotfiles-sync.log"
+if [ -f "$_log" ]; then
+  if tail -n 500 "$_log" > "$_log.tmp"; then
+    cat "$_log.tmp" > "$_log"
+  fi
+  rm -f "$_log.tmp"
+fi
+
+# shellcheck source=../lib/stats.sh
+source "$DOTFILES_DIR/lib/stats.sh"
+# shellcheck source=../lib/lock.sh
+source "$DOTFILES_DIR/lib/lock.sh"
+# shellcheck source=../lib/push-error-classify.sh
+source "$DOTFILES_DIR/lib/push-error-classify.sh"
+
+cd "$DOTFILES_DIR" || { warn "[sync] Cannot cd to dotfiles dir"; exit 1; }
+
+# Acquire lock to prevent concurrent sync/doctor runs
+if ! $DRY_RUN; then
+  acquire_lock "sync" || exit 0
+fi
+
+# Ensure we're at the top of a git work tree. In a linked worktree (such as
+# the applied checkout) .git is a file, not a directory.
+_git_top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "$_git_top" ] || [ "$(cd "$_git_top" && pwd -P)" != "$(pwd -P)" ]; then
+  warn "[sync] Not a git repo. Skipping."
+  exit 0
+fi
+
+# Collect all remotes (push to every one)
+REMOTES=()
+while IFS= read -r r; do REMOTES+=("$r"); done < <(git remote)
+if [ ${#REMOTES[@]} -eq 0 ]; then
+  warn "[sync] No remote configured. Skipping."
+  exit 0
+fi
+
+# Pick a pull remote — prefer origin, fall back to first available
+PULL_REMOTE="origin"
+if ! git remote get-url "$PULL_REMOTE" &>/dev/null; then
+  PULL_REMOTE="${REMOTES[0]}"
+fi
+
+# ── Multi-agent safety: only auto-sync the canonical branch ──────────
+# Everything below (pull --autostash, `git add -u`, the `sync: auto-update`
+# commit, and the push to every remote) operates on whatever branch HEAD
+# points to. In a shared working tree, when a concurrent agent has a feature
+# branch checked out, an unguarded sync sweeps their uncommitted tracked
+# changes into a commit on THAT branch and pushes it — the 2026-06-02 PR #142
+# pollution incident (a58046f landed a parallel session's work in an unrelated
+# PR). Gate the entire sync to the canonical branch (the remote's default,
+# from origin/HEAD); on any other branch, skip and leave it for its owner.
+CANONICAL_BRANCH="$(git symbolic-ref --short "refs/remotes/$PULL_REMOTE/HEAD" 2>/dev/null | sed "s@^$PULL_REMOTE/@@" || true)"
+CURRENT_BRANCH="$(git branch --show-current 2>/dev/null || true)"
+
+# Re-apply chezmoi from this checkout. On failure, show chezmoi's last error line.
+_chezmoi_apply() {
+  local out
+  if out=$(chezmoi apply --source "$DOTFILES_DIR" 2>&1); then
+    return 0
+  fi
+  warn "[sync] chezmoi apply failed: $(printf '%s\n' "$out" | tail -n 1)"
+  return 1
+}
+
+# ── Applied checkout: fast-forward only ──────────────────────────────
+# chezmoi's source checkout sits on its own local branch that tracks the
+# canonical branch (e.g. applied/feat-chezmoi -> origin/feat/chezmoi). It
+# never carries local work, so fast-forward it and re-apply chezmoi, but never
+# commit or push from it. A feature branch that tracks the canonical branch is
+# not chezmoi's source, so it still falls through to the gate below.
+_is_applied_checkout() {
+  local upstream source_dir
+  if [ -z "$CANONICAL_BRANCH" ] || [ "$CURRENT_BRANCH" = "$CANONICAL_BRANCH" ]; then
+    return 1
+  fi
+  upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+  [ "$upstream" = "$PULL_REMOTE/$CANONICAL_BRANCH" ] || return 1
+  command -v chezmoi &>/dev/null || return 1
+  source_dir="$(chezmoi source-path 2>/dev/null || true)"
+  if [ -z "$source_dir" ] || [ ! -d "$source_dir" ]; then
+    return 1
+  fi
+  [ "$(cd "$source_dir" && pwd -P)" = "$(pwd -P)" ]
+}
+
+if _is_applied_checkout; then
+  APPLIED_UPSTREAM="$PULL_REMOTE/$CANONICAL_BRANCH"
+  if $DRY_RUN; then
+    info "[sync] [dry-run] Applied checkout: would fast-forward '$CURRENT_BRANCH' to $APPLIED_UPSTREAM and re-apply chezmoi (no commit, no push)."
+    exit 0
+  fi
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    warn "[sync] Applied checkout has uncommitted changes — leaving it untouched. Commit them from a feature branch instead."
+    exit 0
+  fi
+  _fetch_rc=0
+  _fetch_err=$(git fetch --quiet "$PULL_REMOTE" "$CANONICAL_BRANCH" 2>&1) || _fetch_rc=$?
+  if [ "$_fetch_rc" -ne 0 ]; then
+    warn "[sync] Fetch failed: $(_classify_push_error "$_fetch_err")"
+    exit 0
+  fi
+  if ! git merge --ff-only --quiet "$APPLIED_UPSTREAM" 2>/dev/null; then
+    warn "[sync] Applied checkout '$CURRENT_BRANCH' has diverged from $APPLIED_UPSTREAM — not a fast-forward; leaving it untouched."
+    exit 0
+  fi
+  _head="$(git rev-parse --short HEAD)"
+  if _chezmoi_apply; then
+    ok "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi re-applied."
+  else
+    warn "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi was not re-applied."
+  fi
+  log_run sync
+  exit 0
+fi
+
+if [ -z "$CANONICAL_BRANCH" ]; then
+  warn "[sync] origin/HEAD unset — cannot branch-gate; proceeding on '${CURRENT_BRANCH:-detached HEAD}'. Run 'git remote set-head $PULL_REMOTE --auto' to enable multi-agent branch-gating."
+elif [ "$CURRENT_BRANCH" != "$CANONICAL_BRANCH" ]; then
+  if $DRY_RUN; then
+    info "[sync] [dry-run] Would skip auto-sync: HEAD is on '${CURRENT_BRANCH:-detached HEAD}', not the canonical '$CANONICAL_BRANCH' (multi-agent safety)."
+  else
+    warn "[sync] Skipping auto-sync — HEAD is on '${CURRENT_BRANCH:-detached HEAD}', not the canonical '$CANONICAL_BRANCH'. The branch is left for its owner to commit/push manually (multi-agent safety; see AGENTS.md rule #9)."
+    log_run sync
+  fi
+  exit 0
+fi
+
+# Pull remote changes first (rebase to keep history clean)
+if $DRY_RUN; then
+  info "[sync] [dry-run] Would pull from $PULL_REMOTE/$(git branch --show-current)"
+else
+  info "[sync] Pulling remote changes from $PULL_REMOTE..."
+  _pull_err=""
+  _pull_rc=0
+  _pull_err=$(git pull "$PULL_REMOTE" "$(git branch --show-current)" --rebase --autostash --quiet 2>&1) || _pull_rc=$?
+  if [ "$_pull_rc" -eq 0 ]; then
+    # Apply any config changes from remote
+    if command -v chezmoi &>/dev/null; then
+      _chezmoi_apply || true
+    fi
+  else
+    warn "[sync] Pull failed: $(_classify_push_error "$_pull_err")"
+  fi
+fi
+
+# Recover from stuck rebase if pull failed mid-way
+_git_dir="$(git rev-parse --git-dir)"
+if [ -d "$_git_dir/rebase-merge" ] || [ -d "$_git_dir/rebase-apply" ]; then
+  warn "[sync] Stuck rebase detected, aborting"
+  $DRY_RUN || git rebase --abort 2>/dev/null || true
+fi
+
+# Sync WebStorm keymap back to dotfiles (live → repo).
+# Skip when the destination is a symlink back to the repo source (the
+# jetbrains doctor module creates that symlink in `fix` mode). `cp`
+# refuses to copy a file onto itself with "are identical (not copied)"
+# which fails the whole sync and short-circuits the git push that
+# follows. The symlink case is the happy path: any UI-driven edit lands
+# directly in `$DOTFILES_DIR/jetbrains/keymap.xml`, so there is nothing
+# to copy back.
+ws_dir=$(ls -d "$HOME/Library/Application Support/JetBrains/WebStorm"* 2>/dev/null | sort -V | tail -1 || true)
+if [ -n "$ws_dir" ] && [ -f "$ws_dir/keymaps/Mac OS X 10_5_ copy.xml" ]; then
+  src="$ws_dir/keymaps/Mac OS X 10_5_ copy.xml"
+  dst="$DOTFILES_DIR/jetbrains/keymap.xml"
+  if [ -L "$src" ] && [ "$(readlink "$src")" = "$dst" ]; then
+    : # symlink already points at the repo file — nothing to sync back
+  elif $DRY_RUN; then
+    info "[sync] [dry-run] Would copy WebStorm keymap to jetbrains/keymap.xml"
+  else
+    cp "$src" "$dst"
+  fi
+fi
+
+# Check for local changes
+if [ -n "$(git status --porcelain)" ]; then
+  untracked=$(git status --porcelain | sed -n 's/^?? //p' || true)
+  if $DRY_RUN; then
+    committable=$(git status --porcelain | awk 'substr($0, 1, 2) != "??" && substr($0, 1, 1) != "D" && substr($0, 2, 1) != "D"' || true)
+    if [ -n "$committable" ]; then
+      info "[sync] [dry-run] Would commit these tracked/staged changes:"
+      echo "$committable" | sed 's/^/         /'
+    else
+      ok "[sync] [dry-run] No tracked or staged changes to auto-commit."
+    fi
+    if [ -n "$untracked" ]; then
+      untracked_count=$(echo "$untracked" | wc -l | tr -d ' ')
+      warn "[sync] [dry-run] Ignoring $untracked_count untracked file(s); stage them explicitly to include:"
+      echo "$untracked" | head -10 | sed 's/^/         /'
+    fi
+    # Show what would be excluded (deletions)
+    deleted=$(git status --porcelain | grep '^.D ' | sed 's/^.D //' || true)
+    if [ -n "$deleted" ]; then
+      deleted_count=$(echo "$deleted" | wc -l | tr -d ' ')
+      warn "[sync] [dry-run] Would exclude $deleted_count deletion(s) from auto-commit"
+    fi
+    info "[sync] [dry-run] Would push to: ${REMOTES[*]}"
+    exit 0
+  fi
+
+  info "[sync] Changes detected, committing..."
+  git add -u
+
+  # Unstage files listed in .sync-protect (manual-commit-only files)
+  if [ -f "$DOTFILES_DIR/.sync-protect" ]; then
+    while IFS= read -r protected; do
+      # Skip comments and blank lines
+      [[ "$protected" =~ ^[[:space:]]*# ]] && continue
+      [[ -z "$protected" ]] && continue
+      if git diff --cached --name-only 2>/dev/null | grep -qx "$protected"; then
+        git reset HEAD --quiet -- "$protected" 2>/dev/null || true
+        warn "[sync] Skipped protected file: $protected"
+      fi
+    done < "$DOTFILES_DIR/.sync-protect"
+  fi
+
+  # Never auto-commit file deletions — unstage them and warn
+  deleted=$(git diff --cached --diff-filter=D --name-only 2>/dev/null || true)
+  if [ -n "$deleted" ]; then
+    echo "$deleted" | xargs git reset HEAD --quiet -- 2>/dev/null || true
+    deleted_count=$(echo "$deleted" | wc -l | tr -d ' ')
+    warn "[sync] Unstaged $deleted_count deletion(s) — deletions require manual commit:"
+    echo "$deleted" | head -10 | sed 's/^/         /'
+  fi
+
+  # Only commit if there are still staged changes after removing deletions
+  if [ -z "$(git diff --cached --name-only 2>/dev/null)" ]; then
+    if [ -n "$untracked" ]; then
+      untracked_count=$(echo "$untracked" | wc -l | tr -d ' ')
+      warn "[sync] Ignored $untracked_count untracked file(s) — stage them explicitly to include:"
+      echo "$untracked" | head -10 | sed 's/^/         /'
+    fi
+    ok "[sync] No changes after excluding deletions."
+    log_run sync
+    exit 0
+  fi
+
+  git commit -m "sync: auto-update $(date '+%Y-%m-%d %H:%M')" --quiet
+  # Push to every configured remote. The global pre-push hook still
+  # blocks private identities before anything reaches GitHub.com.
+  _direct_push_count=0
+  for remote in "${REMOTES[@]}"; do
+    _push_err=$(git push "$remote" --quiet 2>&1) \
+      || warn "[sync] Push to $remote failed: $(_classify_push_error "$_push_err")"
+    _direct_push_count=$((_direct_push_count + 1))
+  done
+  ok "[sync] Synced and pushed (${_direct_push_count} remote(s))."
+  log_run sync
+else
+  if $DRY_RUN; then
+    ok "[sync] [dry-run] No changes to sync."
+    exit 0
+  fi
+  ok "[sync] No changes."
+  log_run sync
+fi

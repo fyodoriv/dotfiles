@@ -71,7 +71,7 @@ remotes, shutdown/restart behavior, or the agent manager's active
 
 ```bash
 pmset -g custom | rg -A16 '^AC Power:'
-cd ~/apps/tooling/dotfiles-applied
+cd "$(chezmoi source-path)"
 bin/dotfiles doctor --module macos --quiet
 ```
 

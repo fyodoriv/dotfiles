@@ -108,7 +108,7 @@ const REQUIRED_BLOCK_TEMPLATE = `## Vision trace
 - **User story**: <\`user-stories/<id>.md\`, \`US-NN\`, or \`N/A — <reason>\`>
 - **Competitor prior art**: <competitor name + what they ship, or \`N/A — <reason>\`>
 
-Opt-out for release bots / lockfile bumps / mirror-sync commits:
+Opt-out for release bots / lockfile bumps / sync commits:
 
     <!-- vision-trace: not-applicable — <reason ≥3 chars> -->`;
 

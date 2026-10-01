@@ -60,10 +60,10 @@
     },
     {
       "id": 6,
-      "prompt": "The global agentbrew command uses a detached agentbrew-applied-memory worktree that is behind origin/main. Refresh tooling safely.",
+      "prompt": "The global agentbrew command uses a detached read-only agentbrew clone that is behind origin/main. Refresh tooling safely.",
       "expected_output": "Fetches origin/main, fast-forwards only the clean detached applied AgentBrew worktree, builds it after advancement, and preserves unsafe state.",
       "expectations": [
-        "Treats agentbrew-applied-memory as a linked worktree even though its .git entry is a file",
+        "Treats the detached read-only agentbrew clone as the applied checkout",
         "Uses git merge --ff-only origin/main without rebasing, resetting, or checking out the detached worktree",
         "Runs npm run build only after the applied worktree advances",
         "Reports and preserves dirty, ahead, diverged, malformed, or fetch-failed applied worktree state",

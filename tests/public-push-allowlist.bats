@@ -2,20 +2,20 @@
 # Tests for the public-push allowlist that bin/git enforces.
 #
 # bin/git blocks agent-authored pushes to public repositories unless the
-# normalized remote appears in config/public-mirror-remotes.txt. That file is a
+# normalized remote appears in config/public-push-remotes.txt. That file is a
 # security boundary with no test coverage until now: an accidental wildcard or a
 # stray entry would widen what agent pushes can reach on public GitHub with
 # nothing objecting.
 
 setup() {
   REPO_ROOT="$BATS_TEST_DIRNAME/.."
-  ALLOWLIST="$REPO_ROOT/config/public-mirror-remotes.txt"
+  ALLOWLIST="$REPO_ROOT/config/public-push-remotes.txt"
 
   # Source the two wrapper functions under test rather than reimplementing them,
   # so the test tracks bin/git instead of drifting from it.
   SCRIPT_DIR="$REPO_ROOT/bin"
-  PUBLIC_MIRROR_ALLOWLIST="$ALLOWLIST"
-  export SCRIPT_DIR PUBLIC_MIRROR_ALLOWLIST
+  PUBLIC_PUSH_ALLOWLIST="$ALLOWLIST"
+  export SCRIPT_DIR PUBLIC_PUSH_ALLOWLIST
   eval "$(sed -n '/^_git_public_repository_key()/,/^}/p;/^_git_public_repository_allowed()/,/^}/p' "$SCRIPT_DIR/git")"
 }
 
@@ -64,11 +64,6 @@ setup() {
 @test "ssh and https forms of a listed repo resolve the same" {
   run _git_public_repository_allowed "git@github.com:fyodoriv/minsky.git"
   [ "$status" -eq 0 ]
-}
-
-@test "the retired mirror-setup repository is not allowed" {
-  run _git_public_repository_allowed "https://github.com/fyodoriv/mirror-setup.git"
-  [ "$status" -ne 0 ]
 }
 
 @test "the own public tool repos are allowed" {

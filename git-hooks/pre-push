@@ -36,8 +36,9 @@ fi
 # ── Repo-scope check ────────────────────────────────────────────────
 # This hook is wired globally via `core.hooksPath`, so it fires for
 # EVERY git repo on the machine — not just dotfiles. The privacy gate
-# applies to dotfiles itself (it carries lib/oss-readiness.sh) and to any
-# push whose destination is github.com/fyodoriv/{dotfiles,agentbrew}.
+# applies to dotfiles itself (it carries lib/oss-readiness.sh), to any
+# push whose destination is github.com/fyodoriv/{dotfiles,agentbrew}, and to
+# every public repo in config/public-push-remotes.txt (the list bin/git uses).
 # Any other repo defers to its own gates.
 CURRENT_REPO="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
 gated_repo=0
@@ -46,6 +47,12 @@ case "$remote_url" in
   *github.com[:/]fyodoriv/agentbrew | *github.com[:/]fyodoriv/agentbrew.git | *github.com[:/]fyodoriv/agentbrew/) gated_repo=1 ;;
 esac
 if [ -n "$CURRENT_REPO" ] && [ -f "$CURRENT_REPO/lib/oss-readiness.sh" ]; then
+  gated_repo=1
+fi
+PUBLIC_REPO_ALLOWLIST="${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-$DOTFILES_DIR/config/public-push-remotes.txt}"
+remote_key="$(printf '%s' "$remote_url" | sed -E 's#^[a-z+]+://##; s#^[^@/]+@##; s#:#/#; s#/$##; s#\.git$##')"
+if [ "$gated_repo" -eq 0 ] && [ -n "$remote_key" ] && [ -r "$PUBLIC_REPO_ALLOWLIST" ] &&
+  sed 's/#.*//; s/[[:space:]]//g' "$PUBLIC_REPO_ALLOWLIST" | grep -qixF -- "$remote_key"; then
   gated_repo=1
 fi
 
@@ -133,13 +140,18 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
 
   # 1b. History scan: a commit in the range may add a private reference
   # that a later commit removed, so the pushed tip looks clean. Check the
-  # lines each pushed commit adds. Print commit ids only, never the text.
+  # lines, file names, and message of each pushed commit. Print commit ids
+  # only, never the text.
   if [ -n "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
     history_hits=()
     while IFS= read -r commit; do
       [ -n "$commit" ] || continue
       if git -C "$CURRENT_REPO" show --format= --no-color --no-ext-diff -m "$commit" 2>/dev/null \
         | grep -E '^\+' | grep -Ev '^\+\+\+ ' \
+        | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN" ||
+        git -C "$CURRENT_REPO" show --format= --name-only --diff-filter=ACR -m "$commit" 2>/dev/null \
+        | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN" ||
+        git -C "$CURRENT_REPO" log -1 --format=%B "$commit" 2>/dev/null \
         | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN"; then
         history_hits+=("$(git -C "$CURRENT_REPO" rev-parse --short "$commit")")
         [ "${#history_hits[@]}" -ge 20 ] && break
@@ -147,7 +159,7 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
     done < <(git -C "$CURRENT_REPO" rev-list "${range_args[@]}" 2>/dev/null || true)
 
     if [ "${#history_hits[@]}" -gt 0 ]; then
-      printf '%s✗ %d commit(s) in the push add lines that match the private-reference pattern:%s\n' "$RED" "${#history_hits[@]}" "$RST" >&2
+      printf '%s✗ %d commit(s) in the push add lines, file names, or messages that match the private-reference pattern:%s\n' "$RED" "${#history_hits[@]}" "$RST" >&2
       printf '   %s\n' "${history_hits[@]}" >&2
       printf '\n%sRewrite those commits so no pushed commit carries the reference.%s\n' "$YEL" "$RST" >&2
       scan_failed=1

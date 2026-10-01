@@ -287,3 +287,57 @@ _roots_env() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"unapproved root commit"* ]]
 }
+
+# ── Every listed public repo, file names, and commit messages ──────────
+
+@test "pre-push gates every public repo in the push allowlist" {
+  local repo="$TEST_DIR/repo"
+  _make_repo "$repo" "dev@private.example"
+
+  run _run_pre_push "$repo" origin "https://github.com/fyodoriv/minsky.git"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Private author or committer emails"* ]]
+}
+
+@test "pre-push blocks a pushed file whose name matches the private pattern" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  _commit_file "$repo" company-private-ignore.yaml "clean content"
+  _pattern_env 'company-private'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"company-private"* ]]
+}
+
+@test "pre-push blocks a file name that a later commit removed" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  _commit_file "$repo" company-private.md "clean content"
+  git -C "$repo" rm --quiet company-private.md
+  git -C "$repo" commit --quiet -m "docs: remove file"
+  _pattern_env 'company-private'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+}
+
+@test "pre-push blocks a commit message that matches the private pattern" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  printf 'clean\n' > "$repo/notes.md"
+  git -C "$repo" add notes.md
+  git -C "$repo" commit --quiet -m "docs: notes from the company-private wiki"
+  _pattern_env 'company-private'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"company-private"* ]]
+}

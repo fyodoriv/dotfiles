@@ -8,6 +8,10 @@
   project-sync freshness and read-only transport compatibility evidence to
   AgentBrew. Dotfiles keeps the daily compatibility shim and does not parse
   Claude memory files or reimplement MCP transport.
+- **Pre-push gate covers every public repo** — `git-hooks/pre-push` now gates
+  pushes to every repo in `config/public-push-remotes.txt`, not only
+  dotfiles and agentbrew. It also checks file names and commit messages of
+  each pushed commit, so a private name in a path or message is blocked.
 - **Pre-push private-reference gate** — `git-hooks/pre-push` now blocks a push
   when a file changed in the pushed range matches the private-identifier
   pattern. The message lists paths only.

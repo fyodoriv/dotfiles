@@ -509,7 +509,7 @@ check_symlink() {
     pass "$desc"
   elif $FIX_MODE; then
     local _f0=$fix_count _x0=$fail_count
-    _fix "$desc" "mkdir -p '$(dirname "$dst")'; [ -f '$dst' ] && mv '$dst' '${dst}.backup' 2>/dev/null; [ -L '$dst' ] && rm '$dst'; ln -s '$src' '$dst'"
+    _fix "$desc" "mkdir -p '$(dirname "$dst")'; [ -f '$dst' ] && [ ! -L '$dst' ] && mv '$dst' '${dst}.backup' 2>/dev/null; [ -L '$dst' ] && rm '$dst'; ln -s '$src' '$dst'"
     if (( fix_count > _f0 )); then
       $JSON_MODE && _json_add "$id" "fixed" "$desc"
       fixed_check_ids+=("$id")

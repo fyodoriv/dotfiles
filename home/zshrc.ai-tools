@@ -214,7 +214,7 @@ dvb() {
   _DV_START_EPOCH=$(date +%s)
 
   if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh &>/dev/null; then
-    export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
+    export GITHUB_TOKEN="$(gh auth token -h github.com 2>/dev/null)"
   fi
 
   devin --model gpt-5-5-xhigh-priority --permission-mode dangerous -- "$@"

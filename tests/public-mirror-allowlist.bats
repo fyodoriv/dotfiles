@@ -70,3 +70,10 @@ setup() {
   run _git_public_repository_allowed "https://github.com/fyodoriv/mirror-setup.git"
   [ "$status" -ne 0 ]
 }
+
+@test "the own public tool repos are allowed" {
+  for repo in fyodoriv/taskgrind fyodoriv/code-smells fyodoriv/homebrew-tap tasksmd/tasks.md; do
+    run _git_public_repository_allowed "git@github.com:$repo.git"
+    [ "$status" -eq 0 ] || { echo "blocked: $repo"; return 1; }
+  done
+}

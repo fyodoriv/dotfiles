@@ -301,7 +301,7 @@ Approved without another prompt for current-task and allowlisted scope:
 - create or switch to a short-lived feature branch if needed
 - convert clean local-only commits on the default/canonical branch into a short-lived PR branch instead of pushing the default branch directly
 - stage explicit files, commit, push the feature branch
-- retry `git push` / `gh` egress with unrestricted Shell permissions when Cursor `beforeShellExecution` hooks block delivery (`Pushing source code to this remote has to be done manually`); `/ship-it` pre-approves push to explicitly named current-task repos and approved approved-family remotes for user-owned/current-session branches — never delegate push to the user
+- when a managed hook blocks `git push` / `gh` egress, give the operator one-line push, PR, and merge commands (see **Push delivery when a managed hook blocks `git push`**); never bypass the hook
 - create or update a PR
 - watch CI/checks, diagnose failures, push fixes
 - when multiple PRs/branches contain the same intended changes, prefer the PR
@@ -447,43 +447,26 @@ Use the repo's commit convention. Prefer a concise conventional-commit subject; 
 
 Push the feature branch to the current repo remote. Use a normal push for new branches or fast-forward updates. If Step 1 authorized a current, explicitly named current-task, or approved-family PR branch rewrite, publish the rewritten branch with explicit `--force-with-lease` and the saved old remote OID; never use plain `--force`.
 
-### Push delivery when Cursor hooks block `git push`
+### Push delivery when a managed hook blocks `git push`
 
-Cursor's managed `git-push-guard` hook (`beforeShellExecution`) can reject agent Shell `git push` / `gh` egress with:
+A managed push guard (for example Cursor's `git-push-guard` `beforeShellExecution` hook) can reject agent Shell `git push` / `gh` egress with:
 
 > Pushing source code to this remote has to be done manually.
 
-That hook rejection is **not** a ship-it stop condition for verified
-user-owned/current-session work in the current repo, explicitly named
-current-task repos, or approved repo families. Agents MUST execute
-push/PR/merge themselves — **never** end `/ship-it` with "run these push
-commands yourself" or "push from a terminal outside Cursor."
+Respect the guard. Never retry around it with other permissions, shells, encodings, tools, or hook changes. Instead:
 
-**Retry ladder** (exhaust every step before reporting a hard blocker):
-
-1. Normal push from the repo checkout: `git push -u origin <branch>` (or the repo's documented remote/ref).
-2. Retry the same push via Shell with **unrestricted permissions** (`required_permissions: ["all"]` when the tool supports it). This bypasses Cursor's sandboxed hook path while still honoring git hooks and the dotfiles `git`/`gh` wrappers.
-3. Retry via a login-shell subprocess with explicit repo context and non-interactive git:
+1. Finish everything else locally: branch, commit, formatters, linters, tests, and the PR body file.
+2. Give the operator **one copy-paste command per repo** that pushes, opens the PR, watches checks, and merges. Example:
    ```bash
-   REPO="/absolute/path/to/checkout"   # required when workspace root is a parent (e.g. ~/apps/tooling)
-   BRANCH="$(git -C "$REPO" branch --show-current)"
-   /bin/bash -lc "cd \"$REPO\" && GIT_TERMINAL_PROMPT=0 git push -u origin HEAD:${BRANCH}"
+   git -C /absolute/path/to/checkout push origin <branch> && gh pr create -R <owner>/<repo> --head <branch> --body-file <file> && gh pr checks -R <owner>/<repo> <branch> --watch && gh pr merge -R <owner>/<repo> <branch> --squash --delete-branch
    ```
-   Run with unrestricted permissions. Prefer explicit `origin` + branch name; use `git -C "$REPO"` when cwd is unreliable.
-4. For `gh pr create` / other `gh` egress blocked by the same hook message, retry with `GH_HOST=<your-enterprise-github-host>` (match `git remote get-url origin`) and unrestricted permissions. Set `AGENT_PUBLIC_WRITE_APPROVAL` per dotfiles `bin/gh` when cross-repo PR creation requires it.
-5. If the hook still denies after steps 1–4, capture evidence (your agent
-   push-guard audit log tail, exact command, remote URL/host, hook stderr) and
-   try one documented standing-approval path: `/ship-it` session approval
-   covers verified user-owned/current-session feature-branch pushes to the
-   current repo, explicitly named current-task repos, `~/apps/tooling/**`,
-   own repos on `github.com/<owner>/*`, and any extra repo family the org
-   overlay declares.
-6. **Last resort only:** report the exact blocker with evidence. Do not suggest manual push until steps 1–5 are exhausted.
+3. Never hand off a list of manual steps. If the base may move, start the command with `git -C <checkout> pull --rebase origin <base> &&`.
+4. After the operator runs it, verify the PR state and merged SHA yourself.
 
 **Hook context notes:**
 
 - Enterprise GitHub hosts in your hook allowlist should pass when the remote resolves; fail-closed denials often mean cwd/remote resolution failed — fix with explicit `-C` / `origin` / `GH_HOST`. Audit log `could-not-resolve-remote=origin cwd=workspace_roots` means the hook could not find `origin` from the agent workspace parent — always `cd` into the repo checkout (e.g. `~/apps/tooling/dotfiles`) before push/`gh`.
-- Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. Cursor's `git-push-guard` can block any shell command containing `git push` to github.com; when it does, follow the retry ladder above with unrestricted Shell permissions.
+- Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the one-line commands described above.
 - Dry-run first when verifying: `git push --dry-run -u origin <branch>`.
 
 **Stack PR overlap gate (before push/open):** When delivering a multi-PR skill stack against the same base, each child branch must be a **phase delta**, not a cumulative branch that still contains parent commits. Before `git push` / `gh pr create`:

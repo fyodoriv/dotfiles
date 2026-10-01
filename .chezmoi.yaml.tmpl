@@ -16,6 +16,10 @@
 {{- if hasKey . "brew_skip" -}}
 {{-   $brewSkip = .brew_skip -}}
 {{- end -}}
+{{- $extraOverlayRoot := "" -}}
+{{- if hasKey . "extra_overlay_root" -}}
+{{-   $extraOverlayRoot = .extra_overlay_root -}}
+{{- end -}}
 {{- $autoSync := true -}}
 {{- if hasKey . "auto_sync" -}}
 {{-   $autoSync = .auto_sync -}}
@@ -24,13 +28,27 @@
 {{- $useEncryption := promptBoolOnce . "use_encryption" "Enable age encryption (requires ~/.config/chezmoi/key.txt)" false -}}
 {{- $ageRecipient := "unused-no-encryption-configured" -}}
 {{- if $useEncryption -}}
-{{-   $ageRecipient = promptStringOnce . "age_recipient" "age public key (recipient)" "" -}}
+{{-   $ageRecipient = dig "age" "recipient" "" .chezmoi.config -}}
+{{-   if hasKey . "age_recipient" -}}
+{{-     $ageRecipient = .age_recipient -}}
+{{-   else if not $ageRecipient -}}
+{{-     $ageRecipient = promptStringOnce . "age_recipient" "age public key (recipient)" "" -}}
+{{-   end -}}
 {{- end -}}
 {{- $morningHour := 8 -}}
 {{- $morningMinute := 30 -}}
 {{- if eq $profile "full" -}}
-{{-   $morningHour = promptIntOnce . "morning_hour" "Morning briefing hour (0-23)" 8 -}}
-{{-   $morningMinute = promptIntOnce . "morning_minute" "Morning briefing minute (0-59)" 30 -}}
+{{/*  YAML loads small numbers as uint64, which promptIntOnce ignores */ -}}
+{{-   if hasKey . "morning_hour" -}}
+{{-     $morningHour = int .morning_hour -}}
+{{-   else -}}
+{{-     $morningHour = promptIntOnce . "morning_hour" "Morning briefing hour (0-23)" 8 -}}
+{{-   end -}}
+{{-   if hasKey . "morning_minute" -}}
+{{-     $morningMinute = int .morning_minute -}}
+{{-   else -}}
+{{-     $morningMinute = promptIntOnce . "morning_minute" "Morning briefing minute (0-59)" 30 -}}
+{{-   end -}}
 {{- end -}}
 
 {{/* ── Git identity ────────────────────────────────────────────────── */ -}}
@@ -74,6 +92,7 @@ data:
   use_local_ai: {{ $useLocalAi }}
   use_cursor: {{ $useCursor }}
   use_encryption: {{ $useEncryption }}
+  age_recipient: {{ $ageRecipient | quote }}
   morning_hour: {{ $morningHour }}
   morning_minute: {{ $morningMinute }}
   git_work_name: {{ $gitWorkName | quote }}
@@ -81,3 +100,6 @@ data:
   git_personal_enabled: {{ $gitPersonalEnabled }}
   git_personal_name: {{ $gitPersonalName | quote }}
   git_personal_email: {{ $gitPersonalEmail | quote }}
+{{- if $extraOverlayRoot }}
+  extra_overlay_root: {{ $extraOverlayRoot | quote }}
+{{- end }}

@@ -399,3 +399,45 @@ chezmoi_verify() {
   [ "$(readlink "$TEST_HOME/.zshenv")" = "$REAL_DOTFILES/home/zshenv" ]
   [ "$(readlink "$TEST_HOME/.ideavimrc")" = "$REAL_DOTFILES/home/ideavimrc" ]
 }
+
+# ── Re-init keeps existing data ──
+
+reinit_config() {
+  HOME="$TEST_HOME" chezmoi init \
+    --config "$TEST_HOME/.config/chezmoi/chezmoi.yaml" \
+    --source "$REAL_DOTFILES" \
+    --promptDefaults </dev/null >/dev/null 2>&1
+}
+
+@test "re-init keeps age recipient, morning time, and overlay root" {
+  cat > "$TEST_HOME/.config/chezmoi/chezmoi.yaml" << EOF2
+sourceDir: "$REAL_DOTFILES"
+encryption: age
+age:
+  identity: "$TEST_HOME/.config/chezmoi/key.txt"
+  recipient: age1testrecipient
+data:
+  profile: full
+  use_encryption: true
+  morning_hour: 9
+  morning_minute: 0
+  extra_overlay_root: "/tmp/overlay"
+EOF2
+  reinit_config
+  local cfg="$TEST_HOME/.config/chezmoi/chezmoi.yaml"
+  grep -q '^  recipient: age1testrecipient$' "$cfg"
+  grep -q '^  age_recipient: "age1testrecipient"$' "$cfg"
+  grep -q '^  morning_hour: 9$' "$cfg"
+  grep -q '^  morning_minute: 0$' "$cfg"
+  grep -q '^  extra_overlay_root: "/tmp/overlay"$' "$cfg"
+}
+
+@test "fresh init uses defaults and omits overlay root" {
+  printf 'data:\n  profile: full\n' > "$TEST_HOME/.config/chezmoi/chezmoi.yaml"
+  reinit_config
+  local cfg="$TEST_HOME/.config/chezmoi/chezmoi.yaml"
+  grep -q '^  morning_hour: 8$' "$cfg"
+  grep -q '^  morning_minute: 30$' "$cfg"
+  grep -q '^  recipient: unused-no-encryption-configured$' "$cfg"
+  ! grep -q 'extra_overlay_root' "$cfg"
+}

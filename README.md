@@ -466,11 +466,13 @@ Pre-commit and pre-push enforce that contract before a commit leaves the
 machine. Nothing rewrites history later, so a private email cannot be made
 safe after the fact.
 
-The global `git-hooks/pre-push` applies a privacy gate to pushes of dotfiles
-and agentbrew to github.com. It blocks commits whose author or committer
-email matches the private-email pattern. It also blocks files changed in
-the push (read at the pushed commit) that match the private-identifier
-pattern, and lists paths only. Both patterns come from the org
+The global `git-hooks/pre-push` applies a privacy gate to pushes of dotfiles,
+agentbrew, and every repo in `config/public-push-remotes.txt` to github.com.
+It blocks commits whose author or committer email matches the private-email
+pattern. It also blocks files changed in the push (read at the pushed commit)
+that match the private-identifier pattern, and lists paths only. Each pushed
+commit's added lines, file names, and message are checked too; that message
+lists commit ids only. Both patterns come from the org
 overlay's `oss-readiness.env`, which `lib/oss-readiness.sh` loads. With no
 overlay, those two checks have nothing to match. The hook then delegates to
 the repo-local `hooks/pre-push`.

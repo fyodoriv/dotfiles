@@ -104,7 +104,7 @@ the others.
 | Layer | Where | What it catches | Bypass |
 |-------|-------|-----------------|--------|
 | **L1** Pre-commit hook | `git-hooks/pre-commit` | Forbidden files, content, secrets, and private committer email on staged files. In dotfiles it also blocks protected-directory deletions and lints TASKS.md | `git commit --no-verify` |
-| **L2** Pre-push hook | `git-hooks/pre-push` | For pushes of dotfiles and agentbrew to github.com: blocks commits whose author or committer email matches the private-email pattern, and blocks files changed in the push (read at the pushed commit) that match the private-identifier pattern. The message lists paths only. Then delegates to the repo-local `hooks/pre-push` | `git push --no-verify` |
+| **L2** Pre-push hook | `git-hooks/pre-push` | For pushes of dotfiles, agentbrew, and every repo in `config/public-push-remotes.txt` to github.com: blocks commits whose author or committer email matches the private-email pattern, blocks files changed in the push (read at the pushed commit) that match the private-identifier pattern, and blocks pushed commits whose added lines, file names, or message match. The messages list paths or commit ids only. Then delegates to the repo-local `hooks/pre-push` | `git push --no-verify` |
 | **L3** Local test gate | `make check` | Shellcheck, TASKS.md lint, and affected Bats tests. GitHub Actions is turned off, so this is the last gate before merge to `feat/chezmoi` | skipping the run |
 
 Nothing rewrites history after a push. A private email that passes L1 and

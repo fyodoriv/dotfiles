@@ -353,11 +353,13 @@ short version every contributor needs:
    last-resort emergency fix; later gates still fire.
 
 3. **The pre-push hook (`git-hooks/pre-push`) applies a privacy gate** to
-   pushes of dotfiles and agentbrew to github.com. It blocks any commit
+   pushes of dotfiles, agentbrew, and every repo in
+   `config/public-push-remotes.txt` to github.com. It blocks any commit
    whose author or committer email matches the private-email pattern. It
    also blocks the push when a file changed in the pushed range (read at
    the pushed commit) matches the private-identifier pattern; the message
-   lists file paths only. Both patterns come from the org overlay's `oss-readiness.env`,
+   lists file paths only. It also blocks a pushed commit whose added lines,
+   file names, or message match; that message lists commit ids only. Both patterns come from the org overlay's `oss-readiness.env`,
    which `lib/oss-readiness.sh` loads. With no overlay, those two checks
    have nothing to match. The hook then delegates to the repo-local
    `hooks/pre-push`.

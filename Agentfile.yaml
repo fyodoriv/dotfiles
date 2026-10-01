@@ -25,6 +25,13 @@ hooks:
     matcher: "*"
     command: "~/.config/dotfiles/hooks/session-endpoint-path.sh"
 
+# null keeps each agent's own model. dotfiles owns these defaults
+# (AGENTS.md § Model Configuration); agentbrew must not overwrite them.
+modelOverrides:
+  claude-code: null
+  codex: null
+  devin: null
+
 mcp:
   - context7
   - playwright

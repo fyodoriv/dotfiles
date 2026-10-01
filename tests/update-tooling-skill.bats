@@ -54,7 +54,7 @@ AGENTFILE="$ROOT/Agentfile.yaml"
 }
 
 @test "update-tooling refreshes the detached applied AgentBrew build safely" {
-  grep -F -q 'agentbrew-applied-memory' "$SKILL"
+  grep -F -q 'AGENTBREW_APPLIED="${AGENTBREW_APPLIED:-$TOOLING_ROOT/agentbrew}"' "$SKILL"
   grep -F -q 'git -C "$AGENTBREW_APPLIED" fetch origin main' "$SKILL"
   grep -F -q 'git -C "$AGENTBREW_APPLIED" merge --ff-only origin/main' "$SKILL"
   grep -F -q '(cd "$AGENTBREW_APPLIED" && npm run build)' "$SKILL"

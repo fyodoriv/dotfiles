@@ -120,21 +120,21 @@ reason and leave it unchanged.
 `agentbrew sync --pull` refreshes managed sources and generated agent
 configuration. It does not update the agentbrew repository itself.
 
-The applied AgentBrew checkout is normally
-`$TOOLING_ROOT/agentbrew-applied-memory`. It can be detached. Refresh it
-separately from the development checkout. Do not assume the global
+The applied AgentBrew checkout is normally `$TOOLING_ROOT/agentbrew`, a
+read-only clone whose `dist/cli.js` the global `agentbrew` command resolves
+to. It can be detached. Refresh it separately from any development clone. Do not assume the global
 `agentbrew` command resolves there; record its actual target and use the
 applied CLI explicitly after a successful build. It is safe to advance only
 when the applied checkout is clean and its detached `HEAD` is an ancestor of
 `origin/main`:
 
 ```bash
-AGENTBREW_APPLIED="${AGENTBREW_APPLIED:-$TOOLING_ROOT/agentbrew-applied-memory}"
+AGENTBREW_APPLIED="${AGENTBREW_APPLIED:-$TOOLING_ROOT/agentbrew}"
 ENDPOINT_NODE_SAFE_MODE=false
 [ -e "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
   && ENDPOINT_NODE_SAFE_MODE=true
 if [ ! -e "$AGENTBREW_APPLIED/.git" ]; then
-  echo "preserved applied AgentBrew checkout: not a linked worktree"
+  echo "preserved applied AgentBrew checkout: not a git checkout"
 elif ! git -C "$AGENTBREW_APPLIED" fetch origin main; then
   echo "preserved applied AgentBrew checkout: fetch failed"
 elif [ -n "$(git -C "$AGENTBREW_APPLIED" status --porcelain)" ]; then

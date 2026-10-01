@@ -77,7 +77,7 @@ For any repository explicitly named by the active request, `/ship-it` pre-approv
 
 - Fetch the actual PR base, preserve the old remote head, rebase onto `origin/<base>`, resolve conflicts, and re-run required gates. Rebasing owned work is always approved.
 - Publish rewritten owned PR branches only with an explicit `--force-with-lease=<ref>:<old-oid>`. Never use plain `--force`.
-- A Cursor “Pushing source code … manually” guard is not a stop condition: retry from the absolute repo checkout with explicit remote/ref. Never delegate an approved push to the user.
+- Never bypass a “Pushing source code … manually” guard; see **Push unblock**.
 - Verify PR author, head owner, and branch before rewriting. Never rewrite someone else’s branch.
 
 This does not permit admin/bypass merge or release in product repos; the allowlist below and repo-local rules govern those.
@@ -115,7 +115,7 @@ BRANCH="$(git -C "$REPO" branch --show-current)"
 /bin/bash -lc "cd \"$REPO\" && GIT_TERMINAL_PROMPT=0 git push -u origin HEAD:${BRANCH}"
 ```
 
-Use the same explicit `cd "$REPO"` and enterprise `GH_HOST` context for `gh pr create` or `gh pr merge`. If the guard still denies after the documented retry ladder, record its audit evidence and report the blocker; do not evade the hook.
+Use the same explicit `cd "$REPO"` and enterprise `GH_HOST` context for `gh pr create` or `gh pr merge`. If it still denies, do not evade it: give the operator one command per repo that pushes, opens the PR, watches checks, and merges.
 
 ## Memory sync (every delivery, all repos)
 

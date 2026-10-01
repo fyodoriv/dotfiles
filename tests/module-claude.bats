@@ -65,14 +65,14 @@ WRAPPER
 
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 2 ]
+  [ "$pass_count" -eq 3 ]
   [ "$fail_count" -eq 0 ]
 }
 
 @test "claude: wrapper check fails when unmanaged wrapper is missing" {
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 0 ]
+  [ "$pass_count" -eq 1 ]
   [ "$fail_count" -eq 2 ]
 }
 
@@ -83,7 +83,26 @@ WRAPPER
   collected=()
   check() { collected+=("$1"); }
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
-  [ "${#collected[@]}" -eq 2 ]
+  [ "${#collected[@]}" -eq 3 ]
   [ "${collected[0]}" = "claude.model_wrapper" ]
   [ "${collected[1]}" = "claude.model_default" ]
+  [ "${collected[2]}" = "claude.observe_plugin_server" ]
+}
+
+@test "claude: observe check fails when the plugin is enabled and its server is down" {
+  mkdir -p "$TEST_HOME/.claude"
+  echo '{"enabledPlugins":{"agents-observe@agents-observe":true}}' > "$TEST_HOME/.claude/settings.json"
+  export AGENTS_OBSERVE_SERVER_PORT=1
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+  run _claude_observe_plugin_ok
+  [ "$status" -ne 0 ]
+}
+
+@test "claude: observe check passes when the plugin is disabled" {
+  mkdir -p "$TEST_HOME/.claude"
+  echo '{"enabledPlugins":{"agents-observe@agents-observe":false}}' > "$TEST_HOME/.claude/settings.json"
+  export AGENTS_OBSERVE_SERVER_PORT=1
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+  run _claude_observe_plugin_ok
+  [ "$status" -eq 0 ]
 }

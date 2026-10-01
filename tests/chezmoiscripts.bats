@@ -1167,6 +1167,33 @@ CONFIG
   ! should_skip_agent "dotfiles-upgrade"
 }
 
+@test "launchagents: should_skip_agent skips both sync agents when auto_sync=false" {
+  PROFILE="full"
+  AUTO_SYNC="false"
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  should_skip_agent "dotfiles-sync"
+  should_skip_agent "tooling-sync"
+}
+
+@test "launchagents: should_skip_agent keeps both sync agents by default" {
+  PROFILE="full"
+  unset AUTO_SYNC
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  ! should_skip_agent "dotfiles-sync"
+  ! should_skip_agent "tooling-sync"
+}
+
+@test "launchagents template: auto_sync re-renders the lifecycle script" {
+  grep -q '^# auto_sync: {{ dig "auto_sync" true . }}' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+}
+
+@test "sync doctor skips scheduled-sync checks when auto_sync=false" {
+  grep -q 'dig "auto_sync" true' "$TEST_DOTFILES/modules/sync/doctor.sh"
+  grep -q '_AUTO_SYNC_ENABLED" != "false"' "$TEST_DOTFILES/modules/sync/doctor.sh"
+}
+
 @test "launchagents: exactly one agent runs the weekly upgrade" {
   local count
   count="$(grep -l 'bin/dotfiles-upgrade' "$TEST_DOTFILES"/launchagents/*.plist* | wc -l | tr -d ' ')"

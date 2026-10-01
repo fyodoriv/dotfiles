@@ -138,7 +138,8 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 
 | Agent | Schedule | Profile | Purpose |
 |---|---|---|---|
-| `dotfiles-sync` | Every 30 min + at load | all | Auto-commit local changes and pull remote |
+| `dotfiles-sync` | Every 30 min + at load | all | Auto-commit local changes and pull remote (skipped when `auto_sync: false`) |
+| `tooling-sync` | Every 60 min + at load | all | Fast-forward the tooling repos (skipped when `auto_sync: false`) |
 | `dotfiles-doctor` | Monday 9:00 AM | all | Weekly health check with `--fix` |
 | `cleanup` | Periodic | all | Clean caches, logs, and temp files |
 | `git-maintain` | Periodic | all | Git gc, prune, and maintenance across repos |

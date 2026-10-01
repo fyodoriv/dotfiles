@@ -16,6 +16,10 @@
 {{- if hasKey . "brew_skip" -}}
 {{-   $brewSkip = .brew_skip -}}
 {{- end -}}
+{{- $autoSync := true -}}
+{{- if hasKey . "auto_sync" -}}
+{{-   $autoSync = .auto_sync -}}
+{{- end -}}
 {{- $autoUpgrade := promptBoolOnce . "auto_upgrade" "Enable auto-upgrade LaunchAgent (brew upgrade at 3am Sunday)" false -}}
 {{- $useEncryption := promptBoolOnce . "use_encryption" "Enable age encryption (requires ~/.config/chezmoi/key.txt)" false -}}
 {{- $ageRecipient := "unused-no-encryption-configured" -}}
@@ -65,6 +69,7 @@ data:
     []
 {{- end }}
   auto_upgrade: {{ $autoUpgrade }}
+  auto_sync: {{ $autoSync }}
   use_ai_tools: {{ $useAiTools }}
   use_local_ai: {{ $useLocalAi }}
   use_cursor: {{ $useCursor }}

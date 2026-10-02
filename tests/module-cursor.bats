@@ -127,7 +127,7 @@ _setup_cursor_installed() {
 
 _setup_cursor_model_state() {
   mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/.cursor" "$(dirname "$CURSOR_STATE_DB")"
-  printf '{"model":"claude-opus-4-8","effortLevel":"xhigh"}\n' > "$TEST_HOME/.claude/settings.json"
+  printf '{"model":"claude-opus-5-5","effortLevel":"medium"}\n' > "$TEST_HOME/.claude/settings.json"
   cat > "$TEST_HOME/.cursor/cli-config.json" <<'JSON'
 {
   "version": 1,
@@ -153,7 +153,7 @@ import sys
 db = sys.argv[1]
 key = "src.vs.platform.reactivestorage.browser.reactiveStorageServiceImpl.persistentStorage.applicationUser"
 state = {
-    "availableDefaultModels2": [{"serverModelName": "claude-opus-4-8-xhigh"}],
+    "availableDefaultModels2": [{"serverModelName": "claude-opus-5-5-medium"}],
     "aiSettings": {
         "modelConfig": {
             "composer": {"modelName": "default", "maxMode": False, "selectedModels": None},
@@ -319,7 +319,7 @@ import sqlite3
 import sys
 
 cli_path, db_path = sys.argv[1:]
-target = "claude-opus-4-8-xhigh"
+target = "claude-opus-5-5-medium"
 selection = [{"modelId": target, "parameters": []}]
 features = (
     "composer",
@@ -334,6 +334,7 @@ features = (
 cli = json.load(open(cli_path, encoding="utf-8"))
 assert cli["model"]["modelId"] == target
 assert cli["model"]["displayModelId"] == target
+assert cli["model"]["displayName"] == "Claude Opus 5.5 Medium"
 assert cli["hasChangedDefaultModel"] is True
 assert cli["authInfo"]["email"] == "user@example.com"
 
@@ -650,4 +651,62 @@ PY
   [ "$pass_count" -eq 0 ]
   [ "$fail_count" -eq 0 ]
   [ "$fix_count" -eq 0 ]
+}
+
+@test "cursor: model parity fix uses effort parameters when the catalog lists base models" {
+  _setup_cursor_installed
+  _setup_cursor_model_state
+  python3 - "$CURSOR_STATE_DB" <<'PY'
+import json
+import sqlite3
+import sys
+
+key = "src.vs.platform.reactivestorage.browser.reactiveStorageServiceImpl.persistentStorage.applicationUser"
+conn = sqlite3.connect(sys.argv[1])
+state = json.loads(conn.execute("select value from ItemTable where key = ?", (key,)).fetchone()[0])
+enum = lambda *values: {"enumParameter": {"values": [{"value": v} for v in values]}}
+state["availableDefaultModels2"] = [{
+    "name": "claude-opus-5-5",
+    "parameterDefinitions": [
+        {"id": "context", "parameterType": enum("300k", "1m")},
+        {"id": "effort", "parameterType": enum("low", "medium", "high", "xhigh", "max")},
+        {"id": "fast", "parameterType": {"booleanParameter": {"values": [{"value": "false"}, {"value": "true"}]}}},
+    ],
+}]
+conn.execute("update ItemTable set value = ? where key = ?", (json.dumps(state), key))
+conn.commit()
+PY
+  FIX_MODE=true
+
+  source "$TEST_DOTFILES/modules/cursor/doctor.sh"
+
+  [ "$fix_count" -ge 1 ]
+  python3 - "$TEST_HOME/.cursor/cli-config.json" "$CURSOR_STATE_DB" <<'PY'
+import json
+import sqlite3
+import sys
+
+cli_path, db_path = sys.argv[1:]
+assert json.load(open(cli_path, encoding="utf-8"))["model"]["modelId"] == "claude-opus-5-5-medium"
+key = "src.vs.platform.reactivestorage.browser.reactiveStorageServiceImpl.persistentStorage.applicationUser"
+state = json.loads(sqlite3.connect(db_path).execute("select value from ItemTable where key = ?", (key,)).fetchone()[0])
+expected = [{
+    "modelId": "claude-opus-5-5",
+    "parameters": [
+        {"id": "context", "value": "300k"},
+        {"id": "effort", "value": "medium"},
+        {"id": "fast", "value": "false"},
+    ],
+}]
+for feature in ("composer", "background-composer", "plan-execution", "quick-agent"):
+    model_config = state["aiSettings"]["modelConfig"][feature]
+    assert model_config["modelName"] == "claude-opus-5-5", feature
+    assert model_config["selectedModels"] == expected, feature
+assert state["aiSettings"]["modelConfig"]["cmd-k"]["modelName"] == "default"
+PY
+
+  pass_count=0; fail_count=0; fix_count=0; skip_count=0
+  FIX_MODE=false
+  source "$TEST_DOTFILES/modules/cursor/doctor.sh"
+  [ "$fail_count" -eq 0 ]
 }

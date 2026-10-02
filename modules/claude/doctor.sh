@@ -12,7 +12,7 @@ check "claude.model_wrapper" "\$HOME/bin/claude strips ANTHROPIC_MODEL and defau
 
 # ── Claude Code model default ─────────────────────────────────────────
 # Per AGENTS.md § Model Configuration, Claude Code's tier-1 default is
-# "Claude Opus 4.8 High" — model="claude-opus-4-8" + effortLevel="xhigh"
+# "Claude Opus 5.5 Medium" — model="claude-opus-5-5" + effortLevel="medium"
 # in ~/.claude/settings.json. The pin is installed idempotently by
 # .chezmoiscripts/run_after_claude-settings-model.sh on every chezmoi apply.
 # We check via jq if available (the script requires it anyway); fall back
@@ -26,15 +26,15 @@ _claude_model_is_default() {
     e="$(jq -r '.effortLevel // ""' "$settings" 2>/dev/null)"
     p="$(jq -r '.permissions.defaultMode // ""' "$settings" 2>/dev/null)"
     s="$(jq -r '.skipAutoPermissionPrompt // false' "$settings" 2>/dev/null)"
-    [ "$m" = "claude-opus-4-8" ] && [ "$e" = "xhigh" ] && [ "$p" = "bypassPermissions" ] && [ "$s" = "true" ]
+    [ "$m" = "claude-opus-5-5" ] && [ "$e" = "medium" ] && [ "$p" = "bypassPermissions" ] && [ "$s" = "true" ]
   else
-    grep -q '"model"[[:space:]]*:[[:space:]]*"claude-opus-4-8"' "$settings" && \
-      grep -q '"effortLevel"[[:space:]]*:[[:space:]]*"xhigh"' "$settings" && \
+    grep -q '"model"[[:space:]]*:[[:space:]]*"claude-opus-5-5"' "$settings" && \
+      grep -q '"effortLevel"[[:space:]]*:[[:space:]]*"medium"' "$settings" && \
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"bypassPermissions"' "$settings" && \
       grep -q '"skipAutoPermissionPrompt"[[:space:]]*:[[:space:]]*true' "$settings"
   fi
 }
-check "claude.model_default" "Claude Code config pinned to Opus 4.8 and bypassPermissions" \
+check "claude.model_default" "Claude Code config pinned to Opus 5.5 medium and bypassPermissions" \
   "_claude_model_is_default" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-model.sh'"
 

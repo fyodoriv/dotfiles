@@ -25,10 +25,14 @@ hooks:
     matcher: "*"
     command: "~/.config/dotfiles/hooks/session-endpoint-path.sh"
 
-# null keeps each agent's own model. dotfiles owns these defaults
-# (AGENTS.md § Model Configuration); agentbrew must not overwrite them.
+# Default model for agents with a file-managed model setting (AGENTS.md §
+# Model Configuration). Keep equal to the pin in
+# .chezmoiscripts/run_after_claude-settings-model.sh.
+defaultModel: claude-opus-5-5
+defaultEffort: medium
+# null keeps that agent's own model: Codex is OpenAI-only and Devin has its
+# own pin in modules/devin.
 modelOverrides:
-  claude-code: null
   codex: null
   devin: null
 

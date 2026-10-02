@@ -170,16 +170,54 @@ def subset_matches(current, desired):
 
 
 def sync_model_parity():
-    def desired_model_id():
+    def desired_model():
         settings = load_json(claude_settings)
         model = settings.get("model", "")
         effort = settings.get("effortLevel", "")
-        if not model:
-            return ""
         if re.fullmatch(r"claude-opus-\d+-\d+", model):
             effort = "xhigh" if effort in ("", "max") else effort
-            return f"{model}-{effort}"
-        return model
+            return model, effort, f"{model}-{effort}"
+        return model, "", model
+
+    def default_parameter_value(definition, effort):
+        if definition.get("id") == "effort":
+            return effort
+        parameter_type = definition.get("parameterType", {})
+        for kind in ("enumParameter", "booleanParameter"):
+            values = parameter_type.get(kind, {}).get("values") or []
+            if values:
+                return values[0].get("value")
+        return None
+
+    def ide_selection(state, base_model, effort, target):
+        """Model name and selection for IDE features, or None when the catalog has neither shape.
+
+        Older catalogs list the joined slug (claude-opus-4-8-xhigh). Newer
+        catalogs list the base model and take effort as a parameter.
+        """
+        catalog = {
+            item.get("serverModelName") or item.get("name"): item
+            for item in state.get("availableDefaultModels2", [])
+            if isinstance(item, dict)
+        }
+        if not catalog or target in catalog:
+            return target, [selected_model(target)]
+        entry = catalog.get(base_model)
+        if not effort or not isinstance(entry, dict):
+            return None
+        definitions = entry.get("parameterDefinitions") or []
+        effort_definition = next((d for d in definitions if d.get("id") == "effort"), None)
+        effort_values = [
+            v.get("value") for v in effort_definition.get("parameterType", {}).get("enumParameter", {}).get("values", [])
+        ] if effort_definition else []
+        if effort not in effort_values:
+            return None
+        parameters = [
+            {"id": d["id"], "value": default_parameter_value(d, effort)}
+            for d in definitions
+            if d.get("id") and default_parameter_value(d, effort) is not None
+        ]
+        return base_model, [{"modelId": base_model, "parameters": parameters}]
 
     def display_name(model_id):
         match = re.fullmatch(r"claude-opus-(\d+)-(\d+)-(.+)", model_id)
@@ -230,7 +268,7 @@ def sync_model_parity():
         expected = subagent_override_entry(agent_config)
         return all(overrides.get(name) == expected for name in overrides)
 
-    target = desired_model_id()
+    base_model, effort, target = desired_model()
     if not target:
         return True, None
 
@@ -250,17 +288,13 @@ def sync_model_parity():
             row = conn.execute("select value from ItemTable where key = ?", (state_key,)).fetchone()
             if row:
                 state = json.loads(row[0])
-                available = {
-                    item.get("serverModelName") or item.get("name")
-                    for item in state.get("availableDefaultModels2", [])
-                    if isinstance(item, dict)
-                }
-                if not available or target in available:
+                selection = ide_selection(state, base_model, effort, target)
+                if selection:
+                    ide_model, expected_selection = selection
                     model_config = state.get("aiSettings", {}).get("modelConfig", {})
-                    expected_selection = [selected_model(target)]
                     ide_ok = all(
                         isinstance(model_config.get(feature), dict)
-                        and model_config[feature].get("modelName") == target
+                        and model_config[feature].get("modelName") == ide_model
                         and model_config[feature].get("selectedModels") == expected_selection
                         and model_config[feature].get("maxMode") is False
                         for feature in ide_features
@@ -271,7 +305,7 @@ def sync_model_parity():
                         ai_settings["modelDefaultSwitchOnNewChat"] = False
                         for feature in ide_features:
                             current = model_config.setdefault(feature, {})
-                            current["modelName"] = target
+                            current["modelName"] = ide_model
                             current["maxMode"] = False
                             current["selectedModels"] = expected_selection
                         conn.execute(
@@ -281,7 +315,8 @@ def sync_model_parity():
                         conn.commit()
                         ide_ok = True
 
-                    agent_config = editor_agent_model_config(state, target)
+                    if ide_model == target:
+                        agent_config = editor_agent_model_config(state, target)
 
             subagent_row = conn.execute(
                 "select value from ItemTable where key = ?",

@@ -31,7 +31,8 @@ esac
 exit 0
 STUB
   chmod +x "$LAND_TMP/bin/gh"
-  export PATH="$LAND_TMP/bin:$PATH"
+  # The git wrapper under test, not the one from the installed checkout.
+  export PATH="$LAND_TMP/bin:$BATS_TEST_DIRNAME/../bin:$PATH"
   export LAND_ALLOW_NON_TTY=1
   # Agent shells set these; the pushes here go to a local bare repo.
   unset AGENT_PUBLIC_WRITE_GUARD DEVIN_MODEL DEVIN_SESSION_ID CLAUDE_CODE_SSE_PORT CLAUDECODE CURSOR_AGENT WINDSURF_AGENT CODEX_AGENT
@@ -51,6 +52,7 @@ teardown() {
 @test "land refuses inside an agent shell even with the terminal override" {
   run env LAND_ALLOW_NON_TTY=1 CURSOR_AGENT=1 bash "$SCRIPT" .
   [ "$status" -eq 3 ]
+  [[ "$output" == *"CURSOR_AGENT is set"* ]]
 }
 
 @test "land --lease accepts only one checkout" {
@@ -65,6 +67,13 @@ teardown() {
   [ "$status" -eq 0 ]
   [ "$(git -C "$LAND_TMP/remote.git" rev-parse feat/thing)" = "$(git -C "$LAND_TMP/work" rev-parse HEAD)" ]
   grep -q 'pr create -R owner/repo --head feat/thing --base main --fill' "$GH_LOG"
+}
+
+@test "land runs in an operator shell that exports DEVIN_MODEL" {
+  setup_land_repo
+  run env DEVIN_MODEL=gpt-5-5-xhigh-priority bash "$SCRIPT" "$LAND_TMP/work"
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$LAND_TMP/remote.git" rev-parse feat/thing)" = "$(git -C "$LAND_TMP/work" rev-parse HEAD)" ]
 }
 
 @test "land --dry-run pushes nothing and opens no PR" {

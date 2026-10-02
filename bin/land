@@ -34,14 +34,24 @@ fi
 # The managed push guard inspects agent commands for `git push`. This wrapper
 # would hide that, so it only runs from a human terminal. The marker list
 # matches _git_wrapper_is_agent_context in bin/git.
-is_agent_context() {
-  [ -n "${AGENT_PUBLIC_WRITE_GUARD:-}" ] || [ -n "${DEVIN_MODEL:-}" ] ||
-    [ -n "${DEVIN_SESSION_ID:-}" ] || [ -n "${CLAUDE_CODE_SSE_PORT:-}" ] ||
-    [ -n "${CLAUDECODE:-}" ] || [ -n "${CURSOR_AGENT:-}" ] ||
-    [ -n "${WINDSURF_AGENT:-}" ] || [ -n "${CODEX_AGENT:-}" ]
+agent_marker() {
+  # DEVIN_MODEL is a model setting exported in operator shells, not a session marker.
+  local var
+  for var in AGENT_PUBLIC_WRITE_GUARD DEVIN_SESSION_ID CLAUDE_CODE_SSE_PORT CLAUDECODE \
+    CURSOR_AGENT WINDSURF_AGENT CODEX_AGENT; do
+    if [ -n "${!var:-}" ]; then
+      printf '%s\n' "$var"
+      return 0
+    fi
+  done
+  return 1
 }
-if is_agent_context || { [ ! -t 0 ] && [ "${LAND_ALLOW_NON_TTY:-0}" != "1" ]; }; then
-  echo "✗ land is human-only: run it in your own terminal (agents must hand it to the operator)" >&2
+if marker="$(agent_marker)"; then
+  echo "✗ land is human-only: $marker is set, so this looks like an agent shell (agents must hand land to the operator)" >&2
+  exit 3
+fi
+if [ ! -t 0 ] && [ "${LAND_ALLOW_NON_TTY:-0}" != "1" ]; then
+  echo "✗ land is human-only: stdin is not a terminal; run it in your own terminal" >&2
   exit 3
 fi
 

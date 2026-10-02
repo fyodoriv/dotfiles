@@ -16,10 +16,8 @@ authoring. For plans spanning a docs hub, hosts, repositories, Jira, or shared
 state, also read `task-command-center` →
 `references/implementation-plan-template.md`.
 
-Those skills define the required plan shape — goal and rationale first,
-material alternatives compared, source-backed facts separated from proposals, a
-numbered task series, and the versioned `HostBootstrapPayload` contract for a
-host integration. Follow them rather than restating the shape here.
+Follow those skills for the plan shape, including the versioned
+`HostBootstrapPayload` contract for a host integration.
 
 This applies only to a planning request. It does not add a planning stop before
 an explicitly requested implementation or delivery.
@@ -115,15 +113,9 @@ BRANCH="$(git -C "$REPO" branch --show-current)"
 /bin/bash -lc "cd \"$REPO\" && GIT_TERMINAL_PROMPT=0 git push -u origin HEAD:${BRANCH}"
 ```
 
-Use the same explicit `cd "$REPO"` and enterprise `GH_HOST` context for `gh pr create` or `gh pr merge`. If it still denies, do not evade it.
+Use the same `cd "$REPO"` and enterprise `GH_HOST` for `gh pr create`/`merge`. If it still denies, do not evade it.
 
-Agents cannot push to `github.com` (dotfiles, agentbrew), and those clones set `remote.origin.pushurl` to `DISABLED`. Give the operator one `land` command for every pending checkout; it pushes to the explicit GitHub URL and opens each PR:
-
-```bash
-~/apps/tooling/dotfiles/bin/land /absolute/path/to/checkout-a /absolute/path/to/checkout-b
-```
-
-Never run `land` yourself; it refuses agent shells. After the operator runs it, refresh PR bodies, watch CI, and merge with `GH_HOST=github.com gh pr … -R <owner>/<repo>` yourself — those are not blocked.
+Agents cannot push to `github.com`. Hand the operator one `land` command for every pending checkout, as the last line of the message. Then refresh PR bodies, watch CI, and merge with `GH_HOST=github.com gh pr …` yourself. Details: `docs/ship-it-reference.md` § Push delivery.
 
 ## Memory sync (every delivery, all repos)
 

@@ -36,6 +36,10 @@ check "resilience.wakeup_hook_exists" '$HOME/.wakeup hook fires network-watchdog
   "[ -f \"\$HOME/.wakeup\" ] && grep -q 'network-watchdog' \"\$HOME/.wakeup\"" \
   "echo 'Re-apply dotfiles to restore: dotfiles apply'"
 
+check "resilience.network_watchdog_exec" "network-watchdog is executable" \
+  "[ -x '$DOTFILES_DIR/bin/network-watchdog' ]" \
+  "chmod +x '$DOTFILES_DIR/bin/network-watchdog'"
+
 # ── network-resilience LaunchAgent ────────────────────────────────────
 # Stale-path detection: the agent was firing exit-127 errors after the
 # repo moved from ~/apps/dotfiles to ~/apps/tooling/dotfiles. The fix

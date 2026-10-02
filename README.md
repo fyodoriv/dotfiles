@@ -143,12 +143,12 @@ feature-specific gates.
 | chrome | full | Chrome default profile, work profile detection, ChromeWork URL router |
 | claude | full | Claude config, MCP servers, GitHub Enterprise integration |
 | cursor | full | Cursor settings, keybindings, extensions |
-| devin | full | Devin CLI config |
+| devin | full | Devin CLI config — deprecated and frozen; doctor skips it ([AGENTS.md § Deprecated agents](AGENTS.md#deprecated-agents--frozen)) |
 | editor | full | editorconfig, global editor settings |
 | enterprise | full | AWS CLI, kubectl, Gradle, Java, enterprise SSH |
 | extras | full | Fastfetch config, misc tools |
 | jetbrains | full | IdeaVim config |
-| windsurf | full | Windsurf settings + keybindings + extensions, inherited from WebStorm |
+| windsurf | full | Windsurf settings + keybindings + extensions, inherited from WebStorm — deprecated and frozen; doctor skips it |
 | local-llm | full | Local-LLM stack detection (pipx, aider, huggingface-cli, mlx-lm) for Minsky's claude-exhaustion fallback |
 | memory | full | Shared MCP daemon, maintenance job, schema/embedding health, and backup freshness/integrity |
 | prompt | full | Starship config symlink and theme |

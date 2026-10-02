@@ -221,18 +221,6 @@ remote without explicit operator approval in the current session. -->
   - **Measurement**: `stat -f %Lp ~/.agent-browser; chezmoi status ~/.agent-browser`
   - **Anchor**: chezmoi reference, "Source state attributes" (`private_` sets 0700 on directories); Saltzer & Schroeder, "The Protection of Information in Computer Systems", 1975 (least privilege).
 
-- [ ] Deprecate Windsurf and Augment; focus on Claude Code, WebStorm and Cursor
-  - **ID**: deprecate-windsurf-augment-agents
-  - **Tags**: agentfile, agents, deprecation, windsurf, augment, cleanup
-  - **Details**: Owner decision 2026-09-28: Windsurf and Augment are deprecated. The focus tools are Claude Code (also in the WebStorm terminal), WebStorm and Cursor; a machine can still opt out of Cursor with `use_cursor: false`. Today dotfiles still lets agentbrew detect and sync windsurf, because the merged global Agentfile excludes only `cursor` (through `config/agentfile-no-cursor.yaml`). It also runs `modules/windsurf/doctor.sh` (2 doctor failures on a Mac without Windsurf) and links `windsurf/` settings and keybindings into `~/Library/Application Support/Windsurf/User`. On 2026-09-28, removing `~/.codeium/windsurf` by hand did not stick: the next `agentbrew sync --pull` recreated it. Steps: (1) exclude `windsurf` and `augment` on every machine: add them to `excludeAgents` in the base `Agentfile.yaml`, or add an always-merged `config/agentfile-deprecated-agents.yaml` in `.chezmoiscripts/run_after_agentbrew-sync.sh`; (2) retire `modules/windsurf` and the `windsurf/` settings, and remove the links they created; (3) state the focus tools in README; (4) once agentbrew cleans up excluded agents (agentbrew task `agents-deprecated-flag-and-exclude-cleanup`), confirm `~/.codeium/windsurf` is gone after apply.
-  - **Files**: Agentfile.yaml or config/agentfile-deprecated-agents.yaml, .chezmoiscripts/run_after_agentbrew-sync.sh, modules/windsurf/, windsurf/, README.md, tests/
-  - **Acceptance**: (1) the merged `~/.config/agentbrew/Agentfile.yaml` excludes `windsurf` and `augment` on every machine; (2) doctor runs no windsurf checks; (3) no dotfiles link points into `~/Library/Application Support/Windsurf`; (4) bats covers the merged exclusion.
-  - **Hypothesis**: Windsurf still gets synced config and doctor noise only because dotfiles never excludes it. Excluding it takes detected deprecated agents from 1 (windsurf) to 0 and windsurf doctor failures from 2 to 0.
-  - **Success**: The Measurement lists `windsurf` and `augment` under `excludeAgents`, and the detected-agent line does not name windsurf.
-  - **Pivot**: If some machine still needs Windsurf, move the exclusion to a per-machine chezmoi flag (like `use_cursor`) instead of the base Agentfile.
-  - **Measurement**: `yq '.excludeAgents' ~/.config/agentbrew/Agentfile.yaml; agentbrew status --verbose 2>&1 | grep -i -c windsurf`
-  - **Anchor**: Fowler, "ParallelChange", martinfowler.com, 2014 (deprecate, migrate, then remove in separate steps).
-
 - [ ] Cut doctor failures on a converged personal Mac from 43 to the ones that need action
   - **ID**: doctor-converged-mac-failure-triage
   - **Tags**: scout, doctor, noise, triage

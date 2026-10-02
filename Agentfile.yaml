@@ -218,3 +218,4 @@ rules: |
   Approved-family /ship-it delivery and org-overlay IRON LAW: see shared-rules.md sections "Git and delivery" and "Org-overlay routing" (full text in ship-it command + templates/AGENTS.md).
   Broad sibling delivery remains limited to approved repo families.
   Within those families, never bypass-merge someone else's PR.
+  Windsurf, Devin, and Augment (Auggie) are deprecated and frozen in all tooling repos: keep their existing support, but never implement fixes or features for them, never file tasks for them, and ignore their failing checks.

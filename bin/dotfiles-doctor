@@ -661,6 +661,18 @@ run_module_doctor() {
   local doctor_file="$module_dir/doctor.sh"
   [ ! -f "$doctor_file" ] && return
 
+  # Windsurf, Devin, and Augment are deprecated and frozen (AGENTS.md §
+  # Deprecated agents): their checks stay in the tree but never ask for fixes.
+  case "$module_name" in
+    windsurf|devin|augment)
+      if [ "${DOTFILES_DEPRECATED_AGENT_CHECKS:-0}" != "1" ]; then
+        skip_count=$((skip_count + 1))
+        $QUIET_MODE || echo "  ⊘ $module_name skipped: deprecated agent, frozen (no fixes)"
+        return
+      fi
+      ;;
+  esac
+
   # agentbrew and the resilience architecture check execute fnm Node. Current
   # enterprise policy blocks the Node.js Foundation TeamIdentifier regardless
   # of its user-directory path, producing one policy dialog per spawn. Keep those

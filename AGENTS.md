@@ -6,13 +6,22 @@ macOS developer dotfiles with self-healing health checks. Chezmoi-based, shell s
 
 ## Main use cases — first-class AI coding agents
 
-This dotfiles repo + agentbrew + minsky together support five **primary AI coding agents** as equal first-class citizens: **Claude Code, Cursor, Windsurf, Devin, Codex**. Every agent-config surface (skills, MCP, rules, commands, agents, hooks, instructions) syncs to all five automatically every 30 minutes via the auto-repair launchagent. Cursor is **not** an afterthought — it gets the same `~/.cursor/rules/`, `~/.cursor/skills/`, `~/.cursor/commands/`, `~/.cursor/agents/`, `~/.cursor/mcp.json`, `~/.cursor/hooks.json`, and `~/.cursor/CLAUDE.md` treatment as Claude Code does. Long-tail agents (OpenCode, Kiro, Amp, Goose, Cline, Roo Code, Gemini CLI, GitHub Copilot, …) are best-effort: they get every category their underlying API supports, but new first-party features ship for the five primary agents first.
+This dotfiles repo + agentbrew + minsky together support three **primary AI coding agents** as equal first-class citizens: **Claude Code, Cursor, Codex**. Every agent-config surface (skills, MCP, rules, commands, agents, hooks, instructions) syncs to all three automatically every 30 minutes via the auto-repair launchagent. Cursor is **not** an afterthought — it gets the same `~/.cursor/rules/`, `~/.cursor/skills/`, `~/.cursor/commands/`, `~/.cursor/agents/`, `~/.cursor/mcp.json`, `~/.cursor/hooks.json`, and `~/.cursor/CLAUDE.md` treatment as Claude Code does. Long-tail agents (OpenCode, Kiro, Amp, Goose, Cline, Roo Code, Gemini CLI, GitHub Copilot, …) are best-effort: they get every category their underlying API supports, but new first-party features ship for the three primary agents first.
+
+### Deprecated agents — frozen
+
+Owner decision 2026-10-02: **Windsurf, Devin, and Augment (Auggie) are deprecated and frozen** in every tooling repo (dotfiles, agentbrew, minsky, tasks.md, dev-skills, and the org overlays).
+
+- Existing support stays. Do not delete their modules, configs, sync targets, or tests.
+- Never implement a fix or a feature for them. Do not file tasks for them, and do not fix their failing checks.
+- Doctor reports the `windsurf` and `devin` modules as skipped ("deprecated agent, frozen"). Set `DOTFILES_DEPRECATED_AGENT_CHECKS=1` to run them once for diagnosis.
+- If work for a supported agent breaks a frozen agent's existing test, skip that test with a note naming this section. Do not fix the agent.
 
 Concrete invariants enforced by tests:
 - `~/.cursor/rules/*.mdc` ↔ canonical shared rules — see `agentbrew/src/sync/rules-sync.ts` and the per-agent matrix.
 - Cursor's `mcp.json` carries the same MCP servers Claude Code's `~/.claude.json` does.
 - The same skill catalog mounts under both `~/.claude/skills/` and `~/.cursor/skills/`.
-- A new dotfiles feature that touches agent config but only works for Claude Code is a P0 regression. File a follow-up before merge.
+- A new dotfiles feature that touches agent config but only works for Claude Code is a P0 regression. File a follow-up before merge. Deprecated agents (below) are exempt.
 
 ## agent-browser attach-first policy
 

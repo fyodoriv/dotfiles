@@ -147,7 +147,8 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `gui-path` | At load | all | Ensure GUI apps inherit shell PATH |
 | `network-resilience` | Periodic | all | Monitor and recover network connectivity |
 | `atuin-daemon` | At load | all | Background shell history daemon (if atuin installed) |
-| `rancher-desktop` | At load | all | Rancher Desktop integration (if app installed) |
+| `rancher-desktop` | At load | all | Rancher Desktop integration (if app installed); turns Kubernetes off unless `DOTFILES_RANCHER_KUBERNETES=1` |
+| `pmset-drift-watch` | On power-plist write + every 5 min | all | Read-only log of power-settings changes and the processes alive at that moment |
 | `morning` | Configurable (default 8:30 AM) | full | Morning briefing |
 | `sleepwatcher` | At load | full | Run scripts on sleep/wake events |
 | `cursor-priority` | At load | full | Set process priority for Cursor/Windsurf IDE |

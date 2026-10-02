@@ -127,7 +127,7 @@ _setup_cursor_installed() {
 
 _setup_cursor_model_state() {
   mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/.cursor" "$(dirname "$CURSOR_STATE_DB")"
-  printf '{"model":"claude-opus-4-8","effortLevel":"xhigh"}\n' > "$TEST_HOME/.claude/settings.json"
+  printf '{"model":"claude-opus-5-5","effortLevel":"medium"}\n' > "$TEST_HOME/.claude/settings.json"
   cat > "$TEST_HOME/.cursor/cli-config.json" <<'JSON'
 {
   "version": 1,
@@ -153,7 +153,7 @@ import sys
 db = sys.argv[1]
 key = "src.vs.platform.reactivestorage.browser.reactiveStorageServiceImpl.persistentStorage.applicationUser"
 state = {
-    "availableDefaultModels2": [{"serverModelName": "claude-opus-4-8-xhigh"}],
+    "availableDefaultModels2": [{"serverModelName": "claude-opus-5-5-medium"}],
     "aiSettings": {
         "modelConfig": {
             "composer": {"modelName": "default", "maxMode": False, "selectedModels": None},
@@ -319,7 +319,7 @@ import sqlite3
 import sys
 
 cli_path, db_path = sys.argv[1:]
-target = "claude-opus-4-8-xhigh"
+target = "claude-opus-5-5-medium"
 selection = [{"modelId": target, "parameters": []}]
 features = (
     "composer",
@@ -334,6 +334,7 @@ features = (
 cli = json.load(open(cli_path, encoding="utf-8"))
 assert cli["model"]["modelId"] == target
 assert cli["model"]["displayModelId"] == target
+assert cli["model"]["displayName"] == "Claude Opus 5.5 Medium"
 assert cli["hasChangedDefaultModel"] is True
 assert cli["authInfo"]["email"] == "user@example.com"
 

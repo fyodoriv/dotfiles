@@ -55,7 +55,7 @@ teardown() {
 @test "claude: wrapper check passes when ~/bin/claude strips ANTHROPIC_MODEL" {
   mkdir -p "$TEST_HOME/bin" "$TEST_HOME/.claude" "$TEST_HOME/.local/bin"
   touch "$TEST_HOME/.local/bin/claude"
-  echo '{"model":"claude-opus-4-8","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"medium","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
   cat > "$TEST_HOME/bin/claude" <<'WRAPPER'
 #!/bin/bash
 unset ANTHROPIC_MODEL

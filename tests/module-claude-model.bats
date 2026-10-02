@@ -73,32 +73,32 @@ teardown() {
 }
 
 @test "claude.model_default passes when settings.json has the correct pin" {
-  echo '{"model":"claude-opus-4-8","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"medium","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -eq 0 ]
   [ "$pass_count" -ge 2 ]  # both wrapper and model_default
 }
 
 @test "claude.model_default fails when settings.json has the wrong model" {
-  echo '{"model":"claude-sonnet-4-6","effortLevel":"xhigh"}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-sonnet-4-6","effortLevel":"medium"}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -ge 1 ]
 }
 
 @test "claude.model_default fails when settings.json has the wrong effortLevel" {
-  echo '{"model":"claude-opus-4-8","effortLevel":"medium"}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh"}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -ge 1 ]
 }
 
 @test "claude.model_default fails when settings.json has the wrong permission mode" {
-  echo '{"model":"claude-opus-4-8","effortLevel":"xhigh","permissions":{"defaultMode":"default"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"medium","permissions":{"defaultMode":"default"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -ge 1 ]
 }
 
 @test "claude.model_default fails when settings.json is missing the model key" {
-  echo '{"effortLevel":"xhigh","other":"stuff"}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"effortLevel":"medium","other":"stuff"}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -ge 1 ]
 }
@@ -110,7 +110,7 @@ teardown() {
 }
 
 @test "claude.model_default fix mode pins the model, effortLevel, and permission mode idempotently" {
-  echo '{"model":"haiku","effortLevel":"medium","hooks":{"PostToolUse":[{"matcher":"x"}]}}' \
+  echo '{"model":"haiku","effortLevel":"low","hooks":{"PostToolUse":[{"matcher":"x"}]}}' \
     > "$TEST_HOME/.claude/settings.json"
   FIX_MODE=true
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
@@ -118,14 +118,14 @@ teardown() {
   # Existing keys preserved (the hooks block must survive the jq merge)
   grep -q '"hooks"' "$TEST_HOME/.claude/settings.json"
   # New pin landed
-  grep -q '"model"[[:space:]]*:[[:space:]]*"claude-opus-4-8"' "$TEST_HOME/.claude/settings.json"
-  grep -q '"effortLevel"[[:space:]]*:[[:space:]]*"xhigh"' "$TEST_HOME/.claude/settings.json"
+  grep -q '"model"[[:space:]]*:[[:space:]]*"claude-opus-5-5"' "$TEST_HOME/.claude/settings.json"
+  grep -q '"effortLevel"[[:space:]]*:[[:space:]]*"medium"' "$TEST_HOME/.claude/settings.json"
   grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"bypassPermissions"' "$TEST_HOME/.claude/settings.json"
   grep -q '"skipAutoPermissionPrompt"[[:space:]]*:[[:space:]]*true' "$TEST_HOME/.claude/settings.json"
 }
 
 @test "claude.model_default fix is idempotent on repeat runs" {
-  echo '{"model":"haiku","effortLevel":"medium"}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"haiku","effortLevel":"low"}' > "$TEST_HOME/.claude/settings.json"
   FIX_MODE=true
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   local first_mtime

@@ -2,9 +2,13 @@
 # Pin Claude Code's default model and permission mode in ~/.claude/settings.json.
 #
 # Per AGENTS.md § Model Configuration, Claude Code's tier-1 default is
-# "Claude Opus 4.8 High" — which Claude Code expresses as:
-#   - model:       "claude-opus-4-8"   (rejects -max suffix)
-#   - effortLevel: "xhigh"             (highest persistable; -max is in-session only)
+# "Claude Opus 5.5 Medium" — which Claude Code expresses as:
+#   - model:       "claude-opus-5-5"   (rejects effort suffixes such as -max)
+#   - effortLevel: "medium"            (persistable: low/medium/high/xhigh; max is in-session only)
+#
+# Keep these values equal to defaultModel/defaultEffort in Agentfile.yaml.
+# agentbrew writes the same keys; this pin covers machines where agentbrew
+# cannot run (tests/claude-model-agentfile-consistency.bats).
 #
 # ~/.claude/settings.json is owned by Claude Code itself — it writes hooks,
 # MCPs, plugins, etc. into the same file. We use `jq` to merge in just the
@@ -25,8 +29,8 @@ fi
 unset _script_dir
 
 SETTINGS="$HOME/.claude/settings.json"
-DESIRED_MODEL="claude-opus-4-8"
-DESIRED_EFFORT="xhigh"
+DESIRED_MODEL="claude-opus-5-5"
+DESIRED_EFFORT="medium"
 DESIRED_PERMISSION_MODE="bypassPermissions"
 
 # Skip if Claude Code isn't installed (no ~/.local/bin/claude binary).

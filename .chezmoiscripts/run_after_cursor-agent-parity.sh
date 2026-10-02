@@ -58,6 +58,7 @@ fi
 "$_dotfiles_bin/python3" - "$MODE" <<'PY'
 import json
 import os
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -175,15 +176,16 @@ def sync_model_parity():
         effort = settings.get("effortLevel", "")
         if not model:
             return ""
-        if model == "claude-opus-4-8":
+        if re.fullmatch(r"claude-opus-\d+-\d+", model):
             effort = "xhigh" if effort in ("", "max") else effort
             return f"{model}-{effort}"
         return model
 
     def display_name(model_id):
-        if model_id.startswith("claude-opus-4-8-"):
-            effort = model_id.removeprefix("claude-opus-4-8-").replace("-", " ").title()
-            return f"Claude Opus 4.8 {effort}"
+        match = re.fullmatch(r"claude-opus-(\d+)-(\d+)-(.+)", model_id)
+        if match:
+            major, minor, effort = match.groups()
+            return f"Claude Opus {major}.{minor} {effort.replace('-', ' ').title()}"
         return model_id
 
     def selected_model(model_id):

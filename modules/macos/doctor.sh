@@ -95,7 +95,7 @@ check "macos.pmset_battery_disk_sleep_15" "Battery disk sleep = 15 min" \
 check "macos.pmset_ac_sleep_1" "AC system sleep = 1 min when no agent is running" \
   "! command -v pmset >/dev/null || pmset_custom_value_is 'AC Power' sleep 1" \
   "sudo -n pmset -c sleep 1"
-check "macos.pmset_ac_disk_sleep_10" "AC disk sleep = 10 min when no agent is running" \
+check "macos.pmset_ac_disk_sleep_10" "AC disk sleep = 10 min when no agent is running (who reset it: ~/.local/share/dotfiles/logs/pmset-drift.log)" \
   "! command -v pmset >/dev/null || pmset_custom_value_is 'AC Power' disksleep 10" \
   "sudo -n pmset -c disksleep 10"
 

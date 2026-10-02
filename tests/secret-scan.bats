@@ -123,3 +123,45 @@ PRIVATE_KEY_PATH="$HOME/.ssh/id_ed25519"'
   [ "$status" -eq 0 ]
   [ "$output" = "" ]
 }
+
+# ── Agent-config backup bearer scan ──
+
+fake_bearer() {
+  printf 'Bearer %s' "$(printf 'x%.0s' $(seq 1 32))"
+}
+
+@test "agent-config scan flags a plaintext bearer in a ~/.claude.json backup" {
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME/.config/agentbrew/backups/manual"
+  printf '{"args":["--header","Authorization: %s"]}\n' "$(fake_bearer)" > "$HOME/.claude.json.backup"
+  printf '{"args":["Authorization: Bearer ${SPLUNK_TOKEN}"]}\n' > "$HOME/.config/agentbrew/backups/manual/claude.json.1.bak"
+  printf '{"args":["--header","Authorization: %s"]}\n' "$(fake_bearer)" > "$HOME/.claude.json"
+  source "$LIB"
+
+  run dotfiles_agent_config_bearer_leaks
+  [ "$status" -eq 0 ]
+  [ "$output" = "$HOME/.claude.json.backup" ]
+}
+
+@test "agent-config repair redacts bearer tokens and keeps JSON valid" {
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME/.config/agentbrew/backups/manual"
+  printf '{"args":["--header","Authorization: %s"]}\n' "$(fake_bearer)" > "$HOME/.config/agentbrew/backups/manual/claude.json.2.bak"
+  source "$LIB"
+
+  dotfiles_redact_agent_config_bearer_leaks
+  run dotfiles_agent_config_bearer_leaks
+  [ -z "$output" ]
+  grep -q 'Authorization: Bearer REDACTED' "$HOME/.config/agentbrew/backups/manual/claude.json.2.bak"
+  plutil -convert xml1 -o /dev/null "$HOME/.config/agentbrew/backups/manual/claude.json.2.bak"
+}
+
+@test "agent-config scan ignores already-redacted bearer markers" {
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME"
+  printf '{"args":["Authorization: Bearer REDACTED-ROTATE-IN-SPLUNK"]}\n' > "$HOME/.claude.json.backup"
+  source "$LIB"
+
+  run dotfiles_agent_config_bearer_leaks
+  [ -z "$output" ]
+}

@@ -677,6 +677,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 |-------|-------------|
 | `com.dotfiles.atuin-daemon` | Shell history sync daemon |
 | `com.dotfiles.sleepwatcher` | Run scripts on sleep/wake events |
+| `com.dotfiles.pmset-drift-watch` | Read-only: log each power-settings change with the processes alive at that moment (`logs/pmset-drift.log`) |
 
 **Login-time (run once at login)**
 
@@ -685,7 +686,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 | `com.dotfiles.capslock-control` | Remap CapsLock to Control |
 | `com.dotfiles.gui-path` | Export PATH to GUI session environment |
 | `com.dotfiles.cursor-at-login` | Launch Cursor in background (`open -g -a Cursor`, no focus steal) |
-| `com.dotfiles.rancher-desktop` | Start Rancher Desktop + wait for Docker socket |
+| `com.dotfiles.rancher-desktop` | Start Rancher Desktop, keep Kubernetes off, wait until the Docker API answers (one restart if it does not) |
 
 **Browser automation (started at login, not kept alive — attach via CDP)**
 
@@ -923,7 +924,8 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
-| `rancher-desktop` | Start Rancher Desktop and wait for Docker socket | At login |
+| `rancher-desktop` | Start Rancher Desktop and wait until the Docker API answers | At login |
+| `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
 
 **Git workflow**
 

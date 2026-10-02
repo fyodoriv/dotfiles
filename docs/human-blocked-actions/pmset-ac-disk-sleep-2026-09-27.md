@@ -1,6 +1,6 @@
 # Human-blocked action: set the AC disk-sleep timer
 
-- **Status**: resolved
+- **Status**: reopened 2026-10-02 (setting reset by an outside writer)
 - **Filed**: 2026-09-27
 - **Agent**: GPT-5.6 Terra
 **TASKS.md entry**: the merged sleep-protection work
@@ -93,3 +93,36 @@ reports `disksleep 10`. `dotfiles doctor --module macos --quiet` exited 0
 with only expected skips, and the resilience module exited 0 with one expected
 skip. The live manager continues to protect the tracked Cursor process with
 `PreventSystemSleep` and `PreventDiskIdle`.
+
+## Recurrence (2026-10-02)
+
+The setting drifted back. Both power profiles now match one template that
+dotfiles never writes: `sleep 1`, `displaysleep 60`, `disksleep 0`,
+`powermode 0`, and battery `powernap 1`. So a second one-time `sudo pmset`
+would drift again.
+
+**Evidence gathered without admin rights:**
+
+- `/Library/Preferences/com.apple.PowerManagement.plist` was last written at
+  2026-10-02 06:40:00, the same second the Mac switched to battery
+  (`pmset -g log`). No other readable file changed in that window.
+- No dotfiles, agentbrew, or Minsky code, shell history, sleep/wake hook,
+  EON (`EONRootHelper` only schedules reboots), Workspace ONE script, sensor,
+  or hub log sets these values.
+- The MDM `com.apple.MCX` payload sets `SleepDisabled` and
+  `DestroyFVKeyOnStandby`, the same keys stored in that plist. So MDM does
+  write power preferences on this Mac. No Energy Saver timer payload is
+  visible to a standard user.
+- The account is not an admin (elevation goes through CyberArk EPM), so
+  `log show` and `profiles show` are not readable.
+
+**Next step:** `com.dotfiles.pmset-drift-watch` now logs every change to
+`~/.local/share/dotfiles/logs/pmset-drift.log` with the diff, the power source,
+and the processes alive at that moment. The next reset names its writer. Then
+either fix the dotfiles-side cause, or ask the device-management team to drop
+or change the energy policy. Do not add a privileged enforcer that fights MDM.
+
+**Resolution:** `.overrides` now skips `macos.pmset_ac_disk_sleep_10`, the same
+way it already skips the display-sleep and battery checks that this template
+also resets. On an SSD-only Mac, disk sleep has almost no effect. The drift
+watcher stays installed, so the next reset still names its writer.

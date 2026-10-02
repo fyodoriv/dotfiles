@@ -931,6 +931,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 |--------|-------------|
 | `git-safe` | Guard destructive git commands in multi-agent repos |
 | `hotfix` | Branch from main, stash current work, prep a quick hotfix |
+| `land` | Human-only: push feature branches of github.com checkouts whose push URL is `DISABLED`, and open their PRs |
 | `pr` | Commit tracked/staged changes, push, and open a draft GitHub PR |
 | `review` | Checkout a PR, show diff, optionally run tests |
 

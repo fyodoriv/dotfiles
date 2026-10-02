@@ -37,7 +37,6 @@ fi
 
 _git_wrapper_is_agent_context() {
   [ -n "${AGENT_PUBLIC_WRITE_GUARD:-}" ] ||
-    [ -n "${DEVIN_MODEL:-}" ] ||
     [ -n "${DEVIN_SESSION_ID:-}" ] ||
     [ -n "${CLAUDE_CODE_SSE_PORT:-}" ] ||
     [ -n "${CURSOR_AGENT:-}" ] ||

@@ -115,7 +115,15 @@ BRANCH="$(git -C "$REPO" branch --show-current)"
 /bin/bash -lc "cd \"$REPO\" && GIT_TERMINAL_PROMPT=0 git push -u origin HEAD:${BRANCH}"
 ```
 
-Use the same explicit `cd "$REPO"` and enterprise `GH_HOST` context for `gh pr create` or `gh pr merge`. If it still denies, do not evade it: give the operator one command per repo that pushes, opens the PR, watches checks, and merges.
+Use the same explicit `cd "$REPO"` and enterprise `GH_HOST` context for `gh pr create` or `gh pr merge`. If it still denies, do not evade it.
+
+Agents cannot push to `github.com` (dotfiles, agentbrew), and those clones set `remote.origin.pushurl` to `DISABLED`. Give the operator one `land` command for every pending checkout; it pushes to the explicit GitHub URL and opens each PR:
+
+```bash
+~/apps/tooling/dotfiles/bin/land /absolute/path/to/checkout-a /absolute/path/to/checkout-b
+```
+
+Never run `land` yourself; it refuses agent shells. After the operator runs it, refresh PR bodies, watch CI, and merge with `GH_HOST=github.com gh pr … -R <owner>/<repo>` yourself — those are not blocked.
 
 ## Memory sync (every delivery, all repos)
 

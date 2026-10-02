@@ -45,6 +45,13 @@ if [ ! -f "$HOOKS_JSON" ]; then
   exit 0
 fi
 
+# Managed endpoint tooling can take ownership of hooks.json (for example as root).
+# Its commands are then not ours to rewrite, and a failed write must not abort apply.
+if [ ! -w "$HOOKS_JSON" ]; then
+  echo "○ ~/.cursor/hooks.json is not writable (owner: $(stat -f %Su "$HOOKS_JSON" 2>/dev/null || echo unknown)) — managed by endpoint tooling; skipping endpoint wrap" >&2
+  exit 0
+fi
+
 if [ ! -x "$WRAPPER" ]; then
   echo "⚠ Missing $WRAPPER — run run_after_cursor-agent-hooks.sh first" >&2
   exit 0

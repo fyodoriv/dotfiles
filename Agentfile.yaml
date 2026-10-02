@@ -198,6 +198,10 @@ rules: |
   Keep TASKS.md in tasks.md format and remove completed task blocks entirely.
   Agentfile.yaml is the source; generated agent config is owned by agentbrew.
   No completion claims without fresh verification evidence.
+  End every message with one last line that says exactly what you need from me,
+  as a one-liner: "**Needed from you:** <action or exact command>". If you need
+  nothing, write "**Needed from you:** nothing". Never put the request only
+  mid-message.
   At session start, when the memory MCP is available, call get_bootstrap_profile with this agent's ID and current task_summary, then search ranked memory and mistake notes before consequential decisions.
   Before answering questions about local repositories, architecture, configuration, operations, or domain workflows, automatically search memory with the task and relevant repo/topic tags. Prefer current-revision repo-procedure and pattern memories over generic repo-docs dossiers; if grounded memory is missing or stale, read the current source docs, answer from them, and store the reusable correction with source paths and revision.
   Before the final response after substantive work, call commit_session_legacy once; encode decisions as {what, why}, errors as {error, tool, resolution}, and user corrections as {original, corrected_to}.

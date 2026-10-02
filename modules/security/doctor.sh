@@ -1343,5 +1343,12 @@ check "security.git_ssh_hung_upload_pack" \
   "[ \"\$(dotfiles_heal_count_hung_git_sessions)\" -eq 0 ]" \
   "'$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents' --fix --quiet"
 
+# ── Plaintext bearer tokens in agent-config backups ──────────────
+# A redacted copy does not revoke the token: rotate it at its issuer too.
+check "security.agent_config_backup_bearer" \
+  "No plaintext bearer tokens in ~/.claude.json backups (after repair, rotate the token at its issuer)" \
+  "[ -z \"\$(dotfiles_agent_config_bearer_leaks)\" ]" \
+  "dotfiles_redact_agent_config_bearer_leaks"
+
 DOTFILES_DIR="$DOTFILES_MODULE_DIR"
 unset DOTFILES_MODULE_DIR

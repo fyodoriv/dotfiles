@@ -3,6 +3,33 @@
 
 DOTFILES_SECRET_PATTERNS="(API_KEY|SECRET_KEY|PRIVATE_KEY|ACCESS_TOKEN|AUTH_TOKEN|PASSWORD|CLIENT_SECRET)=['\"]?[A-Za-z0-9+/=_-]{8,}"
 
+DOTFILES_BEARER_PATTERN='Bearer [A-Za-z0-9._~+/=-]{20,}'
+
+# Backups and crash leftovers of ~/.claude.json keep whatever the live file
+# once held, including hand-added literal tokens. The live file is excluded:
+# agentbrew owns it and warns about hardcoded secrets on every sync.
+dotfiles_agent_config_backups() {
+  local f
+  for f in "$HOME"/.claude.json.* "$HOME"/.config/agentbrew/backups/*/claude.json*; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+
+dotfiles_agent_config_bearer_leaks() {
+  local f
+  while IFS= read -r f; do
+    grep -Eo "$DOTFILES_BEARER_PATTERN" "$f" 2>/dev/null | grep -vq '^Bearer REDACTED' && printf '%s\n' "$f"
+  done < <(dotfiles_agent_config_backups)
+  return 0
+}
+
+dotfiles_redact_agent_config_bearer_leaks() {
+  local f
+  while IFS= read -r f; do
+    /usr/bin/perl -pi -e 's/Bearer (?!REDACTED)[A-Za-z0-9._~+\/=-]{20,}/Bearer REDACTED/g' "$f" || return 1
+  done < <(dotfiles_agent_config_bearer_leaks)
+}
+
 dotfiles_secret_scan_is_fixture_path() {
   local rel="$1"
 

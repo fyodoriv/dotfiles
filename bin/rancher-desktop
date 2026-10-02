@@ -1,7 +1,13 @@
 #!/bin/bash
-# Start Rancher Desktop and wait for the Docker socket to be ready.
-# Used by the LaunchAgent so downstream tools (codegen, docker CLI) can
-# reliably connect after login without racing against the daemon startup.
+# Start Rancher Desktop and wait until the Docker API answers.
+# Used by the LaunchAgent so downstream tools (codegen, docker CLI, the
+# agents-observe plugin) can connect after login without racing the daemon.
+# A socket file alone is not enough: the VM can forward the socket while the
+# engine behind it is dead, so readiness means a successful /_ping.
+# Kubernetes stays off unless DOTFILES_RANCHER_KUBERNETES=1, because a failed
+# k3s download aborts startup before Docker comes up.
+# PATH management stays manual: home/zshrc already adds ~/.rd/bin, and the
+# "rcfiles" mode appends a hardcoded block to the symlinked ~/.zshrc.
 # Usage: rancher-desktop
 
 set -euo pipefail
@@ -16,17 +22,50 @@ if [ ! -x "$RDCTL" ]; then
   exit 1
 fi
 
-"$RDCTL" start --application.start-in-background
+docker_ready() {
+  [ -S "$SOCKET" ] && curl -fsS --max-time 3 --unix-socket "$SOCKET" http://localhost/_ping >/dev/null 2>&1
+}
 
-echo "Waiting for Docker socket at $SOCKET (timeout ${TIMEOUT}s)..."
-elapsed=0
-while [ ! -S "$SOCKET" ]; do
-  if [ "$elapsed" -ge "$TIMEOUT" ]; then
-    echo "Timed out waiting for Docker socket after ${TIMEOUT}s" >&2
-    exit 1
+setting() {
+  "$RDCTL" list-settings 2>/dev/null | plutil -extract "$1" raw -o - - 2>/dev/null
+}
+
+enforce_settings() {
+  if [ "$(setting application.pathManagementStrategy)" = "rcfiles" ]; then
+    echo "Switching PATH management to manual so Rancher Desktop stops editing shell rc files"
+    "$RDCTL" set --application.path-management-strategy manual || echo "rdctl set --application.path-management-strategy failed" >&2
   fi
-  sleep 2
-  elapsed=$((elapsed + 2))
-done
+  [ "${DOTFILES_RANCHER_KUBERNETES:-0}" = "1" ] && return 0
+  if [ "$(setting kubernetes.enabled)" = "true" ]; then
+    echo "Kubernetes is enabled; disabling it so Docker can start without k3s"
+    "$RDCTL" set --kubernetes.enabled=false || echo "rdctl set --kubernetes.enabled=false failed" >&2
+  fi
+}
 
-echo "Docker socket ready after ${elapsed}s"
+wait_for_docker() {
+  local elapsed=0
+  echo "Waiting for Docker socket at $SOCKET (timeout ${TIMEOUT}s)..."
+  while ! docker_ready; do
+    if [ "$elapsed" -ge "$TIMEOUT" ]; then
+      return 1
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  echo "Docker socket ready after ${elapsed}s"
+}
+
+"$RDCTL" start --application.start-in-background
+enforce_settings
+
+wait_for_docker && exit 0
+
+echo "Docker API did not answer; restarting Rancher Desktop once" >&2
+"$RDCTL" shutdown >/dev/null 2>&1 || true
+"$RDCTL" start --application.start-in-background
+enforce_settings
+
+if ! wait_for_docker; then
+  echo "Timed out waiting for Docker socket after ${TIMEOUT}s (after one restart)" >&2
+  exit 1
+fi

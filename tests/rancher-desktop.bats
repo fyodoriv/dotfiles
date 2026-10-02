@@ -14,6 +14,13 @@ setup() {
   export ORIG_HOME="$HOME"
   export HOME="$TEST_HOME"
   export PATH="$STUB_DIR:$PATH"
+
+  # Docker API answers whenever the socket exists, unless a test overrides it.
+  cat > "$STUB_DIR/curl" << 'STUB'
+#!/bin/bash
+[ -S "$HOME/.rd/docker.sock" ]
+STUB
+  chmod +x "$STUB_DIR/curl"
 }
 
 teardown() {
@@ -47,9 +54,10 @@ teardown() {
   grep -q 'is Rancher Desktop installed' "$RANCHER_CMD"
 }
 
-@test "rancher-desktop waits for Docker socket" {
+@test "rancher-desktop waits for the Docker API, not only the socket file" {
   grep -q 'SOCKET=.*docker.sock' "$RANCHER_CMD"
-  grep -q 'while.*! -S.*SOCKET' "$RANCHER_CMD"
+  grep -q 'unix-socket "\$SOCKET" http://localhost/_ping' "$RANCHER_CMD"
+  grep -q 'while ! docker_ready' "$RANCHER_CMD"
 }
 
 @test "rancher-desktop has a timeout for socket wait" {
@@ -209,6 +217,107 @@ STUB
   # Verify timeout message went to stderr
   [ -f "$TEST_DIR/stderr.txt" ]
   grep -q "Timed out" "$TEST_DIR/stderr.txt"
+}
+
+# ── Functional: dead engine behind a live socket ──
+
+@test "restarts Rancher Desktop once when the socket exists but Docker does not answer" {
+  python3 -c "
+import socket, os
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(os.path.expanduser('~/.rd/docker.sock'))
+s.listen(1)
+import time; time.sleep(30)
+" &
+  local socket_pid=$!
+  while [ ! -S "$TEST_HOME/.rd/docker.sock" ]; do sleep 0.01; done
+
+  printf '#!/bin/bash\nexit 7\n' > "$STUB_DIR/curl"
+  chmod +x "$STUB_DIR/curl"
+  cat > "$TEST_HOME/.rd/bin/rdctl" << STUB
+#!/bin/bash
+echo "\$*" >> "$TEST_DIR/rdctl.log"
+STUB
+  chmod +x "$TEST_HOME/.rd/bin/rdctl"
+
+  local test_script="$TEST_DIR/rancher-desktop-fast"
+  sed 's/TIMEOUT=120/TIMEOUT=2/' "$RANCHER_CMD" > "$test_script"
+
+  run bash "$test_script"
+  kill "$socket_pid" 2>/dev/null || true
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"restarting Rancher Desktop once"* ]]
+  [ "$(grep -c '^start --application.start-in-background' "$TEST_DIR/rdctl.log")" -eq 2 ]
+  grep -qx 'shutdown' "$TEST_DIR/rdctl.log"
+}
+
+# ── Functional: Kubernetes guard ──
+
+@test "disables Kubernetes when Rancher Desktop has it enabled" {
+  cat > "$TEST_HOME/.rd/bin/rdctl" << STUB
+#!/bin/bash
+echo "\$*" >> "$TEST_DIR/rdctl.log"
+case "\$1" in
+  list-settings) echo '{"kubernetes":{"enabled":true}}' ;;
+  start) python3 -c "
+import socket, os
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(os.path.expanduser('~/.rd/docker.sock'))
+s.listen(1)
+import time; time.sleep(5)
+" & for _i in \$(seq 1 50); do [ -S ~/.rd/docker.sock ] && break; sleep 0.01; done ;;
+esac
+STUB
+  chmod +x "$TEST_HOME/.rd/bin/rdctl"
+
+  run bash "$RANCHER_CMD"
+  [ "$status" -eq 0 ]
+  grep -qx 'set --kubernetes.enabled=false' "$TEST_DIR/rdctl.log"
+}
+
+@test "switches PATH management from rcfiles to manual" {
+  cat > "$TEST_HOME/.rd/bin/rdctl" << STUB
+#!/bin/bash
+echo "\$*" >> "$TEST_DIR/rdctl.log"
+case "\$1" in
+  list-settings) echo '{"application":{"pathManagementStrategy":"rcfiles"},"kubernetes":{"enabled":false}}' ;;
+  start) python3 -c "
+import socket, os
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(os.path.expanduser('~/.rd/docker.sock'))
+s.listen(1)
+import time; time.sleep(5)
+" & for _i in \$(seq 1 50); do [ -S ~/.rd/docker.sock ] && break; sleep 0.01; done ;;
+esac
+STUB
+  chmod +x "$TEST_HOME/.rd/bin/rdctl"
+
+  run bash "$RANCHER_CMD"
+  [ "$status" -eq 0 ]
+  grep -qx 'set --application.path-management-strategy manual' "$TEST_DIR/rdctl.log"
+  ! grep -q 'kubernetes.enabled=false' "$TEST_DIR/rdctl.log"
+}
+
+@test "keeps Kubernetes when DOTFILES_RANCHER_KUBERNETES=1" {
+  cat > "$TEST_HOME/.rd/bin/rdctl" << STUB
+#!/bin/bash
+echo "\$*" >> "$TEST_DIR/rdctl.log"
+case "\$1" in
+  list-settings) echo '{"kubernetes":{"enabled":true}}' ;;
+  start) python3 -c "
+import socket, os
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(os.path.expanduser('~/.rd/docker.sock'))
+s.listen(1)
+import time; time.sleep(5)
+" & for _i in \$(seq 1 50); do [ -S ~/.rd/docker.sock ] && break; sleep 0.01; done ;;
+esac
+STUB
+  chmod +x "$TEST_HOME/.rd/bin/rdctl"
+
+  DOTFILES_RANCHER_KUBERNETES=1 run bash "$RANCHER_CMD"
+  [ "$status" -eq 0 ]
+  ! grep -q 'kubernetes.enabled=false' "$TEST_DIR/rdctl.log"
 }
 
 # ── Functional: output messages ──

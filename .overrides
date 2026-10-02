@@ -6,7 +6,7 @@
 # To add an override: dotfiles-doctor --skip <check-id>
 # To list all checks: dotfiles-doctor --list
 
-# 2026-05-12 — cbrwizard (off-VPN personal Mac, 32GB arm64)
+# cbrwizard (off-VPN personal Mac, 32GB arm64)
 # local-ai-warmup would auto-start LM Studio at login + every 30min.
 # Per operator rule: local models must not run without explicit approval.
 local-ai.warmup_agent_loaded
@@ -15,6 +15,10 @@ local-ai.warmup_agent_loaded
 # Plist is installed at com.dotfiles.ollama.plist.disabled for reference.
 local-ai.ollama_agent_loaded
 
+# Device management resets both power profiles to one template. Fighting it
+# needs a root enforcer, so these checks are skipped. AC disk sleep has almost no effect on an SSD-only Mac.
+# The writer is logged in ~/.local/share/dotfiles/logs/pmset-drift.log.
 macos.pmset_display_sleep_15
 macos.pmset_battery_sleep_15
 macos.pmset_battery_disk_sleep_15
+macos.pmset_ac_disk_sleep_10

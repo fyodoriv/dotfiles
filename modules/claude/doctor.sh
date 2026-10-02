@@ -40,15 +40,18 @@ check "claude.model_default" "Claude Code config pinned to Opus 5.5 medium and b
 
 # ── agents-observe plugin server ──────────────────────────────────────
 # The agents-observe plugin hooks every Claude Code event but sends all
-# errors to /dev/null. Without its Docker server, it records nothing and
+# errors to /dev/null. Its hook starts the Docker server on demand, and the
+# server stops itself when no session is connected, so a stopped server is
+# normal. A dead Docker engine is not: the plugin then records nothing and
 # says nothing. This check makes that state visible.
 _claude_observe_plugin_ok() {
   local settings="$HOME/.claude/settings.json"
   [ -s "$settings" ] || return 0
   command -v jq >/dev/null 2>&1 || return 0
   [ "$(jq -r '.enabledPlugins["agents-observe@agents-observe"] // false' "$settings" 2>/dev/null)" = "true" ] || return 0
-  curl -fsS --max-time 2 "http://127.0.0.1:${AGENTS_OBSERVE_SERVER_PORT:-4981}/api/health" >/dev/null 2>&1
+  curl -fsS --max-time 2 "http://127.0.0.1:${AGENTS_OBSERVE_SERVER_PORT:-4981}/api/health" >/dev/null 2>&1 && return 0
+  curl -fsS --max-time 3 --unix-socket "$HOME/.rd/docker.sock" http://localhost/_ping >/dev/null 2>&1
 }
-check "claude.observe_plugin_server" "agents-observe plugin server is up (if down: start Rancher Desktop, or run: claude plugin disable agents-observe@agents-observe)" \
+check "claude.observe_plugin_server" "agents-observe plugin can start its server (Docker API answers; opt out: claude plugin disable agents-observe@agents-observe)" \
   "_claude_observe_plugin_ok" \
-  ""
+  "bash '$DOTFILES_DIR/bin/rancher-desktop'"

@@ -98,6 +98,23 @@ WRAPPER
   [ "$status" -ne 0 ]
 }
 
+@test "claude: observe check passes when the server is idle but Docker answers" {
+  mkdir -p "$TEST_HOME/.claude" "$TEST_DIR/stubs"
+  echo '{"enabledPlugins":{"agents-observe@agents-observe":true}}' > "$TEST_HOME/.claude/settings.json"
+  printf '#!/bin/bash\ncase "$*" in *unix-socket*) exit 0 ;; *) exit 7 ;; esac\n' > "$TEST_DIR/stubs/curl"
+  chmod +x "$TEST_DIR/stubs/curl"
+  export AGENTS_OBSERVE_SERVER_PORT=1
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+  PATH="$TEST_DIR/stubs:$PATH" run _claude_observe_plugin_ok
+  [ "$status" -eq 0 ]
+}
+
+@test "claude: observe repair starts Rancher Desktop" {
+  check() { [ "$1" = "claude.observe_plugin_server" ] && echo "$4" > "$TEST_DIR/fix_cmd"; return 0; }
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+  [ "$(cat "$TEST_DIR/fix_cmd")" = "bash '$DOTFILES_DIR/bin/rancher-desktop'" ]
+}
+
 @test "claude: observe check passes when the plugin is disabled" {
   mkdir -p "$TEST_HOME/.claude"
   echo '{"enabledPlugins":{"agents-observe@agents-observe":false}}' > "$TEST_HOME/.claude/settings.json"

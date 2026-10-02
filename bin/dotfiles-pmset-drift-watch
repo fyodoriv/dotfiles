@@ -1,0 +1,49 @@
+#!/bin/bash
+# Record who changes macOS power settings (pmset) and when.
+# The LaunchAgent runs this whenever /Library/Preferences/com.apple.PowerManagement.plist
+# is written. When `pmset -g custom` differs from the last snapshot, it logs the
+# diff, the power source, and the processes alive at that moment, so the
+# writer of an unexpected reset can be named. It never changes settings.
+# Usage: dotfiles-pmset-drift-watch
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+PMSET="${DOTFILES_PMSET_BIN:-/usr/bin/pmset}"
+STATE_DIR="$HOME/.local/state/dotfiles"
+SNAPSHOT="$STATE_DIR/pmset-custom.last"
+LOG="$HOME/.local/share/dotfiles/logs/pmset-drift.log"
+# Apple processes that can rewrite power settings. Third-party management
+# agents are logged by location below, so none is named here.
+SUSPECTS='System Settings|mdmclient|ManagedClient|pmset|powerd'
+
+mkdir -p "$STATE_DIR" "$(dirname "$LOG")"
+
+current="$("$PMSET" -g custom 2>/dev/null)"
+[ -n "$current" ] || exit 0
+
+if [ ! -f "$SNAPSHOT" ]; then
+  printf '%s\n' "$current" > "$SNAPSHOT"
+  exit 0
+fi
+
+previous="$(cat "$SNAPSHOT")"
+[ "$current" = "$previous" ] && exit 0
+
+{
+  echo "=== $(date '+%Y-%m-%d %H:%M:%S %z') pmset settings changed"
+  echo "--- power source: $("$PMSET" -g batt 2>/dev/null | head -1)"
+  echo "--- diff (previous → current):"
+  diff <(printf '%s\n' "$previous") <(printf '%s\n' "$current") || true
+  echo "--- processes started in the last 3 minutes:"
+  ps -axo pid=,ppid=,user=,etime=,command= 2>/dev/null \
+    | awk '$4 !~ /[-]/ && split($4, t, ":") == 2 && t[1] + 0 < 3' | cut -c1-240 || true
+  echo "--- management agents running now:"
+  pgrep -lf "$SUSPECTS" 2>/dev/null | cut -c1-240 || true
+  echo "--- third-party root processes running now:"
+  ps -axo pid=,user=,command= 2>/dev/null \
+    | awk '$2 == "root" && $3 ~ /^\// && $3 !~ /^\/(System|usr|bin|sbin|Library\/Apple)\//' \
+    | cut -c1-240 || true
+} >> "$LOG"
+
+printf '%s\n' "$current" > "$SNAPSHOT"

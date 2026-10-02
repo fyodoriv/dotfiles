@@ -121,3 +121,8 @@ would drift again.
 and the processes alive at that moment. The next reset names its writer. Then
 either fix the dotfiles-side cause, or ask the device-management team to drop
 or change the energy policy. Do not add a privileged enforcer that fights MDM.
+
+**Resolution:** `.overrides` now skips `macos.pmset_ac_disk_sleep_10`, the same
+way it already skips the display-sleep and battery checks that this template
+also resets. On an SSD-only Mac, disk sleep has almost no effect. The drift
+watcher stays installed, so the next reset still names its writer.

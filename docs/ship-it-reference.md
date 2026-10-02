@@ -301,7 +301,7 @@ Approved without another prompt for current-task and allowlisted scope:
 - create or switch to a short-lived feature branch if needed
 - convert clean local-only commits on the default/canonical branch into a short-lived PR branch instead of pushing the default branch directly
 - stage explicit files, commit, push the feature branch
-- when a managed hook blocks `git push` / `gh` egress, give the operator one-line push, PR, and merge commands (see **Push delivery when a managed hook blocks `git push`**); never bypass the hook
+- when a managed hook blocks `git push` / `gh` egress, give the operator one `land` command for the pushes, then open, watch, and merge the PRs yourself (see **Push delivery when a managed hook blocks `git push`**); never bypass the hook
 - create or update a PR
 - watch CI/checks, diagnose failures, push fixes
 - when multiple PRs/branches contain the same intended changes, prefer the PR
@@ -453,20 +453,21 @@ A managed push guard (for example Cursor's `git-push-guard` `beforeShellExecutio
 
 > Pushing source code to this remote has to be done manually.
 
-Respect the guard. Never retry around it with other permissions, shells, encodings, tools, or hook changes. Instead:
+Respect the guard. Never retry around it with other permissions, shells, encodings, tools, or hook changes. The `bin/git` wrapper enforces the same rule for agent shells. Instead:
 
 1. Finish everything else locally: branch, commit, formatters, linters, tests, and the PR body file.
-2. Give the operator **one copy-paste command per repo** that pushes, opens the PR, watches checks, and merges. Example:
+2. Give the operator **one copy-paste `land` command** that covers every pending checkout:
    ```bash
-   git -C /absolute/path/to/checkout push origin <branch> && gh pr create -R <owner>/<repo> --head <branch> --body-file <file> && gh pr checks -R <owner>/<repo> <branch> --watch && gh pr merge -R <owner>/<repo> <branch> --squash --delete-branch
+   ~/apps/tooling/dotfiles/bin/land /absolute/path/to/checkout-a /absolute/path/to/checkout-b
    ```
-3. Never hand off a list of manual steps. If the base may move, start the command with `git -C <checkout> pull --rebase origin <base> &&`.
-4. After the operator runs it, verify the PR state and merged SHA yourself.
+   `land` pushes each checkout's current branch to the explicit `https://github.com/<owner>/<repo>.git` URL and opens a PR when none exists. The explicit URL is needed because the tooling clones set `remote.origin.pushurl` to `DISABLED`, so `git push origin` fails even for the operator. `land` refuses to run without a terminal or in an agent shell, so never run it yourself. For a rebased branch, hand off `land --lease <old-remote-oid> <checkout>` (one checkout per command). Until `land` is on the canonical branch, use its worktree path.
+3. The push is the only human step. `gh pr create`, `gh pr edit`, `gh pr checks`, and `gh pr merge` for an already-pushed branch are not blocked: run them yourself with `GH_HOST=github.com` and `-R <owner>/<repo>` to refresh the PR body, watch CI, and merge.
+4. Never hand off a list of manual steps. After the operator runs `land`, verify the PR state and merged SHA yourself.
 
 **Hook context notes:**
 
 - Enterprise GitHub hosts in your hook allowlist should pass when the remote resolves; fail-closed denials often mean cwd/remote resolution failed — fix with explicit `-C` / `origin` / `GH_HOST`. Audit log `could-not-resolve-remote=origin cwd=workspace_roots` means the hook could not find `origin` from the agent workspace parent — always `cd` into the repo checkout (e.g. `~/apps/tooling/dotfiles`) before push/`gh`.
-- Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the one-line commands described above.
+- Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the `land` command described above.
 - Dry-run first when verifying: `git push --dry-run -u origin <branch>`.
 
 **Stack PR overlap gate (before push/open):** When delivering a multi-PR skill stack against the same base, each child branch must be a **phase delta**, not a cumulative branch that still contains parent commits. Before `git push` / `gh pr create`:

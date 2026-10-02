@@ -1,0 +1,110 @@
+#!/bin/bash
+# Push feature branches of github.com checkouts whose origin push URL is
+# DISABLED, and open a PR for each. Human-only: agents hand this command to
+# the operator because the managed push guard blocks agent pushes.
+# Usage: land [--dry-run] [--lease <old-oid>] [DIR...]   (default DIR: .)
+#   --dry-run       show what would be pushed; push nothing
+#   --lease OID     rewrite the remote branch only if it is still at OID
+#                   (one DIR only; for rebased branches)
+# Example: land ~/apps/tooling/agentbrew/.worktrees/x ~/apps/tooling/dotfiles/.worktrees/y
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+dry_run=false
+lease=""
+dirs=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) dry_run=true ;;
+    --lease) lease="${2:?--lease needs an object id}"; shift ;;
+    --lease=*) lease="${1#--lease=}" ;;
+    -*) echo "✗ unknown option: $1" >&2; exit 2 ;;
+    *) dirs+=("$1") ;;
+  esac
+  shift
+done
+[ "${#dirs[@]}" -gt 0 ] || dirs=(.)
+
+if [ -n "$lease" ] && [ "${#dirs[@]}" -ne 1 ]; then
+  echo "✗ --lease applies to exactly one DIR" >&2
+  exit 2
+fi
+
+# The managed push guard inspects agent commands for `git push`. This wrapper
+# would hide that, so it only runs from a human terminal. The marker list
+# matches _git_wrapper_is_agent_context in bin/git.
+is_agent_context() {
+  [ -n "${AGENT_PUBLIC_WRITE_GUARD:-}" ] || [ -n "${DEVIN_MODEL:-}" ] ||
+    [ -n "${DEVIN_SESSION_ID:-}" ] || [ -n "${CLAUDE_CODE_SSE_PORT:-}" ] ||
+    [ -n "${CLAUDECODE:-}" ] || [ -n "${CURSOR_AGENT:-}" ] ||
+    [ -n "${WINDSURF_AGENT:-}" ] || [ -n "${CODEX_AGENT:-}" ]
+}
+if is_agent_context || { [ ! -t 0 ] && [ "${LAND_ALLOW_NON_TTY:-0}" != "1" ]; }; then
+  echo "✗ land is human-only: run it in your own terminal (agents must hand it to the operator)" >&2
+  exit 3
+fi
+
+github_slug() {
+  local url="$1"
+  case "$url" in
+    https://github.com/*) url="${url#https://github.com/}" ;;
+    git@github.com:*) url="${url#git@github.com:}" ;;
+    ssh://git@github.com/*) url="${url#ssh://git@github.com/}" ;;
+    *) return 1 ;;
+  esac
+  printf '%s\n' "${url%.git}"
+}
+
+land_one() {
+  local dir="$1" branch url slug default_branch sha
+  if ! git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "✗ $dir: not a git checkout" >&2
+    return 1
+  fi
+  branch="$(git -C "$dir" branch --show-current)"
+  if [ -z "$branch" ]; then
+    echo "✗ $dir: detached HEAD; switch to a feature branch first" >&2
+    return 1
+  fi
+  url="$(git -C "$dir" config --get remote.origin.url 2>/dev/null || true)"
+  if ! slug="$(github_slug "$url")"; then
+    echo "✗ $dir: origin is not a github.com repo ($url)" >&2
+    return 1
+  fi
+  default_branch="$(GH_HOST=github.com gh repo view "$slug" --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)"
+  case "$branch" in
+    main|master|"$default_branch")
+      echo "✗ $dir: refusing to push the default branch '$branch'; use a feature branch" >&2
+      return 1
+      ;;
+  esac
+  if [ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ]; then
+    echo "✗ $dir: uncommitted tracked changes; commit them first" >&2
+    return 1
+  fi
+  sha="$(git -C "$dir" rev-parse --short HEAD)"
+
+  local push_args=(push)
+  [ -n "$lease" ] && push_args+=("--force-with-lease=refs/heads/$branch:$lease")
+  $dry_run && push_args+=(--dry-run)
+  push_args+=("https://github.com/$slug.git" "HEAD:refs/heads/$branch")
+
+  echo "→ $slug: pushing $branch ($sha)"
+  git -C "$dir" "${push_args[@]}" || { echo "✗ $slug: push failed" >&2; return 1; }
+  $dry_run && return 0
+
+  if GH_HOST=github.com gh pr view "$branch" -R "$slug" --json url -q .url >/dev/null 2>&1; then
+    echo "✓ $slug: PR $(GH_HOST=github.com gh pr view "$branch" -R "$slug" --json url -q .url) updated"
+  else
+    (cd "$dir" && GH_HOST=github.com gh pr create -R "$slug" --head "$branch" \
+      ${default_branch:+--base "$default_branch"} --fill) || { echo "✗ $slug: PR create failed" >&2; return 1; }
+  fi
+}
+
+failed=0
+for dir in "${dirs[@]}"; do
+  land_one "$dir" || failed=$((failed + 1))
+done
+[ "$failed" -eq 0 ] || { echo "✗ $failed checkout(s) not landed" >&2; exit 1; }
+echo "✓ Landed ${#dirs[@]} branch(es). The agent can now refresh PR bodies, watch CI, and merge."

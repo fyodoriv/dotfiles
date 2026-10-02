@@ -59,6 +59,20 @@ JSON
   [[ "$remainder" != *with-endpoint-path* ]]
 }
 
+@test "hooks-endpoint-wrap: skips a hooks.json it cannot write" {
+  mkdir -p "$TEST_HOME/.cursor" "$TEST_HOME/.config/dotfiles/hooks"
+  cp ./agent-hooks/with-endpoint-path.sh "$TEST_HOME/.config/dotfiles/hooks/"
+  chmod +x "$TEST_HOME/.config/dotfiles/hooks/with-endpoint-path.sh"
+  printf '%s\n' '{"version": 1, "hooks": {"afterFileEdit": [{"command": "~/.cursor/codeassist/hooks-scripts/audit-logger.sh"}]}}' > "$TEST_HOME/.cursor/hooks.json"
+  chmod 444 "$TEST_HOME/.cursor/hooks.json"
+  before="$(cat "$TEST_HOME/.cursor/hooks.json")"
+  run env HOME="$TEST_HOME" DOTFILES_DIR="$TEST_DOTFILES" bash ./.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh
+  chmod 644 "$TEST_HOME/.cursor/hooks.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not writable"* ]]
+  [ "$(cat "$TEST_HOME/.cursor/hooks.json")" = "$before" ]
+}
+
 @test "hooks-endpoint-wrap: collapses re-added codeassist hooks to one entry" {
   mkdir -p "$TEST_HOME/.cursor" "$TEST_HOME/.config/dotfiles/hooks"
   cp ./agent-hooks/with-endpoint-path.sh "$TEST_HOME/.config/dotfiles/hooks/"

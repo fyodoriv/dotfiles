@@ -33,6 +33,19 @@ remote without explicit operator approval in the current session. -->
 
 ## P1
 
+- [ ] `pre-push-private-repo-root-check` — stop the public-repo gates from blocking approved pushes to private repos
+  - **ID**: pre-push-private-repo-root-check
+  - **Tags**: p1, security, git-hooks, bug
+  - **Competitive-goal**: manual-step count — a new private repo no longer needs a hand edit of the local env before its first approved push.
+  - **Details**: `git-hooks/pre-push` treats every remote in the push allowlist (`DOTFILES_PUBLIC_PUSH_ALLOWLIST`, else `config/public-push-remotes.txt`) as a public repo and runs every OSS gate on it. The one-shot allowlist is also how the operator approves a push to a private repo through `bin/git`, so a private repo fails check 1c: its own root commit is not in `OSS_READINESS_ALLOWED_ROOTS`. Today the only way through is adding each private repo's root to the local env by hand (needed on 2026-10-02 and again on 2026-10-03). A second bug: when the allowlist is a process substitution (`<(echo ...)`), whichever of `bin/git` and the hook reads the pipe first consumes it, so the hook sometimes sees an empty list and skips every gate. Fix: tell private approvals apart from public ones (for example a separate private allowlist, or the remote's visibility checked once and cached), skip only the public-history root check for private repos, and make both readers see the same allowlist (for example `bin/git` copies it to a temp file once and exports that path).
+  - **Files**: `git-hooks/pre-push`, `bin/git`, `tests/pre-push.bats`
+  - **Acceptance**: in `tests/pre-push.bats`, (1) an approved push to a private fixture remote whose root is not in `OSS_READINESS_ALLOWED_ROOTS` passes the root check; (2) a public-repo push with an unapproved root still fails; (3) with a process-substitution allowlist, the hook gates the same remotes that `bin/git` allowed.
+  - **Hypothesis**: separating private approvals from public ones drops blocked approved private-repo pushes from 100% to 0%, while public pushes with an unapproved root stay blocked 100% of the time.
+  - **Success**: all three bats cases pass, and a new private repo needs 0 manual env edits.
+  - **Pivot**: If a remote's visibility cannot be known offline and cheaply, require an explicit private allowlist file and document it in README.
+  - **Measurement**: `bats tests/pre-push.bats`
+  - **Anchor**: Saltzer and Schroeder, "The Protection of Information in Computer Systems", Proc. IEEE 63(9), 1975 (fail-safe defaults, separation of privilege); operator decision 2026-10-03.
+
 <!-- COHORT: github-issues-task-backend (2026-05-29 operator directive). Shell-level
      ergonomics for the GitHub Issues task backend so filing/claiming a task from a
      terminal (or a personal machine) is as fast as editing TASKS.md was. Blocks on

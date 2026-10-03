@@ -49,9 +49,8 @@ or a script would violate the repository's no-secrets boundary.
   [`macos.sh`](../../macos.sh) sets AC `disksleep 10`, and
   [`modules/macos/doctor.sh`](../../modules/macos/doctor.sh) detects and
   repairs that exact value with `sudo -n`.
-- **Management state**: `profiles status -type enrollment` reported DEP and
-  user-approved MDM enrollment. No MDM write endpoint or credential is
-  available to this session.
+- **Management state**: the Mac is under device management. No MDM write
+  endpoint or credential is available to this session.
 
 ## Exact action the human must take
 

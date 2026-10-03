@@ -30,7 +30,7 @@
 #   - .chezmoiscripts/run_after_uv-python-setup.sh — same pattern for uv pythons
 #   - modules/security/doctor.sh § "endpoint agent: brew bottles"
 #   - bin/dotfiles-adhoc-sign-curl — fast login path for curl + libcurl
-#   - agentbrew skill endpoint-security-block-triage § "Unsigned user-dir binaries"
+#   - the org overlay's endpoint triage skill § "Unsigned user-dir binaries"
 
 set -uo pipefail
 

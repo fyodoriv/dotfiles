@@ -32,11 +32,11 @@ fi
 # ── Homebrew installed ──────────────────────────────────────────────
 check "upgrade.brew" "brew installed (fix: https://brew.sh)" "command -v brew" ""
 
-# ── EPE-blocked casks absent (EPE-managed Macs) ─────────────────────
-# Raycast install/upgrade triggers Application Elevation (admin). It is
+# ── Casks blocked by privilege management absent (managed Macs) ────
+# Raycast install/upgrade needs a privilege elevation (admin). It is
 # never in the dotfiles Brewfile; if present it was installed manually and
 # topgrade's greedy_cask step will try to upgrade it every dotfiles upgrade.
 if [ "$(chezmoi execute-template '{{ dig "is_enterprise" "false" . }}' 2>/dev/null || echo "false")" = "true" ]; then
-  check "upgrade.no-raycast" "raycast not installed (EPE-blocked — fix: brew uninstall --cask raycast)" \
+  check "upgrade.no-raycast" "raycast not installed (blocked by privilege management — fix: brew uninstall --cask raycast)" \
     "! brew list --cask raycast &>/dev/null" ""
 fi

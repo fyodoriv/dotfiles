@@ -449,7 +449,7 @@ Push the feature branch to the current repo remote. Use a normal push for new br
 
 ### Push delivery when a managed hook blocks `git push`
 
-A managed push guard (for example Cursor's `git-push-guard` `beforeShellExecution` hook) can reject agent Shell `git push` / `gh` egress with:
+A managed push guard (for example a `beforeShellExecution` hook) can reject agent Shell `git push` / `gh` egress with:
 
 > Pushing source code to this remote has to be done manually.
 
@@ -466,7 +466,7 @@ Respect the guard. Never retry around it with other permissions, shells, encodin
 
 **Hook context notes:**
 
-- Enterprise GitHub hosts in your hook allowlist should pass when the remote resolves; fail-closed denials often mean cwd/remote resolution failed — fix with explicit `-C` / `origin` / `GH_HOST`. Audit log `could-not-resolve-remote=origin cwd=workspace_roots` means the hook could not find `origin` from the agent workspace parent — always `cd` into the repo checkout (e.g. `~/apps/tooling/dotfiles`) before push/`gh`.
+- Enterprise GitHub hosts in your hook allowlist should pass when the remote resolves; fail-closed denials often mean cwd/remote resolution failed — fix with explicit `-C` / `origin` / `GH_HOST`. A denial that names an unresolved `origin` means the hook could not find it from the agent workspace parent — always `cd` into the repo checkout (e.g. `~/apps/tooling/dotfiles`) before push/`gh`.
 - Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the `land` command described above.
 - Dry-run first when verifying: `git push --dry-run -u origin <branch>`.
 

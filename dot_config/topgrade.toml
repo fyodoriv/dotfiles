@@ -93,8 +93,8 @@ disable = [
 greedy_cask   = true
 greedy_latest = true
 # NOTE: `greedy_*` upgrades every installed cask, not just dotfiles-managed
-# ones. Do NOT `brew install --cask raycast` (or lunar) on EPE-managed Macs
-# machines — install/upgrade requires Application Elevation. If present,
+# ones. Do NOT `brew install --cask raycast` (or lunar) on privilege-managed
+# Macs — install/upgrade requires a privilege elevation. If present,
 # remove with `brew uninstall --cask raycast` and add to chezmoi `brew_skip`.
 
 [git]

@@ -197,6 +197,16 @@ chezmoi_verify() {
   [ ! -e "$TEST_HOME/launchagents" ]
   [ ! -e "$TEST_HOME/mcp" ]
   [ ! -e "$TEST_HOME/TASKS.md" ]
+  # Regression: these repo files/dirs were leaking to ~ root (see .chezmoiignore)
+  [ ! -e "$TEST_HOME/ARCHITECTURE.md" ]
+  [ ! -e "$TEST_HOME/ROADMAP.md" ]
+  [ ! -e "$TEST_HOME/VISION.md" ]
+  [ ! -e "$TEST_HOME/agent-hooks" ]
+  [ ! -e "$TEST_HOME/commands" ]
+  [ ! -e "$TEST_HOME/scripts" ]
+  [ ! -e "$TEST_HOME/templates" ]
+  [ ! -e "$TEST_HOME/vscode" ]
+  [ ! -e "$TEST_HOME/windsurf" ]
 }
 
 @test "chezmoiignore excludes every non-source root entry from HOME" {

@@ -11,7 +11,7 @@ done)
 
 SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh \
            $(wildcard private_dot_agent-browser/executable_*.sh) \
-           lib/agentbrew-memory-readiness.sh lib/brew-bottle-audit.sh lib/colors.sh lib/lock.sh lib/output.sh lib/overlay-locate.sh lib/secret-scan.sh lib/stats.sh \
+           lib/agentbrew-memory-readiness.sh lib/brew-bottle-audit.sh lib/colors.sh lib/gh-public-leak.sh lib/lock.sh lib/output.sh lib/overlay-locate.sh lib/secret-scan.sh lib/stats.sh \
            $(BIN_SCRIPTS) $(wildcard modules/*/doctor.sh) \
            $(wildcard .chezmoiscripts/*.sh) $(wildcard .github/scripts/*.sh) \
            $(shell grep -L call_lefthook git-hooks/* 2>/dev/null)

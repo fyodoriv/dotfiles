@@ -38,22 +38,20 @@
 #
 # Bypass: set MINSKY_PIPELINE=1 (set by the minsky orchestrator when it
 # spawns unattended pipeline runs) to preserve attribution for
-# pipeline-to-PR linkage.
+# pipeline-to-PR linkage. The public leak guard below still runs.
 #
-# Public leak guard:
-#   Text bound for a PUBLIC github.com repository fails closed when it
-#   carries a private reference: a match for the overlay's private
-#   pattern or private email pattern (lib/oss-readiness.sh), this
-#   machine's $HOME path, an enterprise host that gh is signed in to, or
-#   a token-shaped secret. It covers every intercepted body, title, and
-#   comment, `gh api` write fields and --input JSON, `gh pr merge`
-#   subject/body (the squash commit lands in public git history), and
-#   `gh gist create --public` files. Enterprise hosts and private
-#   repositories are not checked, so an org machine can still post org
-#   details to its own GitHub Enterprise. A repository listed in
-#   config/public-push-remotes.txt is always checked; any other
-#   github.com repository is checked unless the API says it is private.
-#   Deliberate post: DOTFILES_GH_ALLOW_PRIVATE_REFS=1.
+# Public leak guard (lib/gh-public-leak.sh):
+#   Runs first, right after the real gh is found, so no exec below can
+#   skip it. Read-only calls return at once. A write-shaped call (pr,
+#   issue, release, gist, repo, and label writes, and gh api writes) has
+#   its raw text scanned before the strip pass. When the target is a
+#   PUBLIC github.com repo, gist, or API endpoint, the call fails closed
+#   on the private patterns from lib/oss-readiness.sh, home paths,
+#   enterprise hosts, ssh remotes, and token-shaped secrets. The message
+#   names the field and the class, never the matched text. Other hosts
+#   (GitHub Enterprise) and private repos are not scanned. If the lib is
+#   missing, write-shaped calls fail. Deliberate post:
+#   DOTFILES_ALLOW_GH_PRIVATE_REFS=1.
 #
 # Per-repo agent PR allowlist:
 #   The cross-repo approval gate that fires when `gh pr create --repo X`
@@ -97,6 +95,74 @@ else
   fi
 fi
 
+# True when argv can publish text. An argv-only check, so a missing guard
+# lib still fails closed on writes and never blocks reads.
+_gh_is_write_shaped() {
+  local cmd="${1:-}" sub="" arg val skip=0 method="" fields=0 indirect=0 mutation=0 endpoint=""
+  [ "$#" -eq 0 ] || shift
+  if [ "$cmd" != "api" ]; then
+    for arg in "$@"; do
+      if [ "$skip" = 1 ]; then skip=0; continue; fi
+      case "$arg" in
+        -R|--repo) skip=1 ;;
+        -*) ;;
+        *) sub="$arg"; break ;;
+      esac
+    done
+    case "$cmd $sub" in
+      "pr create"|"pr new"|"pr edit"|"pr comment"|"pr review"|"pr close"|"pr reopen"|"pr merge"|\
+      "issue create"|"issue new"|"issue edit"|"issue comment"|"issue close"|"issue reopen"|\
+      "release create"|"release new"|"release edit"|"release upload"|\
+      "gist create"|"gist new"|"gist edit"|"repo create"|"repo new"|"repo edit"|\
+      "label create"|"label edit")
+        return 0 ;;
+    esac
+    return 1
+  fi
+  while [ "$#" -gt 0 ]; do
+    arg="$1"
+    shift
+    val=""
+    # `-i` (include) is the only boolean short flag; drop it from clusters.
+    while [ "${#arg}" -gt 2 ] && [ "${arg#-i}" != "$arg" ]; do arg="-${arg#-i}"; done
+    case "$arg" in
+      -X|--method) method="${1:-}"; [ "$#" -eq 0 ] || shift ;;
+      --method=*) method="${arg#*=}" ;;
+      -X*) method="${arg#-X}"; method="${method#=}" ;;
+      -f|-F|--field|--raw-field) fields=1; val="${1:-}"; [ "$#" -eq 0 ] || shift ;;
+      --field=*|--raw-field=*) fields=1; val="${arg#*=}" ;;
+      -f*|-F*) fields=1; val="${arg#-?}"; val="${val#=}" ;;
+      --input|--input=*) fields=1; indirect=1; [ "$arg" != --input ] || [ "$#" -eq 0 ] || shift ;;
+      -H|--header|-q|--jq|-t|--template|-p|--preview|--hostname|--cache) [ "$#" -eq 0 ] || shift ;;
+      -*) ;;
+      *) [ -n "$endpoint" ] || endpoint="$arg" ;;
+    esac
+    case "$val" in *mutation*) mutation=1 ;; esac
+    case "$val" in *=@*) indirect=1 ;; esac
+  done
+  case "$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')" in
+    GET|HEAD) return 1 ;;
+  esac
+  # A graphql call writes only through a mutation. A query read from a
+  # file or stdin is checked by the lib.
+  if [ "${endpoint#/}" = "graphql" ]; then
+    [ "$mutation" = 1 ] || [ "$indirect" = 1 ]
+    return
+  fi
+  [ -n "$method" ] || [ "$fields" = 1 ]
+}
+
+if _gh_is_write_shaped "$@"; then
+  leak_lib="$(cd "$(dirname "$0")" && pwd)/../lib/gh-public-leak.sh"
+  if [ ! -f "$leak_lib" ]; then
+    echo "gh wrapper: blocked a write: lib/gh-public-leak.sh is missing next to this wrapper." >&2
+    exit 1
+  fi
+  # shellcheck source=lib/gh-public-leak.sh
+  . "$leak_lib"
+  gh_public_leak_guard "$@"
+fi
+
 # Minsky pipelines preserve attribution — exec straight through.
 if [ -n "${MINSKY_PIPELINE:-}" ]; then
   exec "$REAL_GH" "$@"
@@ -130,9 +196,6 @@ if [ $# -ge 2 ]; then
       needs_filter=1 ; is_comment_subcommand=1 ;;
     "release create"|"release edit")
       needs_filter=1 ;;
-    "pr merge"|"gist create")
-      # Leak guard only: no footer and no PR-create validation.
-      needs_filter=1 ;;
   esac
 fi
 
@@ -158,10 +221,6 @@ if [ "${1:-}" = "api" ]; then
       -f=body=*|--field=body=*|-F=body=*|--raw-field=body=*)
         needs_filter=1 ; is_api_body=1 ; break ;;
       --input|--input=*)
-        needs_filter=1 ; is_api_body=1 ; break ;;
-      -f|--field|-F|--raw-field|-f=*|--field=*|-F=*|--raw-field=*)
-        # Any write field (title=, message=, …) goes past the leak
-        # guard. The walker re-emits non-body fields unchanged.
         needs_filter=1 ; is_api_body=1 ; break ;;
     esac
   done
@@ -479,10 +538,6 @@ _prepare_body_tmp() {
   if ! _gh_wrapper_is_agent_context; then
     return 0
   fi
-  # A squash-merge body becomes a commit message, not a PR comment.
-  if [ "${argv[0]} ${argv[1]}" = "pr merge" ]; then
-    return 0
-  fi
   # PR create: full treatment — markdown normalisation, footer, and
   # rationale validation. PR-create remains the strictest gate because
   # a missing rationale on a fresh PR means the agent shipped without
@@ -505,205 +560,6 @@ _prepare_body_tmp() {
   # without the footer because `_ensure_agent_footer` was previously
   # gated on `pr create` only.
   _ensure_agent_footer "$tmp"
-}
-
-# ── Public leak guard (see header) ──────────────────────────────────
-
-# Enterprise hosts gh is signed in to: every hosts.yml key but github.com.
-_leak_guard_enterprise_hosts() {
-  local hosts_file
-  hosts_file="${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}/hosts.yml"
-  [ -f "$hosts_file" ] || return 0
-  awk '/^[^[:space:]#][^:]*:/ {
-    h = $0; sub(/:.*/, "", h); gsub(/["'"'"']/, "", h)
-    if (tolower(h) != "github.com") print h
-  }' "$hosts_file"
-}
-
-# An ssh alias such as `github-work` is resolved to its real hostname.
-_leak_guard_real_host() {
-  local host="$1" resolved
-  case "$host" in
-    *.*|"") printf '%s' "$host" ;;
-    *)
-      resolved="$(ssh -G "$host" 2>/dev/null | awk '$1 == "hostname" { print $2; exit }')"
-      printf '%s' "${resolved:-$host}"
-      ;;
-  esac
-}
-
-# Prints "<host> <owner/repo>" for the write target. The slug is empty
-# when argv does not name a repository (graphql, gists).
-_leak_guard_target() {
-  local host="" slug="" repo_arg="" remote endpoint="" idx arg
-  if [ "${argv[0]}" = "api" ]; then
-    host="$(_arg_value --hostname || true)"
-    idx=1
-    while [ "$idx" -lt "$nargs" ]; do
-      arg="${argv[$idx]}"
-      case "$arg" in
-        -X|--method|-H|--header|-f|--field|-F|--raw-field|--input|-q|--jq|-t|--template|--hostname|-p|--preview|--cache)
-          idx=$((idx+2)) ;;
-        -*) idx=$((idx+1)) ;;
-        *) endpoint="${arg#/}"; break ;;
-      esac
-    done
-    case "$endpoint" in
-      repos/*/*) slug="$(printf '%s' "$endpoint" | awk -F/ '{ print $2 "/" $3 }')" ;;
-    esac
-    case "$slug" in
-      *"{owner}"*|*"{repo}"*) repo_arg="$(git config --get remote.origin.url 2>/dev/null || true)" ;;
-    esac
-  elif [ "${argv[0]}" != "gist" ]; then
-    repo_arg="$(_arg_value --repo || _arg_value -R || true)"
-    [ -n "$repo_arg" ] || repo_arg="${GH_REPO:-}"
-    if [ -z "$repo_arg" ]; then
-      remote="$(git config --get remote.origin.url 2>/dev/null || true)"
-      repo_arg="$remote"
-    fi
-  fi
-  if [ -n "$repo_arg" ]; then
-    slug="$(_normalize_repo_slug "$repo_arg")"
-    [ -n "$host" ] || host="$(_repo_host "$repo_arg")"
-  fi
-  [ -n "$host" ] || host="${GH_HOST:-github.com}"
-  printf '%s %s' "$(_leak_guard_real_host "$host")" "$slug"
-}
-
-# True when the text is bound for a public github.com target.
-_leak_guard_applies() {
-  local host="$1" slug="$2" visibility method
-  [ "$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')" = "github.com" ] || return 1
-  case "${argv[0]} ${argv[1]:-}" in
-    "gist create")
-      printf '%s\n' "${argv[@]}" | grep -qxE -- '--public(=true)?|-p'
-      return
-      ;;
-  esac
-  if [ "${argv[0]}" = "api" ]; then
-    method="$(_arg_value -X || _arg_value --method || true)"
-    [ "$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')" = "GET" ] && return 1
-    # A graphql call only writes through a mutation.
-    if [ "${argv[1]:-}" = "graphql" ] && ! printf '%s\n' "${argv[@]}" | grep -q 'mutation'; then
-      return 1
-    fi
-  fi
-  [ -n "$slug" ] || return 0
-  if grep -qixF -- "github.com/$slug" "$self_dir/../config/public-push-remotes.txt" 2>/dev/null; then
-    return 0
-  fi
-  visibility="$("$REAL_GH" api --hostname github.com "repos/$slug" --jq .visibility 2>/dev/null || true)"
-  case "$visibility" in
-    private|internal) return 1 ;;
-  esac
-  return 0
-}
-
-# Prints the value of a `key=value` api field, or the file it points at.
-_leak_guard_field_text() {
-  local value="${1#*=}"
-  case "$value" in
-    @-) ;;
-    @*) [ -f "${value#@}" ] && cat "${value#@}" ;;
-    *) printf '%s\n' "$value" ;;
-  esac
-}
-
-# Writes every piece of text this call would publish to "$1".
-_leak_guard_collect() {
-  local out="$1" idx=0 arg next
-  while [ "$idx" -lt "${#new_args[@]}" ]; do
-    arg="${new_args[$idx]}"
-    case "$arg" in
-      --body-file|--notes-file|--input)
-        idx=$((idx+1)); next="${new_args[$idx]:-}"
-        if [ -f "$next" ]; then cat "$next" >> "$out"; fi
-        ;;
-      --body-file=*|--notes-file=*|--input=*)
-        next="${arg#*=}"
-        if [ -f "$next" ]; then cat "$next" >> "$out"; fi
-        ;;
-      -H|--header)
-        idx=$((idx+1))
-        ;;
-      -f|--field|-F|--raw-field)
-        idx=$((idx+1)); next="${new_args[$idx]:-}"
-        if [ "${argv[0]}" = "api" ]; then
-          _leak_guard_field_text "$next" >> "$out"
-        elif [ "$arg" = "-F" ] && [ -f "$next" ]; then
-          # `gh pr merge -F <file>` is the commit body file.
-          cat "$next" >> "$out"
-        else
-          printf '%s\n' "$next" >> "$out"
-        fi
-        ;;
-      *)
-        if [ -f "$arg" ]; then
-          # A file operand is content only for gists; release assets
-          # and other paths are not published as text.
-          if [ "${argv[0]} ${argv[1]:-}" = "gist create" ]; then cat "$arg" >> "$out"; fi
-        else
-          printf '%s\n' "$arg" >> "$out"
-        fi
-        ;;
-    esac
-    idx=$((idx+1))
-  done
-}
-
-# Prints one line per private reference found in "$1".
-_leak_guard_findings() {
-  local text="$1" host hits pattern email
-  if [ -n "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
-    hits="$(grep -oiE -- "$OSS_READINESS_INTERNAL_PATTERN" "$text" 2>/dev/null | sort -u | head -5 | paste -sd',' - || true)"
-    [ -z "$hits" ] || printf 'overlay pattern: %s\n' "$hits"
-  fi
-  if [ -n "${OSS_READINESS_PRIVATE_EMAIL_PATTERN:-}" ]; then
-    while IFS= read -r email; do
-      oss_readiness_email_is_safe "$email" || printf 'private email: %s\n' "$email"
-    done < <(grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]+' "$text" 2>/dev/null | sort -u)
-  fi
-  if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && grep -qF -- "$HOME/" "$text"; then
-    printf 'home path: %s/\n' "$HOME"
-  fi
-  while IFS= read -r host; do
-    [ -n "$host" ] || continue
-    if grep -qiF -- "$host" "$text"; then printf 'enterprise host: %s\n' "$host"; fi
-  done < <(_leak_guard_enterprise_hosts)
-  for pattern in "${OSS_READINESS_SECRET_PATTERNS[@]:-}"; do
-    [ -n "$pattern" ] || continue
-    if grep -qE -- "$pattern" "$text" 2>/dev/null; then
-      printf 'token-shaped secret (pattern /%s/)\n' "$pattern"
-      break
-    fi
-  done
-  return 0
-}
-
-_leak_guard() {
-  local target host slug text findings
-  [ "${DOTFILES_GH_ALLOW_PRIVATE_REFS:-0}" = "1" ] && return 0
-  target="$(_leak_guard_target)"
-  host="${target%% *}"
-  slug="${target#* }"
-  _leak_guard_applies "$host" "$slug" || return 0
-  if [ -f "$self_dir/../lib/oss-readiness.sh" ]; then
-    # shellcheck source=lib/oss-readiness.sh
-    . "$self_dir/../lib/oss-readiness.sh"
-    oss_readiness_load_private_env >/dev/null 2>&1 || true
-  fi
-  text=$(mktemp -t gh-wrapper-leak.XXXXXX)
-  WRAPPER_TMPS+=("$text")
-  _leak_guard_collect "$text"
-  findings="$(_leak_guard_findings "$text")"
-  [ -n "$findings" ] || return 0
-  {
-    echo "gh wrapper: blocked a post to public ${host}${slug:+/$slug}: the text has a private reference."
-    printf '%s\n' "$findings" | sed 's/^/  - /'
-    echo "Replace each one with a generic placeholder (~ for the home dir, github.example.com for hosts, PROJ-123 for tickets)."
-    echo "For a deliberate post, rerun with DOTFILES_GH_ALLOW_PRIVATE_REFS=1."
-  } >&2
-  exit 1
 }
 
 # Track temp files so we clean up on exit.
@@ -986,7 +842,5 @@ if _gh_wrapper_is_agent_context && [ "${argv[0]} ${argv[1]}" = "pr create" ]; th
     exit 1
   fi
 fi
-
-_leak_guard
 
 "$REAL_GH" "${new_args[@]}"

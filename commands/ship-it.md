@@ -105,7 +105,7 @@ Own-tool release automation is explicitly enabled for `agentbrew`, `dotfiles`, `
 
 ## Push unblock
 
-If Cursor's `git-push-guard` rejects an approved current-task or approved-family push because the workspace root is not the git checkout, retry from the absolute checkout:
+If a managed push guard rejects an approved current-task or approved-family push because the workspace root is not the git checkout, retry from the absolute checkout:
 
 ```bash
 REPO="/absolute/path/to/repo"

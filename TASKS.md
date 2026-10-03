@@ -305,6 +305,18 @@ remote without explicit operator approval in the current session. -->
   - **Acceptance**: Hook fixture tests block `gh pr create --repo other/repo` without approval token; dotfiles `tests/gh-wrapper.bats` stays green.
   - **Surfaced-by**: 2026-06-11 closing `dotfiles-migrate-shell-wrappers-to-hooks` — four of five planned hooks landed; cross-repo gate deferred to agentbrew.
 
+- [ ] User-dir installers for AWS CLI v2 and the gcloud SDK, so `dotfiles apply` reproduces them without brew Python
+  - **ID**: user-dir-installers-for-aws-gcloud
+  - **Tags**: scout, brew, arm64-migration, endpoint-security, reproducibility
+  - **Details**: The arm64 Homebrew migration removed `awscli` and the `gcloud-cli` cask from the inline Brewfile. Both pull `python@3.x`, and endpoint agents flag that Python on every spawn (see the NOTE in `.chezmoiscripts/run_onchange_brew.sh.tmpl` and AGENTS.md rule #10). The tools were then installed into user dirs by hand: AWS CLI v2 from `AWSCLIV2.pkg`, unpacked to `~/.local/aws-cli` and symlinked into `~/.local/bin`; the Google Cloud SDK from `https://sdk.cloud.google.com` into `~/google-cloud-sdk`, symlinked into `~/.local/bin`. `run_after_uv-tools.sh` reproduces poetry, httpie, and jrnl, but AWS CLI v2 is not on PyPI and gcloud is not a uv tool. So a fresh `dotfiles apply` installs neither, although both scripts already point at this task ID. Add `.chezmoiscripts/run_once_install_aws_gcloud.sh` (or extend `run_after_uv-tools.sh`) that: (1) when `~/.local/bin/aws` is absent, downloads `https://awscli.amazonaws.com/AWSCLIV2.pkg`, runs `pkgutil --expand-full`, copies the `aws-cli` payload to `~/.local/aws-cli`, and symlinks `aws` and `aws_completer` into `~/.local/bin`; (2) when `~/google-cloud-sdk` is absent, runs the gcloud install script with `--disable-prompts --install-dir="$HOME"` and symlinks `gcloud`, `gsutil`, and `bq` into `~/.local/bin`. Gate both behind `.is_enterprise` (where `awscli` used to live) and skip cleanly when the tool is already present. The `enterprise.aws` doctor fix hint still says `brew install awscli`; point it at the new installer and add checks that `aws` and `gcloud` resolve under `~/.local`.
+  - **Files**: `.chezmoiscripts/run_once_install_aws_gcloud.sh` (new), `modules/enterprise/doctor.sh`, `tests/chezmoiscripts.bats`, `docs/what-gets-changed.md`
+  - **Acceptance**: On a fresh machine with `is_enterprise: true`, `dotfiles apply` leaves `command -v aws` at `~/.local/bin/aws` (v2) and `command -v gcloud` at `~/.local/bin/gcloud`, and neither spawns brew Python. A second `dotfiles apply` is a no-op for both. The enterprise doctor checks pass.
+  - **Hypothesis**: A user-dir installer makes AWS CLI v2 and gcloud reproducible, so manual install steps after a fresh enterprise apply drop from 2 to 0.
+  - **Success**: On a clean enterprise-profile HOME, one `dotfiles apply` installs both tools under `~/.local/bin`, and a second apply changes nothing.
+  - **Pivot**: If either vendor installer needs admin rights or triggers an endpoint prompt, stop and document one `needs-user-action` step instead.
+  - **Measurement**: `command -v aws gcloud | grep -c "$HOME/.local/bin/"` reads 2 after a fresh `dotfiles apply` with `is_enterprise: true`.
+  - **Anchor**: AGENTS.md rule #10 (user-dir installs over admin paths); chezmoi `run_once_` script docs; AWS CLI v2 "install for the current user" macOS docs.
+
 - [ ] dotfiles-doctor JSON mode reports "fixed" status before `_fix` actually runs
   - **ID**: doctor-json-fixed-status-leaks-on-fix-failure
   - **Tags**: scout, doctor, json, observability

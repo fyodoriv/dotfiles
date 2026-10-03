@@ -181,18 +181,6 @@ remote without explicit operator approval in the current session. -->
   - **Measurement**: `lib/local-ai-agent.py` retry tests pass and a recorded Ollama version threshold is added to docs.
   - **Anchor**: ollama/ollama#14834 and PRs #14906/#14915; docs/user-stories/09-run-local-models-fast.md.
 
-- [ ] Add the `tests/chezmoi.bats` regression assertions for the `.chezmoiignore` repo entries
-  - **ID**: chezmoiignore-repo-files-leak-to-home-root
-  - **Tags**: chezmoi, dotfiles-apply, bug, regression, scout
-  - **Details**: Status 2026-09-28: the `.chezmoiignore` entries landed, and the live Measurement reads 0. Only the matching `[ ! -e "$TEST_HOME/<name>" ]` assertions in `tests/chezmoi.bats` remain; none exist yet. Original report: `.chezmoiignore` is missing repo entries for `ARCHITECTURE.md`, `ROADMAP.md`, `VISION.md`, `agent-hooks`, `commands`, `scripts`, `templates`, `vscode`, and `windsurf`, so `chezmoi apply` currently deploys these repo files/dirs to `$HOME` root on every apply. Confirmed live 2026-09-17: `chezmoi managed --path-style absolute` lists each as a managed target directly under `$HOME`. Fix: add those paths to `.chezmoiignore` under a new comment block (`# Repo files/dirs that must never deploy to $HOME (were leaking to ~ root)`), and extend the existing deploy-target regression test in `tests/chezmoi.bats` (the block asserting `[ ! -e "$TEST_HOME/launchagents" ]` etc.) with matching `[ ! -e "$TEST_HOME/<name>" ]` assertions for every listed name.
-  - **Files**: .chezmoiignore, tests/chezmoi.bats
-  - **Acceptance**: `chezmoi managed --path-style absolute` (after a clean apply) lists none of those repo paths under `$HOME` top level; `bats tests/chezmoi.bats` exits 0 including the new regression assertions.
-  - **Hypothesis**: Adding the missing entries to `.chezmoiignore` stops repo files from deploying to `$HOME` root.
-  - **Success**: `chezmoi managed --path-style absolute` shows none of the listed repo paths under `$HOME` top level after apply.
-  - **Pivot**: If entries still leak after the ignore-list edit, the deploy path isn't `.chezmoiignore`-driven for those types (e.g. symlink vs copy mode) — inspect chezmoi source-attribute prefixes instead of extending the ignore list further.
-  - **Measurement**: `chezmoi managed --path-style absolute | grep -c -E '^/Users/[^/]+/(ARCHITECTURE\.md|ROADMAP\.md|VISION\.md|agent-hooks|commands|scripts|templates|vscode|windsurf)$'` reads 0.
-  - **Anchor**: chezmoi source/target separation (chezmoi `.chezmoiignore` docs); dotfiles rule "never deploy repo files to $HOME".
-
 ## P2
 
 - [ ] Prevent dotfiles-sync from stopping its own active run during a LaunchAgent reload

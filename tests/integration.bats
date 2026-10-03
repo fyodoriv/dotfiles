@@ -439,5 +439,19 @@ EOF2
   grep -q '^  morning_hour: 8$' "$cfg"
   grep -q '^  morning_minute: 30$' "$cfg"
   grep -q '^  recipient: unused-no-encryption-configured$' "$cfg"
+  ! grep -qE 'claude_model|claude_effort' "$cfg" || false
   ! grep -q 'extra_overlay_root' "$cfg"
+}
+
+@test "re-init keeps the Claude model and effort override" {
+  cat > "$TEST_HOME/.config/chezmoi/chezmoi.yaml" << EOF2
+data:
+  profile: full
+  claude_model: "claude-example-model"
+  claude_effort: "high"
+EOF2
+  reinit_config
+  local cfg="$TEST_HOME/.config/chezmoi/chezmoi.yaml"
+  grep -q '^  claude_model: "claude-example-model"$' "$cfg"
+  grep -q '^  claude_effort: "high"$' "$cfg"
 }

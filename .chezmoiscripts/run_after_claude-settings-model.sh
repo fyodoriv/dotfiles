@@ -2,11 +2,13 @@
 # Pin Claude Code's default model and permission mode in ~/.claude/settings.json.
 #
 # Per AGENTS.md § Model Configuration, Claude Code's tier-1 default is
-# "Claude Opus 5.5 Medium" — which Claude Code expresses as:
+# "Claude Opus 5.5 XHigh" — which Claude Code expresses as:
 #   - model:       "claude-opus-5-5"   (rejects effort suffixes such as -max)
-#   - effortLevel: "medium"            (persistable: low/medium/high/xhigh; max is in-session only)
+#   - effortLevel: "xhigh"             (persistable: low/medium/high/xhigh; max is in-session only)
 #
 # Keep these values equal to defaultModel/defaultEffort in Agentfile.yaml.
+# One machine or an org overlay can pick another pair without editing this
+# file: see the override block below.
 # agentbrew writes the same keys; this pin covers machines where agentbrew
 # cannot run (tests/claude-model-agentfile-consistency.bats).
 #
@@ -30,8 +32,34 @@ unset _script_dir
 
 SETTINGS="$HOME/.claude/settings.json"
 DESIRED_MODEL="claude-opus-5-5"
-DESIRED_EFFORT="medium"
+DESIRED_EFFORT="xhigh"
 DESIRED_PERMISSION_MODE="bypassPermissions"
+
+# Per-machine override. Env wins over chezmoi data, key by key; an unset key
+# keeps the base default above.
+#   env:          DOTFILES_CLAUDE_MODEL, DOTFILES_CLAUDE_EFFORT
+#   chezmoi data: claude_model, claude_effort (~/.config/chezmoi/chezmoi.yaml)
+_data_model=""
+_data_effort=""
+if { [ -z "${DOTFILES_CLAUDE_MODEL:-}" ] || [ -z "${DOTFILES_CLAUDE_EFFORT:-}" ]; } \
+  && command -v chezmoi >/dev/null 2>&1; then
+  IFS='|' read -r _data_model _data_effort < <(
+    chezmoi execute-template '{{ dig "claude_model" "" . }}|{{ dig "claude_effort" "" . }}' 2>/dev/null || true
+  ) || true
+fi
+DESIRED_MODEL="${DOTFILES_CLAUDE_MODEL:-${_data_model:-$DESIRED_MODEL}}"
+_effort="${DOTFILES_CLAUDE_EFFORT:-${_data_effort:-$DESIRED_EFFORT}}"
+case "$_effort" in
+  low|medium|high|xhigh) DESIRED_EFFORT="$_effort" ;;
+  *) echo "⚠ Claude effort '$_effort' is not persistable (low/medium/high/xhigh) — keeping $DESIRED_EFFORT" >&2 ;;
+esac
+unset _data_model _data_effort _effort
+
+# modules/claude/doctor.sh reads the resolved pair here, so check and fix agree.
+if [ "${1:-}" = "--print-desired" ]; then
+  printf '%s %s\n' "$DESIRED_MODEL" "$DESIRED_EFFORT"
+  exit 0
+fi
 
 # Skip if Claude Code isn't installed (no ~/.local/bin/claude binary).
 [ -e "$HOME/.local/bin/claude" ] || exit 0

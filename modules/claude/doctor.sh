@@ -12,29 +12,37 @@ check "claude.model_wrapper" "\$HOME/bin/claude strips ANTHROPIC_MODEL and defau
 
 # ── Claude Code model default ─────────────────────────────────────────
 # Per AGENTS.md § Model Configuration, Claude Code's tier-1 default is
-# "Claude Opus 5.5 Medium" — model="claude-opus-5-5" + effortLevel="medium"
+# "Claude Opus 5.5 XHigh" — model="claude-opus-5-5" + effortLevel="xhigh"
 # in ~/.claude/settings.json. The pin is installed idempotently by
 # .chezmoiscripts/run_after_claude-settings-model.sh on every chezmoi apply.
+# That script also resolves per-machine overrides, so this check asks it for
+# the expected pair (--print-desired) instead of keeping its own copy.
 # We check via jq if available (the script requires it anyway); fall back
 # to a grep that tolerates ordering/spacing if jq is somehow absent.
 _claude_model_is_default() {
   local settings="$HOME/.claude/settings.json"
   [ -s "$settings" ] || return 1
+  local want_m want_e
+  read -r want_m want_e < <(bash "$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-model.sh" --print-desired 2>/dev/null) || return 1
+  [ -n "$want_m" ] && [ -n "$want_e" ] || return 1
   if command -v jq >/dev/null 2>&1; then
     local m e p s
     m="$(jq -r '.model // ""' "$settings" 2>/dev/null)"
     e="$(jq -r '.effortLevel // ""' "$settings" 2>/dev/null)"
     p="$(jq -r '.permissions.defaultMode // ""' "$settings" 2>/dev/null)"
     s="$(jq -r '.skipAutoPermissionPrompt // false' "$settings" 2>/dev/null)"
-    [ "$m" = "claude-opus-5-5" ] && [ "$e" = "medium" ] && [ "$p" = "bypassPermissions" ] && [ "$s" = "true" ]
+    [ "$m" = "$want_m" ] && [ "$e" = "$want_e" ] && [ "$p" = "bypassPermissions" ] && [ "$s" = "true" ]
   else
-    grep -q '"model"[[:space:]]*:[[:space:]]*"claude-opus-5-5"' "$settings" && \
-      grep -q '"effortLevel"[[:space:]]*:[[:space:]]*"medium"' "$settings" && \
+    # Escape the model for grep: an id such as claude-opus-5-5[1m] has brackets.
+    local want_m_re
+    want_m_re="$(printf '%s' "$want_m" | sed 's/[][\\.*^$]/\\&/g')"
+    grep -q "\"model\"[[:space:]]*:[[:space:]]*\"$want_m_re\"" "$settings" && \
+      grep -q "\"effortLevel\"[[:space:]]*:[[:space:]]*\"$want_e\"" "$settings" && \
       grep -q '"defaultMode"[[:space:]]*:[[:space:]]*"bypassPermissions"' "$settings" && \
       grep -q '"skipAutoPermissionPrompt"[[:space:]]*:[[:space:]]*true' "$settings"
   fi
 }
-check "claude.model_default" "Claude Code config pinned to Opus 5.5 medium and bypassPermissions" \
+check "claude.model_default" "Claude Code config pinned to Opus 5.5 xhigh (or this machine's override) and bypassPermissions" \
   "_claude_model_is_default" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-model.sh'"
 

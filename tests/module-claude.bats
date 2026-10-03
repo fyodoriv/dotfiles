@@ -17,6 +17,12 @@ setup() {
 
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
+  unset DOTFILES_CLAUDE_MODEL DOTFILES_CLAUDE_EFFORT XDG_CONFIG_HOME
+
+  # claude.model_default asks the pin script for the expected model/effort.
+  mkdir -p "$TEST_DOTFILES/.chezmoiscripts"
+  cp "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-model.sh" \
+     "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-model.sh"
 
   OVERRIDES_FILE="$TEST_DOTFILES/.overrides"
   touch "$OVERRIDES_FILE"
@@ -55,7 +61,7 @@ teardown() {
 @test "claude: wrapper check passes when ~/bin/claude strips ANTHROPIC_MODEL" {
   mkdir -p "$TEST_HOME/bin" "$TEST_HOME/.claude" "$TEST_HOME/.local/bin"
   touch "$TEST_HOME/.local/bin/claude"
-  echo '{"model":"claude-opus-5-5","effortLevel":"medium","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
   cat > "$TEST_HOME/bin/claude" <<'WRAPPER'
 #!/bin/bash
 unset ANTHROPIC_MODEL

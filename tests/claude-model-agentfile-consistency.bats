@@ -9,12 +9,13 @@
 #           .chezmoiscripts/run_after_claude-settings-model.sh (chezmoi apply
 #           and the claude.model_default doctor fix)
 #
-# If they differ, each sync flips the model back and forth.
+# If they differ, each sync flips the model back and forth. The doctor has no
+# copy of its own: it asks the pin script for the resolved pair.
 
 load test_helper
 
 EXPECTED_MODEL="claude-opus-5-5"
-EXPECTED_EFFORT="medium"
+EXPECTED_EFFORT="xhigh"
 
 @test "claude model: Agentfile.yaml sets defaultModel=$EXPECTED_MODEL and defaultEffort=$EXPECTED_EFFORT" {
   local agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
@@ -33,7 +34,18 @@ EXPECTED_EFFORT="medium"
   grep -qE "^DESIRED_EFFORT=\"$EXPECTED_EFFORT\"$" "$script"
 }
 
-@test "claude model: doctor expects $EXPECTED_MODEL at $EXPECTED_EFFORT effort" {
+@test "claude model: settings pin script resolves $EXPECTED_MODEL $EXPECTED_EFFORT with no override" {
+  local script="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-model.sh"
+  local home="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$home"
+  run env -u DOTFILES_CLAUDE_MODEL -u DOTFILES_CLAUDE_EFFORT -u XDG_CONFIG_HOME \
+    HOME="$home" bash "$script" --print-desired
+  [ "$status" -eq 0 ]
+  [ "$output" = "$EXPECTED_MODEL $EXPECTED_EFFORT" ]
+}
+
+@test "claude model: doctor reads the expected pair from the pin script" {
   local doctor="$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
-  grep -qF "[ \"\$m\" = \"$EXPECTED_MODEL\" ] && [ \"\$e\" = \"$EXPECTED_EFFORT\" ]" "$doctor"
+  grep -qF 'run_after_claude-settings-model.sh" --print-desired' "$doctor"
+  ! grep -qE '\[ "\$m" = "claude-' "$doctor"
 }

@@ -127,7 +127,7 @@ _setup_cursor_installed() {
 
 _setup_cursor_model_state() {
   mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/.cursor" "$(dirname "$CURSOR_STATE_DB")"
-  printf '{"model":"claude-opus-5-5","effortLevel":"medium"}\n' > "$TEST_HOME/.claude/settings.json"
+  printf '{"model":"claude-opus-5-5","effortLevel":"xhigh"}\n' > "$TEST_HOME/.claude/settings.json"
   cat > "$TEST_HOME/.cursor/cli-config.json" <<'JSON'
 {
   "version": 1,
@@ -153,7 +153,7 @@ import sys
 db = sys.argv[1]
 key = "src.vs.platform.reactivestorage.browser.reactiveStorageServiceImpl.persistentStorage.applicationUser"
 state = {
-    "availableDefaultModels2": [{"serverModelName": "claude-opus-5-5-medium"}],
+    "availableDefaultModels2": [{"serverModelName": "claude-opus-5-5-xhigh"}],
     "aiSettings": {
         "modelConfig": {
             "composer": {"modelName": "default", "maxMode": False, "selectedModels": None},
@@ -319,7 +319,7 @@ import sqlite3
 import sys
 
 cli_path, db_path = sys.argv[1:]
-target = "claude-opus-5-5-medium"
+target = "claude-opus-5-5-xhigh"
 selection = [{"modelId": target, "parameters": []}]
 features = (
     "composer",
@@ -334,7 +334,7 @@ features = (
 cli = json.load(open(cli_path, encoding="utf-8"))
 assert cli["model"]["modelId"] == target
 assert cli["model"]["displayModelId"] == target
-assert cli["model"]["displayName"] == "Claude Opus 5.5 Medium"
+assert cli["model"]["displayName"] == "Claude Opus 5.5 Xhigh"
 assert cli["hasChangedDefaultModel"] is True
 assert cli["authInfo"]["email"] == "user@example.com"
 
@@ -687,14 +687,14 @@ import sqlite3
 import sys
 
 cli_path, db_path = sys.argv[1:]
-assert json.load(open(cli_path, encoding="utf-8"))["model"]["modelId"] == "claude-opus-5-5-medium"
+assert json.load(open(cli_path, encoding="utf-8"))["model"]["modelId"] == "claude-opus-5-5-xhigh"
 key = "src.vs.platform.reactivestorage.browser.reactiveStorageServiceImpl.persistentStorage.applicationUser"
 state = json.loads(sqlite3.connect(db_path).execute("select value from ItemTable where key = ?", (key,)).fetchone()[0])
 expected = [{
     "modelId": "claude-opus-5-5",
     "parameters": [
         {"id": "context", "value": "300k"},
-        {"id": "effort", "value": "medium"},
+        {"id": "effort", "value": "xhigh"},
         {"id": "fast", "value": "false"},
     ],
 }]
@@ -709,4 +709,25 @@ PY
   FIX_MODE=false
   source "$TEST_DOTFILES/modules/cursor/doctor.sh"
   [ "$fail_count" -eq 0 ]
+}
+
+@test "cursor: model parity follows the Claude Code pin and its override" {
+  _setup_cursor_installed
+  _setup_cursor_model_state
+  unset DOTFILES_CLAUDE_MODEL DOTFILES_CLAUDE_EFFORT XDG_CONFIG_HOME
+  cp "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-model.sh" \
+     "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-model.sh"
+  mkdir -p "$TEST_HOME/.local/bin"
+  touch "$TEST_HOME/.local/bin/claude"
+  echo '{}' > "$TEST_HOME/.claude/settings.json"
+
+  # Base default: Claude Code gets claude-opus-5-5 + xhigh, Cursor the joined id.
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-model.sh"
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_cursor-agent-parity.sh"
+  [ "$(jq -r .model.modelId "$TEST_HOME/.cursor/cli-config.json")" = "claude-opus-5-5-xhigh" ]
+
+  # A machine override reaches Cursor through Claude Code's settings.json.
+  DOTFILES_CLAUDE_EFFORT=high bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-model.sh"
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_cursor-agent-parity.sh"
+  [ "$(jq -r .model.modelId "$TEST_HOME/.cursor/cli-config.json")" = "claude-opus-5-5-high" ]
 }

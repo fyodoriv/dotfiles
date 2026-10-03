@@ -24,6 +24,15 @@
 {{- if hasKey . "auto_sync" -}}
 {{-   $autoSync = .auto_sync -}}
 {{- end -}}
+{{/*  Optional Claude Code model/effort override (run_after_claude-settings-model.sh) */ -}}
+{{- $claudeModel := "" -}}
+{{- if hasKey . "claude_model" -}}
+{{-   $claudeModel = .claude_model -}}
+{{- end -}}
+{{- $claudeEffort := "" -}}
+{{- if hasKey . "claude_effort" -}}
+{{-   $claudeEffort = .claude_effort -}}
+{{- end -}}
 {{- $autoUpgrade := promptBoolOnce . "auto_upgrade" "Enable auto-upgrade LaunchAgent (brew upgrade at 3am Sunday)" false -}}
 {{- $useEncryption := promptBoolOnce . "use_encryption" "Enable age encryption (requires ~/.config/chezmoi/key.txt)" false -}}
 {{- $ageRecipient := "unused-no-encryption-configured" -}}
@@ -102,4 +111,10 @@ data:
   git_personal_email: {{ $gitPersonalEmail | quote }}
 {{- if $extraOverlayRoot }}
   extra_overlay_root: {{ $extraOverlayRoot | quote }}
+{{- end }}
+{{- if $claudeModel }}
+  claude_model: {{ $claudeModel | quote }}
+{{- end }}
+{{- if $claudeEffort }}
+  claude_effort: {{ $claudeEffort | quote }}
 {{- end }}

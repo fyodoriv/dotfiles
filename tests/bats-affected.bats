@@ -252,6 +252,7 @@ assert_affected_includes() {
 @test "bin/gh change triggers gh-wrapper.bats and smoke.bats" {
   result=$(affected_for "bin/gh")
   echo "$result" | basenames | grep -q "gh-wrapper"
+  echo "$result" | basenames | grep -q "gh-wrapper-leak-guard"
   echo "$result" | basenames | grep -q "smoke"
 }
 

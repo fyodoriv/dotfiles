@@ -64,7 +64,7 @@ fi
 # bin/X          → tests/X.bats  (direct name)
 # Special: bin/dotfiles → tests/cli.bats
 #          bin/cheat    → tests/cli.bats
-#          bin/gh       → tests/gh-wrapper.bats
+#          bin/gh       → tests/gh-wrapper.bats, tests/gh-wrapper-leak-guard.bats
 #          bin/git      → tests/git-wrapper.bats
 #          bin/dotfiles-add + bin/dotfiles-unmanage → tests/add-unmanage.bats
 #          bin/dotfiles-new-module, bin/dotfiles-brew-add,
@@ -142,7 +142,7 @@ for file in "${changed_files[@]}"; do
         affected+=("$TESTS_DIR/cli.bats")
         ;;
       gh)
-        affected+=("$TESTS_DIR/gh-wrapper.bats")
+        affected+=("$TESTS_DIR/gh-wrapper.bats" "$TESTS_DIR/gh-wrapper-leak-guard.bats")
         ;;
       git)
         affected+=("$TESTS_DIR/git-wrapper.bats")
@@ -193,7 +193,7 @@ for file in "${changed_files[@]}"; do
       case "$bin_name" in
         dotfiles)        affected+=("$TESTS_DIR/cli.bats") ;;
         cheat)           affected+=("$TESTS_DIR/cli.bats") ;;
-        gh)              affected+=("$TESTS_DIR/gh-wrapper.bats") ;;
+        gh)              affected+=("$TESTS_DIR/gh-wrapper.bats" "$TESTS_DIR/gh-wrapper-leak-guard.bats") ;;
         git)             affected+=("$TESTS_DIR/git-wrapper.bats") ;;
         dotfiles-add|dotfiles-unmanage)    affected+=("$TESTS_DIR/add-unmanage.bats") ;;
         dotfiles-new-module|dotfiles-brew-add|dotfiles-defaults-add|dotfiles-profile)

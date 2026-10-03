@@ -38,7 +38,20 @@
 #
 # Bypass: set MINSKY_PIPELINE=1 (set by the minsky orchestrator when it
 # spawns unattended pipeline runs) to preserve attribution for
-# pipeline-to-PR linkage.
+# pipeline-to-PR linkage. The public leak guard below still runs.
+#
+# Public leak guard (lib/gh-public-leak.sh):
+#   Runs first, right after the real gh is found, so no exec below can
+#   skip it. Read-only calls return at once. A write-shaped call (pr,
+#   issue, release, gist, repo, and label writes, and gh api writes) has
+#   its raw text scanned before the strip pass. When the target is a
+#   PUBLIC github.com repo, gist, or API endpoint, the call fails closed
+#   on the private patterns from lib/oss-readiness.sh, home paths,
+#   enterprise hosts, ssh remotes, and token-shaped secrets. The message
+#   names the field and the class, never the matched text. Other hosts
+#   (GitHub Enterprise) and private repos are not scanned. If the lib is
+#   missing, write-shaped calls fail. Deliberate post:
+#   DOTFILES_ALLOW_GH_PRIVATE_REFS=1.
 #
 # Per-repo agent PR allowlist:
 #   The cross-repo approval gate that fires when `gh pr create --repo X`
@@ -80,6 +93,74 @@ else
     echo "gh wrapper: could not locate the real gh binary" >&2
     exit 127
   fi
+fi
+
+# True when argv can publish text. An argv-only check, so a missing guard
+# lib still fails closed on writes and never blocks reads.
+_gh_is_write_shaped() {
+  local cmd="${1:-}" sub="" arg val skip=0 method="" fields=0 indirect=0 mutation=0 endpoint=""
+  [ "$#" -eq 0 ] || shift
+  if [ "$cmd" != "api" ]; then
+    for arg in "$@"; do
+      if [ "$skip" = 1 ]; then skip=0; continue; fi
+      case "$arg" in
+        -R|--repo) skip=1 ;;
+        -*) ;;
+        *) sub="$arg"; break ;;
+      esac
+    done
+    case "$cmd $sub" in
+      "pr create"|"pr new"|"pr edit"|"pr comment"|"pr review"|"pr close"|"pr reopen"|"pr merge"|\
+      "issue create"|"issue new"|"issue edit"|"issue comment"|"issue close"|"issue reopen"|\
+      "release create"|"release new"|"release edit"|"release upload"|\
+      "gist create"|"gist new"|"gist edit"|"repo create"|"repo new"|"repo edit"|\
+      "label create"|"label edit")
+        return 0 ;;
+    esac
+    return 1
+  fi
+  while [ "$#" -gt 0 ]; do
+    arg="$1"
+    shift
+    val=""
+    # `-i` (include) is the only boolean short flag; drop it from clusters.
+    while [ "${#arg}" -gt 2 ] && [ "${arg#-i}" != "$arg" ]; do arg="-${arg#-i}"; done
+    case "$arg" in
+      -X|--method) method="${1:-}"; [ "$#" -eq 0 ] || shift ;;
+      --method=*) method="${arg#*=}" ;;
+      -X*) method="${arg#-X}"; method="${method#=}" ;;
+      -f|-F|--field|--raw-field) fields=1; val="${1:-}"; [ "$#" -eq 0 ] || shift ;;
+      --field=*|--raw-field=*) fields=1; val="${arg#*=}" ;;
+      -f*|-F*) fields=1; val="${arg#-?}"; val="${val#=}" ;;
+      --input|--input=*) fields=1; indirect=1; [ "$arg" != --input ] || [ "$#" -eq 0 ] || shift ;;
+      -H|--header|-q|--jq|-t|--template|-p|--preview|--hostname|--cache) [ "$#" -eq 0 ] || shift ;;
+      -*) ;;
+      *) [ -n "$endpoint" ] || endpoint="$arg" ;;
+    esac
+    case "$val" in *mutation*) mutation=1 ;; esac
+    case "$val" in *=@*) indirect=1 ;; esac
+  done
+  case "$(printf '%s' "$method" | tr '[:lower:]' '[:upper:]')" in
+    GET|HEAD) return 1 ;;
+  esac
+  # A graphql call writes only through a mutation. A query read from a
+  # file or stdin is checked by the lib.
+  if [ "${endpoint#/}" = "graphql" ]; then
+    [ "$mutation" = 1 ] || [ "$indirect" = 1 ]
+    return
+  fi
+  [ -n "$method" ] || [ "$fields" = 1 ]
+}
+
+if _gh_is_write_shaped "$@"; then
+  leak_lib="$(cd "$(dirname "$0")" && pwd)/../lib/gh-public-leak.sh"
+  if [ ! -f "$leak_lib" ]; then
+    echo "gh wrapper: blocked a write: lib/gh-public-leak.sh is missing next to this wrapper." >&2
+    exit 1
+  fi
+  # shellcheck source=lib/gh-public-leak.sh
+  . "$leak_lib"
+  gh_public_leak_guard "$@"
 fi
 
 # Minsky pipelines preserve attribution — exec straight through.

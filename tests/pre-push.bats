@@ -9,10 +9,18 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   PRIVATE_ENV_FILE="$TEST_DIR/private-email.env"
   EMPTY_ENV_FILE="$TEST_DIR/empty.env"
+  MIN_VERSION="$(cat "$BATS_TEST_DIRNAME/../config/oss-readiness-min-version")"
+  # Pushes to the owner's public repos need an armed pattern file: a
+  # private pattern and a current version. Fixture terms are fake.
+  ARMED_ENV="OSS_READINESS_INTERNAL_PATTERN='zz-fixture-never-matches'
+OSS_READINESS_PATTERN_VERSION=$MIN_VERSION"
   cat > "$PRIVATE_ENV_FILE" <<'EOF'
 OSS_READINESS_PRIVATE_EMAIL_PATTERN='@private\.example$'
 EOF
+  printf '%s\n' "$ARMED_ENV" >> "$PRIVATE_ENV_FILE"
   : > "$EMPTY_ENV_FILE"
+  # Keep the runner's gh hosts out of the marker scan.
+  export GH_CONFIG_DIR="$TEST_DIR/gh-config"
 }
 
 teardown() {
@@ -134,8 +142,9 @@ EOF' _ "$repo" "$HOOK" "$sha"
   _make_repo "$repo" "author@private.example"
   local sha
   sha="$(git -C "$repo" rev-parse HEAD)"
+  printf '%s\n' "$ARMED_ENV" > "$TEST_DIR/armed.env"
 
-  run env -u OSS_READINESS_PRIVATE_EMAIL_PATTERN OSS_READINESS_ENV_FILE="$EMPTY_ENV_FILE" bash -c 'cd "$1" && "$2" "$3" "$4" <<EOF
+  run env -u OSS_READINESS_PRIVATE_EMAIL_PATTERN OSS_READINESS_ENV_FILE="$TEST_DIR/armed.env" bash -c 'cd "$1" && "$2" "$3" "$4" <<EOF
 refs/heads/main $5 refs/heads/main 0000000000000000000000000000000000000000
 EOF
 ' _ "$repo" "$HOOK" origin "https://github.com/fyodoriv/agentbrew.git" "$sha"
@@ -146,7 +155,7 @@ EOF
 # ── Private-reference content gate ─────────────────────────────────────
 
 _pattern_env() {
-  printf "OSS_READINESS_INTERNAL_PATTERN='%s'\n" "$1" > "$TEST_DIR/pattern.env"
+  printf "OSS_READINESS_INTERNAL_PATTERN='%s'\nOSS_READINESS_PATTERN_VERSION=%s\n" "$1" "$MIN_VERSION" > "$TEST_DIR/pattern.env"
 }
 
 _push_range() {
@@ -231,7 +240,7 @@ _commit_file() {
   [[ "$output" == *"tracked.md"* ]]
 }
 
-@test "pre-push allows a matching file when no pattern is configured" {
+@test "pre-push blocks an owner push when no pattern is configured" {
   local repo="$TEST_DIR/repo" sha
   _make_repo "$repo" "public@example.test"
   _commit_file "$repo" notes.md "company-private"
@@ -241,6 +250,99 @@ _commit_file() {
 refs/heads/topic $3 refs/heads/topic 0000000000000000000000000000000000000000
 EOF
 ' _ "$repo" "$HOOK" "$sha"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"pattern file"*"missing"* ]]
+}
+
+@test "pre-push blocks an owner push when the pattern file is older than the minimum" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  _commit_file "$repo" notes.md "clean"
+  printf "OSS_READINESS_INTERNAL_PATTERN='zz-fixture'\nOSS_READINESS_PATTERN_VERSION=%s\n" "$((MIN_VERSION - 1))" > "$TEST_DIR/pattern.env"
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"version $((MIN_VERSION - 1))"*"version $MIN_VERSION or later"* ]]
+}
+
+@test "pre-push does not require the pattern file for a non-owner push" {
+  local repo="$TEST_DIR/dotfiles-fork" sha
+  _make_repo "$repo" "public@example.test"
+  mkdir -p "$repo/lib"
+  : > "$repo/lib/oss-readiness.sh"
+  sha="$(git -C "$repo" rev-parse HEAD)"
+
+  run env -u OSS_READINESS_INTERNAL_PATTERN OSS_READINESS_ENV_FILE="$EMPTY_ENV_FILE" bash -c 'cd "$1" && "$2" origin "https://github.com/someone/dotfiles.git" <<EOF
+refs/heads/topic $3 refs/heads/topic 0000000000000000000000000000000000000000
+EOF
+' _ "$repo" "$HOOK" "$sha"
+
+  [ "$status" -eq 0 ]
+}
+
+# ── Generic markers (no private pattern needed) ────────────────────────
+# Fixture names are fake and built at run time.
+
+@test "pre-push blocks another user's home path in an added line" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  local user="zz""corpuser"
+  _commit_file "$repo" notes.md "cache at /Users/$user/Library/x"
+  _pattern_env 'zz-fixture'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"user home path"* ]]
+  [[ "$output" != *"corpuser"* ]]
+}
+
+@test "pre-push blocks an enterprise-style host in a commit message" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  printf 'clean\n' > "$repo/notes.md"
+  git -C "$repo" add notes.md
+  git -C "$repo" commit --quiet -m "docs: mirror of github.zz""widget.net/team/repo"
+  _pattern_env 'zz-fixture'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"enterprise-style host"* ]]
+}
+
+@test "pre-push blocks a host gh is signed in to" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  mkdir -p "$GH_CONFIG_DIR"
+  printf 'github.com:\n    user: octo\ncode.zz''widget-sso.net:\n    user: octo\n' > "$GH_CONFIG_DIR/hosts.yml"
+  _commit_file "$repo" notes.md "see https://code.zz""widget-sso.net/a"
+  _pattern_env 'zz-fixture'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"enterprise host"* ]]
+}
+
+@test "pre-push allows placeholders and skips allow-listed fixture paths" {
+  local repo="$TEST_DIR/repo" base
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  _commit_file "$repo" notes.md "clone git@github.example.com:org/repo into /Users/alice/src; bundle com.github.facebook.watchman"
+  mkdir -p "$repo/tests"
+  _commit_file "$repo" .oss-readiness-allow 'tests/*leak*.bats'
+  local user="zz""corpuser"
+  _commit_file "$repo" tests/fake-leak.bats "/Users/$user/x"
+  _pattern_env 'zz-fixture'
+
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
 
   [ "$status" -eq 0 ]
 }
@@ -261,7 +363,7 @@ EOF
 }
 
 _roots_env() {
-  printf "OSS_READINESS_ALLOWED_ROOTS='%s'\n" "$1" > "$TEST_DIR/pattern.env"
+  printf "OSS_READINESS_ALLOWED_ROOTS='%s'\n%s\n" "$1" "$ARMED_ENV" > "$TEST_DIR/pattern.env"
 }
 
 @test "pre-push allows history that starts at an approved root" {

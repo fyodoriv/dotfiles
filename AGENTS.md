@@ -368,10 +368,15 @@ short version every contributor needs:
    also blocks the push when a file changed in the pushed range (read at
    the pushed commit) matches the private-identifier pattern; the message
    lists file paths only. It also blocks a pushed commit whose added lines,
-   file names, or message match; that message lists commit ids only. Both patterns come from the org overlay's `oss-readiness.env`,
-   which `lib/oss-readiness.sh` loads. With no overlay, those two checks
-   have nothing to match. The hook then delegates to the repo-local
-   `hooks/pre-push`.
+   file names, or message match; that message lists commit ids only. Both patterns come from the local-only `oss-readiness.env`,
+   which `lib/oss-readiness.sh` loads. For the owner's public repos the
+   hook fails closed: a missing or outdated pattern file (version below
+   `config/oss-readiness-min-version`) blocks the push. Generic markers
+   (home paths, enterprise hosts, `git@` remotes) run on pushed lines and
+   messages with no pattern file. See `SECURITY.md` § "Private pattern
+   file". The hook then delegates to the repo-local `hooks/pre-push`.
+   Never set `DOTFILES_ALLOW_GH_PRIVATE_REFS=1` as an agent; only a human
+   who read the text may.
 
 4. **`bats tests/no-internal-refs.bats`** + **`bats tests/oss-readiness-lib.bats`**
    lock the private-reference scanner and secret patterns in place.

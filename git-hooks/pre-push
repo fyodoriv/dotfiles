@@ -216,7 +216,8 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
     [ -n "$commit" ] || continue
     {
       git -C "$CURRENT_REPO" show --format= --no-color --no-ext-diff --unified=0 -m "$commit" 2>/dev/null |
-        awk -v allow="$allow_re" '
+        ALLOW_RE="$allow_re" awk '
+          BEGIN { allow = ENVIRON["ALLOW_RE"] }  # -v would eat the regex backslashes
           /^\+\+\+ / { p = substr($0, 5); sub(/^b\//, "", p); skip = (allow != "" && p ~ allow); next }
           /^\+/ && !skip { print substr($0, 2) }'
       git -C "$CURRENT_REPO" log -1 --format=%B "$commit" 2>/dev/null

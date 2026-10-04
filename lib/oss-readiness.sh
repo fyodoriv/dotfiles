@@ -63,6 +63,77 @@ oss_readiness_load_private_env() {
   return 1
 }
 
+_oss_readiness_config_dir() {
+  printf '%s\n' "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config"
+}
+
+# Prints the owner's public repos as lower-case "host/owner/repo" lines.
+oss_readiness_owner_public_repos() {
+  local list="${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-$(_oss_readiness_config_dir)/public-push-remotes.txt}"
+  [ -r "$list" ] || return 0
+  sed 's/#.*//; s/[[:space:]]//g' "$list" | grep -v '^$' | tr '[:upper:]' '[:lower:]'
+}
+
+# Succeeds when "$1" (a "host/owner/repo" key) is one of the owner's public
+# repos. Only the owner can push there, so a push or post to one comes
+# from the owner's machine.
+oss_readiness_is_owner_public() {
+  local key
+  key="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [ -n "$key" ] || return 1
+  oss_readiness_owner_public_repos | grep -qxF -- "$key"
+}
+
+# Prints the lowest private pattern file version that a push or post to an
+# owner's public repo accepts (config/oss-readiness-min-version).
+oss_readiness_min_version() {
+  local v
+  v="$(tr -cd '0-9' 2>/dev/null < "$(_oss_readiness_config_dir)/oss-readiness-min-version" || true)"
+  printf '%s\n' "${v:-1}"
+}
+
+# Succeeds when the loaded private env can guard a write to an owner's
+# public repo: it has a private pattern, and its OSS_READINESS_PATTERN_VERSION
+# is at least the minimum. Otherwise prints the reason and fails, so the
+# caller blocks the write. A missing or outdated file fails closed: an
+# outdated file let private references reach public repos before.
+oss_readiness_check_private_env() {
+  local min have
+  min="$(oss_readiness_min_version)"
+  if [ -z "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
+    echo "the private pattern file (~/.config/oss-readiness/oss-readiness.env) is missing or has no OSS_READINESS_INTERNAL_PATTERN"
+    return 1
+  fi
+  have="${OSS_READINESS_PATTERN_VERSION:-0}"
+  case "$have" in '' | *[!0-9]*) have=0 ;; esac
+  if [ "$have" -lt "$min" ]; then
+    echo "the private pattern file is version $have, and this dotfiles needs version $min or later; copy the current ~/.config/oss-readiness/ from the machine that has it"
+    return 1
+  fi
+  return 0
+}
+
+# Prints one extended regex for the path globs in .oss-readiness-allow at
+# revision "$2" of repo "$1" (one glob per line, # comments). Paths that
+# match skip the generic marker scan; list only leak-guard test fixtures.
+# Prints nothing when the file is missing or empty.
+oss_readiness_allow_regex() {
+  git -C "$1" show "$2:.oss-readiness-allow" 2>/dev/null |
+    sed 's/#.*//; s/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' |
+    awk '{
+      g = $0; r = ""
+      for (i = 1; i <= length(g); i++) {
+        c = substr(g, i, 1)
+        if (c == "*" && substr(g, i + 1, 1) == "*") { r = r ".*"; i++ }
+        else if (c == "*") r = r "[^/]*"
+        else if (c == "?") r = r "[^/]"
+        else if (index(".+()|[]{}^$\\", c)) r = r "\\" c
+        else r = r c
+      }
+      out = out (out == "" ? "" : "|") "^" r "$"
+    } END { if (out != "") print out }'
+}
+
 oss_readiness_email_is_safe() {
   local email="$1"
   [ -n "${OSS_READINESS_PRIVATE_EMAIL_PATTERN:-}" ] || return 0

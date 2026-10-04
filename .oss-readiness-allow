@@ -1,0 +1,4 @@
+# Paths the pre-push generic marker scan skips (git-hooks/pre-push, 1d).
+# One glob per line. List only leak-guard test fixtures with fake private
+# references. Everything else must use placeholders.
+tests/gh-wrapper-leak-guard.bats

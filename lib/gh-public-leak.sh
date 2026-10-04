@@ -712,67 +712,7 @@ _ghpl_collect() {
 
 # ── Matchers ─────────────────────────────────────────────────────────
 
-# Generic markers that need no private pattern. Prints "<file><TAB><class>".
-# Placeholders such as /Users/<you>/, /Users/$USER/, github.example.com,
-# and GitHub Actions expressions such as github.event.x are not matches.
-_GHPL_MARKERS_AWK='
-function hit(cls) {
-  if (!((FILENAME SUBSEP cls) in seen)) { seen[FILENAME SUBSEP cls] = 1; print FILENAME "\t" cls }
-}
-function placeholder(h) {
-  return (("." h ".") ~ /\.example\./) || (h ~ /\.(test|invalid|localhost|local)$/)
-}
-function labels(s,   n, parts, i) {
-  n = split(s, parts, ".")
-  for (i = 1; i <= n; i++) if (parts[i] !~ /^[a-z0-9-]+$/) return 0
-  return n
-}
-BEGIN {
-  nent = split(ent, ents, " ")
-  split("shared runner user username you me example linuxbrew", ok, " ")
-  for (i in ok) homeok[ok[i]] = 1
-  me = tolower(me)
-}
-{
-  line = $0
-  lc = tolower(line)
-  if (home != "" && index(line, home "/") > 0) hit("home path")
-  s = line; off = 0
-  while (match(s, /\/(Users|home)\/[^\/ \t<>$*{}%~]+\//)) {
-    pos = off + RSTART
-    pre = (pos > 1) ? substr(line, pos - 1, 1) : ""
-    name = tolower(substr(s, RSTART, RLENGTH))
-    sub(/^\/(users|home)\//, "", name); sub(/\/$/, "", name)
-    if (pre !~ /[A-Za-z0-9._-]/ && name !~ /^\.+$/ && !(name in homeok) && name != me) { hit("user home path"); break }
-    off = pos; s = substr(s, RSTART + 1)
-  }
-  n = split(lc, toks, /[^a-z0-9._-]+/)
-  for (i = 1; i <= n; i++) {
-    t = toks[i]; sub(/\.+$/, "", t)
-    p = index("." t, ".github.")
-    if (p > 0) {
-      h = substr(t, p)
-      if (labels(substr(h, 8)) >= 2 && !placeholder(h) \
-          && h !~ /^github\.(event|ref|repository|actor|sha|workflow|job|token|workspace|action|env|path)\./ \
-          && h !~ /(\.githubassets\.com|^github\.global\.ssl\.fastly\.net)$/ \
-          && h !~ /\.(json|yml|yaml|md|txt|toml|lock|xml|html|css|js|ts|sh|py|rb|go|rs|conf|cfg|ini|log|tmpl)$/)
-        hit("enterprise-style host")
-    }
-    if (t ~ /[a-z0-9-]\.ghe\.com$/) {
-      name = t; sub(/\.ghe\.com$/, "", name); sub(/^.*\./, "", name)
-      if (name !~ /^(example|subdomain|tenant|octocorp)$/) hit("enterprise-style host")
-    }
-  }
-  s = lc
-  while (match(s, /(ssh:\/\/)?git@[a-z0-9.-]+/)) {
-    m = substr(s, RSTART, RLENGTH); nxt = substr(s, RSTART + RLENGTH, 1)
-    viassh = (m ~ /^ssh:/)
-    sub(/^(ssh:\/\/)?git@/, "", m)
-    if ((viassh || nxt == ":") && m !~ /^(github\.com|ssh\.github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)$/ && !placeholder(m)) { hit("ssh host"); break }
-    s = substr(s, RSTART + RLENGTH)
-  }
-  for (i = 1; i <= nent; i++) if (ents[i] != "" && ents[i] != "github.com" && index(lc, ents[i]) > 0) hit("enterprise host")
-}'
+# Generic markers that need no private pattern: lib/private-ref-markers.awk.
 
 # Prints "<piece file><TAB><class>" for every private reference in the
 # collected pieces. A few processes in all, not a few per piece.
@@ -793,7 +733,7 @@ _ghpl_scan() {
       fi
     done < <(grep -laE "$email_re" "$_ghpl_tmp"/p* 2>/dev/null || true)
   fi
-  awk -v home="${HOME:-}" -v me="${HOME##*/}" -v ent="${_ghpl_auth//$'\n'/ }" "$_GHPL_MARKERS_AWK" \
+  awk -v home="${HOME:-}" -v me="${HOME##*/}" -v ent="${_ghpl_auth//$'\n'/ }" -f "$_ghpl_dir/private-ref-markers.awk" \
     "$_ghpl_tmp"/p* 2>/dev/null || true
   for pattern in ${OSS_READINESS_SECRET_PATTERNS[@]+"${OSS_READINESS_SECRET_PATTERNS[@]}"}; do
     secret_args+=(-e "$pattern")
@@ -814,6 +754,35 @@ _ghpl_load_patterns() {
   . "$_ghpl_dir/oss-readiness.sh"
   { [ -n "$repo" ] && oss_readiness_load_private_env "$repo"; } >/dev/null 2>&1 ||
     oss_readiness_load_private_env dotfiles >/dev/null 2>&1 || true
+}
+
+# Prints the github.com login from gh's hosts.yml in lower case, or nothing.
+_ghpl_github_login() {
+  local hosts_file="${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}/hosts.yml"
+  awk '/^[^[:space:]#]/ { h = $0; sub(/:.*/, "", h); gsub(/["'"'"']/, "", h); inh = (tolower(h) == "github.com"); next }
+    inh && /^[[:space:]]+user:/ { u = $0; sub(/^[[:space:]]+user:[[:space:]]*/, "", u); gsub(/["'"'"']/, "", u); print tolower(u); exit }' \
+    "$hosts_file" 2>/dev/null || true
+}
+
+# Succeeds when the owner writes to one of their own public repos
+# (config/public-push-remotes.txt), and sets _ghpl_target to it. A token
+# with no known login counts as the owner.
+_ghpl_owner_public_write() {
+  local slug login
+  declare -F oss_readiness_is_owner_public >/dev/null || return 1
+  login="$(_ghpl_github_login)"
+  if [ -n "$login" ] &&
+     ! oss_readiness_owner_public_repos | cut -d/ -f2 | grep -qxF -- "$login"; then
+    return 1
+  fi
+  for slug in "${_ghpl_ts[@]}"; do
+    [ -n "$slug" ] || continue
+    if oss_readiness_is_owner_public "github.com/$slug"; then
+      _ghpl_target="github.com/$slug"
+      return 0
+    fi
+  done
+  return 1
 }
 
 _ghpl_cleanup() {
@@ -840,6 +809,17 @@ gh_public_leak_guard() {
     return 0
   fi
   _ghpl_load_patterns
+  # The owner's own public repos need an armed pattern file. A missing or
+  # outdated file blocks the write instead of skipping the pattern scan.
+  if compgen -G "$_ghpl_tmp/p*" >/dev/null && _ghpl_owner_public_write &&
+     ! _ghpl_env_problem="$(oss_readiness_check_private_env)"; then
+    {
+      echo "gh wrapper: blocked a write to public $_ghpl_target: $_ghpl_env_problem."
+      echo "The pattern file is local-only and never goes through a repo. See SECURITY.md \"Private pattern file\"."
+    } >&2
+    _ghpl_cleanup
+    exit 1
+  fi
   hits="$(_ghpl_scan)"
   if [ -z "$hits" ] || ! _ghpl_confirm_public; then
     _ghpl_cleanup; trap - EXIT

@@ -77,6 +77,25 @@ else
   RED='' YEL='' RST=''
 fi
 
+# ── Fail closed for the owner's public repos ───────────────────────────
+# Only the owner can push to these, so this is the owner's machine, and the
+# private pattern gate must be armed. A missing or outdated pattern file
+# blocks the push instead of skipping the scan.
+if oss_readiness_is_owner_public "$remote_key"; then
+  if ! env_problem="$(oss_readiness_check_private_env)"; then
+    printf '%s✗ Push to public %s blocked: %s.%s\n' "$RED" "$remote_key" "$env_problem" "$RST" >&2
+    printf '%sThe pattern file is local-only and never goes through a repo. See SECURITY.md "Private pattern file".%s\n' "$YEL" "$RST" >&2
+    exit 1
+  fi
+fi
+
+# Hosts gh is signed in to. The generic marker scan treats every one other
+# than github.com as an enterprise host.
+gh_hosts="$(awk '/^[^[:space:]#][^:]*:/ { h = $0; sub(/:.*/, "", h); gsub(/["'"'"']/, "", h); print tolower(h) }' \
+  "${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}/hosts.yml" 2>/dev/null | tr '\n' ' ' || true)"
+marker_dir="$(mktemp -d "${TMPDIR:-/tmp}/pre-push-markers.XXXXXX")"
+trap 'rm -rf "$marker_dir"' EXIT
+
 # ── Read stdin: per-ref pre-push payload ───────────────────────────────
 # Format: <local ref> <local sha> <remote ref> <remote sha>\n …
 # We only scan refs we're actually about to push.
@@ -184,6 +203,42 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
     done < <(git -C "$CURRENT_REPO" rev-list --max-parents=0 "$local_sha" 2>/dev/null || true)
   fi
 
+  # 1d. Generic markers (lib/private-ref-markers.awk): the lines each pushed
+  # commit adds, and its message, must not carry a home path, another
+  # user's home path, an enterprise-style or signed-in enterprise host, or
+  # a git@ remote on another host. These need no private pattern file, so
+  # they hold even where that file is missing or old. Paths that match a
+  # glob in the pushed .oss-readiness-allow are skipped (leak-guard test
+  # fixtures only). Print commit ids and classes only, never the text.
+  allow_re="$(oss_readiness_allow_regex "$CURRENT_REPO" "$local_sha" || true)"
+  rm -f "$marker_dir"/c.*
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    {
+      git -C "$CURRENT_REPO" show --format= --no-color --no-ext-diff --unified=0 -m "$commit" 2>/dev/null |
+        awk -v allow="$allow_re" '
+          /^\+\+\+ / { p = substr($0, 5); sub(/^b\//, "", p); skip = (allow != "" && p ~ allow); next }
+          /^\+/ && !skip { print substr($0, 2) }'
+      git -C "$CURRENT_REPO" log -1 --format=%B "$commit" 2>/dev/null
+    } > "$marker_dir/c.$commit"
+  done < <(git -C "$CURRENT_REPO" rev-list "${range_args[@]}" 2>/dev/null || true)
+  marker_hits=()
+  while IFS=$'\t' read -r f class; do
+    [ -n "$f" ] || continue
+    marker_hits+=("$(git -C "$CURRENT_REPO" rev-parse --short "${f##*/c.}"): $class")
+  done < <(
+    if compgen -G "$marker_dir/c.*" >/dev/null; then
+      awk -v home="${HOME:-}" -v me="${HOME##*/}" -v ent="$gh_hosts" \
+        -f "$DOTFILES_DIR/lib/private-ref-markers.awk" "$marker_dir"/c.* 2>/dev/null || true
+    fi
+  )
+  if [ "${#marker_hits[@]}" -gt 0 ]; then
+    printf '%s✗ %d private reference(s) in lines or messages of pushed commits:%s\n' "$RED" "${#marker_hits[@]}" "$RST" >&2
+    printf '   %s\n' "${marker_hits[@]}" >&2
+    printf '\n%sUse placeholders: ~ for a home dir, github.example.com for a host. Then rewrite those commits.%s\n' "$YEL" "$RST" >&2
+    scan_failed=1
+  fi
+
   # 2. Author/committer scan: no commit in the range may carry a private
   # email. Nothing rewrites history after the push, so a private email
   # would reach GitHub.com as-is. Run against CURRENT_REPO (the repo being
@@ -223,6 +278,8 @@ fi
 # stdin (husky / lefthook / project commit checks operate on the
 # working tree), so this is acceptable.
 if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
+  # exec skips the EXIT trap.
+  rm -rf "$marker_dir"
   exec "$CURRENT_REPO/hooks/pre-push" "$@"
 fi
 

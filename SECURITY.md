@@ -104,8 +104,8 @@ the others.
 | Layer | Where | What it catches | Bypass |
 |-------|-------|-----------------|--------|
 | **L1** Pre-commit hook | `git-hooks/pre-commit` | Forbidden files, content, secrets, and private committer email on staged files. In dotfiles it also blocks protected-directory deletions and lints TASKS.md | `git commit --no-verify` |
-| **L2** Pre-push hook | `git-hooks/pre-push` | For pushes of dotfiles, agentbrew, and every repo in `config/public-push-remotes.txt` to github.com: blocks commits whose author or committer email matches the private-email pattern, blocks files changed in the push (read at the pushed commit) that match the private-identifier pattern, and blocks pushed commits whose added lines, file names, or message match. The messages list paths or commit ids only. Then delegates to the repo-local `hooks/pre-push` | `git push --no-verify` |
-| **L2b** gh leak guard | `bin/gh` + `lib/gh-public-leak.sh` | Text that git hooks never see, read raw before any other `bin/gh` step (so `MINSKY_PIPELINE` and pass-through calls are covered): PR, issue, and release titles, bodies, and comments (flags, files, and stdin), squash-merge messages, release asset names, gist files and file names, repo and label descriptions, and `gh api` write fields (`@file`, `@-`) and `--input` JSON. For a public github.com target it blocks the private-identifier and private-email patterns, home paths (this machine's and other users'), enterprise-style and signed-in enterprise hosts, `git@` remotes on other hosts, and token-shaped secrets. The message names the field and the class only. GitHub Enterprise hosts and private repos are not scanned. A missing lib blocks writes | `DOTFILES_ALLOW_GH_PRIVATE_REFS=1` |
+| **L2** Pre-push hook | `git-hooks/pre-push` | For pushes of dotfiles, agentbrew, and every repo in `config/public-push-remotes.txt` to github.com: blocks commits whose author or committer email matches the private-email pattern, blocks files changed in the push (read at the pushed commit) that match the private-identifier pattern, and blocks pushed commits whose added lines, file names, or message match. It also runs the generic markers (`lib/private-ref-markers.awk`: home paths, enterprise-style and signed-in enterprise hosts, `git@` remotes on other hosts) on the lines each pushed commit adds and on its message; these need no pattern file. For the owner's public repos it fails closed: a missing or outdated pattern file blocks the push (see "Private pattern file"). The messages list paths, commit ids, or classes only. Then delegates to the repo-local `hooks/pre-push` | `git push --no-verify` |
+| **L2b** gh leak guard | `bin/gh` + `lib/gh-public-leak.sh` | Text that git hooks never see, read raw before any other `bin/gh` step (so `MINSKY_PIPELINE` and pass-through calls are covered): PR, issue, and release titles, bodies, and comments (flags, files, and stdin), squash-merge messages, release asset names, gist files and file names, repo and label descriptions, and `gh api` write fields (`@file`, `@-`) and `--input` JSON. For a public github.com target it blocks the private-identifier and private-email patterns, home paths (this machine's and other users'), enterprise-style and signed-in enterprise hosts, `git@` remotes on other hosts, and token-shaped secrets. The message names the field and the class only. GitHub Enterprise hosts and private repos are not scanned. A missing lib blocks writes. When the signed-in owner writes to one of their own public repos, a missing or outdated pattern file blocks the write | `DOTFILES_ALLOW_GH_PRIVATE_REFS=1` |
 | **L3** Local test gate | `make check` | Shellcheck, TASKS.md lint, and affected Bats tests. GitHub Actions is turned off, so this is the last gate before merge to `feat/chezmoi` | skipping the run |
 
 Nothing rewrites history after a push. A private email that passes L1 and
@@ -185,7 +185,31 @@ the overlay root, then sibling repos under `~/apps`. Keep the local file out of
 every repo.
 
 With no overlay, both patterns are empty and those checks have nothing to
-match. Run `tests/no-internal-refs.bats` with that env loaded before you
+match. That is allowed only for other people's pushes and posts, such as a
+contributor pushing to a fork.
+
+### Private pattern file
+
+The owner's public repos (`config/public-push-remotes.txt`) fail closed. A
+push to one, or a `gh` write to one by its signed-in owner, is blocked
+unless the loaded env has `OSS_READINESS_INTERNAL_PATTERN` and
+`OSS_READINESS_PATTERN_VERSION` at or above `config/oss-readiness-min-version`.
+An outdated pattern file on a second machine once let private references
+into public PRs, so a stale file must stop the write, not skip the scan.
+
+When you add terms to the pattern file:
+
+1. Raise `OSS_READINESS_PATTERN_VERSION` in the local file.
+2. Raise `config/oss-readiness-min-version` to the same number, in a PR.
+3. Copy the folder `~/.config/oss-readiness/` to every other machine by hand.
+   Never send it through a repo. Each machine stays blocked from public
+   pushes and posts until it has the new file.
+
+The version is a plain counter. It says nothing about the terms.
+
+The generic markers in `lib/private-ref-markers.awk` need no pattern file.
+Paths listed in a repo's `.oss-readiness-allow` (one glob per line) skip
+the pre-push marker scan. List only leak-guard test fixtures there. Run `tests/no-internal-refs.bats` with that env loaded before you
 push. If it finds a match, move the content to the overlay or generalize it
 in the base.
 

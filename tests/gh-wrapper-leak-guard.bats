@@ -303,6 +303,46 @@ make_checkout() {
   assert_posted
 }
 
+# ── Owner's public repos: the pattern file must be armed ──────────────
+
+_sign_in_as_owner() {
+  cat > "$GH_CONFIG_DIR/hosts.yml" <<'YML'
+github.com:
+    user: fyodoriv
+    git_protocol: ssh
+YML
+}
+
+@test "owner post to an owner public repo is blocked when the pattern file is missing" {
+  _sign_in_as_owner
+  rm -f "$OSS_READINESS_ENV_FILE"
+  run "$GH_WRAPPER" pr comment 8 -R fyodoriv/dotfiles --body "plain text"
+  assert_blocked "pattern file"
+  [[ "$output" == *"github.com/fyodoriv/dotfiles"* ]]
+}
+
+@test "owner post to an owner public repo is blocked when the pattern file is outdated" {
+  _sign_in_as_owner
+  local min
+  min="$(cat "$REPO_ROOT/config/oss-readiness-min-version")"
+  printf 'OSS_READINESS_PATTERN_VERSION=%s\n' "$((min - 1))" >> "$OSS_READINESS_ENV_FILE"
+  run "$GH_WRAPPER" pr comment 8 -R fyodoriv/dotfiles --body "plain text"
+  assert_blocked "version $((min - 1))"
+}
+
+@test "owner post to an owner public repo goes through with a current pattern file" {
+  _sign_in_as_owner
+  printf 'OSS_READINESS_PATTERN_VERSION=%s\n' "$(cat "$REPO_ROOT/config/oss-readiness-min-version")" >> "$OSS_READINESS_ENV_FILE"
+  run "$GH_WRAPPER" pr comment 8 -R fyodoriv/dotfiles --body "plain text"
+  assert_posted
+}
+
+@test "another user's post to an owner public repo does not need the pattern file" {
+  rm -f "$OSS_READINESS_ENV_FILE"
+  run "$GH_WRAPPER" pr comment 8 -R fyodoriv/dotfiles --body "plain text"
+  assert_posted
+}
+
 # ── Bypass paths that must stay closed ───────────────────────────────
 
 @test "MINSKY_PIPELINE=1 does not skip the guard" {

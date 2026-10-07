@@ -57,10 +57,21 @@ fi
 if [ -x "$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation" ]; then
   "$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation" || true
 fi
+# DOTFILES_AGENT_NODE_BIN names an approved Node from another publisher; put
+# it first on PATH so agentbrew sync and the jobs it writes run on it.
+_agent_node_active=false
+_default_node_path="$PATH"
 if [ -f "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
     && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
-  echo "○ agentbrew sync skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
-  exit 0
+  if [ -f "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" ] \
+      && source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" \
+      && dotfiles_use_agent_node; then
+    _agent_node_active=true
+    echo "→ agentbrew sync uses approved agent Node $(dotfiles_agent_node_bin)"
+  else
+    echo "○ agentbrew sync skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
+    exit 0
+  fi
 fi
 
 # mcpm is a pipx console script whose shebang executes uv Python 3.13.
@@ -195,4 +206,9 @@ if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
       bash "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" || true
     fi
   fi
+fi
+
+# Jobs that sync just rewrote onto the approved agent Node can now be enabled.
+if $_agent_node_active; then
+  PATH="$_default_node_path" "$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation" || true
 fi

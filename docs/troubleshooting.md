@@ -204,6 +204,13 @@ then ask for a machine-scoped exception. After approval, set
 `DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER=1` (or
 `DOTFILES_ALLOW_BLOCKED_OLLAMA_PUBLISHER=1`) and reinstall the jobs you need.
 
+**Agent Node from another publisher:** to keep agentbrew running while the
+Node.js Foundation publisher is blocked, set `DOTFILES_AGENT_NODE_BIN` to a Node
+from another publisher (for example `/opt/homebrew/bin/node`), then run
+`dotfiles apply`. Agentbrew sync, its LaunchAgents, and its doctors then run on
+that Node. The default `node` and Topgrade stay in safe mode. If the variable
+names a missing file or a binary from the blocked publisher, nothing changes.
+
 **Python:** `uv` Pythons have no publisher identity, so a strict policy can still
 flag them after ad-hoc signing. Python-dependent doctor modules stay off unless
 `DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=1` is set.

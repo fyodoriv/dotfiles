@@ -7,7 +7,7 @@
 {{-   $workEmailDomain = promptStringOnce . "work_email_domain" "Work email domain for Chrome profile detection" "example.com" -}}
 {{-   $gheHost = promptStringOnce . "github_enterprise_host" "GitHub Enterprise hostname" "github.example.com" -}}
 {{- end -}}
-{{- $useAiTools := promptBoolOnce . "use_ai_tools" "Enable AI agent tooling (Devin CLI, ANTHROPIC_MODEL, agent-browser)" false -}}
+{{- $useAiTools := promptBoolOnce . "use_ai_tools" "Enable AI agent tooling (ANTHROPIC_MODEL, agent-browser)" false -}}
 {{- $useLocalAi := promptBoolOnce . "use_local_ai" "Enable local-LLM stack (pipx + aider + mlx-lm on Apple Silicon; ~30 GB model weights require explicit opt-in via ~/.config/dotfiles/.local-llm-bootstrap-confirmed sentinel)" false -}}
 {{- $useCursor := promptBoolOnce . "use_cursor" "Manage Cursor (settings, extensions, launch agents, agentbrew Cursor config)" true -}}
 {{- $dotfilesDir := promptStringOnce . "dotfiles_dir" "Dotfiles directory relative to home (e.g. apps/dotfiles, dotfiles)" "apps/dotfiles" -}}

@@ -141,7 +141,6 @@ show_keys() {
   cmd "Ctrl+X Ctrl+E"        "Open current command in \$EDITOR"
   cmd "fc"                   "Edit + re-run last command in \$EDITOR"
   cmd "Ctrl+R"               "Reverse history search (fzf)"
-  cmd "Ctrl+G"               "Send line to Devin"
 }
 
 show_tools() {

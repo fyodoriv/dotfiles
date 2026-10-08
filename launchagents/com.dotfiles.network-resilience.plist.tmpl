@@ -29,7 +29,7 @@
         <key>HOME</key>
         <string>{{ .chezmoi.homeDir }}</string>
 {{ if dig "use_ai_tools" false . }}        <key>DOTFILES_NETWORK_TARGETS</key>
-        <string>https://github.com https://api.anthropic.com https://app.devin.ai</string>
+        <string>https://github.com https://api.anthropic.com</string>
 {{ end }}    </dict>
     <!-- Don't accumulate if many changes happen in quick succession -->
     <key>ThrottleInterval</key>

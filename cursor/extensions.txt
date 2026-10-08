@@ -5,7 +5,7 @@
 # To add/remove: edit this file, run `dotfiles-doctor --fix --module cursor`.
 # The doctor installs missing extensions only; existing local extensions stay.
 #
-# Layered to match the same WebStorm/Ghostty parity goal as windsurf/extensions.txt,
+# Layered to match the same WebStorm/Ghostty parity goal as vscode/extensions.txt,
 # while keeping Cursor's first-party AI surface owned by Cursor/agentbrew.
 
 # ── Keymap (replaces WebStorm "Mac OS X 10.5+ copy" keymap) ──────────────────

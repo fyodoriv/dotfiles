@@ -47,7 +47,7 @@ Every module declares one of four severity tiers in `modules/<name>/severity`. T
 | Tier | One-liner | Modules |
 |------|-----------|---------|
 | **critical** | Security & safety — failures need immediate attention | `security`, `ssh`, `workflow` |
-| **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `devin`, `editor`, `git`, `memory`, `shell`, `sync`, `upgrade` |
+| **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `memory`, `shell`, `sync`, `upgrade` |
 | **performance** | System performance — nice to have, not blocking | `macos`, `tools` |
 | **cosmetic** | Personal preference — ok to skip | `claude`, `cursor`, `enterprise`, `extras`, `jetbrains`, `prompt`, `terminal` |
 
@@ -173,7 +173,6 @@ Spotlight check count varies based on which directories exist on your machine.
 | `tool.gum` | gum installed | `brew install gum` |
 | `tool.delta` | delta installed | `brew install git-delta` |
 | `tool.fastfetch` | fastfetch installed | `brew install fastfetch` |
-| `tool.devin_wrapper` | Devin wrapper preserves title without blocking restart | `dotfiles apply` |
 
 ### sync
 
@@ -190,15 +189,6 @@ Spotlight check count varies based on which directories exist on your machine.
 | `upgrade.launchagent` | Upgrade LaunchAgent loaded | None |
 | `upgrade.recent` | Last upgrade within 14 days | None |
 | `upgrade.brew` | Homebrew installed | None |
-
-### devin
-
-| ID | What it checks | Auto-fix |
-|----|---------------|----------|
-| `devin.network_watchdog_exec` | network-watchdog is executable | `chmod +x` |
-| `devin.binary_exists` | Devin CLI binary exists | Install instruction |
-| `devin.binary_not_stub` | Devin current binary is real executable | Roll back to last real binary |
-| `devin.model_default` | Devin config defaults to Claude Opus 4.8 Max | Update config JSON |
 
 ### agentbrew (core checks + conditional MCP checks)
 

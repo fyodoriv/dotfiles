@@ -30,7 +30,7 @@
                                         ▼
    ┌──────────────────────────────────────────────────────────────┐
    │ Agentfile.yaml  →  agentbrew sync  →  ~/.claude/, ~/.cursor/  │
-   │                                       ~/.config/devin/, …    │
+   │                                       ~/.codex/, …           │
    │                              (every agent surface in Agentfile) │
    └──────────────────────────────────────────────────────────────┘
                                         │
@@ -53,7 +53,7 @@ The 5-layer stack: source → chezmoi → host filesystem → agent-config (via 
 | **CLI surface** | dotfiles | `bin/*` (`dotfiles`, `dotfiles-doctor`, `dotfiles-sync`, `dotfiles-stats`, `morning`, `cleanup`, `git-maintain`, `cheat`, etc.) |
 | **Test surface** | dotfiles | `tests/*.bats` |
 | **Agent manifest** | dotfiles | `Agentfile.yaml` (declares MCP servers / skills / sources for agentbrew) |
-| **Generated agent config** | **agentbrew** (NOT dotfiles) | `~/.claude/`, `~/.cursor/`, `~/.config/devin/`, … |
+| **Generated agent config** | **agentbrew** (NOT dotfiles) | `~/.claude/`, `~/.cursor/`, `~/.codex/`, … |
 
 The boundary between dotfiles and agentbrew is in [`AGENTS.md` § "Ownership Boundary"](AGENTS.md#ownership-boundary). Iron rule: **never have both repos write to the same target path.**
 
@@ -81,7 +81,7 @@ modules/
 ├── shell-startup/doctor.sh    # <200ms startup; alerts on regression
 ├── starship/doctor.sh         # config present + valid TOML
 ├── ghostty/doctor.sh          # config + Mac-permission grants
-├── ai-tools/doctor.sh         # DEVIN_MODEL set, agent CLIs installed (opt-in)
+├── ai-tools/doctor.sh         # agent CLIs installed (opt-in)
 ├── local-llm/doctor.sh        # Ollama + qwen3-coder healthy
 ├── memory/doctor.sh           # shared MCP, maintenance, backup integrity
 ├── security/doctor.sh         # endpoint-policy compliance: no Python.framework pipx

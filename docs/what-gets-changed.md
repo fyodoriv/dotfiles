@@ -36,7 +36,7 @@ These files in the repo's `home/` directory are symlinked into `~/`:
 | `home/ideavimrc` | `~/.ideavimrc` | IdeaVim config: 275 keybindings for JetBrains IDEs (full only) |
 | `home/sleep` | `~/.sleep` | Sleepwatcher hook: logs sleep events (full only) |
 | `home/wakeup` | `~/.wakeup` | Sleepwatcher hook: runs network watchdog on wake (full only) |
-| `home/zshrc.ai-tools` | `~/.zshrc.ai-tools` | AI agent tooling: Devin CLI, model defaults (opt-in) |
+| `home/zshrc.ai-tools` | `~/.zshrc.ai-tools` | AI agent tooling: tmux launchers, agent-browser tuning (opt-in) |
 
 **Note:** `~/.gitconfig` is also deployed via chezmoi template (`dot_gitconfig.tmpl`) which adds a machine-specific `core.hooksPath` pointing to the repo's `git-hooks/` directory. The symlinked version in `home/gitconfig` does not include this path.
 
@@ -151,7 +151,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `pmset-drift-watch` | On power-plist write + every 5 min | all | Read-only log of power-settings changes and the processes alive at that moment |
 | `morning` | Configurable (default 8:30 AM) | full | Morning briefing |
 | `sleepwatcher` | At load | full | Run scripts on sleep/wake events |
-| `cursor-priority` | At load | full | Set process priority for Cursor/Windsurf IDE |
+| `cursor-priority` | At load | full | Set process priority for Cursor IDE |
 | `agent-browser-chrome` | At load, not kept alive | full | Dashboard / SSO Chrome with remote debugging on port 9223; manual close for logout/shutdown is respected |
 | `debug-chrome` | At load, not kept alive | full | Debug-work Chrome with remote debugging on port 9224; manual close for logout/shutdown is respected |
 | `tooling-chrome` | At load, not kept alive | full | Tooling-repo Chrome with remote debugging on port 9225; manual close for logout/shutdown is respected |
@@ -221,7 +221,6 @@ These chezmoi scripts run automatically during `chezmoi apply`:
 | `run_after_cache-inits.sh` | Every apply | Cache fzf, zoxide, starship, fnm init scripts to `~/.cache/zsh/` |
 | `run_after_endpoint-security.sh` | Every apply | Re-sign Homebrew bottles, uv pythons, and dotfiles endpoint shims (managed-endpoint drift) |
 | `run_after_agentbrew-sync.sh` | Every apply | Sync agent config from `Agentfile.yaml` (non-fatal) |
-| `run_after_devin-caffeinate.sh` | Every apply | Install Devin title wrapper at `~/.local/bin/devin` (if Devin installed) |
 
 ---
 

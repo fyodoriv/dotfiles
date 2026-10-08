@@ -2,7 +2,7 @@
 
 agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
 
-@test "Agentfile includes MCP servers expected in fresh Devin sessions" {
+@test "Agentfile includes MCP servers expected in fresh agent sessions" {
   for server in context7 playwright tasks-mcp github; do
     run awk -v server="$server" '
       /^mcp:/ { in_mcp = 1; next }

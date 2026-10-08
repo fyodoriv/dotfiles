@@ -1,7 +1,7 @@
 # ── AI agent tooling (opt-in: use_ai_tools: true in chezmoi config) ──
 # This file is sourced by ~/.zshrc when deployed by chezmoi with
-# use_ai_tools enabled. It contains Devin CLI shortcuts, AI model
-# defaults, agent-browser tuning, and related helpers.
+# use_ai_tools enabled. It contains tmux agent launchers,
+# agent-browser tuning, and related helpers.
 
 # ── Secrets (loaded from macOS Keychain at shell startup) ────────────
 # Exported eagerly so MCP servers launched by GUI apps (Cursor, Claude Desktop)
@@ -11,24 +11,6 @@ export JIRA_PERSONAL_TOKEN="${JIRA_PERSONAL_TOKEN:-$(security find-generic-passw
 jira-token() {
   echo "$JIRA_PERSONAL_TOKEN"
 }
-
-# ── AI model defaults ────────────────────────────────────────────────
-# Devin reads this as a CLI/env default; ~/.config/devin/config.json also pins
-# the same model so non-interactive sessions inherit it without a shell.
-#
-# Devin uses GPT-5.5 XHigh Thinking Fast by default — see
-# AGENTS.md § Model Configuration for the source-level pin and rationale.
-export DEVIN_MODEL="gpt-5-5-xhigh-priority"
-export WAVEFRONT_API_KEY="${WAVEFRONT_API_KEY:-}"  # stub — prevents Devin CLI startup error from shared Windsurf MCP config
-
-# ── Minsky per-machine agent config ──────────────────────────────────
-# Controls which CLI minsky's tick-loop spawns for cloud iterations.
-# Default: "claude" (claude --print). Set to "devin" to use Devin CLI
-# (devin --print --model <DEVIN_MODEL> --permission-mode dangerous).
-# The cloud-agent env var is the per-machine preference; the tick-loop
-# reads it at startup alongside MINSKY_LOCAL_AGENT for local iterations.
-export MINSKY_CLOUD_AGENT="devin"
-export MINSKY_CLOUD_AGENT_MODEL="${DEVIN_MODEL}"
 
 # ── agent-browser performance ─────────────────────────────────────────
 # Keep daemon alive 10 min between commands (avoids cold start per invocation)
@@ -43,7 +25,7 @@ export AGENT_BROWSER_DEFAULT_TIMEOUT=15000
 # an existing CDP endpoint.
 #
 # Problem: every agent-browser caller defaulted to session "default", so
-# Devin / Claude Code / Cursor / Windsurf agents running concurrently on
+# Claude Code / Cursor agents running concurrently on
 # the same box ended up driving the same Chrome and stealing each other's
 # active tab mid-task. Real collision observed 2026-05-12.
 #
@@ -154,87 +136,17 @@ if [[ "${DOTFILES_JETBRAINS_FAST_SHELL:-0}" == "1" ]]; then
   return 0
 fi
 
-# ── PATH: AI tools ──────────────────────────────────────────────────
-# Windsurf IDE CLI
-[ -d "$HOME/.codeium/windsurf/bin" ] && export PATH="$HOME/.codeium/windsurf/bin:$PATH"
-
-# ── Devin CLI: power user shortcuts ──────────────────────────────────
-# The devin wrapper (~/.local/bin/devin) keeps terminal titles useful without
-# using caffeinate, so macOS update restarts are not blocked by agent sessions.
-alias dv='devin'
-alias dvp='devin -p --'
-alias dvc='devin -c'
-alias dvr='devin --resume'     # resume last session
-alias dvl='devin --list'       # list recent sessions
-
-# dvb — Devin bypass mode. The one-shot launcher operators reach for when
-# they want maximum agent capability with no permission prompts:
-#   - --model gpt-5-5-xhigh-priority GPT-5.5 XHigh Thinking Fast
-#                                    per AGENTS.md § Model Configuration.
-#   - --permission-mode dangerous    Auto-approves every tool — no prompts.
-#                                    Devin's own default is "auto" which
-#                                    still prompts on writes.
-#
-# Why pin --model explicitly even though ~/.config/devin/config.json
-# already pins the same value: env-var leaks (ANTHROPIC_MODEL, DEVIN_MODEL),
-# accidental config edits, or a stale value persisting from before the
-# GPT-5.5 default-model change can all silently
-# override the file-level default. Passing the flag every time means dvb
-# is the canonical "I want bypass + GPT-5.5 XHigh Thinking Fast" entry point regardless
-# of any in-flight env-var or config drift.
-#
-# Why pre-export GITHUB_TOKEN: Devin imports MCP configs from peer agents
-# (~/.cursor/mcp.json, ~/.claude.json, …) and strict-interpolates
-# ${GITHUB_TOKEN}. A bare placeholder with an unset env var aborts Devin's
-# WHOLE MCP load — every tool (playwright, context7, etc.), not just
-# github. `~/.zshenv.company.secrets` sets the var at parent-shell init
-# time, but `gh auth login` may have happened after this shell started,
-# leaving GITHUB_TOKEN empty for the child Devin. Defensive re-derivation
-# closes that gap. Pinned by tests/zshrc-ai-tools-dvb.bats § 6 cases.
-#
-# Note: the MARATHON=N delegation to taskgrind that pre-#124-dvb supported
-# is gone — taskgrind was deprecated in PR #124. Operators who want
-# multi-session loops should use minsky's daemon mode directly
-# (`minsky run`) instead of layering it under dvb.
-_DV_START_EPOCH=""
-
-_dv_show_duration() {
-  if [[ -n "$_DV_START_EPOCH" ]]; then
-    local elapsed=$(( $(date +%s) - _DV_START_EPOCH ))
-    local h=$((elapsed / 3600)) m=$(( (elapsed % 3600) / 60 ))
-    if [[ $h -gt 0 ]]; then
-      echo "⏱  Session duration: ${h}h${m}m"
-    else
-      echo "⏱  Session duration: ${m}m"
-    fi
-  fi
-}
-
-dvb() {
-  _DV_START_EPOCH=$(date +%s)
-
-  if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh &>/dev/null; then
-    export GITHUB_TOKEN="$(gh auth token -h github.com 2>/dev/null)"
-  fi
-
-  devin --model gpt-5-5-xhigh-priority --permission-mode dangerous -- "$@"
-  _dv_show_duration
-}
-
 # ── tmux-wrapped agent launchers ─────────────────────────────────────
 # Per the agent-tmux convention (rusty-art/claude-tmux, amux, agentdock):
 # launching an AI agent inside tmux makes the process survive terminal
 # close, ssh disconnect, Ghostty/iTerm quit, and macOS sleep cycles
-# (when Amphetamine/pmset prevents lid-close sleep). The plain `dv`,
-# `cc`, `curr` aliases still launch the agent in the foreground for
+# (when Amphetamine/pmset prevents lid-close sleep). The plain `cc`,
+# `curr` aliases still launch the agent in the foreground for
 # quick one-shot work; the `t*` variants persist.
 #
 # Session naming: `<agent>-<cwd-basename>`. Re-running the same alias
 # in the same repo attaches to the live session instead of creating a
 # new one. Detach with `Ctrl-a d` (prefix is `Ctrl-a` per ~/.tmux.conf).
-alias tdv='agent-tmux devin'                              # Devin CLI in tmux
-alias tdvr='agent-tmux devin --resume'                    # Resume last Devin session in tmux
-alias tdvp='agent-tmux devin --permission-mode dangerous --'  # Devin with prompt in tmux
 alias tcc='agent-tmux claude'                             # Claude Code in tmux
 alias tcur='agent-tmux cursor-agent'                      # Cursor Agent in tmux
 alias tcdx='agent-tmux codex'                             # Codex CLI in tmux
@@ -244,75 +156,17 @@ alias agents='agent-tmux --ls'                            # List active agent-tm
 # Per the agent-tmux convention (rusty-art/claude-tmux, amux, agentdock):
 # launching an AI agent inside tmux makes the process survive terminal
 # close, ssh disconnect, Ghostty/iTerm quit, and macOS sleep cycles
-# (when Amphetamine/pmset prevents lid-close sleep). The plain `dv`,
-# `cc`, `curr` aliases still launch the agent in the foreground for
+# (when Amphetamine/pmset prevents lid-close sleep). The plain `cc`,
+# `curr` aliases still launch the agent in the foreground for
 # quick one-shot work; the `t*` variants persist.
 #
 # Session naming: `<agent>-<cwd-basename>`. Re-running the same alias
 # in the same repo attaches to the live session instead of creating a
 # new one. Detach with `Ctrl-a d` (prefix is `Ctrl-a` per ~/.tmux.conf).
-alias tdv='agent-tmux devin'                              # Devin CLI in tmux
-alias tdvr='agent-tmux devin --resume'                    # Resume last Devin session in tmux
-alias tdvp='agent-tmux devin --permission-mode dangerous --'  # Devin with prompt in tmux
 alias tcc='agent-tmux claude'                             # Claude Code in tmux
 alias tcur='agent-tmux cursor-agent'                      # Cursor Agent in tmux
 alias tcdx='agent-tmux codex'                             # Codex CLI in tmux
 alias agents='agent-tmux --ls'                            # List active agent-tmux sessions
-
-# devin-fleet — launch N parallel Devin agents in tmux
-# Usage: devin-fleet "task 1" "task 2" "task 3"
-devin-fleet() {
-  if [[ $# -eq 0 ]]; then
-    echo "Usage: devin-fleet \"task 1\" \"task 2\" ..."; return 1
-  fi
-  local session="devin-fleet-$$"
-  tmux new-session -d -s "$session" -n "devin-0" "devin --permission-mode dangerous -- $(printf '%q' "$1")"
-  shift
-  local i=1
-  for task in "$@"; do
-    tmux new-window -t "$session" -n "devin-$i" "devin --permission-mode dangerous -- $(printf '%q' "$task")"
-    ((i++))
-  done
-  echo "Launched $i Devin agents in tmux session: $session"
-  echo "Attach: tmux attach -t $session"
-}
-
-# devin-session — open a persistent named tmux session for Devin/Claude work.
-# Creates: left pane = devin, right pane = claude / shell. Reattaches if exists.
-# Usage: devin-session [session-name]
-devin-session() {
-  local name="${1:-ai}"
-  if tmux has-session -t "$name" 2>/dev/null; then
-    echo "Reattaching to existing session: $name"
-    tmux attach -t "$name"
-    return
-  fi
-  # Create session with devin in main pane
-  tmux new-session -d -s "$name" -x 220 -y 50
-  tmux rename-window -t "$name:1" "devin"
-  # Split right: shell / claude pane
-  tmux split-window -h -t "$name:1" -p 45
-  tmux select-pane -t "$name:1.1"
-  tmux send-keys -t "$name:1.1" "devin --permission-mode dangerous" Enter
-  tmux send-keys -t "$name:1.2" "echo 'Right pane: run claude or shell commands here'" Enter
-  # Attach
-  tmux attach -t "$name"
-}
-
-# devin-buffer — Ctrl+G workaround: grab current typed line and send to Devin
-# Enterprise accounts block `devin shell setup`, so Ctrl+G is unavailable.
-# This widget replicates the behavior: capture buffer, clear line, run devin with it.
-# Ghostty: Ctrl+G is bindable. WebStorm terminal: may conflict — use a different key if needed.
-_devin_send_buffer() {
-  local task="$BUFFER"
-  BUFFER=""
-  zle reset-prompt
-  if [[ -n "$task" ]]; then
-    devin --permission-mode dangerous -- "$task"
-  fi
-}
-zle -N _devin_send_buffer
-bindkey "^G" _devin_send_buffer
 
 # ── MLX local LLM server (auto-start, hardware-adaptive) ─────────────
 # Starts from the user's terminal context — some corporate Endpoint Security

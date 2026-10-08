@@ -63,9 +63,6 @@ keybind = super+comma=open_config
 keybind = super+plus=increase_font_size:1
 keybind = super+minus=decrease_font_size:1
 keybind = super+zero=reset_font_size
-# Pass Ctrl+G through to the shell so the _devin_send_buffer zsh widget works.
-# Without this, Ghostty may intercept it before zsh sees it.
-keybind = ctrl+g=unbind
 # Jump to tab N by number (Cmd+1..5)
 keybind = super+1=goto_tab:1
 keybind = super+2=goto_tab:2

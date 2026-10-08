@@ -27,7 +27,7 @@ EOF
 
 @test "doctor gates Python-dependent modules behind explicit exception opt-in" {
   grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' bin/dotfiles-doctor
-  grep -q 'claude-\*|cursor|devin|local-ai|local-llm|mcp-orchestrator|vscode|windsurf' bin/dotfiles-doctor
+  grep -q 'claude-\*|cursor|local-ai|local-llm|mcp-orchestrator|vscode' bin/dotfiles-doctor
   grep -q 'python3 has no publisher authority' bin/dotfiles-doctor
 }
 

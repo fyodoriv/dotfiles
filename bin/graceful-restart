@@ -35,7 +35,7 @@ BLOCKERS=(
 found_blockers=0
 check_blocker() {
   local pattern="$1" label="$2"
-  if ps aux | grep -v -E "cursor.agent|claude-bg|devin|grep|graceful-restart" | grep -q "$pattern"; then
+  if ps aux | grep -v -E "cursor.agent|claude-bg|grep|graceful-restart" | grep -q "$pattern"; then
     echo -e "  ${YELLOW}⏳${NC} ${label} is still running"
     found_blockers=1
   fi

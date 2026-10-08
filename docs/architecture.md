@@ -33,9 +33,8 @@ On `chezmoi apply`, scripts in `.chezmoiscripts/` run automatically in this orde
 4. run_onchange_launchagents.sh.tmpl ← LaunchAgents (re-runs when templates change)
 5. run_after_agentbrew-sync.sh    ← AI agent config sync (every apply)
 6. run_after_cache-inits.sh       ← Shell init caching (every apply)
-7. run_after_devin-caffeinate.sh  ← Devin CLI title wrapper (every apply)
-8. run_after_endpoint-security.sh ← Re-sign Homebrew bottles + uv pythons + endpoint shims (every apply)
-9. run_after_install_local_llm.sh.tmpl ← Local-LLM pipx/model bootstrap when opted in
+7. run_after_endpoint-security.sh ← Re-sign Homebrew bottles + uv pythons + endpoint shims (every apply)
+8. run_after_install_local_llm.sh.tmpl ← Local-LLM pipx/model bootstrap when opted in
 ```
 
 Within each group, scripts run alphabetically. `run_once_*` keys to filename hash (runs once ever). `run_onchange_*` keys to rendered content hash (re-runs when output changes). `run_after_*` runs on every apply.
@@ -196,7 +195,6 @@ User runs: chezmoi apply
     │   ├── run_onchange_launchagents.sh.tmpl → launchctl load
     │   ├── run_after_agentbrew-sync.sh → agentbrew sync
     │   ├── run_after_cache-inits.sh → cache shell inits
-    │   ├── run_after_devin-caffeinate.sh → install title wrapper
     │   └── run_after_install_local_llm.sh.tmpl → local-LLM bootstrap when opted in
     │
     └── Done. Shell restart picks up new config.

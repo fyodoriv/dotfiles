@@ -127,7 +127,7 @@ chezmoi init --source ~/apps/dotfiles --apply
 During init, you'll be prompted for:
 - **Profile**: `core` (team-friendly) or `full` (opinionated)
 - **Enterprise mode**: on/off (enables org-specific overlay config)
-- **AI tooling**: opt-in for Devin/Claude agent config
+- **AI tooling**: opt-in for Claude agent config
 
 ## Step 5: Verify
 

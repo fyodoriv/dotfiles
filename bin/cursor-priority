@@ -115,7 +115,6 @@ else
   # Default process list when no config file exists
   # IDE apps
   set_process_priority "Cursor"
-  set_process_priority "Windsurf"
   set_process_priority "Slack"
   set_process_priority "Google Chrome"
   set_process_priority "Microsoft Outlook"
@@ -126,7 +125,6 @@ else
   # Agent/model workers must yield to interactive apps under CPU contention.
   # Claude Code launched from WebStorm is an interactive terminal child, so
   # keep it responsive with the IDE while backgrounding other Claude workers.
-  set_process_background "devin"
   set_claude_priority
   set_process_background "codex"
   set_process_background "cursor-agent"

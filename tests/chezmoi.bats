@@ -206,7 +206,6 @@ chezmoi_verify() {
   [ ! -e "$TEST_HOME/scripts" ]
   [ ! -e "$TEST_HOME/templates" ]
   [ ! -e "$TEST_HOME/vscode" ]
-  [ ! -e "$TEST_HOME/windsurf" ]
 }
 
 @test "chezmoiignore excludes every non-source root entry from HOME" {

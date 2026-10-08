@@ -48,7 +48,6 @@ snapshot.sh
 templates
 tests
 vscode
-windsurf
 
 # Profile-based ignoring (target paths, not source paths)
 {{- if ne .profile "full" }}

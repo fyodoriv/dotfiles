@@ -43,7 +43,6 @@ dotfiles_expects_native_homebrew() {
 # Format per line: "DisplayName:fallback.bundle.id"
 dotfiles_managed_app_entries() {
   cat <<'EOF'
-Windsurf:com.exafunction.windsurf
 Cursor:com.todesktop.230313mzl4w4u92
 Slack:com.tinyspeck.slackmacgap
 Google Chrome:com.google.Chrome

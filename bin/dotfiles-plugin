@@ -33,29 +33,6 @@ source "$DOTFILES_DIR/lib/colors.sh" 2>/dev/null || {
 # from "no-op re-run" in the user-facing summary.
 SYMLINKS_CREATED_THIS_RUN=0
 
-# Devin-present detection result cache. Set by `devin_present` on first
-# call, reused for the rest of the invocation so we don't shell out to
-# `command -v` repeatedly. The `DOTFILES_PLUGIN_DEVIN_PRESENT` env var
-# overrides detection (1 = force present, 0 = force absent) so callers
-# can dry-run "what would I install on a Devin-less machine" and so
-# tests don't depend on the operator's real PATH.
-DEVIN_DETECTION_CACHED=""
-
-devin_present() {
-  if [ -z "$DEVIN_DETECTION_CACHED" ]; then
-    if [ "${DOTFILES_PLUGIN_DEVIN_PRESENT:-}" = "0" ]; then
-      DEVIN_DETECTION_CACHED=no
-    elif [ "${DOTFILES_PLUGIN_DEVIN_PRESENT:-}" = "1" ]; then
-      DEVIN_DETECTION_CACHED=yes
-    elif command -v devin >/dev/null 2>&1; then
-      DEVIN_DETECTION_CACHED=yes
-    else
-      DEVIN_DETECTION_CACHED=no
-    fi
-  fi
-  [ "$DEVIN_DETECTION_CACHED" = yes ]
-}
-
 show_help() {
   cat <<EOF
 Usage: dotfiles-plugin <command> [args]
@@ -272,24 +249,6 @@ install_agentbrew_target() {
   # 1a. Regular skill source — symlink-style registration via skillSourceDirs.
   if [ -d "$plugin_target/skills" ]; then
     register_skill_source "$name" "${name}-plugin" "$plugin_target/skills" skillSourceLabel
-  fi
-
-  # 1b. Devin-only skill source under .devin/skills/. Registered only
-  # when the Devin CLI is detected on the user's machine. The
-  # `devinSkipped` flag in install-state lets `remove` know whether
-  # the devin-skills label was ever created (so cleanup doesn't try
-  # to drop something that was never there).
-  if [ -d "$plugin_target/.devin/skills" ]; then
-    if devin_present; then
-      register_skill_source "$name" "${name}-devin-skills" "$plugin_target/.devin/skills" devinSkillSourceLabel
-      # shellcheck disable=SC2016
-      state_set "$name" '.devinSkipped = false'
-    else
-      plog "$name" "agentbrew: skipped .devin/skills/ (Devin CLI not present)"
-      echo "  ${DIM}Devin contributions skipped (Devin CLI not detected on PATH)${NC}"
-      # shellcheck disable=SC2016
-      state_set "$name" '.devinSkipped = true'
-    fi
   fi
 
   # 2. Agentfile fragment merge.
@@ -545,22 +504,16 @@ cmd_remove() {
 
   plog "$name" "remove: starting"
 
-  # 1. Drop the skill source(s) from state.yaml (regular + Devin-only,
-  # whichever were registered). Reads BOTH `skillSourceLabel` and
-  # `devinSkillSourceLabel` from install-state — present only when the
-  # corresponding registration happened.
-  local skill_label devin_label state_yaml
+  # 1. Drop the skill source(s) from state.yaml (whichever was registered).
+  # Reads `skillSourceLabel` from install-state — present only when the
+  # registration happened.
+  local skill_label state_yaml
   state_yaml="$HOME/.config/agentbrew/state.yaml"
   skill_label="$(jq -r '.skillSourceLabel // empty' "$state")"
-  devin_label="$(jq -r '.devinSkillSourceLabel // empty' "$state")"
   if [ -f "$state_yaml" ]; then
     if [ -n "$skill_label" ]; then
       yq -i "del(.skillSourceDirs[] | select(.label == \"$skill_label\"))" "$state_yaml"
       plog "$name" "remove: dropped skillSourceDirs label '$skill_label'"
-    fi
-    if [ -n "$devin_label" ]; then
-      yq -i "del(.skillSourceDirs[] | select(.label == \"$devin_label\"))" "$state_yaml"
-      plog "$name" "remove: dropped skillSourceDirs label '$devin_label' (Devin-only)"
     fi
   fi
 

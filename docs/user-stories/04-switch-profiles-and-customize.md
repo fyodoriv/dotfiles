@@ -13,7 +13,7 @@ dotfiles profile          # show current profile
 | Profile | Modules | Best for |
 |---------|---------|----------|
 | `core` | git, macos, ssh, tools, workflow, sync, security | Team machines, minimal |
-| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, devin, enterprise | Personal daily driver |
+| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, enterprise | Personal daily driver |
 
 Profile controls four things:
 - **File deployment** — `.chezmoiignore` skips files conditionally (core deploys fewer files)

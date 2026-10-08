@@ -185,6 +185,18 @@ EOF
   [[ "$output" == *"Missing shebang: bin/no-shebang"* ]]
 }
 
+@test "validate --quick skips tool shim symlinks to binaries in the shebang check" {
+  local repo
+  repo="$(mktemp -d)"
+  create_validate_fixture_repo "$repo"
+  ln -s /bin/ls "$repo/bin/ls"
+
+  run bash "$repo/bin/dotfiles-validate" --quick
+
+  rm -rf "$repo"
+  [[ "$output" != *"Missing shebang: bin/ls"* ]]
+}
+
 @test "validate --quick reports a world-writable script fixture with relative path" {
   local repo
   repo="$(mktemp -d)"

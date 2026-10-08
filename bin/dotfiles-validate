@@ -131,6 +131,8 @@ done
 missing_shebang=0
 for script in "$DOTFILES_DIR"/bin/*; do
   [ ! -f "$script" ] && continue
+  # Tool shims (bin/dotfiles-link-*-shim) are symlinks to signed binaries.
+  [ -L "$script" ] && continue
   first_line=$(head -1 "$script")
   if [[ ! "$first_line" =~ ^#! ]]; then
     fail "Missing shebang: bin/$(basename "$script")"

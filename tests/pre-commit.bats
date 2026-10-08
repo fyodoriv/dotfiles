@@ -113,6 +113,26 @@ teardown() {
   [[ "$output" == *"protected file(s) staged for deletion"* ]]
 }
 
+@test "pre-commit allows untracking a gitignored bin/ file that stays on disk" {
+  cd "$TEST_REPO"
+  echo "bin/my-script" > .gitignore
+  git add .gitignore
+  git rm --quiet --cached bin/my-script
+  run git commit -m "chore: untrack generated script"
+  [ "$status" -eq 0 ]
+  [ -f bin/my-script ]
+}
+
+@test "pre-commit still blocks deleting a gitignored bin/ file from disk" {
+  cd "$TEST_REPO"
+  echo "bin/my-script" > .gitignore
+  git add .gitignore
+  git rm --quiet bin/my-script
+  run git commit -m "chore: delete generated script"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bin/my-script"* ]]
+}
+
 @test "pre-commit allows the verified AgentBrew memory-library retirement" {
   cd "$TEST_REPO"
   cat > bin/dotfiles-memory <<'SHIM'

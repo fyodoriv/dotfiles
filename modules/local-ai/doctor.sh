@@ -23,6 +23,14 @@ check "local-ai.opencode_installed" "opencode binary present" \
   "command -v opencode || [ -x \"\$HOME/.opencode/bin/opencode\" ]" \
   "curl -fsSL https://opencode.ai/install | bash"
 
+# macOS kills a binary whose signature no longer matches its contents
+# (launchd: OS_REASON_CODESIGNING), so opencode-serve never answers.
+# The fix re-signs it ad hoc, like the other user-dir binaries here.
+_opencode_bin() { command -v opencode 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"; }
+check "local-ai.opencode_signature_valid" "opencode binary code signature is valid" \
+  "[ ! -x \"\$(_opencode_bin)\" ] || ! command -v codesign >/dev/null || codesign --verify \"\$(_opencode_bin)\"" \
+  "codesign --force --sign - \"\$(_opencode_bin)\""
+
 # ── LaunchAgents ─────────────────────────────────────────────────────
 _launchagent_loaded() { launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1; }
 

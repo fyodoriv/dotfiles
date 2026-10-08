@@ -55,3 +55,45 @@ teardown() { rm -rf "$TEST_DIR"; }
   source "$TEST_DOTFILES/modules/local-ai/doctor.sh"
   [ "$pass_count" -ge 1 ]
 }
+
+# ── opencode signature ───────────────────────────────────────────────
+# macOS kills a binary whose code signature no longer matches its contents
+# (launchd reports OS_REASON_CODESIGNING), so opencode-serve never answers.
+
+_fake_opencode() {
+  mkdir -p "$TEST_HOME/.opencode/bin"
+  printf '#!/bin/sh\n' > "$TEST_HOME/.opencode/bin/opencode"
+  chmod +x "$TEST_HOME/.opencode/bin/opencode"
+}
+
+@test "local-ai: opencode signature check re-signs a broken binary in fix mode" {
+  _fake_opencode
+  CODESIGN_LOG="$TEST_DIR/codesign.log"
+  codesign() {
+    echo "$*" >> "$CODESIGN_LOG"
+    [ "$1" = "--verify" ] && return 1
+    return 0
+  }
+  FIX_MODE=true
+  source "$TEST_DOTFILES/modules/local-ai/doctor.sh"
+  grep -q -- "--force --sign - $TEST_HOME/.opencode/bin/opencode" "$CODESIGN_LOG"
+  [ "$fix_count" -ge 1 ]
+}
+
+@test "local-ai: opencode signature check passes for a valid signature" {
+  _fake_opencode
+  codesign() { return 0; }
+  passed_descs=()
+  pass() { pass_count=$((pass_count + 1)); passed_descs+=("$1"); }
+  source "$TEST_DOTFILES/modules/local-ai/doctor.sh"
+  printf '%s\n' "${passed_descs[@]}" | grep -q 'opencode binary code signature is valid'
+}
+
+@test "local-ai: opencode signature check fails without fix mode when the signature is broken" {
+  _fake_opencode
+  codesign() { [ "$1" = "--verify" ] && return 1; return 0; }
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$TEST_DOTFILES/modules/local-ai/doctor.sh"
+  printf '%s\n' "${failed_descs[@]}" | grep -q 'opencode binary code signature is valid'
+}

@@ -260,3 +260,29 @@ EOF
   grep -q 'dotfiles_launchagent_runs_blocked_node' modules/security/doctor.sh
   grep -q 'dotfiles_agent_node_bin' modules/security/doctor.sh
 }
+
+@test "launchagent check passes a job whose blocked fnm bin follows the approved Node" {
+  source lib/dotfiles-agent-node.sh
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:$FAKE_BIN:/usr/bin:/bin"
+  ! PATH="$FAKE_BIN:$PATH" dotfiles_launchagent_runs_blocked_node \
+    "$TEST_HOME/Library/LaunchAgents/com.agentbrew.check.plist"
+}
+
+@test "launchagent check flags a job whose first node on PATH is the blocked one" {
+  source lib/dotfiles-agent-node.sh
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$FAKE_BIN:$AGENT_NODE_DIR:/usr/bin:/bin"
+  PATH="$FAKE_BIN:$PATH" dotfiles_launchagent_runs_blocked_node \
+    "$TEST_HOME/Library/LaunchAgents/com.agentbrew.check.plist"
+}
+
+@test "agent Node opt-in keeps a job whose blocked fnm bin follows the approved Node" {
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:$FAKE_BIN:/usr/bin:/bin"
+
+  run env HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    DOTFILES_MANAGED_ENDPOINT=1 DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node" \
+    bin/dotfiles-disable-blocked-node-automation
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Disabled 0 unattended agentbrew job(s)"* ]]
+  ! grep -q 'disable gui/.*/com.agentbrew.check' "$LAUNCHCTL_LOG"
+}

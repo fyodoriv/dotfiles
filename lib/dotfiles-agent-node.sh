@@ -39,7 +39,8 @@ dotfiles_use_agent_node() {
 }
 
 # True when a LaunchAgent plist would run the blocked Node: its program is the
-# blocked binary, or a bare `node` on its PATH resolves to it.
+# blocked binary, or the first `node` on its PATH is. A blocked bin later on
+# PATH (for example fnm after the approved Node) never runs for a bare `node`.
 dotfiles_launchagent_runs_blocked_node() {
   local plist="$1" program job_path entry
   program="$(/usr/bin/plutil -extract ProgramArguments.0 raw -o - "$plist" 2>/dev/null \
@@ -49,7 +50,8 @@ dotfiles_launchagent_runs_blocked_node() {
   IFS=':' read -r -a _agent_node_path_parts <<<"$job_path"
   for entry in "${_agent_node_path_parts[@]}"; do
     [ -n "$entry" ] && [ -x "$entry/node" ] || continue
-    dotfiles_node_publisher_blocked "$entry/node" && return 0
+    dotfiles_node_publisher_blocked "$entry/node"
+    return
   done
   return 1
 }

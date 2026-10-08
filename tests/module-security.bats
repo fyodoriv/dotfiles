@@ -553,6 +553,22 @@ EOF
   printf '%s\n' "${failed_ids[@]:-}" | /usr/bin/grep -qx "security.no_env_shebang.git-hooks_pre-commit"
 }
 
+@test "security: env shebang in minsky/bin is flagged on a managed endpoint" {
+  mkdir -p "$TEST_HOME/apps/tooling/minsky/bin"
+  printf '#!/usr/bin/env bash\necho hi\n' > "$TEST_HOME/apps/tooling/minsky/bin/minsky-init"
+  export DOTFILES_MANAGED_ENDPOINT=1
+  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
+  printf '%s\n' "${failed_ids[@]:-}" | /usr/bin/grep -qx "security.no_env_shebang.minsky_bin_minsky-init"
+}
+
+@test "security: env shebang in minsky/bin is not flagged off a managed endpoint" {
+  mkdir -p "$TEST_HOME/apps/tooling/minsky/bin"
+  printf '#!/usr/bin/env bash\necho hi\n' > "$TEST_HOME/apps/tooling/minsky/bin/minsky-init"
+  unset DOTFILES_MANAGED_ENDPOINT DOTFILES_ENDPOINT_AGENT_APPS
+  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
+  ! printf '%s\n' "${failed_ids[@]:-}" | /usr/bin/grep -q '^security\.no_env_shebang\.minsky_'
+}
+
 @test "security: LaunchAgent plist with /usr/bin/env is flagged" {
   mkdir -p "$TEST_DOTFILES/launchagents"
   cat > "$TEST_DOTFILES/launchagents/com.dotfiles.bad.plist" <<'EOF'

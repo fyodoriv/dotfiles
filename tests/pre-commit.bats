@@ -163,12 +163,29 @@ SHIM
 
 # ── Bypass with --no-verify ──────────────────────────────────────
 
-@test "pre-commit bypass hint mentions --no-verify" {
+@test "pre-commit allows protected deletions listed in DOTFILES_INTENDED_DELETIONS" {
+  cd "$TEST_REPO"
+  git rm --quiet modules/git/doctor.sh bin/my-script
+  run env DOTFILES_INTENDED_DELETIONS="modules/git/ bin/my-script" git commit -m "refactor: remove git module"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-commit still blocks protected deletions DOTFILES_INTENDED_DELETIONS does not list" {
+  cd "$TEST_REPO"
+  git rm --quiet modules/git/doctor.sh lib/colors.sh
+  run env DOTFILES_INTENDED_DELETIONS="modules/git/" git commit -m "refactor: remove git module"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"lib/colors.sh"* ]]
+  [[ "$output" != *"modules/git/doctor.sh"* ]]
+}
+
+@test "pre-commit names DOTFILES_INTENDED_DELETIONS, not --no-verify, for intended deletions" {
   cd "$TEST_REPO"
   git rm --quiet bin/my-script
   run git commit -m "chore: delete script"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"--no-verify"* ]]
+  [[ "$output" == *"DOTFILES_INTENDED_DELETIONS"* ]]
+  [[ "$output" != *"If intentional: git commit --no-verify"* ]]
 }
 
 @test "pre-commit can be bypassed with --no-verify for intentional deletions" {

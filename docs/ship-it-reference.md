@@ -599,7 +599,7 @@ After a PR merges, reconcile the local default/canonical branch before release c
 
 This reconciliation is local-only cleanup after successful delivery. It does not permit direct protected-branch pushes, dropping unpreserved commits, or `git reset --hard`.
 
-## 9. Clean up shipped/redundant worktrees
+## 9. Clean up shipped/redundant worktrees, branches, and stashes
 
 After PR merge and local default-branch reconciliation, run the worktree
 inventory again. For every current-repo or approved-family worktree classified
@@ -619,6 +619,39 @@ This step is part of "done" for approved repo-family `/ship-it` runs: stale
 worktrees are not harmless when they make future agents rediscover already
 shipped work. Cleanup remains salvage-first; if any useful or unknown work
 exists, ship/preserve/report it instead of deleting.
+
+### Local branches and stashes
+
+Owner rule: clean up local branches and stashes whenever it is safe. Do not
+wait to be asked. Research every local branch and stash in each repo you
+touched, plus every approved-family checkout the run inventoried:
+
+```bash
+git fetch --prune origin
+git for-each-ref --format='%(refname:short)|%(upstream:short)|%(upstream:track)' refs/heads
+git stash list
+```
+
+Delete a local branch only with one of these proofs:
+
+- Its tip equals the head of a merged PR
+  (`gh pr list --head <branch> --state merged --json headRefOid`).
+- It is an ancestor of the default branch (`git merge-base --is-ancestor`).
+- Its tree, or the files it changes, equal the default branch. For example, a
+  release bump that already landed.
+- Its PR was closed as superseded or out of scope. Example: work for a
+  deprecated agent.
+
+Drop a stash only when the default branch already contains it:
+`git stash show -p stash@{N} | git apply --check -R` succeeds on that branch.
+
+Before deleting a branch with commits that are not on any remote, save them
+with `git bundle create ~/.local/state/tooling-cutover/branch-cleanup-<date>/<repo>-<branch>.bundle <branch>`,
+then run `git bundle verify` inside the repo. Keep the default branch, a
+branch with an open PR, a branch checked out in a worktree, and shared state
+refs that match their remote (for example `tasks-claims`). Keep anything
+unknown or owned by another person or agent, and report it. Report each
+deleted branch or dropped stash with its proof.
 
 ## 11. Release
 

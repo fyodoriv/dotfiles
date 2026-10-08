@@ -125,6 +125,6 @@ It exits 0 even when the daemon is down, reporting skipped stores. **Never block
 
 ## Delivery procedure
 
-Follow `~/apps/tooling/dotfiles/docs/ship-it-reference.md` Steps 1–14. Run tooling Steps 12–13 via Shell (`dotfiles apply`, LaunchAgent reload/CDP checks, `agentbrew sync --pull`, context measurement, doctor), then Step 14 (memory sync) on every delivery, whatever the repo family. Report **Merged N/M PRs**, never “complete” while session PRs remain open, and remind the user to start a new chat after config sync.
+Follow `~/apps/tooling/dotfiles/docs/ship-it-reference.md` Steps 1–14. Step 9 cleanup researches every local branch and stash in the touched repos and removes the ones proven safe; do not wait to be asked. Run tooling Steps 12–13 via Shell (`dotfiles apply`, LaunchAgent reload/CDP checks, `agentbrew sync --pull`, context measurement, doctor), then Step 14 (memory sync) on every delivery, whatever the repo family. Report **Merged N/M PRs**, never “complete” while session PRs remain open, and remind the user to start a new chat after config sync.
 
 <!-- turbo -->

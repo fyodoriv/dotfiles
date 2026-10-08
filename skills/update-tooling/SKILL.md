@@ -73,6 +73,12 @@ including untracked files, as dirty. Preserve it for its owner. Do not use
 `git pull --rebase`, `git reset`, `git checkout .`, `git clean`, or a force
 push during this workflow.
 
+### Clean up local branches and stashes
+
+After the inventory, apply `docs/ship-it-reference.md` Step 9 § "Local
+branches and stashes" to every checkout. Delete only branches and stashes
+with a recorded proof; keep and report the rest.
+
 ## 2. Fast-forward only clean canonical checkouts
 
 For a clean primary checkout, choose the pull remote and derive the canonical

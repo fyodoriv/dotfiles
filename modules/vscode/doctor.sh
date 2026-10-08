@@ -11,8 +11,13 @@
 
 _VC_LOCAL="${VSCODE_LOCAL_DIR:-$HOME/.local/share/dotfiles-vscode}"
 _VC_USER_DIR="$HOME/Library/Application Support/Code/User"
-_VC_BIN="$(command -v code 2>/dev/null || echo /usr/local/bin/code)"
 _VC_APP="/Applications/Visual Studio Code.app"
+# The app bundle ships the CLI; use it when `code` is not on PATH.
+_VC_BIN="$(command -v code 2>/dev/null || true)"
+if [ -z "$_VC_BIN" ] && [ -x "$_VC_APP/Contents/Resources/app/bin/code" ]; then
+  _VC_BIN="$_VC_APP/Contents/Resources/app/bin/code"
+fi
+: "${_VC_BIN:=/usr/local/bin/code}"
 if [ -n "${EXTRA_OVERLAY_ROOT:-}" ]; then
   _VC_OVERLAY_ROOT="$EXTRA_OVERLAY_ROOT"
 elif command -v chezmoi >/dev/null 2>&1; then

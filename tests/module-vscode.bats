@@ -162,3 +162,31 @@ _setup_vscode_installed() {
   run python3 -c 'import json, re, sys; d = json.loads(re.sub(r"(?m)^\s*//.*$", "", open(sys.argv[1]).read())); sys.exit(1 if ("mcpServers" in d or "mcp" in d) else 0)' "$BATS_TEST_DIRNAME/../vscode/settings.json"
   [ "$status" -eq 0 ]
 }
+
+@test "vscode: falls back to the app-bundled code CLI when code is not on PATH" {
+  _setup_vscode_installed
+  rm -f "$VC_BIN"
+  bundled="$VC_APP/Contents/Resources/app/bin/code"
+  calls="$TEST_DIR/code-calls"
+  mkdir -p "$(dirname "$bundled")"
+  cat > "$bundled" <<STUB
+#!/bin/bash
+echo "\$*" >> "$calls"
+[ "\$1" = "--list-extensions" ] && echo mikestead.dotenv
+exit 0
+STUB
+  chmod +x "$bundled"
+  # Drop every PATH entry that provides a code CLI.
+  _path=""
+  while IFS= read -r _d; do
+    [ -n "$_d" ] && [ ! -x "$_d/code" ] && _path="${_path:+$_path:}$_d"
+  done < <(printf '%s\n' "${PATH//:/$'\n'}")
+  export PATH="$_path"
+  FIX_MODE=true
+
+  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
+
+  [ "$_VC_BIN" = "$bundled" ]
+  grep -q -- '--list-extensions' "$calls"
+  ! grep -q -- '--install-extension' "$calls"
+}

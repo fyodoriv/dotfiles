@@ -10,7 +10,7 @@ This dotfiles repo + agentbrew + minsky together support three **primary AI codi
 
 ### Deprecated agents — frozen
 
-Owner decision 2026-10-02: **Windsurf, Devin, and Augment (Auggie) are deprecated and frozen** in every tooling repo (dotfiles, agentbrew, minsky, tasks.md, dev-skills, and the org overlays).
+Owner decision 2026-10-02: **Windsurf, Devin, and Augment (Auggie) are deprecated and frozen** in every tooling repo (dotfiles, agentbrew, minsky, tasks.md, and the org overlays).
 
 - Existing support stays. Do not delete their modules, configs, sync targets, or tests.
 - Never implement a fix or a feature for them. Do not file tasks for them, and do not fix their failing checks.

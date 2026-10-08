@@ -2,7 +2,6 @@
 # Keep this list repository-specific. Do not add github.com or an owner wildcard.
 github.com/fyodoriv/agentbrew
 github.com/fyodoriv/dotfiles
-github.com/fyodoriv/dev-skills
 github.com/fyodoriv/minsky
 github.com/fyodoriv/taskgrind
 github.com/fyodoriv/code-smells

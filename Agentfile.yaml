@@ -194,7 +194,9 @@ sources:
   - modelcontextprotocol/ext-apps
   - mattpocock/skills
   - addyosmani/agent-skills
-  - fyodoriv/dev-skills
+  # Workflow skills (handoff, iterate, writing-plans, task-command-center, …)
+  # live in agentbrew's skill-plugins/workflow/ and install by name from the
+  # agentbrew catalog. They need no source entry here.
 
 rules: |
   Keep TASKS.md in tasks.md format and remove completed task blocks entirely.

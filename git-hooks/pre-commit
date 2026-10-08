@@ -242,9 +242,19 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
     [ -e "$1" ] || [ -L "$1" ] || return 1
     git check-ignore --no-index -q -- "$1" 2>/dev/null
   }
+  # DOTFILES_INTENDED_DELETIONS lists path prefixes the committer means to
+  # delete, separated by spaces. Only matching paths pass; every other check
+  # in this hook still runs.
+  is_intended_deletion() {
+    local prefix
+    for prefix in ${DOTFILES_INTENDED_DELETIONS:-}; do
+      [[ "$1" == "$prefix"* ]] && return 0
+    done
+    return 1
+  }
   for f in "${DELETED[@]}"; do
     if [[ "$f" =~ $PROTECTED_DIRS ]] && ! is_verified_retired_memory_library_delete "$f" \
-        && ! is_untracked_ignored_path "$f"; then
+        && ! is_untracked_ignored_path "$f" && ! is_intended_deletion "$f"; then
       protected_deletions+=("$f")
     fi
   done
@@ -258,7 +268,8 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
     printf 's structural surface — bin/, tests/, lib/, modules/, skills/.\n' >&2
     printf 'Deletions here typically indicate a multi-agent worktree mishap or an\n' >&2
     printf 'accidental `git add -A` after a stray `rm`. Confirm the deletion is intended.\n%s' "$RST" >&2
-    printf '\n%sIf intentional: %sgit commit --no-verify%s%s\n' "$YEL" "$RST" "$YEL" "$RST" >&2
+    printf '\n%sIf intentional, list the paths (other checks still run):%s\n' "$YEL" "$RST" >&2
+    printf '  DOTFILES_INTENDED_DELETIONS="modules/foo/ tests/foo.bats" git commit ...\n' >&2
     printf '\n' >&2
     exit 1
   fi

@@ -1306,9 +1306,12 @@ fi
 
 # Minsky bin/ scripts are invoked directly by operators and the tick-loop
 # maintenance path; env shebangs pop endpoint agent on every spawn.
+# Minsky is a public cross-platform repo, so only a managed endpoint needs this.
 _minsky_home="${HOME}/apps/tooling/minsky"
 _env_minsky_count=0
-if [ -d "$_minsky_home/bin" ]; then
+if [ -d "$_minsky_home/bin" ] \
+    && declare -F dotfiles_managed_endpoint >/dev/null \
+    && dotfiles_managed_endpoint; then
   while IFS= read -r _env_minsky; do
     [ -n "$_env_minsky" ] || continue
     _env_minsky_rel="${_env_minsky#"$_minsky_home"/}"

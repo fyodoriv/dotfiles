@@ -86,7 +86,6 @@ In `.chezmoiscripts/`, scripts run automatically during `chezmoi apply`. Chezmoi
 |--------|-------------|-------|
 | `run_after_agentbrew-sync.sh` | Runs `agentbrew sync` if Agentfile.yaml exists | Non-fatal (uses `set -uo pipefail`, not `-euo`) |
 | `run_after_cache-inits.sh` | Caches `fzf`, `zoxide`, `starship`, `fnm` init output to `~/.cache/zsh/` | Enables fast shell startup |
-| `run_after_devin-caffeinate.sh` | Installs restart-safe title wrapper for Devin CLI at `~/.local/bin/devin` | Idempotent — exits early if wrapper is already correct |
 
 #### Skipping or forcing re-execution
 
@@ -258,7 +257,7 @@ Selected at `chezmoi init` time (stored in `~/.config/chezmoi/chezmoi.yaml`):
 | Profile | Modules |
 |---------|---------|
 | `core` | git, macos, ssh, tools, workflow, sync, security |
-| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, devin, enterprise |
+| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, enterprise |
 
 Profile controls which files chezmoi deploys (via `.chezmoiignore` conditions) and which Brew packages are installed (via conditions in the Brewfile template).
 

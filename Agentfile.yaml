@@ -32,11 +32,9 @@ hooks:
 # overlay Agentfile, so agentbrew and the pin agree.
 defaultModel: claude-opus-5-5
 defaultEffort: xhigh
-# null keeps that agent's own model: Codex is OpenAI-only and Devin has its
-# own pin in modules/devin.
+# null keeps that agent's own model: Codex is OpenAI-only.
 modelOverrides:
   codex: null
-  devin: null
 
 mcp:
   - context7
@@ -233,4 +231,4 @@ rules: |
   Approved-family /ship-it delivery and org-overlay IRON LAW: see shared-rules.md sections "Git and delivery" and "Org-overlay routing" (full text in ship-it command + templates/AGENTS.md).
   Broad sibling delivery remains limited to approved repo families.
   Within those families, never bypass-merge someone else's PR.
-  Windsurf, Devin, and Augment (Auggie) are deprecated and frozen in all tooling repos: keep their existing support, but never implement fixes or features for them, never file tasks for them, and ignore their failing checks.
+  Windsurf and Devin support was removed on 2026-10-08. Augment (Auggie) is deprecated and frozen in all tooling repos: keep its existing support, but never implement fixes or features for it, never file tasks for it, and ignore its failing checks.

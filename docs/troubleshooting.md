@@ -312,38 +312,6 @@ dotfiles doctor --skip security.git_gpgsign
 
 ---
 
-## Devin uses the wrong model
-
-Dotfiles sets the interactive Devin CLI model from `home/zshrc.ai-tools` when
-`use_ai_tools: true` is enabled. Devin also keeps its own non-interactive default
-in `~/.config/devin/config.json`, so check both layers before editing anything.
-
-**Diagnose:**
-
-```bash
-echo "shell DEVIN_MODEL=${DEVIN_MODEL:-<unset>}"
-grep -n 'DEVIN_MODEL' ~/apps/dotfiles/home/zshrc.ai-tools
-grep -n '"model"' ~/.config/devin/config.json
-grep -n 'use_ai_tools' ~/.config/chezmoi/chezmoi.yaml
-dotfiles doctor --module devin
-```
-
-**Fix:**
-
-```bash
-dotfiles apply
-source ~/.zshrc
-dotfiles doctor --module devin --fix
-```
-
-If the fresh shell still reports `DEVIN_MODEL=<unset>`, set `use_ai_tools` to
-`true` in `~/.config/chezmoi/chezmoi.yaml` and rerun `dotfiles apply`. If
-`~/.config/devin/config.json` still has a different `agent.model`, let
-`dotfiles doctor --module devin --fix` rewrite that Devin-owned default; keep
-the dotfiles source in `home/zshrc.ai-tools` as the interactive shell default.
-
----
-
 ## `agentbrew sync` fails during `dotfiles apply`
 
 Agentbrew sync is non-fatal during chezmoi apply so the rest of dotfiles can
@@ -444,10 +412,10 @@ disable configs for inactive clones. For a one-off override, add paths to
 
 ---
 
-## Edited Claude, Cursor, or Devin config keeps reverting
+## Edited Claude or Cursor config keeps reverting
 
-Agentbrew owns generated agent config. Files under `~/.claude/`,
-`~/.cursor/mcp.json`, and agent-managed sections of `~/.config/devin/` are
+Agentbrew owns generated agent config. Files under `~/.claude/`
+and `~/.cursor/mcp.json` are
 outputs from `Agentfile.yaml` plus agentbrew state.
 
 **Fix:**
@@ -821,7 +789,7 @@ Common causes from dotfiles history:
    `LSArchitecturePriority = x86_64` in `macos-apps.sh` (Ghostty). Finder →
    Get Info → “Open using Rosetta” on Cursor, Ghostty, Terminal, or Chrome has
    the same effect. Fixed now; apply clears `LSArchitecturePriority` for all
-   managed apps (Cursor, Ghostty, Chrome, Slack, Windsurf, Outlook, Terminal).
+   managed apps (Cursor, Ghostty, Chrome, Slack, Outlook, Terminal).
    Manual fix:
 
    ```bash

@@ -40,7 +40,7 @@ Up to 4 during first run:
 | Profile | Modules | Best for |
 |---------|---------|----------|
 | `core` | git, macos, ssh, tools, workflow, sync, security | Team machines, minimal setup |
-| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, devin, enterprise | Personal daily driver |
+| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, enterprise | Personal daily driver |
 
 ## Files Involved
 

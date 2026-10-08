@@ -404,7 +404,7 @@ _cr_extension_installed() {
   _cr_installed_extensions | grep -Fxq "$ext_lc"
 }
 
-# Same corporate-CA bundle pattern as the windsurf module: Cursor's bundled
+# Corporate-CA bundle pattern (also used by the vscode module): Cursor's bundled
 # Electron Node doesn't honour the macOS keychain, so we materialise a PEM
 # from System.keychain + SystemRootCertificates.keychain and pass it via
 # NODE_EXTRA_CA_CERTS for `cursor --install-extension`. Refreshed monthly.

@@ -11,7 +11,6 @@ load test_helper
 ZSHRC_AI="$BATS_TEST_DIRNAME/../home/zshrc.ai-tools"
 DOCTOR_AGENT_BROWSER="$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
 DOCTOR_AGENTBREW="$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
-DOCTOR_DEVIN="$BATS_TEST_DIRNAME/../modules/devin/doctor.sh"
 DOCTOR_UPGRADE="$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
 
 @test "zshrc.ai-tools probes both apps/ and apps/tooling/ for agentbrew" {

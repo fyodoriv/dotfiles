@@ -2,9 +2,7 @@
 # Source of truth for `modules/vscode/doctor.sh`. One extension ID per line.
 # Lines starting with `#` and blank lines are ignored.
 #
-# Mirrors windsurf/extensions.txt for the WebStorm-parity layer; drops the
-# Cascade/Codeium-only entries (VS Code doesn't have them) and keeps the
-# MCP-relevant first-party tooling.
+# WebStorm-parity layer plus MCP-relevant first-party tooling.
 
 # ── Keymap (replaces WebStorm "Mac OS X 10.5+ copy" keymap) ──────────────────
 k--kato.intellij-idea-keybindings

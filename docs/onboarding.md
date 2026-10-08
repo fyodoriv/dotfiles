@@ -36,7 +36,7 @@ You'll be prompted for:
 |--------|---------|---------------|
 | **Installation profile** | `core` (essentials) or `full` (opinionated) | Start with `core` -- upgrade later with `dotfiles profile full` |
 | **Enterprise configs** | `true` / `false` | `false` unless you need AWS, K8s, Gradle |
-| **AI agent tooling** | `true` / `false` | `false` -- enables Devin CLI, ANTHROPIC_MODEL, agent-browser config |
+| **AI agent tooling** | `true` / `false` | `false` -- enables ANTHROPIC_MODEL, agent-browser config |
 | **Auto-upgrade** | `true` / `false` | `false` -- silent `brew upgrade` at 3am Sunday |
 | **Age encryption** | `true` / `false` | `false` unless you have an age key for encrypted secrets |
 | **Dotfiles directory** | path (relative to `$HOME`) | `apps/dotfiles` -- leave as default unless your dotfiles are at a different path |

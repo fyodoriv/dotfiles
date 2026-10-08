@@ -20,8 +20,3 @@ done
 check_managed "managed.topgrade" \
   "$DOTFILES_DIR/dot_config/topgrade.toml" \
   "$HOME/.config/topgrade.toml"
-
-# Devin CLI wrapper — preserves terminal title without blocking macOS restart/update
-check "tool.devin_wrapper" "devin wrapper does not block restart" \
-  "[ -f \"\$HOME/.local/bin/devin\" ] && [ ! -L \"\$HOME/.local/bin/devin\" ] && grep -q 'title-watchdog-from-cwd' \"\$HOME/.local/bin/devin\" 2>/dev/null && grep -q 'exec \"\$REAL_DEVIN\" \"\$@\"' \"\$HOME/.local/bin/devin\" 2>/dev/null && ! grep -q caffeinate \"\$HOME/.local/bin/devin\" 2>/dev/null" \
-  "dotfiles apply"

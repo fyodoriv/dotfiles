@@ -27,7 +27,7 @@ All values are prompted once at `chezmoi init` and stored in `~/.config/chezmoi/
 | `is_enterprise` | `false` | Enable enterprise tools (AWS, K8s, Gradle, enterprise SSH) |
 | `work_email_domain` | `example.com` | Work email domain for Chrome profile detection (enterprise only) |
 | `github_enterprise_host` | `github.example.com` | GitHub Enterprise hostname (enterprise only) |
-| `use_ai_tools` | `false` | Enable AI agent tooling (Devin CLI, ANTHROPIC_MODEL, agent-browser) |
+| `use_ai_tools` | `false` | Enable AI agent tooling (ANTHROPIC_MODEL, agent-browser) |
 | `dotfiles_dir` | `apps/dotfiles` | Dotfiles repo path relative to `$HOME` |
 | `repos_dir` | `apps` | Repos directory relative to `$HOME` (exported as `DOTFILES_REPOS_DIR`) |
 | `brew_skip` | `[]` | List of Homebrew packages to exclude (e.g. `["poetry", "pyenv"]`) |
@@ -85,7 +85,7 @@ git commit --no-verify -m "chore: remove <name> module"
 
 | If your team doesn't use... | Remove these modules |
 |------------------------------|---------------------|
-| AI coding agents | `claude`, `cursor`, `agentbrew`, `agent-browser`, `devin` |
+| AI coding agents | `claude`, `cursor`, `agentbrew`, `agent-browser` |
 | JetBrains IDEs | `jetbrains` |
 | Enterprise tools (AWS, K8s) | `enterprise` |
 | Ghostty terminal | `terminal` (or just remove Ghostty checks) |
@@ -228,13 +228,12 @@ If your team doesn't use AI coding agents, the simplest approach:
 1. Set `use_ai_tools: false` (the default) during `chezmoi init`
 2. Remove these modules entirely:
    ```bash
-   git rm -r modules/{claude,cursor,agentbrew,agent-browser,devin}
+   git rm -r modules/{claude,cursor,agentbrew,agent-browser}
    git commit --no-verify -m "chore: remove AI tooling modules"
    ```
 3. Remove the agentbrew lifecycle script:
    ```bash
    git rm .chezmoiscripts/run_after_agentbrew-sync.sh
-   git rm .chezmoiscripts/run_after_devin-caffeinate.sh
    ```
 4. Remove `home/zshrc.ai-tools` if you don't want the file in your repo at all.
 

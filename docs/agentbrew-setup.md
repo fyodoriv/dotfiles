@@ -14,7 +14,7 @@ recovering from an `agentbrew sync` failure.
 |--------|-------|--------|
 | `Agentfile.yaml` | dotfiles | Declarative list of MCP servers, skills, sources, and shared rules |
 | `~/.config/agentbrew/state.yaml` | agentbrew | Local registry of installed items and detected agents |
-| `~/.claude/`, `~/.cursor/mcp.json`, `~/.config/devin/` | agentbrew or the agent | Generated agent config; do not edit by hand |
+| `~/.claude/`, `~/.cursor/mcp.json` | agentbrew or the agent | Generated agent config; do not edit by hand |
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
 
 If generated config looks wrong, update `Agentfile.yaml` or agentbrew state and
@@ -48,8 +48,8 @@ them.
    Dotfiles also ships a real `bin/agentbrew` shim for machines with a local
    checkout at `~/apps/agentbrew` or `~/apps/tooling/agentbrew`; it works in
    non-interactive shells and launch agents, not just interactive zsh.
-   `agentbrew init` detects installed agents such as Claude Code, Cursor,
-   Windsurf, and Devin-compatible config directories.
+   `agentbrew init` detects installed agents such as Claude Code and Cursor
+   config directories.
 
 3. **Configure MCP credentials.**
 

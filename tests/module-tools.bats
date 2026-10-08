@@ -59,15 +59,8 @@ teardown() {
 }
 
 @test "tools: passes when all tools installed" {
-  # Also create the restart-safe devin wrapper
-  cat > "$TEST_HOME/.local/bin/devin" <<'WRAPPER'
-#!/bin/bash
-# title-watchdog-from-cwd
-exec "$REAL_DEVIN" "$@"
-WRAPPER
   source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
-  # tool checks + 1 devin wrapper check
-  [ "$pass_count" -eq 14 ]
+  [ "$pass_count" -eq 13 ]
   [ "$fail_count" -eq 0 ]
 }
 
@@ -79,44 +72,10 @@ WRAPPER
   [ "$fail_count" -ge 3 ]
 }
 
-@test "tools: devin_wrapper fails when wrapper is a symlink" {
-  ln -s /usr/local/bin/devin "$TEST_HOME/.local/bin/devin"
-  source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
-  # devin_wrapper should fail (is a symlink, not a wrapper)
-  [ "$fail_count" -ge 1 ]
-}
-
 @test "tools: overrides skip specific tools" {
   echo "tool.fzf" >> "$OVERRIDES_FILE"
   echo "tool.eza" >> "$OVERRIDES_FILE"
   echo "tool.bat" >> "$OVERRIDES_FILE"
   source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
   [ "$skip_count" -ge 3 ]
-}
-
-@test "tools: devin wrapper missing fails devin_wrapper check" {
-  rm -f "$TEST_HOME/.local/bin/devin"
-  source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
-  # tool checks pass, devin_wrapper fails
-  [ "$pass_count" -eq 13 ]
-  [ "$fail_count" -eq 1 ]
-}
-
-@test "tools: devin wrapper without title watchdog tag fails" {
-  cat > "$TEST_HOME/.local/bin/devin" <<'WRAPPER'
-#!/bin/bash
-exec "$REAL_DEVIN" "$@"
-WRAPPER
-  source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
-  [ "$fail_count" -ge 1 ]
-}
-
-@test "tools: devin wrapper with caffeinate fails" {
-  cat > "$TEST_HOME/.local/bin/devin" <<'WRAPPER'
-#!/bin/bash
-# title-watchdog-from-cwd
-exec caffeinate -ms "$REAL_DEVIN" "$@"
-WRAPPER
-  source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
-  [ "$fail_count" -ge 1 ]
 }

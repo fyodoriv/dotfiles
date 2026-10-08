@@ -125,7 +125,7 @@ fi
 section "agent-tmux (tmux wrapper for agent CLIs)"
 if command -v agent-tmux >/dev/null 2>&1; then
   ok "agent-tmux on PATH ($(command -v agent-tmux))"
-  hint "run agents: \`tdv\` (Devin), \`tcc\` (Claude Code), \`tcur\` (Cursor), \`agents\` (list)"
+  hint "run agents: \`tcc\` (Claude Code), \`tcur\` (Cursor), \`agents\` (list)"
 else
   err "agent-tmux not on PATH — re-run \`dotfiles apply\`"
 fi

@@ -2,6 +2,11 @@
 
 **Status:** Draft (proposed 2026-05-15) · **Owner:** dotfiles + agentbrew · **Branch:** `feat/tooling-plugins` (proposed)
 
+> **Update 2026-10-08:** Devin support was removed from dotfiles. The
+> Devin-only (`.devin/skills/`) contribution path, `devin_present`
+> detection, and US-4 below are historical design notes. `dotfiles plugin`
+> no longer registers Devin-only skill sources.
+
 > A tooling-app at `~/apps/tooling/<name>/` (minsky, …) can ship
 > per-target plugin folders: `plugins/dotfiles/` and/or `plugins/agentbrew/`.
 > The user, with `dotfiles` and `agentbrew` already installed, runs **one
@@ -410,7 +415,6 @@ Phase 3 — Devin opt-out:
 | `tests/plugin/install.bats` | US-1 | symlinks land, state.yaml updated, doctor green, sync ran |
 | `tests/plugin/uninstall.bats` | US-2 | install-state inverse runs, source untouched, list empty |
 | `tests/plugin/heal.bats` | US-3 | partial breakage detected, repaired idempotently |
-| `tests/plugin/optional-devin.bats` | US-4 | no `~/.config/devin/` writes when CLI absent, doctor skips |
 | `tests/plugin/manifest-validation.bats` | (cross-cutting) | bad schemaVersion / missing name / bad path errors cleanly |
 | `tests/plugin/conflict-mcp.bats` | (open question) | two plugins with same MCP name → warn + last-wins |
 

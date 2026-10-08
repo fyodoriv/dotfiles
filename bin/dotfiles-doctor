@@ -668,10 +668,10 @@ run_module_doctor() {
   local doctor_file="$module_dir/doctor.sh"
   [ ! -f "$doctor_file" ] && return
 
-  # Windsurf, Devin, and Augment are deprecated and frozen (AGENTS.md §
-  # Deprecated agents): their checks stay in the tree but never ask for fixes.
+  # Augment is deprecated and frozen (AGENTS.md § Deprecated agents): its
+  # checks stay in the tree but never ask for fixes.
   case "$module_name" in
-    windsurf|devin|augment)
+    augment)
       if [ "${DOTFILES_DEPRECATED_AGENT_CHECKS:-0}" != "1" ]; then
         skip_count=$((skip_count + 1))
         $QUIET_MODE || echo "  ⊘ $module_name skipped: deprecated agent, frozen (no fixes)"
@@ -719,7 +719,7 @@ run_module_doctor() {
       && [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" != "1" ] \
       && command -v codesign >/dev/null 2>&1; then
     case "$module_name" in
-      claude-*|cursor|devin|local-ai|local-llm|mcp-orchestrator|vscode|windsurf)
+      claude-*|cursor|local-ai|local-llm|mcp-orchestrator|vscode)
         _doctor_python="$(command -v python3 2>/dev/null || true)"
         _doctor_python_signature=""
         [ -n "$_doctor_python" ] \

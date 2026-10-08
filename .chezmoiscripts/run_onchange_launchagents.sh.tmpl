@@ -47,7 +47,6 @@ should_skip_agent() {
     cursor-priority)
       [ "$PROFILE" != "full" ] && return 0
       ! command -v cursor &>/dev/null \
-        && ! pgrep -x "Windsurf" &>/dev/null \
         && ! pgrep -x "ghostty" &>/dev/null \
         && ! pgrep -x "WebStorm" &>/dev/null \
         && [ ! -d "/Applications/Ghostty.app" ] \

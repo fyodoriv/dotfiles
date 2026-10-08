@@ -16,12 +16,10 @@
 #   agent-tmux --help                 Show this message.
 #
 # Examples:
-#   agent-tmux devin                  → session "devin-tooling" in cwd ~/apps/tooling
-#   agent-tmux devin -r               → resume most-recent Devin session
-#   agent-tmux claude                 → Claude Code in tmux
+#   agent-tmux claude                 → session "claude-tooling" in cwd ~/apps/tooling
 #   agent-tmux cursor-agent           → Cursor Agent in tmux
 #
-# Reattach later: `tmux a -t devin-tooling` (or run agent-tmux again
+# Reattach later: `tmux a -t claude-tooling` (or run agent-tmux again
 # with the same agent name in the same cwd — `tmux new -A` will attach).
 #
 # Why this script vs. raw `tmux new -A -s ... <cmd>`: (a) consistent
@@ -46,7 +44,7 @@ if [ -n "${TMUX:-}" ]; then
 fi
 
 if [ "${1:-}" = "--ls" ]; then
-  tmux ls 2>/dev/null | grep -E "^(devin|claude|cursor|codex|gemini|opencode|amp|cline|aider|goose|windsurf)" || {
+  tmux ls 2>/dev/null | grep -E "^(claude|cursor|codex|gemini|opencode|amp|cline|aider|goose)" || {
     echo "(no active agent-tmux sessions)" >&2
     exit 0
   }
@@ -88,8 +86,7 @@ SESSION="${AGENT_TMUX_SESSION:-${AGENT}-${CWD_BASE}}"
 # creates a new one. The wrapped command is the agent + any passthrough
 # args. The agent runs in $PWD (tmux respects -c "$PWD" or inherits cwd).
 #
-# Why we don't use `caffeinate -s` here: Devin CLI already self-wraps
-# in `caffeinate -ms`, and Claude Code / Cursor don't need it for their
-# foreground operation. macOS lid-close sleep is handled by Amphetamine
+# Why we don't use `caffeinate -s` here: Claude Code / Cursor
+# don't need it for their foreground operation. macOS lid-close sleep is handled by Amphetamine
 # (system-level), not per-process caffeinate.
 exec tmux new -A -s "$SESSION" -c "$PWD" "$AGENT" "$@"

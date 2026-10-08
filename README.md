@@ -77,7 +77,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 |--------|----------|---------|-------------|
 | Profile | `profile` | `full` | `core` = 7 baseline modules, team-friendly. `full` = all 35 discovered modules, subject to feature gates. |
 | Enterprise mode | `is_enterprise` | `false` | Adds generic enterprise tools (AWS CLI, K8s, Gradle, Java 21, enterprise SSH). Organization-specific tools belong in the org overlay repo, not the base repo. |
-| AI tooling | `use_ai_tools` | `false` | Deploys `~/.zshrc.ai-tools` with GPT-5.5 XHigh Thinking Fast Devin defaults (`DEVIN_MODEL=gpt-5-5-xhigh-priority`) and Devin CLI aliases — see [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration) for the default-model policy and [troubleshooting](docs/troubleshooting.md#devin-uses-the-wrong-model) if Devin picks the wrong model |
+| AI tooling | `use_ai_tools` | `false` | Deploys `~/.zshrc.ai-tools` (tmux agent launchers, agent-browser tuning) — see [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration) for the default-model policy |
 | Local AI | `use_local_ai` | `false` | Installs the local-LLM fallback stack (`pipx`, `aider-chat`, `huggingface_hub[cli]`, and `mlx-lm` on native Apple Silicon). Local health checks never spawn models; the Ollama supervisor skips startup when another healthy owner already serves `:11434`. The ~30 GB model download still requires the sentinel in [docs/local-llm.md](docs/local-llm.md). |
 | Cursor | `use_cursor` | `true` | Manages Cursor: the `cursor` doctor module, the `run_after_cursor-*` scripts, the Cursor-only LaunchAgents (`cursor-at-login`, `heal-stuck-agents`), and agentbrew's Cursor target. `false` turns all of them off, removes those LaunchAgents on the next apply, and merges `config/agentfile-no-cursor.yaml` (`excludeAgents: [cursor]`) into the agentbrew Agentfile. Dotfiles does not uninstall the Cursor app itself. |
 | *(not prompted)* | `auto_sync` | `true` | Scheduled `dotfiles-sync` (30 min) and `tooling-sync` (60 min) LaunchAgents. Set `false` in `~/.config/chezmoi/chezmoi.yaml` and run `dotfiles apply` to remove them and sync by hand. |
@@ -144,12 +144,10 @@ feature-specific gates.
 | chrome | full | Chrome default profile, work profile detection, ChromeWork URL router |
 | claude | full | Claude config, MCP servers, GitHub Enterprise integration |
 | cursor | full | Cursor settings, keybindings, extensions |
-| devin | full | Devin CLI config — deprecated and frozen; doctor skips it ([AGENTS.md § Deprecated agents](AGENTS.md#deprecated-agents--frozen)) |
 | editor | full | editorconfig, global editor settings |
 | enterprise | full | AWS CLI, kubectl, Gradle, Java, enterprise SSH |
 | extras | full | Fastfetch config, misc tools |
 | jetbrains | full | IdeaVim config |
-| windsurf | full | Windsurf settings + keybindings + extensions, inherited from WebStorm — deprecated and frozen; doctor skips it |
 | local-llm | full | Local-LLM stack detection (pipx, aider, huggingface-cli, mlx-lm) for Minsky's claude-exhaustion fallback |
 | memory | full | Shared MCP daemon, maintenance job, schema/embedding health, and backup freshness/integrity |
 | prompt | full | Starship config symlink and theme |
@@ -299,13 +297,11 @@ Only enable this if your work requires AWS, K8s, or JVM tooling — it adds extr
 
 ### 3. AI tooling (optional)
 
-AI agent tooling (Devin CLI shortcuts, model defaults, agent-browser config) is opt-in. When prompted during `chezmoi init`, set `use_ai_tools: true` — or enable it later by editing `~/.config/chezmoi/chezmoi.yaml` and running `dotfiles apply`.
+AI agent tooling (tmux agent launchers, agent-browser config) is opt-in. When prompted during `chezmoi init`, set `use_ai_tools: true` — or enable it later by editing `~/.config/chezmoi/chezmoi.yaml` and running `dotfiles apply`.
 
-This deploys `~/.zshrc.ai-tools`, which sets `DEVIN_MODEL` and Devin CLI aliases (`dv`, `dvp`, `dvc`, `dvr`, `dvl`). It also installs a `~/bin/claude` wrapper that strips leaked `ANTHROPIC_MODEL` values and starts Claude Code with `--permission-mode bypassPermissions` unless you pass an explicit permission mode.
+This deploys `~/.zshrc.ai-tools`, which sets up tmux agent launchers (`tcc`, `tcur`, `tcdx`) and agent-browser tuning. It also installs a `~/bin/claude` wrapper that strips leaked `ANTHROPIC_MODEL` values and starts Claude Code with `--permission-mode bypassPermissions` unless you pass an explicit permission mode.
 
 Teammates who want MCP servers, shared skills, and generated agent config should also follow [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for `agentbrew init`, credential setup, sync, status checks, and recovery.
-
-If Devin starts with the wrong model, use the symptom-first recovery entry in [docs/troubleshooting.md#devin-uses-the-wrong-model](docs/troubleshooting.md#devin-uses-the-wrong-model) instead of editing generated config by hand.
 
 ### 4. Enterprise secrets
 
@@ -402,7 +398,7 @@ daily `com.dotfiles.memory-sync-projects` LaunchAgent and `/ship-it` trigger to
 client instead of a second raw HTTP implementation. AgentBrew's Claude Code
 `SessionEnd` hook adds a debounced, non-blocking fast path. The daily job
 remains recovery when a session hook cannot run. Claude project-memory files
-are one source for the same managed store that Cursor, Windsurf, Devin, and
+are one source for the same managed store that Cursor and
 Codex use; they are not a separate backend.
 Normal project-memory sync is metadata-delta based. Use
 `agentbrew memory sync-projects --force` only for a deliberate recovery
@@ -541,7 +537,6 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 | **shell** | Zsh: 100K history, completion, lazy fnm (0.05s startup), fzf/zoxide, aliases | |
 | **editor** | `.editorconfig` (2-space indent, UTF-8, LF) + `.gitignore_global` + `.npmrc` | |
 | **jetbrains** | IdeaVim (113 mappings), WebStorm keymap, 8GB heap, zero-latency typing | |
-| **windsurf** | Generated local settings.json + keybindings.json symlinked, 25+ extensions, IntelliJ keymap + vim layered, 8GB tsserver, file-watcher exclusions for monorepos, CA bundle for corp TLS inspection | |
 | **terminal** | Ghostty (GPU-accelerated, Catppuccin auto light/dark, Nerd Font) + tmux (C-a, vim nav, mouse) | |
 | **prompt** | Starship: git branch/status, node/python version, command duration | |
 | **extras** | Lazygit, tig, yazi, hyperfine, duf/dust/procs, and other niche CLI tools | |
@@ -551,7 +546,6 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 | **agentbrew** | Verifies agentbrew CLI/state sync and warns when registered MCP CLIs need local setup | `ai-tools` |
 | **agent-browser** | agent-browser CLI installed, Chrome CDP responsive for browser automation | `ai-tools` |
 | **chrome** | Chrome opens with Work profile by default; ChromeWork is kept as the system HTTP(S) handler so links from Slack, Mail, and Messages route there even when agent-browser Chrome daemons share the bundle | `enterprise` (both work-profile checks) |
-| **devin** | Devin CLI binary, model consistency, config hygiene | `ai-tools` |
 | **enterprise** | AWS CLI, Kubernetes, Gradle, Java 21, organization-specific tools + enterprise SSH config | `enterprise` |
 
 > **Gate legend:** `enterprise` = requires `dotfiles enterprise on`. `ai-tools` = requires `use_ai_tools: true` in chezmoi config. Modules without a gate are available to all full-profile users.
@@ -560,7 +554,7 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 
 AI agent configuration (MCP servers, skills, rules, commands) is managed by [agentbrew](https://www.npmjs.com/package/agentbrew), not dotfiles. The `Agentfile.yaml` in this repo is the declarative manifest — see [Agentfile.yaml](Agentfile.yaml) for the full config and [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for teammate setup and recovery. The no-argument `/learn-repos` command repairs its shared-memory connection before scanning and uses the `/ship-it` safety and ownership gates to deliver only source-backed repository healing.
 
-Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Cursor, Windsurf, Devin, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
+Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Cursor, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
 
 The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
 
@@ -612,7 +606,7 @@ final non-draft PR opens or becomes ready, then done after it merges. It uses
 the configured team's available transition names and skips drafts, stack
 children, and ambiguous or unrelated tickets.
 
-**Adding an MCP server** (e.g. Jira/Atlassian) — deploys to **all agents** (Claude Code, Cursor, Windsurf, etc.) in one command:
+**Adding an MCP server** (e.g. Jira/Atlassian) — deploys to **all agents** (Claude Code, Cursor, etc.) in one command:
 
 ```bash
 agentbrew install atlassian          # installs mcp-atlassian across all detected agents
@@ -627,7 +621,7 @@ To share the setup with a colleague (gets Jira MCP in all their agents):
 ```bash
 # On their machine:
 npm install -g agentbrew
-agentbrew init                       # detects Claude Code, Cursor, Windsurf, etc.
+agentbrew init                       # detects Claude Code, Cursor, etc.
 agentbrew install atlassian          # deploys to all detected agents globally
 agentbrew setup atlassian            # guided wizard — tells you exactly where to get the tokens
 agentbrew sync
@@ -981,7 +975,7 @@ User-configurable variables that customize dotfiles behavior. Set them in `~/.zs
 | `DOTFILES_STATS_FILE` | `$HOME/.dotfiles-stats.jsonl` | JSON Lines file tracking automation statistics (time saved, runs) |
 | `DOTFILES_CI` | `false` | Set to `true` in CI to skip macOS-specific checks (spotlight, pager, etc.) |
 | `DOTFILES_DOCTOR_NOTIFY` | `0` | Set to `1` to enable macOS notification banners after `dotfiles-doctor` runs (failures and `--fix` successes). Default off; logs and exit codes unchanged. |
-| `DOTFILES_NETWORK_TARGETS` | Anthropic, GitHub, Devin URLs | Space-separated URLs for network watchdog connectivity checks |
+| `DOTFILES_NETWORK_TARGETS` | Anthropic, GitHub URLs | Space-separated URLs for network watchdog connectivity checks |
 | `TERMINAL_LOG` | (unset) | Set to `1` to enable terminal session logging to `~/.local/share/terminal-logs/` |
 | `FIX_TIMEOUT` | `30` | Seconds to wait for each auto-fix command in `dotfiles doctor --fix` |
 | `EDITOR` | `vim` | Default editor for git commits and `dotfiles edit` |
@@ -993,7 +987,6 @@ User-configurable variables that customize dotfiles behavior. Set them in `~/.zs
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `DEVIN_MODEL` | `gpt-5-5-xhigh-priority` | Devin CLI model (`GPT-5.5 XHigh Thinking Fast`) — see [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration) for the per-agent model policy |
 | `AGENT_BROWSER_IDLE_TIMEOUT_MS` | `600000` | Keep agent-browser daemon alive (ms) between commands |
 | `AGENT_BROWSER_DEFAULT_TIMEOUT` | `15000` | Page load timeout (ms) for agent-browser |
 | `AGENT_BROWSER_SESSION` | (auto-set for agents) | Stable daemon/session identity. Dotfiles-assigned agent sessions attach to `--cdp 9223` by default; a caller-provided value is the explicit isolation escape hatch for non-SSO work. |
@@ -1158,7 +1151,7 @@ Then `dotfiles apply` to deploy.
 | Concern | Owner |
 |---------|-------|
 | Shell, git, macOS, SSH, editor config | **dotfiles** |
-| AI model defaults (`DEVIN_MODEL`, Claude Code model pin, Cursor model parity) | **dotfiles** (opt-in via `use_ai_tools`) |
+| AI model defaults (Claude Code model pin, Cursor model parity) | **dotfiles** (opt-in via `use_ai_tools`) |
 | AI agent MCP servers, skills, rules, commands | **agentbrew** |
 
 Rule: never have both repos write to the same target path.

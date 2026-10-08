@@ -31,6 +31,14 @@
 - **Doctor warm-run performance** — successful Homebrew bottle signature audits
   are cached for 24 hours. Auto-discovery ignores base repository worktrees.
 
+### Removed
+
+- **Windsurf and Devin support (2026-10-08)** — deleted the `windsurf` and
+  `devin` doctor modules, the `windsurf/` config dir, the Devin CLI wrapper
+  script, the `dv*`/`tdv*` aliases and `DEVIN_MODEL` export in
+  `home/zshrc.ai-tools`, and their tests. Augment (Auggie) stays deprecated
+  and frozen.
+
 ### Changed
 
 - **One canonical repo** — `github.com/fyodoriv/dotfiles` on `feat/chezmoi` is

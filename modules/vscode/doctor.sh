@@ -7,7 +7,7 @@
 #   - keybindings.json  → symlinked into User/keybindings.json
 #   - extensions.txt    → one extension id per line; doctor installs missing
 #
-# This module mirrors modules/windsurf/doctor.sh and modules/cursor/doctor.sh.
+# This module mirrors modules/cursor/doctor.sh.
 
 _VC_LOCAL="${VSCODE_LOCAL_DIR:-$HOME/.local/share/dotfiles-vscode}"
 _VC_USER_DIR="$HOME/Library/Application Support/Code/User"
@@ -125,7 +125,7 @@ _vc_extension_installed() {
   _vc_installed_extensions | grep -Fxq "$ext_lc"
 }
 
-# Corporate-CA bundle (same pattern as windsurf/cursor doctors).
+# Corporate-CA bundle (same pattern as the cursor doctor).
 _VC_CA_BUNDLE="$_VC_LOCAL/ca-bundle.pem"
 if [ ! -f "$_VC_CA_BUNDLE" ] || [ -n "$(find "$_VC_CA_BUNDLE" -mtime +30 2>/dev/null)" ]; then
   mkdir -p "$_VC_LOCAL"

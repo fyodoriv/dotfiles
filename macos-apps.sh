@@ -29,7 +29,6 @@ set_app_responsiveness_defaults() {
   defaults write "$app_bundle_identifier" NSDisableAutomaticTermination -bool true 2>/dev/null || true
 }
 
-set_app_responsiveness_defaults "Windsurf" "com.exafunction.windsurf"
 set_app_responsiveness_defaults "Cursor" "com.todesktop.230313mzl4w4u92"
 set_app_responsiveness_defaults "Slack" "com.tinyspeck.slackmacgap"
 set_app_responsiveness_defaults "Google Chrome" "com.google.Chrome"

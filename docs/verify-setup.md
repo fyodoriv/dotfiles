@@ -162,7 +162,6 @@ All 21 doctor modules and what they check:
 | chrome | Chrome profile and extensions |
 | claude | Claude CLI configuration |
 | cursor | Cursor editor settings |
-| devin | Devin CLI configuration |
 | editor | Default editor setup |
 | enterprise | AWS, kubectl, gradle, java |
 | extras | Additional CLI tools |

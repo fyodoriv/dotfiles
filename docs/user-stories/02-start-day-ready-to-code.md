@@ -60,7 +60,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `tooling-sync` | Pull agentbrew and minsky; push agentbrew TASKS.md edits | Every hour |
 | `dotfiles-doctor` | Health check + auto-fix | Weekly |
 | `git-maintain` | `git maintenance` on all repos | Daily |
-| `cursor-priority` | Every 60s | Boost Cursor/Windsurf scheduling priority | Every 60s |
+| `cursor-priority` | Every 60s | Boost Cursor scheduling priority | Every 60s |
 | `cursor-at-login` | Launch Cursor in background at login (`open -g -a Cursor`) | At login |
 | `morning` | Morning startup routine | 8:30 AM daily |
 | `capslock-control` | Caps Lock → Control remapping | At login |

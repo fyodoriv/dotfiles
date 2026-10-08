@@ -50,6 +50,12 @@ _agentbrew_global_agentfile_in_sync() {
     fi
   fi
   [ -n "$extra_agentfile" ] && [ -f "$extra_agentfile" ] && paths+=("$extra_agentfile")
+  # Match run_after_agentbrew-sync.sh: use_cursor=false merges the no-Cursor Agentfile last.
+  local no_cursor_agentfile="$DOTFILES_DIR/config/agentfile-no-cursor.yaml"
+  if [ "${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo true)}" = "false" ] \
+      && [ -f "$no_cursor_agentfile" ]; then
+    paths+=("$no_cursor_agentfile")
+  fi
   [ "${#paths[@]}" -gt 0 ] || return 0
 
   local expected status

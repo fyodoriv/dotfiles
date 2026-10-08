@@ -277,6 +277,42 @@ AGENTBREW_EOF
   [ "$pass_count" -ge 1 ]
 }
 
+@test "agentbrew: global Agentfile drift check includes the no-Cursor Agentfile when use_cursor=false" {
+  grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
+  mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
+
+  echo "mcp: [context7]" > "$TEST_DOTFILES/Agentfile.yaml"
+  mkdir -p "$TEST_DOTFILES/config"
+  printf 'excludeAgents:\n  - cursor\n' > "$TEST_DOTFILES/config/agentfile-no-cursor.yaml"
+  echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
+  # The sync script merged both inputs; the mock merge records their names.
+  echo "Agentfile.yaml agentfile-no-cursor.yaml" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+
+  cat > "$TEST_DIR/bin/agentbrew" << 'AGENTBREW_EOF'
+#!/bin/bash
+if [ "$1" = "agentfile" ] && [ "$2" = "merge" ]; then
+  if [ "$3" = "--help" ]; then
+    echo "Usage: agentbrew agentfile merge [options] <agentfiles...>"
+    exit 0
+  fi
+  shift 2
+  inputs=()
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--output" ]; then output="$2"; shift 2; continue; fi
+    inputs+=("$(basename "$1")")
+    shift
+  done
+  echo "${inputs[*]}" > "$output"
+fi
+AGENTBREW_EOF
+  chmod +x "$TEST_DIR/bin/agentbrew"
+
+  DOTFILES_USE_CURSOR=false source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+
+  [ "$fail_count" -eq 0 ]
+  [ "$pass_count" -ge 1 ]
+}
+
 @test "agentbrew: global Agentfile drift check skips when CLI lacks agentfile merge" {
   grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
   mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"

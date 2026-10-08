@@ -150,7 +150,7 @@ check "resilience.amphetamine_sync_tool" "dotfiles-amphetamine-sync executable" 
 # Returns 0 when local == repo, non-zero when they drift.
 check "resilience.amphetamine_sync_in_sync" "Amphetamine preferences match dotfiles/data/amphetamine-prefs.json" \
   "! [ -d /Applications/Amphetamine.app ] || ! [ -s \"\$DOTFILES_DIR/data/amphetamine-prefs.json\" ] || [ \"\$(jq 'keys | length' \"\$DOTFILES_DIR/data/amphetamine-prefs.json\")\" = '0' ] || \"\$DOTFILES_DIR/bin/dotfiles-amphetamine-sync\" diff >/dev/null 2>&1" \
-  "echo 'Drift detected. To capture local -> dotfiles: dotfiles-amphetamine-sync export. To restore dotfiles -> local: dotfiles-amphetamine-sync apply'"
+  "echo 'Run dotfiles-amphetamine-sync diff to see the cause: drift, or macOS blocking the app container. To capture local -> dotfiles: dotfiles-amphetamine-sync export. To restore dotfiles -> local: dotfiles-amphetamine-sync apply'"
 
 # ── Process-scoped agent keepawake (Cursor + Claude Code) ─────────────
 _agent_keepawake_battery_policy_configured() {

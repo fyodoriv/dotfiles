@@ -981,7 +981,9 @@ Display sleep and screen lock still work. The manager does not block an
 explicit Restart or Shut Down.
 
 **One-time lid-close setup:** Install Amphetamine. Apply the managed baseline
-with `dotfiles-amphetamine-sync apply`. Leave generic Amphetamine Triggers,
+with `dotfiles-amphetamine-sync apply`. If it reports `cannot read Amphetamine
+preferences`, macOS blocks your terminal from the Amphetamine app container.
+Grant the terminal Full Disk Access, then run `apply` again. Leave generic Amphetamine Triggers,
 Start Session At Launch, Start Session On Wake, and AC-reconnect sessions off.
 In Amphetamine → Preferences → Sessions, toggle **Allow System to Sleep When
 Display is Closed** once and choose **Do Not Show This Message Again** in its

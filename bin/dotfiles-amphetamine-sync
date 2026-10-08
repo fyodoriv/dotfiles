@@ -81,7 +81,20 @@ warn() { printf "  ${_YEL}⚠${_RST} %s\n" "$1"; }
 err()  { printf "  ${_RED}✗${_RST} %s\n" "$1" >&2; }
 hint() { printf "  ${_DIM}→ %s${_RST}\n" "$1"; }
 
-amphetamine_installed() { [ -d /Applications/Amphetamine.app ]; }
+amphetamine_installed() { [ -d "${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}" ]; }
+
+# macOS privacy protection can block access to the app container. Then
+# `defaults export` prints an empty dict and exits 0, which looks like
+# "no prefs set". Detect the block so callers never treat it as drift.
+container_blocked() {
+  local container="${AMPHETAMINE_CONTAINER_DIR:-$HOME/Library/Containers/$DOMAIN}"
+  [ -d "$container" ] && ! ls "$container/Data/Library/Preferences" >/dev/null 2>&1
+}
+
+report_container_blocked() {
+  err "cannot read Amphetamine preferences — macOS blocks this terminal from the app container"
+  hint "grant Full Disk Access to your terminal app (System Settings → Privacy & Security), then retry"
+}
 
 managed_policy_is_safe() {
   jq -e '
@@ -96,6 +109,10 @@ managed_policy_is_safe() {
 # Read all live prefs as JSON, then keep only the synced keys.
 # Returns JSON on stdout; non-zero exit on failure.
 capture_local_subset() {
+  if container_blocked; then
+    report_container_blocked
+    return 1
+  fi
   local tmp_plist
   tmp_plist=$(mktemp -t amphetamine-export.XXXXXX.plist)
   # `defaults export <domain> -` writes the entire plist to stdout as XML.
@@ -200,6 +217,11 @@ cmd_apply() {
     return 0
   fi
 
+  if container_blocked; then
+    report_container_blocked
+    return 1
+  fi
+
   echo "Applying Amphetamine prefs: $PREFS_FILE → local"
   for key in "${SYNCED_KEYS[@]}"; do
     apply_one_key "$PREFS_FILE" "$key"
@@ -217,6 +239,11 @@ cmd_apply() {
 cmd_diff() {
   amphetamine_installed || { warn "Amphetamine.app not installed"; return 0; }
   [ -f "$PREFS_FILE" ] || { warn "$PREFS_FILE not found — run \`export\` first"; return 1; }
+
+  if container_blocked; then
+    report_container_blocked
+    return 1
+  fi
 
   local local_tmp
   local_tmp=$(mktemp -t amphetamine-local.XXXXXX.json)

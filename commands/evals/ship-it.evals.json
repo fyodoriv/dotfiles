@@ -126,6 +126,18 @@
         "Does not transition for drafts, blocked stack children, partial delivery, ambiguous or unrelated keys, or epics",
         "Does not add a Jira comment unless the user explicitly requests one"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "/ship-it after merging a PR in a repo that also has stale local branches and an old stash",
+      "expected_output": "During Step 9 cleanup the agent lists every local branch and stash, deletes only those with a recorded proof (merged PR head, ancestor of the default branch, equal tree, or superseded PR), bundles unpushed commits first, and reports what it kept and why.",
+      "expectations": [
+        "Lists every local branch with its upstream state and every stash, not only the branch just shipped",
+        "Deletes a branch only after proving it merged, an ancestor, tree-equivalent, or superseded",
+        "Saves unpushed commits with git bundle create and verifies the bundle before deleting",
+        "Drops a stash only after git apply --check -R proves the default branch contains it",
+        "Keeps the default branch, open-PR branches, worktree branches, shared state refs, and unknown work, and reports them"
+      ]
     }
   ]
 }

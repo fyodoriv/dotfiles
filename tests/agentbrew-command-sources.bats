@@ -188,6 +188,21 @@
   grep -q "/ship-it fix lint errors" "$reference_file"
 }
 
+@test "ship-it cleanup researches every local branch and stash" {
+  local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
+  local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  local skill_file="$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+  local eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
+
+  grep -q "## 9. Clean up shipped/redundant worktrees, branches, and stashes" "$reference_file"
+  grep -q "### Local branches and stashes" "$reference_file"
+  grep -q "git bundle create" "$reference_file"
+  grep -q "git apply --check -R" "$reference_file"
+  grep -q "every local branch and stash" "$command_file"
+  grep -q "Clean up local branches and stashes" "$skill_file"
+  jq -e '.evals | any(.id == 11 and (.prompt | contains("stale local branches")))' "$eval_file" >/dev/null
+}
+
 @test "ship-it keeps a linked Jira ticket aligned with final delivery" {
   local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"

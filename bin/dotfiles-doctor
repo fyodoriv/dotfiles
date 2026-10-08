@@ -46,6 +46,13 @@ DOTFILES_SECURITY_USE_APPLIED_ROOT=1
 # checks represent the machine's applied checkout when doctor runs elsewhere.
 # shellcheck source=../lib/dotfiles-endpoint-paths.sh
 source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh"
+# Opt-in agent Node (DOTFILES_AGENT_NODE_BIN) for a blocked Node publisher.
+_doctor_agent_node_bin() {
+  [ -f "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" ] || return 1
+  # shellcheck source=../lib/dotfiles-agent-node.sh
+  source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
+  dotfiles_agent_node_bin
+}
 dotfiles_prepend_endpoint_tool_paths "$DOTFILES_LINK_DIR/bin"
 
 # Trim log to last 500 lines (prevents unbounded growth from LaunchAgent)
@@ -688,10 +695,15 @@ run_module_doctor() {
         [ -n "$_doctor_node" ] \
           && _doctor_node_signature="$(codesign -dvv "$_doctor_node" 2>&1 || true)"
         if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_doctor_node_signature"; then
-          skip_count=$((skip_count + 1))
-          $QUIET_MODE || echo "  ⊘ $module_name skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
-          unset _doctor_node _doctor_node_signature
-          return
+          if _doctor_agent_node="$(_doctor_agent_node_bin)"; then
+            _doctor_module_path="$(dirname "$_doctor_agent_node"):$PATH"
+          else
+            skip_count=$((skip_count + 1))
+            $QUIET_MODE || echo "  ⊘ $module_name skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
+            unset _doctor_node _doctor_node_signature
+            return
+          fi
+          unset _doctor_agent_node
         fi
         unset _doctor_node _doctor_node_signature
         ;;
@@ -732,8 +744,18 @@ run_module_doctor() {
   elif ! $LIST_MODE; then
     echo -e "  ${BLUE}─── $module_name ───${NC}"
   fi
-  # shellcheck source=/dev/null
-  source "$doctor_file"
+  # A blocked default Node runs this module on the approved agent Node.
+  if [ -n "${_doctor_module_path:-}" ]; then
+    local _doctor_saved_path="$PATH"
+    PATH="$_doctor_module_path"
+    unset _doctor_module_path
+    # shellcheck source=/dev/null
+    source "$doctor_file"
+    PATH="$_doctor_saved_path"
+  else
+    # shellcheck source=/dev/null
+    source "$doctor_file"
+  fi
 }
 
 # ── Proactive heal for stuck Cursor agents (before module checks) ────
@@ -829,8 +851,13 @@ if [ "$IS_ENTERPRISE" = "true" ] \
   _agentbrew_node_signature=""
   [ -n "$_agentbrew_node" ] \
     && _agentbrew_node_signature="$(codesign -dvv "$_agentbrew_node" 2>&1 || true)"
-  grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_agentbrew_node_signature" \
-    && _agentbrew_runtime_allowed=false
+  if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_agentbrew_node_signature"; then
+    if _agentbrew_node="$(_doctor_agent_node_bin)"; then
+      _agentbrew_runtime_path="$(dirname "$_agentbrew_node"):$PATH"
+    else
+      _agentbrew_runtime_allowed=false
+    fi
+  fi
   unset _agentbrew_node _agentbrew_node_signature
 fi
 if $_agentbrew_runtime_allowed \
@@ -843,7 +870,7 @@ if $_agentbrew_runtime_allowed \
   elif $REPORT_MODE; then echo ""; echo "### 🤖 AgentBrew"
   else echo ""; echo -e "${BLUE}═══ AgentBrew ═══${NC}"; fi
 
-  if _timeout 15 agentbrew status --ci >/dev/null 2>&1; then
+  if PATH="${_agentbrew_runtime_path:-$PATH}" _timeout 15 agentbrew status --ci >/dev/null 2>&1; then
     $JSON_MODE && _json_add "agentbrew.status" "pass" "agentbrew status --ci — clean"
     pass "agentbrew status --ci — clean"
   else
@@ -851,7 +878,7 @@ if $_agentbrew_runtime_allowed \
     fail "agentbrew status --ci — drift detected (run: agentbrew status --fix)"
   fi
 fi
-unset _agentbrew_runtime_allowed
+unset _agentbrew_runtime_allowed _agentbrew_runtime_path
 
 # ── Summary ──────────────────────────────────────────────────────────
 if $JSON_MODE; then

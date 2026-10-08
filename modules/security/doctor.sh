@@ -430,11 +430,21 @@ check "security.recurring_automation_no_blocked_node" "Recurring apply and docto
   "upgrade dotfiles; agentbrew sync, weekly topgrade, and Node-dependent doctors must remain endpoint-policy gated"
 
 _blocked_node_jobs_unloaded() {
-  local plist label
+  local plist label agent_node=""
+  # With an approved agent Node (DOTFILES_AGENT_NODE_BIN), only jobs that
+  # would still run the blocked Node must stay unloaded.
+  if [ -f "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" ]; then
+    # shellcheck source=../../lib/dotfiles-agent-node.sh
+    source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
+    agent_node="$(dotfiles_agent_node_bin || true)"
+  fi
   for plist in "$HOME"/Library/LaunchAgents/com.agentbrew.*.plist; do
     [ -f "$plist" ] || continue
     label="$(basename "$plist" .plist)"
     [ "$label" = "com.agentbrew.mcp-memory" ] && continue
+    if [ -n "$agent_node" ] && ! dotfiles_launchagent_runs_blocked_node "$plist"; then
+      continue
+    fi
     if launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then
       return 1
     fi

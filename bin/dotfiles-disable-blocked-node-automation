@@ -7,6 +7,8 @@ set -uo pipefail
 
 # shellcheck source=/dev/null
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/dotfiles-endpoint-paths.sh"
+# shellcheck source=../lib/dotfiles-agent-node.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/dotfiles-agent-node.sh"
 
 BLOCKED_TEAM_ID="HX7739G8FX"
 STATE_DIR="$HOME/.local/state/dotfiles"
@@ -37,6 +39,14 @@ mkdir -p "$STATE_DIR"
 printf 'path=%s\nteam_id=%s\ndetected_at=%s\n' \
   "$node_path" "$BLOCKED_TEAM_ID" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >"$SENTINEL"
 
+# DOTFILES_AGENT_NODE_BIN opts agentbrew into a Node from another publisher.
+# Jobs that already run only that Node stay on; the rest stay off until
+# agentbrew sync rewrites them.
+agent_node="$(dotfiles_agent_node_bin || true)"
+if [ -n "$agent_node" ]; then
+  echo "○ Keeping agentbrew jobs on approved agent Node $agent_node"
+fi
+
 disabled=0
 for plist in "$HOME"/Library/LaunchAgents/com.agentbrew.*.plist; do
   [ -f "$plist" ] || continue
@@ -44,6 +54,10 @@ for plist in "$HOME"/Library/LaunchAgents/com.agentbrew.*.plist; do
   # The shared-memory daemon is uvx/Python-owned, not Node-owned. AgentBrew
   # reconciles this required cold-start dependency independently.
   [ "$label" = "com.agentbrew.mcp-memory" ] && continue
+  if [ -n "$agent_node" ] && ! dotfiles_launchagent_runs_blocked_node "$plist"; then
+    launchctl enable "gui/$(id -u)/$label" 2>/dev/null || true
+    continue
+  fi
   launchctl disable "gui/$(id -u)/$label" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
   disabled=$((disabled + 1))

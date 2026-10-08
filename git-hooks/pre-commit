@@ -236,8 +236,15 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
     git show ":bin/dotfiles-memory" 2>/dev/null |
       grep -Fq 'exec "$agentbrew_bin" memory'
   }
+  # `git rm --cached` of a path .gitignore lists fixes a file that was
+  # tracked by mistake. The file stays on disk, so nothing is lost.
+  is_untracked_ignored_path() {
+    [ -e "$1" ] || [ -L "$1" ] || return 1
+    git check-ignore --no-index -q -- "$1" 2>/dev/null
+  }
   for f in "${DELETED[@]}"; do
-    if [[ "$f" =~ $PROTECTED_DIRS ]] && ! is_verified_retired_memory_library_delete "$f"; then
+    if [[ "$f" =~ $PROTECTED_DIRS ]] && ! is_verified_retired_memory_library_delete "$f" \
+        && ! is_untracked_ignored_path "$f"; then
       protected_deletions+=("$f")
     fi
   done

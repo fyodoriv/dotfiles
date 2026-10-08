@@ -120,6 +120,9 @@ skills:
   - analyze
   - ubiquitous-language
   - caveman
+  - project-audit
+  - git-diagnose-codebase
+  - strategic-review
   # ── context budget / token hygiene (agentbrew dev plugins) ───────
   - context-budget           # metrics-driven trim via agentbrew measure context
   - cursor-token-playbook    # daily Cursor habits — model mix, new chat, @ scoping

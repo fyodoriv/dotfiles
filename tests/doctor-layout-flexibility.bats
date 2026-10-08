@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for layout-flexibility fixes in doctor modules and zshrc.ai-tools.
+# Tests for layout-flexibility fixes in doctor modules and the agentbrew shim.
 #
 # The dotfiles assumed `${DOTFILES_REPOS_DIR:-$HOME/apps}/<repo>` everywhere,
 # but several setups now use a `tooling/` wrapper directory
@@ -8,24 +8,38 @@
 
 load test_helper
 
-ZSHRC_AI="$BATS_TEST_DIRNAME/../home/zshrc.ai-tools"
 DOCTOR_AGENT_BROWSER="$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
 DOCTOR_AGENTBREW="$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
 DOCTOR_UPGRADE="$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
 
-@test "zshrc.ai-tools probes both apps/ and apps/tooling/ for agentbrew" {
-  # Two base paths declared and the agentbrew probe lists both.
-  grep -q '_DOTFILES_BASE=' "$ZSHRC_AI"
-  grep -q '_DOTFILES_TOOLING=' "$ZSHRC_AI"
-  awk '/_agentbrew_dir=/,/^fi$/' "$ZSHRC_AI" | grep -q '_DOTFILES_BASE/agentbrew'
-  awk '/_agentbrew_dir=/,/^fi$/' "$ZSHRC_AI" | grep -q '_DOTFILES_TOOLING/agentbrew'
+@test "agentbrew_locate finds both apps/tooling/agentbrew and apps/agentbrew" {
+  # The agentbrew launcher moved from zshrc.ai-tools into bin/agentbrew,
+  # which resolves the checkout through lib/agentbrew-locate.sh.
+  local tmp
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/tooling/agentbrew"
+  run env DOTFILES_REPOS_DIR="$tmp" bash -c 'source "$1"; agentbrew_locate' _ "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh"
+  [ "$output" = "$tmp/tooling/agentbrew" ]
+  rm -rf "$tmp/tooling"
+  mkdir -p "$tmp/agentbrew"
+  run env DOTFILES_REPOS_DIR="$tmp" bash -c 'source "$1"; agentbrew_locate' _ "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh"
+  [ "$output" = "$tmp/agentbrew" ]
+  rm -rf "$tmp"
 }
 
-
-
-@test "zshrc.ai-tools prefers dist/cli.js over tsx for agentbrew function" {
-  awk '/_agentbrew_dir=/,/^fi$/' "$ZSHRC_AI" | grep -q 'dist/cli.js'
-  awk '/_agentbrew_dir=/,/^fi$/' "$ZSHRC_AI" | grep -q 'node_modules/.bin/tsx'
+@test "bin/agentbrew prefers dist/cli.js over tsx" {
+  local tmp
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/agentbrew/dist" "$tmp/agentbrew/node_modules/.bin"
+  printf '#!/bin/sh\necho dist\n' > "$tmp/agentbrew/dist/cli.js"
+  printf '#!/bin/sh\necho tsx\n' > "$tmp/agentbrew/node_modules/.bin/tsx"
+  chmod +x "$tmp/agentbrew/dist/cli.js" "$tmp/agentbrew/node_modules/.bin/tsx"
+  run env DOTFILES_REPOS_DIR="$tmp" "$BATS_TEST_DIRNAME/../bin/agentbrew" --version
+  [ "$output" = "dist" ]
+  rm "$tmp/agentbrew/dist/cli.js"
+  run env DOTFILES_REPOS_DIR="$tmp" "$BATS_TEST_DIRNAME/../bin/agentbrew" --version
+  [ "$output" = "tsx" ]
+  rm -rf "$tmp"
 }
 
 @test "agent-browser doctor checks both zshrc and zshrc.ai-tools for env vars" {
@@ -35,16 +49,12 @@ DOCTOR_UPGRADE="$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
   grep -A 1 'AGENT_BROWSER_DEFAULT_TIMEOUT configured' "$DOCTOR_AGENT_BROWSER" | grep -q 'zshrc.ai-tools'
 }
 
-@test "agentbrew doctor falls back to function declaration + repo checkout" {
-  # The `command -v agentbrew` test fails when the function lives in
-  # zshrc.ai-tools but isn't exported into bash subshells. The doctor
-  # must accept either path.
+@test "agentbrew doctor relies on the PATH shim that locates the checkout" {
+  # bin/agentbrew is on PATH in every bash subshell, so the doctor's
+  # `command -v agentbrew` check works for both layouts.
   grep -q '_agentbrew_cli_available' "$DOCTOR_AGENTBREW"
-  grep -q 'agentbrew/dist/cli.js' "$DOCTOR_AGENTBREW"
-  grep -q 'tooling/agentbrew' "$DOCTOR_AGENTBREW"
+  grep -q 'agentbrew_locate' "$BATS_TEST_DIRNAME/../bin/agentbrew"
 }
-
-
 
 @test "upgrade doctor checks are gated behind auto_upgrade chezmoi data" {
   # When auto_upgrade is false (default), the lifecycle script refuses

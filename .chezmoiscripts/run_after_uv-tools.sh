@@ -28,6 +28,8 @@ if [ "$(uname -s)" = "Darwin" ] \
     && [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" != "1" ]; then
   _allow_python_install=false
 fi
+_uv_bin_dir="$(uv tool dir --bin 2>/dev/null || echo "$HOME/.local/bin")"
+_uv_tool_dir="$(uv tool dir 2>/dev/null || true)"
 for tool in poetry jrnl httpie pipx; do
   if uv tool list 2>/dev/null | grep -q "^${tool} "; then
     continue
@@ -36,9 +38,24 @@ for tool in poetry jrnl httpie pipx; do
     echo "○ uv tool install ${tool} skipped (endpoint-policy safe mode)"
     continue
   fi
+  # uv refuses to overwrite an executable it does not own. A stale uv shim
+  # (target inside the uv tool dir) is safe to replace; anything else
+  # belongs to another installer, so leave it alone.
+  _force=""
+  _existing="${_uv_bin_dir}/${tool}"
+  if [ -e "$_existing" ] || [ -L "$_existing" ]; then
+    _target="$(readlink "$_existing" 2>/dev/null || true)"
+    if [ -n "$_uv_tool_dir" ] && [[ "$_target" == "$_uv_tool_dir"/* ]]; then
+      _force="--force"
+    else
+      echo "○ ${tool} already provided by ${_existing} (not uv-managed) — skipping uv tool install"
+      continue
+    fi
+  fi
   echo "→ uv tool install ${tool}"
-  uv tool install "$tool" || echo "⚠ uv tool install ${tool} failed — continuing"
+  # shellcheck disable=SC2086 # _force is empty or one flag
+  uv tool install $_force "$tool" || echo "⚠ uv tool install ${tool} failed — continuing"
 done
-unset _allow_python_install
+unset _allow_python_install _uv_bin_dir _uv_tool_dir _force _existing _target
 
 echo "✓ uv-managed CLI tools up to date"

@@ -458,8 +458,11 @@ _blocked_node_jobs_unloaded() {
   return 0
 }
 
+# Same gate as the fix script: only a managed endpoint blocks this publisher.
 if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_node_signature" \
-    && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
+    && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ] \
+    && declare -F dotfiles_managed_endpoint >/dev/null \
+    && dotfiles_managed_endpoint; then
   check "security.blocked_node_jobs_unloaded" "Node-backed recurring LaunchAgents are disabled while publisher is blocked" \
     "_blocked_node_jobs_unloaded" \
     "'$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation'"

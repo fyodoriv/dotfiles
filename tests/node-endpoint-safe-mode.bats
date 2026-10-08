@@ -286,3 +286,29 @@ EOF
   [[ "$output" == *"Disabled 0 unattended agentbrew job(s)"* ]]
   ! grep -q 'disable gui/.*/com.agentbrew.check' "$LAUNCHCTL_LOG"
 }
+
+# Source the security module with check helpers that only record check ids.
+security_check_ids() {
+  env -i HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    DOTFILES_DIR="$PWD" DOTFILES_MODULE_DIR="$PWD" "$@" \
+    /bin/bash -c '
+      check() { echo "$1"; }
+      check_advisory() { echo "$1"; }
+      check_symlink() { echo "$1"; }
+      check_managed() { echo "$1"; }
+      pass() { :; }; fail() { :; }; fixed() { :; }; skipped() { :; }; audit_warn() { :; }
+      is_overridden() { return 1; }
+      FIX_MODE=false; LIST_MODE=false; QUIET_MODE=true
+      source modules/security/doctor.sh
+    ' 2>/dev/null
+}
+
+@test "unmanaged Mac with official Node does not require Node jobs unloaded" {
+  run security_check_ids
+  [[ "$output" != *"security.blocked_node_jobs_unloaded"* ]]
+}
+
+@test "managed endpoint with official Node requires Node jobs unloaded" {
+  run security_check_ids DOTFILES_MANAGED_ENDPOINT=1
+  [[ "$output" == *"security.blocked_node_jobs_unloaded"* ]]
+}

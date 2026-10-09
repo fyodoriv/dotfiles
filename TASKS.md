@@ -33,6 +33,18 @@ remote without explicit operator approval in the current session. -->
 
 ## P1
 
+
+- [ ] Full dotfiles doctor finishes inside its 90s budget
+  - **ID**: full-dotfiles-doctor-finishes-inside-its-90s-budget
+  - **Tags**: performance,doctor
+  - **Details**: On 2026-10-08 a full dotfiles-doctor --quiet took 413s (load 8-10), so tests/doctor.bats 'doctor --quiet completes in under 90 seconds' fails on every make check. PR #36 cut the security module from 82s to 30s by batching grep. Per-module profile (each includes ~8s startup): jetbrains ~82s, resilience ~52s, git ~47s, memory ~44s, agentbrew ~38s, vscode ~34s, macos ~33s. Trace with PS4='+ ${EPOCHREALTIME} ' bash -x and group by command to find per-file spawn loops, as in #36.
+  - **Files**: modules/jetbrains/doctor.sh,modules/resilience/doctor.sh,modules/git/doctor.sh,modules/memory/doctor.sh,bin/dotfiles-doctor
+  - **Acceptance**: bats -f 'doctor --quiet completes in under 90 seconds' tests/doctor.bats passes on this Mac at load below 5
+  - **Hypothesis**: Removing per-item process spawns in the slowest modules cuts full doctor wall time from ~360s to under 90s
+  - **Success**: time dotfiles-doctor --quiet under 90s at load below 5
+  - **Pivot**: if three modules are optimized and the total is still above 200s, switch to running modules in parallel instead
+  - **Measurement**: s=$(date +%s); bin/dotfiles-doctor --quiet; echo $(( $(date +%s)-s ))
+  - **Anchor**: Doctor 90s budget test in tests/doctor.bats; Basili GQM 1994
 - [ ] `pre-push-private-repo-root-check` — stop the public-repo gates from blocking approved pushes to private repos
   - **ID**: pre-push-private-repo-root-check
   - **Tags**: p1, security, git-hooks, bug
@@ -196,6 +208,13 @@ remote without explicit operator approval in the current session. -->
 
 ## P2
 
+
+- [ ] dotfiles-audit tests pass on a machine with real shims
+  - **ID**: dotfiles-audit-tests-pass-on-a-machine-with-real-shims
+  - **Tags**: tests,audit
+  - **Details**: Three tests in tests/audit.bats fail on unmodified feat/chezmoi on this Mac: 'ignores intentional test secret fixtures' (line 141), 'passes root artifact check in clean repo' (line 195), 'exits 0 when no failures' (line 252). Each expects exit 0, but dotfiles-audit exits 1 because machine-dependent checks (curl/jq/python shim symlinks, PATH resolution) fail inside the fake dotfiles dir. The tests should stub or skip those environment checks.
+  - **Files**: tests/audit.bats,bin/dotfiles-audit
+  - **Acceptance**: bats tests/audit.bats passes on this Mac with no machine-specific skips added to production code
 - [ ] Prevent dotfiles-sync from stopping its own active run during a LaunchAgent reload
   - **ID**: dotfiles-sync-self-reload-safe
   - **Tags**: launchagents, sync, resilience, doctor

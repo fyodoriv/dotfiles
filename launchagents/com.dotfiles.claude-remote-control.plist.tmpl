@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.dotfiles.claude-remote-control
+
+  Runs `claude remote-control` so this Mac stays reachable from the Claude
+  mobile app and claude.ai/code without an open terminal. New sessions start
+  in ~/apps.
+
+  Opt-in: installed only when chezmoi data `claude_remote_control` is true.
+  Remote sessions run with the ~/bin/claude wrapper's default permission mode
+  (bypassPermissions), and anyone signed in to this claude.ai account can
+  start them.
+
+  KeepAlive=true with ThrottleInterval=30: launchd restarts it after a crash
+  or a network drop without a tight respawn loop.
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.dotfiles.claude-remote-control</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>{{ .chezmoi.homeDir }}/bin/claude</string>
+      <string>remote-control</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{ .chezmoi.homeDir }}/apps</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>LANG</key>
+      <string>C.UTF-8</string>
+      <key>HOME</key>
+      <string>{{ .chezmoi.homeDir }}</string>
+      <key>PATH</key>
+      <string>{{ template "launchagent-path" . }}</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/claude-remote-control.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/claude-remote-control.err.log</string>
+  </dict>
+</plist>

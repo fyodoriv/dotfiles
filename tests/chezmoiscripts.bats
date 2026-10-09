@@ -582,6 +582,65 @@ STALE
   [ "$(cat "$HOME/claude-args")" = "--name [$(basename "$PWD")] --dangerously-skip-permissions prompt" ]
 }
 
+# Remote Control refuses to start when --permission-mode comes before the
+# verb, so the wrapper must put its default after `rc` / `remote-control`.
+@test "claude wrapper: puts the permission mode after the rc verb" {
+  write_fake_claude
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"
+
+  run "$HOME/bin/claude" rc
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/claude-args")" = "rc --permission-mode bypassPermissions" ]
+}
+
+@test "claude wrapper: puts the permission mode after the remote-control verb" {
+  write_fake_claude
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"
+
+  run "$HOME/bin/claude" remote-control --spawn worktree
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/claude-args")" = "remote-control --permission-mode bypassPermissions --spawn worktree" ]
+}
+
+@test "claude wrapper: keeps a user permission mode for remote-control" {
+  write_fake_claude
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"
+
+  run "$HOME/bin/claude" rc --permission-mode auto
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/claude-args")" = "rc --permission-mode auto" ]
+}
+
+@test "claude wrapper: adds nothing when remote-control reattaches" {
+  write_fake_claude
+  bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"
+
+  run "$HOME/bin/claude" rc --continue
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/claude-args")" = "rc --continue" ]
+}
+
+@test "claude wrapper: reinstalls a wrapper without the remote-control fix" {
+  write_fake_claude
+  mkdir -p "$HOME/bin"
+  cat > "$HOME/bin/claude" <<'STALE'
+#!/bin/bash
+unset ANTHROPIC_MODEL
+# Tag: default-permission-mode-bypass
+# Tag: default-name-from-cwd
+STALE
+  chmod +x "$HOME/bin/claude"
+
+  run bash "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"
+
+  [ "$status" -eq 0 ]
+  grep -Fq 'remote-control-flags-after-verb' "$HOME/bin/claude"
+}
+
 # ── run_after_agentbrew-sync.sh ───────────────────────────────────
 
 @test "agentbrew sync: uses PATH agentbrew with sync --agentfile" {
@@ -913,6 +972,45 @@ CONFIG
   after_hash="$(grep '^# launchagents hash:' "$after")"
 
   [ "$before_hash" != "$after_hash" ]
+}
+
+@test "launchagents: should_skip_agent skips claude-remote-control unless opted in" {
+  PROFILE="full"
+  AUTO_UPGRADE="false"
+  CLAUDE_REMOTE_CONTROL="false"
+  mkdir -p "$HOME/.local/bin" && touch "$HOME/.local/bin/claude" && chmod +x "$HOME/.local/bin/claude"
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  should_skip_agent "claude-remote-control"
+}
+
+@test "launchagents: should_skip_agent allows claude-remote-control when opted in" {
+  PROFILE="full"
+  AUTO_UPGRADE="false"
+  CLAUDE_REMOTE_CONTROL="true"
+  mkdir -p "$HOME/.local/bin" && touch "$HOME/.local/bin/claude" && chmod +x "$HOME/.local/bin/claude"
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  ! should_skip_agent "claude-remote-control"
+}
+
+@test "launchagents: should_skip_agent skips claude-remote-control without Claude Code" {
+  PROFILE="full"
+  AUTO_UPGRADE="false"
+  CLAUDE_REMOTE_CONTROL="true"
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  should_skip_agent "claude-remote-control"
+}
+
+@test "launchagents: claude-remote-control runs the wrapper's remote-control in ~/apps" {
+  local plist="$TEST_DOTFILES/launchagents/com.dotfiles.claude-remote-control.plist.tmpl"
+
+  grep -Fq '<string>{{ .chezmoi.homeDir }}/bin/claude</string>' "$plist"
+  grep -Fq '<string>remote-control</string>' "$plist"
+  grep -Fq '<string>{{ .chezmoi.homeDir }}/apps</string>' "$plist"
+  grep -A1 '<key>KeepAlive</key>' "$plist" | grep -Fq '<true/>'
+  ! grep -Fq '/usr/bin/env' "$plist"
 }
 
 @test "launchagents: should_skip_agent skips morning on core profile" {

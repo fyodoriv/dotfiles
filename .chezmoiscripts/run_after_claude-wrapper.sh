@@ -27,6 +27,7 @@ if [ -f "$WRAPPER" ] \
   && grep -q "unset ANTHROPIC_MODEL" "$WRAPPER" 2>/dev/null \
   && grep -q "default-name-from-cwd" "$WRAPPER" 2>/dev/null \
   && grep -q "default-permission-mode-bypass" "$WRAPPER" 2>/dev/null \
+  && grep -q "remote-control-flags-after-verb" "$WRAPPER" 2>/dev/null \
   && ! grep -q "inaccessible on Enterprise accounts" "$WRAPPER" 2>/dev/null; then
   exit 0
 fi
@@ -44,6 +45,25 @@ cat > "$WRAPPER" << 'WRAPPER_EOF'
 REAL_CLAUDE="$HOME/.local/bin/claude"
 
 unset ANTHROPIC_MODEL
+
+# Remote Control refuses to start when --permission-mode comes before the
+# verb, so put the default after it. Reattaching (-c, --continue,
+# --session-id) keeps the session's own mode, so add nothing then.
+# Tag: remote-control-flags-after-verb
+case "${1:-}" in
+  rc|remote-control)
+    _verb="$1"
+    shift
+    for _arg in "$@"; do
+      case "$_arg" in
+        --permission-mode|--permission-mode=*|-c|--continue|--session-id|--session-id=*)
+          exec "$REAL_CLAUDE" "$_verb" "$@"
+          ;;
+      esac
+    done
+    exec "$REAL_CLAUDE" "$_verb" --permission-mode bypassPermissions "$@"
+    ;;
+esac
 
 _has_permission_mode=0
 for _arg in "$@"; do

@@ -59,6 +59,7 @@ setup() {
 echo '#!/bin/bash
 # unset ANTHROPIC_MODEL  # marker for grep
 # default-permission-mode-bypass
+# remote-control-flags-after-verb
 exec /placeholder' > \"\$HOME/bin/claude\"
 chmod +x \"\$HOME/bin/claude\"" > "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"
   chmod +x "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-wrapper.sh"

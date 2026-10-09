@@ -24,6 +24,10 @@
 {{- if hasKey . "auto_sync" -}}
 {{-   $autoSync = .auto_sync -}}
 {{- end -}}
+{{- $claudeRemoteControl := false -}}
+{{- if hasKey . "claude_remote_control" -}}
+{{-   $claudeRemoteControl = .claude_remote_control -}}
+{{- end -}}
 {{/*  Optional Claude Code model/effort override (run_after_claude-settings-model.sh) */ -}}
 {{- $claudeModel := "" -}}
 {{- if hasKey . "claude_model" -}}
@@ -97,6 +101,7 @@ data:
 {{- end }}
   auto_upgrade: {{ $autoUpgrade }}
   auto_sync: {{ $autoSync }}
+  claude_remote_control: {{ $claudeRemoteControl }}
   use_ai_tools: {{ $useAiTools }}
   use_local_ai: {{ $useLocalAi }}
   use_cursor: {{ $useCursor }}

@@ -66,6 +66,7 @@ teardown() {
 #!/bin/bash
 unset ANTHROPIC_MODEL
 # default-permission-mode-bypass
+# remote-control-flags-after-verb
 exec "$HOME/.local/bin/claude" "$@"
 WRAPPER
 
@@ -73,6 +74,21 @@ WRAPPER
 
   [ "$pass_count" -eq 3 ]
   [ "$fail_count" -eq 0 ]
+}
+
+@test "claude: wrapper check fails for a wrapper without the remote-control fix" {
+  mkdir -p "$TEST_HOME/bin"
+  cat > "$TEST_HOME/bin/claude" <<'WRAPPER'
+#!/bin/bash
+unset ANTHROPIC_MODEL
+# default-permission-mode-bypass
+exec "$HOME/.local/bin/claude" "$@"
+WRAPPER
+
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+
+  [ "$pass_count" -eq 1 ]
+  [ "$fail_count" -eq 2 ]
 }
 
 @test "claude: wrapper check fails when unmanaged wrapper is missing" {

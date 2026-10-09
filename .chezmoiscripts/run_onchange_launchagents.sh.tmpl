@@ -3,6 +3,7 @@
 # launchagents hash: {{ range $path := (joinPath .chezmoi.sourceDir "launchagents" "*.plist*" | glob) }}{{ $rel := trimPrefix (print $.chezmoi.sourceDir "/") $path }}{{ $rel }}={{ include $rel | sha256sum }};{{ end }}
 # use_cursor: {{ dig "use_cursor" true . }}
 # auto_sync: {{ dig "auto_sync" true . }}
+# claude_remote_control: {{ dig "claude_remote_control" false . }}
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 set -euo pipefail
 
@@ -11,6 +12,7 @@ PROFILE="{{ .profile }}"
 AUTO_UPGRADE="{{ dig "auto_upgrade" "false" . }}"
 USE_CURSOR="{{ dig "use_cursor" true . }}"
 AUTO_SYNC="{{ dig "auto_sync" true . }}"
+CLAUDE_REMOTE_CONTROL="{{ dig "claude_remote_control" false . }}"
 
 # Tool-presence / profile check — skip agents that shouldn't load
 # Core profile only gets essential agents: sync, doctor, git-maintain,
@@ -54,6 +56,10 @@ should_skip_agent() {
         && return 0 ;;
     morning)
       [ "$PROFILE" != "full" ] && return 0 ;;
+    # Opt-in: makes this Mac reachable from Claude mobile and claude.ai/code
+    claude-remote-control)
+      [ "${CLAUDE_REMOTE_CONTROL:-false}" != "true" ] && return 0
+      [ ! -x "$HOME/.local/bin/claude" ] && return 0 ;;
     # Retired: AgentBrew owns com.agentbrew.mcp-memory and maintenance.
     mcp-memory|mcp-memory-maintain)
       return 0 ;;

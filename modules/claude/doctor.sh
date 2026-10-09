@@ -4,10 +4,11 @@
 
 # ── Claude CLI wrapper ────────────────────────────────────────────────
 # A wrapper at ~/bin/claude strips any leaked ANTHROPIC_MODEL before exec and
-# starts Claude Code with bypassPermissions by default.
+# starts Claude Code with bypassPermissions by default. For Remote Control
+# it puts that flag after the verb, which `claude rc` requires.
 # Lives in ~/bin/ (not ~/.local/bin/) so claude update cannot overwrite it.
 check "claude.model_wrapper" "\$HOME/bin/claude strips ANTHROPIC_MODEL and defaults permission mode" \
-  "[ -f \"\$HOME/bin/claude\" ] && grep -q 'unset ANTHROPIC_MODEL' \"\$HOME/bin/claude\" && grep -q 'default-permission-mode-bypass' \"\$HOME/bin/claude\"" \
+  "[ -f \"\$HOME/bin/claude\" ] && grep -q 'unset ANTHROPIC_MODEL' \"\$HOME/bin/claude\" && grep -q 'default-permission-mode-bypass' \"\$HOME/bin/claude\" && grep -q 'remote-control-flags-after-verb' \"\$HOME/bin/claude\"" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-wrapper.sh'"
 
 # ── Claude Code model default ─────────────────────────────────────────

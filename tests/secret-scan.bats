@@ -165,3 +165,23 @@ fake_bearer() {
   run dotfiles_agent_config_bearer_leaks
   [ -z "$output" ]
 }
+
+@test "secret scan spawns grep a bounded number of times, not once per file" {
+  # The doctor scans every tracked file. One grep per file cost about 50s
+  # on a busy Mac (668 files, two spawns each).
+  local i real_grep
+  for i in $(seq 1 20); do track_text "src/file$i.sh" "echo $i"; done
+  track_text "leaks/one.env" "$(secret_line API_KEY)"
+  real_grep="$(command -v grep)"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/grep" <<STUB
+#!/bin/bash
+echo x >> "$TEST_DIR/grep-calls"
+exec "$real_grep" "\$@"
+STUB
+  chmod +x "$TEST_DIR/bin/grep"
+  run env -u BASH_ENV -u ENV PATH="$TEST_DIR/bin:$PATH" bash -c '. "$1"; dotfiles_scan_tracked_secrets "$2"' _ "$LIB" "$REPO"
+  [ "$status" -eq 0 ]
+  [ "$output" = "leaks/one.env" ]
+  [ "$(wc -l < "$TEST_DIR/grep-calls")" -le 3 ]
+}

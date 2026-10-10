@@ -559,6 +559,8 @@ Personal cross-tooling commands that should appear in every agent live in [`comm
 
 The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
 
+The `tooling-checkup` skill (`/tooling-checkup`) is the one command to run by hand every few days. It ships outstanding tooling work, runs `update-tooling`, upgrades third-party packages through `dotfiles-upgrade` and `claude update`, runs `claude doctor`, audits LaunchAgents and heavy processes, measures Claude Code input latency, and lints skills and instruction files against Anthropic's best practices. It reports what changed since the last run (state in `~/.local/state/tooling-checkup/`), asks a short questionnaire, and applies the answers. It ignores dependabot pull requests unless a critical alert is open, and it touches only repositories under the tooling root.
+
 Do not put live authentication material or customer payload snapshots in test data,
 logs, screenshots, pull request descriptions, or committed files. Use safe
 placeholders and fixtures.

@@ -124,9 +124,15 @@ for file in "${changed_files[@]}"; do
     continue
   fi
 
+  if [[ "$file" == skills/tooling-checkup/* ]]; then
+    affected+=("$TESTS_DIR/tooling-checkup-skill.bats")
+    continue
+  fi
+
   if [[ "$file" == Agentfile.yaml ]]; then
     affected+=("$TESTS_DIR/agent-artifact-coverage.bats")
     affected+=("$TESTS_DIR/update-tooling-skill.bats")
+    affected+=("$TESTS_DIR/tooling-checkup-skill.bats")
     continue
   fi
 

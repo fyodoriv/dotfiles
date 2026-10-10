@@ -105,7 +105,6 @@ skills:
   - verification-before-completion  # require evidence before claiming "done"
   - code-smells-aware        # 50+ TS/React static-analysis audits
   - shadcn                   # shadcn/ui component patterns
-  - effective-ui-design      # WCAG/OKLCH/8pt/forms technical layer
   # local-llm-warmup removed: skill doesn't exist in any registered source
   # ── dev workflow skills ──────────────────────────────────────────
   - grill-with-docs
@@ -129,7 +128,8 @@ skills:
   # frontend-design (anthropics/skills): Anthropic's official creative
   # design guidance for distinctive, production-grade frontend. Bold
   # aesthetics for landing pages and artifacts; complements `taste`
-  # (rule-based dashboard UI) and `effective-ui-design` (technical layer).
+  # (rule-based dashboard UI). It replaces `effective-ui-design`, which
+  # covered the same ground.
   - frontend-design
   # ── MCP Apps (SEP-1865, stabilized 2026-01-26) ──────────────────
   # The first official MCP extension — tools can render interactive
@@ -141,12 +141,18 @@ skills:
   # ── Anthropic plugin marketplace skills (claude-plugins-official) ─
   # Subset that's broadly useful across agents and architectures.
   - build-mcp-server        # canonical Anthropic MCP server guidance
-  - build-mcp-app           # sister to create-mcp-app, post-deployment
   - build-mcpb              # MCP bundles
   - session-report          # HTML usage/skills/cost report from session
-  - writing-hookify-rules   # author hooks-based rules
+  - skill-creator           # create, evaluate, and improve skills
+  - claude-md-improver      # audit and improve CLAUDE.md files
+  - claude-automation-recommender  # suggest hooks, subagents, skills, MCPs
+  - playground              # single-file interactive HTML explorers
+  - math-olympiad           # competition math with adversarial checks
+  - access                  # Discord channel: pairing and allowlists
+  - configure               # Discord channel: bot token and policy
+  - m5-onboard              # flash and provision M5Stack ESP32 boards
+  - cardputer-buddy         # iterate on the Cardputer app bundle
   # Claude-Code plugin authoring (useful for any plugin/skill author)
-  - skill-development
   - command-development
   - agent-development
   - hook-development
@@ -169,13 +175,6 @@ sources:
   - currents-dev/playwright-best-practices-skill
   # shadcn/ui: source for the shadcn skill (component patterns)
   - shadcn/ui
-  # sebastian-software/effective-ui-design-skill: closes the technical
-  # layer the `frontend-design` skill leaves open — WCAG 2.1 AA contrast,
-  # OKLCH palettes, `light-dark()`, 8pt spacing grid, fluid typography
-  # with clamp(), container queries, subgrid, `:user-valid`/`:user-invalid`
-  # form patterns, dark mode + reduced motion, SEO meta + JSON-LD, Core
-  # Web Vitals targets, favicon spec. Concrete values, not creative direction.
-  - sebastian-software/effective-ui-design-skill
   # anthropics/claude-plugins-official: Anthropic's curated plugin marketplace
   # (23.8k stars, 403+ commits, May 2026: hundreds of plugins, official
   # distribution channel for Claude Code). Surfaces many marketplace skills including the

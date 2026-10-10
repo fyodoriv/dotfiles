@@ -129,6 +129,23 @@ EOF
   [[ "$skills$sources" != *"~/.codeium"* ]]
 }
 
+@test "Agentfile declares each skill once and no same-job pair together" {
+  local agentfile skills pair a b
+  agentfile="$(repo_root)/Agentfile.yaml"
+  skills="$(agentfile_block_items skills "$agentfile")"
+
+  [ -z "$(printf '%s\n' "$skills" | sort | uniq -d)" ]
+  # Each pair does the same job; keep the first, never both.
+  for pair in skill-creator:skill-development create-mcp-app:build-mcp-app \
+    frontend-design:effective-ui-design; do
+    a="${pair%%:*}"; b="${pair##*:}"
+    printf '%s\n' "$skills" | grep -qx "$a"
+    ! printf '%s\n' "$skills" | grep -qx "$b"
+  done
+  # writing-hookify-rules needs the hookify plugin, which is not enabled.
+  ! printf '%s\n' "$skills" | grep -qx writing-hookify-rules
+}
+
 @test "Agentfile inline rules cover delivery safety invariants" {
   local agentfile
   agentfile="$(repo_root)/Agentfile.yaml"

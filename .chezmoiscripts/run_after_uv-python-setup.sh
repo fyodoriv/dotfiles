@@ -157,6 +157,17 @@ fi
 launchctl setenv UV_PYTHON_PREFERENCE only-managed 2>/dev/null && \
   echo "✓ launchctl: UV_PYTHON_PREFERENCE=only-managed (covers LaunchAgents + GUI apps)"
 
+# ── python.org installer PATH blocks (no sudo needed) ──
+# The python.org installer prepends its framework bin to ~/.zprofile, so
+# python3 resolves to the framework before Homebrew or uv. Strip those
+# blocks on every apply; the script keeps a backup of each changed file.
+_rfp_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../bin" 2>/dev/null && pwd || echo "")"
+if [ -x "$_rfp_bin_dir/dotfiles-remove-framework-python" ]; then
+  "$_rfp_bin_dir/dotfiles-remove-framework-python" --profile-only || true
+elif [ -x "$HOME/apps/tooling/dotfiles/bin/dotfiles-remove-framework-python" ]; then
+  "$HOME/apps/tooling/dotfiles/bin/dotfiles-remove-framework-python" --profile-only || true
+fi
+
 # ── Check for framework Python install (operator action needed) ──
 # The dotfiles symlinks redirect /usr/local/bin/python* to uv-managed, but
 # /Library/Frameworks/Python.framework can still be invoked directly by

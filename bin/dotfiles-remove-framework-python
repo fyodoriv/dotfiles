@@ -6,6 +6,8 @@ set -euo pipefail
 #
 # Usage: dotfiles-remove-framework-python
 #   (prompts for sudo password once)
+#        dotfiles-remove-framework-python --profile-only
+#   (no sudo: only removes the installer's PATH blocks from shell profiles)
 
 # DOTFILES_PYTHON_ROOT prefixes every system path so tests can use a fake tree.
 readonly ROOT="${DOTFILES_PYTHON_ROOT:-}"
@@ -21,11 +23,41 @@ _framework_install_paths() {
   return 0
 }
 
+# Remove the PATH blocks the python.org installer adds to shell profiles, so
+# python3 resolves to Homebrew or uv. Each changed file keeps a backup.
+_strip_profile_paths() {
+  local profile backup changed=0
+  for profile in "$HOME/.zprofile" "$HOME/.bash_profile" "$HOME/.profile"; do
+    [[ -f "$profile" ]] || continue
+    grep -q 'Library/Frameworks/Python\.framework' "$profile" || continue
+    backup="$profile.dotfiles-bak-$(date +%Y%m%d%H%M%S)"
+    cp -p "$profile" "$backup"
+    awk '
+      /^# Setting PATH for Python [0-9.]+$/ { next }
+      /^# The original version is saved in .*\.pysave$/ { next }
+      /^PATH="[^"]*Library\/Frameworks\/Python\.framework\/[^"]*"$/ { dropped = 1; next }
+      dropped && /^export PATH$/ { dropped = 0; next }
+      { dropped = 0; print }
+    ' "$backup" > "$profile"
+    echo "✓ Removed python.org PATH blocks from $profile (backup: $backup)"
+    changed=1
+  done
+  [[ "$changed" -eq 1 ]] || echo "✓ no python.org PATH blocks in shell profiles"
+  return 0
+}
+
+if [[ "${1:-}" == "--profile-only" ]]; then
+  _strip_profile_paths
+  exit 0
+fi
+
 # Bail early in agent terminals — sudo can't prompt for a password there.
 if [[ "${DOTFILES_IS_AGENT:-0}" == "1" ]]; then
   echo "❌ This script requires sudo — run it in a human terminal (Ghostty/iTerm), not an agent terminal."
   exit 1
 fi
+
+_strip_profile_paths
 
 if [[ ! -d "$FRAMEWORK" ]]; then
   echo "✓ No python.org framework install found — nothing to do."

@@ -15,3 +15,9 @@ load test_helper
 @test "uv-python-setup: references uv python install" {
   grep -q "uv python" "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_uv-python-setup.sh"
 }
+
+@test "uv-python-setup: strips python.org PATH blocks on every apply, without sudo" {
+  local script="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_uv-python-setup.sh"
+  grep -q 'dotfiles-remove-framework-python" --profile-only' "$script"
+  ! grep -q 'sudo .*--profile-only' "$script"
+}

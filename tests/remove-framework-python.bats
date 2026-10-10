@@ -53,3 +53,40 @@ load test_helper
   [[ "$output" != *"Cellar/python@3.13"* ]]
   [[ "$output" != *"com.minsky"* ]]
 }
+
+@test "remove-framework-python: --profile-only strips python.org PATH blocks, keeps the rest" {
+  home="$(mktemp -d)"
+  cat > "$home/.zprofile" <<'PROFILE'
+# keep me
+# Setting PATH for Python 2.7
+# The original version is saved in .zprofile.pysave
+PATH="/Library/Frameworks/Python.framework/Versions/2.7/bin:${PATH}"
+export PATH
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+# Setting PATH for Python 3.11
+# The original version is saved in .zprofile.pysave
+PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:${PATH}"
+export PATH
+export PATH="$HOME/bin:$PATH"
+PROFILE
+  run env HOME="$home" DOTFILES_IS_AGENT=1 bash "$BATS_TEST_DIRNAME/../bin/dotfiles-remove-framework-python" --profile-only
+  [ "$status" -eq 0 ]
+  ! grep -q 'Python.framework' "$home/.zprofile"
+  ! grep -q 'Setting PATH for Python' "$home/.zprofile"
+  grep -q '^# keep me$' "$home/.zprofile"
+  grep -q 'brew shellenv' "$home/.zprofile"
+  grep -q '^export PATH="$HOME/bin:$PATH"$' "$home/.zprofile"
+  [ "$(grep -c '^export PATH$' "$home/.zprofile")" -eq 0 ]
+  ls "$home"/.zprofile.dotfiles-bak-* >/dev/null
+  grep -q 'Versions/3.11' "$home"/.zprofile.dotfiles-bak-*
+}
+
+@test "remove-framework-python: --profile-only is a no-op without python.org blocks" {
+  home="$(mktemp -d)"
+  printf 'export PATH="$HOME/bin:$PATH"\n' > "$home/.zprofile"
+  run env HOME="$home" bash "$BATS_TEST_DIRNAME/../bin/dotfiles-remove-framework-python" --profile-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no python.org PATH"* ]]
+  ! ls "$home"/.zprofile.dotfiles-bak-* >/dev/null 2>&1
+}

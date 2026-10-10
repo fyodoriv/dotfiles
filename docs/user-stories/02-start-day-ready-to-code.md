@@ -60,7 +60,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `tooling-sync` | Pull agentbrew and minsky; push agentbrew TASKS.md edits | Every hour |
 | `dotfiles-doctor` | Health check + auto-fix | Weekly |
 | `git-maintain` | `git maintenance` on all repos | Daily |
-| `cursor-priority` | Every 60s | Boost Cursor scheduling priority | Every 60s |
+| `cursor-priority` | Keep Ghostty, WebStorm, and terminal-launched Claude Code interactive; background agent and model workers | Every 60s |
 | `cursor-at-login` | Launch Cursor in background at login (`open -g -a Cursor`) | At login |
 | `morning` | Morning startup routine | 8:30 AM daily |
 | `capslock-control` | Caps Lock → Control remapping | At login |
@@ -72,7 +72,8 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `agent-browser-chrome` | Dashboard / SSO Chrome CDP for browser automation; manual close respected | At login, not kept alive |
 | `debug-chrome` | Debug-work Chrome CDP for browser automation; manual close respected | At login, not kept alive |
 | `tooling-chrome` | Tooling-repo Chrome CDP for browser automation; manual close respected | At login, not kept alive |
-| `chrome-profile` | Heal Chrome Work profile + reassert ChromeWork as default browser (Slack/Outlook links) | At login + every 1 hour |
+| `chrome-profile` | Heal Chrome Work profile + reassert ChromeWork as default browser (Slack/Outlook links); enterprise Macs only | At login + every 1 hour |
+| `claude-remote-control` | Keep this Mac reachable from Claude mobile and claude.ai/code (opt-in: `claude_remote_control: true`) | At login, kept alive |
 | `chrome-debug` | Chrome with Work profile + debug port | On-demand |
 | `atuin-daemon` | Atuin shell history sync daemon | At login |
 | `ollama` | Start Ollama LLM server (kept alive, restarts on crash) | At login |

@@ -13,6 +13,7 @@ AUTO_UPGRADE="{{ dig "auto_upgrade" "false" . }}"
 USE_CURSOR="{{ dig "use_cursor" true . }}"
 AUTO_SYNC="{{ dig "auto_sync" true . }}"
 CLAUDE_REMOTE_CONTROL="{{ dig "claude_remote_control" false . }}"
+IS_ENTERPRISE="{{ dig "is_enterprise" false . }}"
 
 # Tool-presence / profile check — skip agents that shouldn't load
 # Core profile only gets essential agents: sync, doctor, git-maintain,
@@ -23,6 +24,9 @@ should_skip_agent() {
     # CDP debug ports are a localhost attack vector — require full profile
     agent-browser-chrome|debug-chrome|tooling-chrome|chrome-debug)
       [ "$PROFILE" != "full" ] && return 0 ;;
+    # chrome-heal only repairs enterprise Chrome Work-profile routing
+    chrome-profile)
+      [ "${IS_ENTERPRISE:-false}" != "true" ] && return 0 ;;
     # Scheduled syncs can be turned off; run dotfiles-sync by hand instead
     dotfiles-sync|tooling-sync)
       [ "${AUTO_SYNC:-true}" = "false" ] && return 0 ;;

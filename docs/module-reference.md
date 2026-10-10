@@ -324,7 +324,8 @@ LaunchServices by routing every http(s) URL through
 `~/Applications/ChromeWork.app` (`bin/chromework-install`). Both axes are
 reasserted hourly by `com.dotfiles.chrome-profile` via `bin/chrome-heal`
 (and on every `/ship-it` Step 12 `dotfiles doctor --module chrome --fix`).
-Enterprise-only for the Work-profile checks — they need the configured
+`dotfiles apply` installs that LaunchAgent only on an enterprise Mac
+(`is_enterprise`). Enterprise-only for the Work-profile checks — they need the configured
 `work_email_domain` to detect which profile dir is Work. The three `defaults`
 checks apply to any user with Chrome.
 

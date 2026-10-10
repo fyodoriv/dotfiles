@@ -199,17 +199,21 @@ is cleared, build the advanced applied checkout if needed, then link the
 configured skills with:
 
 ```bash
-env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --only skills
+env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --only skills --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"
 # Equivalent when the global command resolves to this applied build:
-# env -u DOTFILES_DIR agentbrew sync --only skills
+# env -u DOTFILES_DIR agentbrew sync --only skills --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"
 ```
 
 When the sentinel is absent, run the normal sync from `$HOME` or another
 directory without a project Agentfile:
 
 ```bash
-cd "$HOME" && env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --pull
+cd "$HOME" && env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --pull --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"
 ```
+
+Always pass `--no-recommended --agentfile`, as the dotfiles lifecycle does. A
+bare `agentbrew sync` also installs every catalog skill marked `recommended`,
+including skills the Agentfile removed, which brings back duplicates.
 
 Use the dotfiles `agentbrew` shim when it resolves to the applied build. Do not
 edit generated agent configuration directories directly.

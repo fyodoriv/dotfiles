@@ -113,7 +113,8 @@ is listed with its reason and next step.
 ## Phase 3: Refresh tooling
 
 Read and follow the `update-tooling` skill, steps 1 to 4. It fast-forwards
-clean checkouts, rebuilds the applied agentbrew, runs `agentbrew sync --pull`,
+clean checkouts, rebuilds the applied agentbrew, runs
+`agentbrew sync --pull --no-recommended --agentfile …`,
 applies dotfiles, reloads LaunchAgents, and runs the health checks. Keep its
 safety rules. Its step 5 (next work) feeds this skill's report.
 

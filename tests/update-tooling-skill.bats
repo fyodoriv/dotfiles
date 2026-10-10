@@ -44,7 +44,7 @@ AGENTFILE="$ROOT/Agentfile.yaml"
 
 @test "update-tooling applies and verifies the right machine layers" {
   grep -F -q 'env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-sync"' "$SKILL"
-  grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --pull' "$SKILL"
+  grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --pull --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" mcp probe --deep' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" measure context' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-reload-launchagents"' "$SKILL"
@@ -71,7 +71,7 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -F -q 'Do not invoke `agentbrew` to inspect the catalog in this mode.' "$SKILL"
   grep -F -q '"$AGENTBREW_APPLIED/src/catalog.yaml"' "$SKILL"
   grep -F -q 'yq -r' "$SKILL"
-  grep -F -q 'env -u DOTFILES_DIR agentbrew sync --only skills' "$SKILL"
+  grep -F -q 'env -u DOTFILES_DIR agentbrew sync --only skills --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"' "$SKILL"
   grep -F -q 'missing from `skills:`' "$SKILL"
   grep -F -q 'skipped AgentBrew runtime checks' "$SKILL"
   ! grep -F -q 'export DOTFILES_DIR="$TOOLING_ROOT/dotfiles"' "$SKILL"
@@ -96,4 +96,12 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -F -q 'Do not hard-code task IDs in this skill' "$SKILL"
   grep -F -q 'Do not use the legacy `bin/tooling-sync`' "$SKILL"
   grep -F -q 'does not commit, rebase, force-push' "$SKILL"
+}
+
+@test "update-tooling never runs a sync that installs the catalog recommended set" {
+  # A bare `agentbrew sync` installs every catalog `recommended: true` skill,
+  # even ones the Agentfile removed. Each runnable sync line must opt out.
+  local bad
+  bad="$(grep -iE '^ *(cd [^&]*&& )?(env -u DOTFILES_DIR )?"?[$a-z_]*agentbrew[a-z_]*"? sync( |$)' "$SKILL" | grep -v -- '--no-recommended' || true)"
+  [ -z "$bad" ]
 }

@@ -864,8 +864,10 @@ Measured on M3 Max, 64GB RAM, 300+ package JS/TS monorepo:
 Ghostty keeps scrollback in memory for every terminal surface. The managed
 config uses Ghostty's upstream 10 MB cap to prevent verbose commands from
 retaining 100 MB per tab. The `cursor-priority` LaunchAgent runs every minute:
-it keeps Ghostty, WebStorm, and Claude Code launched from a WebStorm terminal
-interactive while unrelated agent and model workers yield under CPU contention.
+it keeps Ghostty, WebStorm, and Claude Code launched from a terminal app
+(Ghostty, WebStorm, Terminal, iTerm2, WezTerm, kitty, Alacritty, Warp)
+interactive. Claude Code with no terminal ancestor (launchd jobs, Remote
+Control) and other agent and model workers yield under CPU contention.
 
 WebStorm terminals identify themselves as `JetBrains-JediTerm`. Their default
 fast shell resolves the default fnm Node directly and loads only the

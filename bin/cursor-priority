@@ -59,14 +59,17 @@ set_process_background_pattern() {
   done <<< "$process_ids"
 }
 
-is_descendant_of_webstorm() {
+is_descendant_of_interactive_app() {
   local current_pid="$1"
   local depth=0
   local parent_pid command_path
 
   while [[ "$current_pid" =~ ^[0-9]+$ && "$current_pid" -gt 1 && "$depth" -lt 16 ]]; do
     command_path=$(ps -p "$current_pid" -o comm= 2>/dev/null || true)
-    [[ "$command_path" == *"/WebStorm.app/"* ]] && return 0
+    case "$command_path" in
+      *"/WebStorm.app/"*|*"/Ghostty.app/"*|*"/Terminal.app/"*|*"/iTerm.app/"*|\
+      *"/WezTerm.app/"*|*"/kitty.app/"*|*"/Alacritty.app/"*|*"/Warp.app/"*) return 0 ;;
+    esac
 
     parent_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null || true)
     parent_pid="${parent_pid//[[:space:]]/}"
@@ -86,7 +89,7 @@ set_claude_priority() {
   local process_id
   while IFS= read -r process_id; do
     [ -z "$process_id" ] && continue
-    if is_descendant_of_webstorm "$process_id"; then
+    if is_descendant_of_interactive_app "$process_id"; then
       taskpolicy -B -t 0 -l 0 -p "$process_id" >/dev/null 2>&1 || true
       renice 0 -p "$process_id" >/dev/null 2>&1 || true
     else
@@ -123,8 +126,9 @@ else
   set_process_priority "WebStorm"
 
   # Agent/model workers must yield to interactive apps under CPU contention.
-  # Claude Code launched from WebStorm is an interactive terminal child, so
-  # keep it responsive with the IDE while backgrounding other Claude workers.
+  # Claude Code launched from a terminal app (Ghostty, WebStorm, ...) is an
+  # interactive session, so keep it responsive. Background the other Claude
+  # workers (launchd jobs, Remote Control, headless runs).
   set_claude_priority
   set_process_background "codex"
   set_process_background "cursor-agent"

@@ -16,6 +16,12 @@ VERIFY_COUNTS_DOC_FILES=(
   docs/team-onboarding.md
   docs/onboarding.md
   docs/forking-guide.md
+  docs/constitution.md
+  docs/agent-hooks.md
+  docs/agent-browser-policy.md
+  docs/repo-map.md
+  docs/privacy-gates.md
+  docs/model-configuration.md
 )
 
 is_verify_counts_doc_path() {

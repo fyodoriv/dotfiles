@@ -41,17 +41,26 @@ cat ~/.config/ghostty/config                           # owned by dotfiles
 
 ## Levers, in order of measured effect
 
-1. **Fewer open sessions.** Several sessions share `~/.claude.json` and lock
+1. **Scheduling band.** Check first:
+   `ps -o pid,nice,pri,comm -p "$(pgrep -x claude | paste -sd, -)"`.
+   An interactive Claude Code session must not show `PRI 4` (the darwin
+   background band). In that band, timers fire about 200 ms late, so every
+   redraw waits. The `cursor-priority` LaunchAgent keeps Claude Code with a
+   terminal-app ancestor (Ghostty, WebStorm, Terminal, and others)
+   interactive. If a session still shows `PRI 4`, fix `bin/cursor-priority`
+   in the dotfiles source. To clear one live session now:
+   `taskpolicy -B -t 0 -l 0 -p <pid>`.
+2. **Fewer open sessions.** Several sessions share `~/.claude.json` and lock
    it. Debug logs show "Lock acquisition took longer than expected" and event
    loop stalls of seconds. Ask the user how many sessions they need open.
-2. **Machine load.** A load average far above the core count slows every
+3. **Machine load.** A load average far above the core count slows every
    key. Phase 5 finds what drives it (often Spotlight indexing).
-3. **Orphaned `~/.claude.json.tmp.*` files.** Move them, do not delete them:
+4. **Orphaned `~/.claude.json.tmp.*` files.** Move them, do not delete them:
    `mkdir -p ~/.local/state/tooling-checkup/claude-json-tmp && mv ~/.claude.json.tmp.* "$_"/`
    Only do this when no session is writing (no new tmp file in the last minute).
-4. **A large `~/.claude.json`.** Report its size. Do not edit it by hand;
+5. **A large `~/.claude.json`.** Report its size. Do not edit it by hand;
    Claude Code rewrites it. Ask the user before you clear project history.
-5. **A slow status line command.** It runs on many redraws. Time it alone.
+6. **A slow status line command.** It runs on many redraws. Time it alone.
    A fix goes in the dotfiles or agentbrew source, not in `settings.json`.
 
 Toggles that did not move the numbers in earlier tests: `--bare`,

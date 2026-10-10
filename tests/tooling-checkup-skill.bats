@@ -273,3 +273,11 @@ EOF
   [[ "$output" == *"keep      dotfiles    com.dotfiles.ok"* ]]
   [[ "$output" == *"failing   third-party com.example.crashy pid=- last_exit=78"* ]]
 }
+
+@test "input latency guide checks the Claude scheduling band first" {
+  local guide="$SKILL_DIR/reference/input-latency.md"
+  grep -q '^1\. \*\*Scheduling band\.\*\*' "$guide"
+  grep -q 'PRI 4' "$guide"
+  grep -q 'taskpolicy -B -t 0 -l 0 -p' "$guide"
+  grep -q 'bin/cursor-priority' "$guide"
+}

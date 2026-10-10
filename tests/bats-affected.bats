@@ -6,7 +6,7 @@ SCRIPT="$DOTFILES_DIR/bin/bats-affected"
 
 setup_file() {
   export TEST_REPO="$BATS_FILE_TMPDIR/repo"
-  mkdir -p "$TEST_REPO"/{bin,lib,modules/git,tests,git-hooks,home,.chezmoiscripts,launchagents,.github/scripts,.github/workflows,skills/update-tooling}
+  mkdir -p "$TEST_REPO"/{bin,lib,modules/git,tests,git-hooks,home,.chezmoiscripts,launchagents,.github/scripts,.github/workflows,skills/update-tooling,skills/tooling-checkup}
 
   # Initialize a git repo with basic structure
   git -C "$TEST_REPO" init -q
@@ -40,7 +40,7 @@ setup_file() {
               dotfiles-brew-add dotfiles-defaults-add dotfiles-profile \
               cached-run git-maintain gh-wrapper git-wrapper output chezmoi \
               pre-commit brew-audit coverage tasks-lint verify-counts \
-              agent-artifact-coverage update-tooling-skill; do
+              agent-artifact-coverage update-tooling-skill tooling-checkup-skill; do
     echo "# $name tests" > "$TEST_REPO/tests/$name.bats"
   done
 
@@ -60,6 +60,7 @@ setup_file() {
   echo '1' > "$TEST_REPO/.shell-coverage-floor"
   echo 'skills: []' > "$TEST_REPO/Agentfile.yaml"
   echo '# update-tooling' > "$TEST_REPO/skills/update-tooling/SKILL.md"
+  echo '# tooling-checkup' > "$TEST_REPO/skills/tooling-checkup/SKILL.md"
   echo 'lint-tasks: ; @true' > "$TEST_REPO/Makefile"
 
   # Initial commit (--no-verify to skip pre-commit hooks in test repos)
@@ -300,10 +301,15 @@ assert_affected_includes() {
   assert_affected_includes "skills/update-tooling/SKILL.md" "update-tooling-skill"
 }
 
-@test "Agentfile changes trigger agent artifact and update-tooling tests" {
+@test "tooling-checkup skill changes trigger its focused contract test" {
+  assert_affected_includes "skills/tooling-checkup/SKILL.md" "tooling-checkup-skill"
+}
+
+@test "Agentfile changes trigger agent artifact and skill contract tests" {
   result=$(affected_for "Agentfile.yaml")
   echo "$result" | basenames | grep -qx "agent-artifact-coverage"
   echo "$result" | basenames | grep -qx "update-tooling-skill"
+  echo "$result" | basenames | grep -qx "tooling-checkup-skill"
 }
 
 # ── test_helper triggers all ─────────────────────────────────────────

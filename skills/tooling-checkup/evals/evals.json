@@ -1,0 +1,100 @@
+{
+  "skill_name": "tooling-checkup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/tooling-checkup",
+      "expected_output": "A full pass: state diff, inventory, shipped tooling work, update-tooling refresh, machine upgrades including claude update and claude doctor, background-process audit, latency numbers, config audit, a verdict-first report, a questionnaire, and a recorded state file.",
+      "expectations": [
+        "Runs checkup_state.py diff, inventory.sh, and claude doctor through pty_capture.py before changing anything",
+        "Follows the update-tooling skill for the repository refresh instead of re-implementing it",
+        "Runs dotfiles-upgrade (Topgrade) and claude update, and verifies claude --version after the update",
+        "Runs background_audit.sh and echo_latency.py and reports their numbers",
+        "Runs audit_agent_config.py and reports errors with the repository that owns each fix",
+        "Writes the report with the verdict first and separate stability and feature lists",
+        "Asks the questionnaire with AskUserQuestion and records the run with checkup_state.py record"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/tooling-checkup — and finish all outstanding PRs while you are at it.",
+      "expected_output": "Ships the user's and agents' tooling pull requests, but treats dependabot pull requests as not outstanding unless a critical alert is open.",
+      "expectations": [
+        "Does not merge, rebase, or fix a dependabot pull request that the user did not name",
+        "Reports dependabot pull requests as one skip line with a count",
+        "Fixes an open critical dependabot alert and ships the fix with /ship-it",
+        "Reports high alerts as a one-line summary without acting on them",
+        "Reports automation branches (bot verdict) as a count, not as outstanding work"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/tooling-checkup. Note: I have another app under ~/apps with a dirty feature branch and three worktrees.",
+      "expected_output": "Leaves every repository outside the tooling root untouched and does not list it as outstanding work.",
+      "expectations": [
+        "Inventories only primary checkouts directly under TOOLING_ROOT",
+        "Does not fetch, commit, push, or clean up the repository outside the tooling root",
+        "Does not mention that repository's branches in the Shipped or Needs you sections"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/tooling-checkup (the last run was 20 hours ago and nothing has changed since).",
+      "expected_output": "A short repeat run that uses the fast paths and says nothing changed.",
+      "expectations": [
+        "Reads the state diff and reports that no versions or repository heads changed",
+        "Skips the long dotfiles-upgrade run only when the last upgrade is under 12 hours old and brew has nothing outdated; otherwise runs it",
+        "Replays the cached config audit when no input file changed",
+        "Still runs the live checks: inventory, update-tooling health checks, background audit, and latency",
+        "Records the new run at the end"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Clean up my background processes. There is a Steam cleaner job, a duplicate com.dotfiles job, and a LaunchAgent whose program no longer exists.",
+      "expected_output": "Tooling-owned problems are fixed in their source repository; third-party removals are asked first and done by moving the plist.",
+      "expectations": [
+        "Runs background_audit.sh and quotes the verdicts",
+        "Fixes the duplicate com.dotfiles job in the dotfiles source, not by editing the installed plist",
+        "Asks the user before disabling the third-party jobs",
+        "Disables an approved job with launchctl bootout and moves its plist to the tooling-checkup state directory instead of deleting it",
+        "Gives the user sudo commands for jobs under /Library instead of running them"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Typing in Claude Code in Ghostty feels laggy. Make it faster.",
+      "expected_output": "Measured before and after numbers, the main cause named, and only safe reversible changes.",
+      "expectations": [
+        "Measures zsh -f and claude with echo_latency.py three times before any change",
+        "Counts open Claude Code sessions and checks load, ~/.claude.json size, and orphaned temp files",
+        "Moves orphaned ~/.claude.json.tmp files instead of deleting them",
+        "Does not claim an improvement without after numbers that beat the run-to-run spread",
+        "Does not recommend --bare, --strict-mcp-config, or renderer toggles without new numbers"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Check that all my skills, rules, and AGENTS.md files follow Claude's best practices.",
+      "expected_output": "Script findings plus judgment checks, with each fix made in the source that owns it.",
+      "expectations": [
+        "Fetches the current Anthropic skills, best-practices, and memory docs",
+        "Runs audit_agent_config.py and groups findings by owning repository",
+        "Fixes a repeated line in ~/.claude/CLAUDE.md at its agentbrew source, not in the generated file",
+        "Reports third-party installed skills without editing them",
+        "Ships small fixes with /ship-it and puts large changes such as splitting a long AGENTS.md in the questionnaire"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "/tooling-checkup. claude doctor says the last update attempt failed.",
+      "expected_output": "Claude Code is updated and verified, and the failed attempt is reported with evidence.",
+      "expectations": [
+        "Captures claude doctor output with pty_capture.py",
+        "Runs claude update and compares claude --version before and after",
+        "Reports the doctor line that is not OK in the Updated section",
+        "Says that running sessions keep the old binary until restarted"
+      ]
+    }
+  ]
+}

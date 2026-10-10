@@ -1003,6 +1003,22 @@ CONFIG
   should_skip_agent "claude-remote-control"
 }
 
+@test "launchagents: should_skip_agent skips chrome-profile on a non-enterprise Mac" {
+  PROFILE="full"
+  IS_ENTERPRISE="false"
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  should_skip_agent "chrome-profile"
+}
+
+@test "launchagents: should_skip_agent keeps chrome-profile on an enterprise Mac" {
+  PROFILE="full"
+  IS_ENTERPRISE="true"
+  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
+
+  ! should_skip_agent "chrome-profile"
+}
+
 @test "launchagents: claude-remote-control runs the wrapper's remote-control in ~/apps" {
   local plist="$TEST_DOTFILES/launchagents/com.dotfiles.claude-remote-control.plist.tmpl"
 

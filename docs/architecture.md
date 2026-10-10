@@ -132,7 +132,8 @@ surfaces:
 | agentbrew `templates/AGENTS.md` + `VISION.md` | reuse before implementation, generated-agent-config ownership, task backend shape, git/public-write safety | `Agentfile.yaml`, `bin/gh`, `git-hooks/*`, `agentbrew/hooks/manifest.yaml` backstops |
 | Minsky `vision.md` constitution | rule #1 reuse, #3 doc/test-first, #6 stay alive, #9 HDD metadata, #10 deterministic gates, #16 default-by-default, #17 proactive healing | `make check`, `make lint-tasks`, `make lint-tasks-rule9`, doctor modules, Bats tests |
 
-Each numbered rule in [`AGENTS.md`](../AGENTS.md#rules-for-editing) names either
+Each numbered rule in [`docs/constitution.md`](constitution.md#rules-for-editing)
+(summarized in [`AGENTS.md`](../AGENTS.md#rules-for-editing)) names either
 a deterministic gate (`make check`, Bats, doctor checks, git hooks, CI scripts)
 or an explicit advisory-only status when dotfiles has not mechanized the rule
 yet. This avoids overclaiming CI coverage while keeping reviewer discussion tied

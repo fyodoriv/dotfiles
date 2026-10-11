@@ -150,11 +150,20 @@ EOF
   local agentfile
   agentfile="$(repo_root)/Agentfile.yaml"
 
-  grep -q "No completion claims without fresh verification evidence" "$agentfile"
-  grep -q "generated agent config is owned by agentbrew" "$agentfile"
   grep -q "approved repo families" "$agentfile"
   grep -q "never bypass-merge someone else's PR" "$agentfile"
   grep -q "Every PR needs uncommitted visual proof" "$agentfile"
+}
+
+@test "Agentfile inline rules do not repeat the agentbrew bootstrap" {
+  local agentfile
+  agentfile="$(repo_root)/Agentfile.yaml"
+
+  # The agentbrew bootstrap (templates/AGENTS.md) and shared-rules.md already
+  # deploy these rules into every agent's global file.
+  ! grep -q "No completion claims without fresh verification evidence" "$agentfile"
+  ! grep -q "generated agent config is owned by agentbrew" "$agentfile"
+  ! grep -q "Keep TASKS.md in tasks.md format" "$agentfile"
 }
 
 @test "Agentfile inline rules use task-aware structured memory lifecycle calls" {

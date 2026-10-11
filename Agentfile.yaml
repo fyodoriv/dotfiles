@@ -200,9 +200,6 @@ sources:
   # agentbrew catalog. They need no source entry here.
 
 rules: |
-  Keep TASKS.md in tasks.md format and remove completed task blocks entirely.
-  Agentfile.yaml is the source; generated agent config is owned by agentbrew.
-  No completion claims without fresh verification evidence.
   End every message with one last line that says exactly what you need from me,
   as a one-liner: "**Needed from you:** <action or exact command>". If you need
   nothing, write "**Needed from you:** nothing". Never put the request only

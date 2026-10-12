@@ -209,12 +209,12 @@ remote without explicit operator approval in the current session. -->
   - **Details**: Three tests in tests/audit.bats fail on unmodified feat/chezmoi on this Mac: 'ignores intentional test secret fixtures' (line 141), 'passes root artifact check in clean repo' (line 195), 'exits 0 when no failures' (line 252). Each expects exit 0, but dotfiles-audit exits 1 because machine-dependent checks (curl/jq/python shim symlinks, PATH resolution) fail inside the fake dotfiles dir. The tests should stub or skip those environment checks.
   - **Files**: tests/audit.bats,bin/dotfiles-audit
   - **Acceptance**: bats tests/audit.bats passes on this Mac with no machine-specific skips added to production code
-- [ ] Prevent dotfiles-sync from stopping its own active run during a LaunchAgent reload
-  - **ID**: dotfiles-sync-self-reload-safe
-  - **Tags**: launchagents, sync, resilience, doctor
-  - **Details**: `dotfiles-sync` can repair or reload `com.dotfiles.dotfiles-sync` while that same job is running. A bootstrap or kickstart can terminate the active run before it finishes its remaining apply and health checks. Preserve a completed active run, then schedule a subsequent sync when a reload is necessary.
-  - **Files**: bin/dotfiles-sync, bin/dotfiles-reload-launchagents, tests/
-  - **Acceptance**: a fixture that requests its own reload completes its current sync path and records one follow-up reload or sync without duplicate concurrent work.
+- [ ] Keep a manual `dotfiles apply` from killing a sync that launchd is running
+  - **ID**: apply-vs-running-sync-job
+  - **Tags**: scout, launchagents, sync, resilience
+  - **Details**: The sync job now defers its own reload (`lib/self-reload.sh`). A `dotfiles apply` typed in a shell is a different process, so its lifecycle script still unloads `com.dotfiles.dotfiles-sync` while launchd may be running a sync. Detect a live sync lock owned by the job and defer that reload the same way.
+  - **Files**: .chezmoiscripts/run_onchange_launchagents.sh.tmpl, lib/self-reload.sh, tests/dotfiles-sync-self-reload.bats
+  - **Acceptance**: with a live sync lock, `install_plist` for the sync agent writes a marker and does not call `launchctl unload`; a bats test covers it.
 
 - [ ] Cut doctor failures on a converged personal Mac from 43 to the ones that need action
   - **ID**: doctor-converged-mac-failure-triage

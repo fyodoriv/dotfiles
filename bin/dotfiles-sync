@@ -29,14 +29,36 @@ fi
 source "$DOTFILES_DIR/lib/stats.sh"
 # shellcheck source=../lib/lock.sh
 source "$DOTFILES_DIR/lib/lock.sh"
+# shellcheck source=../lib/self-reload.sh
+source "$DOTFILES_DIR/lib/self-reload.sh"
 # shellcheck source=../lib/push-error-classify.sh
 source "$DOTFILES_DIR/lib/push-error-classify.sh"
 
 cd "$DOTFILES_DIR" || { warn "[sync] Cannot cd to dotfiles dir"; exit 1; }
 
 # Acquire lock to prevent concurrent sync/doctor runs
+SYNC_LABEL="com.dotfiles.dotfiles-sync"
+
+# If chezmoi apply wants to reload this very LaunchAgent, it only leaves a
+# marker (lib/self-reload.sh): unloading a running job kills the rest of the
+# sync. When the run ends, a detached helper does the one follow-up reload.
+_sync_exit() {
+  rm -f "$DOTFILES_LOCK"
+  if self_reload_pending "$SYNC_LABEL" && [ -x "$DOTFILES_DIR/bin/dotfiles-reload-launchagents" ]; then
+    # setsid detaches the helper so launchd does not kill it with this job.
+    if command -v perl >/dev/null 2>&1; then
+      perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' \
+        "$DOTFILES_DIR/bin/dotfiles-reload-launchagents" --deferred --after-pid "$$" </dev/null 1>&2 &
+    else
+      nohup "$DOTFILES_DIR/bin/dotfiles-reload-launchagents" --deferred --after-pid "$$" </dev/null 1>&2 &
+    fi
+  fi
+}
+
 if ! $DRY_RUN; then
   acquire_lock "sync" || exit 0
+  export DOTFILES_RELOAD_SELF_LABEL="$SYNC_LABEL"
+  trap _sync_exit EXIT
 fi
 
 # Ensure we're at the top of a git work tree. In a linked worktree (such as

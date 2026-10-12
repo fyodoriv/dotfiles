@@ -9,6 +9,9 @@
 #   dotfiles-reload-launchagents --kickstart  # lighter: restart job, plist unchanged
 #   dotfiles-reload-launchagents --kill-chrome  # pkill CDP Chromes before bootstrap
 #   dotfiles-reload-launchagents --dry-run    # print actions only
+#   dotfiles-reload-launchagents --deferred [--after-pid PID]
+#       # run reloads that a job asked for on itself (see lib/self-reload.sh);
+#       # waits for PID to exit first. dotfiles-sync starts this when it ends.
 #
 # Ship-it Step 13 runs this automatically after `dotfiles apply` on every
 # tooling/dotfiles delivery — not optional.
@@ -21,6 +24,8 @@ DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
 source "$DOTFILES_DIR/lib/colors.sh"
 # shellcheck source=../lib/dotfiles-source-dir.sh
 source "$DOTFILES_DIR/lib/dotfiles-source-dir.sh"
+# shellcheck source=../lib/self-reload.sh
+source "$DOTFILES_DIR/lib/self-reload.sh"
 
 # Only the checkout that chezmoi uses as its source may change launchd state
 # for the deployed Home LaunchAgents. Worktrees can inspect the script but
@@ -65,9 +70,14 @@ kill_cdp_chrome_port() {
 MODE=bootstrap
 DRY_RUN=0
 KILL_CHROME=0
+DEFERRED=0
+AFTER_PID=""
 
-for arg in "$@"; do
+while [ $# -gt 0 ]; do
+  arg="$1"; shift
   case "$arg" in
+    --deferred)    DEFERRED=1 ;;
+    --after-pid)   AFTER_PID="${1:-}"; [ $# -gt 0 ] && shift ;;
     --kickstart)   MODE=kickstart ;;
     --kill-chrome) KILL_CHROME=1 ;;
     --dry-run)     DRY_RUN=1 ;;
@@ -141,6 +151,39 @@ bootstrap_agent() {
   warn "bootstrap failed for $label${bootstrap_err:+ — ${bootstrap_err}}"
   return 1
 }
+
+# Deferred mode: reload the jobs that asked for it while they were running.
+# Each marker is claimed once, so concurrent callers never reload twice.
+if [ "$DEFERRED" = "1" ]; then
+  if [ -n "$AFTER_PID" ] && [ "$DRY_RUN" = "0" ]; then
+    for _ in $(seq 1 "${DOTFILES_RELOAD_WAIT_SECS:-120}"); do
+      kill -0 "$AFTER_PID" 2>/dev/null || break
+      sleep 1
+    done
+  fi
+  marker_dir="${DOTFILES_RELOAD_MARKER_DIR:-$HOME/.local/state/dotfiles/pending-reload}"
+  done_count=0
+  for marker in "$marker_dir"/com.*; do
+    [ -e "$marker" ] || continue
+    label="$(basename "$marker")"
+    case "$label" in *.claimed.*) continue ;; esac
+    if [ "$DRY_RUN" = "1" ]; then
+      info "[dry-run] deferred reload $label"
+    else
+      self_reload_claim "$label" || continue
+    fi
+    plist="$HOME/Library/LaunchAgents/${label}.plist"
+    info "deferred reload $label"
+    run_cmd launchctl bootout "${GUI_DOMAIN}/${label}" 2>/dev/null || true
+    if [ -f "$plist" ]; then
+      run_cmd launchctl bootstrap "$GUI_DOMAIN" "$plist" \
+        || warn "bootstrap failed for $label"
+    fi
+    done_count=$((done_count + 1))
+  done
+  ok "LaunchAgents: ${done_count} deferred reload(s) done"
+  exit 0
+fi
 
 reloaded=0
 skipped=0

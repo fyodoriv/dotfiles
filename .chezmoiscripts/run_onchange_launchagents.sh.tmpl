@@ -5,6 +5,7 @@
 # auto_sync: {{ dig "auto_sync" true . }}
 # claude_remote_control: {{ dig "claude_remote_control" false . }}
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
+# self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
 set -euo pipefail
 
 SOURCE_DIR="{{ .chezmoi.sourceDir }}"
@@ -85,10 +86,20 @@ remove_skipped_agent() {
   local short="$1" dst_name="$2"
   local dst="$HOME/Library/LaunchAgents/$dst_name"
   [ -f "$dst" ] || return 1
+  if self_reload_is_self "${dst_name%.plist}"; then
+    # Unloading would kill this running job; remove it after the run ends.
+    rm -f "$dst"
+    self_reload_defer "${dst_name%.plist}"
+    echo "⏳ Deferred removal of $short (running inside it; follow-up after this run)"
+    return 0
+  fi
   launchctl unload "$dst" 2>/dev/null || true
   rm -f "$dst"
   echo "⊘ Removed $short (not applicable for current profile/config)"
 }
+
+# shellcheck source=/dev/null
+source "$SOURCE_DIR/lib/self-reload.sh"
 
 if ! command -v launchctl &>/dev/null; then
   echo "⚠ launchctl not found — skipping LaunchAgent load"
@@ -127,7 +138,10 @@ install_plist() {
   fi
 
   local dst="$HOME/Library/LaunchAgents/$dst_name"
-  launchctl unload "$dst" 2>/dev/null || true
+  local self_job=false
+  self_reload_is_self "${dst_name%.plist}" && self_job=true
+  # A running job must not unload itself: launchd would kill the rest of the run.
+  $self_job || launchctl unload "$dst" 2>/dev/null || true
 
   if [[ "$src" == *.tmpl ]]; then
     if ! chezmoi execute-template < "$src" > "$dst.tmp"; then
@@ -141,6 +155,12 @@ install_plist() {
   fi
 
   mv "$dst.tmp" "$dst"
+
+  if $self_job; then
+    self_reload_defer "${dst_name%.plist}"
+    echo "⏳ $name (running inside it; reload deferred until this run ends)"
+    return 0
+  fi
 
   if launchctl load "$dst" 2>/dev/null; then
     echo "✓ $name"

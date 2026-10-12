@@ -182,6 +182,30 @@ chezmoi_verify() {
   [ "$perms" = "700" ]
 }
 
+@test "private_dot_agent-browser is applied at 0700" {
+  chezmoi_apply
+
+  [ -d "$TEST_HOME/.agent-browser" ]
+  local perms
+  perms="$(stat -f '%A' "$TEST_HOME/.agent-browser")"
+  [ "$perms" = "700" ]
+}
+
+@test "private_dot_agent-browser: no-tty apply converges a 0755 dir without a prompt" {
+  mkdir -p "$TEST_HOME/.agent-browser"
+  chmod 755 "$TEST_HOME/.agent-browser"
+
+  run chezmoi_apply </dev/null
+  [ "$status" -eq 0 ]
+  [ "$(stat -f '%A' "$TEST_HOME/.agent-browser")" = "700" ]
+
+  # A second apply and verify must stay quiet on the private dir.
+  run chezmoi_apply </dev/null
+  [ "$status" -eq 0 ]
+  run chezmoi_verify
+  [ "$status" -eq 0 ]
+}
+
 @test "chezmoiignore excludes repo-only files from HOME" {
   chezmoi_apply
 

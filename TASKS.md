@@ -223,18 +223,6 @@ remote without explicit operator approval in the current session. -->
   - **Files**: lib/lock.sh, bin/dotfiles-sync, bin/dotfiles-doctor, tests/
   - **Acceptance**: tests distinguish a live owner from a nonexistent PID; doctor can recover from the latter and leaves the former untouched.
 
-- [ ] Mark `~/.agent-browser` private in chezmoi so a non-interactive apply does not stop
-  - **ID**: chezmoi-agent-browser-private-dir
-  - **Tags**: chezmoi, dotfiles-apply, agent-browser, security
-  - **Details**: The source directory is `dot_agent-browser`, so chezmoi wants mode 0755. agent-browser keeps the folder at 0700 because it holds `.encryption-key` and browser profiles. After that, `chezmoi status` shows `MM .agent-browser`, and `dotfiles apply` without a TTY stops with ".agent-browser has changed since chezmoi last wrote it?" and "could not open a new TTY" (seen 2026-09-28). An apply with a TTY or `--force` loosens the folder to 0755. Fix: rename `dot_agent-browser` to `private_dot_agent-browser`, so chezmoi's target mode is 0700, and update every path reference to the old name.
-  - **Files**: dot_agent-browser/ (rename), TASKS.md and docs that cite `dot_agent-browser/`, tests/chezmoi.bats
-  - **Acceptance**: (1) after a clean apply, `~/.agent-browser` is 0700; (2) `chezmoi status ~/.agent-browser` prints nothing; (3) `dotfiles apply </dev/null` does not prompt for this folder; (4) bats asserts the 0700 mode.
-  - **Hypothesis**: The prompt comes only from the mode mismatch between the source (0755) and agent-browser's own 0700. A private source attribute makes both 0700 and takes non-TTY apply stops on this folder from 1 per apply to 0.
-  - **Success**: The Measurement prints `700` and no `.agent-browser` status line.
-  - **Pivot**: If agent-browser starts to need group or other read access, keep 0755 in the source and stop agent-browser from tightening the folder instead.
-  - **Measurement**: `stat -f %Lp ~/.agent-browser; chezmoi status ~/.agent-browser`
-  - **Anchor**: chezmoi reference, "Source state attributes" (`private_` sets 0700 on directories); Saltzer & Schroeder, "The Protection of Information in Computer Systems", 1975 (least privilege).
-
 - [ ] Cut doctor failures on a converged personal Mac from 43 to the ones that need action
   - **ID**: doctor-converged-mac-failure-triage
   - **Tags**: scout, doctor, noise, triage

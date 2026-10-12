@@ -1,0 +1,125 @@
+#!/bin/bash
+set -euo pipefail
+
+# Raise the launchd open-file limit, so LaunchAgent jobs get more than 256.
+#
+# Interactive shells get `ulimit -n 65535` from zshrc. Jobs that launchd
+# starts (dotfiles agents, a minsky worker, opencode) get launchd's soft
+# default of 256 instead. Many parallel node, git, and browser processes
+# run out of file descriptors at 256.
+#
+# A root LaunchDaemon runs `launchctl limit maxfiles` at every boot. This
+# needs sudo once, so run it in a human terminal.
+#
+# Usage: dotfiles-launchd-maxfiles            install the daemon and apply now (sudo)
+#        dotfiles-launchd-maxfiles --check    exit 0 when the soft limit is high enough
+#        dotfiles-launchd-maxfiles --print-plist
+#        dotfiles-launchd-maxfiles --uninstall (sudo)
+
+readonly LABEL="com.dotfiles.maxfiles"
+readonly MIN_SOFT=4096
+readonly WANT_SOFT=65536
+# Tests point these at stubs and a temp dir.
+readonly LAUNCHCTL="${DOTFILES_LAUNCHCTL:-/bin/launchctl}"
+readonly SYSCTL="${DOTFILES_SYSCTL:-/usr/sbin/sysctl}"
+readonly SUDO="${DOTFILES_SUDO:-sudo}"
+readonly DAEMON_DIR="${DOTFILES_LAUNCHD_DAEMON_DIR:-/Library/LaunchDaemons}"
+readonly PLIST="$DAEMON_DIR/$LABEL.plist"
+
+# Print the current launchd soft limit ("unlimited" or a number).
+_soft_limit() {
+  "$LAUNCHCTL" limit maxfiles 2>/dev/null | awk '$1 == "maxfiles" { print $2; exit }'
+}
+
+# Print "<soft> <hard>" for this host. The kernel per-process cap is the hard limit.
+_target_limits() {
+  local hard soft
+  hard="$("$SYSCTL" -n kern.maxfilesperproc 2>/dev/null || true)"
+  [[ "$hard" =~ ^[0-9]+$ ]] || hard="$WANT_SOFT"
+  soft="$WANT_SOFT"
+  ((soft > hard)) && soft="$hard"
+  printf '%s %s\n' "$soft" "$hard"
+}
+
+_print_plist() {
+  local soft hard
+  read -r soft hard < <(_target_limits)
+  cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/launchctl</string>
+        <string>limit</string>
+        <string>maxfiles</string>
+        <string>$soft</string>
+        <string>$hard</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+EOF
+}
+
+_check() {
+  local soft
+  soft="$(_soft_limit)"
+  if [[ "$soft" == "unlimited" ]] || { [[ "$soft" =~ ^[0-9]+$ ]] && ((soft >= MIN_SOFT)); }; then
+    echo "✓ launchd maxfiles soft limit is $soft (need >= $MIN_SOFT)"
+    return 0
+  fi
+  echo "✗ launchd maxfiles soft limit is ${soft:-unknown} (need >= $MIN_SOFT)"
+  echo "  Fix: run dotfiles-launchd-maxfiles in a human terminal (needs sudo once)"
+  return 1
+}
+
+_require_human() {
+  if [[ "${DOTFILES_IS_AGENT:-0}" == "1" ]]; then
+    echo "❌ This script needs sudo. Run it in a human terminal (Ghostty/iTerm), not an agent terminal."
+    exit 1
+  fi
+}
+
+_install() {
+  local soft hard tmp
+  read -r soft hard < <(_target_limits)
+  tmp="$(mktemp)"
+  _print_plist >"$tmp"
+  "$SUDO" install -m 644 -o root -g wheel "$tmp" "$PLIST"
+  rm -f "$tmp"
+  "$SUDO" "$LAUNCHCTL" bootout "system/$LABEL" 2>/dev/null || true
+  "$SUDO" "$LAUNCHCTL" bootstrap system "$PLIST"
+  # The daemon applies the limit at boot. Apply it now too.
+  "$SUDO" "$LAUNCHCTL" limit maxfiles "$soft" "$hard"
+  echo "✓ Installed $PLIST (soft $soft, hard $hard)"
+  echo "  Restart running LaunchAgents to pick up the new limit, or log out and back in."
+  _check
+}
+
+_uninstall() {
+  "$SUDO" "$LAUNCHCTL" bootout "system/$LABEL" 2>/dev/null || true
+  "$SUDO" rm -f "$PLIST"
+  echo "✓ Removed $PLIST. The limit goes back to the macOS default after a reboot."
+}
+
+case "${1:-}" in
+  --check) _check ;;
+  --print-plist) _print_plist ;;
+  --uninstall)
+    _require_human
+    _uninstall
+    ;;
+  "")
+    _require_human
+    _install
+    ;;
+  *)
+    echo "Usage: dotfiles-launchd-maxfiles [--check|--print-plist|--uninstall]" >&2
+    exit 2
+    ;;
+esac

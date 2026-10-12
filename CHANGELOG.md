@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Open-file limit for LaunchAgent jobs** — `dotfiles-launchd-maxfiles`
+  installs a root LaunchDaemon (one sudo step) that raises launchd's soft
+  `maxfiles` from 256 to 65536 at every boot. Jobs that launchd starts, such
+  as a minsky worker, no longer run out of file descriptors. The resilience
+  doctor warns (`resilience.launchd_maxfiles`) until it is in place.
 - **Shared-memory hardening visibility** — the memory doctor delegates
   project-sync freshness and read-only transport compatibility evidence to
   AgentBrew. Dotfiles keeps the daily compatibility shim and does not parse

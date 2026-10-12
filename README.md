@@ -714,6 +714,17 @@ launchctl unload ~/Library/LaunchAgents/<agent-label>.plist
 
 To re-enable: `launchctl load ~/Library/LaunchAgents/<agent-label>.plist`. Browser automation agents can also be restarted explicitly with `launchctl start <agent-label>`; `dotfiles doctor --fix` does not reopen them after a manual close.
 
+**Open-file limit for LaunchAgent jobs (one sudo step).** Interactive shells get `ulimit -n 65535` from `.zshrc`. Jobs that launchd starts get launchd's soft default of 256 instead. Parallel node, git, and browser work (for example a minsky worker host) runs out of file descriptors at 256. Run this once in a human terminal:
+
+```bash
+dotfiles-launchd-maxfiles            # installs /Library/LaunchDaemons/com.dotfiles.maxfiles.plist (sudo)
+dotfiles-launchd-maxfiles --check    # exit 0 when the launchd soft limit is >= 4096
+```
+
+The root daemon runs `launchctl limit maxfiles 65536 <kern.maxfilesperproc>` at every boot. `dotfiles doctor --module resilience` warns (`resilience.launchd_maxfiles`) until it is in place. Remove it with `dotfiles-launchd-maxfiles --uninstall`.
+
+**Minsky worker host.** A minsky worker host needs four host settings. dotfiles owns only the open-file limit above. Minsky owns the rest in its own repo: its worker plist pins `ProcessType=Standard` (gated by `scripts/check-machine-budget.mjs`), and its launchd PATH helper picks node. An arm64 node on Apple Silicon gives the arm64 biome binary (`resilience.node_native_arch`). dotfiles never installs a `com.minsky.*` LaunchAgent: minsky autostart stays opt-in through `minsky enable-autostart`.
+
 ## Fork & customize
 
 This repo is designed for team adoption. Fork it, then run through the setup:

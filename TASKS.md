@@ -18,19 +18,6 @@ remote without explicit operator approval in the current session. -->
   - **Measurement**: `bash scripts/benchmark-run.sh --json` → `{dotfiles:{…}, competitors:[≥4]}` on ≥5 shared metrics.
   - **Anchor**: Forsgren/Humble/Kim *Accelerate* 2018 (outcome metrics not vanity); Basili/Caldiera/Rombach 1994 (Goal-Question-Metric); operator directive 2026-05-16.
 
-- [ ] `minsky-worker-host-config-durable` — own, durably, the host/launchd config minsky currently patches in-session so its operator machine-utilisation budget is reachable on a fresh machine without one-off hacks
-  - **ID**: minsky-worker-host-config-durable
-  - **Tags**: p0, operator-directive, launchd, host-config, cross-repo-sync, mirrored-from-minsky
-  - **Competitive-goal**: a fresh machine reproducing the correct minsky worker host-config in one `dotfiles` apply (vs manual in-session plist surgery) is the reproducibility-% and manual-step-count metric on the dotfiles scorecard.
-  - **Details**: operator directive 2026-05-17 (filed from minsky per its vision.md rule #15 "match the operator machine-utilisation budget" + rule #1 "don't hand-maintain what a managed repo should own"). Minsky's worker launchd unit (`com.minsky.opus-sonnet-run`) was being hand-edited per session; make these durable here so minsky pulls them: (a) **`ProcessType=Standard`** for any minsky worker launchd unit — `Background` imposes macOS QoS CPU/IO throttling that makes a high-utilisation budget physically unreachable; (b) raise `ulimit -n` / `maxfiles` for high worker fan-out (dozens of node procs + git worktrees); (c) pin the worker node version consistently (the launchd unit and the interactive shell must agree — a v24.14.0/v24.15.0 split silently broke biome/lefthook hooks); (d) provision the arch-correct toolchain binary path (`BIOME_BINARY` → an arm64 biome on Apple Silicon) so commits/hooks work headless. Provide a template/managed launchd plist + a `ulimit`/`maxfiles` LaunchDaemon or login hook + the node-pin + the biome-binary provisioning, so `dotfiles apply` yields a host where the minsky budget is reachable with zero in-session edits.
-  - **Files**: `launchd/` (managed `com.minsky.opus-sonnet-run` template incl. `ProcessType=Standard`), `limits/` (nofile/maxfiles), node-version pin (`.tool-versions`/fnm), `install/` (arm64 biome provisioning), `TASKS.md`.
-  - **Hypothesis**: today reproducing a correct minsky worker host requires manual plist/ulimit/node/biome surgery every session; after this a single `dotfiles apply` produces it, manual-step-count for "bring up a minsky swarm host" drops to ~0.
-  - **Acceptance**: `dotfiles apply` on a fresh Apple-Silicon host yields a launchd unit with `ProcessType=Standard`, raised nofile, pinned node, working `BIOME_BINARY`; minsky pulls these instead of patching them; documented in the repo README.
-  - **Success**: a clean Apple-Silicon VM reaches a working minsky worker host after one `dotfiles apply`, with 0 manual host-config steps.
-  - **Pivot**: If a step needs admin rights that `dotfiles apply` must not take, document it as a single `needs-user-action` step and stop there.
-  - **Measurement**: count manual host-config steps to bring up a minsky swarm host before vs after (target: from ~5 to 0); reproduce on a clean VM.
-  - **Anchor**: operator directive 2026-05-17; minsky vision.md rule #15 (operator machine-utilisation budget) + rule #1 (propagate to the managed repo); Apple `launchd.plist(5)` (`ProcessType` QoS). Mirrored from minsky `operator-machine-budget-autoscale`.
-
 ## P1
 
 
@@ -232,6 +219,13 @@ remote without explicit operator approval in the current session. -->
 
 ## P2
 
+
+- [ ] Make `tests/module-resilience.bats` source the doctor module again
+  - **ID**: module-resilience-bats-missing-lib
+  - **Tags**: scout, tests, resilience
+  - **Details**: 2 of 3 tests fail on `feat/chezmoi` (d600271): `source modules/resilience/doctor.sh` stops because the test setup copies only `doctor.sh`, and the module now sources `lib/agent-keepawake.sh`. `make check` misses it because the file is not in the affected set unless the module changes.
+  - **Files**: tests/module-resilience.bats
+  - **Acceptance**: `bats tests/module-resilience.bats` passes; the setup copies or points at `lib/agent-keepawake.sh`.
 
 - [ ] Render npm `allow-scripts` into ~/.npmrc from the shared CLI list
   - **ID**: npmrc-allow-scripts-from-list

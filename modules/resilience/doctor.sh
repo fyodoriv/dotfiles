@@ -250,6 +250,12 @@ check "resilience.ulimit_sufficient" "ulimit -n >= 4096 (Chrome/Playwright/multi
   "[ \"\$(ulimit -n 2>/dev/null || echo 0)\" -ge 4096 ]" \
   "echo 'Add to ~/.zshrc: ulimit -n 8192'"
 
+# The zshrc limit does not reach jobs that launchd starts (dotfiles agents,
+# a minsky worker, opencode). They get launchd's soft default of 256.
+check_advisory "resilience.launchd_maxfiles" "launchd maxfiles soft limit >= 4096 (LaunchAgent jobs)" \
+  "[ ! -x /bin/launchctl ] || \"\$DOTFILES_DIR/bin/dotfiles-launchd-maxfiles\" --check" \
+  "Run in a human terminal (needs sudo once): dotfiles-launchd-maxfiles"
+
 # ── Native arm64 shell (Apple Silicon) ────────────────────────────────
 # On Apple Silicon Macs, the shell must run natively as arm64. If it runs
 # under Rosetta (sysctl.proc_translated=1), every npx/node/playwright child

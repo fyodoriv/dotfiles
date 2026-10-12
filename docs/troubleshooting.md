@@ -625,6 +625,16 @@ source ~/.zshrc
 ulimit -n   # should output 65535
 ```
 
+If the error comes from a LaunchAgent job (a dotfiles agent, a minsky worker, opencode), the `.zshrc` limit does not apply. launchd gives its jobs a soft limit of 256. Raise it once in a human terminal:
+
+```bash
+launchctl limit maxfiles            # shows the launchd soft and hard limits
+dotfiles-launchd-maxfiles           # installs a root LaunchDaemon (sudo once)
+dotfiles-launchd-maxfiles --check   # should pass
+```
+
+Then restart the affected LaunchAgent, or log out and back in.
+
 ---
 
 ## Enterprise module checks fail

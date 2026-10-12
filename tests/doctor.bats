@@ -604,6 +604,19 @@ EOF
   [ "$elapsed" -lt 90 ]
 }
 
+@test "doctor DOTFILES_DOCTOR_TIMING=1 reports per-module seconds, slowest first" {
+  # Profiling hook: names the slow module without re-running each one by hand.
+  run env DOTFILES_DOCTOR_TIMING=1 \
+    bash "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module "$DOCTOR_TINY_MODULE" --quiet
+  [[ "$output" =~ doctor-timing:\ total\ [0-9]+s ]]
+  [[ "$output" =~ doctor-timing:\ [0-9]+s\ $DOCTOR_TINY_MODULE ]]
+}
+
+@test "doctor prints no timing lines unless DOTFILES_DOCTOR_TIMING=1" {
+  run bash "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module "$DOCTOR_TINY_MODULE" --quiet
+  [[ "$output" != *doctor-timing* ]]
+}
+
 # ── --watch mode tests ──────────────────────────────────────────────
 
 @test "doctor --watch is accepted as a valid flag" {

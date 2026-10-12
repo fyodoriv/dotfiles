@@ -663,7 +663,24 @@ severity_included() {
   [ "$mod_rank" -le "$filter_rank" ]
 }
 
+# Opt-in profiling: DOTFILES_DOCTOR_TIMING=1 prints whole-second wall time per
+# module (slowest first) to stderr after the run. Uses the $SECONDS builtin, so
+# it adds no process spawns.
+_doctor_timing_rows=()
+_doctor_timing_report() {
+  [ "${DOTFILES_DOCTOR_TIMING:-0}" = "1" ] || return 0
+  echo "doctor-timing: total ${SECONDS}s" >&2
+  [ "${#_doctor_timing_rows[@]}" -gt 0 ] || return 0
+  printf '%s\n' "${_doctor_timing_rows[@]}" | sort -rn | sed 's/^/doctor-timing: /' >&2
+}
+
 run_module_doctor() {
+  local _t0=$SECONDS
+  run_module_doctor_inner "$@"
+  _doctor_timing_rows+=("$((SECONDS - _t0))s $(basename "$1")")
+}
+
+run_module_doctor_inner() {
   local module_dir="$1"
   local module_name
   module_name="$(basename "$module_dir")"
@@ -881,6 +898,8 @@ if $_agentbrew_runtime_allowed \
   fi
 fi
 unset _agentbrew_runtime_allowed _agentbrew_runtime_path
+
+_doctor_timing_report
 
 # ── Summary ──────────────────────────────────────────────────────────
 if $JSON_MODE; then

@@ -34,17 +34,17 @@ remote without explicit operator approval in the current session. -->
 ## P1
 
 
-- [ ] Full dotfiles doctor finishes inside its 90s budget
-  - **ID**: full-dotfiles-doctor-finishes-inside-its-90s-budget
-  - **Tags**: performance,doctor
-  - **Details**: On 2026-10-08 a full dotfiles-doctor --quiet took 413s (load 8-10), so tests/doctor.bats 'doctor --quiet completes in under 90 seconds' fails on every make check. PR #36 cut the security module from 82s to 30s by batching grep. Per-module profile (each includes ~8s startup): jetbrains ~82s, resilience ~52s, git ~47s, memory ~44s, agentbrew ~38s, vscode ~34s, macos ~33s. Trace with PS4='+ ${EPOCHREALTIME} ' bash -x and group by command to find per-file spawn loops, as in #36.
-  - **Files**: modules/jetbrains/doctor.sh,modules/resilience/doctor.sh,modules/git/doctor.sh,modules/memory/doctor.sh,bin/dotfiles-doctor
-  - **Acceptance**: bats -f 'doctor --quiet completes in under 90 seconds' tests/doctor.bats passes on this Mac at load below 5
-  - **Hypothesis**: Removing per-item process spawns in the slowest modules cuts full doctor wall time from ~360s to under 90s
-  - **Success**: time dotfiles-doctor --quiet under 90s at load below 5
-  - **Pivot**: if three modules are optimized and the total is still above 200s, switch to running modules in parallel instead
-  - **Measurement**: s=$(date +%s); bin/dotfiles-doctor --quiet; echo $(( $(date +%s)-s ))
-  - **Anchor**: Doctor 90s budget test in tests/doctor.bats; Basili GQM 1994
+- [ ] Explain the 10-minute `dotfiles-doctor --fix --quiet` run inside `dotfiles apply`
+  - **ID**: doctor-fix-apply-wall-time-unexplained
+  - **Tags**: scout, doctor, performance
+  - **Details**: On 2026-10-12 a full `dotfiles-doctor --quiet` took 45-52s (load 30-40, warm cache) and 69s with a cold bottle cache. Yet `dotfiles-doctor --fix --quiet` inside `dotfiles apply` took about 10 minutes the same day. Read-only runs cannot explain it. Suspects: the cold bottle audit right after brew changes, each failing check's fix running up to `FIX_TIMEOUT` (30s), and load from the apply itself. `DOTFILES_DOCTOR_TIMING=1` now prints per-module seconds; make `bin/dotfiles` apply set it and keep the output in the doctor log so the next slow run names its module.
+  - **Files**: bin/dotfiles, bin/dotfiles-doctor
+  - **Acceptance**: after one `dotfiles apply`, the doctor log holds a `doctor-timing:` block.
+  - **Hypothesis**: The slow part is one module or one fix, not the checks as a whole. The log shows it in one run.
+  - **Success**: the log names the slowest module for every apply.
+  - **Pivot**: if the timing block shows no module above 30s, profile the fix path instead.
+  - **Measurement**: `rg -c 'doctor-timing:' ~/.local/share/dotfiles/logs/dotfiles-doctor.log`
+  - **Anchor**: Basili, Caldiera, Rombach, "The Goal Question Metric Approach", 1994.
 
 <!-- COHORT: github-issues-task-backend (2026-05-29 operator directive). Shell-level
      ergonomics for the GitHub Issues task backend so filing/claiming a task from a
@@ -474,13 +474,6 @@ remote without explicit operator approval in the current session. -->
   - **Files**: Agentfile.yaml, tests/agent-artifact-coverage.bats
   - **Acceptance**: `Agentfile.yaml`'s `rules:` block contains both new lines; `bats tests/agent-artifact-coverage.bats` exits 0 including the new assertions; `agentbrew sync --dry-run` propagates the rules block unchanged in shape (no schema break).
 
-- [ ] Restore the `dotfiles-doctor --quiet` 90-second runtime budget
-  - **ID**: doctor-quiet-runtime-budget
-  - **Tags**: doctor, performance, tests, regression
-  - **Details**: `tests/doctor.bats` test `doctor --quiet completes in under 90 seconds` flakes when `make check` runs tests in parallel, on both the feature checkout and the clean `dotfiles-applied` checkout. Instrument the quiet doctor path by module and command so the slow dependency is visible, then add bounded timeouts or move non-critical work out of the quiet path without weakening doctor coverage.
-  - **Files**: bin/dotfiles-doctor, modules/*/doctor.sh, tests/doctor.bats
-  - **Acceptance**: the focused Bats test passes on this machine and `make check` passes without excluding the doctor runtime test.
-  - **Surfaced-by**: 2026-09-27 Amphetamine safety delivery; feature and clean-applied checkouts both exceeded the existing 90-second gate.
 
 ## P3
 

@@ -188,6 +188,19 @@ With no overlay, both patterns are empty and those checks have nothing to
 match. That is allowed only for other people's pushes and posts, such as a
 contributor pushing to a fork.
 
+### Approved private repos
+
+A private repo has no public history to protect. List it in the local file
+`~/.config/oss-readiness/private-push-remotes.txt` (or the file named by
+`DOTFILES_PRIVATE_PUSH_ALLOWLIST`), one `github.com/owner/repo` per line.
+Never commit that list. For a listed repo, `bin/git` allows the agent push
+and the pre-push hook skips only the approved-root check. Every other gate
+still runs. A repo in `config/public-push-remotes.txt` is never treated as
+private, whatever the local list says.
+
+A one-shot `DOTFILES_PUBLIC_PUSH_ALLOWLIST=<(...)` pipe is copied to a temp
+file once, so `bin/git` and the hook read the same list.
+
 ### Private pattern file
 
 The owner's public repos (`config/public-push-remotes.txt`) fail closed. A

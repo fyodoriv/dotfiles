@@ -9,7 +9,20 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+# A one-shot allowlist may be a pipe (`<(echo ...)`) that can be read once.
+# Copy it to a file now and export the copy, so this wrapper and the pre-push
+# hook it starts read the same list. The copy is removed after git exits.
+allowlist_snapshot=""
+if [ -n "${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-}" ] && [ ! -f "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" ] &&
+  [ -r "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" ]; then
+  allowlist_snapshot="$(mktemp "${TMPDIR:-/tmp}/git-wrapper-allowlist.XXXXXX")"
+  trap 'rm -f "$allowlist_snapshot"' EXIT
+  cat "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" > "$allowlist_snapshot" 2>/dev/null || true
+  export DOTFILES_PUBLIC_PUSH_ALLOWLIST="$allowlist_snapshot"
+fi
 PUBLIC_PUSH_ALLOWLIST="${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-$SCRIPT_DIR/../config/public-push-remotes.txt}"
+# Local-only list of approved private repos (see git-hooks/pre-push).
+PRIVATE_PUSH_ALLOWLIST="${DOTFILES_PRIVATE_PUSH_ALLOWLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/oss-readiness/private-push-remotes.txt}"
 
 if [ -n "${DOTFILES_REAL_GIT:-}" ] && [ -x "$DOTFILES_REAL_GIT" ]; then
   REAL_GIT="$DOTFILES_REAL_GIT"
@@ -112,13 +125,16 @@ _git_public_repository_allowed() {
   local url="$1" key line
   key="$(_git_public_repository_key "$url" 2>/dev/null || true)"
   [ -n "$key" ] || return 1
-  [ -r "$PUBLIC_PUSH_ALLOWLIST" ] || return 1
-  while IFS= read -r line || [ -n "$line" ]; do
-    line="${line%%#*}"
-    line="${line//[[:space:]]/}"
-    [ -n "$line" ] || continue
-    [ "$line" = "$key" ] && return 0
-  done < "$PUBLIC_PUSH_ALLOWLIST"
+  local list
+  for list in "$PUBLIC_PUSH_ALLOWLIST" "$PRIVATE_PUSH_ALLOWLIST"; do
+    [ -r "$list" ] || continue
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%%#*}"
+      line="${line//[[:space:]]/}"
+      [ -n "$line" ] || continue
+      [ "$line" = "$key" ] && return 0
+    done < "$list"
+  done
   return 1
 }
 
@@ -296,4 +312,11 @@ if _git_wrapper_is_agent_context && [ "$git_command" = "push" ]; then
   fi
 fi
 
+if [ -n "$allowlist_snapshot" ]; then
+  # Keep this shell alive so the copy can be removed afterwards.
+  status=0
+  "$REAL_GIT" "$@" || status=$?
+  rm -f "$allowlist_snapshot"
+  exit "$status"
+fi
 exec "$REAL_GIT" "$@"

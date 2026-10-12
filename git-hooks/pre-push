@@ -49,10 +49,36 @@ esac
 if [ -n "$CURRENT_REPO" ] && [ -f "$CURRENT_REPO/lib/oss-readiness.sh" ]; then
   gated_repo=1
 fi
+# A one-shot allowlist may be a pipe (`<(echo ...)`). A pipe can be read once,
+# and this hook reads the list more than once, so copy it to a file first and
+# point every later reader at the copy. bin/git does the same before it runs
+# git, so a copy made there arrives here as a plain file.
+allowlist_snapshot=""
+if [ -n "${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-}" ] && [ ! -f "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" ] &&
+  [ -r "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" ]; then
+  allowlist_snapshot="$(mktemp "${TMPDIR:-/tmp}/pre-push-allowlist.XXXXXX")"
+  trap 'rm -f "$allowlist_snapshot"' EXIT
+  cat "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" > "$allowlist_snapshot" 2>/dev/null || true
+  export DOTFILES_PUBLIC_PUSH_ALLOWLIST="$allowlist_snapshot"
+fi
 PUBLIC_REPO_ALLOWLIST="${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-$DOTFILES_DIR/config/public-push-remotes.txt}"
+# Private repos the operator approved for a push. This list is local-only
+# (never committed). A private repo is gated like any listed repo, except that
+# the public-history root check (1c) does not apply. A repo in the committed
+# public list is never treated as private, whatever this list says.
+PRIVATE_REPO_ALLOWLIST="${DOTFILES_PRIVATE_PUSH_ALLOWLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/oss-readiness/private-push-remotes.txt}"
 remote_key="$(printf '%s' "$remote_url" | sed -E 's#^[a-z+]+://##; s#^[^@/]+@##; s#:#/#; s#/$##; s#\.git$##')"
 if [ "$gated_repo" -eq 0 ] && [ -n "$remote_key" ] && [ -r "$PUBLIC_REPO_ALLOWLIST" ] &&
   sed 's/#.*//; s/[[:space:]]//g' "$PUBLIC_REPO_ALLOWLIST" | grep -qixF -- "$remote_key"; then
+  gated_repo=1
+fi
+
+is_private_repo=0
+if [ -n "$remote_key" ] && [ -r "$PRIVATE_REPO_ALLOWLIST" ] &&
+  sed 's/#.*//; s/[[:space:]]//g' "$PRIVATE_REPO_ALLOWLIST" | grep -qixF -- "$remote_key" &&
+  ! sed 's/#.*//; s/[[:space:]]//g' "$DOTFILES_DIR/config/public-push-remotes.txt" 2>/dev/null | grep -qixF -- "$remote_key" &&
+  ! sed 's/#.*//; s/[[:space:]]//g' "$PUBLIC_REPO_ALLOWLIST" 2>/dev/null | grep -qixF -- "$remote_key"; then
+  is_private_repo=1
   gated_repo=1
 fi
 
@@ -60,6 +86,7 @@ if [ "$gated_repo" -eq 0 ]; then
   # Different repo — defer. Delegate to repo-local hooks/pre-push so
   # husky / lefthook / custom project hooks still fire here.
   if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
+    [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"
     exec "$CURRENT_REPO/hooks/pre-push" "$@"
   fi
   exit 0
@@ -94,7 +121,7 @@ fi
 gh_hosts="$(awk '/^[^[:space:]#][^:]*:/ { h = $0; sub(/:.*/, "", h); gsub(/["'"'"']/, "", h); print tolower(h) }' \
   "${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}/hosts.yml" 2>/dev/null | tr '\n' ' ' || true)"
 marker_dir="$(mktemp -d "${TMPDIR:-/tmp}/pre-push-markers.XXXXXX")"
-trap 'rm -rf "$marker_dir"' EXIT
+trap 'rm -rf "$marker_dir"; [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"' EXIT
 
 # ── Read stdin: per-ref pre-push payload ───────────────────────────────
 # Format: <local ref> <local sha> <remote ref> <remote sha>\n …
@@ -189,7 +216,8 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
   # (OSS_READINESS_ALLOWED_ROOTS, space-separated), a push may only carry
   # history that starts at one of them. This stops an old, pre-public
   # history from reaching the public repo.
-  if [ -n "${OSS_READINESS_ALLOWED_ROOTS:-}" ]; then
+  # A private repo has no public history to protect, so it skips this check.
+  if [ "$is_private_repo" -eq 0 ] && [ -n "${OSS_READINESS_ALLOWED_ROOTS:-}" ]; then
     while IFS= read -r root; do
       [ -n "$root" ] || continue
       case " $OSS_READINESS_ALLOWED_ROOTS " in
@@ -281,6 +309,7 @@ fi
 if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
   # exec skips the EXIT trap.
   rm -rf "$marker_dir"
+  [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"
   exec "$CURRENT_REPO/hooks/pre-push" "$@"
 fi
 

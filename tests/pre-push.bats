@@ -443,3 +443,148 @@ _roots_env() {
   [ "$status" -ne 0 ]
   [[ "$output" != *"company-private"* ]]
 }
+
+# ── Private-repo approvals vs public-repo gates ────────────────────────
+# A private repo approved through the private allowlist skips only the
+# public-history root check. Every other gate still runs. Fixture names are
+# fake placeholders.
+
+PRIVATE_URL="https://github.com/fyodoriv/private-corp-example.git"
+OTHER_ROOT="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+
+_private_allowlist() {
+  printf '# fixture\ngithub.com/fyodoriv/private-corp-example\n' > "$TEST_DIR/private-allow.txt"
+}
+
+_push_with_lists() {
+  # $1 repo, $2 url; env: PRIVATE_LIST, ENV_FILE
+  local sha
+  sha="$(git -C "$1" rev-parse HEAD)"
+  run env DOTFILES_PRIVATE_PUSH_ALLOWLIST="${PRIVATE_LIST:-$TEST_DIR/none.txt}" \
+    OSS_READINESS_ENV_FILE="${ENV_FILE:-$TEST_DIR/pattern.env}" \
+    bash -c 'cd "$1" && "$2" origin "$3" <<EOF
+refs/heads/topic $4 refs/heads/topic 0000000000000000000000000000000000000000
+EOF
+' _ "$1" "$HOOK" "$2" "$sha"
+}
+
+@test "pre-push: approved private repo with an unlisted root passes the root check" {
+  local repo="$TEST_DIR/repo"
+  _make_repo "$repo" "public@example.test"
+  _private_allowlist
+  _roots_env "$OTHER_ROOT"
+
+  PRIVATE_LIST="$TEST_DIR/private-allow.txt" _push_with_lists "$repo" "$PRIVATE_URL"
+
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-push: a repo approved only through the public allowlist still fails the root check" {
+  local repo="$TEST_DIR/repo" sha
+  _make_repo "$repo" "public@example.test"
+  printf 'github.com/fyodoriv/private-corp-example\n' > "$TEST_DIR/public-allow.txt"
+  _roots_env "$OTHER_ROOT"
+  sha="$(git -C "$repo" rev-parse HEAD)"
+
+  run env DOTFILES_PUBLIC_PUSH_ALLOWLIST="$TEST_DIR/public-allow.txt" OSS_READINESS_ENV_FILE="$TEST_DIR/pattern.env" \
+    bash -c 'cd "$1" && "$2" origin "$3" <<EOF
+refs/heads/topic $4 refs/heads/topic 0000000000000000000000000000000000000000
+EOF
+' _ "$repo" "$HOOK" "$PRIVATE_URL" "$sha"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unapproved root commit"* ]]
+}
+
+@test "pre-push: approved private repo still gets the content scan" {
+  local repo="$TEST_DIR/repo"
+  _make_repo "$repo" "public@example.test"
+  _commit_file "$repo" notes.md "see company-private wiki"
+  _private_allowlist
+  printf "OSS_READINESS_INTERNAL_PATTERN='company-private'\nOSS_READINESS_PATTERN_VERSION=%s\n" "$MIN_VERSION" > "$TEST_DIR/pattern.env"
+
+  PRIVATE_LIST="$TEST_DIR/private-allow.txt" _push_with_lists "$repo" "$PRIVATE_URL"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"notes.md"* ]]
+}
+
+@test "pre-push: a private allowlist entry cannot weaken a public repo root check" {
+  local repo="$TEST_DIR/repo"
+  _make_repo "$repo" "public@example.test"
+  printf 'github.com/fyodoriv/dotfiles\n' > "$TEST_DIR/private-allow.txt"
+  _roots_env "$OTHER_ROOT"
+
+  PRIVATE_LIST="$TEST_DIR/private-allow.txt" _push_with_lists "$repo" "https://github.com/fyodoriv/dotfiles.git"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unapproved root commit"* ]]
+}
+
+@test "pre-push: a private allowlist entry cannot weaken the private email gate on a public repo" {
+  local repo="$TEST_DIR/repo"
+  _make_repo "$repo" "author@private.example"
+  printf 'github.com/fyodoriv/dotfiles\n' > "$TEST_DIR/private-allow.txt"
+
+  PRIVATE_LIST="$TEST_DIR/private-allow.txt" ENV_FILE="$PRIVATE_ENV_FILE" _push_with_lists "$repo" "https://github.com/fyodoriv/dotfiles.git"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Private author or committer emails"* ]]
+}
+
+@test "pre-push: a missing pattern file still blocks a public push when a private allowlist is set" {
+  local repo="$TEST_DIR/repo"
+  _make_repo "$repo" "public@example.test"
+  printf 'github.com/fyodoriv/dotfiles\n' > "$TEST_DIR/private-allow.txt"
+
+  PRIVATE_LIST="$TEST_DIR/private-allow.txt" ENV_FILE="$EMPTY_ENV_FILE" _push_with_lists "$repo" "https://github.com/fyodoriv/dotfiles.git"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"pattern file"*"missing"* ]]
+}
+
+@test "pre-push: a process-substitution allowlist gates the same remotes for every reader" {
+  local repo="$TEST_DIR/repo" sha
+  _make_repo "$repo" "public@example.test"
+  sha="$(git -C "$repo" rev-parse HEAD)"
+
+  # The remote is listed only through the pipe. The owner-public pattern
+  # check is the second reader, so it must still see the list.
+  run env -u OSS_READINESS_INTERNAL_PATTERN OSS_READINESS_ENV_FILE="$EMPTY_ENV_FILE" \
+    bash -c 'cd "$1" && DOTFILES_PUBLIC_PUSH_ALLOWLIST=<(echo github.com/fyodoriv/zz-pipe-example) "$2" origin "$3" <<EOF
+refs/heads/topic $4 refs/heads/topic 0000000000000000000000000000000000000000
+EOF
+' _ "$repo" "$HOOK" "https://github.com/fyodoriv/zz-pipe-example.git" "$sha"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"pattern file"*"missing"* ]]
+}
+
+@test "git wrapper: a process-substitution allowlist reaches the real git as a readable file" {
+  local gitwrap="$BATS_TEST_DIRNAME/../bin/git" stub="$TEST_DIR/real-git"
+  # Stub for the real git: proves the wrapper let the push through and that
+  # the allowlist path it exports is a plain file that still lists the remote.
+  printf '#!/bin/bash\n[ -f "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" ] && grep -q zz-pipe-example "$DOTFILES_PUBLIC_PUSH_ALLOWLIST" && echo stub-git-saw-list\n' > "$stub"
+  chmod +x "$stub"
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 DOTFILES_REAL_GIT="$stub" \
+    bash -c 'DOTFILES_PUBLIC_PUSH_ALLOWLIST=<(echo github.com/fyodoriv/zz-pipe-example) "$1" push "$2"' _ "$gitwrap" "https://github.com/fyodoriv/zz-pipe-example.git"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stub-git-saw-list"* ]]
+}
+
+@test "git wrapper: a repo in the private allowlist is an approved push target" {
+  local gitwrap="$BATS_TEST_DIRNAME/../bin/git" stub="$TEST_DIR/real-git"
+  printf '#!/bin/bash\necho stub-git-ran\n' > "$stub"
+  chmod +x "$stub"
+  _private_allowlist
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 DOTFILES_REAL_GIT="$stub" DOTFILES_PRIVATE_PUSH_ALLOWLIST="$TEST_DIR/private-allow.txt" \
+    "$gitwrap" push "$PRIVATE_URL"
+  [ "$status" -eq 0 ]
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 DOTFILES_REAL_GIT="$stub" DOTFILES_PRIVATE_PUSH_ALLOWLIST="$TEST_DIR/private-allow.txt" \
+    "$gitwrap" push "https://github.com/fyodoriv/zz-unlisted-example.git"
+  [ "$status" -ne 0 ]
+}

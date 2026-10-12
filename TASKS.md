@@ -3,20 +3,12 @@
 <!-- policy: do NOT bypass commit hooks (--no-verify) and do NOT push to a
 remote without explicit operator approval in the current session. -->
 
-## P0
+<!-- policy: every new task names the competitive scorecard metric it
+advances (a **Competitive-goal** line). The metrics are in
+docs/competition/scorecard.md; run scripts/benchmark-run.sh --json to refresh
+them. -->
 
-- [ ] `self-metrics-competitive-benchmark` — cover dotfiles with metrics whose north star is measurably beating competitor dotfile/env-management frameworks
-  - **ID**: self-metrics-competitive-benchmark
-  - **Tags**: p0, operator-directive, metrics, competitive, foundational
-  - **Competitive-goal**: this task IS the scorecard that defines every other task's competitive justification (self-referential bootstrap).
-  - **Details**: Operator directive 2026-05-16 (fleet-wide, mirrored from minsky). Define how to measure dotfile-framework performance (fresh-machine bootstrap time, drift-detection latency, cross-machine reproducibility %, manual-step count, secret-rotation MTTR); measure dotfiles AND competitors (chezmoi, yadm, GNU stow, nix home-manager, dotbot) on the same fresh-VM workload; automate the comparison into one scorecard surfaced as the MAIN metric; require every TASKS.md task to state which competitive metric it advances. First 1-2 agent iterations on this repo establish/refresh the baseline before other work.
-  - **Files**: `scripts/benchmark-*.sh`, `docs/competition/*`, `TASKS.md` (policy line), `tests/`
-  - **Acceptance**: (1) cited metric set; (2) competitor corpus ≥4; (3) automated scorecard JSON + doc; (4) every new task carries a competitive-goal rationale; (5) first-iterations-bootstrap rule documented.
-  - **Hypothesis**: today dotfiles has no measured comparison to peer frameworks; after this every change is steered by a live scorecard and the bootstrap-time / reproducibility gap vs the best competitor closes monotonically.
-  - **Success**: the scorecard JSON reports at least 5 shared metrics for dotfiles and at least 4 competitors, from one command.
-  - **Pivot**: If competitors cannot run the same fresh-VM workload inside the budget, measure dotfiles' own trend only and record why the comparison is blocked.
-  - **Measurement**: `bash scripts/benchmark-run.sh --json` → `{dotfiles:{…}, competitors:[≥4]}` on ≥5 shared metrics.
-  - **Anchor**: Forsgren/Humble/Kim *Accelerate* 2018 (outcome metrics not vanity); Basili/Caldiera/Rombach 1994 (Goal-Question-Metric); operator directive 2026-05-16.
+## P0
 
 ## P1
 

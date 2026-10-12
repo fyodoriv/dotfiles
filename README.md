@@ -855,6 +855,16 @@ Files you should customize are kept separate and never overwritten:
 
 **Our niche:** chezmoi handles file management; we add macOS tuning, self-healing health checks, and automation tracking on top.
 
+### Measured scorecard
+
+`scripts/benchmark-run.sh --json` runs dotfiles, chezmoi, GNU Stow, yadm, and
+dotbot on one shared workload in temporary HOME directories. It reports cold
+apply time, no-op re-apply time, drift detection time, reproducibility, and
+manual bootstrap steps. A tool that cannot run (home-manager without nix) is
+listed as blocked with a reason. The latest results, sources, and the gaps
+where dotfiles is behind are in
+[docs/competition/scorecard.md](docs/competition/scorecard.md).
+
 ## Performance
 
 Shell startup is benchmarked on every CI run and must stay under 200ms. The badge at the top reflects this threshold. Check the latest result in the [CI doctor job summary](https://github.example.com/your-org/dotfiles/actions/workflows/ci.yml).

@@ -9,7 +9,7 @@ BIN_SCRIPTS := $(shell for f in bin/*; do \
   file -b "$$f" 2>/dev/null | grep -qE 'shell script|POSIX shell script' && echo "$$f"; \
 done)
 
-SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh \
+SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-run.sh \
            $(wildcard private_dot_agent-browser/executable_*.sh) \
            lib/agentbrew-memory-readiness.sh lib/brew-bottle-audit.sh lib/colors.sh lib/gh-public-leak.sh lib/lock.sh lib/output.sh lib/overlay-locate.sh lib/secret-scan.sh lib/self-reload.sh lib/stats.sh \
            $(BIN_SCRIPTS) $(wildcard modules/*/doctor.sh) \

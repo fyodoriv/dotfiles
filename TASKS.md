@@ -34,6 +34,18 @@ remote without explicit operator approval in the current session. -->
 ## P1
 
 
+- [ ] Keep Spotlight out of the agent worktree folder
+  - **ID**: spotlight-exclude-agent-worktrees
+  - **Tags**: scout, performance, macos, worktrees
+  - **Details**: Agents create many git worktrees under `~/apps/tooling/wt`, each with its own `node_modules`. Spotlight (`mdworker`) indexes all of them. On 2026-10-12, about 25 worktrees from one session kept load near 44 on 10 cores after the work had stopped. Make `dotfiles apply` exclude the folder from Spotlight without admin rights, for example with a `.metadata_never_index` marker file, and have the doctor check it.
+  - **Files**: bin/dotfiles, bin/dotfiles-doctor, tests/
+  - **Acceptance**: after `dotfiles apply`, the worktree folder holds the exclusion marker, and the doctor reports it as passing.
+  - **Hypothesis**: Spotlight indexing of worktrees is the main load source after a parallel agent session; excluding the folder removes it.
+  - **Success**: after a session that creates at least 10 worktrees, `mdworker` CPU stays under 50% total in the next 10 minutes.
+  - **Pivot**: if the marker does not stop indexing on current macOS, record that and fall back to a doctor hint with the `mdutil` or Privacy-list step for the user.
+  - **Measurement**: `ps -A -o %cpu,comm | rg mdworker | awk '{s+=$1} END {print s}'`
+  - **Anchor**: Gregg, "Systems Performance", 2nd ed., 2020 (USE method).
+
 - [ ] Explain the 10-minute `dotfiles-doctor --fix --quiet` run inside `dotfiles apply`
   - **ID**: doctor-fix-apply-wall-time-unexplained
   - **Tags**: scout, doctor, performance

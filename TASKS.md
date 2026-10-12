@@ -209,6 +209,18 @@ remote without explicit operator approval in the current session. -->
 ## P2
 
 
+- [ ] Make the local-llm doctor follow the `use_local_ai` toggle
+  - **ID**: local-llm-doctor-honors-use-local-ai
+  - **Tags**: doctor, local-llm, false-positive
+  - **Details**: On 2026-10-12 `dotfiles doctor` failed "huggingface CLI installed (hf or huggingface-cli)" on this Mac. `chezmoi data` has `use_local_ai: false`, so `.chezmoiscripts/run_after_install_local_llm.sh.tmpl` renders empty and never installs `huggingface_hub[cli]`. `modules/local-llm/doctor.sh` still requires the CLI. A machine that opted out gets a failure it cannot fix through apply. Make the doctor checks use the same toggle as the installer: skip them, or downgrade them to warnings, when the toggle is off.
+  - **Files**: modules/local-llm/doctor.sh, tests/
+  - **Acceptance**: with `use_local_ai: false` and no `hf` on PATH, `dotfiles doctor --module local-llm` reports 0 failed; with the toggle on and no `hf`, it still fails.
+- [ ] Let global npm upgrades run install scripts for CLIs that need them
+  - **ID**: npm-global-upgrade-allow-scripts
+  - **Tags**: upgrade, npm, topgrade, resilience
+  - **Details**: npm 11 skips package install scripts unless allowed. On 2026-10-12 `npm install -g @railway/cli@5.66.0` left `railway` broken ("could not find the CLI binary") until it was re-run with `--allow-scripts=@railway/cli`. The same day, Topgrade's npm step reported OK but left `@railway/cli` at 5.63.4 while 5.66.0 was available. Declare the global CLIs that need install scripts in one place, and make `dotfiles-upgrade` allow those scripts and confirm each CLI still runs afterwards.
+  - **Files**: dot_config/topgrade.toml, bin/dotfiles-upgrade, tests/topgrade-postcommands.bats
+  - **Acceptance**: after `dotfiles-upgrade`, `npm outdated -g` lists no declared CLI, and `railway --version` exits 0; a test covers the allow list.
 - [ ] dotfiles-audit tests pass on a machine with real shims
   - **ID**: dotfiles-audit-tests-pass-on-a-machine-with-real-shims
   - **Tags**: tests,audit

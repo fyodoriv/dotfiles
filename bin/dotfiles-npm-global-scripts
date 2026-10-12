@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Keep global npm CLIs that need install scripts up to date and working.
+#
+# npm 11+ blocks package install scripts unless they are allowed. A plain
+# `npm update -g` (what topgrade runs) then exits 0 but leaves the CLI broken
+# (for example railway: "could not find the CLI binary").
+#
+# The CLIs that need scripts live in ONE place: data/npm-global-allow-scripts.json
+# (a list of {package, bin}). For each one that is installed globally, this
+# script:
+#   1. reinstalls it with `npm install -g --allow-scripts=<pkg>` when outdated
+#      or when `<bin> --version` fails;
+#   2. checks `<bin> --version` again and exits 1 with a clear message if it
+#      still fails.
+# Packages that are not installed are skipped.
+#
+# Usage: dotfiles-npm-global-scripts [--dry-run]
+# Env:   DOTFILES_NPM_BIN (npm to use), DOTFILES_NPM_ALLOW_SCRIPTS_DATA (list file)
+set -uo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DATA="${DOTFILES_NPM_ALLOW_SCRIPTS_DATA:-$DOTFILES_DIR/data/npm-global-allow-scripts.json}"
+NPM="${DOTFILES_NPM_BIN:-npm}"
+DRY_RUN=false
+[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
+
+command -v jq >/dev/null 2>&1 || { echo "✗ jq not found" >&2; exit 1; }
+[ -f "$DATA" ] || { echo "✗ list not found: $DATA" >&2; exit 1; }
+command -v "$NPM" >/dev/null 2>&1 || [ -x "$NPM" ] || { echo "○ npm not found; nothing to do"; exit 0; }
+
+prefix="$("$NPM" prefix -g 2>/dev/null)"
+installed="$("$NPM" ls -g --depth=0 --json 2>/dev/null || true)"
+# `npm outdated` exits 1 when something is outdated, so ignore the status.
+outdated="$("$NPM" outdated -g --json 2>/dev/null || true)"
+[ -n "$outdated" ] || outdated='{}'
+
+_works() { "$prefix/bin/$1" --version >/dev/null 2>&1; }
+
+fail=0
+while IFS=$'\t' read -r pkg bin; do
+  if ! jq -e --arg p "$pkg" '.dependencies[$p]' <<<"$installed" >/dev/null 2>&1; then
+    echo "○ $pkg not installed globally; skipped"
+    continue
+  fi
+  stale=false; broken=false
+  jq -e --arg p "$pkg" 'has($p)' <<<"$outdated" >/dev/null 2>&1 && stale=true
+  _works "$bin" || broken=true
+  if ! $stale && ! $broken; then
+    echo "✓ $pkg is current and $bin runs"
+    continue
+  fi
+  $stale && echo "→ $pkg is outdated"
+  $broken && echo "→ $bin --version fails"
+  cmd=(install -g "--allow-scripts=$pkg" "$pkg@latest")
+  if $DRY_RUN; then
+    echo "Dry running: npm ${cmd[*]}"
+    continue
+  fi
+  "$NPM" "${cmd[@]}" || echo "✗ npm install failed for $pkg" >&2
+  if _works "$bin"; then
+    echo "✓ $pkg updated; $bin runs"
+  else
+    echo "✗ $bin --version failed after installing $pkg with --allow-scripts" >&2
+    fail=1
+  fi
+done < <(jq -r '.[] | [.package, .bin] | @tsv' "$DATA")
+
+exit "$fail"

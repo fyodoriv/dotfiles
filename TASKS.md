@@ -209,12 +209,12 @@ remote without explicit operator approval in the current session. -->
 ## P2
 
 
-- [ ] Let global npm upgrades run install scripts for CLIs that need them
-  - **ID**: npm-global-upgrade-allow-scripts
-  - **Tags**: upgrade, npm, topgrade, resilience
-  - **Details**: npm 11 skips package install scripts unless allowed. On 2026-10-12 `npm install -g @railway/cli@5.66.0` left `railway` broken ("could not find the CLI binary") until it was re-run with `--allow-scripts=@railway/cli`. The same day, Topgrade's npm step reported OK but left `@railway/cli` at 5.63.4 while 5.66.0 was available. Declare the global CLIs that need install scripts in one place, and make `dotfiles-upgrade` allow those scripts and confirm each CLI still runs afterwards.
-  - **Files**: dot_config/topgrade.toml, bin/dotfiles-upgrade, tests/topgrade-postcommands.bats
-  - **Acceptance**: after `dotfiles-upgrade`, `npm outdated -g` lists no declared CLI, and `railway --version` exits 0; a test covers the allow list.
+- [ ] Render npm `allow-scripts` into ~/.npmrc from the shared CLI list
+  - **ID**: npmrc-allow-scripts-from-list
+  - **Tags**: npm, upgrade, resilience
+  - **Details**: `bin/dotfiles-npm-global-scripts` repairs a CLI after topgrade's `npm update --location=global` blocks its install scripts. A persistent `allow-scripts=` line in `~/.npmrc` would let the topgrade step succeed on its own. Render that line in `modify_private_dot_npmrc` from `data/npm-global-allow-scripts.json`, so the list stays in one place.
+  - **Files**: modify_private_dot_npmrc, data/npm-global-allow-scripts.json, tests/
+  - **Acceptance**: a test renders the npmrc from a fixture list and finds one `allow-scripts=` line with every package; `npm update -g` on a fixture prefix keeps a script CLI working.
 - [ ] dotfiles-audit tests pass on a machine with real shims
   - **ID**: dotfiles-audit-tests-pass-on-a-machine-with-real-shims
   - **Tags**: tests,audit

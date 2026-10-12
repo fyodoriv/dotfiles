@@ -117,6 +117,13 @@ poetry_force_self_update = false
 # fail the whole run. See bin/dotfiles-mas-upgrade.
 "App Store (mas, Xcode-tolerant)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-mas-upgrade"
 
+# Global npm CLIs that need install scripts (list: data/npm-global-allow-scripts.json).
+# topgrade's npm step runs `npm update --location=global`. npm 11+ blocks install
+# scripts there, so the step exits 0 but can leave a CLI (railway) broken. This
+# custom step runs after it: it reinstalls with --allow-scripts when a declared
+# CLI is outdated or broken, then checks `<bin> --version`.
+"npm global CLIs with install scripts" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-npm-global-scripts"
+
 # ── Post-upgrade fixups ─────────────────────────────────────────────
 # These run AFTER every successful topgrade run, regardless of how
 # topgrade was invoked (`dotfiles upgrade`, direct `topgrade`, or the

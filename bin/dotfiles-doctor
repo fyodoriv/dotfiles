@@ -68,6 +68,8 @@ IS_ENTERPRISE="$(chezmoi execute-template '{{ .is_enterprise }}' 2>/dev/null || 
 DOTFILES_PROFILE="$(chezmoi execute-template '{{ .profile }}' 2>/dev/null || echo "full")"
 # shellcheck disable=SC2034  # used by sourced doctor modules
 USE_CURSOR="${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo "true")}"
+# shellcheck disable=SC2034  # used by sourced doctor modules
+USE_LOCAL_AI="${DOTFILES_USE_LOCAL_AI:-$(chezmoi execute-template '{{ dig "use_local_ai" false . }}' 2>/dev/null || echo "true")}"
 
 # ── Module discovery roots ───────────────────────────────────────────
 # Modules live under "$DOTFILES_DIR/modules/" by default. An optional overlay

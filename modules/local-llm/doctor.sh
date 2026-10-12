@@ -23,6 +23,17 @@ _LL_SENTINEL="${LOCAL_LLM_SENTINEL:-$HOME/.config/dotfiles/.local-llm-bootstrap-
 _LL_ENDPOINT="${LOCAL_LLM_ENDPOINT:-http://127.0.0.1:8080/v1/models}"
 _LL_MODEL_REPO="${LOCAL_LLM_MODEL_REPO:-Qwen/Qwen3-Coder-30B-A3B-Instruct-MLX-4bit}"
 
+# use_local_ai=false (chezmoi data) means the installer renders empty, so
+# apply cannot fix a missing tool. Report those checks as advisory, not fail.
+# Unset means on (strict), matching a standalone run without chezmoi data.
+_ll_check() {
+  if [ "${USE_LOCAL_AI:-true}" = "false" ]; then
+    check_advisory "$@"
+  else
+    check "$@"
+  fi
+}
+
 # ── Apple Silicon arch (advisory) ────────────────────────────────────
 # mlx-lm requires native arm64 (Metal). If the operator is on an
 # Apple Silicon machine but running under x86_64 Rosetta, mlx-lm
@@ -51,7 +62,7 @@ if _ll_is_apple_silicon_machine; then
 fi
 
 # ── pipx (the install backbone for aider + huggingface_hub[cli]) ────
-check "local-llm.pipx" \
+_ll_check "local-llm.pipx" \
   "pipx installed" \
   "command -v pipx >/dev/null 2>&1" \
   "brew install pipx"
@@ -64,7 +75,7 @@ _ll_check_aider() {
   command -v pipx >/dev/null 2>&1 \
     && pipx list --short 2>/dev/null | grep -q '^aider-chat\b'
 }
-check "local-llm.aider" \
+_ll_check "local-llm.aider" \
   "aider installed (pipx aider-chat)" \
   "_ll_check_aider" \
   "dotfiles apply"
@@ -77,7 +88,7 @@ _ll_check_hf_cli() {
   command -v hf >/dev/null 2>&1 \
     || command -v huggingface-cli >/dev/null 2>&1
 }
-check "local-llm.huggingface_cli" \
+_ll_check "local-llm.huggingface_cli" \
   "huggingface CLI installed (hf or huggingface-cli)" \
   "_ll_check_hf_cli" \
   "dotfiles apply"
@@ -91,7 +102,7 @@ if _ll_is_apple_silicon_machine; then
     # exposes the `mlx_lm.server` console script on PATH.
     return 1
   }
-  check "local-llm.mlx_lm" \
+  _ll_check "local-llm.mlx_lm" \
     "mlx-lm installed (mlx_lm.server on PATH)" \
     "_ll_check_mlx_lm" \
     "brew install mlx-lm"

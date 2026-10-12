@@ -209,12 +209,6 @@ remote without explicit operator approval in the current session. -->
 ## P2
 
 
-- [ ] Make the local-llm doctor follow the `use_local_ai` toggle
-  - **ID**: local-llm-doctor-honors-use-local-ai
-  - **Tags**: doctor, local-llm, false-positive
-  - **Details**: On 2026-10-12 `dotfiles doctor` failed "huggingface CLI installed (hf or huggingface-cli)" on this Mac. `chezmoi data` has `use_local_ai: false`, so `.chezmoiscripts/run_after_install_local_llm.sh.tmpl` renders empty and never installs `huggingface_hub[cli]`. `modules/local-llm/doctor.sh` still requires the CLI. A machine that opted out gets a failure it cannot fix through apply. Make the doctor checks use the same toggle as the installer: skip them, or downgrade them to warnings, when the toggle is off.
-  - **Files**: modules/local-llm/doctor.sh, tests/
-  - **Acceptance**: with `use_local_ai: false` and no `hf` on PATH, `dotfiles doctor --module local-llm` reports 0 failed; with the toggle on and no `hf`, it still fails.
 - [ ] Let global npm upgrades run install scripts for CLIs that need them
   - **ID**: npm-global-upgrade-allow-scripts
   - **Tags**: upgrade, npm, topgrade, resilience

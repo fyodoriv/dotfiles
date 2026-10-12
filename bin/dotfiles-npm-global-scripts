@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Keep global npm CLIs that need install scripts up to date and working.
 #
 # npm 11+ blocks package install scripts unless they are allowed. A plain

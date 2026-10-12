@@ -306,13 +306,6 @@ remote without explicit operator approval in the current session. -->
   - **Files**: .chezmoiscripts/run_onchange_brew.sh.tmpl, modules/tools/doctor.sh
   - **Acceptance**: (1) `command -v gtimeout` succeeds after `dotfiles apply` on a fresh machine; (2) the Brewfile audit workflow still passes; (3) no hook behaviour changes other than which timeout binary is selected.
 
-- [ ] Stop `dotfiles update`/chezmoi apply prompting on untracked `~/.gitconfig` `[user] email` ("could not open a new TTY")
-  - **ID**: chezmoi-gitconfig-email-drift-tty-prompt
-  - **Tags**: scout, chezmoi, gitconfig, drift, dotfiles-update
-  - **Details**: `dotfiles update` (chezmoi apply phase) exits 1 with `chezmoi: ...: could not open a new TTY` because the live `~/.gitconfig` carries a `[user]` `email = <personal-email>` block the chezmoi source does not track, so chezmoi treats it as removable drift and tries to confirm interactively — which fails headless. Two mirror-safe fixes: (a) move the live `[user] email` into `~/.gitconfig.local` (already `[include]`d, untracked) so chezmoi has nothing to reconcile — preferred; or (b) add a `.chezmoiignore`/template guard so chezmoi never manages the `[user]` block. Do NOT hardcode any personal email into a tracked file. Add a `modules/git/doctor.sh` check that fails when `~/.gitconfig` has a tracked `[user] email` conflicting with the source.
-  - **Files**: dot_gitconfig.tmpl, dot_gitconfig.personal.tmpl, .chezmoiignore, modules/git/doctor.sh, tests/module-git-doctor.bats
-  - **Acceptance**: (1) the `dotfiles update` apply phase exits 0 on a host whose `~/.gitconfig` previously carried an untracked `[user] email`; (2) no personal email literal is committed to any tracked source file; (3) a doctor check fails when the drift recurs; (4) `bats tests/module-git-doctor.bats` exits 0.
-
 - [ ] Pin `defaultModel: claude-opus-4-8` in `Agentfile.yaml` so Opus 4.8 is the durable default and no agent ever picks Fable
   - **ID**: pin-default-model-opus-agentfile
   - **Tags**: model-config, agentbrew, agentfile, opus, scout

@@ -12,6 +12,13 @@ check "git.local_config" "\$HOME/.gitconfig.local exists (name + email)" \
   "[ -f \"\$HOME/.gitconfig.local\" ]"
 # no auto-fix — user must set their own name/email; instructions in gitconfig.local.example
 
+# ~/.gitconfig is chezmoi-managed and holds no identity. A [user] section there
+# is drift: chezmoi asks to overwrite it and the prompt fails without a TTY.
+# --fix moves it to ~/.gitconfig.local (see lib/gitconfig-user-migrate.sh).
+check "git.gitconfig_no_user" "managed ~/.gitconfig has no [user] section (identity lives in ~/.gitconfig.local)" \
+  "source \"$DOTFILES_DIR/lib/gitconfig-user-migrate.sh\" && ! gitconfig_has_user_section \"\$HOME/.gitconfig\"" \
+  "source \"$DOTFILES_DIR/lib/gitconfig-user-migrate.sh\" && gitconfig_user_migrate \"\$HOME/.gitconfig\" \"\$HOME/.gitconfig.local\""
+
 check "git.user_name" "git user.name is set" \
   "[ -n \"\$(git -C /tmp config user.name 2>/dev/null)\" ]"
 check "git.user_email" "git user.email is set" \

@@ -310,16 +310,6 @@ remote without explicit operator approval in the current session. -->
   - **Measurement**: `command -v aws gcloud | grep -c "$HOME/.local/bin/"` reads 2 after a fresh `dotfiles apply` with `is_enterprise: true`.
   - **Anchor**: AGENTS.md rule #10 (user-dir installs over admin paths); chezmoi `run_once_` script docs; AWS CLI v2 "install for the current user" macOS docs.
 
-- [ ] dotfiles-doctor JSON mode reports "fixed" status before `_fix` actually runs
-  - **ID**: doctor-json-fixed-status-leaks-on-fix-failure
-  - **Tags**: scout, doctor, json, observability
-  - **Details**: In `bin/dotfiles-doctor`, the `check()`, `check_symlink()`, `check_managed()`, and `check_defaults()` helpers all call `$JSON_MODE && _json_add "$id" "fixed" "$desc"` immediately after `_fix "$desc" "$fix_cmd"` returns — but `_fix` itself decides whether the fix succeeded (calls `fixed "$desc"`) or failed (calls `fail "$desc (fix failed or timed out)"`). The JSON line is written before that decision lands, so `--json --fix` runs report status `"fixed"` for checks where the fix actually failed. Internal counters `fix_count`/`fail_count` are correct because they're set by `_fix` itself — only the JSON output drifts.
-
-    Fix: mirror the same `(( fix_count > _f0 ))` / `(( fail_count > _x0 ))` delta check that was added for `failed_check_ids`/`fixed_check_ids` tracking (in this same commit), and emit the JSON status conditionally based on which counter went up. Apply to all four `check_*` helpers consistently.
-  - **Files**: `bin/dotfiles-doctor` (check, check_symlink, check_managed, check_defaults), `tests/doctor.bats` (add a "JSON status reflects actual fix outcome" test that stubs `_fix` to fail and asserts `--json` reports `"fail"` not `"fixed"`)
-  - **Acceptance**: With a check whose `fix_cmd` is `false`, `bin/dotfiles-doctor --module X --fix --json` outputs `"status":"fail"` (or `"status":"fail_after_fix_attempt"`) for that check, not `"fixed"`. Bats test passes.
-  - **Surfaced-by**: 2026-05-25 — investigating dotfiles-doctor notification content while adding `failed_check_ids`/`fixed_check_ids` tracking exposed the same race in the JSON emission path.
-
 - [ ] dotfiles-doctor notification — add bats test that captures notify content via terminal-notifier stub
   - **ID**: doctor-notification-content-test
   - **Tags**: scout, doctor, tests, observability

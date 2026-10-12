@@ -12,6 +12,5 @@
 
 # Incomplete HDD — genuine stability work (observability / regression-risk),
 # promote once the 5 HDD fields are authored:
-doctor-json-fixed-status-leaks-on-fix-failure
 doctor-notification-content-test
 chrome-enforce-profile-bad-default-fallback

@@ -34,6 +34,30 @@ remote without explicit operator approval in the current session. -->
 ## P1
 
 
+- [ ] Stop the pnpm and Poetry topgrade steps failing every `dotfiles-upgrade`
+  - **ID**: topgrade-pnpm-poetry-steps-fail
+  - **Tags**: scout, upgrade, topgrade, stability
+  - **Details**: On 2026-10-12, `dotfiles-upgrade` ended with `✗ Upgrade complete with failures (rc=1)` twice. Two steps fail on every run. (1) pnpm: no pnpm global packages are installed, so `~/Library/pnpm/global/5` has no `package.json` and `pnpm update -g` exits with `ERR_PNPM_NO_PKG_MANIFEST`. (2) Poetry: the official installer writes `~/.local/bin/poetry` as a `#!/bin/sh` and Python polyglot. Topgrade reads that shebang and runs its Python check through `/bin/sh`, which fails with `syntax error near unexpected token`. Make both steps succeed or skip cleanly: for example, skip pnpm when it has no global manifest, and add `poetry` to the `disable` list in `dot_config/topgrade.toml` with a comment naming the installer that owns its updates.
+  - **Files**: dot_config/topgrade.toml, bin/dotfiles-upgrade, tests/
+  - **Acceptance**: `dotfiles-upgrade` on this machine reports pnpm and Poetry as OK or skipped, and a bats test covers the config change.
+  - **Hypothesis**: These two steps cause every rc=1 upgrade result on this machine; fixing them makes a normal upgrade exit 0.
+  - **Success**: the summary of the next `dotfiles-upgrade` run lists 0 `FAILED` steps.
+  - **Pivot**: if another step fails in their place, file that step and stop changing topgrade config here.
+  - **Measurement**: `tail -r ~/.local/share/dotfiles/logs/dotfiles-upgrade.log | awk '/ Summary /{exit} /: FAILED/{c++} END{print c+0}'`
+  - **Anchor**: Forsgren, Humble, Kim, "Accelerate", 2018 (change failure rate).
+
+- [ ] Run the TASKS.md lint in the pre-commit hook on machines without an endpoint Node block
+  - **ID**: precommit-tasks-lint-skipped-for-official-node
+  - **Tags**: scout, git-hooks, tasks, lint
+  - **Details**: `git-hooks/pre-commit` skips the TASKS.md lint when `node` is signed with the Node.js Foundation team ID, and prints `TASKS.md npx lint deferred to CI`. Every official Node build has that signature, so the lint never runs at commit time. GitHub Actions are off on this repo, so no CI runs it either. On 2026-10-12 the endpoint block marker `~/.local/state/dotfiles/endpoint-node-publisher-blocked` was absent, yet the hook still skipped. Gate the skip on that marker, as the other endpoint safe-mode paths do, and change the message so it does not promise a CI run.
+  - **Files**: git-hooks/pre-commit, tests/
+  - **Acceptance**: with official Node and no marker, staging a malformed TASKS.md fails the commit; with the marker, the hook skips with a message that names the marker.
+  - **Hypothesis**: the signature check is the only reason the lint skips on this machine; gating on the marker makes it run.
+  - **Success**: a bats test with an official-signature node stub and no marker sees the lint run (1 of 1 cases).
+  - **Pivot**: if the lint cannot run safely without the signature check, keep the skip and make `make check` run `lint-tasks` instead.
+  - **Measurement**: `bats tests/pre-commit-tasks-lint.bats`
+  - **Anchor**: Basili, Caldiera, Rombach, "The Goal Question Metric Approach", 1994.
+
 - [ ] Keep Spotlight out of the agent worktree folder
   - **ID**: spotlight-exclude-agent-worktrees
   - **Tags**: scout, performance, macos, worktrees

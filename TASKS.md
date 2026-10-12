@@ -279,13 +279,6 @@ remote without explicit operator approval in the current session. -->
   - **Files**: skills/update-tooling/SKILL.md, Agentfile.yaml, README.md
   - **Acceptance**: Record one current decision in the skill or README: replace with an upstream tool, relocate a portion to agentbrew or chezmoi, or keep the skill with a specific local-only reason. If a maintained upstream covers the workflow, remove duplicated guidance and point to that source.
 
-- [ ] Detect an unaccepted Xcode CLT license in doctor — it silently breaks git, python3, clang and make
-  - **ID**: doctor-detect-unaccepted-xcode-license
-  - **Tags**: scout, doctor, xcode, clt, git, resilience
-  - **Details**: On 2026-09-18 every Command Line Tools-backed binary on this machine exited non-zero with `You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license'`. That silently took out `git`, `python3`, `clang` and `make` at once: `make check` could not run, every `git` command in the login shell died, and a YAML-parse helper using `python3` produced false failures that read like real defects. Nothing in `dotfiles doctor` health checks reported it, so the cause took a full debugging detour to find. The condition is trivially detectable (`/usr/bin/git --version` exits non-zero and its stderr matches `Xcode license`) and the repair is a single documented operator command. Add a check that names the exact fix, and treat it as needs-user-action rather than auto-fixing, because accepting a licence requires `sudo` and human agreement.
-  - **Files**: modules/xcode/doctor.sh (new) or modules/security/doctor.sh, tests/module-xcode-doctor.bats
-  - **Acceptance**: (1) the check fails, with the `sudo xcodebuild -license accept` remedy in its message, when the licence is unaccepted; (2) it passes once accepted; (3) it is marked needs-user-action and never attempts `sudo` itself; (4) bats covers both branches with a stubbed `xcodebuild`/`git`.
-
 - [ ] Make `bin/git` verify the git it selects actually runs, not just that it is executable
   - **ID**: git-wrapper-verify-selected-git-runs
   - **Tags**: scout, git, wrapper, resilience, endpoint-security

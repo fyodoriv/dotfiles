@@ -211,3 +211,14 @@ if [ -n "${OSS_READINESS_PRIVATE_EMAIL_PATTERN:-}" ]; then
     "git -C \"$DOTFILES_DIR\" config user.email <your-public@email>  # see SECURITY.md"
   unset _git_email
 fi
+
+# ── Xcode CLT license (needs user action) ────────────────────────────
+# An unaccepted license silently breaks git, python3, clang and make.
+# Accepting needs sudo, so the fix command is empty on purpose: doctor
+# --fix must never run it. The operator runs it by hand.
+# shellcheck source=../../lib/xcode-license.sh
+source "$DOTFILES_DIR/lib/xcode-license.sh"
+check "git.xcode_license" \
+  "Xcode CLT license accepted (if not, run: sudo xcodebuild -license accept)" \
+  "dotfiles_xcode_license_accepted" \
+  ""

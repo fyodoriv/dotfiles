@@ -120,6 +120,7 @@ Spotlight check count varies based on which directories exist on your machine.
 | `symlink.gitcommit` | `~/.gitcommit_template` symlinked | Create symlink |
 | `symlink.git_editor` | `~/.git-editor` symlinked | Create symlink |
 | `git.local_config` | `~/.gitconfig.local` exists (user name/email) | None (user must create) |
+| `git.xcode_license` | Xcode CLT license accepted (an unaccepted one breaks git, python3, clang, make) | None (run `sudo xcodebuild -license accept` yourself) |
 | `git.pull_rebase` | `pull.rebase = true` | `git config --global` |
 | `git.push_autosetup` | `push.autoSetupRemote = true` | `git config --global` |
 | `git.pager_delta` | `core.pager = delta` | `git config --global` |

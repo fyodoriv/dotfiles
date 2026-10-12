@@ -83,6 +83,7 @@ agentbrew.global_agentfile_in_sync
 agentbrew.hooks_enforcing
 agentbrew.memory_service_singleton
 agentbrew.memory_launchagent_identity
+agentbrew.launchagent_node_pinned
 EOF
 }
 
@@ -723,4 +724,58 @@ _stub_observation_script() { # $1 = exit code the fake script returns
   echo '{}' > "$TEST_HOME/.cache/agentbrew/hook-decisions.jsonl"
   source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
   [ "$warn_count" -eq 0 ]
+}
+
+# ── launchagent_node_pinned: one Node path for LaunchAgents and ~/.local/bin ──
+
+_write_node_fixture() {
+  local plist_ver="$1" link_ver="$2" ver_root="$TEST_HOME/.local/share/fnm/node-versions"
+  mkdir -p "$TEST_HOME/Library/LaunchAgents" "$TEST_HOME/.local/bin"
+  local v
+  for v in v24.21.0 v24.14.0; do
+    mkdir -p "$ver_root/$v/installation/bin"
+    : > "$ver_root/$v/installation/bin/node"
+    chmod +x "$ver_root/$v/installation/bin/node"
+  done
+  echo "v24.21.0" > "$TEST_HOME/.node-version"
+  ln -sf "$ver_root/$link_ver/installation/bin/node" "$TEST_HOME/.local/bin/node"
+  cat > "$TEST_HOME/Library/LaunchAgents/com.agentbrew.check.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>Label</key><string>com.agentbrew.check</string>
+<key>ProgramArguments</key>
+<array>
+<string>$ver_root/$plist_ver/installation/bin/node</string>
+<string>/x/cli.js</string>
+</array>
+</dict></plist>
+EOF
+}
+
+@test "agentbrew: launchagent_node_pinned passes when plists and ~/.local/bin/node match .node-version" {
+  _write_node_fixture v24.21.0 v24.21.0
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  _agentbrew_launchagent_node_pinned
+}
+
+@test "agentbrew: launchagent_node_pinned fails when a plist runs a stale Node version" {
+  _write_node_fixture v24.14.0 v24.21.0
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  run _agentbrew_launchagent_node_pinned
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"com.agentbrew.check.plist"* ]]
+}
+
+@test "agentbrew: launchagent_node_pinned fails when ~/.local/bin/node points at another version" {
+  _write_node_fixture v24.21.0 v24.14.0
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  run _agentbrew_launchagent_node_pinned
+  [ "$status" -ne 0 ]
+  [[ "$output" == *".local/bin/node"* ]]
+}
+
+@test "agentbrew: launchagent_node_pinned passes with no .node-version" {
+  mkdir -p "$TEST_HOME/Library/LaunchAgents"
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  _agentbrew_launchagent_node_pinned
 }

@@ -165,6 +165,56 @@ EOF
   [ "$lock_caller" = "replacement" ]
 }
 
+@test "acquire_lock steals an old lock whose PID was reused by a non-dotfiles process" {
+  source "$LOCK_LIB"
+  sleep 60 &
+  local bg_pid=$!
+  printf '%s\n%s\n' "$bg_pid" "sync" > "$DOTFILES_LOCK"
+  touch -t 202001010000 "$DOTFILES_LOCK"
+  run acquire_lock "doctor"
+  kill "$bg_pid" 2>/dev/null; wait "$bg_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stale lock"* ]]
+  [[ "$output" == *"not a dotfiles process"* ]]
+}
+
+@test "acquire_lock keeps an old lock held by a live dotfiles process" {
+  source "$LOCK_LIB"
+  printf '#!/bin/bash\nsleep 60\n' > "$TEST_DIR/dotfiles-sync"
+  chmod +x "$TEST_DIR/dotfiles-sync"
+  "$TEST_DIR/dotfiles-sync" &
+  local bg_pid=$!
+  printf '%s\n%s\n' "$bg_pid" "sync" > "$DOTFILES_LOCK"
+  touch -t 202001010000 "$DOTFILES_LOCK"
+  run acquire_lock "doctor"
+  kill "$bg_pid" 2>/dev/null; wait "$bg_pid" 2>/dev/null || true
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"locked by sync"* ]]
+  [ "$(head -1 "$DOTFILES_LOCK")" = "$bg_pid" ]
+}
+
+@test "acquire_lock keeps a fresh lock held by a live non-dotfiles process" {
+  source "$LOCK_LIB"
+  sleep 60 &
+  local bg_pid=$!
+  printf '%s\n%s\n' "$bg_pid" "sync" > "$DOTFILES_LOCK"
+  run acquire_lock "doctor"
+  kill "$bg_pid" 2>/dev/null; wait "$bg_pid" 2>/dev/null || true
+  [ "$status" -eq 1 ]
+  [ "$(head -1 "$DOTFILES_LOCK")" = "$bg_pid" ]
+}
+
+@test "DOTFILES_LOCK_MAX_AGE controls when a reused PID counts as stale" {
+  source "$LOCK_LIB"
+  sleep 60 &
+  local bg_pid=$!
+  printf '%s\n%s\n' "$bg_pid" "sync" > "$DOTFILES_LOCK"
+  sleep 2
+  DOTFILES_LOCK_MAX_AGE=1 run acquire_lock "doctor"
+  kill "$bg_pid" 2>/dev/null; wait "$bg_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+}
+
 @test "release_lock is safe when no lock file exists" {
   source "$LOCK_LIB"
   [ ! -f "$DOTFILES_LOCK" ]

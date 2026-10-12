@@ -6,7 +6,9 @@
 # release_lock                →  removes the lock file
 #
 # Lock includes PID for stale-lock detection. If the PID is dead, the lock
-# is considered stale and automatically stolen.
+# is considered stale and automatically stolen. A live PID also loses the lock
+# when the lock is older than DOTFILES_LOCK_MAX_AGE seconds (default 6 hours)
+# and the PID's command is not a dotfiles process: the OS reused the PID.
 
 # Ensure warn() is available — callers usually source colors.sh first, but
 # scripts that source lock.sh directly need a fallback.
@@ -15,6 +17,34 @@ if ! declare -f warn &>/dev/null; then
 fi
 
 DOTFILES_LOCK="${DOTFILES_LOCK:-$HOME/.dotfiles.lock}"
+
+# Seconds after which a live-PID lock needs proof the owner is a dotfiles process.
+_lock_max_age() { echo "${DOTFILES_LOCK_MAX_AGE:-21600}"; }
+
+# Prints the lock file age in seconds (0 when unknown).
+_lock_age() {
+  local mtime now
+  mtime=$(stat -f %m "$DOTFILES_LOCK" 2>/dev/null || stat -c %Y "$DOTFILES_LOCK" 2>/dev/null || echo "")
+  [ -n "$mtime" ] || { echo 0; return; }
+  now=$(date +%s)
+  echo $((now - mtime))
+}
+
+# Returns 0 when the lock owner is a live PID that is still a dotfiles process,
+# or a young lock whose owner is alive. Returns 1 when the owner is gone or the
+# PID was reused by an unrelated process (old lock, non-dotfiles command).
+_lock_owner_alive() {
+  local pid="$1" cmd
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null || return 1
+  [ "$(_lock_age)" -ge "$(_lock_max_age)" ] || return 0
+  cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+  # No command readable: keep the lock. Never steal from a process we cannot identify.
+  [ -n "$cmd" ] || return 0
+  case "$cmd" in
+    *dotfiles*) return 0 ;;
+  esac
+  return 1
+}
 
 acquire_lock() {
   local caller="${1:-unknown}"
@@ -52,12 +82,16 @@ acquire_lock() {
     lock_caller="${lock_caller:-unknown}"
 
     # Check if the locking process is still alive
-    if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+    if _lock_owner_alive "$lock_pid"; then
       warn "[lock] Skipping — locked by $lock_caller (pid $lock_pid)"
       return 1
     fi
-    # Stale lock — process is dead, steal it
-    warn "[lock] Removing stale lock from $lock_caller (pid $lock_pid)"
+    # Stale lock — process is dead, or its PID was reused by another program
+    if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+      warn "[lock] Removing stale lock from $lock_caller (pid $lock_pid is not a dotfiles process)"
+    else
+      warn "[lock] Removing stale lock from $lock_caller (pid $lock_pid)"
+    fi
     if rm -f "$DOTFILES_LOCK" 2>/dev/null; then
       continue
     fi

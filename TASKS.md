@@ -216,13 +216,6 @@ remote without explicit operator approval in the current session. -->
   - **Files**: bin/dotfiles-sync, bin/dotfiles-reload-launchagents, tests/
   - **Acceptance**: a fixture that requests its own reload completes its current sync path and records one follow-up reload or sync without duplicate concurrent work.
 
-- [ ] Recover stale dotfiles sync locks without waiting for a future scheduled sync
-  - **ID**: dotfiles-sync-stale-lock-recovery
-  - **Tags**: lock, sync, doctor, resilience
-  - **Details**: A stale sync lock from PID 79025 blocked `dotfiles-doctor --fix` until a later scheduled sync. Detect a dead lock owner, remove only that stale lock, and keep a live owner protected.
-  - **Files**: lib/lock.sh, bin/dotfiles-sync, bin/dotfiles-doctor, tests/
-  - **Acceptance**: tests distinguish a live owner from a nonexistent PID; doctor can recover from the latter and leaves the former untouched.
-
 - [ ] Cut doctor failures on a converged personal Mac from 43 to the ones that need action
   - **ID**: doctor-converged-mac-failure-triage
   - **Tags**: scout, doctor, noise, triage

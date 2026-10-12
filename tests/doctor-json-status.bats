@@ -20,6 +20,14 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
 setup() {
   TEST_DIR="$(mktemp -d)"
   export EXTRA_DOCTOR_DIR="$REPO_ROOT/tests/fixtures"
+  # `--fix` only runs fixes from the applied checkout (`chezmoi source-path`).
+  # From a worktree that guard makes every fix report-only, so a "fix
+  # succeeded" case fails and a "fix failed" case passes for the wrong
+  # reason. Report this checkout as the applied one.
+  mkdir -p "$TEST_DIR/bin"
+  printf '#!/bin/bash\n[ "$1" = source-path ] && { (cd "%s" && pwd -P); exit 0; }\nexit 0\n' "$REPO_ROOT" > "$TEST_DIR/bin/chezmoi"
+  chmod +x "$TEST_DIR/bin/chezmoi"
+  export PATH="$TEST_DIR/bin:$PATH"
 }
 
 teardown() {

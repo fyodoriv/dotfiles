@@ -16,6 +16,7 @@ recovering from an `agentbrew sync` failure.
 | `~/.config/agentbrew/state.yaml` | agentbrew | Local registry of installed items and detected agents |
 | `~/.claude/`, `~/.cursor/mcp.json` | agentbrew or the agent | Generated agent config; do not edit by hand |
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
+| `~/.config/agentbrew/hooks-overlay/manifest.yaml` | you, plus dotfiles | Per-machine hook overlay. Your `disabled:` list and comments stay. `dotfiles apply` only adds missing opt-in hooks (today `gh-pr-body-requires-docs`) to `enabled:`, through `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml`. List a hook under `disabled:` to opt out on one machine. |
 
 If generated config looks wrong, update `Agentfile.yaml` or agentbrew state and
 sync again. Do not patch generated files directly; the next sync will overwrite

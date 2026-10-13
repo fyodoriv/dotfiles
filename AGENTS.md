@@ -39,6 +39,7 @@ only the doc the routing table names. Do not read the README end to end.
 | Add a chezmoi prompt | `.chezmoi.yaml.tmpl` | README "Configuration" |
 | Change git config or hooks | `dot_gitconfig.tmpl`, `git-hooks/` | [privacy-gates.md](docs/privacy-gates.md) |
 | Change agent MCPs, skills, rules | `Agentfile.yaml` | [agentbrew-setup.md](docs/agentbrew-setup.md) |
+| Turn an opt-in agentbrew hook on for every machine | `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml` (`HOOKS=`) | [agentbrew-setup.md](docs/agentbrew-setup.md) |
 | Change the default model | `Agentfile.yaml` + `.chezmoiscripts/run_after_claude-settings-model.sh` | [model-configuration.md](docs/model-configuration.md) |
 | Change agent wrappers | `bin/gh`, `lib/strip-agent-attribution.sh`, `agent-hooks/` | [agent-hooks.md](docs/agent-hooks.md) |
 | Change a skill or command owned here | `skills/<name>/`, `commands/` | its SKILL.md or command file |

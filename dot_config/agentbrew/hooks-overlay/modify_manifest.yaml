@@ -1,0 +1,58 @@
+#!/bin/sh
+# Renders ~/.config/agentbrew/hooks-overlay/manifest.yaml: keeps the machine's
+# own overlay and makes sure the opt-in agentbrew hooks listed below are on.
+#
+# The overlay is machine state. Each Mac keeps its own `disabled:` list (for
+# example verifier hooks that hang on one machine), so a plain managed file
+# would erase it. A `modify_` script reads the current file on stdin and writes
+# the result to stdout: every existing line survives, and only a missing hook
+# ID is added under `enabled:`.
+#
+# An ID that already appears anywhere (in `enabled:` or `disabled:`) is left
+# alone, so a machine can still opt out by listing it under `disabled:`.
+set -eu
+
+HOOKS="gh-pr-body-requires-docs"
+
+input=$(cat)
+
+for hook in $HOOKS; do
+  if [ -z "$(printf '%s' "$input" | tr -d '[:space:]')" ]; then
+    input=$(printf 'version: 1\n\n# Opt-in agentbrew hooks that dotfiles turns on for every machine.\nenabled:\n  - %s' "$hook")
+    continue
+  fi
+  if printf '%s\n' "$input" | grep -Eq "^[[:space:]]*-[[:space:]]*${hook}[[:space:]]*(#.*)?$"; then
+    continue
+  fi
+  input=$(printf '%s\n' "$input" | awk -v hook="$hook" '
+    { lines[NR] = $0 }
+    END {
+      done = 0
+      for (i = 1; i <= NR; i++) {
+        line = lines[i]
+        if (!done && line ~ /^enabled:[[:space:]]*\[[[:space:]]*\][[:space:]]*(#.*)?$/) {
+          print "enabled:"
+          print "  - " hook
+          done = 1
+          continue
+        }
+        print line
+        if (!done && line ~ /^enabled:[[:space:]]*(#.*)?$/) {
+          indent = "  "
+          if (i < NR && match(lines[i + 1], /^[[:space:]]*-/)) {
+            indent = substr(lines[i + 1], 1, RLENGTH - 1)
+          }
+          print indent "- " hook
+          done = 1
+        }
+      }
+      if (!done) {
+        if (NR > 0 && lines[NR] != "") print ""
+        print "# Opt-in agentbrew hooks that dotfiles turns on for every machine."
+        print "enabled:"
+        print "  - " hook
+      }
+    }')
+done
+
+printf '%s\n' "$input"

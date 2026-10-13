@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Docs hook on every machine** — `dotfiles apply` now adds the opt-in
+  agentbrew hook `gh-pr-body-requires-docs` to `enabled:` in
+  `~/.config/agentbrew/hooks-overlay/manifest.yaml` through a chezmoi
+  `modify_` script. The machine's own `disabled:` list and comments stay; a
+  hook listed under `disabled:` stays off.
 - **Open-file limit for LaunchAgent jobs** — `dotfiles-launchd-maxfiles`
   installs a root LaunchDaemon (one sudo step) that raises launchd's soft
   `maxfiles` from 256 to 65536 at every boot. Jobs that launchd starts, such

@@ -174,6 +174,7 @@ Deployed to `~/.config/` via chezmoi's `dot_config/` source directory:
 | `dot_config/atuin/config.toml` | `~/.config/atuin/config.toml` | Atuin shell history: fuzzy search, secrets filter, daemon mode |
 | `dot_config/fastfetch/config.jsonc` | `~/.config/fastfetch/config.jsonc` | Fastfetch system info display (full only) |
 | `dot_config/dotfiles/env.sh.tmpl` | `~/.config/dotfiles/env.sh` | Chezmoi-generated env vars (DOTFILES_REPOS_DIR) |
+| `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml` | `~/.config/agentbrew/hooks-overlay/manifest.yaml` | agentbrew hook overlay. Keeps the machine's own content and adds missing opt-in hooks (`gh-pr-body-requires-docs`) to `enabled:`. The next `agentbrew sync` in `dotfiles apply` deploys them. |
 
 ---
 

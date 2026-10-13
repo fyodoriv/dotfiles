@@ -11,6 +11,17 @@ Concrete invariants enforced by tests:
 - Cursor's `mcp.json` carries the same MCP servers Claude Code's `~/.claude.json` does.
 - The same skill catalog mounts under both `~/.claude/skills/` and `~/.cursor/skills/`.
 - A new dotfiles feature that touches agent config but only works for Claude Code is a P0 regression. File a follow-up before merge. Deprecated agents (below) are exempt.
+## Deprecated agents — frozen
+
+Owner decision 2026-10-08: **Windsurf and Devin support was removed** from dotfiles. Doctor modules, configs, shell aliases, and tests for them are gone.
+
+**Augment (Auggie) stays deprecated and frozen** in every tooling repo (dotfiles, agentbrew, minsky, tasks.md, and the org overlays).
+
+- Existing Augment support stays. Do not delete its modules, configs, sync targets, or tests.
+- Never implement a fix or a feature for Augment. Do not file tasks for it, and do not fix its failing checks.
+- Doctor reports an `augment` module as skipped ("deprecated agent, frozen"). Set `DOTFILES_DEPRECATED_AGENT_CHECKS=1` to run it once for diagnosis.
+- If work for a supported agent breaks a frozen agent's existing test, skip that test with a note naming this section. Do not fix the agent.
+
 ## Repo Layout
 
 ```

@@ -484,6 +484,26 @@ git commit -m "feat: phase b only"
 
 If overlap is non-zero and phases are sequential, child PR stays **draft** until parent merges; after parent merges, rebase child onto updated `main` and force-push. Never ship a child PR whose Files tab repeats parent-only paths (registry, fixtures, sweep scripts, etc.). See `shared-rules.md` § Phase-delta branches.
 
+Default PR body skeleton (add repo-required sections after it):
+
+```markdown
+## Summary
+
+<2–3 plain sentences: why the change is needed and what it delivers>
+
+## Details
+
+- <one change per bullet>
+
+## Docs
+
+- <doc updated>, or: Docs: none — <reason>
+
+## Visual proof
+
+<pasted terminal transcript or screenshot, with the case and the result>
+```
+
 Open or update a PR with:
 - **PR validation block (IRON LAW)** — three required sections in every PR body:
   - `## Requirements checklist` (or `## What this PR delivers`) — `[x]` for **this PR only**; epic tracking in Jira
@@ -496,6 +516,7 @@ Open or update a PR with:
   Template: `agentbrew/skill-plugins/dev/task-command-center/SKILL.md` § PR validation block. Enforced by `gh-pr-body-requires-validation` hook (blocks) + dotfiles `bin/gh` on agent `pr create`.
 - why this change is needed (rationale — separate hook + gh wrapper)
 - summary bullets
+- `## Docs` — the docs this PR updated, or `Docs: none — <reason>`. Enforced by the agentbrew hook `gh-pr-body-requires-docs`.
 - test plan with exact commands and pass/fail output
 - vision/user-story/competitor trace when the repo requires it
 - required agent attribution/footer from repo rules

@@ -215,7 +215,7 @@ them. -->
 - [ ] Make `tests/module-resilience.bats` source the doctor module again
   - **ID**: module-resilience-bats-missing-lib
   - **Tags**: scout, tests, resilience
-  - **Details**: 2 of 3 tests fail on `feat/chezmoi` (d600271): `source modules/resilience/doctor.sh` stops because the test setup copies only `doctor.sh`, and the module now sources `lib/agent-keepawake.sh`. `make check` misses it because the file is not in the affected set unless the module changes.
+  - **Details**: The tmux tests fail on `feat/chezmoi` (d600271): `source modules/resilience/doctor.sh` stops because the test setup copies only `doctor.sh`, and the module now sources `lib/agent-keepawake.sh`. `make check` misses it because the file is not in the affected set unless the module changes.
   - **Files**: tests/module-resilience.bats
   - **Acceptance**: `bats tests/module-resilience.bats` passes; the setup copies or points at `lib/agent-keepawake.sh`.
 

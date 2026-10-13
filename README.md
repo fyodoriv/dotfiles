@@ -3,6 +3,14 @@
 ![shell startup < 200ms](https://img.shields.io/badge/shell_startup-%3C200ms-brightgreen)
 
 macOS developer dotfiles with self-healing health checks. Powered by [chezmoi](https://chezmoi.io).
+One command sets up a Mac; a weekly doctor finds drift and repairs it.
+
+**Who it is for:** a developer who wants a fast, repeatable Mac setup, a team lead
+who rolls one setup out to a team, and AI coding agents (Claude Code, Cursor,
+Codex) that work in this repo.
+
+**Documentation:** [docs/README.md](docs/README.md) maps every doc to the question it
+answers. Agents start with [AGENTS.md](AGENTS.md).
 
 **Quick start** (from a stock Mac):
 
@@ -253,7 +261,7 @@ This repo works for any macOS team. To adopt it at your organization:
 
 1. **Fork the repo** and clone your fork
 2. **Edit `.chezmoi.yaml.tmpl`** — change `work_email_domain` and `github_enterprise_host` defaults to your organization
-3. **Remove Organization-specific references** — see [docs/forking-guide.md#removing-all-organization-specific-references](docs/forking-guide.md#removing-all-organization-specific-references) for the full list
+3. **Keep organization-specific config out of the fork** — put it in an overlay repo; see [docs/forking-guide.md#authoring-an-organization-overlay](docs/forking-guide.md#authoring-an-organization-overlay)
 4. **Customize the Brewfile** — add or remove packages in `.chezmoiscripts/run_onchange_brew.sh.tmpl`
 5. **Run `dotfiles doctor`** to verify your customized fork works
 6. **Run `dotfiles validate` before sharing** — see the [adoption checklist](docs/adoption-checklist.md#4-write-team-specific-docs) and [team rollout guide](docs/team-onboarding.md#pre-announcement-validation-gate)

@@ -37,45 +37,13 @@ modelOverrides:
   codex: null
 
 mcp:
-  - context7
   - playwright
-  - tasks-mcp
-  # github: catalog @modelcontextprotocol/server-github, token from ${GITHUB_TOKEN}.
-  - github
-  # figma: official remote MCP (https://mcp.figma.com/mcp). Design context,
-  # variables, components and code-connect mappings straight from a Figma file.
-  # Per-client OAuth — the first tool call opens Figma's consent screen, so no
-  # token lives here. Chosen over the desktop server (127.0.0.1:3845), which
-  # only answers while the Figma app is open in Dev Mode on a paid Dev/Full seat.
-  - figma
-  # atlassian (uvx mcp-atlassian) removed from base — some orgs block OAuth MCP
-  # plugins; use your team overlay for token-based jira-mcp instead. Re-add here
-  # only for forks that want uvx mcp-atlassian with JIRA_* env vars directly.
-  # jenkins removed permanently: the jenkins MCP needs JENKINS_URL/USER/
-  # API_TOKEN, but the Jenkins API token is not obtainable here. Jenkins
-  # access is browser-only — use the jenkins-troubleshooting skill
-  # (persistent agent-browser dashboard), not an MCP. Do not re-add.
-  # chrome-devtools-mcp: Google ChromeDevTools team's official MCP.
-  # Gives agents Lighthouse, performance traces, accessibility audits, live
-  # DOM, console errors, and network logs in-loop — closes the "design that
-  # performs" gap (Core Web Vitals + a11y) that screenshot-only tools miss.
-  # No API key. Free. https://github.com/ChromeDevTools/chrome-devtools-mcp
-  - name: chrome-devtools
-    command: npx
-    args:
-      - "-y"
-      - chrome-devtools-mcp@latest
-  # shadcn-mcp (CLI 3.0, zero-config since Aug 2025; May 2026 added registry
-  # include + validate): lets agents browse, search, view, and install
-  # components from any shadcn-compatible registry via natural language.
-  # Works across namespaced registries — no per-project components.json
-  # required upfront. https://ui.shadcn.com/docs/registry/mcp
-  - name: shadcn-mcp
-    command: npx
-    args:
-      - "-y"
-      - shadcn@latest
-      - mcp
+  # Removed 2026-10-13 after a 180-day usage audit found 0 calls from Claude
+  # Code or Codex on this Mac: context7, tasks-mcp, github (gh CLI is used),
+  # figma (OAuth, unused), chrome-devtools (agent-browser is the browser
+  # tool), shadcn-mcp (the shadcn skill stays). Each one started at session
+  # start and was probed every 30 minutes. Re-add with `agentbrew install <name>`
+  # and a line here. atlassian and jenkins stay out (see git history).
 # Semantic memory runtime — AgentBrew owns daemon, MCP URL, and pack reconciliation.
 memory:
   enabled: true
@@ -131,34 +99,14 @@ skills:
   # (rule-based dashboard UI). It replaces `effective-ui-design`, which
   # covered the same ground.
   - frontend-design
-  # ── MCP Apps (SEP-1865, stabilized 2026-01-26) ──────────────────
-  # The first official MCP extension — tools can render interactive
-  # UIs inline in Claude, ChatGPT, VS Code, Goose, Postman, MCPJam.
-  - create-mcp-app          # scaffold a new MCP App from scratch
-  - migrate-oai-app         # port OpenAI Apps SDK → MCP Apps
-  - add-app-to-server       # retrofit existing MCP server with UI
-  - convert-web-app         # web app → hybrid web + MCP App
   # ── Anthropic plugin marketplace skills (claude-plugins-official) ─
-  # Subset that's broadly useful across agents and architectures.
-  - build-mcp-server        # canonical Anthropic MCP server guidance
-  - build-mcpb              # MCP bundles
-  - session-report          # HTML usage/skills/cost report from session
+  # Removed 2026-10-13 (0 uses in 180 days; each cost listing tokens in every
+  # session): the mcp-server-dev and plugin-dev sets, session-report,
+  # claude-md-improver, claude-automation-recommender, playground,
+  # math-olympiad, Discord access/configure, m5-onboard, cardputer-buddy.
+  # In Claude Code, install the official plugin when needed:
+  # `/plugin install plugin-dev@claude-plugins-official` (or mcp-server-dev, …).
   - skill-creator           # create, evaluate, and improve skills
-  - claude-md-improver      # audit and improve CLAUDE.md files
-  - claude-automation-recommender  # suggest hooks, subagents, skills, MCPs
-  - playground              # single-file interactive HTML explorers
-  - math-olympiad           # competition math with adversarial checks
-  - access                  # Discord channel: pairing and allowlists
-  - configure               # Discord channel: bot token and policy
-  - m5-onboard              # flash and provision M5Stack ESP32 boards
-  - cardputer-buddy         # iterate on the Cardputer app bundle
-  # Claude-Code plugin authoring (useful for any plugin/skill author)
-  - command-development
-  - agent-development
-  - hook-development
-  - plugin-structure
-  - plugin-settings
-  - mcp-integration
 
 commands:
   - ./commands

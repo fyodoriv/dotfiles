@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Removed
+
+- **Unused MCP servers and skills** — a 180-day usage audit of Claude Code
+  and Codex sessions on the owner's Mac found 0 calls to context7,
+  tasks-mcp, github, figma, chrome-devtools, and shadcn-mcp, and 0 uses of
+  21 deployed skills (the plugin-dev and mcp-server-dev sets and other
+  official-plugin copies, Discord `access`/`configure`, and the M5 pair).
+  `Agentfile.yaml` drops them, so sessions start fewer servers and list
+  fewer skills. The Agentfile comments say how to add each one back.
+
 ### Added
 
 - **Docs hook on every machine** — `dotfiles apply` now adds the opt-in

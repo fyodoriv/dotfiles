@@ -4,12 +4,15 @@
 #
 # `workspace_discover` prints one `name<TAB>path` line per workspace.
 # Resolution order (first source that exists wins):
-#   1. ~/.config/tasks-md/workspaces.json — the tasks-md CLI's shared
-#      config. Accepts an object {"name": "path"} or an array
-#      [{"name": ..., "path": ...}]. Requires jq (guarded).
-#   2. ~/.config/tasks-md/workspaces.yaml — minimal `name: path` lines
-#      (comments and blanks skipped). Covers hand-written configs until
-#      the tasks-md foundation ships the JSON writer.
+#   1. $XDG_CONFIG_HOME/tasks-md/workspaces.json (default
+#      ~/.config/tasks-md/workspaces.json) — the tasks-md CLI's shared
+#      config, written by `tasks workspaces add`. Spec shape (tasks.md
+#      spec.md § Workspaces): {"workspaces": [{"name": ..., "root": ...}],
+#      "discovery": {...}}. Older hand-written shapes still work: an object
+#      {"name": "path"} or an array [{"name": ..., "path": ...}].
+#      Requires jq (guarded).
+#   2. The sibling workspaces.yaml — minimal `name: path` lines
+#      (comments and blanks skipped) for hand-written configs.
 #   3. Fallback scan: each colon-separated root in $WORKSPACE_SCAN_ROOTS
 #      (default: $HOME/apps). An immediate child dir is a workspace when
 #      it contains a `.tasks-md-workspace` sentinel file OR at least two
@@ -18,10 +21,14 @@
 # Zero workspaces is not an error: prints nothing, returns 0.
 # Paths from configs support a leading `~` / `~/` (expanded to $HOME).
 #
-# Designed as a thin, extractable adapter (AGENTS.md rule #0): when the
-# tasks-md workspaces config becomes authoritative on this machine,
-# consumers keep calling `workspace_discover` unchanged — see TASKS.md
-# task `workspace-doctor-config-integration` for the slice-2 swap.
+# Stays a dotfiles lib (AGENTS.md rule #0 review, docs/workspace.md):
+# `tasks workspaces list` has no machine-readable output to consume yet.
+
+# Directory that holds the tasks-md workspaces config. Same rule as the
+# tasks CLI: $XDG_CONFIG_HOME when set, else ~/.config.
+workspace_config_dir() {
+  printf '%s/tasks-md' "${XDG_CONFIG_HOME:-$HOME/.config}"
+}
 
 _workspace_expand_tilde() {
   case "$1" in
@@ -39,15 +46,18 @@ _workspace_emit() {
 }
 
 workspace_discover() {
-  local cfg_json="${HOME}/.config/tasks-md/workspaces.json"
-  local cfg_yaml="${HOME}/.config/tasks-md/workspaces.yaml"
+  local cfg_dir; cfg_dir="$(workspace_config_dir)"
+  local cfg_json="$cfg_dir/workspaces.json"
+  local cfg_yaml="$cfg_dir/workspaces.yaml"
 
   if [ -f "$cfg_json" ] && command -v jq >/dev/null 2>&1; then
     local name path
     while IFS=$'\t' read -r name path; do
       _workspace_emit "$name" "$path"
     done < <(jq -r '
-        if type == "array"
+        if type == "object" and (.workspaces | type) == "array"
+        then .workspaces[] | "\(.name // "")\t\(.root // "")"
+        elif type == "array"
         then .[] | "\(.name)\t\(.path)"
         else to_entries[] | "\(.key)\t\(.value)"
         end' "$cfg_json" 2>/dev/null)

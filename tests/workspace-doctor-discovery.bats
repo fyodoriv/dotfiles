@@ -112,3 +112,48 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
   [[ "$output" == "home-ws	$TEST_HOME/myws" ]]
 }
+
+# ── tasks-md spec shape (spec.md § Workspaces) ──────────────────────
+# `tasks workspaces add` writes {"workspaces":[{"name","root",...}],
+# "discovery":{...}} to $XDG_CONFIG_HOME/tasks-md/workspaces.json.
+
+@test "discovery: tasks-md spec shape (workspaces[].root) is read, discovery block ignored" {
+  mkdir -p "$TEST_HOME/.config/tasks-md" "$TEST_DIR/tooling" "$TEST_HOME/work"
+  cat > "$TEST_HOME/.config/tasks-md/workspaces.json" <<JSON
+{
+  "workspaces": [
+    { "name": "tooling", "root": "$TEST_DIR/tooling", "exclude": ["archived-repo"], "priorityWeight": 1.0 },
+    { "name": "work", "root": "~/work" }
+  ],
+  "discovery": { "scanRoots": ["~/apps"], "autoDetect": true }
+}
+JSON
+  run _discover "$TEST_HOME" "$SCAN_ROOT"
+  [ "$status" -eq 0 ]
+  [ "$output" = "tooling	$TEST_DIR/tooling
+work	$TEST_HOME/work" ]
+}
+
+@test "discovery: XDG_CONFIG_HOME config wins, like the tasks CLI" {
+  mkdir -p "$TEST_DIR/xdg/tasks-md" "$TEST_DIR/xdg-ws"
+  printf '{"workspaces":[{"name":"xdg","root":"%s"}]}\n' "$TEST_DIR/xdg-ws" \
+    > "$TEST_DIR/xdg/tasks-md/workspaces.json"
+  run env XDG_CONFIG_HOME="$TEST_DIR/xdg" HOME="$TEST_HOME" WORKSPACE_SCAN_ROOTS="$SCAN_ROOT" \
+    bash -c "source '$LIB' && workspace_discover"
+  [ "$status" -eq 0 ]
+  [ "$output" = "xdg	$TEST_DIR/xdg-ws" ]
+}
+
+@test "discovery: reads a config written by the real 'tasks workspaces add'" {
+  command -v tasks >/dev/null 2>&1 || skip "tasks CLI (tasks-md) not installed"
+  mkdir -p "$TEST_HOME/apps/stack/repo-a" "$TEST_DIR/xdg"
+  echo "# Tasks" > "$TEST_HOME/apps/stack/repo-a/TASKS.md"
+  HOME="$TEST_HOME" XDG_CONFIG_HOME="$TEST_DIR/xdg" \
+    tasks workspaces add "$TEST_HOME/apps/stack" --name stack >/dev/null
+  # The writer stores HOME-relative roots as "~/...".
+  grep -q '"root": "~/apps/stack"' "$TEST_DIR/xdg/tasks-md/workspaces.json"
+  run env XDG_CONFIG_HOME="$TEST_DIR/xdg" HOME="$TEST_HOME" WORKSPACE_SCAN_ROOTS="$SCAN_ROOT" \
+    bash -c "source '$LIB' && workspace_discover"
+  [ "$status" -eq 0 ]
+  [ "$output" = "stack	$TEST_HOME/apps/stack" ]
+}

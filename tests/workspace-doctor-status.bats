@@ -127,3 +127,51 @@ teardown() { rm -rf "$TEST_DIR"; }
   [[ "$output" == *"✓ repo-git"* ]]
   [[ "$output" == *"=== All workspaces: 1 workspaces, 2 repos"* ]]
 }
+
+# ── Functional: doctor checks against a tasks-md config ────────────
+
+# Source the module with recording check stubs; prints "<id> <pass|fail|warn>".
+# BASH_ENV (~/.config/dotfiles/bash-env.sh) would reset DOTFILES_DIR to the
+# live checkout, so drop it.
+_run_module() {
+  env -u BASH_ENV -u ENV DOTFILES_DIR="$BATS_TEST_DIRNAME/.." bash -c '
+    check() { if eval "$3" >/dev/null 2>&1; then echo "$1 pass"; else echo "$1 fail"; fi; }
+    check_advisory() { if eval "$3" >/dev/null 2>&1; then echo "$1 pass"; else echo "$1 warn"; fi; }
+    source "$0"' "$MODULE"
+}
+
+_write_config() {  # $1 = root of the "tooling" workspace
+  mkdir -p "$TEST_DIR/xdg/tasks-md"
+  printf '{"workspaces":[{"name":"tooling","root":"%s"}]}\n' "$1" \
+    > "$TEST_DIR/xdg/tasks-md/workspaces.json"
+  export XDG_CONFIG_HOME="$TEST_DIR/xdg"
+}
+
+@test "workspace doctor: declared roots from the XDG tasks-md config are checked" {
+  _write_config "$TEST_DIR/missing-root"
+  run _run_module
+  [[ "$output" == *"workspace.declared_roots_exist fail"* ]]
+}
+
+@test "workspace doctor: declared repos that are git checkouts pass the bootstrap check" {
+  rm -rf "$SCAN_ROOT/tooling/plain-dir"
+  echo "# Tasks" > "$SCAN_ROOT/tooling/repo-git/TASKS.md"
+  _write_config "$SCAN_ROOT/tooling"
+  run _run_module
+  [[ "$output" == *"workspace.declared_roots_exist pass"* ]]
+  [[ "$output" == *"workspace.declared_repos_are_git pass"* ]]
+}
+
+@test "workspace doctor: a declared repo with TASKS.md but no .git warns" {
+  echo "# Tasks" > "$SCAN_ROOT/tooling/plain-dir/TASKS.md"
+  _write_config "$SCAN_ROOT/tooling"
+  run _run_module
+  [[ "$output" == *"workspace.declared_repos_are_git warn"* ]]
+}
+
+@test "workspace doctor: bootstrap check passes vacuously without a config" {
+  echo "# Tasks" > "$SCAN_ROOT/tooling/plain-dir/TASKS.md"
+  export XDG_CONFIG_HOME="$TEST_DIR/no-config"
+  run _run_module
+  [[ "$output" == *"workspace.declared_repos_are_git pass"* ]]
+}

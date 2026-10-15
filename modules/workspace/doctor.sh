@@ -9,10 +9,9 @@
 # `lib/workspace-discovery.sh`: tasks-md workspaces.json → workspaces.yaml
 # → sentinel/structure scan of $WORKSPACE_SCAN_ROOTS (default ~/apps).
 #
-# Cross-tool note: the same config is consumed by the tasks-md CLI and
-# (eventually) agentbrew's workspace-aware sync. Until the tasks-md
-# foundation ships the config writer on this machine, the fallback scan
-# is authoritative — see TASKS.md `workspace-doctor-config-integration`.
+# Cross-tool note: the config is the one `tasks workspaces add` writes
+# ($XDG_CONFIG_HOME/tasks-md/workspaces.json). When it exists it wins; the
+# fallback scan covers hosts without one. See docs/workspace.md.
 #
 # Anchor: AGENTS.md rule #6 (new modules need modules/<name>/doctor.sh);
 # surfaced by TASKS.md task `workspace-folder-doctor`.
@@ -32,13 +31,16 @@ check "workspace.discovery_lib" \
   "_workspace_lib_loads" \
   ""
 
+_workspace_has_config() {
+  local cfg_dir; cfg_dir="$(workspace_config_dir)"
+  [ -f "$cfg_dir/workspaces.json" ] || [ -f "$cfg_dir/workspaces.yaml" ]
+}
+
 _workspace_declared_roots_exist() {
   # Only meaningful when a tasks-md config declares workspaces; the
   # fallback scan can only ever discover directories that exist.
-  local cfg_json="$HOME/.config/tasks-md/workspaces.json"
-  local cfg_yaml="$HOME/.config/tasks-md/workspaces.yaml"
-  { [ -f "$cfg_json" ] || [ -f "$cfg_yaml" ]; } || return 0
   _workspace_lib_loads || return 1
+  _workspace_has_config || return 0
   local _name path
   while IFS=$'\t' read -r _name path; do
     [ -n "$path" ] || continue
@@ -51,6 +53,29 @@ check "workspace.declared_roots_exist" \
   "declared workspace roots exist on disk" \
   "_workspace_declared_roots_exist" \
   "edit ~/.config/tasks-md/workspaces.json (or .yaml) — fix or remove the missing path"
+
+# Bootstrap flag: every repo (child dir with a TASKS.md) of a declared
+# workspace is a git checkout. A plain copy cannot pull, push, or carry a
+# worktree. Only declared workspaces count; the fallback scan is a guess.
+_workspace_declared_repos_are_git() {
+  _workspace_lib_loads || return 1
+  _workspace_has_config || return 0
+  local _name root dir
+  while IFS=$'\t' read -r _name root; do
+    [ -d "$root" ] || continue
+    for dir in "$root"/*/; do
+      dir="${dir%/}"
+      [ -f "$dir/TASKS.md" ] || continue
+      [ -e "$dir/.git" ] || return 1
+    done
+  done < <(workspace_discover)
+  return 0
+}
+
+check_advisory "workspace.declared_repos_are_git" \
+  "repos in declared workspaces are git checkouts" \
+  "_workspace_declared_repos_are_git" \
+  "re-clone the plain copy as a git checkout, or move it out of the workspace — run dotfiles-workspace status to find it"
 
 _workspace_status_runs() {
   [ -x "$_WORKSPACE_BIN" ] || return 1

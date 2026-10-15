@@ -28,13 +28,6 @@ them. -->
   - **Files**: .chezmoiscripts/run_onchange_brew.sh.tmpl, modules/tools/doctor.sh
   - **Acceptance**: (1) `command -v gtimeout` succeeds after `dotfiles apply` on a fresh machine; (2) `make check` still passes; (3) no behaviour changes other than which timeout binary is selected.
 
-- [ ] Workspace doctor slice 2 — consume the live tasks-md workspaces config + bootstrap flags
-  - **ID**: workspace-doctor-config-integration
-  - **Tags**: scout, doctor, workspace, multi-workspace, reuse, upstream
-  - **Details**: Slice 1 (task `workspace-folder-doctor`, shipped 2026-06-12) landed `lib/workspace-discovery.sh` (json → yaml → sentinel/structure scan), `bin/dotfiles-workspace status`, and `modules/workspace/doctor.sh` — with the fallback scan authoritative because `~/.config/tasks-md/workspaces.{json,yaml}` does not exist on this host yet. The tasks.md `tasks workspaces add` command has shipped (tasks.md README "Workspaces") the config writer (`tasks workspaces add`), verify the json reader against the real spec shape, prefer the config end-to-end, and add the deferred bootstrap-flag checks (e.g. repos declared in the tooling workspace should be git checkouts; minsky-observed repos should carry `.minsky/repo.yaml`). This is also the Replace?/Relocate? review required by AGENTS.md rule #0 for the new module: decide whether discovery should relocate into the tasks-md CLI (`tasks workspaces list --porcelain` consumed by dotfiles) or stay a dotfiles lib, and record the decision.
-  - **Files**: lib/workspace-discovery.sh, modules/workspace/doctor.sh, bin/dotfiles-workspace, tests/workspace-doctor-discovery.bats, docs/workspace.md
-  - **Acceptance**: (a) discovery against a real `tasks workspaces add`-written config passes a new bats case pinning the spec shape; (b) bootstrap-flag checks land or are explicitly rejected with a reason in docs/workspace.md; (c) the Replace/Relocate decision (upstream `tasks` CLI vs dotfiles lib) is recorded in docs/workspace.md with a one-line rationale.
-
 - [ ] User-dir installers for AWS CLI v2 and the gcloud SDK, so `dotfiles apply` reproduces them without brew Python
   - **ID**: user-dir-installers-for-aws-gcloud
   - **Tags**: scout, brew, arm64-migration, endpoint-security, reproducibility

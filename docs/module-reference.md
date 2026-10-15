@@ -518,7 +518,7 @@ VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor
 ### workspace
 
 Host-level visibility across every declared workspace folder (parents of
-multiple repo checkouts). Discovery: `~/.config/tasks-md/workspaces.json`
+multiple repo checkouts). Discovery: `$XDG_CONFIG_HOME/tasks-md/workspaces.json` (default `~/.config/...`, written by `tasks workspaces add`)
 → `workspaces.yaml` → sentinel/structure scan of `$WORKSPACE_SCAN_ROOTS`
 (default `~/apps`). See [docs/workspace.md](workspace.md).
 
@@ -526,5 +526,6 @@ multiple repo checkouts). Discovery: `~/.config/tasks-md/workspaces.json`
 |----|---------------|----------|
 | `workspace.discovery_lib` | `lib/workspace-discovery.sh` sources and defines `workspace_discover` | — |
 | `workspace.declared_roots_exist` | every config-declared workspace path exists (vacuous pass without a config) | edit `~/.config/tasks-md/workspaces.{json,yaml}` |
+| `workspace.declared_repos_are_git` | advisory — every repo (child dir with a `TASKS.md`) of a config-declared workspace is a git checkout (vacuous pass without a config) | — |
 | `workspace.status_runs` | `dotfiles-workspace status` exits 0 | — |
 | `workspace.any_discovered` | advisory — at least one workspace discovered | `touch <root>/.tasks-md-workspace` or set `WORKSPACE_SCAN_ROOTS` |

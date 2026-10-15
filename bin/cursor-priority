@@ -68,7 +68,8 @@ is_descendant_of_interactive_app() {
     command_path=$(ps -p "$current_pid" -o comm= 2>/dev/null || true)
     case "$command_path" in
       *"/WebStorm.app/"*|*"/Ghostty.app/"*|*"/Terminal.app/"*|*"/iTerm.app/"*|\
-      *"/WezTerm.app/"*|*"/kitty.app/"*|*"/Alacritty.app/"*|*"/Warp.app/"*) return 0 ;;
+      *"/WezTerm.app/"*|*"/kitty.app/"*|*"/Alacritty.app/"*|*"/Warp.app/"*|\
+      *"/Claude.app/"*) return 0 ;;
     esac
 
     parent_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null || true)

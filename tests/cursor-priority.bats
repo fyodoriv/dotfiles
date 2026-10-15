@@ -272,6 +272,37 @@ MOCK
   ! grep -q -- "10 -p 12345" "$RENICE_LOG"
 }
 
+@test "cursor-priority keeps Claude Desktop Code-tab sessions interactive" {
+  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
+  cat > "$TEST_BIN/pgrep" <<'MOCK'
+#!/bin/bash
+echo "$@" >> "${PGREP_LOG:-/dev/null}"
+case "$*" in
+  *claude*) echo "12345" ;;
+esac
+MOCK
+  chmod +x "$TEST_BIN/pgrep"
+
+  cat > "$TEST_BIN/ps" <<'MOCK'
+#!/bin/bash
+case "$*" in
+  *"12345"*"comm="*) echo "/Users/test/Library/Application Support/Claude/claude-code/2.1.295/abc/claude.app/Contents/MacOS/claude" ;;
+  *"12345"*"ppid="*) echo "23456" ;;
+  *"23456"*"comm="*) echo "/Applications/Claude.app/Contents/Helpers/disclaimer" ;;
+  *"23456"*"ppid="*) echo "34567" ;;
+  *"34567"*"comm="*) echo "/Applications/Claude.app/Contents/MacOS/Claude" ;;
+  *"34567"*"ppid="*) echo "1" ;;
+esac
+MOCK
+  chmod +x "$TEST_BIN/ps"
+
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  grep -q -- "-B -t 0 -l 0 -p 12345" "$TASKPOLICY_LOG"
+  ! grep -q -- "-b -p 12345" "$TASKPOLICY_LOG"
+  ! grep -q -- "10 -p 12345" "$RENICE_LOG"
+}
+
 @test "cursor-priority backgrounds Claude with no terminal ancestor" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   cat > "$TEST_BIN/pgrep" <<'MOCK'

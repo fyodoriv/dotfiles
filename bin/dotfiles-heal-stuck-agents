@@ -9,6 +9,13 @@
 #   dotfiles-heal-stuck-agents --fix      Kill/reset stale resources
 #   dotfiles-heal-stuck-agents --quiet    Log to file only (LaunchAgent mode)
 #
+# LaunchAgent gate: Cursor only. com.dotfiles.heal-stuck-agents (every 30 s)
+# loads only when Cursor is installed and use_cursor is on (should_skip_agent
+# in .chezmoiscripts/run_onchange_launchagents.sh.tmpl). Stale shells, runaway
+# rg crawls, and the API DNS check match Cursor only. Hung git-upload-pack and
+# idle GHE SSH mux checks are agent-neutral; on Macs without Cursor they run
+# through `dotfiles doctor --fix` (daily LaunchAgent and on demand).
+#
 # Cursor cloud transport permanent-fail (THROW eoe, willRetry=false after DNS blip)
 # still requires Developer: Reload Window — dotfiles cannot restart Cursor.
 set -euo pipefail

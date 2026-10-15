@@ -921,7 +921,7 @@ dotfiles-heal-stuck-agents --fix      # kill runaway helpers, hung git workers, 
 dotfiles doctor --fix                 # also runs heal proactively before module checks
 ```
 
-**Automatic heal:** LaunchAgent `com.dotfiles.heal-stuck-agents` runs `dotfiles-heal-stuck-agents --fix --quiet` every 30 seconds (and at login) when Cursor is installed and profile is `full`. The 30-second pass skips network recovery; `com.dotfiles.network-resilience` owns periodic DNS recovery. Logs: `~/.local/share/dotfiles/logs/heal-stuck-agents.log`.
+**Automatic heal:** LaunchAgent `com.dotfiles.heal-stuck-agents` runs `dotfiles-heal-stuck-agents --fix --quiet` every 30 seconds (and at login) when Cursor is installed and profile is `full`. A Mac with only Claude Code or Codex does not get this agent: three of its five matchers (stale shells, runaway `rg` crawls, the Cursor API DNS check) match Cursor only. The agent-neutral hung git check still runs there through `dotfiles doctor --fix`. The 30-second pass skips network recovery; `com.dotfiles.network-resilience` owns periodic DNS recovery. Logs: `~/.local/share/dotfiles/logs/heal-stuck-agents.log`.
 
 **SSH canonical fix:** `~/.ssh/config` sets `ConnectTimeout 15`, `ServerAliveInterval` / `ServerAliveCountMax`, and `ControlPersist 300` on `Host *` (plus optional per-GHE-host block when `ghe_ssh_host` is configured in chezmoi). Re-apply with `chezmoi apply` or `dotfiles doctor --module ssh --fix`. Set `DOTFILES_GHE_SSH_HOST` or chezmoi `ghe_ssh_host` so heal/mux logic targets your enterprise Git host.
 

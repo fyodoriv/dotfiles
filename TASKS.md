@@ -38,13 +38,6 @@ them. -->
 
 ## P2
 
-- [ ] Decide whether `heal-stuck-agents` should run on Macs without Cursor
-  - **ID**: heal-stuck-agents-cursor-gate
-  - **Tags**: scout, launchagents, agents, self-healing
-  - **Details**: `should_skip_agent` skips the `heal-stuck-agents` LaunchAgent when `USE_CURSOR=false` or Cursor.app is absent. Its fixes (hung `git-upload-pack` SSH sessions, stale sandbox shells, runaway high-CPU helpers, idle SSH mux sockets) can also come from Claude Code and Codex. On this Mac the agent never runs on a schedule; only `dotfiles apply` runs it once. Check which matchers are Cursor-specific. If most are not, gate on "any agent CLI present" (as `agent-keepawake` does) instead of Cursor.
-  - **Files**: .chezmoiscripts/run_onchange_launchagents.sh.tmpl, bin/dotfiles-heal-stuck-agents, tests/
-  - **Acceptance**: the gate and the script header agree on which agents it serves, and a bats test covers a Mac with Claude Code and no Cursor.
-
 - [ ] Report Label-less LaunchAgent plists as stubs, not "not XML"
   - **ID**: launchagent-path-fix-stub-plist-message
   - **Tags**: scout, launchagents, ux

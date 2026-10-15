@@ -39,10 +39,13 @@ should_skip_agent() {
       [ "$USE_CURSOR" = "false" ] && return 0
       [ "$PROFILE" != "full" ] && return 0
       [ ! -d "/Applications/Cursor.app" ] && return 0 ;;
+    # Cursor only: 3 of its 5 matchers need Cursor (its process tree, its
+    # ripgrep crawl, its API host). The agent-neutral hung git check runs on
+    # every Mac through `dotfiles doctor --fix`. DOTFILES_CURSOR_APP: tests.
     heal-stuck-agents)
       [ "$USE_CURSOR" = "false" ] && return 0
       [ "$PROFILE" != "full" ] && return 0
-      [ ! -d "/Applications/Cursor.app" ] && return 0 ;;
+      [ ! -d "${DOTFILES_CURSOR_APP:-/Applications/Cursor.app}" ] && return 0 ;;
     agent-keepawake)
       [ "$PROFILE" != "full" ] && return 0
       [ ! -d "/Applications/Cursor.app" ] \

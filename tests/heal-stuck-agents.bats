@@ -165,3 +165,37 @@ teardown() {
   grep -q 'dotfiles-heal-stuck-agents' "$DOCTOR"
   grep -q 'Proactive heal for stuck Cursor agents' "$DOCTOR"
 }
+
+# The LaunchAgent gate lives in should_skip_agent (apply script). Load it
+# with the values a full-profile Mac with use_cursor=true would render.
+_load_launchagent_gate() {
+  local tmpl="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  PROFILE=full USE_CURSOR=true
+  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$tmpl")"
+}
+
+@test "LaunchAgent gate: Claude Code without Cursor skips heal-stuck-agents, keeps agent-keepawake" {
+  mkdir -p "$TEST_HOME/.local/bin"
+  printf '#!/bin/bash\n' > "$TEST_HOME/.local/bin/claude"
+  chmod +x "$TEST_HOME/.local/bin/claude"
+  export DOTFILES_CURSOR_APP="$TEST_DIR/Applications/Cursor.app"
+  _load_launchagent_gate
+
+  should_skip_agent heal-stuck-agents
+  ! should_skip_agent agent-keepawake
+}
+
+@test "LaunchAgent gate: an installed Cursor runs heal-stuck-agents" {
+  export DOTFILES_CURSOR_APP="$TEST_DIR/Applications/Cursor.app"
+  mkdir -p "$DOTFILES_CURSOR_APP"
+  _load_launchagent_gate
+
+  ! should_skip_agent heal-stuck-agents
+}
+
+@test "script header and LaunchAgent gate agree: Cursor only" {
+  grep -q '^# LaunchAgent gate: Cursor only' "$HEAL_BIN"
+  sed -n '/^    heal-stuck-agents)/,/;;/p' \
+    "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl" \
+    | grep -q 'Cursor.app'
+}

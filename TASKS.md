@@ -85,12 +85,6 @@ them. -->
   - **Measurement**: `command -v aws gcloud | grep -c "$HOME/.local/bin/"` reads 2 after a fresh `dotfiles apply` with `is_enterprise: true`.
   - **Anchor**: AGENTS.md rule #10 (user-dir installs over admin paths); chezmoi `run_once_` script docs; AWS CLI v2 "install for the current user" macOS docs.
 
-- [ ] The `gh api -f body=` human-context test checks its assertion in an isolated env
-  - **ID**: gh-wrapper-human-context-test-env-isolation
-  - **Tags**: gh-wrapper, tests, false-positive, scout
-  - **Details**: Two of the three human-context tests in `tests/gh-wrapper.bats` already run under `env -u` (lines ~459 and ~491). The `gh api -f body= leaves human-authored text unchanged` test (~594) still has a mid-test `! grep` with no env isolation, so an agent-context variable such as `CLAUDE_CODE_SSE_PORT` can make it pass for the wrong reason.
-  - **Files**: tests/gh-wrapper.bats
-  - **Acceptance**: the test fails cleanly when `CLAUDE_CODE_SSE_PORT` is set without isolation, and passes after it runs under `env -u` (or the `! grep` becomes the last assertion).
 - [ ] Manage Node upgrade steps so LaunchAgents and ~/.local/bin move together
   - **ID**: dotfiles-launchagent-node-version-sprawl
   - **Tags**: scout, dotfiles, launchagent, node, permissions, mcp

@@ -592,14 +592,19 @@ ALLOW
 }
 
 @test "gh api -f body= leaves human-authored text unchanged (no auto-footer)" {
-  run "$GH_WRAPPER" api \
+  # Env-isolation per the `pr close --comment` human-context test above.
+  run env -u AGENT_PUBLIC_WRITE_GUARD -u DEVIN_MODEL -u DEVIN_SESSION_ID \
+         -u CLAUDE_CODE_SSE_PORT -u CURSOR_AGENT -u WINDSURF_AGENT \
+         -u CODEX_AGENT \
+    "$GH_WRAPPER" api \
     -X POST repos/owner/repo/issues/100/comments \
     -f "body=Thanks!"
 
   [ "$status" -eq 0 ]
   [ -f "$GH_API_BODY" ]
-  ! grep -q "Written by an agent" "$GH_API_BODY"
   grep -q "Thanks!" "$GH_API_BODY"
+  # Keep the negated grep last: bats ignores a mid-test `!` status.
+  ! grep -q "Written by an agent" "$GH_API_BODY"
 }
 
 @test "gh api -f body= strips foreign agent attribution in agent context" {

@@ -208,6 +208,7 @@ Conditional MCP checks only run when the MCP server is present in `~/.config/age
 | `agentbrew.memory_service_http` | Shared loopback memory MCP passes AgentBrew's stateful `initialize` → `notifications/initialized` → non-empty `tools/list` readiness contract when `use_ai_tools` is on and the memory MCP is registered | `agentbrew memory fix` |
 | `agentbrew.memory_launchagent_identity` | Loaded memory LaunchAgent uses the canonical `com.agentbrew.mcp-memory` plist path and operator `HOME` | `agentbrew memory fix` |
 | `agentbrew.memory_service_singleton` | No duplicate per-chat `mcp-memory-service` process is running beside the shared daemon | Stop the stale stdio memory server |
+| `agentbrew.launchagent_node_pinned` | Every `com.agentbrew.*` plist and `~/.local/bin/node` use the Node that `~/.node-version` names (advisory; check in `lib/node-pin.sh`) | `dotfiles-node-upgrade $(cat ~/.node-version)` |
 | `agentbrew.claude_no_npm_leftover` | No stale npm global `claude-code` install | `npm -g uninstall @anthropic-ai/claude-code` |
 
 ### memory

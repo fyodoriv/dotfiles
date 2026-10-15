@@ -33,18 +33,6 @@ them. -->
   - **Measurement**: `command -v aws gcloud | grep -c "$HOME/.local/bin/"` reads 2 after a fresh `dotfiles apply` with `is_enterprise: true`.
   - **Anchor**: AGENTS.md rule #10 (user-dir installs over admin paths); chezmoi `run_once_` script docs; AWS CLI v2 "install for the current user" macOS docs.
 
-- [ ] Manage Node upgrade steps so LaunchAgents and ~/.local/bin move together
-  - **ID**: dotfiles-launchagent-node-version-sprawl
-  - **Tags**: scout, dotfiles, launchagent, node, permissions, mcp
-  - **Details**: Scouted 2026-06-10, narrowed 2026-10-12. Done: every `com.agentbrew.*` plist now runs the Node that `~/.node-version` names, and dotfiles doctor check `agentbrew.launchagent_node_pinned` reports any plist or `~/.local/bin/node` link that drifts. Finding: `exec()` resolves symlinks, so no version-independent path (fnm alias, `~/.local/bin/node` link) can hide a Node upgrade from macOS; at best each deliberate upgrade prompts once. Not verified against a live macOS prompt. Remaining: `~/.node-version` and the `~/.local/bin/{node,npm,npx}` links are hand-made, and plists are rewritten only by a manual `agentbrew auto-sync install`.
-  - **Files**: chezmoi-managed `~/.node-version` and `~/.local/bin` Node links and the upgrade flow (`bin/dotfiles-upgrade`); agentbrew `src/sync/scheduler-paths.ts` and `src/memory/launchagent.ts` rewrite the plists.
-  - **Acceptance**: A Node upgrade through the dotfiles upgrade flow updates `~/.node-version`, the `~/.local/bin` links, and rewrites the agentbrew plists in one step, and `agentbrew.launchagent_node_pinned` stays green after it. The pinned minsky Node and other old fnm versions stay installed.
-  - **Hypothesis**: A single scripted upgrade step removes the manual drift window between the new Node and old plists.
-  - **Success**: After an upgrade, `agentbrew.launchagent_node_pinned` passes without manual steps and macOS shows at most one new Node prompt.
-  - **Pivot**: If macOS still prompts on every tick with one stable path, move scheduler probes behind non-socket fast-tier probes or a pre-approved signed wrapper binary.
-  - **Measurement**: `dotfiles-doctor` reports `agentbrew.launchagent_node_pinned` as passing right after an upgrade; `ps -axo command | grep '/fnm/node-versions/.*/node'` during a scheduler tick shows one versioned path.
-  - **Anchor**: dotfiles PR 54 (drift check); 2026-06-10 scheduler tick diagnosis.
-
 ## P3
 
 - [ ] Replace? Relocate: update-tooling orchestration

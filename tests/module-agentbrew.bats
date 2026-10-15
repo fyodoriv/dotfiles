@@ -12,6 +12,7 @@ setup() {
   mkdir -p "$TEST_DOTFILES/lib"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-memory-readiness.sh" \
     "$TEST_DOTFILES/lib/agentbrew-memory-readiness.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/node-pin.sh" "$TEST_DOTFILES/lib/node-pin.sh"
 
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"

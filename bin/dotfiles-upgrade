@@ -22,6 +22,9 @@
 # Usage:
 #   dotfiles-upgrade              Run full upgrade
 #   dotfiles-upgrade --dry-run    Show what would be upgraded (no changes)
+#   dotfiles-upgrade --node [VER] Switch Node (latest LTS or VER) in one step:
+#                                 fnm, ~/.node-version, ~/.local/bin links,
+#                                 agentbrew plists (bin/dotfiles-node-upgrade)
 #
 # Schedule: com.dotfiles.dotfiles-upgrade LaunchAgent (weekly, Sunday 09:00).
 
@@ -31,6 +34,13 @@ set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# A Node switch is deliberate (macOS may prompt once for the new binary), so
+# it runs only on request, never in the weekly topgrade pass.
+if [ "${1:-}" = "--node" ]; then
+  shift
+  exec bash "$DOTFILES_DIR/bin/dotfiles-node-upgrade" "$@"
+fi
 
 # Topgrade discovers and executes Node/npm/fnm, Ollama, uv/Python, and editor
 # update CLIs. Do not run that unattended publisher fan-out while this managed

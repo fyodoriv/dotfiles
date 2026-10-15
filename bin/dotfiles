@@ -67,6 +67,7 @@ Common:
                               See \`doctor --help\` for all flags
   sync                        Commit local changes and pull remote updates
   upgrade [--dry-run]         Upgrade all software (brew, casks, macOS, tools)
+  upgrade --node [VERSION]    Switch Node in one step (links, .node-version, agentbrew plists)
 
 Scaffolding:
   add <file> [--copy] [--module M]          Add a config file (symlink or copy mode)

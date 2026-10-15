@@ -1,0 +1,154 @@
+#!/bin/bash
+# Switch this Mac to a new Node version in one step.
+#
+# A Node upgrade has pieces that must move together. This script moves them:
+#   1. fnm install + fnm default (old versions stay installed; minsky pins one)
+#   2. ~/.node-version (com.dotfiles.gui-path and agentbrew read it)
+#   3. ~/.local/bin/{node,npm,npx} symlinks
+#   4. agentbrew plists: `agentbrew auto-sync install` and `agentbrew sync`
+#      run on the new Node, so com.agentbrew.* name the new path
+#   5. kickstart com.dotfiles.gui-path so launchd PATH uses the new Node
+#   6. the agentbrew.launchagent_node_pinned drift check (lib/node-pin.sh)
+# macOS may ask once to allow the new node binary. That is expected.
+#
+# Usage:
+#   dotfiles-node-upgrade              Switch to the latest LTS (fnm ls-remote --lts)
+#   dotfiles-node-upgrade 24.22.0      Switch to this version (v prefix optional)
+#   dotfiles-node-upgrade --dry-run    Print the steps; change nothing
+#   dotfiles upgrade --node [VERSION]  Same, through the upgrade flow
+#
+# npm globals are per Node version. The script lists the old version's
+# globals at the end; reinstall the ones you need.
+
+# shellcheck disable=SC2088  # ~ in messages is display text, not a path
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+# shellcheck source=../lib/agentbrew-locate.sh
+source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+# shellcheck source=../lib/node-pin.sh
+source "$DOTFILES_DIR/lib/node-pin.sh"
+
+DRY_RUN=false
+VERSION=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=true ;;
+    -*) echo "dotfiles-node-upgrade: unknown option: $1" >&2; exit 64 ;;
+    *) VERSION="$1" ;;
+  esac
+  shift
+done
+
+if [ -f "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
+    && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
+  echo "○ Node upgrade skipped: Node.js Foundation publisher is blocked (endpoint-policy safe mode)"
+  exit 0
+fi
+
+if ! command -v fnm >/dev/null 2>&1; then
+  fail "fnm not found. Run dotfiles apply (Brewfile installs fnm)."
+  exit 1
+fi
+
+run() {
+  if $DRY_RUN; then
+    info "[dry-run] $*"
+  else
+    "$@"
+  fi
+}
+
+set_alias_lts=false
+if [ -z "$VERSION" ]; then
+  VERSION="$(fnm ls-remote --lts 2>/dev/null | tail -n1 | awk '{print $1}')"
+  set_alias_lts=true
+fi
+VERSION="v${VERSION#v}"
+if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  fail "Not a Node version: $VERSION (expected X.Y.Z)"
+  exit 64
+fi
+
+# One fnm root for fnm, the doctor check, and agentbrew (they all read this).
+export FNM_DIR="$HOME/.local/share/fnm"
+FNM_VERSIONS="$FNM_DIR/node-versions"
+NEW_BIN="$FNM_VERSIONS/$VERSION/installation/bin"
+OLD_VERSION="$(sed 's/^v//' "$HOME/.node-version" 2>/dev/null | head -n1 || true)"
+OLD_VERSION="${OLD_VERSION:+v$OLD_VERSION}"
+
+info "Node $VERSION (was ${OLD_VERSION:-unset})"
+
+# 1. Install and make default. Never uninstall: minsky pins an older Node.
+if [ -x "$NEW_BIN/node" ]; then
+  ok "fnm: $VERSION already installed"
+else
+  run fnm install "$VERSION"
+fi
+run fnm default "$VERSION"
+$set_alias_lts && run fnm alias "$VERSION" lts-latest
+
+# 2. ~/.node-version
+if $DRY_RUN; then
+  info "[dry-run] write $VERSION to ~/.node-version"
+else
+  printf '%s\n' "$VERSION" > "$HOME/.node-version"
+  ok "~/.node-version → $VERSION"
+fi
+
+# 3. ~/.local/bin links. Replace only symlinks; never a real file.
+run mkdir -p "$HOME/.local/bin"
+for tool in node npm npx; do
+  link="$HOME/.local/bin/$tool"
+  if [ -e "$link" ] && [ ! -L "$link" ]; then
+    warn "~/.local/bin/$tool is a regular file; left alone"
+    continue
+  fi
+  run ln -sfn "$NEW_BIN/$tool" "$link"
+done
+$DRY_RUN || ok "~/.local/bin/{node,npm,npx} → $VERSION"
+
+# 4. Rewrite agentbrew plists. They store process.execPath, so run the
+#    agentbrew CLI on the new Node.
+if agentbrew_dir="$(agentbrew_locate)" && [ -f "$agentbrew_dir/dist/cli.js" ]; then
+  cli="$agentbrew_dir/dist/cli.js"
+  PATH="$NEW_BIN:$PATH" run "$NEW_BIN/node" "$cli" auto-sync install
+  agentfile="$HOME/.config/agentbrew/Agentfile.yaml"
+  if [ -f "$agentfile" ]; then
+    PATH="$NEW_BIN:$PATH" run "$NEW_BIN/node" "$cli" sync --no-recommended --agentfile "$agentfile"
+  fi
+else
+  warn "agentbrew checkout (dist/cli.js) not found; com.agentbrew.* plists not rewritten"
+fi
+
+# 5. launchd PATH: gui-path reads ~/.node-version.
+if [ -f "$HOME/Library/LaunchAgents/com.dotfiles.gui-path.plist" ]; then
+  run launchctl kickstart -k "gui/$(id -u)/com.dotfiles.gui-path" || true
+fi
+
+# 6. Verify.
+if $DRY_RUN; then
+  info "[dry-run] check agentbrew.launchagent_node_pinned"
+elif drift="$(_agentbrew_launchagent_node_pinned)"; then
+  ok "agentbrew.launchagent_node_pinned: all LaunchAgents and ~/.local/bin/node use $VERSION"
+else
+  fail "agentbrew.launchagent_node_pinned still drifts:"
+  printf '%s\n' "$drift" | sed 's/^/  /'
+  exit 1
+fi
+
+if [ -n "$OLD_VERSION" ] && [ "$OLD_VERSION" != "$VERSION" ]; then
+  old_npm="$FNM_VERSIONS/$OLD_VERSION/installation/bin/npm"
+  if [ -x "$old_npm" ]; then
+    globals="$(PATH="$FNM_VERSIONS/$OLD_VERSION/installation/bin:$PATH" "$old_npm" ls -g --depth=0 --parseable 2>/dev/null \
+      | sed -n 's|.*/node_modules/||p' | grep -vxE 'npm|corepack' || true)"
+    if [ -n "$globals" ]; then
+      info "npm globals on $OLD_VERSION (per version; reinstall the ones you need):"
+      printf '%s\n' "$globals" | sed 's/^/  /'
+    fi
+  fi
+  info "$OLD_VERSION stays installed (fnm uninstall $OLD_VERSION removes it)"
+fi

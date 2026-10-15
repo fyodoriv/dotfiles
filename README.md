@@ -1005,6 +1005,7 @@ scratch work.
 | `timer` | Pomodoro-style countdown timer with macOS notification |
 | `graceful-restart` | Wait for active processes to finish, then restart macOS |
 | `dotfiles-pnpm-global-update` | Update global pnpm packages; skip cleanly when none are installed (topgrade custom step) |
+| `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx}`, and the `com.agentbrew.*` plists. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
 
 **Build and test infrastructure**
 

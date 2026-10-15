@@ -47,9 +47,9 @@ Every module declares one of four severity tiers in `modules/<name>/severity`. T
 | Tier | One-liner | Modules |
 |------|-----------|---------|
 | **critical** | Security & safety — failures need immediate attention | `security`, `ssh`, `workflow` |
-| **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `memory`, `shell`, `sync`, `upgrade` |
+| **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `local-bin`, `memory`, `personal-machine`, `resilience`, `shell`, `sync`, `upgrade` |
 | **performance** | System performance — nice to have, not blocking | `macos`, `tools` |
-| **cosmetic** | Personal preference — ok to skip | `claude`, `cursor`, `enterprise`, `extras`, `jetbrains`, `prompt`, `terminal` |
+| **cosmetic** | Personal preference — ok to skip | `claude`, `cursor`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
 
 Filter usage:
 
@@ -257,6 +257,71 @@ behavioral bootstrap, schema, and backup health.
 | `agent-browser.agent_session_isolation` | agent contexts use a named agent-browser session | None |
 | `agent-browser.agent_session_wired` | zshrc.ai-tools assigns AGENT_BROWSER_SESSION in agent contexts | None |
 
+### chezmoi
+
+Sweeps every chezmoi-managed symlink. Catches links left behind when the repo moves.
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `chezmoi.installed` | advisory — `chezmoi` on PATH | — (hint: `brew bundle`) |
+| `chezmoi.managed_symlinks_valid` | No chezmoi-managed symlink points at a missing target | `chezmoi apply --exclude=scripts` |
+| `chezmoi.managed_symlinks_inventory` | advisory — lists the broken managed symlinks, when any | — |
+| `chezmoi.managed_symlinks_current` | Managed symlinks point into chezmoi's current source checkout | `chezmoi apply --exclude=scripts` |
+
+### local-bin
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `local_bin.dir_exists` | `~/.local/bin` exists | `mkdir -p ~/.local/bin` |
+| `local_bin.on_path` | `~/.local/bin` is on `$PATH` | None (hint: `chezmoi apply`, then open a new shell) |
+
+### personal-machine
+
+Guards the one-time setup of a personal Mac.
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `personal-machine.global_email` | Global git `user.email` is the owner's personal address (not blank, not a company address) | Writes it to `~/.gitconfig.local` |
+| `personal-machine.dotfiles_clone` | `~/apps/tooling/dotfiles` is a checkout of the dotfiles repo on `feat/chezmoi` | `git clone` |
+| `personal-machine.agentbrew_clone` | `~/apps/tooling/agentbrew` is a checkout of the agentbrew repo on `main` | `git clone` |
+
+### resilience
+
+Keeps agents alive through lid close, network drops, and terminal close: tmux, sleepwatcher, network-watchdog, Amphetamine, and the agent keepawake manager. Setup wizard: `dotfiles-resilience-setup`.
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `resilience.tmux_installed` | tmux installed | None (hint: `brew install tmux`) |
+| `resilience.agent_tmux_executable` | `agent-tmux` wrapper is executable | `chmod +x` |
+| `resilience.sleepwatcher_binary` | sleepwatcher binary present | None (hint: `brew install sleepwatcher`) |
+| `resilience.sleepwatcher_loaded` | sleepwatcher LaunchAgent loaded | None (hint: `launchctl bootstrap`) |
+| `resilience.wakeup_hook_exists` | `~/.wakeup` hook fires network-watchdog | None (hint: `dotfiles apply`) |
+| `resilience.network_watchdog_exec` | network-watchdog is executable | `chmod +x` |
+| `resilience.network_watchdog_clean` | network-resilience LaunchAgent last exit is not 127 | None (hint: reload the LaunchAgent) |
+| `resilience.network_watchdog_loaded` | network-resilience LaunchAgent loaded | None (hint: `launchctl bootstrap`) |
+| `resilience.mas_installed` | `mas` (App Store CLI) installed | None (hint: `brew install mas`) |
+| `resilience.amphetamine_installed` | Amphetamine.app installed | None (hint: `dotfiles-resilience-setup`) |
+| `resilience.amphetamine_stale_single_use` | advisory — no stale Amphetamine Single-Use assertion | — (hint: end the Amphetamine session) |
+| `resilience.amphetamine_managed_session_policy` | Amphetamine has no generic trigger or automatic session | Applies the managed session policy |
+| `resilience.amphetamine_sync_tool` | `dotfiles-amphetamine-sync` executable | `chmod +x` |
+| `resilience.amphetamine_sync_in_sync` | Amphetamine preferences match `data/amphetamine-prefs.json` | None (hint: `dotfiles-amphetamine-sync`) |
+| `resilience.agent_keepawake_script` | `dotfiles-agent-keepawake` executable | `chmod +x` |
+| `resilience.agent_wake_recover_script` | `dotfiles-agent-wake-recover` executable | `chmod +x` |
+| `resilience.agent_keepawake_loaded` | agent-keepawake LaunchAgent loaded (full profile with Cursor or Claude Code) | `launchctl bootstrap` or `dotfiles apply` |
+| `resilience.agent_keepawake_battery_policy` | Keepawake covers AC and battery at or above 20% | `dotfiles apply` + kickstart |
+| `resilience.agent_keepawake_lid_closed_automation` | advisory — Amphetamine Automation ready for lid-closed agent work | — (hint: approve Automation once) |
+| `resilience.agent_keepawake_owned_amphetamine_state` | advisory — manager-owned Amphetamine session matches live agents | — (hint: `dotfiles-agent-keepawake`) |
+| `resilience.agent_keepawake_idle_release` | advisory — manager releases sleep protection when no agent runs | — (hint: `dotfiles-agent-keepawake`) |
+| `resilience.wakeup_agent_recover` | `~/.wakeup` runs `dotfiles-agent-wake-recover` | `dotfiles apply` |
+| `resilience.no_legacy_cascade_caffeinate` | Legacy cascade-caffeinate LaunchAgent unloaded | `launchctl bootout` + remove plist |
+| `resilience.stale_caffeinate` | advisory — no stale manager-owned caffeinate child | — (hint: `dotfiles-agent-keepawake`) |
+| `resilience.ac_idle_timers_normal` | AC idle timers are normal outside agent work | `sudo pmset -c ...` |
+| `resilience.pmset_tcpkeepalive` | advisory — TCP keepalive enabled | — (hint: `sudo pmset -a tcpkeepalive 1`) |
+| `resilience.ulimit_sufficient` | `ulimit -n` is at least 4096 | None (hint: raise `ulimit -n` in `~/.zshrc`) |
+| `resilience.launchd_maxfiles` | advisory — launchd maxfiles soft limit is at least 4096 | — (hint: `dotfiles-launchd-maxfiles` in a human terminal; needs sudo once) |
+| `resilience.native_arm64_shell` | advisory — shell runs natively, not under Rosetta, on Apple Silicon | — |
+| `resilience.node_native_arch` | advisory — active node is arm64-native on Apple Silicon | — |
+
 ---
 
 ## Performance
@@ -365,6 +430,77 @@ Gate: skipped entirely when `use_cursor: false` in chezmoi config (default `true
 | `cursor.at_login_launchagent` | `cursor-at-login` LaunchAgent uses `open -g -a Cursor` | `chezmoi apply` |
 | `cursor.at_login_loaded` | `com.dotfiles.cursor-at-login` registered (when Cursor installed) | `launchctl bootstrap` / `chezmoi apply` |
 | `cursor.no_webstorm_login_item` | WebStorm removed from Login Items | `chezmoi apply` (macos-apps.sh) or osascript delete |
+
+### local-ai (conditional)
+
+Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`), plus `opencode serve` on `:4096`. Model checks run only for the engine that is installed or up.
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `local-ai.engine_installed` | LM Studio or Ollama installed | `brew install --cask lm-studio` or `brew install ollama` |
+| `local-ai.opencode_installed` | `opencode` binary present | opencode install script |
+| `local-ai.opencode_signature_valid` | `opencode` code signature is valid | `codesign --force --sign -` |
+| `local-ai.warmup_agent_loaded` | `com.dotfiles.local-ai-warmup` LaunchAgent registered | `launchctl bootstrap` |
+| `local-ai.opencode_serve_agent_loaded` | `com.dotfiles.opencode-serve` LaunchAgent registered | `launchctl bootstrap` |
+| `local-ai.ollama_agent_loaded` | Collision-safe `com.dotfiles.ollama` LaunchAgent registered (Ollama only) | `launchctl bootstrap` |
+| `local-ai.inference_api_responding` | At least one inference API responds | Runs `local-ai-warmup` |
+| `local-ai.opencode_serve_api` | `opencode serve` responds on `:4096` | `launchctl kickstart -k` |
+| `local-ai.lmstudio_primary` / `local-ai.lmstudio_small` | LM Studio primary and small models on disk | `lms get` |
+| `local-ai.ollama_primary` / `local-ai.ollama_small` | Ollama primary and small models on disk | `ollama pull` |
+| `local-ai.oc_alias` | `oc` alias defined for fast attach to `opencode serve` | None (hint: `dotfiles apply`) |
+| `local-ai.opencode_tools_enabled` | `opencode.json` has an Ollama model with `tools: true` | None (hint: edit `~/.config/opencode/opencode.json`) |
+| `local-ai.opencode_mcp_format` | `opencode.json` MCP entries use the type + command-array schema | None (agentbrew owns `~/.config/opencode/`) |
+
+### local-llm
+
+Optional local LLM via `mlx-lm` on Apple Silicon. Tool checks are advisory when `use_local_ai` is `false`. See [docs/local-llm.md](local-llm.md).
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `local-llm.arch.arm64_native` | advisory — shell runs native arm64 (Apple Silicon only) | — |
+| `local-llm.pipx` | pipx installed | `brew install pipx` |
+| `local-llm.aider` | aider installed (pipx `aider-chat`) | `dotfiles apply` |
+| `local-llm.huggingface_cli` | Hugging Face CLI installed (`hf` or `huggingface-cli`) | `dotfiles apply` |
+| `local-llm.mlx_lm` | `mlx_lm.server` on PATH (Apple Silicon only) | `brew install mlx-lm` |
+| `local-llm.server.reachable` | advisory — `mlx_lm.server` reachable | — (hint: start `mlx_lm.server`) |
+| `local-llm.bootstrap.sentinel` | advisory — operator opted into the model download (sentinel file) | — |
+| `local-llm.model.weights_cached` | advisory — model weights cached under `~/.cache/huggingface/hub` | — |
+
+### minsky
+
+The minsky orchestrator checkout, its PATH shim, and its CLI. `MINSKY_REPO` overrides the repo path.
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `minsky.repo_exists` | minsky repo present | `git clone` |
+| `minsky.repo_is_git_checkout` | Repo is a valid git checkout (HEAD resolves) | None (hint: re-clone) |
+| `minsky.shim_symlinked` | `~/.local/bin/minsky` links to `<repo>/bin/minsky` | `ln -sf` |
+| `minsky.help_runs` | `minsky --help` exits 0 | None (hint: `pnpm install` in the repo) |
+| `minsky.observer_log_present` | advisory — `<repo>/.minsky/observer.log` present | — (hint: `minsky --once`) |
+| `minsky.iter_log_recent` | advisory — `iter-once.log` present | — (hint: `minsky --once`) |
+
+### obsidian — full-only
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `tool.obsidian` | Obsidian installed | None (hint: `brew install --cask obsidian`) |
+| `obsidian.vault_exists` | Vault has a `.obsidian/` dir | `mkdir -p` |
+| `obsidian.vim_mode` | Vim mode enabled in the vault | None |
+| `obsidian.daily_folder` | `daily/` folder exists | `mkdir -p` |
+| `obsidian.templates_folder` | `templates/` folder exists | `mkdir -p` |
+
+### vscode (dynamic)
+
+VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor module. Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `vscode.installed` | VS Code installed | None |
+| `vscode.cli` | `code` CLI available | None |
+| `vscode.symlink.settings` | `settings.json` symlinked into `User/` | Symlink from dotfiles source |
+| `vscode.symlink.keybindings` | `keybindings.json` symlinked into `User/` | Symlink from dotfiles source |
+| `vscode.font.jetbrains_mono_nerd` | advisory — JetBrainsMono Nerd Font available | — (hint: Brewfile cask) |
+| `vscode.extension.<slug>` | Each listed extension installed | `code --install-extension` |
 
 ### enterprise
 

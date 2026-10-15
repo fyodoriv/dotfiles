@@ -35,13 +35,6 @@ them. -->
   - **Files**: lib/workspace-discovery.sh, modules/workspace/doctor.sh, bin/dotfiles-workspace, tests/workspace-doctor-discovery.bats, docs/workspace.md
   - **Acceptance**: (a) discovery against a real `tasks workspaces add`-written config passes a new bats case pinning the spec shape; (b) bootstrap-flag checks land or are explicitly rejected with a reason in docs/workspace.md; (c) the Replace/Relocate decision (upstream `tasks` CLI vs dotfiles lib) is recorded in docs/workspace.md with a one-line rationale.
 
-- [ ] Reconcile docs/module-reference.md with every doctor module
-  - **ID**: module-reference-reconcile
-  - **Tags**: scout, docs, drift, doctor
-  - **Details**: docs/module-reference.md drifts from `modules/*/doctor.sh`. As of 2026-10-15 these modules have no section: chezmoi, local-ai, local-bin, local-llm, minsky, obsidian, personal-machine, resilience, vscode.
-  - **Files**: docs/module-reference.md, modules/*/doctor.sh
-  - **Acceptance**: every `modules/<name>/doctor.sh` has a matching `### <name>` section in docs/module-reference.md; module totals stay out of prose (use `make count` when needed); `bats tests/verify-counts.bats` exits 0.
-
 - [ ] User-dir installers for AWS CLI v2 and the gcloud SDK, so `dotfiles apply` reproduces them without brew Python
   - **ID**: user-dir-installers-for-aws-gcloud
   - **Tags**: scout, brew, arm64-migration, endpoint-security, reproducibility

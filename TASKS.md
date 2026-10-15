@@ -50,13 +50,6 @@ them. -->
 
 ## P2
 
-- [ ] Stop `dotfiles-reload-launchagents` calling profile-skipped agents "not deployed"
-  - **ID**: reload-launchagents-honor-skip-rules
-  - **Tags**: scout, launchagents, ux
-  - **Details**: On 2026-10-15 every reload printed `⚠ skip com.dotfiles.heal-stuck-agents — plist not deployed (... run dotfiles apply first)`, and the same for `cursor-at-login` and `chrome-profile`. `dotfiles apply` skips these three on purpose (`should_skip_agent` in `.chezmoiscripts/run_onchange_launchagents.sh.tmpl`: Cursor absent, not enterprise). `com.github.facebook.watchman` is also in the list but is not a dotfiles template. The hint sends the reader to a command that will never deploy them. Reuse the same skip rules in the reload script and print `⊘ <label> — not applicable for this profile`; keep the warning only for an agent apply should have deployed.
-  - **Files**: bin/dotfiles-reload-launchagents, .chezmoiscripts/run_onchange_launchagents.sh.tmpl, tests/
-  - **Acceptance**: a bats test with `USE_CURSOR=false` and no enterprise flag sees the three agents reported as not applicable, and no "run dotfiles apply first" line. Also deploy or drop `com.dotfiles.watchman` from the reload list (merged from `watchman-plist-deploy-or-drop`, 2026-10-15 review).
-
 - [ ] Decide whether `heal-stuck-agents` should run on Macs without Cursor
   - **ID**: heal-stuck-agents-cursor-gate
   - **Tags**: scout, launchagents, agents, self-healing

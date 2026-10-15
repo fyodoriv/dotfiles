@@ -169,3 +169,34 @@ STUB
   grep -q 'com.dotfiles.gui-path' "$TEST_DIR/launchctl.log"
   ! grep -q 'com.dotfiles.tooling-chrome' "$TEST_DIR/launchctl.log" || true
 }
+
+@test "profile-skipped agents are reported as not applicable, not as not deployed" {
+  # A Mac without Cursor and without the enterprise flag: dotfiles apply
+  # skips heal-stuck-agents, cursor-at-login, and chrome-profile on purpose.
+  local label
+  for label in com.dotfiles.gui-path com.dotfiles.dotfiles-doctor; do
+    printf '%s\n' '<?xml version="1.0"?><plist/>' > "$TEST_HOME/Library/LaunchAgents/${label}.plist"
+  done
+
+  DOTFILES_USE_CURSOR=false DOTFILES_IS_ENTERPRISE=false DOTFILES_PROFILE=full \
+    run bash "$RELOAD_CMD"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"com.dotfiles.heal-stuck-agents — not applicable for this profile"* ]]
+  [[ "$output" == *"com.dotfiles.cursor-at-login — not applicable for this profile"* ]]
+  [[ "$output" == *"com.dotfiles.chrome-profile — not applicable for this profile"* ]]
+  [[ "$output" != *"heal-stuck-agents — plist not deployed"* ]]
+  [[ "$output" != *"cursor-at-login — plist not deployed"* ]]
+  [[ "$output" != *"chrome-profile — plist not deployed"* ]]
+}
+
+@test "an agent apply should deploy still warns when its plist is missing" {
+  DOTFILES_USE_CURSOR=false DOTFILES_IS_ENTERPRISE=false DOTFILES_PROFILE=full \
+    run bash "$RELOAD_CMD"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"com.dotfiles.gui-path — plist not deployed"* ]]
+  [[ "$output" == *"run dotfiles apply first"* ]]
+}
+
+@test "reload list holds only dotfiles-owned agents (no watchman)" {
+  ! grep -q 'com.github.facebook.watchman' "$RELOAD_CMD"
+}

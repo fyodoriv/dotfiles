@@ -48,8 +48,27 @@ readonly DOTFILES_LAUNCHAGENTS=(
   com.dotfiles.agent-browser-chrome
   com.dotfiles.debug-chrome
   com.dotfiles.tooling-chrome
-  com.github.facebook.watchman
 )
+
+# Profile skip rules: reuse should_skip_agent from the apply script, so an
+# agent that apply skips on purpose is not reported as "not deployed".
+# The DOTFILES_* variables override chezmoi data (tests, one-off checks).
+_chezmoi_value() {
+  local key="$1" default="$2"
+  chezmoi execute-template "{{ dig \"$key\" \"$default\" . }}" 2>/dev/null || printf '%s' "$default"
+}
+PROFILE="${DOTFILES_PROFILE:-$(_chezmoi_value profile full)}"
+USE_CURSOR="${DOTFILES_USE_CURSOR:-$(_chezmoi_value use_cursor true)}"
+IS_ENTERPRISE="${DOTFILES_IS_ENTERPRISE:-$(_chezmoi_value is_enterprise false)}"
+AUTO_SYNC="${DOTFILES_AUTO_SYNC:-$(_chezmoi_value auto_sync true)}"
+AUTO_UPGRADE="${DOTFILES_AUTO_UPGRADE:-$(_chezmoi_value auto_upgrade false)}"
+CLAUDE_REMOTE_CONTROL="${DOTFILES_CLAUDE_REMOTE_CONTROL:-$(_chezmoi_value claude_remote_control false)}"
+export PROFILE USE_CURSOR IS_ENTERPRISE AUTO_SYNC AUTO_UPGRADE CLAUDE_REMOTE_CONTROL
+_skip_rules_src="$DOTFILES_DIR/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+if [ -f "$_skip_rules_src" ]; then
+  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$_skip_rules_src")"
+fi
+declare -F should_skip_agent >/dev/null || should_skip_agent() { return 1; }
 
 # CDP Chrome LaunchAgents — bootstrap can fail if launchd has not finished
 # bootout or an orphaned headless Chrome still holds the profile/port.
@@ -190,6 +209,10 @@ skipped=0
 
 for label in "${DOTFILES_LAUNCHAGENTS[@]}"; do
   plist="$HOME/Library/LaunchAgents/${label}.plist"
+  if [ ! -f "$plist" ] && should_skip_agent "${label#com.dotfiles.}"; then
+    echo "⊘ $label — not applicable for this profile"
+    continue
+  fi
   if [ ! -f "$plist" ]; then
     warn "skip $label — plist not deployed ($plist missing; run dotfiles apply first)"
     skipped=$((skipped + 1))

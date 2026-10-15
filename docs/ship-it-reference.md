@@ -771,6 +771,8 @@ bin/dotfiles-heal-stuck-agents --fix --quiet
 cd ~/apps/tooling/minsky && minsky install-daemon
 ```
 
+Reading the reload output: `⊘ <label> — not applicable for this profile` means `dotfiles apply` skips that agent on purpose (the same `should_skip_agent` rules, for example no Cursor or not enterprise). It is not a failure. `⚠ skip <label> — plist not deployed` means apply should have deployed the agent; run `dotfiles apply`.
+
 Skip conditional lines only when the condition is false (no minsky delivery → skip `minsky install-daemon`; agentbrew not delivered → skip `npm run build` in agentbrew checkout). Never skip apply, reload, CDP verify, agentbrew sync, `agentbrew measure context`, or doctor for dotfiles/tooling delivery.
 
 `--module chrome` reasserts ChromeWork as the system default browser (Slack/Outlook/Mail link routing) via `chromework-install` when LaunchServices has drifted back to raw Chrome.

@@ -122,3 +122,47 @@ teardown() {
   [[ "$output" == *"blocked agent-authored 'git push --no-verify'"* ]]
   [[ "$output" == *"ref=feature"* ]]
 }
+
+# ── real-git resolution ─────────────────────────────────────────────────────
+#
+# An unaccepted Xcode licence leaves /usr/bin/git executable but failing on
+# every call. The wrapper must probe each candidate and skip a broken one.
+# DOTFILES_SYSTEM_GIT stands in for /usr/bin/git so the tests stay hermetic.
+
+make_git_candidates() {
+  BROKEN_SYSTEM_GIT="$TEST_DIR/system/git"
+  HEALTHY_SYSTEM_GIT="$TEST_DIR/system-ok/git"
+  PATH_GIT_DIR="$TEST_DIR/path-bin"
+  mkdir -p "$TEST_DIR/system" "$TEST_DIR/system-ok" "$PATH_GIT_DIR"
+  printf '#!/bin/bash\necho "Xcode license not accepted" >&2\nexit 69\n' > "$BROKEN_SYSTEM_GIT"
+  printf '#!/bin/bash\necho "system-git $*"\n' > "$HEALTHY_SYSTEM_GIT"
+  printf '#!/bin/bash\necho "path-git $*"\n' > "$PATH_GIT_DIR/git"
+  chmod +x "$BROKEN_SYSTEM_GIT" "$HEALTHY_SYSTEM_GIT" "$PATH_GIT_DIR/git"
+}
+
+@test "real-git resolution skips an executable system git that fails to run" {
+  make_git_candidates
+  run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$BROKEN_SYSTEM_GIT" \
+    PATH="$PATH_GIT_DIR:/usr/bin:/bin" "$GIT_WRAPPER" --version
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == "path-git --version" ]]
+}
+
+@test "real-git resolution keeps the system git when it is healthy" {
+  make_git_candidates
+  run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$HEALTHY_SYSTEM_GIT" \
+    PATH="$PATH_GIT_DIR:/usr/bin:/bin" "$GIT_WRAPPER" status
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == "system-git status" ]]
+}
+
+@test "real-git resolution prefers DOTFILES_REAL_GIT when it is executable" {
+  make_git_candidates
+  run env DOTFILES_REAL_GIT="$PATH_GIT_DIR/git" \
+    DOTFILES_SYSTEM_GIT="$HEALTHY_SYSTEM_GIT" "$GIT_WRAPPER" status
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == "path-git status" ]]
+}

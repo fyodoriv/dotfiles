@@ -24,19 +24,27 @@ PUBLIC_PUSH_ALLOWLIST="${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-$SCRIPT_DIR/../config/p
 # Local-only list of approved private repos (see git-hooks/pre-push).
 PRIVATE_PUSH_ALLOWLIST="${DOTFILES_PRIVATE_PUSH_ALLOWLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/oss-readiness/private-push-remotes.txt}"
 
+# A candidate counts only if it runs. An unaccepted Xcode licence leaves
+# /usr/bin/git executable but failing on every call.
+_git_candidate_runs() {
+  [ -x "$1" ] && "$1" --version >/dev/null 2>&1
+}
+
+# DOTFILES_SYSTEM_GIT exists so tests can stand in for /usr/bin/git.
+SYSTEM_GIT="${DOTFILES_SYSTEM_GIT:-/usr/bin/git}"
 if [ -n "${DOTFILES_REAL_GIT:-}" ] && [ -x "$DOTFILES_REAL_GIT" ]; then
   REAL_GIT="$DOTFILES_REAL_GIT"
-elif [ -x /usr/bin/git ]; then
-  REAL_GIT="/usr/bin/git"
+elif _git_candidate_runs "$SYSTEM_GIT"; then
+  REAL_GIT="$SYSTEM_GIT"
 else
   self_realpath=$(readlink -f "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0" 2>/dev/null || printf '%s' "$0")
   REAL_GIT=""
   IFS=':' read -r -a path_parts <<< "$PATH"
   for p in "${path_parts[@]}"; do
     cand="$p/git"
-    if [ -x "$cand" ]; then
+    if [ -x "$cand" ] && [ "$cand" != "$SYSTEM_GIT" ]; then
       cand_realpath=$(readlink -f "$cand" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$cand" 2>/dev/null || printf '%s' "$cand")
-      if [ "$cand_realpath" != "$self_realpath" ]; then
+      if [ "$cand_realpath" != "$self_realpath" ] && _git_candidate_runs "$cand"; then
         REAL_GIT="$cand"
         break
       fi

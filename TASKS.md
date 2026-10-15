@@ -39,12 +39,6 @@ them. -->
   - **Details**: `bin/dotfiles-npm-global-scripts` repairs a CLI after topgrade's `npm update --location=global` blocks its install scripts. A persistent `allow-scripts=` line in `~/.npmrc` would let the topgrade step succeed on its own. Render that line in `modify_private_dot_npmrc` from `data/npm-global-allow-scripts.json`, so the list stays in one place. Evidence 2026-10-15: every `dotfiles-upgrade` run prints `→ railway --version fails` after the npm step, and the custom step then reinstalls it; a manual `npm install -g @railway/cli` left it broken the same way.
   - **Files**: modify_private_dot_npmrc, data/npm-global-allow-scripts.json, tests/
   - **Acceptance**: a test renders the npmrc from a fixture list and finds one `allow-scripts=` line with every package; `npm update -g` on a fixture prefix keeps a script CLI working.
-- [ ] Make `bin/git` verify the git it selects actually runs, not just that it is executable
-  - **ID**: git-wrapper-verify-selected-git-runs
-  - **Tags**: scout, git, wrapper, resilience, endpoint-security
-  - **Details**: `bin/git` resolves the real git by testing `[ -x /usr/bin/git ]` and preferring that path, falling back to a PATH scan only when the file is absent. An unaccepted Xcode licence leaves `/usr/bin/git` present and executable but failing on every invocation, so the wrapper kept selecting a git that could not run while a healthy Homebrew git 2.55.0 sat at `/opt/homebrew/bin/git`. Result: `git` was broken in the login shell even though a working git was installed, and `git --version` in a shell with `/opt/homebrew/bin` ahead of `/usr/bin` succeeded — making the failure look intermittent and environment-dependent. Harden the resolver to probe the candidate (for example `"$cand" --version >/dev/null 2>&1`) before committing to it, and fall through to the next candidate when the probe fails. Keep `DOTFILES_REAL_GIT` as the explicit override and do not change wrapper behaviour for the healthy case.
-  - **Files**: bin/git, tests/git-wrapper.bats
-  - **Acceptance**: (1) with a stub `/usr/bin/git` that exits non-zero, `bin/git --version` still succeeds via the next candidate; (2) with all candidates healthy the selected git is unchanged from today; (3) `DOTFILES_REAL_GIT` still wins when set and executable; (4) bats covers all three.
 
 - [ ] Install `coreutils` so hook timeout wrappers stop falling back to `perl alarm`
   - **ID**: brewfile-add-coreutils-for-gtimeout

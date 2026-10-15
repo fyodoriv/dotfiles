@@ -97,6 +97,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
+- **Parallel agents**: run at most 3 gate-running agents at once. Eleven froze a 10-core Mac on 2026-10-15. Check `dotfiles-load-sampler --report 1` before adding more.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.

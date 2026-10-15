@@ -686,6 +686,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 | `com.dotfiles.atuin-daemon` | Shell history sync daemon |
 | `com.dotfiles.sleepwatcher` | Run scripts on sleep/wake events |
 | `com.dotfiles.pmset-drift-watch` | Read-only: log each power-settings change with the processes alive at that moment (`logs/pmset-drift.log`) |
+| `com.dotfiles.load-sampler` | Read-only: append load, memory, swap, and top CPU processes every 30s (`~/.local/state/dotfiles/load-samples.tsv`) |
 
 **Login-time (run once at login)**
 
@@ -897,7 +898,14 @@ it keeps Ghostty, WebStorm, and Claude Code launched from a terminal app
 (Ghostty, WebStorm, Terminal, iTerm2, WezTerm, kitty, Alacritty, Warp) or from
 the Claude desktop app's Code tab interactive. Claude Code with no such
 ancestor (launchd jobs, Remote Control) and other agent and model workers
-yield under CPU contention.
+yield under CPU contention. Test runners that agents start (vitest, tsc,
+biome, bats) also yield, so parallel agent gates cannot starve the desktop.
+
+The `load-sampler` LaunchAgent writes load, free memory, swap, and the top
+CPU processes to `~/.local/state/dotfiles/load-samples.tsv` every 30 seconds.
+A forced power-off loses the macOS log buffer; this file survives it. Run
+`dotfiles-load-sampler --report 24` to see the peak load, overload rows, and
+the last row before each gap (a freeze, sleep, or reboot).
 
 WebStorm terminals identify themselves as `JetBrains-JediTerm`. Their default
 fast shell resolves the default fnm Node directly and loads only the
@@ -958,6 +966,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
 | `rancher-desktop` | Start Rancher Desktop and wait until the Docker API answers | At login |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
+| `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 
 **Git workflow**
 

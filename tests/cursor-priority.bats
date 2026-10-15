@@ -111,6 +111,17 @@ teardown() {
   grep -q "WebStorm" "$PGREP_LOG"
 }
 
+@test "cursor-priority backgrounds test runners that agents start" {
+  # vitest workers are node, bats runs as bash: both need full-argv patterns.
+  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  grep -q -- "-f node_modules/vitest" "$PGREP_LOG"
+  grep -q -- "-f bats-core" "$PGREP_LOG"
+  grep -q -- "-x biome" "$PGREP_LOG"
+  grep -q -- "-f node_modules/typescript/bin/tsc" "$PGREP_LOG"
+}
+
 @test "cursor-priority queries minsky processes by pattern" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"

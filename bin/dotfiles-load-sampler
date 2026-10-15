@@ -1,0 +1,63 @@
+#!/bin/bash
+# Keep an on-disk history of system load, so a freeze leaves evidence.
+# A forced power-off drops the unified log buffer; this file survives it.
+# The LaunchAgent appends one row every 30 seconds and keeps about 7 days.
+# Row: epoch, time, load1, load5, load15, cpus, free memory %, swap MB used,
+# process count, top 3 processes by CPU.
+# Usage: dotfiles-load-sampler            # append one row
+#        dotfiles-load-sampler --report [hours]  # peak, overload rows, gaps (default 24h)
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+SAMPLES="${DOTFILES_LOAD_SAMPLES:-$HOME/.local/state/dotfiles/load-samples.tsv}"
+# 7 days at one row per 30 seconds.
+MAX_ROWS="${DOTFILES_LOAD_SAMPLER_MAX_ROWS:-20160}"
+
+report() {
+  local hours="${1:-24}"
+  [ -s "$SAMPLES" ] || { echo "no samples in $SAMPLES"; return 0; }
+  awk -F'\t' -v since="$(( $(date +%s) - hours * 3600 ))" -v hours="$hours" '
+    $1 < since { next }
+    {
+      rows++
+      if ($3 + 0 > peak + 0) { peak = $3; peak_at = $2; peak_top = $10 }
+      if ($3 + 0 > 2 * $6) { over++ }
+      limit = 2 * $6
+      # A gap over 5 minutes means the sampler did not run: sleep, freeze, or reboot.
+      if (prev_epoch && $1 - prev_epoch > 300) {
+        gaps = gaps sprintf("  gap %ds after %s (load1 %s, free mem %s%%, top: %s)\n", $1 - prev_epoch, prev_at, prev_load, prev_mem, prev_top)
+      }
+      prev_epoch = $1; prev_at = $2; prev_load = $3; prev_mem = $7; prev_top = $10
+    }
+    END {
+      printf "last %sh: %d rows\n", hours, rows
+      printf "peak load1 %s at %s (top: %s)\n", peak, peak_at, peak_top
+      printf "overload rows (load1 > %d): %d\n", limit, over
+      printf "%s", gaps
+    }' "$SAMPLES"
+}
+
+if [ "${1:-}" = "--report" ]; then
+  report "${2:-24}"
+  exit 0
+fi
+
+mkdir -p "$(dirname "$SAMPLES")"
+
+read -r _ load1 load5 load15 _ <<< "$(sysctl -n vm.loadavg 2>/dev/null || echo '{ 0 0 0 }')"
+cpus="$(sysctl -n hw.ncpu 2>/dev/null || echo 0)"
+mem_free="$(sysctl -n kern.memorystatus_level 2>/dev/null || echo 0)"
+swap_used="$(sysctl -n vm.swapusage 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "used") { v = $(i + 2); sub(/M$/, "", v); printf "%d", v } }')"
+procs="$(ps -A -o pid= 2>/dev/null | wc -l | tr -d ' ')"
+# awk reads the whole list: `head` would close the pipe and pipefail would exit 141.
+top="$(ps -A -r -o %cpu=,comm= 2>/dev/null | awk 'NR <= 3 { n = $2; sub(/.*\//, "", n); printf "%s%s:%s", (NR > 1 ? " " : ""), n, $1 }')"
+
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "$(date +%s)" "$(date '+%Y-%m-%dT%H:%M:%S')" "$load1" "$load5" "$load15" \
+  "$cpus" "$mem_free" "${swap_used:-0}" "$procs" "$top" >> "$SAMPLES"
+
+rows="$(wc -l < "$SAMPLES" | tr -d ' ')"
+if [ "$rows" -gt "$MAX_ROWS" ]; then
+  tail -n "$MAX_ROWS" "$SAMPLES" > "$SAMPLES.tmp" && mv "$SAMPLES.tmp" "$SAMPLES"
+fi

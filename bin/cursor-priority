@@ -141,6 +141,12 @@ else
   set_process_background "bats"
   set_process_background "shellcheck"
   set_process_background "parallel"
+  # Test runners that agents start run as node or bash, so `pgrep -x` misses
+  # them. Eleven parallel gates froze the desktop on 2026-10-15.
+  set_process_background_pattern "node_modules/vitest"
+  set_process_background_pattern "node_modules/typescript/bin/tsc"
+  set_process_background_pattern "bats-core"
+  set_process_background "biome"
 fi
 
 log_run cursor-priority

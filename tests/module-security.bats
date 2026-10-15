@@ -781,6 +781,35 @@ EOF
   failed_ids_contains "security.deployed_la_stale_dotfiles_path.com.github.facebook.watchman"
 }
 
+@test "security: endpoint-path repair skips an empty-dict stub plist quietly" {
+  # Vendor updaters (Keystone, Dropbox) leave valid XML stubs with no keys.
+  mkdir -p "$TEST_HOME/Library/LaunchAgents"
+  cat > "$TEST_HOME/Library/LaunchAgents/com.google.keystone.agent.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict/>
+</plist>
+EOF
+  install_launchagent_path_repair
+  write_launchctl_reload_stub
+  run_path_repair_with_launchctl_stub 0
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"⚠"* ]] || { echo "unexpected warning: $output"; false; }
+  [[ "$output" != *"not XML"* ]]
+}
+
+@test "security: endpoint-path repair still warns on a malformed plist" {
+  mkdir -p "$TEST_HOME/Library/LaunchAgents"
+  printf '%s\n' '<?xml version="1.0"?><plist><dict><key>Label' \
+    > "$TEST_HOME/Library/LaunchAgents/com.example.broken.plist"
+  install_launchagent_path_repair
+  write_launchctl_reload_stub
+  run_path_repair_with_launchctl_stub 0
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"⚠ Skipping invalid LaunchAgent plist (plutil -lint failed): com.example.broken.plist"* ]]
+}
+
 @test "security: dotfiles-fix-launchagent-endpoint-path repairs watchman stale PATH" {
   mkdir -p "$TEST_HOME/Library/LaunchAgents"
   cat > "$TEST_HOME/Library/LaunchAgents/com.github.facebook.watchman.plist" <<EOF

@@ -198,6 +198,12 @@ codesign -dv "$(command -v jq)" 2>&1 | rg 'Signature|Authority'   # Signature=ad
 binaries. `zsh -c` still loads `~/.zshenv`, so prefer zsh for agent automation.
 Agent hooks that prepend `dotfiles/bin` (`prepend-endpoint-path.sh`) cover agent shells.
 
+**LaunchAgent PATH repair:** `dotfiles-fix-launchagent-endpoint-path` (run by
+`dotfiles apply` and upgrade) puts `dotfiles/bin` first in each deployed
+LaunchAgent's `PATH`. It skips plists with no `Label` quietly: vendor updaters
+(Google Keystone, Dropbox) leave valid stubs with an empty `<dict/>`. It warns
+only when `plutil -lint` fails, which means the plist is really broken.
+
 **Blocked runtimes:** if policy blocks a runtime such as Node or Ollama by
 publisher, run `dotfiles-disable-blocked-node-automation` to stop recurring jobs,
 then ask for a machine-scoped exception. After approval, set

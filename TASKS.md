@@ -38,13 +38,6 @@ them. -->
 
 ## P2
 
-- [ ] Report Label-less LaunchAgent plists as stubs, not "not XML"
-  - **ID**: launchagent-path-fix-stub-plist-message
-  - **Tags**: scout, launchagents, ux
-  - **Details**: `bin/dotfiles-fix-launchagent-endpoint-path` prints `⚠ Skipping invalid LaunchAgent plist (not XML)` for four Google Keystone and Dropbox updater plists on every upgrade. They are valid XML (`plutil -lint` OK) with an empty `<dict/>`: the vendors leave stubs behind. `_plist_valid` only checks for a `Label`. Say what is true (`no Label (empty stub)`) and skip stubs quietly, warning only when `plutil -lint` fails.
-  - **Files**: bin/dotfiles-fix-launchagent-endpoint-path, tests/
-  - **Acceptance**: a bats test with an empty-dict plist sees no warning, and a test with a malformed plist still warns.
-
 - [ ] Flag a non-uv Poetry whose Python interpreter is gone
   - **ID**: doctor-broken-official-poetry
   - **Tags**: scout, doctor, python, upgrade

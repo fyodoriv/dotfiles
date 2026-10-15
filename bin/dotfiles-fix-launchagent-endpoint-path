@@ -136,7 +136,11 @@ fi
 while IFS= read -r plist; do
   [ -f "$plist" ] || continue
   if ! _plist_valid "$plist"; then
-    echo "⚠ Skipping invalid LaunchAgent plist (not XML): $(basename "$plist")" >&2
+    # Vendor updaters (Keystone, Dropbox) leave valid stubs with no Label
+    # (an empty <dict/>): skip them quietly. Warn only on a broken plist.
+    if ! plutil -lint -s "$plist" >/dev/null 2>&1; then
+      echo "⚠ Skipping invalid LaunchAgent plist (plutil -lint failed): $(basename "$plist")" >&2
+    fi
     continue
   fi
   path="$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:PATH' "$plist" 2>/dev/null || true)"

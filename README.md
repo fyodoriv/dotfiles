@@ -991,6 +991,7 @@ scratch work.
 | `status` | System dashboard: fastfetch, dotfiles version, agent status |
 | `timer` | Pomodoro-style countdown timer with macOS notification |
 | `graceful-restart` | Wait for active processes to finish, then restart macOS |
+| `dotfiles-pnpm-global-update` | Update global pnpm packages; skip cleanly when none are installed (topgrade custom step) |
 
 **Build and test infrastructure**
 

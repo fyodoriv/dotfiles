@@ -1,0 +1,24 @@
+#!/bin/bash
+# Update global pnpm packages, or skip cleanly when there are none.
+#
+# topgrade's built-in pnpm step runs `pnpm update -g`. When no global package
+# was ever installed, the global dir has no package.json and pnpm exits 1 with
+# ERR_PNPM_NO_PKG_MANIFEST, so every `dotfiles-upgrade` ended with rc=1.
+# topgrade.toml disables that step and runs this helper instead.
+#
+# Usage: dotfiles-pnpm-global-update
+# Env:   DOTFILES_PNPM_BIN (pnpm to use)
+set -uo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+PNPM="${DOTFILES_PNPM_BIN:-pnpm}"
+command -v "$PNPM" >/dev/null 2>&1 || [ -x "$PNPM" ] || { echo "○ pnpm not found; nothing to do"; exit 0; }
+
+global_root="$("$PNPM" root -g 2>/dev/null)" || global_root=""
+global_dir="${global_root%/node_modules}"
+if [ -z "$global_root" ] || [ ! -f "$global_dir/package.json" ]; then
+  echo "○ pnpm: no global packages (no ${global_dir:-global dir}/package.json); nothing to update"
+  exit 0
+fi
+
+"$PNPM" update -g

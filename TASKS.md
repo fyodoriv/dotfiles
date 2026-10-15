@@ -13,18 +13,6 @@ them. -->
 ## P1
 
 
-- [ ] Stop the pnpm and Poetry topgrade steps failing every `dotfiles-upgrade`
-  - **ID**: topgrade-pnpm-poetry-steps-fail
-  - **Tags**: scout, upgrade, topgrade, stability
-  - **Details**: On 2026-10-12, `dotfiles-upgrade` ended with `✗ Upgrade complete with failures (rc=1)` twice. Two steps fail on every run. (1) pnpm: no pnpm global packages are installed, so `~/Library/pnpm/global/5` has no `package.json` and `pnpm update -g` exits with `ERR_PNPM_NO_PKG_MANIFEST`. (2) Poetry: the official installer writes `~/.local/bin/poetry` as a `#!/bin/sh` and Python polyglot. Topgrade reads that shebang and runs its Python check through `/bin/sh`, which fails with `syntax error near unexpected token`. Make both steps succeed or skip cleanly: for example, skip pnpm when it has no global manifest, and add `poetry` to the `disable` list in `dot_config/topgrade.toml` with a comment naming the installer that owns its updates.
-  - **Files**: dot_config/topgrade.toml, bin/dotfiles-upgrade, tests/
-  - **Acceptance**: `dotfiles-upgrade` on this machine reports pnpm and Poetry as OK or skipped, and a bats test covers the config change.
-  - **Hypothesis**: These two steps cause every rc=1 upgrade result on this machine; fixing them makes a normal upgrade exit 0.
-  - **Success**: the summary of the next `dotfiles-upgrade` run lists 0 `FAILED` steps.
-  - **Pivot**: if another step fails in their place, file that step and stop changing topgrade config here.
-  - **Measurement**: `tail -r ~/.local/share/dotfiles/logs/dotfiles-upgrade.log | awk '/ Summary /{exit} /: FAILED/{c++} END{print c+0}'`
-  - **Anchor**: Forsgren, Humble, Kim, "Accelerate", 2018 (change failure rate).
-
 - [ ] Run the TASKS.md lint in the pre-commit hook on machines without an endpoint Node block
   - **ID**: precommit-tasks-lint-skipped-for-official-node
   - **Tags**: scout, git-hooks, tasks, lint
@@ -210,6 +198,13 @@ them. -->
   - **Anchor**: ollama/ollama#14834 and PRs #14906/#14915; docs/user-stories/09-run-local-models-fast.md.
 
 ## P2
+
+- [ ] Flag a non-uv Poetry whose Python interpreter is gone
+  - **ID**: doctor-broken-official-poetry
+  - **Tags**: scout, doctor, python, upgrade
+  - **Details**: On 2026-10-15 the official-installer Poetry (`~/.local/bin/poetry` plus `~/Library/Application Support/pypoetry/venv`) linked to pyenv Python 3.10.0, which no longer existed, so `poetry` and topgrade's Poetry step failed on every upgrade. `run_after_uv-tools.sh` saw the file and skipped `uv tool install poetry` ("already provided by ... not uv-managed"). The fix on that Mac was to move both paths aside and run `uv tool install poetry`. Have the doctor report a non-uv `poetry` whose `poetry --version` fails, with that fix as the hint.
+  - **Files**: modules/*/doctor.sh, tests/
+  - **Acceptance**: with a stub `poetry` that fails `--version` and is not under the uv tool dir, the doctor reports it with the move-aside and `uv tool install poetry` hint.
 
 
 - [ ] Make `tests/module-resilience.bats` source the doctor module again

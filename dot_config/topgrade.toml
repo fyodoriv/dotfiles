@@ -82,6 +82,12 @@ disable = [
   # repos on this machine; re-enable by deleting this line once `helm repo
   # list` shows ≥1 repo.
   "helm",
+
+  # `pnpm update -g` exits 1 with ERR_PNPM_NO_PKG_MANIFEST when no global pnpm
+  # package was ever installed, which failed every upgrade. The custom step
+  # below (bin/dotfiles-pnpm-global-update) updates only when the global
+  # package.json exists.
+  "pnpm",
 ]
 
 [brew]
@@ -123,6 +129,10 @@ poetry_force_self_update = false
 # custom step runs after it: it reinstalls with --allow-scripts when a declared
 # CLI is outdated or broken, then checks `<bin> --version`.
 "npm global CLIs with install scripts" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-npm-global-scripts"
+
+# Replaces the built-in pnpm step (disabled above): skips cleanly when there
+# are no global pnpm packages instead of failing the run.
+"pnpm globals (skips when none)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-pnpm-global-update"
 
 # ── Post-upgrade fixups ─────────────────────────────────────────────
 # These run AFTER every successful topgrade run, regardless of how

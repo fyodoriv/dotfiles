@@ -199,6 +199,27 @@ them. -->
 
 ## P2
 
+- [ ] Stop `dotfiles-reload-launchagents` calling profile-skipped agents "not deployed"
+  - **ID**: reload-launchagents-honor-skip-rules
+  - **Tags**: scout, launchagents, ux
+  - **Details**: On 2026-10-15 every reload printed `⚠ skip com.dotfiles.heal-stuck-agents — plist not deployed (... run dotfiles apply first)`, and the same for `cursor-at-login` and `chrome-profile`. `dotfiles apply` skips these three on purpose (`should_skip_agent` in `.chezmoiscripts/run_onchange_launchagents.sh.tmpl`: Cursor absent, not enterprise). `com.github.facebook.watchman` is also in the list but is not a dotfiles template. The hint sends the reader to a command that will never deploy them. Reuse the same skip rules in the reload script and print `⊘ <label> — not applicable for this profile`; keep the warning only for an agent apply should have deployed.
+  - **Files**: bin/dotfiles-reload-launchagents, .chezmoiscripts/run_onchange_launchagents.sh.tmpl, tests/
+  - **Acceptance**: a bats test with `USE_CURSOR=false` and no enterprise flag sees the three agents reported as not applicable, and no "run dotfiles apply first" line.
+
+- [ ] Decide whether `heal-stuck-agents` should run on Macs without Cursor
+  - **ID**: heal-stuck-agents-cursor-gate
+  - **Tags**: scout, launchagents, agents, self-healing
+  - **Details**: `should_skip_agent` skips the `heal-stuck-agents` LaunchAgent when `USE_CURSOR=false` or Cursor.app is absent. Its fixes (hung `git-upload-pack` SSH sessions, stale sandbox shells, runaway high-CPU helpers, idle SSH mux sockets) can also come from Claude Code and Codex. On this Mac the agent never runs on a schedule; only `dotfiles apply` runs it once. Check which matchers are Cursor-specific. If most are not, gate on "any agent CLI present" (as `agent-keepawake` does) instead of Cursor.
+  - **Files**: .chezmoiscripts/run_onchange_launchagents.sh.tmpl, bin/dotfiles-heal-stuck-agents, tests/
+  - **Acceptance**: the gate and the script header agree on which agents it serves, and a bats test covers a Mac with Claude Code and no Cursor.
+
+- [ ] Report Label-less LaunchAgent plists as stubs, not "not XML"
+  - **ID**: launchagent-path-fix-stub-plist-message
+  - **Tags**: scout, launchagents, ux
+  - **Details**: `bin/dotfiles-fix-launchagent-endpoint-path` prints `⚠ Skipping invalid LaunchAgent plist (not XML)` for four Google Keystone and Dropbox updater plists on every upgrade. They are valid XML (`plutil -lint` OK) with an empty `<dict/>`: the vendors leave stubs behind. `_plist_valid` only checks for a `Label`. Say what is true (`no Label (empty stub)`) and skip stubs quietly, warning only when `plutil -lint` fails.
+  - **Files**: bin/dotfiles-fix-launchagent-endpoint-path, tests/
+  - **Acceptance**: a bats test with an empty-dict plist sees no warning, and a test with a malformed plist still warns.
+
 - [ ] Flag a non-uv Poetry whose Python interpreter is gone
   - **ID**: doctor-broken-official-poetry
   - **Tags**: scout, doctor, python, upgrade
@@ -217,7 +238,7 @@ them. -->
 - [ ] Render npm `allow-scripts` into ~/.npmrc from the shared CLI list
   - **ID**: npmrc-allow-scripts-from-list
   - **Tags**: npm, upgrade, resilience
-  - **Details**: `bin/dotfiles-npm-global-scripts` repairs a CLI after topgrade's `npm update --location=global` blocks its install scripts. A persistent `allow-scripts=` line in `~/.npmrc` would let the topgrade step succeed on its own. Render that line in `modify_private_dot_npmrc` from `data/npm-global-allow-scripts.json`, so the list stays in one place.
+  - **Details**: `bin/dotfiles-npm-global-scripts` repairs a CLI after topgrade's `npm update --location=global` blocks its install scripts. A persistent `allow-scripts=` line in `~/.npmrc` would let the topgrade step succeed on its own. Render that line in `modify_private_dot_npmrc` from `data/npm-global-allow-scripts.json`, so the list stays in one place. Evidence 2026-10-15: every `dotfiles-upgrade` run prints `→ railway --version fails` after the npm step, and the custom step then reinstalls it; a manual `npm install -g @railway/cli` left it broken the same way.
   - **Files**: modify_private_dot_npmrc, data/npm-global-allow-scripts.json, tests/
   - **Acceptance**: a test renders the npmrc from a fixture list and finds one `allow-scripts=` line with every package; `npm update -g` on a fixture prefix keeps a script CLI working.
 - [ ] dotfiles-audit tests pass on a machine with real shims

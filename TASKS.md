@@ -12,18 +12,6 @@ them. -->
 
 ## P1
 
-- [ ] Run the TASKS.md lint in the pre-commit hook on machines without an endpoint Node block
-  - **ID**: precommit-tasks-lint-skipped-for-official-node
-  - **Tags**: scout, git-hooks, tasks, lint
-  - **Details**: `git-hooks/pre-commit` skips the TASKS.md lint when `node` is signed with the Node.js Foundation team ID, and prints `TASKS.md npx lint deferred to CI`. GitHub Actions is off on this repo, so "deferred to CI" means the lint never runs. Every official Node build has that signature, so the lint never runs at commit time. GitHub Actions are off on this repo, so no CI runs it either. On 2026-10-12 the endpoint block marker `~/.local/state/dotfiles/endpoint-node-publisher-blocked` was absent, yet the hook still skipped. Gate the skip on that marker, as the other endpoint safe-mode paths do, and change the message so it does not promise a CI run.
-  - **Files**: git-hooks/pre-commit, tests/
-  - **Acceptance**: with official Node and no marker, staging a malformed TASKS.md fails the commit; with the marker, the hook skips with a message that names the marker.
-  - **Hypothesis**: the signature check is the only reason the lint skips on this machine; gating on the marker makes it run.
-  - **Success**: a bats test with an official-signature node stub and no marker sees the lint run (1 of 1 cases).
-  - **Pivot**: if the lint cannot run safely without the signature check, keep the skip and make `make check` run `lint-tasks` instead.
-  - **Measurement**: `bats tests/pre-commit-tasks-lint.bats`
-  - **Anchor**: Basili, Caldiera, Rombach, "The Goal Question Metric Approach", 1994.
-
 - [ ] Keep Spotlight out of the agent worktree folder
   - **ID**: spotlight-exclude-agent-worktrees
   - **Tags**: scout, performance, macos, worktrees

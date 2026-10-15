@@ -278,15 +278,12 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
   # When TASKS.md is staged, validate it against the @tasks-md/lint spec
   # so malformed entries can't land. Same npx pinning as `make lint-tasks`.
   if printf '%s\n' "${STAGED[@]}" | grep -qx 'TASKS.md' 2>/dev/null; then
-    node_path="$(command -v node 2>/dev/null || true)"
-    node_signature=""
-    if [ -n "$node_path" ] && command -v codesign >/dev/null 2>&1; then
-      node_signature="$(codesign -dvv "$node_path" 2>&1 || true)"
-    fi
-    if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$node_signature" \
+    # Skip only where endpoint policy blocks the Node.js Foundation publisher.
+    # bin/dotfiles-disable-blocked-node-automation writes this marker.
+    node_block_marker="$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked"
+    if [ -e "$node_block_marker" ] \
         && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
-      printf '%s⚠ TASKS.md npx lint deferred to CI: Node.js Foundation publisher is blocked.%s\n' "$YEL" "$RST" >&2
-      node_path=""
+      printf '%s⚠ TASKS.md lint skipped: %s exists (endpoint blocks Node). Run make lint-tasks where Node is allowed.%s\n' "$YEL" "$node_block_marker" "$RST" >&2
     else
     tasks_lint_version=""
     if [ -f "$CURRENT_REPO/.tasks-lint-version" ]; then
@@ -303,7 +300,7 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
       exit 1
     fi
     fi
-    unset node_path node_signature
+    unset node_block_marker
   fi
 fi
 

@@ -7,8 +7,10 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   TEST_HOME="$TEST_DIR/home"
   TEST_DOTFILES="$TEST_DIR/dotfiles"
-  mkdir -p "$TEST_HOME" "$TEST_DOTFILES/modules/resilience" "$TEST_DOTFILES/bin"
+  mkdir -p "$TEST_HOME" "$TEST_DOTFILES/modules/resilience" "$TEST_DOTFILES/bin" "$TEST_DOTFILES/lib"
   cp "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" "$TEST_DOTFILES/modules/resilience/"
+  # doctor.sh sources this helper at load time.
+  cp "$BATS_TEST_DIRNAME/../lib/agent-keepawake.sh" "$TEST_DOTFILES/lib/"
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
 

@@ -33,13 +33,6 @@ them. -->
   - **Files**: modules/*/doctor.sh, tests/
   - **Acceptance**: with a stub `poetry` that fails `--version` and is not under the uv tool dir, the doctor reports it with the move-aside and `uv tool install poetry` hint.
 
-- [ ] Make `tests/module-resilience.bats` source the doctor module again
-  - **ID**: module-resilience-bats-missing-lib
-  - **Tags**: scout, tests, resilience
-  - **Details**: The tmux tests fail on `feat/chezmoi` (d600271): `source modules/resilience/doctor.sh` stops because the test setup copies only `doctor.sh`, and the module now sources `lib/agent-keepawake.sh`. `make check` misses it because the file is not in the affected set unless the module changes.
-  - **Files**: tests/module-resilience.bats
-  - **Acceptance**: `bats tests/module-resilience.bats` passes; the setup copies or points at `lib/agent-keepawake.sh`; the test is removed from the AGENTS.md "Known base failures" list.
-
 - [ ] Render npm `allow-scripts` into ~/.npmrc from the shared CLI list
   - **ID**: npmrc-allow-scripts-from-list
   - **Tags**: npm, upgrade, resilience

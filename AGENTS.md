@@ -98,7 +98,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
-- **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/module-resilience.bats` (the tmux tests) and `tests/coverage.bats` "single test file" report.
+- **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
 
 ## Delivery

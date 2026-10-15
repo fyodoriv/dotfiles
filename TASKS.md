@@ -12,18 +12,6 @@ them. -->
 
 ## P1
 
-- [ ] Keep Spotlight out of the agent worktree folder
-  - **ID**: spotlight-exclude-agent-worktrees
-  - **Tags**: scout, performance, macos, worktrees
-  - **Details**: Agents create many git worktrees under `~/apps/tooling/wt`, each with its own `node_modules`. Spotlight (`mdworker`) indexes all of them. On 2026-10-12, about 25 worktrees from one session kept load near 44 on 10 cores after the work had stopped. Make `dotfiles apply` exclude the folder from Spotlight without admin rights, for example with a `.metadata_never_index` marker file, and have the doctor check it.
-  - **Files**: bin/dotfiles, bin/dotfiles-doctor, tests/
-  - **Acceptance**: `~/apps/.metadata_never_index` has existed since 2026-09-27, yet mdworker still indexed the worktrees on 2026-10-12, so the marker alone does not work. Either move agent worktrees to a `.noindex` folder (for example `~/apps/tooling/wt.noindex`, updating every script and doc that names `wt`), or add a doctor hint with the Spotlight Privacy-list or `mdutil` step for the user; then re-measure.
-  - **Hypothesis**: Spotlight indexing of worktrees is the main load source after a parallel agent session; excluding the folder removes it.
-  - **Success**: after a session that creates at least 10 worktrees, `mdworker` CPU stays under 50% total in the next 10 minutes.
-  - **Pivot**: If neither a `.noindex` folder nor the Privacy list stops indexing, drop the exclusion and cap parallel worktrees instead.
-  - **Measurement**: `ps -A -o %cpu,comm | rg mdworker | awk '{s+=$1} END {print s}'`
-  - **Anchor**: Gregg, "Systems Performance", 2nd ed., 2020 (USE method).
-
 ## P2
 
 - [ ] Flag a non-uv Poetry whose Python interpreter is gone

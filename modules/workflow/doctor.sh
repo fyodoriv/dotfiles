@@ -54,6 +54,18 @@ for dir in "${DOTFILES_REPOS_DIR:-$HOME/apps}" "$HOME/.nvm" "$HOME/.gradle" "$HO
     "touch '$dir/.metadata_never_index' 2>/dev/null"
 done
 
+# Agent worktrees: a `.metadata_never_index` marker does not stop Spotlight
+# there, a `.noindex` folder name does (lib/agent-worktrees-noindex.sh).
+if [ -f "$DOTFILES_DIR/lib/agent-worktrees-noindex.sh" ]; then
+  # shellcheck source=../../lib/agent-worktrees-noindex.sh
+  source "$DOTFILES_DIR/lib/agent-worktrees-noindex.sh"
+  if [ -d "$(dirname "$(agent_worktrees_dir)")" ]; then
+    check "spotlight.agent_worktrees" "$(agent_worktrees_dir) is a symlink to a Spotlight-skipped .noindex folder" \
+      "agent_worktrees_noindexed" \
+      "agent_worktrees_noindex_fix"
+  fi
+fi
+
 # Secrets-in-zshrc check removed — covered by security module (dotfiles audit)
 
 # PATH check moved to shell/doctor.sh (shell.dotfiles_on_path)

@@ -104,6 +104,7 @@ unverifiable scans are always repeated.
 |----|---------------|----------|
 | `agent.*` | All deployed `com.dotfiles.*` LaunchAgents loaded | `launchctl load` |
 | `spotlight.*` (11 dirs) | Dev directories excluded from Spotlight indexing (`~/apps`, `~/.cache`, `~/.npm`, `~/.yarn`, `~/.docker`, `~/.pyenv`, `~/.local`, `~/.config`, `~/Library/Caches`, etc.) | `touch .metadata_never_index` |
+| `spotlight.agent_worktrees` | `~/apps/tooling/wt` is a symlink to `wt.noindex`. Spotlight skips a `.noindex` folder; it ignores the `.metadata_never_index` marker there. Runs only when `~/apps/tooling` exists. | Rename `wt` to `wt.noindex` and link `wt` to it. Existing worktree paths keep working. |
 
 Spotlight check count varies based on which directories exist on your machine.
 

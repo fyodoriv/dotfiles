@@ -128,6 +128,28 @@ PLIST
   [ -f "$TEST_HOME/apps/.metadata_never_index" ]
 }
 
+@test "workflow: agent worktree check fails for a real wt folder and fix makes it .noindex" {
+  mkdir -p "$TEST_DOTFILES/lib" "$TEST_HOME/apps/tooling/wt/feature"
+  cp "$BATS_TEST_DIRNAME/../lib/agent-worktrees-noindex.sh" "$TEST_DOTFILES/lib/"
+  touch "$TEST_HOME/apps/.metadata_never_index"
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  [ "$fail_count" -ge 1 ]
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  [ -L "$TEST_HOME/apps/tooling/wt" ]
+  [ -d "$TEST_HOME/apps/tooling/wt.noindex/feature" ]
+}
+
+@test "workflow: agent worktree check is skipped without a tooling folder" {
+  mkdir -p "$TEST_DOTFILES/lib" "$TEST_HOME/apps"
+  cp "$BATS_TEST_DIRNAME/../lib/agent-worktrees-noindex.sh" "$TEST_DOTFILES/lib/"
+  touch "$TEST_HOME/apps/.metadata_never_index"
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  [ "$fail_count" -eq 0 ]
+  [ ! -e "$TEST_HOME/apps/tooling" ]
+}
+
 @test "workflow: skips spotlight for non-existent directories" {
   # $HOME/apps doesn't exist, so the loop continues past it
   # Only the launchagent checks should run (jira check was removed)

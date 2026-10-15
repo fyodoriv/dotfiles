@@ -12,5 +12,5 @@
 
 # Incomplete HDD — genuine stability work (observability / regression-risk),
 # promote once the 5 HDD fields are authored:
-doctor-notification-content-test
-chrome-enforce-profile-bad-default-fallback
+# 2026-10-15 /review-tasks: the local-AI loop has not run since 2026-05-11 and no inference engine is reachable; promote when local AI is back in use.
+overnight-grind-branch-per-task

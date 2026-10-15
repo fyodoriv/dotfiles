@@ -19,6 +19,7 @@ only the doc the routing table names. Do not read the README end to end.
 | Tests affected by a committed branch | `bin/bats-affected origin/feat/chezmoi \| xargs bats` |
 | Full suite (slow; run in the background) | `make test-all` |
 | Lint only / TASKS.md only | `make lint` / `make lint-tasks` |
+| Review the task queue (truth, usefulness, priority) | `/review-tasks` (tasks.md command, installed by the Agentfile) |
 | Apply to this Mac | `dotfiles apply` (needed after `Agentfile.yaml` edits) |
 | Check one module | `dotfiles doctor --module <name>` |
 

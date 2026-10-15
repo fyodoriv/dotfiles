@@ -114,6 +114,9 @@ prune_old_dirs() {
     done <<< "$candidates"
     [ "$pruned" -gt 0 ] && echo -e "${GREEN}✓${NC} Pruned $pruned old $label (>${MIN_AGE_DAYS}d, kept $keep)"
   fi
+  # A false test above must not become the return status: under set -e it
+  # would abort cleanup before "Done!" and fail every dotfiles-upgrade.
+  return 0
 }
 
 cleanup_main() {

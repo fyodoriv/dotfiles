@@ -257,3 +257,16 @@ _load_is_safe_path() {
   after_size=$(wc -c < "$LOG_DIR/huge.log" | tr -d ' ')
   [ "$after_size" -eq "$original_size" ]
 }
+
+@test "prune_old_dirs returns 0 when no candidate is old enough" {
+  _load_is_safe_path
+  DRY_RUN=false
+  MIN_AGE_DAYS=30
+  local snapshots="$HOME/.dotfiles-snapshots"
+  for n in 01 02 03; do mkdir -p "$snapshots/2026101${n}_000000"; done
+
+  run prune_old_dirs "snapshot(s)" "$snapshots" 1
+
+  [ "$status" -eq 0 ]
+  [ "$(ls "$snapshots" | wc -l | tr -d ' ')" -eq 3 ]
+}

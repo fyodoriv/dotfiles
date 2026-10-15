@@ -46,6 +46,16 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
+# The real security module also runs machine checks (curl/jq/python shims,
+# PATH order, LaunchAgents). Those fail inside the fake dotfiles dir on any
+# Mac. Tests that pin the wrapper's own exit logic swap in a module that only
+# passes, so the result does not depend on this machine.
+use_passing_security_module() {
+  cat > "$FAKE_DOTFILES/modules/security/doctor.sh" <<'MOD'
+check "security.stub" "stub security check" "true"
+MOD
+}
+
 @test "dotfiles-audit runs without errors" {
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"
@@ -73,7 +83,7 @@ teardown() {
 @test "dotfiles-audit checks private key permissions" {
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"
-  echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$HOME/.ssh/id_test"
+  echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$HOME/.ssh/id_test" # dotfiles-secret-allowlist: fake key header for the permissions check
   chmod 600 "$HOME/.ssh/id_test"
   run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
   [[ "$output" == *"id_test permissions"* ]]
@@ -82,7 +92,7 @@ teardown() {
 @test "dotfiles-audit flags world-readable private key" {
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"
-  echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$HOME/.ssh/id_test"
+  echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$HOME/.ssh/id_test" # dotfiles-secret-allowlist: fake key header for the permissions check
   chmod 644 "$HOME/.ssh/id_test"
   run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
   [[ "$output" == *"id_test permissions"* ]]
@@ -138,8 +148,9 @@ teardown() {
   echo 'API_KEY="sk_live_intentionaltestfixture"' > "$FAKE_DOTFILES/tests/audit_fixture.bats" # dotfiles-secret-allowlist: writes an explicit fixture-path secret
   (cd "$FAKE_DOTFILES" && git add tests/audit_fixture.bats && git commit -q -m "add test fixture" --author="test <test@test>")
   run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
-  [ "$status" -eq 0 ]
+  # Do not assert the exit code: machine shim checks may fail here.
   [[ "$output" == *"No secrets detected in tracked files"* ]]
+  [[ "$output" != *"No secrets in"* ]]
   [[ "$output" != *"tests/audit_fixture.bats"* ]]
 }
 
@@ -190,6 +201,7 @@ teardown() {
 @test "dotfiles-audit passes root artifact check in clean repo" {
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"
+  use_passing_security_module
 
   run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
   [ "$status" -eq 0 ]
@@ -239,7 +251,7 @@ teardown() {
 @test "dotfiles-audit exits 1 when failures found" {
   mkdir -p "$HOME/.ssh"
   chmod 755 "$HOME/.ssh"
-  echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$HOME/.ssh/id_test"
+  echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$HOME/.ssh/id_test" # dotfiles-secret-allowlist: fake key header for the permissions check
   chmod 644 "$HOME/.ssh/id_test"
   run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
   [ "$status" -eq 1 ]
@@ -248,6 +260,7 @@ teardown() {
 @test "dotfiles-audit exits 0 when no failures" {
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"
+  use_passing_security_module
   run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
   [ "$status" -eq 0 ]
 }

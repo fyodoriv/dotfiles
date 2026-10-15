@@ -69,6 +69,42 @@ count_log() {
   [ ! -e "$DOTFILES_RELOAD_MARKER_DIR/$SYNC_LABEL" ]
 }
 
+@test "install_plist from a manual apply defers while a sync run holds the lock" {
+  write_install_script
+  sleep 30 & sync_pid=$!
+  printf '%s\n%s\n' "$sync_pid" sync > "$DOTFILES_LOCK"
+  run bash "$TEST_DIR/install.sh"
+  kill "$sync_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(count_log '^unload')" -eq 0 ]
+  [ "$(count_log '^load')" -eq 0 ]
+  [ -e "$DOTFILES_RELOAD_MARKER_DIR/$SYNC_LABEL" ]
+  grep -q 'plist new' "$HOME/Library/LaunchAgents/$SYNC_LABEL.plist"
+}
+
+@test "install_plist reloads at once when the sync lock owner is dead" {
+  write_install_script
+  bash -c 'exit 0' & dead_pid=$!
+  wait "$dead_pid"
+  printf '%s\n%s\n' "$dead_pid" sync > "$DOTFILES_LOCK"
+  run bash "$TEST_DIR/install.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_log '^unload')" -eq 1 ]
+  [ "$(count_log '^load')" -eq 1 ]
+  [ ! -e "$DOTFILES_RELOAD_MARKER_DIR/$SYNC_LABEL" ]
+}
+
+@test "install_plist reloads at once while a manual apply holds the lock" {
+  write_install_script
+  sleep 30 & apply_pid=$!
+  printf '%s\n%s\n' "$apply_pid" apply > "$DOTFILES_LOCK"
+  run bash "$TEST_DIR/install.sh"
+  kill "$apply_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(count_log '^unload')" -eq 1 ]
+  [ ! -e "$DOTFILES_RELOAD_MARKER_DIR/$SYNC_LABEL" ]
+}
+
 @test "reload --deferred reloads a marked job once, then does nothing" {
   mkdir -p "$DOTFILES_RELOAD_MARKER_DIR"
   : > "$DOTFILES_RELOAD_MARKER_DIR/$SYNC_LABEL"

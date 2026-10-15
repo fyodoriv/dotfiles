@@ -89,11 +89,11 @@ remove_skipped_agent() {
   local short="$1" dst_name="$2"
   local dst="$HOME/Library/LaunchAgents/$dst_name"
   [ -f "$dst" ] || return 1
-  if self_reload_is_self "${dst_name%.plist}"; then
+  if self_reload_should_defer "${dst_name%.plist}"; then
     # Unloading would kill this running job; remove it after the run ends.
     rm -f "$dst"
     self_reload_defer "${dst_name%.plist}"
-    echo "⏳ Deferred removal of $short (running inside it; follow-up after this run)"
+    echo "⏳ Deferred removal of $short (job is running; follow-up after this run)"
     return 0
   fi
   launchctl unload "$dst" 2>/dev/null || true
@@ -142,8 +142,9 @@ install_plist() {
 
   local dst="$HOME/Library/LaunchAgents/$dst_name"
   local self_job=false
-  self_reload_is_self "${dst_name%.plist}" && self_job=true
-  # A running job must not unload itself: launchd would kill the rest of the run.
+  self_reload_should_defer "${dst_name%.plist}" && self_job=true
+  # Never unload a running job (this one, or a sync launchd is running now):
+  # launchd would kill the rest of the run.
   $self_job || launchctl unload "$dst" 2>/dev/null || true
 
   if [[ "$src" == *.tmpl ]]; then
@@ -161,7 +162,7 @@ install_plist() {
 
   if $self_job; then
     self_reload_defer "${dst_name%.plist}"
-    echo "⏳ $name (running inside it; reload deferred until this run ends)"
+    echo "⏳ $name (job is running; reload deferred until this run ends)"
     return 0
   fi
 

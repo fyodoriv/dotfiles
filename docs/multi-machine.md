@@ -15,6 +15,8 @@ This means changes made on Machine A appear on Machine B within ~30 minutes, wit
 
 When chezmoi's source is a separate applied checkout (a linked worktree on its own branch that tracks the canonical branch), sync only fast-forwards that checkout and re-runs `chezmoi apply`. It never commits or pushes from it, and it leaves the checkout untouched when it has local changes or has diverged.
 
+An apply never unloads the `dotfiles-sync` LaunchAgent while a sync runs, because unloading kills the run. This covers the sync's own `chezmoi apply` and a manual `chezmoi apply` that starts while launchd runs a sync (the sync holds `~/.dotfiles.lock`). The apply writes a marker in `~/.local/state/dotfiles/pending-reload/`, and the sync reloads the agent once after it ends.
+
 ---
 
 ## Setting Up a Second Machine

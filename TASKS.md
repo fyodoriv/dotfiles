@@ -24,18 +24,6 @@ them. -->
   - **Measurement**: `ps -A -o %cpu,comm | rg mdworker | awk '{s+=$1} END {print s}'`
   - **Anchor**: Gregg, "Systems Performance", 2nd ed., 2020 (USE method).
 
-- [ ] Explain the 10-minute `dotfiles-doctor --fix --quiet` run inside `dotfiles apply`
-  - **ID**: doctor-fix-apply-wall-time-unexplained
-  - **Tags**: scout, doctor, performance
-  - **Details**: On 2026-10-12 a full `dotfiles-doctor --quiet` took 45-52s (load 30-40, warm cache) and 69s with a cold bottle cache. Yet `dotfiles-doctor --fix --quiet` inside `dotfiles apply` took about 10 minutes the same day. Read-only runs cannot explain it. Suspects: the cold bottle audit right after brew changes, each failing check's fix running up to `FIX_TIMEOUT` (30s), and load from the apply itself. `DOTFILES_DOCTOR_TIMING=1` now prints per-module seconds; make `bin/dotfiles` apply set it and keep the output in the doctor log so the next slow run names its module. New lead (2026-10-15): an apply started from a Claude desktop Code-tab session inherited the background band (nice 10, PRI 4) from `cursor-priority`; its `dotfiles-doctor --fix --quiet` step ran 29 minutes, then finished 7 s after `taskpolicy -B` lifted the band, and a standalone unthrottled `dotfiles doctor` took 50 s. The Claude.app ancestor fix removes that cause for Desktop sessions; re-measure before adding timing work.
-  - **Files**: bin/dotfiles, bin/dotfiles-doctor
-  - **Acceptance**: Step 1: re-measure `dotfiles apply` now that the PRI-4 band fix (#66) landed. If the doctor step takes at most 2 minutes, close this task as fixed by #66. Otherwise, after one `dotfiles apply` the doctor log holds a `doctor-timing:` block (set `DOTFILES_DOCTOR_TIMING` from `bin/dotfiles`).
-  - **Hypothesis**: The slow part is one module or one fix, not the checks as a whole. The log shows it in one run.
-  - **Success**: the log names the slowest module for every apply.
-  - **Pivot**: if the timing block shows no module above 30s, profile the fix path instead.
-  - **Measurement**: `rg -c 'doctor-timing:' ~/.local/share/dotfiles/logs/dotfiles-doctor.log`
-  - **Anchor**: Basili, Caldiera, Rombach, "The Goal Question Metric Approach", 1994.
-
 ## P2
 
 - [ ] Flag a non-uv Poetry whose Python interpreter is gone

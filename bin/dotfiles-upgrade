@@ -14,7 +14,7 @@
 #   - macOS notification on completion
 #   - last-upgrade timestamp file for `dotfiles stats`
 #
-# topgrade's own behaviour is configured via dot_config/topgrade.toml
+# topgrade's own behaviour is configured via dot_config/topgrade.toml.tmpl
 # (lands at ~/.config/topgrade.toml — topgrade reads the file directly,
 # not a subdir).
 # Run `topgrade --edit-config` to open + edit that file.
@@ -151,13 +151,13 @@ fi
 # whenever a Devin/minsky session is up — which fails the whole upgrade
 # (the original symptom: "Timeout (300s) when waiting for lock on .../uv").
 # Cache pruning instead runs via the [post_commands] `cleanup` step
-# (bin/cleanup) in dot_config/topgrade.toml: it already covers brew / npm /
+# (bin/cleanup) in dot_config/topgrade.toml.tmpl: it already covers brew / npm /
 # yarn and is lock-tolerant (errors swallowed; its uv prune uses a short
 # UV_LOCK_TIMEOUT so it skips fast when the cache is busy).
 #
 # Per-step configuration (which managers to run, brew greedy mode,
 # post-upgrade bottle re-signing + cache cleanup) lives in
-# dot_config/topgrade.toml — don't override via flags here.
+# dot_config/topgrade.toml.tmpl — don't override via flags here.
 _args=(--no-tmux --yes)
 if $DRY_RUN; then
   _args+=(--dry-run)

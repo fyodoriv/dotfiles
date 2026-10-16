@@ -27,6 +27,13 @@
 
 _MINSKY_REPOS_DIR="${DOTFILES_REPOS_DIR:-$HOME/apps}"
 _MINSKY_REPO="${MINSKY_REPO:-$_MINSKY_REPOS_DIR/tooling/minsky}"
+
+# Minsky is optional for everyone but the owner: on another Mac with no
+# checkout, skip the module instead of failing every check.
+if [ "${OWNER_MACHINE:-true}" = "false" ] && [ ! -d "$_MINSKY_REPO" ]; then
+  # shellcheck disable=SC2317  # return when sourced; exit when executed directly
+  return 0 2>/dev/null || exit 0
+fi
 _MINSKY_SHIM="${MINSKY_SHIM:-$HOME/.local/bin/minsky}"
 _MINSKY_OBSERVER_LOG="$_MINSKY_REPO/.minsky/observer.log"
 _MINSKY_ITER_LOG="$_MINSKY_REPO/.minsky/iter-once.log"

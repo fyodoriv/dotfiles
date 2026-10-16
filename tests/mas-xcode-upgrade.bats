@@ -7,7 +7,7 @@
 # whenever the App Store re-reports Xcode as outdated.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/dotfiles-mas-upgrade"
-TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml"
+TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml.tmpl"
 
 setup() {
   TEST_DIR="$(mktemp -d)"

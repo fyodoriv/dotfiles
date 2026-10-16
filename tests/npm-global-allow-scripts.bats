@@ -5,7 +5,7 @@
 # data/npm-global-allow-scripts.json and reinstalls with --allow-scripts.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/dotfiles-npm-global-scripts"
-TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml"
+TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml.tmpl"
 
 setup() {
   FIXTURE="$(mktemp -d)"

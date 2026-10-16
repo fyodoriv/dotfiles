@@ -1,13 +1,25 @@
 #!/usr/bin/env bats
-# Tests for dot_config/agentbrew/hooks-overlay/modify_manifest.yaml
+# Tests for dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl
 
 load test_helper
 
-SCRIPT="$BATS_TEST_DIRNAME/../dot_config/agentbrew/hooks-overlay/modify_manifest.yaml"
+TEMPLATE="$BATS_TEST_DIRNAME/../dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl"
 HOOK="gh-pr-body-requires-docs"
 
+setup() {
+  SCRIPT="$(mktemp)"
+  chezmoi execute-template --source "$BATS_TEST_DIRNAME/.." --override-data '{"owner_machine":true}' \
+    < "$TEMPLATE" > "$SCRIPT"
+}
+
+teardown() { rm -f "$SCRIPT"; }
+
 render() {
-  printf '%s' "$1" | sh "$SCRIPT"
+  printf '%s' "$1" | DOTFILES_OVERLAY_HOOKS="$HOOK" sh "$SCRIPT"
+}
+
+render_all() {
+  printf '%s' "$1" | env -u DOTFILES_OVERLAY_HOOKS sh "$SCRIPT"
 }
 
 @test "hooks overlay: empty input creates version and enabled list" {
@@ -59,4 +71,21 @@ render() {
   once="$(render $'version: 1\ndisabled:\n  - a\n')"
   twice="$(render "$once")"
   [ "$once" = "$twice" ]
+}
+
+@test "hooks overlay: owner-only hooks stay off on a new user's Mac" {
+  chezmoi execute-template --source "$BATS_TEST_DIRNAME/.." --override-data '{"owner_machine":false}' \
+    < "$TEMPLATE" > "$SCRIPT"
+  input=$'version: 1\ndisabled:\n  - x\n'
+  run render_all "$input"
+  [ "$status" -eq 0 ]
+  [ "$output" = "${input%$'\n'}" ]
+}
+
+@test "hooks overlay: the owner's Mac turns the owner-only hooks on" {
+  run render_all ""
+  [ "$status" -eq 0 ]
+  for hook in perf-task-review async-human-comms-blocks gdoc-surgical-edit-only; do
+    [[ "$output" == *"  - $hook"* ]]
+  done
 }

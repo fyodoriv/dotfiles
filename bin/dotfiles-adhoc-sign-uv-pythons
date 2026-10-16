@@ -29,7 +29,7 @@
 #   - bin/dotfiles-adhoc-sign-bottles — same pattern for Homebrew bottles
 #   - .chezmoiscripts/run_after_uv-python-setup.sh — sources this script
 #   - modules/security/doctor.sh § "uv-managed python must be ad-hoc signed"
-#   - dot_config/topgrade.toml [post_commands] — runs this after every upgrade
+#   - dot_config/topgrade.toml.tmpl [post_commands] — runs this after every upgrade
 
 set -uo pipefail
 

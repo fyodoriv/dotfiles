@@ -1,7 +1,7 @@
 # topgrade configuration — see https://github.com/topgrade-rs/topgrade
 #
-# Managed by dotfiles. Edit `dot_config/topgrade.toml` in the dotfiles
-# source repo (chezmoi copies it to ~/.config/topgrade.toml — topgrade
+# Managed by dotfiles. Edit `dot_config/topgrade.toml.tmpl` in the dotfiles
+# source repo (chezmoi renders it, with the dotfiles path filled in, to ~/.config/topgrade.toml — topgrade
 # reads the file directly under .config, NOT a subdir).
 # Running `topgrade --edit-config` opens this same file.
 #
@@ -123,7 +123,7 @@ poetry_force_self_update = false
 # fail the whole run. It also skips ids in DOTFILES_MAS_SKIP_IDS (default:
 # 310633997, WhatsApp) and reports any app whose upgrade needs sudo as
 # skipped. See bin/dotfiles-mas-upgrade.
-"App Store (mas, Xcode-tolerant)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-mas-upgrade"
+"App Store (mas, Xcode-tolerant)" = "{{ .chezmoi.sourceDir }}/bin/dotfiles-mas-upgrade"
 
 # Global npm CLIs that need install scripts (list: data/npm-global-allow-scripts.json).
 # topgrade's npm step runs `npm update --location=global`. npm 11+ blocks install
@@ -132,11 +132,11 @@ poetry_force_self_update = false
 # npm step itself keeps them working. This custom step is the backstop: it
 # reinstalls with --allow-scripts when a declared CLI is outdated or broken,
 # then checks `<bin> --version`.
-"npm global CLIs with install scripts" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-npm-global-scripts"
+"npm global CLIs with install scripts" = "{{ .chezmoi.sourceDir }}/bin/dotfiles-npm-global-scripts"
 
 # Replaces the built-in pnpm step (disabled above): skips cleanly when there
 # are no global pnpm packages instead of failing the run.
-"pnpm globals (skips when none)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-pnpm-global-update"
+"pnpm globals (skips when none)" = "{{ .chezmoi.sourceDir }}/bin/dotfiles-pnpm-global-update"
 
 # ── Post-upgrade fixups ─────────────────────────────────────────────
 # These run AFTER every successful topgrade run, regardless of how
@@ -151,7 +151,7 @@ poetry_force_self_update = false
 # unsigned; endpoint agent fires the policy dialog on every spawn of an
 # unsigned binary. The helper is idempotent — re-signing an already-
 # ad-hoc-signed binary is a no-op. See AGENTS.md rule #10.
-"Re-sign new Homebrew bottles (endpoint agent)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-adhoc-sign-bottles"
+"Re-sign new Homebrew bottles (endpoint agent)" = "{{ .chezmoi.sourceDir }}/bin/dotfiles-adhoc-sign-bottles"
 
 # Re-sign uv-managed pythons for endpoint agent. The `uv` step runs
 # `uv python upgrade`, which re-extracts python-build-standalone binaries
@@ -160,12 +160,12 @@ poetry_force_self_update = false
 # the weekly upgrade silently re-introduces the dialog storm AGENTS.md rule
 # #10 removed (run_after_uv-python-setup.sh only re-signs on `dotfiles apply`,
 # not on `dotfiles upgrade`). Same idempotent helper run_after sources.
-"Re-sign uv-managed pythons (endpoint agent)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-adhoc-sign-uv-pythons"
+"Re-sign uv-managed pythons (endpoint agent)" = "{{ .chezmoi.sourceDir }}/bin/dotfiles-adhoc-sign-uv-pythons"
 
 # Refresh endpoint shims + LaunchAgent PATH after brew upgrades (grep/curl/jq/sed/awk
 # symlinks can point at stale cellar paths until chezmoi apply). Same script as
 # run_after_endpoint-security.sh — idempotent link + adhoc-sign + LA PATH repair.
-"Refresh endpoint shims + LaunchAgent PATH" = "$HOME/apps/tooling/dotfiles/.chezmoiscripts/run_after_endpoint-security.sh"
+"Refresh endpoint shims + LaunchAgent PATH" = "{{ .chezmoi.sourceDir }}/.chezmoiscripts/run_after_endpoint-security.sh"
 
 # Dev-cache cleanup after the upgrade has downloaded new artifacts. Owns ALL
 # cache pruning (brew, npm, yarn, uv) plus the dotfiles-specific cleanups
@@ -175,4 +175,4 @@ poetry_force_self_update = false
 # servers and fails the run; doing every prune here is lock-tolerant.
 # Safelist-protected via the script's is_safe_path guard. Replaces the
 # standalone com.dotfiles.cleanup LaunchAgent (deleted PR #128).
-"Dev cache cleanup (gradle, tmp/node_modules, Library/Caches)" = "$HOME/apps/tooling/dotfiles/bin/cleanup"
+"Dev cache cleanup (gradle, tmp/node_modules, Library/Caches)" = "{{ .chezmoi.sourceDir }}/bin/cleanup"

@@ -11,7 +11,7 @@
 #   footers in PR descriptions even when the underlying commits are
 #   clean. This wrapper intercepts those calls, strips vendor
 #   attribution from the body content, and (if any was stripped)
-#   appends the canonical tool-neutral Fyodor footer before handing
+#   appends the canonical tool-neutral "not <first name>" footer before handing
 #   off to the real `gh` binary. In agent-shaped sessions, PR creation
 #   also fails closed unless the body is attributed and explains why the
 #   PR is needed. Cross-repo PR creation still requires exact approval.
@@ -202,7 +202,7 @@ fi
 # `gh api` body detection: any -f / --field / -F / --raw-field whose
 # value starts with `body=` is a candidate. We don't gate on the
 # endpoint URL — the strip is always safe (no false positives on
-# vendor-footer regexes), and the canonical Fyodor footer is only
+# vendor-footer regexes), and the canonical footer is only
 # appended in agent context, so a non-comment `gh api -f body=…` call
 # from a human is still left alone.
 #
@@ -246,6 +246,9 @@ fi
 . "$strip_lib"
 
 _gh_wrapper_is_agent_context() {
+  # The agent policy (footer, PR body rules, approval gate) is the owner's.
+  # ~/.gitconfig sets dotfiles.agentPolicy=false on everyone else's Mac.
+  _agent_attr_enabled || return 1
   [ -n "${AGENT_PUBLIC_WRITE_GUARD:-}" ] ||
     [ -n "${DEVIN_SESSION_ID:-}" ] ||
     [ -n "${CLAUDE_CODE_SSE_PORT:-}" ] ||
@@ -387,19 +390,20 @@ _repo_host() {
 }
 
 _ensure_agent_footer() {
-  local body_file tmp_file
+  local body_file tmp_file name
   body_file="$1"
   # Strip any agent footer with a non-canonical name (e.g., GitHub username
   # like "the-owner" injected by a stale agent rule template) along with
   # its preceding "---" divider. Regression path: a manual footer added by
-  # an agent rule used to stack on top of the wrapper's canonical Fyodor
+  # an agent rule used to stack on top of the wrapper's canonical
   # footer. We normalize to one canonical footer regardless of what the
   # caller passed in. Idempotent: if only the canonical footer is present
   # the awk pass is a no-op.
   tmp_file=$(mktemp -t gh-wrapper-strip.XXXXXX)
-  awk '
+  name="$(_agent_footer_name)"
+  awk -v name="$name" '
     /^---[[:space:]]*$/ { divider = $0; have_divider = 1; next }
-    /Written by an agent, not Fyodor/ {
+    index($0, "Written by an agent, not " name ".") {
       if (have_divider) { print divider; have_divider = 0 }
       print
       next
@@ -417,8 +421,8 @@ _ensure_agent_footer() {
   ' "$body_file" > "$tmp_file"
   mv "$tmp_file" "$body_file"
 
-  # If the canonical Fyodor footer is already present, nothing more to do.
-  if grep -qE 'Written by an agent, not Fyodor' "$body_file"; then
+  # If the canonical footer is already present, nothing more to do.
+  if grep -qF "Written by an agent, not $name." "$body_file"; then
     return 0
   fi
 
@@ -429,7 +433,7 @@ _ensure_agent_footer() {
   }' "$body_file" > "$tmp_file"
   {
     cat "$tmp_file"
-    printf '\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+    printf '\n---\n_🤖 Written by an agent, not %s. Ping me if this looks off._\n' "$name"
   } > "$body_file"
   rm -f "$tmp_file"
 }
@@ -534,7 +538,7 @@ _prepare_body_tmp() {
   tmp="$1"
   # Outside agent context: leave human-authored bodies alone (no
   # auto-footer, no rationale validation). The strip already ran in
-  # the caller — we don't add Fyodor's footer to a human's PR body.
+  # the caller — we don't add the agent footer to a human's PR body.
   if ! _gh_wrapper_is_agent_context; then
     return 0
   fi
@@ -553,7 +557,7 @@ _prepare_body_tmp() {
   # All other body-bearing subcommands the wrapper intercepts —
   # `pr edit`, `pr comment`, `pr review`, `issue create`, `issue edit`,
   # `issue comment`, `release create`, `release edit`. Append the
-  # canonical footer so agent-authored content posted under Fyodor's
+  # canonical footer so agent-authored content posted under the user's
   # identity is always attributed. This closes the footer-
   # missing regression observed during orchestrator-driven PR closures
   # plus the corrective `gh pr comment` follow-ups that ALSO went out

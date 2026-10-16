@@ -123,7 +123,8 @@ sync_repo() {
     fi
 }
 
-TOOLING=~/apps/tooling
+# TOOLING_ROOT overrides the folder that holds the agentbrew and minsky clones.
+TOOLING="${TOOLING_ROOT:-$HOME/apps/tooling}"
 
 # Run both repos in parallel; wait before exit so the caller sees a clean exit
 sync_repo "$TOOLING/agentbrew" true  &

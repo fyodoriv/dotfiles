@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# use_cursor (chezmoi data, default true) turns every dotfiles-managed Cursor
+# use_cursor (chezmoi data; prompt default false, missing key reads as true) turns every dotfiles-managed Cursor
 # surface off: chezmoi scripts, Cursor-only LaunchAgents, the doctor module,
 # and agentbrew's Cursor target (see overlay-root-agentfile.bats).
 
@@ -30,8 +30,8 @@ _load_launchagent_helpers() {
   eval "$(printf '%s\n' "$script" | sed -n '/^remove_skipped_agent() {/,/^}/p')"
 }
 
-@test "chezmoi config template declares use_cursor with default true" {
-  grep -q 'promptBoolOnce . "use_cursor" ".*" true' "$REPO/.chezmoi.yaml.tmpl"
+@test "chezmoi config template declares use_cursor with default false" {
+  grep -q 'promptBoolOnce . "use_cursor" ".*" false' "$REPO/.chezmoi.yaml.tmpl"
   grep -q '^  use_cursor: {{ $useCursor }}' "$REPO/.chezmoi.yaml.tmpl"
 }
 

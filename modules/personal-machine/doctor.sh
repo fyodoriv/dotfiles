@@ -13,11 +13,12 @@
 #   2. The tooling repos are cloned at the canonical paths with the expected
 #      GitHub.com remote URL and current branch.
 #
-# Profile gate: this module is PERSONAL-MACHINE ONLY (skips when
-# is_enterprise=true). On corporate Macs the global git identity is
-# @company.example by org policy — running these checks there produces
-# false alarms.
-if [ "${IS_ENTERPRISE:-false}" = "true" ]; then
+# Profile gate: this module is OWNER-PERSONAL-MACHINE ONLY. It skips when
+# is_enterprise=true (corporate Macs use a work identity by policy) and when
+# owner_machine=false (anyone else's Mac: the checks below hardcode the
+# owner's email and clone paths, so they would only produce false alarms
+# and a fix that writes the owner's email into the new user's git config).
+if [ "${IS_ENTERPRISE:-false}" = "true" ] || [ "${OWNER_MACHINE:-true}" = "false" ]; then
   # shellcheck disable=SC2317  # return when sourced; exit when executed directly
   return 0 2>/dev/null || exit 0
 fi

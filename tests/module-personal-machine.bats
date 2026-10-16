@@ -164,3 +164,10 @@ make_fake_repo() {
   [ "$fail_count" -eq 0 ]
   [ "$pass_count" -eq 3 ]
 }
+
+@test "personal-machine: skips every check when owner_machine=false (someone else's Mac)" {
+  OWNER_MACHINE="false"
+  source "$TEST_DOTFILES/modules/personal-machine/doctor.sh"
+  [ "$pass_count" -eq 0 ]
+  [ "$fail_count" -eq 0 ]
+}

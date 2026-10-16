@@ -1,5 +1,5 @@
 {{- $choices := list "full" "core" -}}
-{{- $profile := promptChoiceOnce . "profile" "Installation profile (full = all modules, core = essential only)" $choices "full" -}}
+{{- $profile := promptChoiceOnce . "profile" "Installation profile (full = all modules, core = essential only)" $choices "core" -}}
 {{- $enterprise := promptBoolOnce . "is_enterprise" "Enable enterprise configs (AWS, K8s, Gradle)" false -}}
 {{- $workEmailDomain := "example.com" -}}
 {{- $gheHost := "github.example.com" -}}
@@ -9,7 +9,7 @@
 {{- end -}}
 {{- $useAiTools := promptBoolOnce . "use_ai_tools" "Enable AI agent tooling (ANTHROPIC_MODEL, agent-browser)" false -}}
 {{- $useLocalAi := promptBoolOnce . "use_local_ai" "Enable local-LLM stack (pipx + aider + mlx-lm on Apple Silicon; ~30 GB model weights require explicit opt-in via ~/.config/dotfiles/.local-llm-bootstrap-confirmed sentinel)" false -}}
-{{- $useCursor := promptBoolOnce . "use_cursor" "Manage Cursor (settings, extensions, launch agents, agentbrew Cursor config)" true -}}
+{{- $useCursor := promptBoolOnce . "use_cursor" "Manage Cursor (settings, extensions, launch agents, agentbrew Cursor config)" false -}}
 {{- $dotfilesDir := promptStringOnce . "dotfiles_dir" "Dotfiles directory relative to home (e.g. apps/dotfiles, dotfiles)" "apps/dotfiles" -}}
 {{- $reposDir := promptStringOnce . "repos_dir" "Repos directory relative to home (e.g. apps, repos, src)" "apps" -}}
 {{- $brewSkip := list -}}
@@ -19,10 +19,6 @@
 {{- $extraOverlayRoot := "" -}}
 {{- if hasKey . "extra_overlay_root" -}}
 {{-   $extraOverlayRoot = .extra_overlay_root -}}
-{{- end -}}
-{{- $autoSync := true -}}
-{{- if hasKey . "auto_sync" -}}
-{{-   $autoSync = .auto_sync -}}
 {{- end -}}
 {{- $claudeRemoteControl := false -}}
 {{- if hasKey . "claude_remote_control" -}}
@@ -79,6 +75,30 @@
 {{-   $gitPersonalEmail = promptStringOnce . "git_personal_email" "Git commit email for personal identity (github.com) — consider <username>@users.noreply.github.com" "" -}}
 {{- end -}}
 
+{{/* ── Owner machine ─────────────────────────────────────────────────
+     owner_machine turns on checks and jobs that only make sense on the
+     repo owner's Macs (personal-machine doctor, auto-commit-and-push
+     sync). It is derived from the git identity, so a new user gets
+     false and the owner's saved config needs no new key. Override with
+     `owner_machine: true|false` in ~/.config/chezmoi/chezmoi.yaml. */ -}}
+{{- $ownerMachine := or (eq $gitWorkEmail "fyodor@sent.com") (eq $gitPersonalEmail "fyodor@sent.com") -}}
+{{- if hasKey . "owner_machine" -}}
+{{-   $ownerMachine = .owner_machine -}}
+{{- end -}}
+{{/* auto_sync auto-commits and pushes the dotfiles checkout every 30 min.
+     Default: on for the owner, off for everyone else (a fork's main
+     should never get unreviewed pushes). */ -}}
+{{- $autoSync := $ownerMachine -}}
+{{- if hasKey . "auto_sync" -}}
+{{-   $autoSync = .auto_sync -}}
+{{- end -}}
+{{/* global_git_hooks wires git-hooks/ as core.hooksPath for every repo
+     (leak gates + commit-msg cleanup). Opt out with false. */ -}}
+{{- $globalGitHooks := true -}}
+{{- if hasKey . "global_git_hooks" -}}
+{{-   $globalGitHooks = .global_git_hooks -}}
+{{- end -}}
+
 sourceDir: {{ .chezmoi.sourceDir | quote }}
 
 encryption: age
@@ -101,6 +121,8 @@ data:
 {{- end }}
   auto_upgrade: {{ $autoUpgrade }}
   auto_sync: {{ $autoSync }}
+  owner_machine: {{ $ownerMachine }}
+  global_git_hooks: {{ $globalGitHooks }}
   claude_remote_control: {{ $claudeRemoteControl }}
   use_ai_tools: {{ $useAiTools }}
   use_local_ai: {{ $useLocalAi }}

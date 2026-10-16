@@ -11,7 +11,15 @@
 	# dramatically faster in large monorepos by avoiding full directory scans.
 	untrackedCache = true
 	fsmonitor = false
+{{- if dig "global_git_hooks" true . }}
 	hooksPath = {{ .chezmoi.sourceDir }}/git-hooks
+{{- end }}
+
+# Owner-only agent policy: git-hooks/commit-msg and bin/gh rewrite vendor
+# agent attribution into a neutral footer, and bin/gh holds agent PR bodies
+# to the owner's PR rules. Off on everyone else's Mac.
+[dotfiles]
+	agentPolicy = {{ dig "owner_machine" true . }}
 
 [interactive]
 	diffFilter = delta --color-only

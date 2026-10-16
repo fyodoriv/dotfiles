@@ -23,7 +23,7 @@ All values are prompted once at `chezmoi init` and stored in `~/.config/chezmoi/
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `profile` | `full` | `core` (team-friendly) or `full` (opinionated) |
+| `profile` | `core` | `core` (team-friendly) or `full` (opinionated) |
 | `is_enterprise` | `false` | Enable enterprise tools (AWS, K8s, Gradle, enterprise SSH) |
 | `work_email_domain` | `example.com` | Work email domain for Chrome profile detection (enterprise only) |
 | `github_enterprise_host` | `github.example.com` | GitHub Enterprise hostname (enterprise only) |
@@ -33,6 +33,9 @@ All values are prompted once at `chezmoi init` and stored in `~/.config/chezmoi/
 | `brew_skip` | `[]` | List of Homebrew packages to exclude (e.g. `["poetry", "pyenv"]`) |
 | `auto_upgrade` | `false` | Enable auto-upgrade LaunchAgent (brew upgrade weekly) |
 | `use_encryption` | `false` | Enable age encryption for secrets |
+| `owner_machine` | derived: `true` only for the upstream owner's git email | Owner-only doctor checks and the `auto_sync` default. Leave it `false` on your Mac. |
+| `auto_sync` | same as `owner_machine` | Auto-commit and push this checkout every 30 min. Keep it `false` on a fork unless you want unreviewed pushes. |
+| `global_git_hooks` | `true` | Use `git-hooks/` for every repo on the Mac. `false` keeps each repo's own hooks. |
 
 **For your team:** change the defaults in `.chezmoi.yaml.tmpl` to match your organization. For example, set `work_email_domain` default to `yourcompany.com` and `github_enterprise_host` to `github.yourcompany.com`.
 

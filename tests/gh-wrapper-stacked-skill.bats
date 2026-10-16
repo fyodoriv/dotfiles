@@ -26,6 +26,8 @@ exit 0
 STUB
   chmod +x "$GH_STUB"
   export DOTFILES_REAL_GH="$GH_STUB"
+  # Footer name is the first word of git user.name; pin it for the tests.
+  export AGENT_FOOTER_NAME=Fyodor
   export GH_ARGS
   export GH_BODY
 }

@@ -12,7 +12,7 @@
 # pass while still upgrading everything else (Tailscale, etc.).
 #
 # WHEN: replaces topgrade's built-in `mas` step — `mas` is in the `disable`
-# list in dot_config/topgrade.toml and this runs via the [commands] block.
+# list in dot_config/topgrade.toml.tmpl and this runs via the [commands] block.
 #
 # Some apps need sudo to upgrade (WhatsApp, id 310633997: "sudo: a terminal is
 # required to read the password"). A LaunchAgent has no tty, so such an

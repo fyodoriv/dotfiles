@@ -19,8 +19,9 @@ set -euo pipefail
 
 # Resolve DOTFILES_DIR via the same pattern other lifecycle scripts use.
 # chezmoi may copy this script to a tmpdir at runtime; the script's own
-# location is unreliable. The well-known repo path is the simplest resolver.
-DOTFILES_DIR="${DOTFILES_DIR:-$HOME/apps/tooling/dotfiles}"
+# location is unreliable. chezmoi exports CHEZMOI_SOURCE_DIR to scripts; the
+# well-known repo path is the last resort.
+DOTFILES_DIR="${DOTFILES_DIR:-${CHEZMOI_SOURCE_DIR:-$HOME/apps/tooling/dotfiles}}"
 if [ ! -d "$DOTFILES_DIR" ]; then
   DOTFILES_DIR="$HOME/apps/dotfiles"
 fi

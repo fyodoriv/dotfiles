@@ -1,6 +1,7 @@
 #!/bin/sh
 # Renders ~/.config/agentbrew/hooks-overlay/manifest.yaml: keeps the machine's
-# own overlay and makes sure the opt-in agentbrew hooks listed below are on.
+# own overlay and makes sure the opt-in agentbrew hooks listed below are on
+# (chezmoi renders this file as a template first).
 #
 # The overlay is machine state. Each Mac keeps its own `disabled:` list (for
 # example verifier hooks that hang on one machine), so a plain managed file
@@ -12,7 +13,12 @@
 # alone, so a machine can still opt out by listing it under `disabled:`.
 set -eu
 
-HOOKS="gh-pr-body-requires-docs"
+# Owner-only hooks: they hold agents to the repo owner's workflow (PR body
+# rules, comment and naming style, Jira/Google Docs habits, time reviews).
+# agentbrew ships them off by default; only the owner's Macs
+# (owner_machine) turn them on. A new user gets none of them.
+# DOTFILES_OVERLAY_HOOKS replaces the list (tests use it).
+HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs async-human-comms-blocks jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review{{ end }}}"
 
 input=$(cat)
 

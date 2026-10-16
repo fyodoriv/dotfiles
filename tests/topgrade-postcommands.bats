@@ -10,7 +10,7 @@
 # The post_command runs this helper to re-sign them every upgrade.
 
 SIGNER="$BATS_TEST_DIRNAME/../bin/dotfiles-adhoc-sign-uv-pythons"
-TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml"
+TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml.tmpl"
 
 setup() {
   FIXTURE="$(mktemp -d)"

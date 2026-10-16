@@ -51,6 +51,8 @@ exit 0
 STUB
   chmod +x "$GH_STUB"
   export DOTFILES_REAL_GH="$GH_STUB"
+  # Footer name is the first word of git user.name; pin it for the tests.
+  export AGENT_FOOTER_NAME=Fyodor
   export GH_ARGS
   export GH_BODY
   export GH_COMMENT
@@ -823,4 +825,13 @@ JSON
   [ -f "$GH_API_INPUT" ]
   grep -q "unrelated" "$GH_API_INPUT"
   ! grep -q "Written by an agent, not Fyodor" "$GH_API_INPUT"
+}
+
+@test "agentPolicy=false: a contributor's agent opens a fork PR with no owner gates" {
+  printf '[dotfiles]\n\tagentPolicy = false\n' > "$TEST_DIR/gitconfig"
+  run env GIT_CONFIG_GLOBAL="$TEST_DIR/gitconfig" AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
+    --repo fyodoriv/dotfiles --head alex:fix-x --title "fix: x" --body "Short body."
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GH_BODY")" = "Short body." ]
+  [[ "$(cat "$GH_ARGS")" == *"--repo fyodoriv/dotfiles"* ]]
 }

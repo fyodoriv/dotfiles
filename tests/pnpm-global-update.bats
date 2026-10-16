@@ -4,7 +4,7 @@
 # package was ever installed. The helper updates only when the manifest exists.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/dotfiles-pnpm-global-update"
-TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml"
+TOPGRADE_CFG="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml.tmpl"
 
 setup() {
   FIXTURE="$(mktemp -d)"

@@ -20,5 +20,5 @@ done
 # topgrade 17.5.1 behaviour: `topgrade --edit-config` opens
 # "~/.config/topgrade.toml".
 check_managed "managed.topgrade" \
-  "$DOTFILES_DIR/dot_config/topgrade.toml" \
+  "$DOTFILES_DIR/dot_config/topgrade.toml.tmpl" \
   "$HOME/.config/topgrade.toml"

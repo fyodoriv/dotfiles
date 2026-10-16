@@ -79,7 +79,7 @@ fi
 # to whichever specific vendor happened to run the command. The shared
 # library below removes both vendor `Co-Authored-By:` trailers and
 # `Generated with [<Agent>](...)` footers, then appends the
-# tool-neutral Fyodor footer so the commit is still marked as
+# tool-neutral "not <first name>" footer so the commit is still marked as
 # agent-authored.
 #
 # Repos that override core.hooksPath via Husky also enforce the same

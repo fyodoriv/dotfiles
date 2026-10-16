@@ -5,7 +5,7 @@
 # GET-don't-IMPLEMENT unified upgrader). These tests pin the wrapper's
 # value-add: lock acquisition, grind-active safety, logging, notification,
 # bottle re-signing — NOT topgrade's per-manager upgrade logic, which is
-# tested upstream and configured via dot_config/topgrade.toml.
+# tested upstream and configured via dot_config/topgrade.toml.tmpl.
 
 load test_helper
 
@@ -266,7 +266,7 @@ STUB
   # the re-signing helper is invoked from topgrade's [post_commands]
   # block (not bin/dotfiles-upgrade) — same coverage, plus direct
   # `topgrade` runs also get the safety. See AGENTS.md rule #10.
-  local cfg="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml"
+  local cfg="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml.tmpl"
   [ -f "$cfg" ]
   grep -q '\[post_commands\]' "$cfg"
   grep -q 'dotfiles-adhoc-sign-bottles' "$cfg"
@@ -279,7 +279,7 @@ STUB
   # after the upgrade has downloaded new artifacts (correct ordering:
   # download new → purge old). brew/npm/yarn cache pruning comes from
   # topgrade's own `--cleanup` flag passed by the wrapper.
-  local cfg="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml"
+  local cfg="$BATS_TEST_DIRNAME/../dot_config/topgrade.toml.tmpl"
   grep -q "bin/cleanup" "$cfg"
 }
 

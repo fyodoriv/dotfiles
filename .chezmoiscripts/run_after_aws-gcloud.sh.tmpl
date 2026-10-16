@@ -1,0 +1,14 @@
+#!/bin/bash
+# Install AWS CLI v2 and the Google Cloud SDK into user dirs on enterprise
+# machines. They were brew-managed before the arm64 migration, but the brew
+# formulae pull python@3.x, which endpoint agents flag (AGENTS.md rule #10).
+# Enterprise: {{ dig "is_enterprise" false . }}
+#
+# Idempotent: the helper skips a tool that is already installed, so a second
+# apply changes nothing. Non-enterprise machines render an empty body.
+set -euo pipefail
+{{- if dig "is_enterprise" false . }}
+
+"{{ .chezmoi.sourceDir }}/bin/dotfiles-install-aws-gcloud" ||
+  echo "⚠ AWS CLI / gcloud user-dir install failed — run dotfiles-install-aws-gcloud to retry"
+{{- end }}

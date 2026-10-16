@@ -508,7 +508,7 @@ VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
-| `enterprise.aws` | AWS CLI installed | `brew install awscli` |
+| `enterprise.aws` | AWS CLI installed | `dotfiles-install-aws-gcloud --aws` |
 | `enterprise.kubectl` | kubectl installed | `brew install kubernetes-cli` |
 | `enterprise.gradle` | Gradle installed | `brew install gradle` |
 | `enterprise.java` | Java installed | `brew install openjdk@21` |
@@ -516,6 +516,8 @@ VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor
 | `enterprise.docker` | Docker installed | `brew install docker` |
 | `enterprise.gh` | GitHub CLI installed | `brew install gh` |
 | `enterprise.jq` | jq installed | `brew install jq` |
+| `enterprise.aws_user_dir` | `aws` resolves to `~/.local/bin/aws` (user-dir AWS CLI v2, not brew Python) | `dotfiles-install-aws-gcloud --aws` |
+| `enterprise.gcloud_user_dir` | `gcloud` resolves to `~/.local/bin/gcloud` (user-dir Google Cloud SDK) | `dotfiles-install-aws-gcloud --gcloud` |
 
 ### workspace
 

@@ -17,7 +17,8 @@ fi
 
 # httpie ships the `http`/`https` commands; jrnl, poetry, pipx ship eponymous
 # executables. awscli is NOT here — AWS CLI v2 is not on PyPI; it is installed
-# via the AWS user-dir pkg (see TASKS.md "user-dir-installers-for-aws-gcloud").
+# via the AWS user-dir pkg (bin/dotfiles-install-aws-gcloud, run by
+# run_after_aws-gcloud.sh.tmpl on enterprise machines).
 _allow_python_install=true
 _endpoint_lib="${CHEZMOI_SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/dotfiles-endpoint-paths.sh"
 # shellcheck source=/dev/null

@@ -16,7 +16,7 @@ cat > "$RENDERED" << 'BREWFILE_EOF'
 # formulae pull python@3.x, whose binaries endpoint agents flag on every
 # spawn. They are installed as user-dir tools instead — poetry/httpie/jrnl via
 # `.chezmoiscripts/run_after_uv-tools.sh` (uv tools), awscli via the AWS CLI v2 user pkg
-# (see TASKS.md "user-dir-installers-for-aws-gcloud"). See AGENTS.md rule #10. Do NOT re-add.
+# (bin/dotfiles-install-aws-gcloud, with gcloud). See AGENTS.md rule #10. Do NOT re-add.
 # ── Core: Git ────────────────────────────────────────────────────
 brew "git-delta"
 brew "gh"

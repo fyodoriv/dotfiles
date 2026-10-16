@@ -1555,3 +1555,39 @@ MOCK
   # The prompt must default to false (~30 GB download requires opt-in)
   grep -E 'promptBoolOnce.*"use_local_ai".*false' "$TEST_DOTFILES/.chezmoi.yaml.tmpl"
 }
+
+# ── run_after_aws-gcloud.sh.tmpl ───────────────────────────────────
+# AWS CLI v2 and gcloud user-dir installs, gated on is_enterprise.
+
+AWS_GCLOUD_TMPL="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_aws-gcloud.sh.tmpl"
+
+_render_aws_gcloud_template() {
+  local enterprise="$1"
+  local out="$TEST_DIR/run_after_aws-gcloud.$enterprise.sh"
+  {
+    printf '{{- $_ := set . "is_enterprise" %s -}}\n' "$enterprise"
+    cat "$AWS_GCLOUD_TMPL"
+  } | chezmoi execute-template --source "$TEST_DOTFILES" > "$out"
+  chmod +x "$out"
+  printf '%s\n' "$out"
+}
+
+@test "aws-gcloud template: enterprise render runs the user-dir installer" {
+  local out
+  out="$(_render_aws_gcloud_template true)"
+  grep -q 'bin/dotfiles-install-aws-gcloud"' "$out"
+  bash -n "$out"
+}
+
+@test "aws-gcloud template: non-enterprise render installs nothing" {
+  local out
+  out="$(_render_aws_gcloud_template false)"
+  ! grep -q 'dotfiles-install-aws-gcloud"' "$out"
+  run "$out"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "brew template: awscli and gcloud-cli stay out of the Brewfile" {
+  ! grep -qE '^(brew "awscli"|cask "gcloud-cli")' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_brew.sh.tmpl"
+}

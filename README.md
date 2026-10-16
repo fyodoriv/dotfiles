@@ -1004,6 +1004,7 @@ scratch work.
 | `status` | System dashboard: fastfetch, dotfiles version, agent status |
 | `timer` | Pomodoro-style countdown timer with macOS notification |
 | `graceful-restart` | Wait for active processes to finish, then restart macOS |
+| `dotfiles-install-aws-gcloud` | Install AWS CLI v2 (`~/.local/aws-cli`) and the Google Cloud SDK (`~/google-cloud-sdk`) as user-dir installs linked into `~/.local/bin`, without brew Python. Runs on every apply on enterprise machines; skips tools already installed. `--aws`, `--gcloud`, `--dry-run` |
 | `dotfiles-pnpm-global-update` | Update global pnpm packages; skip cleanly when none are installed (topgrade custom step) |
 | `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx}`, and the `com.agentbrew.*` plists. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
 

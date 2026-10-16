@@ -45,11 +45,18 @@ setup() {
 
   # Create mock enterprise tool binaries
   mkdir -p "$TEST_DIR/bin"
-  for tool in aws kubectl gradle java node docker gh jq; do
+  for tool in kubectl gradle java node docker gh jq; do
     echo '#!/bin/bash' > "$TEST_DIR/bin/$tool"
     chmod +x "$TEST_DIR/bin/$tool"
   done
-  export PATH="$TEST_DIR/bin:$PATH"
+  # aws and gcloud are user-dir installs under ~/.local/bin.
+  mkdir -p "$TEST_HOME/.local/bin"
+  for tool in aws gcloud; do
+    echo '#!/bin/bash' > "$TEST_HOME/.local/bin/$tool"
+    chmod +x "$TEST_HOME/.local/bin/$tool"
+  done
+  ln -s "$TEST_HOME/.local/bin/aws" "$TEST_DIR/bin/aws"
+  export PATH="$TEST_HOME/.local/bin:$TEST_DIR/bin:$PATH"
 }
 
 teardown() {
@@ -58,12 +65,12 @@ teardown() {
 
 @test "enterprise: passes when all tools installed" {
   source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
-  [ "$pass_count" -eq 8 ]
+  [ "$pass_count" -eq 10 ]
   [ "$fail_count" -eq 0 ]
 }
 
 @test "enterprise: fails when tools missing" {
-  rm -f "$TEST_DIR/bin/aws" "$TEST_DIR/bin/kubectl"
+  rm -f "$TEST_HOME/.local/bin/aws" "$TEST_DIR/bin/kubectl"
   # Include /bin and /usr/bin for shell builtins but not tool-specific paths
   export PATH="$TEST_DIR/bin:/bin:/usr/bin"
   source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
@@ -79,14 +86,14 @@ teardown() {
 
 @test "enterprise: individual tool missing fails only that check" {
   rm -f "$TEST_DIR/bin/gradle"
-  export PATH="$TEST_DIR/bin:/bin:/usr/bin"
+  export PATH="$TEST_HOME/.local/bin:$TEST_DIR/bin:/bin:/usr/bin"
   source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
   [ "$pass_count" -ge 7 ]
   [ "$fail_count" -eq 1 ]
 }
 
 @test "enterprise: all tools missing fails all checks" {
-  rm -f "$TEST_DIR/bin/aws" "$TEST_DIR/bin/kubectl" "$TEST_DIR/bin/gradle" "$TEST_DIR/bin/java" "$TEST_DIR/bin/node" "$TEST_DIR/bin/docker" "$TEST_DIR/bin/gh" "$TEST_DIR/bin/jq"
+  rm -f "$TEST_HOME/.local/bin/aws" "$TEST_DIR/bin/kubectl" "$TEST_DIR/bin/gradle" "$TEST_DIR/bin/java" "$TEST_DIR/bin/node" "$TEST_DIR/bin/docker" "$TEST_DIR/bin/gh" "$TEST_DIR/bin/jq"
   export PATH="$TEST_DIR/bin:/bin:/usr/bin"
   source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
   # At least 6 fail (java and jq may exist at /usr/bin on some systems)
@@ -99,4 +106,32 @@ teardown() {
   source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
   [ "$pass_count" -eq 0 ]
   [ "$fail_count" -eq 0 ]
+}
+
+@test "enterprise: aws outside ~/.local/bin fails the user-dir check with the installer fix" {
+  rm -f "$TEST_HOME/.local/bin/aws" "$TEST_DIR/bin/aws"
+  echo '#!/bin/bash' > "$TEST_DIR/bin/aws"
+  chmod +x "$TEST_DIR/bin/aws"
+  export PATH="$TEST_HOME/.local/bin:$TEST_DIR/bin:/bin:/usr/bin"
+  failed_ids=""
+  fixes=""
+  check() {
+    if eval "$3" >/dev/null 2>&1; then pass "$2"; else fail "$2"; failed_ids="$failed_ids $1"; fixes="$fixes|$4"; fi
+  }
+  source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
+  [ "$failed_ids" = " enterprise.aws_user_dir" ]
+  [[ "$fixes" == *"dotfiles-install-aws-gcloud --aws"* ]]
+}
+
+@test "enterprise: missing aws and gcloud point at the user-dir installer, not brew" {
+  rm -f "$TEST_HOME/.local/bin/aws" "$TEST_HOME/.local/bin/gcloud" "$TEST_DIR/bin/aws"
+  export PATH="$TEST_HOME/.local/bin:$TEST_DIR/bin:/bin:/usr/bin"
+  fixes=""
+  check() {
+    case "$1" in enterprise.aws|enterprise.aws_user_dir|enterprise.gcloud_user_dir) fixes="$fixes|$1=$4" ;; esac
+  }
+  source "$BATS_TEST_DIRNAME/../modules/enterprise/doctor.sh"
+  [[ "$fixes" == *"enterprise.aws=dotfiles-install-aws-gcloud --aws"* ]]
+  [[ "$fixes" == *"enterprise.gcloud_user_dir=dotfiles-install-aws-gcloud --gcloud"* ]]
+  [[ "$fixes" != *"awscli"* ]]
 }

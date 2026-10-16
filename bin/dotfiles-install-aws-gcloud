@@ -1,0 +1,111 @@
+#!/bin/bash
+# Install AWS CLI v2 and the Google Cloud SDK into user dirs, without brew Python.
+#
+# The brew `awscli` formula and `gcloud-cli` cask pull python@3.x, which
+# endpoint agents flag on every spawn (AGENTS.md rule #10). This helper uses
+# the vendor installers in user dirs instead, with no admin rights:
+#   aws:    AWSCLIV2.pkg, signature checked, expanded with `pkgutil
+#           --expand-full`, payload copied to ~/.local/aws-cli; `aws` and
+#           `aws_completer` linked into ~/.local/bin.
+#   gcloud: the macOS SDK tarball, unpacked to ~/google-cloud-sdk, then its
+#           install.sh with prompts, PATH edits, and rc edits turned off;
+#           `gcloud`, `gsutil`, and `bq` linked into ~/.local/bin.
+# A tool that is already installed is skipped, so a second run changes nothing.
+#
+# Usage: dotfiles-install-aws-gcloud [--aws|--gcloud] [--dry-run]
+# Env:   DOTFILES_AWS_PKG_URL, DOTFILES_GCLOUD_TARBALL_URL (download overrides)
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+want_aws=true
+want_gcloud=true
+dry_run=false
+for arg in "$@"; do
+  case "$arg" in
+    --aws) want_gcloud=false ;;
+    --gcloud) want_aws=false ;;
+    --dry-run) dry_run=true ;;
+    *) echo "✗ unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "○ not macOS; skipping AWS CLI and gcloud user-dir installs"
+  exit 0
+fi
+
+bin_dir="$HOME/.local/bin"
+aws_dir="$HOME/.local/aws-cli"
+gcloud_dir="$HOME/google-cloud-sdk"
+case "$(uname -m)" in
+  arm64) gcloud_arch="arm" ;;
+  *) gcloud_arch="x86_64" ;;
+esac
+aws_url="${DOTFILES_AWS_PKG_URL:-https://awscli.amazonaws.com/AWSCLIV2.pkg}"
+gcloud_url="${DOTFILES_GCLOUD_TARBALL_URL:-https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-darwin-${gcloud_arch}.tar.gz}"
+
+work="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-aws-gcloud.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
+
+# Link $1 to $2 only when the link is missing or points elsewhere.
+_link() {
+  [ "$(readlink "$2" 2>/dev/null)" = "$1" ] && return 0
+  ln -sfn "$1" "$2"
+  echo "  linked $2 → $1"
+}
+
+fail=0
+
+if $want_aws; then
+  if [ -e "$bin_dir/aws" ] || [ -L "$bin_dir/aws" ]; then
+    echo "✓ aws already at $bin_dir/aws; skipped"
+  elif $dry_run; then
+    echo "Dry running: download $aws_url, expand to $aws_dir, link aws into $bin_dir"
+  else
+    echo "→ installing AWS CLI v2 into $aws_dir"
+    if curl -fsSL -o "$work/AWSCLIV2.pkg" "$aws_url" &&
+      pkgutil --check-signature "$work/AWSCLIV2.pkg" | grep -q "Amazon" &&
+      pkgutil --expand-full "$work/AWSCLIV2.pkg" "$work/aws-pkg" &&
+      [ -x "$work/aws-pkg/aws-cli.pkg/Payload/aws-cli/aws" ]; then
+      mkdir -p "$bin_dir" "$(dirname "$aws_dir")"
+      rm -rf "$aws_dir"
+      cp -R "$work/aws-pkg/aws-cli.pkg/Payload/aws-cli" "$aws_dir"
+      _link "$aws_dir/aws" "$bin_dir/aws"
+      _link "$aws_dir/aws_completer" "$bin_dir/aws_completer"
+      echo "✓ aws installed: $("$bin_dir/aws" --version 2>&1 | head -1)"
+    else
+      echo "✗ AWS CLI v2 install failed (download, signature, or pkg layout)" >&2
+      fail=1
+    fi
+  fi
+fi
+
+if $want_gcloud; then
+  if [ -d "$gcloud_dir" ]; then
+    echo "✓ gcloud SDK already at $gcloud_dir; skipped install"
+  elif $dry_run; then
+    echo "Dry running: download $gcloud_url, unpack to $gcloud_dir, link gcloud/gsutil/bq into $bin_dir"
+  else
+    echo "→ installing the Google Cloud SDK into $gcloud_dir"
+    if curl -fsSL -o "$work/gcloud.tar.gz" "$gcloud_url" &&
+      tar -xzf "$work/gcloud.tar.gz" -C "$work" &&
+      [ -x "$work/google-cloud-sdk/bin/gcloud" ]; then
+      mv "$work/google-cloud-sdk" "$gcloud_dir"
+      # No prompts, no rc or PATH edits: dotfiles owns ~/.zshrc.
+      "$gcloud_dir/install.sh" --quiet --usage-reporting false \
+        --path-update false --command-completion false >/dev/null ||
+        echo "⚠ gcloud install.sh reported a problem; the SDK is unpacked" >&2
+    else
+      echo "✗ Google Cloud SDK install failed (download or tarball layout)" >&2
+      fail=1
+    fi
+  fi
+  if ! $dry_run && [ -d "$gcloud_dir/bin" ]; then
+    mkdir -p "$bin_dir"
+    for tool in gcloud gsutil bq; do
+      [ -x "$gcloud_dir/bin/$tool" ] && _link "$gcloud_dir/bin/$tool" "$bin_dir/$tool"
+    done
+  fi
+fi
+
+exit "$fail"

@@ -101,6 +101,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`BASH_ENV` resets `DOTFILES_DIR`** to the live checkout in child `bash`. Tests that spawn `bash` without `load test_helper` must use `env -u BASH_ENV`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
+- **Agent perf `project`** is the repo of the session start directory, not of a `cd` target. Read a cross-repo session with `--all`.
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
 
 ## Delivery

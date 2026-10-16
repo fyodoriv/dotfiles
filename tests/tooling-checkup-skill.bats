@@ -75,7 +75,11 @@ make_tooling_root() {
   grep -F -q 'audit_agent_config.py --cache' "$SKILL"
   grep -F -q 'AskUserQuestion' "$SKILL"
   grep -F -q 'checkup_state.py record' "$SKILL"
-  [ "$(grep -c '^\*\*Done when:\*\*' "$SKILL")" -eq 10 ]
+  grep -F -q 'agent_time_review.py --days 7' "$SKILL"
+  grep -F -q '### Agent time (7 days)' "$SKILL"
+  grep -F -q 'runs all eleven phases' "$SKILL"
+  [ "$(grep -c '^## Phase ' "$SKILL")" -eq 11 ]
+  [ "$(grep -c '^\*\*Done when:\*\*' "$SKILL")" -eq 11 ]
 }
 
 @test "tooling-checkup reference links resolve one level deep" {
@@ -280,4 +284,78 @@ EOF
   grep -q 'PRI 4' "$guide"
   grep -q 'taskpolicy -B -t 0 -l 0 -p' "$guide"
   grep -q 'bin/cursor-priority' "$guide"
+}
+
+# Fake agentbrew perf CLI: prints $PERF_FIXTURES/<all|project>.json for `report`.
+make_perf_fixtures() {
+  PERF_FIXTURES="$TEST_DIR/perf"
+  mkdir -p "$PERF_FIXTURES/log"
+  cat > "$PERF_FIXTURES/agent-perf.mjs" <<'JS'
+import fs from 'fs'
+const a = process.argv.slice(2)
+const i = a.indexOf('--project')
+const name = i === -1 ? 'all' : a[i + 1]
+process.stdout.write(fs.readFileSync(`${process.env.PERF_FIXTURES}/${name}.json`, 'utf8'))
+JS
+  cat > "$PERF_FIXTURES/session-report.mjs" <<'JS'
+process.stdout.write(JSON.stringify({ overall: { sessions: 4, hours: { active: 3.5, wall_clock: 9 },
+  input_tokens: { total: 5e6, pct_cached: 90 }, output_tokens: 2e5 },
+  top_prompts: [{ text: 'SECRET-PROMPT-TEXT' }] }))
+JS
+  local now
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf '{"ts":"%s","project":"alpha","ms":5}\n{"ts":"%s","project":"other","ms":5}\n{"ts":"2001-01-01T00:00:00Z","project":"ancient","ms":5}\n' \
+    "$now" "$now" > "$PERF_FIXTURES/log/2026-10.jsonl"
+  local npm='{"key":"npm ci","count":14,"sumMs":840000,"p50Ms":60000,"p95Ms":70000,"maxMs":70000,"failures":0}'
+  local poll='{"key":"until <arg>","count":3,"sumMs":900000,"p50Ms":300000,"p95Ms":300000,"maxMs":300000,"failures":0}'
+  local quick='{"key":"git status","count":9,"sumMs":900,"p50Ms":100,"p95Ms":120,"maxMs":120,"failures":0}'
+  printf '{"toolMs":1740900,"calls":26,"failures":0,"keys":[%s,%s,%s],"slowest":[{"key":"until <arg>","ms":300000}],"previous":{"toolMs":870450,"toolMsChangePct":100}}' \
+    "$npm" "$poll" "$quick" > "$PERF_FIXTURES/all.json"
+  printf '{"toolMs":840900,"calls":23,"keys":[%s,%s]}' "$npm" "$quick" > "$PERF_FIXTURES/alpha.json"
+  printf '{"toolMs":900000,"calls":3,"keys":[%s]}' "$poll" > "$PERF_FIXTURES/other.json"
+  export PERF_FIXTURES AGENT_PERF_SCRIPT="$PERF_FIXTURES/agent-perf.mjs" \
+    SESSION_REPORT_SCRIPT="$PERF_FIXTURES/session-report.mjs" AGENT_PERF_DIR="$PERF_FIXTURES/log" \
+    TOOLING_CHECKUP_STATE_DIR="$TEST_DIR/state"
+}
+
+@test "time review lists slow recurring steps, fixes, tasks, and metrics" {
+  command -v node >/dev/null || skip "node not installed"
+  make_tooling_root
+  make_perf_fixtures
+
+  run env TOOLING_ROOT="$TOOLING" python3 "$SCRIPTS/agent_time_review.py" --days 7
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool time 29m00s over 26 calls (0 failed); previous window 14m30s (+100%)"* ]]
+  [[ "$output" == *"sessions 4, active 3.5 h"* ]]
+  [[ "$output" == *"1. until <arg>: 15m00s total, 3x"* ]]
+  [[ "$output" == *"fix: polling loop"* ]]
+  [[ "$output" == *"fix: repeated full install"* ]]
+  [[ "$output" == *"slowest single call: until <arg> 5m00s"* ]]
+  [[ "$output" == *"file    alpha speed-up-npm-ci: npm ci costs 2m00s/day"* ]]
+  [[ "$output" == *"inspect other speed-up-until-arg"* ]]
+  [[ "$output" != *"git status costs"* ]]
+  [[ "$output" != *"ancient"* ]]
+  [[ "$output" != *"SECRET-PROMPT-TEXT"* ]]
+  [[ "$output" == *"--metric agent_tool_hours_7d=0.48"* ]]
+  [[ "$output" == *"--metric slowest_step_p95_s=300.0"* ]]
+  [[ "$output" == *"--metric 'top_step_key=until <arg>'"* ]]
+  [[ "$output" == *"agent_active_hours_7d: none -> 3.5"* ]]
+}
+
+@test "time review marks filed tasks and reports non-tooling projects only" {
+  command -v node >/dev/null || skip "node not installed"
+  make_tooling_root
+  make_perf_fixtures
+  printf '#### speed-up-npm-ci\n' > "$TOOLING/alpha/TASKS.md"
+  printf '{"toolMs":900000,"calls":3,"keys":[{"key":"npm test","count":3,"sumMs":900000,"p95Ms":300000}]}' \
+    > "$PERF_FIXTURES/other.json"
+
+  run env TOOLING_ROOT="$TOOLING" python3 "$SCRIPTS/agent_time_review.py" --days 7
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"filed   alpha speed-up-npm-ci"* ]]
+  [[ "$output" == *"report  other speed-up-npm-test"*"fix: full gate or test run"* ]]
+
+  run env TOOLING_ROOT="$TOOLING" AGENT_PERF_SCRIPT="$TEST_DIR/missing.mjs" python3 "$SCRIPTS/agent_time_review.py"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"no agent-perf data"* ]]
 }

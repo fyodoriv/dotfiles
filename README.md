@@ -569,6 +569,16 @@ The `update-tooling` skill safely refreshes primary tooling checkouts, applies t
 
 The `tooling-checkup` skill (`/tooling-checkup`) is the one command to run by hand every few days. It ships outstanding tooling work, runs `update-tooling`, upgrades third-party packages through `dotfiles-upgrade` and `claude update`, runs `claude doctor`, audits LaunchAgents and heavy processes, measures Claude Code input latency, and lints skills and instruction files against Anthropic's best practices. It reports what changed since the last run (state in `~/.local/state/tooling-checkup/`), asks a short questionnaire, and applies the answers. It ignores dependabot pull requests unless a critical alert is open, and it touches only repositories under the tooling root.
 
+### Agent time metrics
+
+agentbrew records how long each agent tool call takes (hooks `perf-record`, `perf-brief`, and `perf-task-review`; on by default). Read the numbers three ways:
+
+- **Status line.** Claude Code shows model, session time, API time, tool time, the slowest step, and context use, for example `Opus 5.5 · 42m (api 18m · tools 15m) · slowest: npm run verify 6m12s · ctx 38%`. agentbrew manages this `statusLine`. A `statusLine` that you set yourself wins.
+- **Reports.** `node ~/.config/agentbrew/scripts/agent-perf.mjs report --all --days 7` lists tool time, calls, and per-step count, total, p50, p95, and max, with the change against the previous 7 days. `--session latest` reports one session; `--json` gives machine output. A step is a redacted key such as `npm run verify` or `git push`, never the full command.
+- **Reviews.** `/tooling-checkup` Phase 8 runs `skills/tooling-checkup/scripts/agent_time_review.py`: the 3 slowest recurring steps per project and overall, a known fix for each, speedup tasks for tooling repos, and the change since the last checkup. `/ship-it` ends each delivery with a Time review of the session. The `session-report` skill adds tokens and active hours.
+
+The log lives in `${XDG_STATE_HOME:-~/.local/state}/agentbrew/perf/YYYY-MM.jsonl` (one file per month, kept 180 days). It holds no prompts, file contents, or full commands. To opt out on one machine, list the hook IDs under `disabled:` in `~/.config/agentbrew/hooks-overlay/manifest.yaml`, or set `HOOK_BYPASS_PERF_RECORD=1`. Full reference: agentbrew `docs/agent-perf.md`.
+
 Do not put live authentication material or customer payload snapshots in test data,
 logs, screenshots, pull request descriptions, or committed files. Use safe
 placeholders and fixtures.

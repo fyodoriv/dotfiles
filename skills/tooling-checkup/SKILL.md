@@ -5,7 +5,7 @@ description: >
   outstanding tooling work, refreshes the tooling checkouts and agent config,
   upgrades Homebrew, npm, uv, pipx, mise, and Claude Code, runs `claude doctor`,
   audits LaunchAgents and heavy processes, measures Claude Code input latency
-  in Ghostty, and lints skills, rules, and AGENTS.md files against Anthropic's
+  in Ghostty, reviews where agent tool time went, and lints skills, rules, and AGENTS.md files against Anthropic's
   best practices. Then it reports what changed since the last run, asks the
   owner a questionnaire, and applies the answers. Use when the user runs
   "/tooling-checkup", or asks to update all tooling and the machine, to tidy up
@@ -18,15 +18,15 @@ disable-model-invocation: true
 # Tooling checkup
 
 The user runs this by hand every 2 or 3 days. It must be safe to repeat, and
-fast when nothing changed. Run ten phases in order. Each phase ends with a
-**Done when** check. Phases 8, 9, and 10 always run, even when an earlier
+fast when nothing changed. Run eleven phases in order. Each phase ends with a
+**Done when** check. Phases 9, 10, and 11 always run, even when an earlier
 phase is blocked.
 
 `<skill-dir>` below means this skill's base directory.
 `TOOLING_ROOT` defaults to `~/apps/tooling`.
 
-**Scope.** `/tooling-checkup` alone runs all ten phases. A request for one part
-runs Phase 1, that part, and Phases 8 to 10:
+**Scope.** `/tooling-checkup` alone runs all eleven phases. A request for one part
+runs Phase 1, that part, and Phases 9 to 11:
 
 | The user asks to… | Run |
 |---|---|
@@ -35,6 +35,7 @@ runs Phase 1, that part, and Phases 8 to 10:
 | clean up background processes | Phase 5 |
 | make Claude Code typing faster | Phase 6 |
 | check skills and rules against best practices | Phase 7 |
+| find what makes agents slow | Phase 8 |
 
 ## Hard rules
 
@@ -76,7 +77,7 @@ Phase 1 compares the machine with it. Use it to keep a repeat run short:
 - Phase 4 skips the long upgrade when the last upgrade is under 12 hours old
   and Homebrew has nothing outdated (see the reference file).
 - Phase 7 replays the cached audit when no skill or rule file changed.
-- Phases 1, 3, 5, and 6 always run. They check live state.
+- Phases 1, 3, 5, 6, and 8 always run. They check live state.
 
 ## Phase 1: Take stock (read-only)
 
@@ -127,7 +128,7 @@ Follow [reference/machine-updates.md](reference/machine-updates.md). In short:
 
 1. Run `dotfiles-upgrade` (Topgrade: Homebrew and casks, npm and pnpm globals,
    uv, pipx, mise, gh extensions) unless the fast path applies. Run it in the
-   background and go on with Phases 5 to 7.
+   background and go on with Phases 5 to 8.
 2. Run `claude update`. Compare `claude --version` before and after.
 3. Run `claude doctor` again. Report every line that is not OK.
 4. Check what is still outdated. Report macOS updates; never install them.
@@ -144,7 +145,7 @@ lists the heaviest processes.
 
 - Fix tooling-owned jobs in their source repo.
 - Unload an `off-rule` minsky job at once.
-- Put each third-party removal in the Phase 9 questionnaire. Disable only
+- Put each third-party removal in the Phase 10 questionnaire. Disable only
   after a yes, and only by moving the plist.
 
 **Done when:** every job that is not `keep` has an action, a question, or a
@@ -170,7 +171,38 @@ Ship small fixes in the source repo. Put big changes in the questionnaire.
 **Done when:** every ERROR is fixed or listed with its owner, and the judgment
 checks are done.
 
-## Phase 8: Report
+## Phase 8: Agent time review
+
+agentbrew logs the time of every agent tool call (the `perf-record` hook).
+Read the last 7 days, per project and overall:
+
+```bash
+python3 <skill-dir>/scripts/agent_time_review.py --days 7
+```
+
+It wraps `agent-perf.mjs report --all --days 7 --json` and the
+`session-report` analyzer (tokens and hours). It prints the top 3 slowest
+recurring steps (2 or more calls) per project and overall, a `fix:` line for
+each step that matches a known safe fix, the change since the last checkup,
+and one speedup line per recurring step that costs 1 min/day or more:
+
+| Line | Do this |
+|---|---|
+| `file` | Add the task id to that tooling repo's `TASKS.md`, with the step, its cost per day, and the fix. Ship it in Phase 11. |
+| `filed` | The task exists. Re-rank it when the cost grew. |
+| `report` | Not a tooling repo. Report it only. |
+| `inspect` | The key is redacted. Find the real step with `agent-perf.mjs report --session <id>`, then file or report it. |
+
+Known fixes: a polling loop becomes a blocking wait; a repeated full install
+is skipped when the lockfile is unchanged; a full gate in the inner loop uses
+affected-test selection; a test runner at PRI 4 is on background QoS. In a
+tooling repo, ship a small fix with `/ship-it`. Put a big one in the
+questionnaire. Use the perf-review skill for deeper analysis.
+
+**Done when:** the review is printed with real numbers, and each `file`,
+`filed`, `report`, and `inspect` line has an action.
+
+## Phase 9: Report
 
 Put the verdict first. Use this template.
 
@@ -197,6 +229,12 @@ Put the verdict first. Use this template.
 ### Config audit
 - <n> errors, <n> warnings · fixed: <list> · open: <list with owner>
 
+### Agent time (7 days)
+- Tool time: <h> (<change> vs last run) · active <h> · output <n>M tokens
+- Slowest recurring: <key> <total> (<n>x, p95 <s>) · <key> … · <key> …
+- Per project: <project>: <top key> <total> · …
+- Speedups: filed <repo>/<task-id> (<min/day>) · fixed: <what> · none
+
 ### Needs you
 - <item> → <the exact question or command>
 
@@ -214,7 +252,7 @@ feature work in separate lists, up to three each. Recommend from the refreshed
 
 **Done when:** the report is written and each claim has evidence.
 
-## Phase 9: Ask the owner
+## Phase 10: Ask the owner
 
 Collect the questions: each "Needs you" item, each third-party job to remove,
 each big config change, and which next tasks to start. Skip a question an
@@ -230,16 +268,18 @@ question:
 
 **Done when:** every question has an answer, or the user chose to stop.
 
-## Phase 10: Apply the answers and record
+## Phase 11: Apply the answers and record
 
 1. Apply each answer: disable the approved jobs, ship the approved config
-   changes with `/ship-it`, and file or re-rank tasks.
+   changes with `/ship-it`, and file or re-rank tasks (with the Phase 8
+   speedup tasks).
 2. Run `bash <skill-dir>/scripts/inventory.sh` again and update the report.
 3. Record this run:
 
    ```bash
    python3 <skill-dir>/scripts/checkup_state.py record --verdict "<verdict line>" \
-     --metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> --metric claude_sessions=<n>
+     --metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> --metric claude_sessions=<n> \
+     <the Phase 8 `record:` metrics>
    ```
 
 **Done when:** each answer is applied or listed with a reason, and the state

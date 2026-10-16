@@ -138,6 +138,19 @@
         "Drops a stash only after git apply --check -R proves the default branch contains it",
         "Keeps the default branch, open-PR branches, worktree branches, shared state refs, and unknown work, and reports them"
       ]
+    },
+    {
+      "id": 12,
+      "prompt": "/ship-it after a long session that ran the full gate four times (Time review)",
+      "expected_output": "After Step 14 the agent reads this session's perf report, writes a Time review of 5 lines or fewer with the 3 slowest steps and one concrete speedup, and files a task in the tooling repo when the speedup saves 1 minute or more and recurs. It does not run a second review when the perf-task-review Stop hook already asked this turn.",
+      "expectations": [
+        "Runs agent-perf.mjs report --session with CLAUDE_CODE_SESSION_ID or latest, plus --all",
+        "Names the 3 slowest steps with total time and call count from the real report",
+        "Gives one concrete speedup with its expected saving",
+        "Files a TASKS.md task only when the speedup saves 1 minute or more and the step recurs",
+        "Reuses the Stop-hook Time review from this turn instead of writing a second one",
+        "Writes 'Time review: no perf data' and continues when the log has no rows"
+      ]
     }
   ]
 }

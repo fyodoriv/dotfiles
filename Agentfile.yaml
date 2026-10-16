@@ -94,6 +94,9 @@ skills:
   # ── context budget / token hygiene (agentbrew dev plugins) ───────
   - context-budget           # metrics-driven trim via agentbrew measure context
   - cursor-token-playbook    # daily Cursor habits — model mix, new chat, @ scoping
+  # ── agent time (agentbrew perf log; /tooling-checkup Phase 8, /ship-it Step 15) ──
+  - perf-review              # slowest recurring steps → speedup tasks (agentbrew)
+  - session-report           # tokens, cache, active hours (official plugin; back after the 2026-10-13 trim)
   # ── web design quality skills ───────────────────────────────────
   # frontend-design (anthropics/skills): Anthropic's official creative
   # design guidance for distinctive, production-grade frontend. Bold
@@ -103,9 +106,9 @@ skills:
   - frontend-design
   # ── Anthropic plugin marketplace skills (claude-plugins-official) ─
   # Removed 2026-10-13 (0 uses in 180 days; each cost listing tokens in every
-  # session): the mcp-server-dev and plugin-dev sets, session-report,
-  # claude-md-improver, claude-automation-recommender, playground,
-  # math-olympiad, Discord access/configure, m5-onboard, cardputer-buddy.
+  # session): the mcp-server-dev and plugin-dev sets, claude-md-improver,
+  # claude-automation-recommender, playground, math-olympiad, Discord
+  # access/configure, m5-onboard, cardputer-buddy.
   # In Claude Code, install the official plugin when needed:
   # `/plugin install plugin-dev@claude-plugins-official` (or mcp-server-dev, …).
   - skill-creator           # create, evaluate, and improve skills

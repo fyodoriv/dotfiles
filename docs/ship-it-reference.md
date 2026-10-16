@@ -947,3 +947,35 @@ the only path.
 **When memory was written this session**, say so in the delivery report with
 the store and file count, so the operator can see what was captured rather than
 having to go looking for it.
+
+## 15. Time review (every delivery, all repo families)
+
+The last step of every `/ship-it`, after Step 14. agentbrew's `perf-record`
+hook logs the time of each tool call. Read this session's steps:
+
+```bash
+node ~/.config/agentbrew/scripts/agent-perf.mjs report --session "${CLAUDE_CODE_SESSION_ID:-latest}" --all
+```
+
+- `CLAUDE_CODE_SESSION_ID` names this exact session. Without it, `latest`
+  picks the session of the newest row, which can be a parallel agent.
+- `--all` keeps steps from every repo the session touched. Without it, the
+  report covers only the current project.
+
+Add a `### Time review` block to the delivery report, 5 lines or fewer:
+
+1. The 3 slowest steps: key, total time, call count.
+2. One concrete speedup: what to change and the expected saving.
+3. A task when the speedup saves 1 minute or more per run and the step
+   recurs (2 or more calls this session, or a top key in
+   `agent-perf.mjs report --days 7`). In an approved tooling repo, file it in
+   that repo's `TASKS.md`. Elsewhere, report it only.
+
+**One review per turn.** The agentbrew `perf-task-review` Stop hook asks for
+the same Time review when a turn spends `AGENTBREW_PERF_REVIEW_MIN_SECS`
+(default 300) seconds or more in tools. When that hook already asked in this
+turn, reuse that review in the delivery report. Do not run a second one.
+
+**Non-blocking.** With no perf rows, write `Time review: no perf data` and
+check `agentbrew status` for the `perf-record` hook. Never hold a delivery for
+this step. The `perf-review` skill explains how to read the report.

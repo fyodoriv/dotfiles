@@ -26,7 +26,7 @@ env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-upgrade"
 ```
 
 It can take 5 to 20 minutes. Run it in the background and keep working on
-Phases 5 to 7. Its log is `~/.local/share/dotfiles/logs/dotfiles-upgrade.log`.
+Phases 5 to 8. Its log is `~/.local/share/dotfiles/logs/dotfiles-upgrade.log`.
 
 The wrapper exits early in endpoint Node safe mode
 (`~/.local/state/dotfiles/endpoint-node-publisher-blocked`). Report that as

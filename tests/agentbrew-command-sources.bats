@@ -466,3 +466,18 @@
   grep -q "refs/ship-it-preserved" "$reference_file"
   grep -q "git reset --keep" "$reference_file"
 }
+
+@test "ship-it ends every delivery with one time review" {
+  local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
+  local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  local eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
+
+  grep -q "Steps 1–15" "$command_file"
+  grep -q "agent-perf.mjs report --session latest" "$command_file"
+  grep -q "perf-task-review" "$command_file"
+  grep -q "## 15. Time review (every delivery, all repo families)" "$reference_file"
+  grep -F -q 'report --session "${CLAUDE_CODE_SESSION_ID:-latest}" --all' "$reference_file"
+  grep -q "reuse that review" "$reference_file"
+  grep -q "Time review: no perf data" "$reference_file"
+  jq -e '.evals | any(.id == 12 and (.prompt | contains("Time review")))' "$eval_file" >/dev/null
+}

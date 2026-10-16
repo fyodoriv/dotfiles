@@ -95,6 +95,18 @@
         "Reports the doctor line that is not OK in the Updated section",
         "Says that running sessions keep the old binary until restarted"
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "/tooling-checkup — and tell me what slowed my agents down this week.",
+      "expected_output": "Phase 8 prints a time review from the real perf log: top 3 slow recurring steps per project and overall, known fixes, speedup tasks filed only in tooling repos, and metrics recorded for the next diff.",
+      "expectations": [
+        "Runs agent_time_review.py --days 7 and quotes its real numbers instead of estimating",
+        "Lists the top 3 slowest recurring steps overall and per project",
+        "Files a TASKS.md task only for `file` lines in tooling repos, and only reports other projects",
+        "Names the matching fix for a polling loop, a repeated install, or a full gate in the inner loop",
+        "Adds the Agent time section to the report and records the helper's metrics with checkup_state.py record"
+      ]
     }
   ]
 }

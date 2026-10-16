@@ -18,6 +18,22 @@ recovering from an `agentbrew sync` failure.
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
 | `~/.config/agentbrew/hooks-overlay/manifest.yaml` | you, plus dotfiles | Per-machine hook overlay. Your `disabled:` list and comments stay. `dotfiles apply` only adds missing opt-in hooks (today `gh-pr-body-requires-docs`) to `enabled:`, through `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml`. List a hook under `disabled:` to opt out on one machine. |
 
+### Agent time skills
+
+agentbrew's perf hooks are on by default, so `dotfiles apply` needs no hook
+overlay change for them. The two skills that read the perf data are not
+default on a machine with an Agentfile, so `Agentfile.yaml` lists them under
+`skills:`:
+
+- `perf-review` (agentbrew): reads `agent-perf.mjs report` and turns real
+  speedups into tasks.
+- `session-report` (official plugin): tokens, cache, and active hours. The
+  checkup runs its analyzer with `--json --since 7d` and reads only the
+  `overall` totals, never the prompt list.
+
+Check them with `ls ~/.claude/skills | rg 'session-report|perf-review'`.
+README "Agent time metrics" explains how to read the numbers.
+
 If generated config looks wrong, update `Agentfile.yaml` or agentbrew state and
 sync again. Do not patch generated files directly; the next sync will overwrite
 them.

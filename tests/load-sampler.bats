@@ -58,6 +58,13 @@ teardown() {
   [[ "$(printf '%s' "$row" | cut -f10)" == "node:98.0 WindowServer:40.5 zsh:3.0" ]]
 }
 
+@test "load-sampler records CPU busy % so blocked-thread load is not read as CPU saturation" {
+  # Sum of %cpu (98 + 40.5 + 3 + 1 = 142.5) over 10 CPUs = 14%.
+  run env PATH="$TEST_BIN:$PATH" "$SAMPLER_CMD"
+  [ "$status" -eq 0 ]
+  [ "$(cut -f11 "$DOTFILES_LOAD_SAMPLES")" = "14" ]
+}
+
 @test "load-sampler survives a long process list (no SIGPIPE under pipefail)" {
   cat > "$TEST_BIN/ps" <<'MOCK'
 #!/bin/bash
@@ -79,13 +86,14 @@ MOCK
 @test "load-sampler --report names the peak, overload rows, and gaps" {
   now=$(date +%s)
   printf '%s\tt1\t4.00\t0\t0\t10\t60\t0\t300\tnode:10\n' "$((now - 4000))" > "$DOTFILES_LOAD_SAMPLES"
-  printf '%s\tt2\t25.00\t0\t0\t10\t20\t900\t900\tnode:400.0 bash:50\n' "$((now - 3970))" >> "$DOTFILES_LOAD_SAMPLES"
+  printf '%s\tt2\t25.00\t0\t0\t10\t20\t900\t900\tnode:400.0 bash:50\t87\n' "$((now - 3970))" >> "$DOTFILES_LOAD_SAMPLES"
   printf '%s\tt3\t3.00\t0\t0\t10\t60\t0\t300\tzsh:1\n' "$((now - 60))" >> "$DOTFILES_LOAD_SAMPLES"
   run "$SAMPLER_CMD" --report 24
   [ "$status" -eq 0 ]
   [[ "$output" == *"peak load1 25.00"* ]]
   [[ "$output" == *"overload rows (load1 > 20): 1"* ]]
   [[ "$output" == *"gap"*"t2"* ]]
+  [[ "$output" == *"peak CPU busy 87%"* ]]
 }
 
 @test "load-sampler LaunchAgent runs the sampler every 30 seconds" {

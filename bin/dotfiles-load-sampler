@@ -3,7 +3,9 @@
 # A forced power-off drops the unified log buffer; this file survives it.
 # The LaunchAgent appends one row every 30 seconds and keeps about 7 days.
 # Row: epoch, time, load1, load5, load15, cpus, free memory %, swap MB used,
-# process count, top 3 processes by CPU.
+# process count, top 3 processes by CPU, CPU busy %.
+# Load counts threads blocked in the kernel too, so a high load with a low
+# CPU busy % means a kernel or I/O stall, not CPU saturation.
 # Usage: dotfiles-load-sampler            # append one row
 #        dotfiles-load-sampler --report [hours]  # peak, overload rows, gaps (default 24h)
 
@@ -22,6 +24,7 @@ report() {
     {
       rows++
       if ($3 + 0 > peak + 0) { peak = $3; peak_at = $2; peak_top = $10 }
+      if ($11 != "" && $11 + 0 > busy + 0) { busy = $11; busy_at = $2 }
       if ($3 + 0 > 2 * $6) { over++ }
       limit = 2 * $6
       # A gap over 5 minutes means the sampler did not run: sleep, freeze, or reboot.
@@ -34,6 +37,7 @@ report() {
       printf "last %sh: %d rows\n", hours, rows
       printf "peak load1 %s at %s (top: %s)\n", peak, peak_at, peak_top
       printf "overload rows (load1 > %d): %d\n", limit, over
+      if (busy_at != "") printf "peak CPU busy %s%% at %s\n", busy, busy_at
       printf "%s", gaps
     }' "$SAMPLES"
 }
@@ -51,11 +55,16 @@ mem_free="$(sysctl -n kern.memorystatus_level 2>/dev/null || echo 0)"
 swap_used="$(sysctl -n vm.swapusage 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "used") { v = $(i + 2); sub(/M$/, "", v); printf "%d", v } }')"
 procs="$(ps -A -o pid= 2>/dev/null | wc -l | tr -d ' ')"
 # awk reads the whole list: `head` would close the pipe and pipefail would exit 141.
-top="$(ps -A -r -o %cpu=,comm= 2>/dev/null | awk 'NR <= 3 { n = $2; sub(/.*\//, "", n); printf "%s%s:%s", (NR > 1 ? " " : ""), n, $1 }')"
+cpu_line="$(ps -A -r -o %cpu=,comm= 2>/dev/null | awk -v cpus="$cpus" '
+  { sum += $1 }
+  NR <= 3 { n = $2; sub(/.*\//, "", n); top = top sprintf("%s%s:%s", (NR > 1 ? " " : ""), n, $1) }
+  END { printf "%s\t%d", top, (cpus > 0 ? sum / cpus : 0) }')"
+top="${cpu_line%%$'\t'*}"
+cpu_busy="${cpu_line##*$'\t'}"
 
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
   "$(date +%s)" "$(date '+%Y-%m-%dT%H:%M:%S')" "$load1" "$load5" "$load15" \
-  "$cpus" "$mem_free" "${swap_used:-0}" "$procs" "$top" >> "$SAMPLES"
+  "$cpus" "$mem_free" "${swap_used:-0}" "$procs" "$top" "$cpu_busy" >> "$SAMPLES"
 
 rows="$(wc -l < "$SAMPLES" | tr -d ' ')"
 if [ "$rows" -gt "$MAX_ROWS" ]; then

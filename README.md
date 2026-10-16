@@ -901,8 +901,10 @@ ancestor (launchd jobs, Remote Control) and other agent and model workers
 yield under CPU contention. Test runners that agents start (vitest, tsc,
 biome, bats) also yield, so parallel agent gates cannot starve the desktop.
 
-The `load-sampler` LaunchAgent writes load, free memory, swap, and the top
-CPU processes to `~/.local/state/dotfiles/load-samples.tsv` every 30 seconds.
+The `load-sampler` LaunchAgent writes load, free memory, swap, the top CPU
+processes, and CPU busy % to `~/.local/state/dotfiles/load-samples.tsv` every
+30 seconds. Load also counts threads blocked in the kernel, so high load with
+low CPU busy % points to a kernel or I/O stall, not CPU saturation.
 A forced power-off loses the macOS log buffer; this file survives it. Run
 `dotfiles-load-sampler --report 24` to see the peak load, overload rows, and
 the last row before each gap (a freeze, sleep, or reboot).

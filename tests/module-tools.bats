@@ -47,7 +47,7 @@ setup() {
 
   # Create mock tool binaries
   mkdir -p "$TEST_DIR/bin"
-  for tool in fzf eza bat fd rg zoxide tree htop jq gum delta fastfetch topgrade; do
+  for tool in fzf eza bat fd rg zoxide tree htop jq gum delta fastfetch topgrade gtimeout; do
     echo '#!/bin/bash' > "$TEST_DIR/bin/$tool"
     chmod +x "$TEST_DIR/bin/$tool"
   done
@@ -60,7 +60,7 @@ teardown() {
 
 @test "tools: passes when all tools installed" {
   source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
-  [ "$pass_count" -eq 13 ]
+  [ "$pass_count" -eq 14 ]
   [ "$fail_count" -eq 0 ]
 }
 
@@ -78,4 +78,20 @@ teardown() {
   echo "tool.bat" >> "$OVERRIDES_FILE"
   source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
   [ "$skip_count" -ge 3 ]
+}
+
+@test "tools: gtimeout missing fails and the fix installs coreutils" {
+  rm -f "$TEST_DIR/bin/gtimeout"
+  export PATH="$TEST_DIR/bin:/usr/bin:/bin"
+  fix_cmds=""
+  check() {
+    case "$1" in
+      tool.gtimeout)
+        if eval "$3" >/dev/null 2>&1; then pass "$2"; else fail "$2"; fix_cmds="$4"; fi
+        ;;
+    esac
+  }
+  source "$BATS_TEST_DIRNAME/../modules/tools/doctor.sh"
+  [ "$fail_count" -eq 1 ]
+  [[ "$fix_cmds" == *"brew install coreutils"* ]]
 }

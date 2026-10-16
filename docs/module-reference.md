@@ -175,6 +175,7 @@ Spotlight check count varies based on which directories exist on your machine.
 | `tool.gum` | gum installed | `brew install gum` |
 | `tool.delta` | delta installed | `brew install git-delta` |
 | `tool.fastfetch` | fastfetch installed | `brew install fastfetch` |
+| `tool.gtimeout` | gtimeout installed (bounds doctor and hook timeouts) | `brew install coreutils` |
 
 ### sync
 

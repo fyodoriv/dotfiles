@@ -534,7 +534,7 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 | **git** | delta diffs (with fallback), rerere, histogram algorithm, auto-rebase, auto-prune, aliases |
 | **macos** | Fastest key repeat, no autocorrect/smart quotes, Finder improvements, Spotlight pruning/exclusions, 15-minute idle lock, analytics off |
 | **ssh** | macOS Keychain agent, connection multiplexing, keep-alive |
-| **tools** | bat, eza, fd, ripgrep, jq, btop, gum, fastfetch, htop, tealdeer, tree |
+| **tools** | bat, eza, fd, ripgrep, jq, btop, gum, fastfetch, htop, tealdeer, tree, coreutils (`gtimeout`) |
 | **workflow** | Scripts + LaunchAgents (sync, doctor, cleanup, git-maintain, capslock-control, gui-path) |
 | **sync** | Dotfiles auto-sync health: launchagent loaded, recent sync, clean working tree |
 | **security** | SSH key permissions, secrets scanning, git credential audit, endpoint-security signing checks |

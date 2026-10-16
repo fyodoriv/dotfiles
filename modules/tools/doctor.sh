@@ -1,9 +1,11 @@
 #!/bin/bash
 # Doctor checks for tools module
-for tool in fzf eza bat fd rg zoxide tree htop jq gum delta fastfetch topgrade; do
+for tool in fzf eza bat fd rg zoxide tree htop jq gum delta fastfetch topgrade gtimeout; do
   case "$tool" in
     rg)    brew_pkg="ripgrep" ;;
     delta) brew_pkg="git-delta" ;;
+    # Timeout wrappers in bin/dotfiles-doctor and bin/morning prefer gtimeout.
+    gtimeout) brew_pkg="coreutils" ;;
     *)     brew_pkg="$tool" ;;
   esac
   check "tool.$tool" "$tool installed" "command -v $tool" "brew install $brew_pkg 2>/dev/null"

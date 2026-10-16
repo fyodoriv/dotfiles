@@ -110,7 +110,7 @@ Installed via `run_onchange_brew.sh.tmpl`. Re-runs automatically when the Brewfi
 |---|---|
 | Git | `git-delta`, `gh` |
 | Shell | `atuin`, `direnv`, `fnm`, `fzf`, `poetry`, `pyenv`, `uv`, `yarn`, `zoxide`, `zsh-autosuggestions`, `zsh-fast-syntax-highlighting`, `zsh-history-substring-search`, `zsh-syntax-highlighting` |
-| Tools | `bat`, `bats-core`, `btop`, `eza`, `fastfetch`, `fd`, `fswatch`, `gum`, `htop`, `httpie`, `jq`, `ripgrep`, `shellcheck`, `sleepwatcher`, `terminal-notifier`, `tealdeer`, `tree`, `yq` |
+| Tools | `bat`, `bats-core`, `btop`, `coreutils`, `eza`, `fastfetch`, `fd`, `fswatch`, `gum`, `htop`, `httpie`, `jq`, `ripgrep`, `shellcheck`, `sleepwatcher`, `terminal-notifier`, `tealdeer`, `tree`, `yq` |
 | Prompt | `starship` |
 
 ### Full profile additions

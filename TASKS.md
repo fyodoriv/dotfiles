@@ -21,13 +21,6 @@ them. -->
   - **Files**: modify_private_dot_npmrc, data/npm-global-allow-scripts.json, tests/
   - **Acceptance**: a test renders the npmrc from a fixture list and finds one `allow-scripts=` line with every package; `npm update -g` on a fixture prefix keeps a script CLI working.
 
-- [ ] Install `coreutils` so hook timeout wrappers stop falling back to `perl alarm`
-  - **ID**: brewfile-add-coreutils-for-gtimeout
-  - **Tags**: scout, brewfile, hooks, tooling
-  - **Details**: `bin/dotfiles-doctor`, `bin/morning`, and agentbrew `hooks/checks/a-pr-is-not-ready.sh` pick their timeout mechanism in the order `gtimeout` → `timeout` → `perl alarm` → none. Neither `gtimeout` nor `timeout` is installed on this machine (`coreutils` is absent from the inline Brewfile), so every timeout-bounded hook takes the `perl alarm` branch. That branch is correct and was verified to bound at its configured limit, so this is not a correctness bug — but it is an undeclared dependency on system perl for a path the code clearly intends to run under coreutils, and the last fallback (`timeout_cmd=""`) removes the bound entirely. Add `coreutils` to the inline Brewfile so the intended branch is the one that runs.
-  - **Files**: .chezmoiscripts/run_onchange_brew.sh.tmpl, modules/tools/doctor.sh
-  - **Acceptance**: (1) `command -v gtimeout` succeeds after `dotfiles apply` on a fresh machine; (2) `make check` still passes; (3) no behaviour changes other than which timeout binary is selected.
-
 - [ ] User-dir installers for AWS CLI v2 and the gcloud SDK, so `dotfiles apply` reproduces them without brew Python
   - **ID**: user-dir-installers-for-aws-gcloud
   - **Tags**: scout, brew, arm64-migration, endpoint-security, reproducibility

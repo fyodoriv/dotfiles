@@ -18,6 +18,7 @@ them. -->
 
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack
   - **ID**: bench-gemma4-vs-qwen3-coder-local-ai
+  - **Blocked**: needs a quiet-machine window and about 47 GB of downloads (checked 2026-10-16). Ollama 0.40.5 is running, but neither candidate (`gemma4:26b` 18 GB, `gemma4:e4b` 9.6 GB) nor the baseline `qwen3-coder:30b` (about 18 GB) is on disk; `ollama list` shows only qwen3:14b, qwen3:0.6b, qwen3.6:27b, and two custom tags. Parallel agent sessions keep load1 at 20-80, which would distort tok/s numbers. Unblock: run the pulls and the bench on an idle machine (load1 under 5), and first confirm the baseline is still `qwen3-coder:30b` and not `qwen3.6:27b`.
   - **Tags**: local-ai, bench, model-evaluation, ollama, mlx
   - **Details**: Gemma 4 shipped April 2026 (Apache 2.0, 256K context,
     multimodal, MoE A4B variant). The
@@ -77,14 +78,14 @@ them. -->
 - [ ] Investigate Ollama upstream qwen3-coder XML-parser fix (PRs #14906 / #14915)
   - **ID**: track-ollama-qwen3coder-parser-fix
   - **Tags**: local-ai, upstream, ollama
-  - **Blocked**: needs-external-action — upstream fix has NOT shipped: PR ollama/ollama#14906 closed UNMERGED, successor #14915 still open, issue #14834 still open (checked 2026-06-12 via api.github.com). Unblock when #14915 (or equivalent) merges into a tagged Ollama release; then simplify the retry ladder per Acceptance.
+  - **Blocked**: needs-external-action — upstream fix has NOT shipped: PR ollama/ollama#14906 closed UNMERGED, successor #14915 still open, issue #14834 still open (checked 2026-06-12 and again 2026-10-16 via api.github.com; local Ollama is 0.40.5). Unblock when #14915 (or equivalent) merges into a tagged Ollama release; then simplify the retry ladder per Acceptance.
   - **Research**: 2026-06-12 — upstream status check
     `curl -sf https://api.github.com/repos/ollama/ollama/pulls/14906` → state=closed, merged=false.
     `.../pulls/14915` → state=open. `.../issues/14834` → state=open.
     Watch-list entries + an anonymous-API fallback snippet added to docs/local-ai-roadmap.md
     (this host has no github.com gh auth; the API check needs no token).
     Re-check command: `curl -sf https://api.github.com/repos/ollama/ollama/pulls/14915 | jq '{state, merged, merged_at}'`.
-  - **Last-enriched**: 2026-06-12
+  - **Last-enriched**: 2026-10-16
   - **Details**: The 3-stage retry ladder in lib/local-ai-agent.py
     is a workaround for ollama/ollama#14834 — the qwen3-coder XML
     tool-call parser crashes with HTTP 500 on certain model
@@ -108,6 +109,7 @@ them. -->
 
 - [ ] Cross-repo local-AI loop (currently dotfiles-only)
   - **ID**: local-ai-loop-cross-repo
+  - **Blocked**: needs the loop's default model `qwen3-coder:30b` (about 18 GB), which is not on disk (checked 2026-10-16), to prove a real run in a second repo. The config extraction itself can be tested with a stub agent, as `tests/local-ai-loop-branching.bats` does. Unblock: local AI back in use with the default model pulled.
   - **Tags**: local-ai, cross-repo, refactor
   - **Details**: `bin/local-ai-loop` hardcodes assumptions that
     only hold in `dotfiles/`: `make check` exists, `bats tests/`
@@ -132,6 +134,7 @@ them. -->
 
 - [ ] Stretch the loop to genuine feature work (patch_file in anger)
   - **ID**: local-ai-loop-feature-work-dogfood
+  - **Blocked**: needs a real model run; the loop's default `qwen3-coder:30b` (about 18 GB) is not on disk (checked 2026-10-16). Unblock: local AI back in use with the default model pulled.
   - **Tags**: local-ai, dogfood, patch_file
   - **Details**: Earlier loop runs only produced new static test files. The harder case is editing an existing file with `patch_file`. Pick one open dotfiles task that edits a large existing file (for example `module-resilience-bats-missing-lib` or `launchagent-path-fix-stub-plist-message`), run the loop on it, and record where `patch_file` breaks.
   - **Files**: the chosen task's files, docs/audits/local-ai-failure-modes.md
@@ -147,6 +150,7 @@ them. -->
 
 - [ ] Run the local-AI loop for 8 hours from a task queue and log the success rate
   - **ID**: local-ai-loop-overnight-grind
+  - **Blocked**: an 8-hour measured run, over the 60-minute agent limit, and the default model `qwen3-coder:30b` (about 18 GB) is not on disk (checked 2026-10-16). Per-task branches shipped (#115); the run is the only remaining step.
   - **Tags**: local-ai, automation, overnight
   - **Details**: The queue reader (`read_queue_dir`, `lib/local-ai-loop.py`), the run CSV, and the reviewer gate already shipped. What remains is the measured long run. Per-task branches (`overnight-grind-branch-per-task`) shipped on 2026-10-16. The loop never pushes, so each task ends as a local branch or a rollback note, not a PR. The loop last ran on 2026-05-11 and no inference engine is reachable today, so this waits until local AI is back in use.
   - **Files**: bin/local-ai-loop, lib/local-ai-loop.py, docs/local-ai-roadmap.md

@@ -36,6 +36,11 @@ Do not assume remote hosts or default branches. Read each checkout's configured
 `origin` and `origin/HEAD`. This supports enterprise origins, GitHub origins,
 and forks without embedding host-specific rules.
 
+Why this is a local skill and not an upstream tool: topgrade's `git_repos`
+step and `chezmoi update` (`git pull --autostash --rebase`) do not skip and
+report dirty or diverged checkouts. Decision and re-check triggers:
+`docs/plans/replace-relocate-update-tooling-orchestration.md`.
+
 ## 1. Inventory every checkout
 
 Start with the current project context in every repository you inspect. Then

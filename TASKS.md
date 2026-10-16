@@ -29,13 +29,6 @@ them. -->
   - **Pivot**: if per-key session counts cannot reach the script without an agentbrew change, normalise by load average instead and record why.
   - **Anchor**: agentbrew #114 (perf log design); Basili et al. 1994 (GQM).
 
-- [ ] Replace? Relocate: update-tooling orchestration
-  - **ID**: replace-relocate-update-tooling-orchestration
-  - **Tags**: scout, tooling, agentbrew, dotfiles, reuse, upstream
-  - **Details**: The `update-tooling` skill currently coordinates safe primary-checkout refresh, the chezmoi applied checkout, agentbrew sync and health checks, and task ranking. Re-evaluate whether a maintained upstream tool can own more of this workflow without losing the local ownership boundary: dotfiles owns the host and Agentfile; agentbrew owns generated agent configuration. Prefer a pointer or thin adapter when an upstream workflow can preserve fast-forward-only Git behavior, applied-checkout safety, and non-destructive task recommendations.
-  - **Files**: skills/update-tooling/SKILL.md, Agentfile.yaml, README.md
-  - **Acceptance**: Record one current decision in the skill or README: replace with an upstream tool, relocate a portion to agentbrew or chezmoi, or keep the skill with a specific local-only reason. If a maintained upstream covers the workflow, remove duplicated guidance and point to that source.
-
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack
   - **ID**: bench-gemma4-vs-qwen3-coder-local-ai
   - **Tags**: local-ai, bench, model-evaluation, ollama, mlx

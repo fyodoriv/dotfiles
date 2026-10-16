@@ -8,9 +8,15 @@ This is a watch-list of upstream Ollama PRs/issues that may impact our local-AI 
 block format; one task per file is the v1 contract, a `## P*` header is
 optional) in lexical filename order instead of the repo TASKS.md, and deletes
 a spec only after the full close gates (make check + the pre-merge reviewer)
-pass — failures leave the spec for the next run. Remaining epic slices:
-per-task summary CSV (`overnight-grind-summary-csv`) and per-task dogfood
-branches with merge-or-revert (`overnight-grind-branch-per-task`).
+pass — failures leave the spec for the next run. Each queue task runs on its
+own `dogfood/<task-id>` branch cut from the starting branch. A fully gated
+success fast-forwards the starting branch and deletes the task branch. A
+failure (agent, `make check`, reviewer, or a branch that no longer
+fast-forwards) reverts the task's files, switches back, and logs
+`rollback: abandoned dogfood/<id> (<outcome>); <base> unchanged`; the outcome
+also lands in `docs/audits/local-ai-loop-runs.csv`. `--single-branch` turns
+this off. The loop never pushes, so there is no `--open-prs` mode. What
+remains is the measured 8-hour run (`local-ai-loop-overnight-grind`).
 
 ## Speculative decoding
 

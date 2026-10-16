@@ -148,7 +148,7 @@ them. -->
 - [ ] Run the local-AI loop for 8 hours from a task queue and log the success rate
   - **ID**: local-ai-loop-overnight-grind
   - **Tags**: local-ai, automation, overnight
-  - **Details**: The queue reader (`read_queue_dir`, `lib/local-ai-loop.py`), the run CSV, and the reviewer gate already shipped. What remains is the measured long run. It needs `overnight-grind-branch-per-task` first. The loop never pushes, so each task ends as a local branch or a rollback note, not a PR. The loop last ran on 2026-05-11 and no inference engine is reachable today, so this waits until local AI is back in use.
+  - **Details**: The queue reader (`read_queue_dir`, `lib/local-ai-loop.py`), the run CSV, and the reviewer gate already shipped. What remains is the measured long run. Per-task branches (`overnight-grind-branch-per-task`) shipped on 2026-10-16. The loop never pushes, so each task ends as a local branch or a rollback note, not a PR. The loop last ran on 2026-05-11 and no inference engine is reachable today, so this waits until local AI is back in use.
   - **Files**: bin/local-ai-loop, lib/local-ai-loop.py, docs/local-ai-roadmap.md
   - **Acceptance**: `./bin/local-ai-loop --queue tasks-queue/` runs for 8 hours and writes one CSV row per task with status, wall time, and regression outcome.
   - **Hypothesis**: Running queued local-AI tasks for hours exposes success-rate and rollback failure modes that one-task tests hide.
@@ -156,16 +156,3 @@ them. -->
   - **Pivot**: If the success rate is below 80%, pause feature work and fix the top recurring failure in the run CSV.
   - **Measurement**: `docs/audits/local-ai-runs.csv` rows for the run.
   - **Anchor**: docs/local-ai-roadmap.md; docs/user-stories/09-run-local-models-fast.md.
-
-- [ ] Overnight grind sub-task 3 — per-task dogfood branch, merge-or-revert
-  - **ID**: overnight-grind-branch-per-task
-  - **Parent**: local-ai-loop-overnight-grind
-  - **Tags**: local-ai, automation, overnight, git-safety
-  - **Details**: Each queue task runs on its own `dogfood/<task-id>` branch from the starting HEAD; on a fully-gated success (make check + reviewer gate from the shipped pre-merge reviewer) merge back to the starting branch, on failure abandon the branch after `revert_uncommitted` and record a rollback note (CSV outcome + log line). Optional `--open-prs` flag covers the epic's "opens N PRs" acceptance; pushing stays opt-in per the bin header's "loop never pushes" contract.
-  - **Files**: lib/local-ai-loop.py, tests/local-ai-loop-branching.bats (new), bin/local-ai-loop, docs/local-ai-roadmap.md
-  - **Acceptance**: fixture run shows success-task merged to the starting branch and failure-task branch abandoned with a rollback note; multi-agent git-safety rules respected (no reset --hard/checkout ./clean -fd); `make check` exits 0.
-  - **Hypothesis**: Branch isolation per task prevents failure-mode pollution between queued tasks over an 8h run.
-  - **Success**: Per-task branches merge or are abandoned strictly by the existing close gates.
-  - **Pivot**: If branch churn confuses the auto-sync agent, run the whole queue on one grind branch and rely on revert_uncommitted isolation.
-  - **Measurement**: `bats tests/local-ai-loop-branching.bats` exits 0.
-  - **Anchor**: parent task local-ai-loop-overnight-grind Acceptance; CLAUDE.md multi-agent git-safety rules.

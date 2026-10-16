@@ -18,7 +18,11 @@
 #   local-ai-loop --queue tasks-queue/   # one-task-per-file specs instead
 #                                        # of TASKS.md (overnight grind);
 #                                        # a spec is deleted only after the
-#                                        # full close gates pass
+#                                        # full close gates pass. Each queue
+#                                        # task runs on dogfood/<task-id>;
+#                                        # success fast-forwards the start
+#                                        # branch, failure abandons it
+#   local-ai-loop --queue q/ --single-branch   # queue tasks on the current branch
 #
 # Launch an overnight grind:
 #   nohup local-ai-loop --deadline 8h > ~/.cache/local-ai-loop.log 2>&1 &

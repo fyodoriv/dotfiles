@@ -652,6 +652,64 @@ def reviewer_reject_close(cwd: str, task_id: str, committed: bool) -> None:
     revert_uncommitted(cwd, task_id)
 
 
+# ── Per-task dogfood branches (queue mode) ────────────────────────────
+# Each queue task runs on its own `dogfood/<task-id>` branch cut from the
+# starting branch. A fully gated success fast-forwards the starting branch
+# to it; any failure leaves the starting branch untouched and abandons the
+# task branch with a rollback note. Git safety: no reset --hard, no
+# checkout ., no clean -fd; `branch -d` deletes only a merged branch, so a
+# failed branch that still holds commits is kept for inspection.
+
+def _git(cwd: str, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+
+
+def current_branch(cwd: str) -> str:
+    """The checked-out branch name, or '' on a detached HEAD."""
+    name = (_git(cwd, "rev-parse", "--abbrev-ref", "HEAD").stdout or "").strip()
+    return "" if name in ("", "HEAD") else name
+
+
+def start_task_branch(cwd: str, task_id: str) -> str:
+    """Create and switch to dogfood/<task-id> from the current HEAD."""
+    branch = f"dogfood/{task_id}"
+    if _git(cwd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0:
+        branch = f"{branch}-{int(time.time())}"
+    r = _git(cwd, "switch", "-c", branch)
+    if r.returncode != 0:
+        print(f"loop: ⚠ couldn't create {branch}: {(r.stderr or '').strip()}", flush=True)
+        return ""
+    print(f"loop: working on branch {branch}", flush=True)
+    return branch
+
+
+def merge_task_branch(cwd: str, base: str, branch: str) -> bool:
+    """Fast-forward base to the task branch, then delete the merged branch."""
+    if _git(cwd, "switch", base).returncode != 0:
+        print(f"loop: ⚠ couldn't switch back to {base}", flush=True)
+        return False
+    r = _git(cwd, "merge", "--ff-only", branch)
+    if r.returncode != 0:
+        print(f"loop: ⚠ {branch} does not fast-forward {base}: {(r.stderr or '').strip()}", flush=True)
+        return False
+    _git(cwd, "branch", "-d", branch)
+    print(f"loop: merged {branch} into {base}", flush=True)
+    return True
+
+
+def abandon_task_branch(cwd: str, base: str, branch: str, outcome: str) -> None:
+    """Return to base after a failed task and log the rollback note.
+
+    Callers run revert_uncommitted first, so nothing from the task leaks
+    onto base. `branch -d` removes the branch only when it holds no
+    unmerged commits; otherwise it stays for inspection.
+    """
+    _git(cwd, "switch", base)
+    kept = _git(cwd, "branch", "-d", branch).returncode != 0
+    print(f"loop: rollback: abandoned {branch} ({outcome}); {base} unchanged"
+          + ("; branch kept for inspection" if kept else ""), flush=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--deadline", default="8h", help="e.g. 8h, 30m, 3600")
@@ -662,6 +720,9 @@ def main() -> int:
     ap.add_argument("--queue", default="",
                     help="directory of one-task-per-file specs — overrides "
                          "TASKS.md as the task source (overnight grind mode)")
+    ap.add_argument("--single-branch", action="store_true",
+                    help="queue mode: run every task on the current branch "
+                         "instead of a dogfood/<task-id> branch per task")
     args = ap.parse_args()
 
     repo = os.path.abspath(args.cwd)
@@ -685,6 +746,13 @@ def main() -> int:
     except Exception as e:
         print(f"FATAL: bad --deadline {args.deadline}: {e}", file=sys.stderr)
         return 1
+
+    base_branch = ""
+    if queue_dir and not args.single_branch and not args.dry_run:
+        base_branch = current_branch(repo)
+        if not base_branch:
+            print("loop: ⚠ detached HEAD; running queue tasks without "
+                  "per-task branches", flush=True)
 
     started = time.time()
     fail = 0
@@ -719,6 +787,7 @@ def main() -> int:
             skipped_ids.add(task["id"])  # don't loop
             continue
 
+        task_branch = start_task_branch(repo, task["id"]) if base_branch else ""
         prompt = build_prompt(task, cwd=repo)
         max_turns = estimate_max_turns(task)
         print(f"loop:   budget={max_turns} turns "
@@ -731,6 +800,8 @@ def main() -> int:
             print(f"loop: ✗ agent rc={rc}; skipping {task['id']} "
                   "for the rest of this run.")
             revert_uncommitted(repo, task["id"])
+            if task_branch:
+                abandon_task_branch(repo, base_branch, task_branch, "agent-failed")
             record_run_row(repo, task, "agent-failed",
                            time.time() - task_started, max_turns)
             skipped_ids.add(task["id"])
@@ -744,6 +815,8 @@ def main() -> int:
             print(f"loop: ✗ agent rc=0 but `make check` fails; skipping "
                   f"{task['id']} for the rest of this run.")
             revert_uncommitted(repo, task["id"])
+            if task_branch:
+                abandon_task_branch(repo, base_branch, task_branch, "check-failed")
             record_run_row(repo, task, "check-failed",
                            time.time() - task_started, max_turns)
             skipped_ids.add(task["id"])
@@ -784,7 +857,21 @@ def main() -> int:
                   f"close commit: {', '.join(missing)}; failing "
                   f"{task['id']} and reverting.")
             reviewer_reject_close(repo, task["id"], committed)
+            if task_branch:
+                abandon_task_branch(repo, base_branch, task_branch, "reviewer-failed")
             record_run_row(repo, task, "reviewer-failed",
+                           time.time() - task_started, max_turns)
+            skipped_ids.add(task["id"])
+            fail += 1
+            seen_ids.add(task["id"])
+            continue
+
+        # Every gate passed — bring the task branch home. A branch that no
+        # longer fast-forwards (someone moved the base) is a failure: the
+        # base stays untouched and the spec stays for the next run.
+        if task_branch and not merge_task_branch(repo, base_branch, task_branch):
+            abandon_task_branch(repo, base_branch, task_branch, "merge-failed")
+            record_run_row(repo, task, "merge-failed",
                            time.time() - task_started, max_turns)
             skipped_ids.add(task["id"])
             fail += 1

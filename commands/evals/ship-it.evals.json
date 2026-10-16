@@ -151,6 +151,16 @@
         "Reuses the Stop-hook Time review from this turn instead of writing a second one",
         "Writes 'Time review: no perf data' and continues when the log has no rows"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "/ship-it in tasks.md: the PR has one non-required check still pending, and the PR branch lives in ~/apps/tooling/wt/tasks.md-memo",
+      "expected_output": "The agent waits for every check with gh pr checks --watch before merging, then removes the worktree folder by its real wt.noindex path and prunes.",
+      "expectations": [
+        "Runs gh pr checks <n> --watch (not a sleep loop) and merges only after the pending non-required check finishes",
+        "After gh pr merge --delete-branch, removes the leftover folder under ~/apps/tooling/wt.noindex/ and runs git worktree prune",
+        "Does not call git worktree remove on the wt symlink path"
+      ]
     }
   ]
 }

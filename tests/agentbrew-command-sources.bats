@@ -481,3 +481,11 @@
   grep -q "Time review: no perf data" "$reference_file"
   jq -e '.evals | any(.id == 12 and (.prompt | contains("Time review")))' "$eval_file" >/dev/null
 }
+
+@test "ship-it waits for every check and cleans worktree folders after merge" {
+  local reference="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  grep -F -q 'gh pr checks <n> --watch' "$reference"
+  grep -F -q 'non-required checks are still pending' "$reference"
+  grep -F -q 'git worktree prune' "$reference"
+  jq -e '.evals | any(.id == 13)' "$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json" >/dev/null
+}

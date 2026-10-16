@@ -608,6 +608,10 @@ Run **§ Repo bypass allowlist** detection first. When required checks are green
 6. Process **every** session PR in the family inventory before final report — never stop after the first review-gate failure on one PR.
 7. If any condition other than an unbypassable review gate is false, report the exact blocker and what was already merged.
 
+Wait for every check before you merge, required or not: `gh pr checks <n> --watch`. Do not poll with a foreground `sleep` loop (agent shells block it). `gh pr merge` accepts a PR while non-required checks are still pending, so a green required set is not enough.
+
+After `gh pr merge --delete-branch` from the live checkout, the PR's worktree is unregistered but its folder stays. Remove the folder by its real path (`~/apps/tooling/wt.noindex/<name>`; `git worktree remove` on the `wt` symlink path says "is not a working tree"), then run `git worktree prune`.
+
 ## 8. Reconcile local default branch
 
 After a PR merges, reconcile the local default/canonical branch before release checks when the working copy for that branch is clean:

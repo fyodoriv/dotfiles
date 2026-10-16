@@ -72,6 +72,8 @@ make_tooling_root() {
   grep -F -q 'dotfiles-upgrade' "$SKILL"
   grep -F -q 'background_audit.sh' "$SKILL"
   grep -F -q 'echo_latency.py' "$SKILL"
+  grep -F -q 'machine_metrics.py --hours 24' "$SKILL"
+  grep -F -q 'latency-check: run' "$SKILL"
   grep -F -q 'audit_agent_config.py --cache' "$SKILL"
   grep -F -q 'AskUserQuestion' "$SKILL"
   grep -F -q 'checkup_state.py record' "$SKILL"
@@ -358,4 +360,42 @@ JS
   run env TOOLING_ROOT="$TOOLING" AGENT_PERF_SCRIPT="$TEST_DIR/missing.mjs" python3 "$SCRIPTS/agent_time_review.py"
   [ "$status" -eq 1 ]
   [[ "$output" == *"no agent-perf data"* ]]
+}
+
+@test "machine metrics flag overload and skip the echo test without a lag signal" {
+  local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
+  : > "$samples"
+  for i in $(seq 0 11); do
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tGeForceNOW:90.1 WindowServer:40.2 mds:10.0\t90\n' \
+      "$((now - 3600 + i * 30))" "$i" >> "$samples"
+  done
+  printf '%s\t2026-10-16T09:00:00\t3.0\t3.0\t3.0\t10\t60\t1200\t800\tclaude:5.0\t10\n' "$now" >> "$samples"
+  printf '  PID PRI TTY      COMM\n 26082   4 ??       /Users/x/.local/bin/claude\n 3001  31 ttys001  claude\n' > "$ps_file"
+  echo '{"metrics": {"claude_echo_p95_ms": "11.5"}}' > "$TEST_DIR/state.json"
+
+  run python3 "$SCRIPTS/machine_metrics.py" --now "$now" --samples "$samples" --ps-file "$ps_file" \
+    --state "$TEST_DIR/state.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"act     load_overload_rows"*" 12 "*"GeForceNOW x12"* ]]
+  [[ "$output" == *"claude_sessions"*" 1 "* ]]
+  [[ "$output" == *"ok      claude_background_pri"*" 0 "* ]]
+  [[ "$output" == *"latency-check: skip (no trigger)"* ]]
+  [[ "$output" == *"--metric machine_overload_rows_24h=12"* ]]
+}
+
+@test "machine metrics trigger the echo test for a PRI 4 terminal session or reported lag" {
+  local ps_file="$TEST_DIR/ps.txt"
+  printf '  PID PRI TTY      COMM\n 3001   4 ttys001  claude\n' > "$ps_file"
+  run python3 "$SCRIPTS/machine_metrics.py" --samples "$TEST_DIR/none.tsv" --ps-file "$ps_file" \
+    --state "$TEST_DIR/none.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"act     claude_background_pri"*"pids 3001"* ]]
+  [[ "$output" == *"latency-check: run (1 session(s) at PRI 4)"* ]]
+
+  printf '  PID PRI TTY      COMM\n' > "$ps_file"
+  run python3 "$SCRIPTS/machine_metrics.py" --lag-reported --samples "$TEST_DIR/none.tsv" --ps-file "$ps_file" \
+    --state "$TEST_DIR/none.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log" --json
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.latency_check.run' <<<"$output")" = "true" ]
+  [ "$(jq -r '.latency_check.triggers[0]' <<<"$output")" = "the user reported lag" ]
 }

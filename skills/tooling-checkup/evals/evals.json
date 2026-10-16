@@ -4,12 +4,12 @@
     {
       "id": 1,
       "prompt": "/tooling-checkup",
-      "expected_output": "A full pass: state diff, inventory, shipped tooling work, update-tooling refresh, machine upgrades including claude update and claude doctor, background-process audit, latency numbers, config audit, a verdict-first report, a questionnaire, and a recorded state file.",
+      "expected_output": "A full pass: state diff, inventory, shipped tooling work, update-tooling refresh, machine upgrades including claude update and claude doctor, background-process audit, machine metrics (echo test only on a trigger), config audit, a verdict-first report, a questionnaire, and a recorded state file.",
       "expectations": [
         "Runs checkup_state.py diff, inventory.sh, and claude doctor through pty_capture.py before changing anything",
         "Follows the update-tooling skill for the repository refresh instead of re-implementing it",
         "Runs dotfiles-upgrade (Topgrade) and claude update, and verifies claude --version after the update",
-        "Runs background_audit.sh and echo_latency.py and reports their numbers",
+        "Runs background_audit.sh and machine_metrics.py, reports their act and warn lines, and skips echo_latency.py when the script prints latency-check: skip",
         "Runs audit_agent_config.py and reports errors with the repository that owns each fix",
         "Writes the report with the verdict first and separate stability and feature lists",
         "Asks the questionnaire with AskUserQuestion and records the run with checkup_state.py record"
@@ -66,6 +66,7 @@
       "prompt": "Typing in Claude Code in Ghostty feels laggy. Make it faster.",
       "expected_output": "Measured before and after numbers, the main cause named, and only safe reversible changes.",
       "expectations": [
+        "Runs machine_metrics.py --lag-reported first, so latency-check says run",
         "Measures zsh -f and claude with echo_latency.py three times before any change",
         "Counts open Claude Code sessions and checks load, ~/.claude.json size, and orphaned temp files",
         "Moves orphaned ~/.claude.json.tmp files instead of deleting them",
@@ -106,6 +107,17 @@
         "Files a TASKS.md task only for `file` lines in tooling repos, and only reports other projects",
         "Names the matching fix for a polling loop, a repeated install, or a full gate in the inner loop",
         "Adds the Agent time section to the report and records the helper's metrics with checkup_state.py record"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "/tooling-checkup (load samples show 600 overload rows in the last 24 hours, peak load 157, mostly GeForceNOW and WindowServer; no Claude Code session is at PRI 4 and nobody reported lag).",
+      "expected_output": "Phase 6 reports the overload as an act line with its top processes, routes the third-party cause to the questionnaire, and skips the echo test.",
+      "expectations": [
+        "Runs machine_metrics.py once and reports load_overload_rows as act with the peak and the top processes",
+        "Does not run echo_latency.py, because the script printed latency-check: skip",
+        "Puts the third-party GeForceNOW load into the Phase 10 questionnaire instead of killing or disabling it",
+        "Records the machine_overload_rows_24h and machine_peak_load1_24h metrics with checkup_state.py record"
       ]
     }
   ]

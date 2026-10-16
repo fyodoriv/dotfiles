@@ -4,8 +4,10 @@ description: >
   One-command health pass for the tooling repositories and the whole Mac. Ships
   outstanding tooling work, refreshes the tooling checkouts and agent config,
   upgrades Homebrew, npm, uv, pipx, mise, and Claude Code, runs `claude doctor`,
-  audits LaunchAgents and heavy processes, measures Claude Code input latency
-  in Ghostty, reviews where agent tool time went, and lints skills, rules, and AGENTS.md files against Anthropic's
+  audits LaunchAgents and heavy processes, reads the recent machine and tooling
+  metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals)
+  and measures input latency only when a lag signal fires, reviews where agent
+  tool time went, and lints skills, rules, and AGENTS.md files against Anthropic's
   best practices. Then it reports what changed since the last run, asks the
   owner a questionnaire, and applies the answers. Use when the user runs
   "/tooling-checkup", or asks to update all tooling and the machine, to tidy up
@@ -33,7 +35,7 @@ runs Phase 1, that part, and Phases 9 to 11:
 | ship what is pending in tooling | Phase 2 |
 | update tooling and the machine | Phases 3 and 4 |
 | clean up background processes | Phase 5 |
-| make Claude Code typing faster | Phase 6 |
+| check machine metrics, or make Claude Code typing faster | Phase 6 |
 | check skills and rules against best practices | Phase 7 |
 | find what makes agents slow | Phase 8 |
 
@@ -77,6 +79,8 @@ Phase 1 compares the machine with it. Use it to keep a repeat run short:
 - Phase 4 skips the long upgrade when the last upgrade is under 12 hours old
   and Homebrew has nothing outdated (see the reference file).
 - Phase 7 replays the cached audit when no skill or rule file changed.
+- Phase 6 runs the slow echo test only when `machine_metrics.py` prints
+  `latency-check: run`.
 - Phases 1, 3, 5, 6, and 8 always run. They check live state.
 
 ## Phase 1: Take stock (read-only)
@@ -151,16 +155,34 @@ lists the heaviest processes.
 **Done when:** every job that is not `keep` has an action, a question, or a
 reason to leave it.
 
-## Phase 6: Claude Code input latency
+## Phase 6: Machine metrics
 
-Follow [reference/input-latency.md](reference/input-latency.md). Measure with
-`scripts/echo_latency.py` (three runs of `zsh -f` and of `claude`). Collect the
-causes: open sessions, load, `~/.claude.json` size, orphaned temp files, the
-status line, the Ghostty config. Apply only safe, reversible fixes, then
-measure again.
+Read every recent machine and tooling metric in one fast pass (under a
+second; it reads files the LaunchAgents already wrote):
 
-**Done when:** you have before numbers, and after numbers for each change you
-made. With no change, report the numbers and the top cause.
+```bash
+python3 <skill-dir>/scripts/machine_metrics.py --hours 24
+```
+
+Add `--lag-reported` when the user mentions slow typing. Each line has a
+verdict:
+
+| Verdict | Do this |
+|---|---|
+| `act` | Find the cause (the line names the top processes or pids). Fix it in its tooling source repo with `/ship-it`, or file a task with the numbers. A third-party cause goes to the Phase 10 questionnaire. |
+| `warn` | Report it. File a task when the same metric warned in the last run too. |
+| `ok`, `unknown` | Report `unknown` with its note; nothing else. |
+
+Input latency is a metric, not a ritual. Run the echo test from
+[reference/input-latency.md](reference/input-latency.md) (`scripts/echo_latency.py`)
+only when the script prints `latency-check: run`. Its triggers: the user
+reported lag, a terminal session in the PRI 4 band, too many sessions, a large
+`~/.claude.json`, orphaned temp files, or a high p95 in the last run. Then apply
+only safe, reversible fixes and measure again.
+
+**Done when:** each `act` line is fixed, filed, or in the questionnaire; and
+the echo test ran with before and after numbers, or the script printed
+`latency-check: skip`.
 
 ## Phase 7: Agent config audit
 
@@ -223,8 +245,9 @@ Put the verdict first. Use this template.
 - Removed: <label> (<why>) · Kept for you to decide: <label>
 - Heavy: <process> <cpu>% <mem> MB → <cause or lead>
 
-### Input latency
-- claude p95: <before> → <after> ms · shell p95: <n> ms · sessions: <n>
+### Machine metrics (24 h)
+- act: <metric> <value> → <fix, task, or question> · warn: <metric> <value> · rest ok
+- Input latency: skipped (no trigger) | claude p95 <before> → <after> ms (<trigger>)
 
 ### Config audit
 - <n> errors, <n> warnings · fixed: <list> · open: <list with owner>
@@ -278,8 +301,8 @@ question:
 
    ```bash
    python3 <skill-dir>/scripts/checkup_state.py record --verdict "<verdict line>" \
-     --metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> --metric claude_sessions=<n> \
-     <the Phase 8 `record:` metrics>
+     <the Phase 6 `record:` metrics> <the Phase 8 `record:` metrics> \
+     [--metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> when the echo test ran]
    ```
 
 **Done when:** each answer is applied or listed with a reason, and the state

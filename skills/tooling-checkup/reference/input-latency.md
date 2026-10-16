@@ -1,5 +1,8 @@
 # Claude Code input latency in Ghostty (Phase 6)
 
+Run this guide only when `scripts/machine_metrics.py` prints
+`latency-check: run`, or the user asks for faster typing.
+
 The goal: keys typed into Claude Code appear fast. Measure before you change
 anything. Claim a gain only with before and after numbers from this session.
 

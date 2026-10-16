@@ -30,6 +30,17 @@ fund=false
 audit=false
 MANAGED
 
+# Global CLIs whose install scripts may run. npm 11+ blocks them otherwise, and
+# topgrade's `npm update -g` then leaves the CLI broken. The list lives in one
+# place, data/npm-global-allow-scripts.json, shared with
+# bin/dotfiles-npm-global-scripts. chezmoi exports CHEZMOI_SOURCE_DIR.
+list="${DOTFILES_NPM_ALLOW_SCRIPTS_DATA:-${CHEZMOI_SOURCE_DIR:-}/data/npm-global-allow-scripts.json}"
+if [ -f "$list" ]; then
+  allow=$(grep -o '"package"[[:space:]]*:[[:space:]]*"[^"]*"' "$list" |
+    sed 's/.*"\([^"]*\)"$/\1/' | paste -sd, -)
+  [ -n "$allow" ] && printf '# Install scripts allowed for global CLIs\nallow-scripts=%s\n' "$allow"
+fi
+
 # Registry-scoped lines (`//host/path/:key=value`) are where npm stores
 # credentials, and `_auth`/`_password` cover the legacy unscoped forms. Both are
 # machine state, never repo state.

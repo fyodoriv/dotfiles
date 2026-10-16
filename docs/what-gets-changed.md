@@ -186,7 +186,7 @@ Deployed directly to `~/` via chezmoi:
 | Source | Target | Purpose |
 |---|---|---|
 | `dot_editorconfig` | `~/.editorconfig` | EditorConfig: indent style, trailing whitespace, final newline |
-| `modify_private_dot_npmrc` | `~/.npmrc` | npm config: exact versions, prefer offline, no fund/audit. Rendered at 0600; registry credentials npm wrote locally are preserved on every apply. |
+| `modify_private_dot_npmrc` | `~/.npmrc` | npm config: exact versions, prefer offline, no fund/audit, and an `allow-scripts=` line built from `data/npm-global-allow-scripts.json`, so `npm update -g` keeps script-dependent global CLIs working. Rendered at 0600; registry credentials npm wrote locally are preserved on every apply. |
 | `dot_biome.json` | `~/.biome.json` | Biome linter/formatter config |
 | `dot_hushlogin` | `~/.hushlogin` | Suppress "Last login" message in terminal |
 | `dot_gradle/gradle.properties` | `~/.gradle/gradle.properties` | Gradle build config |

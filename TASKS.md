@@ -14,13 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] Render npm `allow-scripts` into ~/.npmrc from the shared CLI list
-  - **ID**: npmrc-allow-scripts-from-list
-  - **Tags**: npm, upgrade, resilience
-  - **Details**: `bin/dotfiles-npm-global-scripts` repairs a CLI after topgrade's `npm update --location=global` blocks its install scripts. A persistent `allow-scripts=` line in `~/.npmrc` would let the topgrade step succeed on its own. Render that line in `modify_private_dot_npmrc` from `data/npm-global-allow-scripts.json`, so the list stays in one place. Evidence 2026-10-15: every `dotfiles-upgrade` run prints `→ railway --version fails` after the npm step, and the custom step then reinstalls it; a manual `npm install -g @railway/cli` left it broken the same way.
-  - **Files**: modify_private_dot_npmrc, data/npm-global-allow-scripts.json, tests/
-  - **Acceptance**: a test renders the npmrc from a fixture list and finds one `allow-scripts=` line with every package; `npm update -g` on a fixture prefix keeps a script CLI working.
-
 - [ ] User-dir installers for AWS CLI v2 and the gcloud SDK, so `dotfiles apply` reproduces them without brew Python
   - **ID**: user-dir-installers-for-aws-gcloud
   - **Tags**: scout, brew, arm64-migration, endpoint-security, reproducibility

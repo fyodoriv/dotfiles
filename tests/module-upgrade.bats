@@ -15,6 +15,21 @@ setup() {
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
 
+  # Stub chezmoi so the test does not depend on this machine's chezmoi data.
+  # The doctor gates upgrade.launchagent/upgrade.recent on `auto_upgrade`.
+  # Tests set AUTO_UPGRADE=false to cover the opt-out path.
+  export AUTO_UPGRADE=true
+  mkdir -p "$TEST_DIR/chezmoibin"
+  cat > "$TEST_DIR/chezmoibin/chezmoi" <<'STUB'
+#!/bin/bash
+case "$*" in
+  *auto_upgrade*) echo "$AUTO_UPGRADE" ;;
+  *) echo "false" ;;
+esac
+STUB
+  chmod +x "$TEST_DIR/chezmoibin/chezmoi"
+  export PATH="$TEST_DIR/chezmoibin:$PATH"
+
   OVERRIDES_FILE="$TEST_DOTFILES/.overrides"
   touch "$OVERRIDES_FILE"
   FIX_MODE=false
@@ -76,6 +91,17 @@ teardown() {
   echo "not-a-number" > "$TEST_HOME/.local/share/dotfiles/last-upgrade"
   source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
   [ "$fail_count" -ge 1 ]
+}
+
+@test "upgrade: skips upgrade.launchagent and upgrade.recent when auto_upgrade is false" {
+  export AUTO_UPGRADE=false
+  rm -f "$TEST_HOME/.local/share/dotfiles/last-upgrade"
+  checked_ids=()
+  check() { checked_ids+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  ! printf '%s\n' "${checked_ids[@]}" | grep -qx "upgrade.launchagent"
+  ! printf '%s\n' "${checked_ids[@]}" | grep -qx "upgrade.recent"
+  printf '%s\n' "${checked_ids[@]}" | grep -qx "upgrade.brew"
 }
 
 @test "upgrade: passes upgrade.brew when brew is installed" {

@@ -40,19 +40,6 @@ them. -->
   - **Anchor**: Nielsen 1994, heuristic 9 (help users recognize and diagnose errors).
   - **Competitive-goal**: manual_bootstrap_steps — `dotfiles doctor --fix` is step 4 of bootstrap; an unnamed ✗ adds a manual re-run.
 
-- [ ] `tests/module-upgrade.bats` sets `auto_upgrade` itself so tests 2, 3, 4, 6, 8 pass
-  - **ID**: module-upgrade-bats-auto-upgrade-fixture
-  - **Tags**: tests, upgrade, bats
-  - **Details**: Verified on `feat/chezmoi` at 2377a45: `bats tests/module-upgrade.bats` → `not ok` 2, 3, 4, 6, 8 (lines 66, 72, 78, 95, 113). Cause: `modules/upgrade/doctor.sh:13` reads `chezmoi execute-template '{{ dig "auto_upgrade" "false" . }}'` and registers `upgrade.launchagent`/`upgrade.recent` only when it is `true`. The test `setup()` sets `HOME` to a temp dir with no chezmoi config, so the value is `false` (`HOME=$(mktemp -d) chezmoi execute-template ...` → `false`) and the checks the tests count never run. So the failure does not need this Mac's data; it should fail on any machine. Not on the AGENTS.md "Known base failures" list. Fix: stub `chezmoi` on `PATH` in `setup()` (or seed `$HOME/.config/chezmoi/chezmoi.toml` with `auto_upgrade = true`), and add one test for the `false` path.
-  - **Files**: tests/module-upgrade.bats
-  - **Acceptance**: `bats tests/module-upgrade.bats` passes 11 of 11, plus a new test that both checks are skipped when `auto_upgrade` is false.
-  - **Hypothesis**: Seeding `auto_upgrade` in the test fixture takes the file from 5 failures to 0 with no doctor code change.
-  - **Success**: 0 failures in `tests/module-upgrade.bats` on two runs.
-  - **Pivot**: If the gate in `modules/upgrade/doctor.sh` is wrong, fix the gate instead of the fixture.
-  - **Measurement**: `bats tests/module-upgrade.bats`.
-  - **Anchor**: Meszaros 2007, *xUnit Test Patterns* (fresh fixture; no hidden environment dependency).
-  - **Competitive-goal**: reproducibility_pct — the suite that guards a reproducible apply must itself give the same result on every machine.
-
 - [ ] `tests/cli.bats` "dotfiles cd" passes in a worktree whose path lacks "dotfiles"
   - **ID**: cli-bats-cd-test-path-independent
   - **Tags**: tests, cli, bats, worktrees

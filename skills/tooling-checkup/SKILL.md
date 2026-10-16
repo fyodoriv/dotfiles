@@ -206,7 +206,8 @@ It wraps `agent-perf.mjs report --all --days 7 --json` and the
 `session-report` analyzer (tokens and hours). It prints the top 3 slowest
 recurring steps (2 or more calls) per project and overall, a `fix:` line for
 each step that matches a known safe fix, the change since the last checkup,
-and one speedup line per recurring step that costs 1 min/day or more:
+and one speedup line per step that recurs in 2 or more sessions and costs
+1 min/day or more. A step repeated inside one session is not a task:
 
 | Line | Do this |
 |---|---|

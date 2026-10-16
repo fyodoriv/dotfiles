@@ -16,19 +16,6 @@ them. -->
 
 ## P3
 
-- [ ] Agent time review suggests a speedup task only for steps that recur across sessions
-  - **ID**: agent-time-review-multi-session-recurrence
-  - **Tags**: tooling-checkup, perf, false-positive
-  - **Details**: `task_candidates` in `skills/tooling-checkup/scripts/agent_time_review.py` keeps a step when `count >= RECURRING_MIN_CALLS` (2) and it costs 1+ min/day. It does not check sessions, so a step that repeats inside one session counts as recurring. Example: a `cp` that was slow only once, under load ~53, produced a task suggestion. Checked on feat/chezmoi: the filter reads only `count` and `sumMs`, and the agentbrew `agent-perf.mjs report --json` key rows carry no session count. Fix: require the step in 2+ distinct sessions before suggesting a task, or normalise by load. This needs a per-key session count (add `sessions` to agentbrew `summarize`, or count distinct `sid` from the rows here).
-  - **Files**: `skills/tooling-checkup/scripts/agent_time_review.py`, `tests/tooling-checkup-skill.bats`, `skills/tooling-checkup/SKILL.md`
-  - **Output**: code
-  - **Acceptance**: a fixture with one step repeated 3 times in one session gets no task suggestion; the same step in 2 sessions still gets one; the existing `agent_time_review.py` bats cases pass.
-  - **Hypothesis**: requiring 2+ sessions removes single-session false-positive task suggestions without dropping real recurring steps.
-  - **Measurement**: `python3 skills/tooling-checkup/scripts/agent_time_review.py --days 7 --json | jq '[.tasks[] | select(.sessions < 2)] | length'` (field name per the implementation; today no session field exists).
-  - **Success**: 0 suggestions come from a single session, and every suggestion from the previous run that spans 2+ sessions is still listed.
-  - **Pivot**: if per-key session counts cannot reach the script without an agentbrew change, normalise by load average instead and record why.
-  - **Anchor**: agentbrew #114 (perf log design); Basili et al. 1994 (GQM).
-
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack
   - **ID**: bench-gemma4-vs-qwen3-coder-local-ai
   - **Tags**: local-ai, bench, model-evaluation, ollama, mlx

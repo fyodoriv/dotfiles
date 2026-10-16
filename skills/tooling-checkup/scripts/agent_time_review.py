@@ -32,6 +32,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from checkup_state import state_path  # noqa: E402
 
 RECURRING_MIN_CALLS = 2
+# A step must recur across sessions before it becomes a speedup task. A step
+# that repeats inside one session (for example under a one-off load spike)
+# is not a recurring cost.
+RECURRING_MIN_SESSIONS = 2
 TASK_MIN_MS_PER_DAY = 60_000
 
 # Known safe fix patterns, matched on the redacted step key.
@@ -113,12 +117,11 @@ def perf_report(days: int, project: str = ""):
     return run_json(["node", perf_script(), "report", *scope, "--days", str(days), "--json"])
 
 
-def projects_in_log(days: int) -> list:
-    """Distinct project names in the perf log window (reads the project field only)."""
+def tool_rows_in_log(days: int):
+    """Yield tool rows (rows with `ms`) in the perf log window."""
     base = os.environ.get("AGENT_PERF_DIR") or os.path.join(
         os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "agentbrew", "perf")
     since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
-    names = set()
     for path in sorted(glob.glob(os.path.join(base, "*.jsonl")))[-2:]:
         try:
             lines = pathlib.Path(path).read_text(errors="replace").splitlines()
@@ -131,8 +134,24 @@ def projects_in_log(days: int) -> list:
             except (json.JSONDecodeError, ValueError, AttributeError):
                 continue
             if ts >= since and row.get("project") and "ms" in row:
-                names.add(str(row["project"]))
-    return sorted(names)
+                yield row
+
+
+def projects_in_log(days: int) -> list:
+    """Distinct project names in the perf log window (reads the project field only)."""
+    return sorted({str(row["project"]) for row in tool_rows_in_log(days)})
+
+
+def sessions_by_step(days: int) -> dict:
+    """Map (project, step key) to its number of distinct sessions in the window.
+
+    The step key matches agent-perf.mjs `summarize`: `key`, else `tool`.
+    """
+    sids = {}
+    for row in tool_rows_in_log(days):
+        key = row.get("key") or row.get("tool") or "unknown"
+        sids.setdefault((str(row["project"]), key), set()).add(row.get("sid") or "")
+    return {k: len(v - {""}) for k, v in sids.items()}
 
 
 def tooling_repo(project: str) -> str:
@@ -179,7 +198,7 @@ def slowest_line(report: dict) -> str:
     return f"slowest single call: {top.get('key')} {fmt_ms(top.get('ms'))}"
 
 
-def task_candidates(per_project: dict, days: int) -> list:
+def task_candidates(per_project: dict, days: int, sessions: dict) -> list:
     root = pathlib.Path(os.environ.get("TOOLING_ROOT") or os.path.expanduser("~/apps/tooling"))
     out = []
     for project, report in per_project.items():
@@ -189,8 +208,11 @@ def task_candidates(per_project: dict, days: int) -> list:
             if step.get("count", 0) < RECURRING_MIN_CALLS or per_day < TASK_MIN_MS_PER_DAY:
                 continue
             key = step["key"]
+            seen_in = sessions.get((project, key), 0)
+            if seen_in < RECURRING_MIN_SESSIONS:
+                continue
             item = {"project": project, "repo": repo, "key": key, "msPerDay": round(per_day),
-                    "count": step.get("count", 0), "p95Ms": step.get("p95Ms", 0),
+                    "count": step.get("count", 0), "sessions": seen_in, "p95Ms": step.get("p95Ms", 0),
                     "taskId": f"speed-up-{slug(key)}", "fix": fix_hint(key)}
             if "<" in key:
                 item["action"] = "inspect"  # redacted key: find the real step by session first
@@ -249,7 +271,7 @@ def main() -> int:
     if script:
         data, _ = run_json(["node", script, "--json", "--since", f"{days}d"], timeout=180)
         session = (data or {}).get("overall", {})  # never read top_prompts: it holds prompt text
-    candidates = task_candidates(per_project, days)
+    candidates = task_candidates(per_project, days, sessions_by_step(days))
     values = metrics(overall, session, days)
     previous = last_metrics()
 
@@ -283,13 +305,13 @@ def main() -> int:
             print(f"    {i}. {step_line(step, days)}")
         if slowest_line(report):
             print(f"    {slowest_line(report)}")
-    print(f"  speedup tasks (recurring, {TASK_MIN_MS_PER_DAY // 60000}+ min/day):")
+    print(f"  speedup tasks (recurring in {RECURRING_MIN_SESSIONS}+ sessions, {TASK_MIN_MS_PER_DAY // 60000}+ min/day):")
     if not candidates:
-        print("    none: no recurring step costs 1 min/day or more")
+        print(f"    none: no step in {RECURRING_MIN_SESSIONS}+ sessions costs 1 min/day or more")
     for item in candidates:
         where = item["repo"] or item["project"]
         print(f"    {item['action']:<7} {where} {item['taskId']}: {item['key']} costs "
-              f"{fmt_ms(item['msPerDay'])}/day ({item['count']}x, p95 {fmt_ms(item['p95Ms'])})"
+              f"{fmt_ms(item['msPerDay'])}/day ({item['count']}x in {item['sessions']} sessions, p95 {fmt_ms(item['p95Ms'])})"
               + (f"; fix: {item['fix']}" if item["fix"] else ""))
     print("  vs last checkup:")
     for name, value in values.items():

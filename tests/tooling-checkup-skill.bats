@@ -306,8 +306,16 @@ process.stdout.write(JSON.stringify({ overall: { sessions: 4, hours: { active: 3
 JS
   local now
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '{"ts":"%s","project":"alpha","ms":5}\n{"ts":"%s","project":"other","ms":5}\n{"ts":"2001-01-01T00:00:00Z","project":"ancient","ms":5}\n' \
-    "$now" "$now" > "$PERF_FIXTURES/log/2026-10.jsonl"
+  # Tool rows: each recurring step appears in 2 sessions, so it can become a task.
+  {
+    printf '{"ts":"%s","project":"alpha","sid":"s1","key":"npm ci","ms":5}\n' "$now"
+    printf '{"ts":"%s","project":"alpha","sid":"s2","key":"npm ci","ms":5}\n' "$now"
+    printf '{"ts":"%s","project":"other","sid":"s1","key":"until <arg>","ms":5}\n' "$now"
+    printf '{"ts":"%s","project":"other","sid":"s3","key":"until <arg>","ms":5}\n' "$now"
+    printf '{"ts":"%s","project":"other","sid":"s1","key":"npm test","ms":5}\n' "$now"
+    printf '{"ts":"%s","project":"other","sid":"s2","key":"npm test","ms":5}\n' "$now"
+    printf '{"ts":"2001-01-01T00:00:00Z","project":"ancient","sid":"s9","key":"npm ci","ms":5}\n'
+  } > "$PERF_FIXTURES/log/2026-10.jsonl"
   local npm='{"key":"npm ci","count":14,"sumMs":840000,"p50Ms":60000,"p95Ms":70000,"maxMs":70000,"failures":0}'
   local poll='{"key":"until <arg>","count":3,"sumMs":900000,"p50Ms":300000,"p95Ms":300000,"maxMs":300000,"failures":0}'
   local quick='{"key":"git status","count":9,"sumMs":900,"p50Ms":100,"p95Ms":120,"maxMs":120,"failures":0}'
@@ -342,6 +350,31 @@ JS
   [[ "$output" == *"--metric slowest_step_p95_s=300.0"* ]]
   [[ "$output" == *"--metric 'top_step_key=until <arg>'"* ]]
   [[ "$output" == *"agent_active_hours_7d: none -> 3.5"* ]]
+}
+
+@test "time review suggests a task only for a step seen in 2+ sessions" {
+  command -v node >/dev/null || skip "node not installed"
+  make_tooling_root
+  make_perf_fixtures
+  local now
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # alpha "npm ci": 3 calls, all in one session. other "until <arg>": 2 sessions.
+  {
+    printf '{"ts":"%s","project":"alpha","sid":"only","key":"npm ci","ms":5}\n' "$now" "$now" "$now"
+    printf '{"ts":"%s","project":"other","sid":"s1","key":"until <arg>","ms":5}\n' "$now"
+    printf '{"ts":"%s","project":"other","sid":"s2","key":"until <arg>","ms":5}\n' "$now"
+  } > "$PERF_FIXTURES/log/2026-10.jsonl"
+
+  run env TOOLING_ROOT="$TOOLING" python3 "$SCRIPTS/agent_time_review.py" --days 7 --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq '[.tasks[] | select(.sessions < 2)] | length')" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq '[.tasks[] | select(.key == "npm ci")] | length')" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.tasks[] | select(.key == "until <arg>") | .sessions')" -eq 2 ]
+
+  run env TOOLING_ROOT="$TOOLING" python3 "$SCRIPTS/agent_time_review.py" --days 7
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"speed-up-npm-ci"* ]]
+  [[ "$output" == *"inspect other speed-up-until-arg"*"in 2 sessions"* ]]
 }
 
 @test "time review marks filed tasks and reports non-tooling projects only" {

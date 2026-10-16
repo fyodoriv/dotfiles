@@ -85,8 +85,11 @@ readme_doctor_reference_block() {
 @test "dotfiles cd prints dotfiles directory" {
   run bash "$CLI" cd
   [ "$status" -eq 0 ]
-  [[ "$output" == *"dotfiles"* ]]
+  # Compare with this checkout's root, not a path substring: worktree paths
+  # need not contain "dotfiles".
   [ -d "$output" ]
+  [ -x "$output/bin/dotfiles" ]
+  [ "$(cd "$output" && pwd -P)" = "$(cd "$DOTFILES_DIR" && pwd -P)" ]
 }
 
 @test "dotfiles status shows branch and commit" {

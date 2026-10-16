@@ -40,19 +40,6 @@ them. -->
   - **Anchor**: Nielsen 1994, heuristic 9 (help users recognize and diagnose errors).
   - **Competitive-goal**: manual_bootstrap_steps — `dotfiles doctor --fix` is step 4 of bootstrap; an unnamed ✗ adds a manual re-run.
 
-- [ ] `tests/cli.bats` "dotfiles cd" passes in a worktree whose path lacks "dotfiles"
-  - **ID**: cli-bats-cd-test-path-independent
-  - **Tags**: tests, cli, bats, worktrees
-  - **Details**: Verified on `feat/chezmoi` at 2377a45. `tests/cli.bats:85-90` asserts `[[ "$output" == *"dotfiles"* ]]`. `bin/dotfiles:245-246` prints `$DOTFILES_DIR`, which is the checkout path (`bin/dotfiles:10`). In a detached worktree at `~/apps/tooling/wt/df-cdprobe` the test failed: `not ok 1 dotfiles cd prints dotfiles directory` (line 88). Fix: assert that the output equals the repo root of the test checkout (`$DOTFILES_DIR`) and that `bin/dotfiles` exists under it.
-  - **Files**: tests/cli.bats
-  - **Acceptance**: The test passes in a worktree whose path has no "dotfiles", and still fails if `dotfiles cd` prints a wrong dir.
-  - **Hypothesis**: Asserting on the real repo root instead of a path substring takes failures in non-"dotfiles" worktrees from 1 to 0.
-  - **Success**: `bats -f 'dotfiles cd prints' tests/cli.bats` passes in such a worktree.
-  - **Pivot**: None needed; if `DOTFILES_DIR` is not reliable in the test, compare with `git rev-parse --show-toplevel`.
-  - **Measurement**: `bats -f 'dotfiles cd prints' tests/cli.bats` run from `~/apps/tooling/wt/<name-without-dotfiles>`.
-  - **Anchor**: Meszaros 2007, *xUnit Test Patterns* (no test dependency on the run location).
-  - **Competitive-goal**: reproducibility_pct — gate results must not depend on the checkout path.
-
 ## P3
 
 - [ ] Agent time review suggests a speedup task only for steps that recur across sessions

@@ -97,3 +97,57 @@ STUB
   [ "$status" -eq 0 ]
   [[ "$output" == *"not installed"* ]]
 }
+
+# Mock `mas` whose `upgrade 555` fails the way a sudo-needing app does in a
+# LaunchAgent (no tty).
+_make_mas_sudo() {
+  cat > "$STUB_BIN/mas" <<'STUB'
+#!/bin/bash
+case "$1" in
+  outdated) printf '%s\n' "$MOCK_OUTDATED" ;;
+  upgrade)
+    echo "$2" >> "$UPGRADE_LOG"
+    if [ "$2" = "555" ]; then
+      echo "sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper" >&2
+      echo "sudo: a password is required" >&2
+      exit 1
+    fi
+    exit 0 ;;
+  *) exit 0 ;;
+esac
+STUB
+  chmod +x "$STUB_BIN/mas"
+}
+
+@test "skips WhatsApp (310633997) by default via DOTFILES_MAS_SKIP_IDS" {
+  _make_mas
+  export MOCK_OUTDATED="310633997 WhatsApp (25.1 -> 25.2)
+123456789 SomeApp (1.0 -> 1.1)"
+  unset DOTFILES_MAS_SKIP_IDS
+  MAS_BIN="$STUB_BIN/mas" run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Skipping App Store app (id 310633997)"*"DOTFILES_MAS_SKIP_IDS"* ]]
+  ! grep -q '310633997' "$UPGRADE_LOG"
+  grep -q '123456789' "$UPGRADE_LOG"
+}
+
+@test "DOTFILES_MAS_SKIP_IDS replaces the default skip list" {
+  _make_mas
+  export MOCK_OUTDATED="310633997 WhatsApp (25.1 -> 25.2)
+123456789 SomeApp (1.0 -> 1.1)"
+  DOTFILES_MAS_SKIP_IDS="123456789" MAS_BIN="$STUB_BIN/mas" run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  grep -q '310633997' "$UPGRADE_LOG"
+  ! grep -q '123456789' "$UPGRADE_LOG"
+}
+
+@test "an app whose upgrade needs sudo is reported as skipped, not failed" {
+  _make_mas_sudo
+  export MOCK_OUTDATED="555 NeedsSudo (1.0 -> 1.1)
+123456789 SomeApp (1.0 -> 1.1)"
+  DOTFILES_MAS_SKIP_IDS="" MAS_BIN="$STUB_BIN/mas" run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Skipped App Store app (id 555): the upgrade needs sudo"* ]]
+  [[ "$output" == *"skipped (needs sudo): 555"* ]]
+  grep -q '123456789' "$UPGRADE_LOG"
+}

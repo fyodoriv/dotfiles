@@ -120,7 +120,9 @@ poetry_force_self_update = false
 # Xcode-tolerant Mac App Store upgrade. Replaces the built-in `mas` step
 # (disabled above): upgrades each outdated app individually and skips Xcode,
 # whose root-owned _MASReceipt makes `mas upgrade` fail and would otherwise
-# fail the whole run. See bin/dotfiles-mas-upgrade.
+# fail the whole run. It also skips ids in DOTFILES_MAS_SKIP_IDS (default:
+# 310633997, WhatsApp) and reports any app whose upgrade needs sudo as
+# skipped. See bin/dotfiles-mas-upgrade.
 "App Store (mas, Xcode-tolerant)" = "$HOME/apps/tooling/dotfiles/bin/dotfiles-mas-upgrade"
 
 # Global npm CLIs that need install scripts (list: data/npm-global-allow-scripts.json).

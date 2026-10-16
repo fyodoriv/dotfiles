@@ -23,6 +23,7 @@ them. -->
     7. `make check` writes per-step durations to `~/.local/state/dotfiles/gate-timings.jsonl`, shown by `bin/dotfiles-metrics`; the speed review stays in `/tooling-checkup`.
     8. New `docs/learnings.md` (predicted vs observed), seeded from closed hypotheses; `docs/decisions/` ADRs from the ROADMAP decision log.
     9. `.gitignore`: `.env`, `.env.*`; extend the rule-9 lint to P2 or record why P2 is exempt.
+    Requirement updates from the tasks.md 100% run (2026-10-16, new-project skill): each story's metric is an outcome rate, not a passing-test count; each e2e test names its story ID; the event writer allow-lists string fields and tests turn the log off; a metric whose source answers 0 for a missing thing shows `(stub)`; every `dotfiles-doctor` failing line carries its fix; the cache key lists every file a step reads (prove it by editing one file); the README setup block ends with the doctor. Worked example: tasks.md PRs #26-#34.
     Accepted push back (map or waive, do not build): no `scripts/*.sh` aliases for `bin/` commands; setup may prompt when macOS requires it; no external error reporter; timings live under `~/.local/state/dotfiles`, not `.metrics/`; no hermetic e2e for US-07 and US-09 (unit bats instead); the speed review lives in `/tooling-checkup`, not a second `RECURRING.md`.
   - **Files**: `AGENTS.md`, `VISION.md`, `README.md`, `docs/`, `bin/dotfiles-doctor`, `Makefile`, `.gitignore`, `.agents/requirements.yaml`
   - **Output**: code

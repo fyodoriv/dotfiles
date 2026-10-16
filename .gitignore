@@ -12,6 +12,11 @@ bin/find
 bin/otool
 
 *.backup
+
+# Local secrets never enter the repo. Secrets live in 1Password (op) and age
+# files, so there is no .env.example: dotfiles reads nothing from a .env.
+.env
+.env.*
 .overrides
 .orchestrator
 .idea/

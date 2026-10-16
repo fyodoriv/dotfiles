@@ -66,6 +66,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 |---|---|---|
 | [user-stories/](user-stories/) | What success looks like for each user goal | both |
 | [competition/](competition/) | The competitive scorecard and how it is measured | both |
+| [decisions/](decisions/) | Why the hard-to-reverse choices were made (ADRs) | both |
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
 | [templates/](templates/) | Templates, such as the plan template | agent |
 | [audits/](audits/) | Past audits and run logs | both |

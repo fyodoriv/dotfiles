@@ -54,6 +54,8 @@ Per [`VISION.md` § "Non-goals"](VISION.md#non-goals):
 
 ## Decision log
 
+Each entry below that shapes the repo has a full record in [docs/decisions/](docs/decisions/README.md).
+
 - **2026-05-13 — Canonical branch is `feat/chezmoi`**. Legacy `main` preserved for history; do not push to it. Rationale + future move-to-`main` plan in [`docs/architecture.md` § "Canonical branch"](docs/architecture.md#canonical-branch-featchezmoi).
 - **2026-05-21 — Standing approval for tasksmd.** The `tasksmd/tasks.md` repo gets standing push + merge approval per the global agentbrew rule (see `~/.config/devin/AGENTS.md` § "Standing approvals").
 - **2026-05-23 — Canonical doc structure adopted.** The `load-project-context` rule lands, and VISION/ARCHITECTURE/ROADMAP live at repo roots.

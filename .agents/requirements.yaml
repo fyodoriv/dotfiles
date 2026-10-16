@@ -42,3 +42,8 @@ map.user-stories: docs/user-stories/README.md tests/e2e/stories-e2e.bats tests/u
 # (accepted push back: no scripts/ alias for a bin/ command); every failing
 # line ends with its fix. tests/errors-log.bats enforces all of it.
 map.observability: docs/observability.md lib/errors-log.sh bin/dotfiles-doctor tests/errors-log.bats
+# Secrets: .gitignore ignores .env and .env.*; git-hooks/pre-commit scans every
+# commit for secrets and private references and git-hooks/pre-push blocks them
+# before github.com. No .metrics/ entry: gate timings live under
+# ~/.local/state/dotfiles, outside the repo (accepted push back).
+map.secrets: .gitignore git-hooks/pre-commit git-hooks/pre-push

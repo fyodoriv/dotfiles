@@ -2,6 +2,10 @@
 
 > Drive an agentic coding loop against a local LLM on Apple Silicon — no internet, no per-token bill, ~85 tok/s on qwen3-coder:30b.
 
+**Metric:** Local-AI health checks that found an engine, last 2000 log lines (%) — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/local-ai-warmup.bats, tests/module-local-llm.bats. Unit bats only (accepted push back: the story needs a local model).
+
 ## Setup
 
 ```bash

@@ -109,8 +109,19 @@ teardown() { rm -rf "$TEST_DIR"; }
   grep -q 'agentbrew-install run --yes --no-auto-repair' "$LOG"
 }
 
-@test "README opens with the one sentence for the agent, and INSTALL.md covers every phase" {
-  head -25 "$REPO/README.md" | grep -qF "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md"
+@test "optional steps warn instead of failing: a failing doctor --fix and agentbrew installer" {
+  stub doctor 'echo "doctor $*" >> "$LOG"; exit 1'
+  mkdir -p "$TEST_DIR/agentbrew/.git" "$TEST_DIR/agentbrew/scripts"
+  printf '#!/bin/bash\nexit 1\n' > "$TEST_DIR/agentbrew/scripts/install.sh"
+  run bash "$REPO/bin/dotfiles-install" run --yes --agentbrew-dir "$TEST_DIR/agentbrew"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Some checks still fail"* ]]
+  [[ "$output" == *"agentbrew did not install"* ]]
+  [[ "$output" == *"dotfiles is installed"* ]]
+}
+
+@test "README quick start offers the one sentence for the agent, and INSTALL.md covers every phase" {
+  head -40 "$REPO/README.md" | grep -qF "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md"
   for text in "dotfiles-install plan" "dotfiles-install run --yes" "dotfiles-install restore" \
     "full context" "restores the backup by itself" "add or update a test" "dotfiles contribute"; do
     grep -qF "$text" "$REPO/INSTALL.md" || { echo "INSTALL.md missing: $text"; return 1; }

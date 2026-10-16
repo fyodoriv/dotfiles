@@ -2,6 +2,10 @@
 
 > One command to add a config file, a Homebrew package, a macOS default, or a new health check module — each includes automatic verification.
 
+**Metric:** Managed files that drifted from the source (`chezmoi status` lines) — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/dotfiles-add-family.bats.
+
 ## Add a Config File
 
 ```bash

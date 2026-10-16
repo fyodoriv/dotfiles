@@ -94,7 +94,7 @@ test-force: ## Run full test suite (no cache)
 	@$(FULLPOWER) bats --jobs $(JOBS) --no-parallelize-within-files tests/
 
 # ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
-e2e: ## Run the hermetic install e2e (about 40 s; E2E_FULL=1 for the whole doctor)
+e2e: ## Run the hermetic install and story e2e (about 100 s; E2E_FULL=1 for the whole doctor)
 	@bats tests/e2e/
 
 e2e-if-needed: ## Run the install e2e only when an installer path changed

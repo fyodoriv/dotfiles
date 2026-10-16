@@ -22,7 +22,10 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
   run bash -c "printf '.chezmoiscripts/run_after_foo.sh\nREADME.md\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
   [ "$status" -eq 0 ]
   [ "$output" = ".chezmoiscripts/run_after_foo.sh" ]
-  run bash -c "printf 'README.md\ndocs/x.md\nmodules/git/doctor.sh\ntests/foo.bats\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
+  # The story e2e drives morning, git-safe, and the git doctor module.
+  run bash -c "printf 'bin/morning\nmodules/git/doctor.sh\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
+  [ "$status" -eq 0 ]
+  run bash -c "printf 'README.md\ndocs/x.md\nmodules/ssh/doctor.sh\nbin/dotfiles-metrics\ntests/foo.bats\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
   [ "$status" -eq 1 ]
 }
 

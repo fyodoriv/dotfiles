@@ -2,6 +2,10 @@
 
 > After setup, config stays in sync and self-heals — no manual maintenance needed.
 
+**Metric:** Doctor runs with no failure, last 30 runs (%) — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/doctor.bats, tests/doctor-symlink-relink.bats.
+
 ## Three Layers of Automation
 
 ### 1. Auto-sync (every 30 minutes)

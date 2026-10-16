@@ -2,6 +2,10 @@
 
 > Multiple agents and automated scripts touch this repo. Safety nets prevent accidental deletions, secrets leaking, and destructive git operations.
 
+**Metric:** Private-reference matches on the public branch — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/git-safe.bats, tests/secret-scan.bats, tests/pre-commit.bats.
+
 ## Deletion Protection
 
 ### Auto-sync never commits deletions

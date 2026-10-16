@@ -19,7 +19,7 @@ setup() {
 
 teardown() { rm -rf "$SCRATCH"; }
 
-@test "e2e: a fresh install applies, heals, verifies, and leaves a working shell" {
+@test "US01 e2e: a fresh install applies, heals, verifies, and leaves a working shell" {
   run "$REPO/tests/e2e/hermetic-install.sh" "$SCRATCH" run --yes --profile core \
     --name "E2E User" --email e2e@example.com --no-agentbrew
   [ "$status" -eq 0 ] || { tail -40 "$SCRATCH/run.log"; return 1; }
@@ -40,7 +40,7 @@ teardown() { rm -rf "$SCRATCH"; }
   grep -q 'dotfiles contribute' "$SCRATCH/run.log"
 }
 
-@test "e2e: a failure after files were written restores the Mac by itself" {
+@test "US01 e2e: a failure after files were written restores the Mac by itself" {
   E2E_BREAK=1 run "$REPO/tests/e2e/hermetic-install.sh" "$SCRATCH" run --yes --profile core \
     --name "E2E User" --email e2e@example.com --no-agentbrew
   [ "$status" -eq 1 ]

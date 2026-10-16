@@ -12,19 +12,26 @@ Codex) that work in this repo.
 **Documentation:** [docs/README.md](docs/README.md) maps every doc to the question it
 answers. Agents start with [AGENTS.md](AGENTS.md).
 
-**Install with your AI agent (one step):** open Claude Code (or Cursor, Codex) and say:
-
-> Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md
-
-The agent explains what will change and what you need, asks your preferences, backs up your files and macOS settings, installs dotfiles and agentbrew, heals, verifies, and restores the backup by itself on a critical error. Undo later with `bin/dotfiles-install restore`. Details: [INSTALL.md](INSTALL.md).
-
-**Quick start** (from a stock Mac):
+**Quick start** (a Mac with Homebrew; the installer names any other missing tool):
 
 ```bash
-git clone <your-fork-or-origin> ~/apps/dotfiles
-chezmoi init --source ~/apps/dotfiles --apply
-dotfiles doctor --fix   # verify everything installed correctly
+git clone https://github.com/fyodoriv/dotfiles.git ~/apps/dotfiles && ~/apps/dotfiles/bin/dotfiles-install run --yes && ~/apps/dotfiles/bin/dotfiles-doctor
 ```
+
+It backs up your files and macOS settings, applies dotfiles, heals, verifies,
+and installs agentbrew. It is safe to run again. A critical error restores the
+backup by itself; optional steps (agentbrew, a failing doctor check) only warn.
+macOS may ask for permission prompts on the way. Preview first with
+`bin/dotfiles-install plan`; undo with `bin/dotfiles-install restore`. The
+last command is the doctor: every failing line names its fix.
+
+Other ways in:
+
+- **With your AI agent**: open Claude Code (or Cursor, Codex) and say
+  "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md".
+  The agent asks your preferences first. Details: [INSTALL.md](INSTALL.md).
+- **Plain chezmoi**: `chezmoi init --source ~/apps/dotfiles --apply`, then
+  `dotfiles doctor --fix` (no backup).
 
 **Verify:** after installation, open a fresh terminal and run `dotfiles doctor`. All checks should pass. See [docs/onboarding.md](docs/onboarding.md) for a full setup walkthrough.
 
@@ -49,7 +56,7 @@ A new Mac ships with conservative defaults — slow key repeat, Spotlight crawli
 
 ## Highlights
 
-- **One command setup** — `chezmoi init --source ~/apps/dotfiles --apply` goes from stock macOS to fully configured.
+- **One command setup** — `bin/dotfiles-install run --yes` goes from stock macOS to fully configured, with a backup and automatic restore.
 - **Self-healing** — `dotfiles doctor --fix` auto-discovers every module's checks and repairs drift. Only the configured chezmoi source checkout can apply fixes or reload Home LaunchAgents; other checkouts audit without mutating the machine. Runs weekly via LaunchAgent.
 - **Durable local agent memory** — one loopback-only `mcp-memory-service`
   daemon serves every agent; `dotfiles memory` provides status, repair,

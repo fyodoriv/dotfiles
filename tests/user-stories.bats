@@ -1190,3 +1190,41 @@ MORNING="$REPO_ROOT/bin/morning"
     }
   done <<< "$patterns"
 }
+
+@test "every story names an outcome metric from docs/metrics.md" {
+  # Metric: names a docs/metrics.md row. A test count may follow only after
+  # "Guard:", so a passing-test count never stands in for the outcome.
+  local f n metric bad=""
+  for f in "$REPO_ROOT"/docs/user-stories/[0-9][0-9]-*.md; do
+    n="$(grep -c '^\*\*Metric:\*\* ' "$f")"
+    [ "$n" -eq 1 ] || { bad="$bad $(basename "$f"):metric-lines=$n"; continue; }
+    metric="$(sed -nE 's/^\*\*Metric:\*\* (.*) — see \[docs\/metrics\.md\].*/\1/p' "$f")"
+    grep -qF "| $metric |" "$REPO_ROOT/docs/metrics.md" || bad="$bad $(basename "$f"):no-row'$metric'"
+    if sed -nE 's/^\*\*Metric:\*\* (.*)Guard:.*/\1/p;t;s/^\*\*Metric:\*\* (.*)/\1/p' "$f" | grep -qiE '\btests?\b|bats|passing'; then
+      bad="$bad $(basename "$f"):test-count-before-Guard"
+    fi
+  done
+  [ -z "$bad" ] || { echo "fix the Metric line in:$bad"; return 1; }
+}
+
+@test "every story's Tests line names files that exist, and e2e files hold a test with its ID" {
+  local f id paths p bad=""
+  for f in "$REPO_ROOT"/docs/user-stories/[0-9][0-9]-*.md; do
+    id="US$(basename "$f" | cut -c1-2)"
+    paths="$(grep -E '^\*\*Tests:\*\* ' "$f" | grep -oE 'tests/[A-Za-z0-9_./-]+\.(bats|sh)')"
+    [ -n "$paths" ] || { bad="$bad $id:no-Tests-line"; continue; }
+    while IFS= read -r p; do
+      [ -f "$REPO_ROOT/$p" ] || { bad="$bad $id:missing:$p"; continue; }
+      case "$p" in
+        tests/e2e/*) grep -qE "^@test \"$id e2e: " "$REPO_ROOT/$p" || bad="$bad $id:no-$id-test-in:$p" ;;
+      esac
+    done <<< "$paths"
+  done
+  [ -z "$bad" ] || { echo "fix the Tests line or the e2e test name:$bad"; return 1; }
+}
+
+@test "every e2e test name starts with its story ID" {
+  local bad
+  bad="$(grep -hE '^@test ' "$REPO_ROOT"/tests/e2e/*.bats | grep -vE '^@test "US[0-9]{2} e2e: ' || true)"
+  [ -z "$bad" ] || { echo "e2e tests without a story ID: $bad"; return 1; }
+}

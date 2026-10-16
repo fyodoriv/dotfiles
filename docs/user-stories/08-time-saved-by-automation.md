@@ -2,6 +2,10 @@
 
 > Concrete numbers — not vibes — for how much time dotfiles automation has saved.
 
+**Metric:** Minutes saved by automation in the last 30 days — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/stats.bats.
+
 ## Viewing Stats
 
 ```bash

@@ -2,6 +2,10 @@
 
 > Your company has internal tools, brewfile entries, doctor checks, or shell env that don't belong in the public dotfiles repo. Drop them in a private `<base>-<company>` overlay repo and point dotfiles at it. Symmetric uninstall when you're done.
 
+**Metric:** Public forks of dotfiles — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/overlay-root-doctor.bats, tests/overlay-root-uninstall.bats.
+
 This story is the **overlay** path. It's different from the [forking guide](../forking-guide.md), which describes forking the whole dotfiles repo to change defaults org-wide. Use this one when you want to **keep dotfiles as-is** (so you get future updates for free) and just plug in a tiny company-specific layer.
 
 ## When to use this vs forking

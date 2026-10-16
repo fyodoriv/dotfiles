@@ -52,7 +52,8 @@ echo -e "${BLUE}→ Pulling latest code...${NC}"
 for dir in "$REPOS_DIR"/*/; do
   [ ! -d "$dir/.git" ] && continue
   name="$(basename "$dir")"
-  branch=$(cd "$dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  # A repo with no commits has no branch; skip it instead of exiting (set -e).
+  branch=$(cd "$dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null) || continue
   [ "$branch" = "main" ] || [ "$branch" = "master" ] || continue
   (cd "$dir" && _timeout 30 git pull --rebase --quiet 2>/dev/null) && echo -e "  ${GREEN}✓${NC} $name" && repos_pulled=$((repos_pulled + 1))
 done
@@ -123,7 +124,9 @@ echo ""
 echo -e "${BLUE}→ Top resource usage:${NC}"
 # macOS ps doesn't support --sort; use -r for CPU-descending sort
 # Single invocation: print header, then top 3 non-system processes
-ps -eo pid,pcpu,pmem,comm -r | awk 'NR==1 { print; next } /WindowServer|kernel_task/ { next } printed<3 { print; printed++ }'
+# Optional step: a missing process list warns instead of ending the routine.
+ps -eo pid,pcpu,pmem,comm -r 2>/dev/null | awk 'NR==1 { print; next } /WindowServer|kernel_task/ { next } printed<3 { print; printed++ }' ||
+  echo -e "  ${YELLOW}⚠${NC} process list unavailable"
 
 # 8. Time saved summary
 echo ""

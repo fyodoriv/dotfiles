@@ -2,6 +2,10 @@
 
 > Switch between core and full profiles instantly, add enterprise tools, or override shared config — without changing the shared repo.
 
+**Metric:** `.overrides` entries that name no known check — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/doctor-validate-overrides.bats.
+
 ## Switch Profile
 
 ```bash

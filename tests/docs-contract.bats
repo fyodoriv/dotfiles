@@ -62,3 +62,11 @@ AGENT_GUIDE_MAX_BYTES=10000
   grep -q '^```bash' <<<"$head"
   grep -qF '(docs/README.md)' <<<"$head"
 }
+
+@test "docs contract: README's first code block is the one-line install and ends with the doctor" {
+  local first
+  first="$(awk '/^```/{if (f) exit; f=1; next} f' "$DOTFILES_DIR/README.md")"
+  [ "$(printf '%s\n' "$first" | grep -c .)" -eq 1 ] || { echo "first block is not one line: $first"; return 1; }
+  grep -qF 'bin/dotfiles-install run --yes' <<<"$first" || { echo "first block does not run the installer: $first"; return 1; }
+  grep -qE 'dotfiles-doctor$' <<<"$first" || { echo "first block does not end with the doctor: $first"; return 1; }
+}

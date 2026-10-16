@@ -3,7 +3,7 @@
 # agentbrew skill-plugins/workflow/new-project/references/requirements-map.md
 # Each map line lands in the PR that makes it true, with a comment saying why.
 # Gaps left: TASKS.md task meet-new-project-requirements.
-map.e2e: tests/e2e/hermetic-install.sh tests/stranger-readiness.bats
+map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/stories-e2e.bats tests/stranger-readiness.bats
 map.checkup: skills/tooling-checkup/SKILL.md
 map.caching: bin/cached-run bin/bats-affected
 map.docs: docs/README.md tests/docs-contract.bats
@@ -19,3 +19,18 @@ map.vision: VISION.md
 # no command or a placeholder. The scorecard gives each benchmark metric a
 # goal, pivot, and command. Gate speed joins the table with the gate timings.
 map.metrics: docs/metrics.md docs/competition/scorecard.md bin/dotfiles-metrics tests/dotfiles-contribute-metrics.bats
+
+# Setup: the README's first code block is one line that clones, runs
+# bin/dotfiles-install (backup, apply, heal, verify, auto-restore), and ends
+# with the doctor; tests/docs-contract.bats fails if it drifts. Optional steps
+# (agentbrew, a failing doctor --fix) warn instead of failing
+# (tests/dotfiles-install.bats). No scripts/setup.sh alias for a bin/ command,
+# and setup may prompt when macOS requires it (accepted push back).
+map.setup: README.md bin/dotfiles-install tests/docs-contract.bats tests/dotfiles-install.bats
+
+# Each story has a Metric line naming a docs/metrics.md outcome row (test
+# counts only after "Guard:") and a Tests line naming its test files; e2e tests
+# are named "USNN e2e: ..." with a happy and an error case (stories-e2e.bats
+# runs real commands after a real sandboxed install). US07 and US09 use unit
+# bats (accepted push back). tests/user-stories.bats fails on any drift.
+map.user-stories: docs/user-stories/README.md tests/e2e/stories-e2e.bats tests/user-stories.bats

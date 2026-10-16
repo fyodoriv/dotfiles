@@ -2,6 +2,10 @@
 
 > Clone, run one command, answer the chezmoi init prompts — fully configured development environment.
 
+**Metric:** Commands a person types on a fresh Mac — see [docs/metrics.md](../metrics.md#metrics). Guard: the install e2e passes.
+
+**Tests:** tests/e2e/dotfiles-install-e2e.bats, tests/dotfiles-install.bats, tests/stranger-readiness.bats.
+
 ## Steps
 
 ```bash

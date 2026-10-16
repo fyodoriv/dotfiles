@@ -2,6 +2,10 @@
 
 > Everything is already pulled, healthy, and visible — one command or fully automatic.
 
+**Metric:** `morning` runs in the last 7 days — see [docs/metrics.md](../metrics.md#metrics).
+
+**Tests:** tests/e2e/stories-e2e.bats, tests/morning.bats.
+
 ## How It Works
 
 ```bash

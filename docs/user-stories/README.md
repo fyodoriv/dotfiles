@@ -21,6 +21,21 @@ See [../README.md](../../README.md) for installation and CLI reference.
 | 9 | [Run AI coding agents on a local model](09-run-local-models-fast.md) | Local LLM fallback for agent loops | `dotfiles doctor --module local-llm` |
 | 10 | [Add your company's config without forking](10-fork-for-your-company.md) | Private overlay repo plugs in via `extra_overlay_root` | `dotfiles apply` |
 
+## Metric and Tests lines
+
+Each story names how we know it works:
+
+- **`**Metric:**`** names one row of [docs/metrics.md](../metrics.md#metrics):
+  an outcome that users create, such as runs, drift, or time saved. A test
+  count may follow only after `Guard:`.
+- **`**Tests:**`** names the test files. Each story with a hermetic e2e has a
+  test named `USNN e2e: …` in `tests/e2e/` (happy and error case); `make e2e`
+  runs them in a sandboxed scratch HOME. US07 and US09 use unit bats only:
+  their commands need GitHub or a local model.
+
+`tests/user-stories.bats` fails when a Metric line names no metrics row, when
+a Tests line names a missing file, or when an e2e test has no story ID.
+
 ## Ownership Boundary
 
 | What | Owner |

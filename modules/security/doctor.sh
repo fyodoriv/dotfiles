@@ -903,6 +903,29 @@ if [ "$_la_endpoint_deploy_bad" -eq 0 ]; then
 fi
 unset _la_endpoint_deploy_bad _la_endpoint_deploy_label _la_deployed _deploy_path _deploy_jq _deploy_ggrep _deploy_curl _deploy_perl _deploy_py _deploy_py13
 
+# Locale for LaunchAgents that dotfiles does not own. launchd sets no locale,
+# and the bin/awk shim (Homebrew gawk) then fails unanchored regex matches.
+# tests/launchagents.bats requires LANG in every dotfiles plist. This advisory
+# names other owners' agents that run shell tooling (they set PATH) but set
+# neither LANG nor LC_ALL. Fix each in its owning repo; dotfiles never edits
+# plists it does not own.
+_la_no_locale=()
+while IFS= read -r _la_deployed; do
+  [ -f "$_la_deployed" ] || continue
+  _la_locale_label="$(basename "$_la_deployed" .plist)"
+  case "$_la_locale_label" in com.dotfiles.*) continue ;; esac
+  /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:PATH' "$_la_deployed" >/dev/null 2>&1 || continue
+  /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:LANG' "$_la_deployed" >/dev/null 2>&1 && continue
+  /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:LC_ALL' "$_la_deployed" >/dev/null 2>&1 && continue
+  _la_no_locale+=("$_la_locale_label")
+done < <("$_DOTFILES_FIND" "$HOME/Library/LaunchAgents" -maxdepth 1 -name '*.plist' 2>/dev/null | sort -u)
+_la_no_locale_list="${_la_no_locale[*]:-}"
+check_advisory "security.deployed_la_locale" \
+  "Other owners' LaunchAgents that set PATH also set LANG or LC_ALL${_la_no_locale_list:+ (missing: $_la_no_locale_list)}" \
+  "[ -z '$_la_no_locale_list' ]" \
+  "add LANG=C.UTF-8 to EnvironmentVariables in each owning repo's plist template"
+unset _la_no_locale _la_no_locale_list _la_locale_label _la_deployed
+
 # Cursor / CI sandboxes that run `bash -c` with PATH=/usr/bin:/bin bypass ~/.zshenv.
 # zsh -c still loads ~/.zshenv and picks up dotfiles/bin — prefer zsh for agent shells.
 check_advisory "security.zsh_minimal_path_endpoint" "zsh -c with minimal PATH resolves jq via dotfiles/bin (~/.zshenv)" \

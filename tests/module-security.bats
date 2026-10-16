@@ -1151,3 +1151,51 @@ EOF
   source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
   ! failed_ids_contains "security.python3_launchagent_path"
 }
+
+# ── security.deployed_la_locale (advisory) ───────────────────────────
+_write_la_plist() {  # $1 = label, $2 = extra EnvironmentVariables XML
+  mkdir -p "$TEST_HOME/Library/LaunchAgents"
+  cat > "$TEST_HOME/Library/LaunchAgents/$1.plist" <<EOF2
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$1</string>
+  $2
+</dict>
+</plist>
+EOF2
+}
+
+_locale_warning() {
+  printf '%s\n' "${warn_messages[@]:-}" | grep -F "Other owners' LaunchAgents that set PATH also set LANG or LC_ALL"
+}
+
+@test "security: deployed_la_locale names another owner's agent that sets PATH but no locale" {
+  chmod 700 "$TEST_HOME/.ssh"
+  _write_la_plist com.example.nolocale "<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string></dict>"
+  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
+  _locale_warning | grep -qF "missing: com.example.nolocale"
+}
+
+@test "security: deployed_la_locale ignores agents with LANG or LC_ALL, dotfiles agents, and agents without PATH" {
+  chmod 700 "$TEST_HOME/.ssh"
+  _write_la_plist com.example.lang "<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string><key>LANG</key><string>C.UTF-8</string></dict>"
+  _write_la_plist com.example.lcall "<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string><key>LC_ALL</key><string>C.UTF-8</string></dict>"
+  _write_la_plist com.dotfiles.mine "<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string></dict>"
+  _write_la_plist com.example.vendor ""
+  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
+  ! _locale_warning
+}
+
+@test "security: deployed_la_locale warns once and never edits the plist" {
+  chmod 700 "$TEST_HOME/.ssh"
+  _write_la_plist com.example.a "<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string></dict>"
+  _write_la_plist com.example.b "<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string></dict>"
+  local before
+  before="$(cat "$TEST_HOME/Library/LaunchAgents/com.example.a.plist")"
+  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
+  [ "$(_locale_warning | wc -l | tr -d ' ')" -eq 1 ]
+  _locale_warning | grep -qF "com.example.a com.example.b"
+  [ "$before" = "$(cat "$TEST_HOME/Library/LaunchAgents/com.example.a.plist")" ]
+}

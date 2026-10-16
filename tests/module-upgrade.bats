@@ -112,3 +112,48 @@ teardown() {
   source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
   [ "$fail_count" -ge 1 ]
 }
+
+# ── Non-uv poetry with a missing interpreter ─────────────────────────
+# Stub poetry/uv in a private bin dir that wins PATH lookup.
+_poetry_stub() {  # $1 = dir, $2 = exit code for `poetry --version`
+  mkdir -p "$1"
+  printf '#!/bin/bash\nexit %s\n' "$2" > "$1/poetry"
+  chmod +x "$1/poetry"
+}
+_uv_stub() {  # `uv tool dir` prints $TEST_DIR/uv-tools
+  mkdir -p "$TEST_DIR/stubbin"
+  printf '#!/bin/bash\n[ "$1 $2" = "tool dir" ] && echo "%s" && exit 0\nexit 1\n' "$TEST_DIR/uv-tools" > "$TEST_DIR/stubbin/uv"
+  chmod +x "$TEST_DIR/stubbin/uv"
+}
+
+@test "upgrade: reports a non-uv poetry whose --version fails, with the uv hint" {
+  _poetry_stub "$TEST_DIR/stubbin" 1
+  _uv_stub
+  export PATH="$TEST_DIR/stubbin:$PATH"
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  printf '%s\n' "${failed_descs[@]}" | grep -F "non-uv poetry" | grep -F "uv tool install poetry" | grep -qF "pypoetry/venv"
+}
+
+@test "upgrade: passes a non-uv poetry that runs" {
+  _poetry_stub "$TEST_DIR/stubbin" 0
+  _uv_stub
+  export PATH="$TEST_DIR/stubbin:$PATH"
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  ! printf '%s\n' "${failed_descs[@]}" | grep -qF "poetry"
+}
+
+@test "upgrade: ignores a uv-managed poetry even when --version fails" {
+  _uv_stub
+  _poetry_stub "$TEST_DIR/uv-tools/poetry/bin" 1
+  mkdir -p "$TEST_DIR/localbin"
+  ln -s "$TEST_DIR/uv-tools/poetry/bin/poetry" "$TEST_DIR/localbin/poetry"
+  export PATH="$TEST_DIR/localbin:$TEST_DIR/stubbin:$PATH"
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  ! printf '%s\n' "${failed_descs[@]}" | grep -qF "poetry"
+}

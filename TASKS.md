@@ -14,13 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] Flag a non-uv Poetry whose Python interpreter is gone
-  - **ID**: doctor-broken-official-poetry
-  - **Tags**: scout, doctor, python, upgrade
-  - **Details**: On 2026-10-15 the official-installer Poetry (`~/.local/bin/poetry` plus `~/Library/Application Support/pypoetry/venv`) linked to pyenv Python 3.10.0, which no longer existed, so `poetry` and topgrade's Poetry step failed on every upgrade. `run_after_uv-tools.sh` saw the file and skipped `uv tool install poetry` ("already provided by ... not uv-managed"). The fix on that Mac was to move both paths aside and run `uv tool install poetry`. Have the doctor report a non-uv `poetry` whose `poetry --version` fails, with that fix as the hint.
-  - **Files**: modules/*/doctor.sh, tests/
-  - **Acceptance**: with a stub `poetry` that fails `--version` and is not under the uv tool dir, the doctor reports it with the move-aside and `uv tool install poetry` hint.
-
 - [ ] Render npm `allow-scripts` into ~/.npmrc from the shared CLI list
   - **ID**: npmrc-allow-scripts-from-list
   - **Tags**: npm, upgrade, resilience

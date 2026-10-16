@@ -191,6 +191,7 @@ Spotlight check count varies based on which directories exist on your machine.
 | `upgrade.launchagent` | Upgrade LaunchAgent loaded | None |
 | `upgrade.recent` | Last upgrade within 14 days | None |
 | `upgrade.brew` | Homebrew installed | None |
+| `upgrade.poetry_runs` | A non-uv `poetry` (official installer) still runs `--version`; only checked when one is on PATH | None (hint: move `~/.local/bin/poetry` and `~/Library/Application Support/pypoetry/venv` aside, then `uv tool install poetry`) |
 
 ### agentbrew (core checks + conditional MCP checks)
 

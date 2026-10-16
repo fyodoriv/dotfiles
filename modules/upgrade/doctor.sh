@@ -40,3 +40,21 @@ if [ "$(chezmoi execute-template '{{ dig "is_enterprise" "false" . }}' 2>/dev/nu
   check "upgrade.no-raycast" "raycast not installed (blocked by privilege management — fix: brew uninstall --cask raycast)" \
     "! brew list --cask raycast &>/dev/null" ""
 fi
+
+# ── Non-uv poetry still runs ────────────────────────────────────────
+# The official-installer poetry (~/.local/bin/poetry plus
+# ~/Library/Application Support/pypoetry/venv) is pinned to the Python it
+# was installed with. When that Python is removed, `poetry` and topgrade's
+# poetry step fail on every upgrade, and run_after_uv-tools.sh skips
+# `uv tool install poetry` because the file is "not uv-managed".
+_poetry_bin="$(command -v poetry 2>/dev/null || true)"
+if [ -n "$_poetry_bin" ]; then
+  _poetry_uv_dir="$(uv tool dir 2>/dev/null || true)"
+  _poetry_target="$(readlink "$_poetry_bin" 2>/dev/null || echo "$_poetry_bin")"
+  if [ -z "$_poetry_uv_dir" ] || [[ "$_poetry_target" != "$_poetry_uv_dir"/* ]]; then
+    check "upgrade.poetry_runs" \
+      "non-uv poetry at $_poetry_bin runs (fix: mv '$_poetry_bin' '$_poetry_bin.bak' && mv ~/Library/Application\\ Support/pypoetry/venv ~/Library/Application\\ Support/pypoetry/venv.bak && uv tool install poetry)" \
+      "'$_poetry_bin' --version" ""
+  fi
+fi
+unset _poetry_bin _poetry_uv_dir _poetry_target

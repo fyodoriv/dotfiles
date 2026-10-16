@@ -1,0 +1,266 @@
+#!/bin/bash
+# dotfiles-install — one-step installer for dotfiles (and agentbrew). An agent
+# runs it from a fresh clone; INSTALL.md is the playbook that tells it how.
+#
+# Usage:
+#   dotfiles-install plan [--profile core|full]   Explain what will change; change nothing
+#   dotfiles-install run --yes [flags]            Back up, apply, heal, verify (+ agentbrew)
+#   dotfiles-install restore [BACKUP_ID]          Put the backed-up files and macOS settings back
+#   dotfiles-install backups                      List backups
+#
+# Flags for `run` (the answers to the INSTALL.md questions):
+#   --profile core|full     core = essentials (default); full = everything, incl. visual settings and apps
+#   --name NAME             git commit name
+#   --email EMAIL           git commit email
+#   --no-macos-defaults     Do not change macOS system settings
+#   --no-agentbrew          Do not install agentbrew afterwards
+#   --agentbrew-dir DIR     Where to clone agentbrew (default: next to this repo)
+#   --agentbrew-flags "..." Flags passed to agentbrew's installer (for example "--no-auto-repair")
+#   --yes                   Required: confirms the user agreed to the plan
+#
+# Phases: preflight -> backup (chezmoi config, every file chezmoi manages,
+# dotfiles LaunchAgents, each macOS settings domain) -> apply -> heal ->
+# verify -> agentbrew. A failed apply or verify restores the backup by itself.
+# Homebrew packages that were installed stay installed after a restore.
+set -uo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+BACKUP_ROOT="$STATE_DIR/install-backups"
+CHEZMOI_CONFIG="$HOME/.config/chezmoi/chezmoi.yaml"
+LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+DOCTOR="${DOTFILES_INSTALL_DOCTOR:-$REPO_DIR/bin/dotfiles-doctor}"
+AGENTBREW_URL="${DOTFILES_INSTALL_AGENTBREW_URL:-https://github.com/fyodoriv/agentbrew.git}"
+
+say() { printf '%s\n' "$*"; }
+step() { printf '\n== %s\n' "$*"; }
+usage() { sed -n '2,27p' "$0" | sed -E 's/^# ?//'; }
+
+# macOS settings domains that macos*.sh may change (data/macos-defaults.json).
+defaults_domains() {
+  jq -r '[.[]? | .domain? // empty] | unique | .[]' "$REPO_DIR/data/macos-defaults.json" 2>/dev/null
+}
+
+preflight() {
+  local ok=0
+  if xcode-select -p >/dev/null 2>&1 || [ -n "${DOTFILES_INSTALL_SKIP_XCODE_CHECK:-}" ]; then say "  ✓ Xcode Command Line Tools"
+  else say "  ✗ Xcode Command Line Tools: run 'xcode-select --install' (a macOS dialog opens)"; ok=1; fi
+  if command -v brew >/dev/null 2>&1; then say "  ✓ Homebrew"
+  else say "  ✗ Homebrew: install it from https://brew.sh (it asks for your Mac password)"; ok=1; fi
+  for tool in git jq chezmoi; do
+    if command -v "$tool" >/dev/null 2>&1; then say "  ✓ $tool"
+    else say "  ✗ $tool: brew install $tool"; ok=1; fi
+  done
+  return "$ok"
+}
+
+cmd_plan() {
+  local profile="core"
+  [ "${1:-}" = "--profile" ] && profile="${2:-core}"
+  say "dotfiles install plan (profile: $profile; nothing has changed yet)"
+  step "What you need"
+  preflight
+  say "  - 10-20 minutes for core, 30-60 for full (Homebrew downloads)."
+  say "  - Your Mac password once or twice (Homebrew; power settings are skipped without it)."
+  say "  - Stay on power and network. You can keep working; apps may restart."
+  step "What will happen"
+  say "  1. Back up to $BACKUP_ROOT/<time>/:"
+  say "     your chezmoi config, every config file dotfiles will manage (~/.zshrc,"
+  say "     ~/.gitconfig, ~/.config/... ), dotfiles LaunchAgents, and $(defaults_domains | wc -l | tr -d ' ') macOS settings domains."
+  say "  2. chezmoi apply: link shell and git config, install Homebrew packages for"
+  say "     the $profile profile, set macOS settings (unless you opt out), and add"
+  say "     background jobs (sync off for you, doctor weekly, load sampler)."
+  say "  3. Heal: 'dotfiles doctor --fix' repairs what it can."
+  say "  4. Verify: 'chezmoi verify' and a clean zsh start."
+  say "  5. Install agentbrew (AI agent skills and rules) with its own installer, unless you opt out."
+  step "If something goes wrong"
+  say "  A critical error in apply or verify restores the backup automatically:"
+  say "  files, LaunchAgents, and macOS settings. Homebrew packages stay installed."
+  say "  Undo by hand any time: bash $REPO_DIR/bin/dotfiles-install restore"
+  step "Your choices (the agent asks you these)"
+  say "  - Profile: core (recommended) or full"
+  say "  - Your git name and email"
+  say "  - Change macOS system settings? (default yes)"
+  say "  - Also install agentbrew? (default yes) and where to put it"
+}
+
+# Backup ids are timestamps, so the glob's sort order is oldest first.
+latest_backup() {
+  local d last=""
+  for d in "$BACKUP_ROOT"/*/; do [ -d "$d" ] && last="$(basename "$d")"; done
+  printf '%s' "$last"
+}
+
+backup_files() {
+  local dir="$1" rel plist existing=()
+  : > "$dir/absent.txt"
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -e "$HOME/$rel" ] || [ -L "$HOME/$rel" ]; then existing+=("$rel"); else printf '%s\n' "$rel" >> "$dir/absent.txt"; fi
+  done < <(chezmoi managed --source "$REPO_DIR" --include files,symlinks 2>/dev/null)
+  if [ -d "$LAUNCH_AGENTS_DIR" ]; then
+    : > "$dir/launchagents.txt"
+    for plist in "$LAUNCH_AGENTS_DIR"/com.dotfiles.*.plist; do
+      [ -e "$plist" ] && printf 'Library/LaunchAgents/%s\n' "$(basename "$plist")" >> "$dir/launchagents.txt"
+    done
+    while IFS= read -r rel; do [ -n "$rel" ] && existing+=("$rel"); done < "$dir/launchagents.txt"
+  else
+    : > "$dir/launchagents.txt"
+  fi
+  printf '%s\n' "${existing[@]+"${existing[@]}"}" > "$dir/present.txt"
+  if [ "${#existing[@]}" -gt 0 ]; then
+    (cd "$HOME" && tar -czf "$dir/files.tar.gz" "${existing[@]}") || return 1
+  else
+    tar -czf "$dir/files.tar.gz" -T /dev/null || return 1
+  fi
+  say "  ✓ ${#existing[@]} file(s) and LaunchAgent(s)"
+}
+
+backup_defaults() {
+  local dir="$1" domain n=0
+  mkdir -p "$dir/defaults"
+  : > "$dir/defaults-absent.txt"
+  while IFS= read -r domain; do
+    [ -n "$domain" ] || continue
+    if defaults export "$domain" "$dir/defaults/$domain.plist" >/dev/null 2>&1; then n=$((n + 1))
+    else printf '%s\n' "$domain" >> "$dir/defaults-absent.txt"; fi
+  done < <(defaults_domains)
+  say "  ✓ $n macOS settings domain(s)"
+}
+
+restore_defaults() {
+  local dir="$1" file domain
+  for file in "$dir"/defaults/*.plist; do
+    [ -e "$file" ] || continue
+    domain="$(basename "$file" .plist)"
+    defaults import "$domain" "$file" >/dev/null 2>&1 || say "  ! could not restore settings domain $domain"
+  done
+  while IFS= read -r domain; do
+    [ -n "$domain" ] && defaults delete "$domain" >/dev/null 2>&1
+  done < "$dir/defaults-absent.txt"
+  killall cfprefsd Dock Finder SystemUIServer >/dev/null 2>&1 || true
+}
+
+do_restore() {
+  local id="${1:-$(latest_backup)}" dir rel plist
+  [ -n "$id" ] || { say "No backup found in $BACKUP_ROOT"; return 1; }
+  dir="$BACKUP_ROOT/$id"
+  [ -f "$dir/files.tar.gz" ] || { say "Backup $id not found in $BACKUP_ROOT"; return 1; }
+  if [ -d "$LAUNCH_AGENTS_DIR" ]; then
+    for plist in "$LAUNCH_AGENTS_DIR"/com.dotfiles.*.plist; do
+      [ -e "$plist" ] || continue
+      rel="Library/LaunchAgents/$(basename "$plist")"
+      launchctl bootout "gui/$(id -u)" "$plist" >/dev/null 2>&1 || true
+      grep -qxF "$rel" "$dir/launchagents.txt" 2>/dev/null || rm -f "$plist"
+    done
+  fi
+  while IFS= read -r rel; do [ -n "$rel" ] && rm -rf "${HOME:?}/$rel"; done < "$dir/absent.txt"
+  while IFS= read -r rel; do [ -n "$rel" ] && rm -rf "${HOME:?}/$rel"; done < "$dir/present.txt"
+  (cd "$HOME" && tar -xzf "$dir/files.tar.gz") || return 1
+  while IFS= read -r rel; do
+    [ -n "$rel" ] && launchctl bootstrap "gui/$(id -u)" "$HOME/$rel" >/dev/null 2>&1 || true
+  done < "$dir/launchagents.txt"
+  if [ -f "$dir/chezmoi.yaml" ]; then
+    mkdir -p "$(dirname "$CHEZMOI_CONFIG")" && cp "$dir/chezmoi.yaml" "$CHEZMOI_CONFIG"
+  else
+    rm -f "$CHEZMOI_CONFIG"
+  fi
+  restore_defaults "$dir"
+  say "  ✓ Restored files, LaunchAgents, chezmoi config, and macOS settings from backup $id"
+}
+
+critical() {
+  say ""
+  say "✗ Critical error during $1. Restoring your previous setup..."
+  if do_restore "$BACKUP_ID"; then
+    say "Your Mac is back to how it was before (Homebrew packages stay installed)."
+  else
+    say "Automatic restore failed. Restore by hand: bash $REPO_DIR/bin/dotfiles-install restore $BACKUP_ID"
+  fi
+  say "Please report it: https://github.com/fyodoriv/dotfiles/issues (attach the output above)."
+  exit 1
+}
+
+cmd_run() {
+  local yes=0 profile=core name="" email="" macos=1 agentbrew=1 ab_dir="" ab_flags="" dir
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes) yes=1 ;;
+      --profile) profile="${2:-}"; shift ;;
+      --name) name="${2:-}"; shift ;;
+      --email) email="${2:-}"; shift ;;
+      --no-macos-defaults) macos=0 ;;
+      --no-agentbrew) agentbrew=0 ;;
+      --agentbrew-dir) ab_dir="${2:-}"; shift ;;
+      --agentbrew-flags) ab_flags="${2:-}"; shift ;;
+      *) say "Unknown flag: $1"; usage; exit 2 ;;
+    esac
+    shift
+  done
+  [ "$yes" -eq 1 ] || { say "Show the plan first (dotfiles-install plan), then rerun with --yes."; exit 2; }
+  case "$profile" in core|full) ;; *) say "--profile must be core or full"; exit 2 ;; esac
+
+  step "1/6 Check prerequisites"
+  preflight || { say "Install the missing tools above, then run again. Nothing was changed."; exit 1; }
+
+  step "2/6 Back up current settings"
+  BACKUP_ID="$(date +%Y%m%d-%H%M%S)"
+  dir="$BACKUP_ROOT/$BACKUP_ID"
+  mkdir -p "$dir" || { say "Cannot create $dir. Nothing was changed."; exit 1; }
+  [ -f "$CHEZMOI_CONFIG" ] && cp "$CHEZMOI_CONFIG" "$dir/chezmoi.yaml"
+  chezmoi init --source "$REPO_DIR" --promptDefaults \
+    --promptChoice "Installation profile (full = all modules, core = essential only)=$profile" \
+    --promptString "Git commit name for work/default identity=$name" \
+    --promptString "Git commit email for work/default identity=$email" \
+    --promptString "Dotfiles directory relative to home (e.g. apps/dotfiles, dotfiles)=${REPO_DIR#"$HOME"/}" \
+    >/dev/null 2>&1 || critical "chezmoi init"
+  backup_files "$dir" || critical "the file backup"
+  backup_defaults "$dir"
+  say "  Backup: $dir"
+
+  step "3/6 Apply"
+  export DOTFILES_SNAPSHOT_DONE=1
+  [ "$macos" -eq 1 ] || export DOTFILES_SKIP_MACOS_DEFAULTS=1
+  chezmoi apply --source "$REPO_DIR" --force || critical "chezmoi apply"
+
+  step "4/6 Heal"
+  if ! bash "$DOCTOR" --fix; then
+    say "  ! Some checks still fail. Your setup works; run 'dotfiles doctor' to see them."
+  fi
+
+  step "5/6 Verify"
+  chezmoi verify --source "$REPO_DIR" >/dev/null 2>&1 || critical "verification (chezmoi verify)"
+  zsh -i -c exit >/dev/null 2>&1 || critical "verification (zsh does not start cleanly)"
+
+  step "6/6 agentbrew"
+  if [ "$agentbrew" -eq 1 ]; then
+    ab_dir="${ab_dir:-$(dirname "$REPO_DIR")/agentbrew}"
+    if [ ! -d "$ab_dir/.git" ]; then git clone "$AGENTBREW_URL" "$ab_dir" || say "  ! Could not clone agentbrew; install it later from INSTALL.md."; fi
+    if [ -f "$ab_dir/scripts/install.sh" ]; then
+      # shellcheck disable=SC2086  # ab_flags is a list of flags on purpose
+      bash "$ab_dir/scripts/install.sh" run --yes $ab_flags ||
+        say "  ! agentbrew did not install (it restored its own backup). dotfiles is installed."
+    fi
+  else
+    say "  skipped (you chose not to install agentbrew)"
+  fi
+
+  step "Done"
+  say "dotfiles is installed. Backup: $dir"
+  say "Undo any time: bash $REPO_DIR/bin/dotfiles-install restore $BACKUP_ID"
+  say "Open a new terminal to load the new shell. See how it runs: dotfiles metrics"
+  say ""
+  say "Found something to fix in dotfiles while installing? Send it upstream:"
+  say "  cd $REPO_DIR && git switch -c fix/<short-name>"
+  say "  # change the code, add a test and update the docs, then run: make check"
+  say "  dotfiles contribute --dry-run && dotfiles contribute"
+}
+
+case "${1:-}" in
+  plan) shift; cmd_plan "$@" ;;
+  run) shift; cmd_run "$@" ;;
+  restore) shift; do_restore "${1:-}" ;;
+  backups) ls -1 "$BACKUP_ROOT" 2>/dev/null || say "No backups yet." ;;
+  -h|--help|help|"") usage ;;
+  *) say "Unknown command: $1"; usage; exit 2 ;;
+esac

@@ -6,6 +6,13 @@
 # data/macos-defaults.json hash: {{ include "data/macos-defaults.json" | sha256sum }}
 set -euo pipefail
 
+# The installer sets this when the user chose to keep their macOS settings.
+# Apply them later with: bash {{ .chezmoi.sourceDir }}/macos.sh
+if [ "${DOTFILES_SKIP_MACOS_DEFAULTS:-}" = "1" ]; then
+  echo "→ Skipping macOS defaults (DOTFILES_SKIP_MACOS_DEFAULTS=1)"
+  exit 0
+fi
+
 echo "→ Applying macOS defaults..."
 bash "{{ .chezmoi.sourceDir }}/macos.sh"
 

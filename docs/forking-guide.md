@@ -4,6 +4,8 @@ How to fork this repo and adapt it for your team. Covers what to keep, what to r
 
 ## Quick start
 
+Fastest path: open Claude Code (or Cursor, Codex) and say "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md". For your fork, point it at your fork's `INSTALL.md`. The agent asks your preferences, backs up first, and restores the backup on a critical error. The manual steps:
+
 ```bash
 # 1. Fork the repo on GitHub, then clone your fork
 git clone git@github.com:<your-org>/dotfiles.git ~/apps/dotfiles

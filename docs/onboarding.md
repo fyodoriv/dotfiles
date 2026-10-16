@@ -2,6 +2,8 @@
 
 Get from stock macOS to a fully configured development environment. Estimated time: 10-15 minutes.
 
+> **Fastest path:** tell your AI agent "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md". It runs `bin/dotfiles-install`, which backs up your files and macOS settings first and restores them by itself on a critical error. The steps below are the same install done by hand.
+
 > **Enterprise users:** Follow this guide first, then see your organization's overlay docs (e.g. `~/apps/dotfiles-<org>/docs/onboarding.md`) for additional enterprise-specific steps.
 
 ## Before You Start

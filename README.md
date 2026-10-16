@@ -12,6 +12,12 @@ Codex) that work in this repo.
 **Documentation:** [docs/README.md](docs/README.md) maps every doc to the question it
 answers. Agents start with [AGENTS.md](AGENTS.md).
 
+**Install with your AI agent (one step):** open Claude Code (or Cursor, Codex) and say:
+
+> Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md
+
+The agent explains what will change and what you need, asks your preferences, backs up your files and macOS settings, installs dotfiles and agentbrew, heals, verifies, and restores the backup by itself on a critical error. Undo later with `bin/dotfiles-install restore`. Details: [INSTALL.md](INSTALL.md).
+
 **Quick start** (from a stock Mac):
 
 ```bash
@@ -953,6 +959,7 @@ dotfiles sync                                     Commit tracked/staged local ch
 dotfiles managed                                  List all managed files
 dotfiles status                                   Git status of dotfiles repo
 dotfiles stats [--oneliner] [--recalc]            Automation stats (runs, time saved, streak)
+dotfiles install plan|run|restore                 One-step install with backup and auto-restore (see INSTALL.md)
 dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP health, machine load (local only)
 dotfiles contribute [--repo agentbrew|PATH]       Open a PR upstream from your branch; forks the repo for you
 dotfiles edit                                     Open dotfiles repo in $EDITOR

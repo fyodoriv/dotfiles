@@ -83,6 +83,7 @@ Advanced:
   managed                      List all managed files
   status                       Show git status of dotfiles repo
   stats                        Show automation stats (runs, time saved, streak)
+  install plan|run|restore     One-step install with backup and auto-restore
   metrics [--share FILE]       Agent time, hook blocks, MCP health, machine load
   contribute [--repo agentbrew] Open a PR upstream from your branch (forks for you)
   cheat                        Show all available commands and aliases
@@ -269,6 +270,11 @@ case "$cmd" in
   stats)
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-stats" "$@"
+    ;;
+
+  install)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-install" "$@"
     ;;
 
   metrics)

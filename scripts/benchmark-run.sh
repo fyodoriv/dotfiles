@@ -16,6 +16,9 @@
 #   BENCH_NO_FETCH=1 do not download competitors; a missing one is blocked
 #   BENCH_TOOLS      space-separated subset of tools to run (default: all)
 #   BENCH_<TOOL>     override a tool binary (CHEZMOI, STOW, YADM, DOTBOT, NIX)
+#   BENCH_SAVE       where a full run (all tools) saves its JSON scorecard for
+#                    `dotfiles metrics --table` (default:
+#                    ~/.local/state/dotfiles/scorecard.json; empty disables)
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -356,6 +359,13 @@ scorecard="$(jq -s \
              detail: $cmp}
         end)
     }' "$rows")"
+
+# Only a full run is comparable with the published scorecard, so a subset
+# run never replaces the saved one.
+SAVE="${BENCH_SAVE-$HOME/.local/state/dotfiles/scorecard.json}"
+if [ -n "$SAVE" ] && [ "$TOOLS" = "$ALL_TOOLS" ]; then
+  mkdir -p "$(dirname "$SAVE")" && printf '%s\n' "$scorecard" > "$SAVE"
+fi
 
 if [ "$OUTPUT" = json ]; then
   printf '%s\n' "$scorecard"

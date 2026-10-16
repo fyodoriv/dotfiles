@@ -6,11 +6,15 @@
 #
 # Usage:
 #   dotfiles metrics [--days N] [--share FILE]
+#   dotfiles metrics --table
 #
 # Flags:
 #   --days N      Window in days (default: 7).
 #   --share FILE  Write an aggregate-only Markdown snapshot to FILE, to attach
 #                 to an issue or PR. No project names, paths, or prompts.
+#   --table       Run every command in docs/metrics.md and print each metric
+#                 with its value, goal, and pivot. A failing command prints
+#                 (stub), never a made-up 0.
 #   --help, -h    Print this message.
 set -euo pipefail
 
@@ -20,16 +24,61 @@ SAMPLER="${DOTFILES_LOAD_SAMPLER_BIN:-$DOTFILES_DIR/bin/dotfiles-load-sampler}"
 
 days=7
 share=""
+table=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --days) days="${2:-7}"; shift 2 ;;
     --share) share="${2:-}"; [ -n "$share" ] || { echo "dotfiles metrics: --share needs a file" >&2; exit 2; }; shift 2 ;;
-    --help|-h) sed -n '2,15p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    --table) table=1; shift ;;
+    --help|-h) sed -n '2,19p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "dotfiles metrics: unknown flag $1" >&2; exit 2 ;;
   esac
 done
 case "$days" in '' | *[!0-9]*) echo "dotfiles metrics: --days needs a number" >&2; exit 2 ;; esac
 hours=$((days * 24))
+
+# Rows of the "## Metrics" table in docs/metrics.md, one per line, with the
+# cells joined by a tab. "\|" inside a cell is a literal pipe.
+metric_rows() {
+  awk '
+    /^## / { on = ($0 == "## Metrics"); next }
+    on && /^\| / && !/^\| *Metric *\|/ && !/^\|[-| ]+\|$/ {
+      line = $0
+      gsub(/\\\|/, "\001", line)
+      n = split(line, c, "|")
+      out = ""
+      for (i = 2; i < n; i++) {
+        cell = c[i]
+        gsub(/^ +| +$/, "", cell)
+        gsub(/\001/, "|", cell)
+        out = out (i > 2 ? "\t" : "") cell
+      }
+      print out
+    }' "$1"
+}
+
+# The command is the first backtick span of the Command cell.
+metric_value() {
+  local cmd value
+  cmd="$(printf '%s' "$1" | sed -nE 's/^`([^`]*)`.*/\1/p')"
+  [ -n "$cmd" ] || { echo "(stub)"; return; }
+  if value="$(cd "$DOTFILES_DIR" && bash -o pipefail -c "$cmd" 2>/dev/null | tail -1)" \
+      && printf '%s' "$value" | grep -qE '^-?[0-9]+(\.[0-9]+)?$'; then
+    echo "$value"
+  else
+    echo "(stub)"
+  fi
+}
+
+if [ "$table" = 1 ]; then
+  file="${DOTFILES_METRICS_FILE:-$DOTFILES_DIR/docs/metrics.md}"
+  [ -f "$file" ] || { echo "dotfiles metrics: $file not found" >&2; exit 1; }
+  printf '%-8s | %-10s | %s\n' "Now" "Story" "Metric (goal; pivot)"
+  metric_rows "$file" | while IFS="$(printf '\t')" read -r name goal pivot command story; do
+    printf '%-8s | %-10s | %s (goal %s; pivot %s)\n' "$(metric_value "$command")" "$story" "$name" "$goal" "$pivot"
+  done
+  exit 0
+fi
 
 # The full load report names the top processes; the shared one keeps only
 # the numeric lines.

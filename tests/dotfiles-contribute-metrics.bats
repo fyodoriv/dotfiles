@@ -60,3 +60,44 @@ teardown() { rm -rf "$TEST_DIR"; }
   run env DOTFILES_DIR="$REPO" bash "$REPO/bin/dotfiles-metrics" --days soon
   [ "$status" -eq 2 ]
 }
+
+@test "metrics --table prints each value, and (stub) when a source is missing" {
+  cat > "$TEST_DIR/metrics.md" <<'MD'
+## Metrics
+
+| Metric | Goal | Pivot | Command | Story |
+|---|---|---|---|---|
+| Rows in a file | ≥ 2 | < 1 | `printf 'a\nb\n' \| wc -l \| tr -d ' '` | US01 |
+| Missing source | 0 | 1 | `jq -s length "$TEST_DIR/no-such-file.jsonl"` | US02 |
+| Count from a source that is missing | 0 | 1 | `cat "$TEST_DIR/no-such-file" \| wc -l` | US03 |
+| Not a number | 0 | 1 | `echo soon` | US04 |
+
+## Guards
+
+| Metric | Goal | Pivot | Command | Story |
+|---|---|---|---|---|
+| Never run | 0 | 1 | `echo 7` | US05 |
+MD
+  run env DOTFILES_DIR="$REPO" DOTFILES_METRICS_FILE="$TEST_DIR/metrics.md" TEST_DIR="$TEST_DIR" bash "$REPO/bin/dotfiles-metrics" --table
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "2        | US01" ]]
+  [[ "$output" =~ "(stub)   | US02" ]]
+  # A pipe that would answer 0 for a missing file prints (stub), not 0.
+  [[ "$output" =~ "(stub)   | US03" ]]
+  [[ "$output" =~ "(stub)   | US04" ]]
+  [[ "$output" != *"US05"* ]]
+}
+
+@test "metrics --table: every docs/metrics.md row has a goal, a pivot, a command, and a story" {
+  run awk '/^## /{on=($0=="## Metrics"); next} on && /^\| / && !/^\| *Metric *\|/ && !/^\|[-| ]+\|$/' "$REPO/docs/metrics.md"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  while IFS= read -r row; do
+    cells="$(printf '%s' "$row" | sed 's/\\|//g' | awk -F'|' '{print NF-2}')"
+    [ "$cells" -eq 5 ] || { echo "not 5 cells: $row"; return 1; }
+    printf '%s' "$row" | grep -q '| `' || { echo "no command: $row"; return 1; }
+    if printf '%s' "$row" | grep -qiE '\| *(same|TODO|FILL|TBD|-) *\||<[a-z]+>'; then
+      echo "placeholder: $row"; return 1
+    fi
+  done <<< "$output"
+}

@@ -39,6 +39,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 
 | Doc | What it answers | Audience |
 |---|---|---|
+| [metrics.md](metrics.md) | Is dotfiles working? Each metric with its goal, pivot, and command | both |
 | [repo-map.md](repo-map.md) | Where does each file live, and which repo owns which path? | both |
 | [module-reference.md](module-reference.md) | What does each doctor check do? | both |
 | [what-gets-changed.md](what-gets-changed.md) | What does `dotfiles apply` change on my Mac? | human |

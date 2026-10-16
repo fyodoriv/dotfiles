@@ -1,9 +1,21 @@
 # Where dotfiles meets each new-project required area. check-setup.sh reads it;
 # the monthly audit in /tooling-checkup re-checks every line. Contract:
 # agentbrew skill-plugins/workflow/new-project/references/requirements-map.md
-# Only areas the audit (2026-10-16) found fully met are mapped; the rest are
-# gaps in TASKS.md task meet-new-project-requirements.
+# Each map line lands in the PR that makes it true, with a comment saying why.
+# Gaps left: TASKS.md task meet-new-project-requirements.
 map.e2e: tests/e2e/hermetic-install.sh tests/stranger-readiness.bats
 map.checkup: skills/tooling-checkup/SKILL.md
 map.caching: bin/cached-run bin/bats-affected
 map.docs: docs/README.md tests/docs-contract.bats
+
+# VISION.md (root, where it has always lived) has Problem, Non-goals, Success
+# (dated numeric goals with pivots and exact commands), Kill criteria phrased
+# per wrapper, and Prior art linking docs/competition/scorecard.md.
+map.vision: VISION.md
+
+# docs/metrics.md: every metric is an outcome with a goal, a pivot, and its
+# exact command; missing data prints (stub). bin/dotfiles-metrics --table runs
+# every command; tests/dotfiles-contribute-metrics.bats fails on a row with
+# no command or a placeholder. The scorecard gives each benchmark metric a
+# goal, pivot, and command. Gate speed joins the table with the gate timings.
+map.metrics: docs/metrics.md docs/competition/scorecard.md bin/dotfiles-metrics tests/dotfiles-contribute-metrics.bats

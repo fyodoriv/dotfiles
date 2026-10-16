@@ -28,6 +28,17 @@ non_goals:
 
 > **Self-healing macOS developer dotfiles with a no-leak privacy contract.** Powered by [chezmoi](https://chezmoi.io); shell startup under 200ms; automated tests; per-module doctor checks.
 
+## Problem
+
+A Mac drifts. Settings change by hand, tools update, LaunchAgents die, and
+config files get edited in place. Setting up a new Mac takes hours of copied
+commands, and the result is never quite the same as the old one. Most dotfile
+managers copy files and stop there. They do not notice that the machine is
+unhealthy, and they do not fix it.
+
+dotfiles gets a new or drifted Mac to the correct state with the fewest human
+steps, and keeps it there with doctor checks that find and fix drift.
+
 ## Who it's for
 
 **Primary user: any macOS developer who wants their config to be reproducible and to heal itself.** Clone the repo, run `chezmoi init --source ~/apps/dotfiles --apply`, run `dotfiles doctor --fix`, and you have a fully-configured Mac — Homebrew + casks + tap, macOS defaults across Finder/Spotlight/keyboard, shell with starship + atuin + zoxide + fnm + uv, terminal (Ghostty), git, SSH, launch agents, AI agent tooling, and 21 self-healing module check sets that auto-detect and offer to fix drift.
@@ -80,10 +91,52 @@ New capabilities earn a new user story; new user stories carry a numeric thresho
 - **Not an agent config tool.** `agentbrew` owns `~/.claude/`, `~/.cursor/`, etc. dotfiles owns only the `Agentfile.yaml` manifest.
 - **Not a system for sharing org-internal tooling.** Org-gated MCPs / skills / scripts live in an overlay repo (e.g. `~/apps/dotfiles-<org>/`) and are loaded via the `EXTRA_AGENTFILE` hook. The litmus test: if a fresh contributor outside the org runs `dotfiles apply`, does the MCP work? If no, it's overlay content.
 
+## Success
+
+Success is measured, not felt. [`docs/metrics.md`](docs/metrics.md) holds every
+metric with its goal, pivot, and exact command; `dotfiles metrics --table`
+prints them all. The headline ones:
+
+| Metric | Baseline (2026-10-16) | Goal | Pivot | Command |
+|---|---|---|---|---|
+| North star: scorecard metrics where dotfiles beats the best competitor | 0 of 5 (2026-10-12) | ≥ 2 by 2027-04-30 | 0 on 2027-04-30 | `scripts/benchmark-run.sh --json \| jq .north_star.metrics_beaten` |
+| Interactive shell startup, median (ms) | 80 | < 200 | ≥ 300 | `for i in 1 2 3 4 5; do /usr/bin/time -p zsh -i -c exit 2>&1 >/dev/null \| awk '/^real/{print int($2*1000)}'; done \| sort -n \| sed -n 3p` |
+| Commands a person types on a fresh Mac | 4 | 1 by 2027-01-31 | ≥ 3 on 2027-01-31 | `scripts/benchmark-run.sh --json \| jq .dotfiles.metrics.manual_bootstrap_steps` |
+
+## Kill criteria
+
+dotfiles is a set of wrappers around tools that exist without it. Each wrapper
+must earn its place against the plain tool. A missed date below means the
+wrapper goes, not a new deadline.
+
+- **`dotfiles apply` (wraps chezmoi)**: if the north star is still 0 of 5 on
+  2027-04-30, deprecate the wrapper and document plain `chezmoi apply` plus
+  `dotfiles doctor`.
+- **`bin/dotfiles-install` (wraps a backup, `chezmoi apply`, and the doctor)**:
+  if a fresh Mac still needs 3 or more commands on 2027-01-31, delete it and
+  document chezmoi's own one-line `init --apply` plus `dotfiles doctor --fix`.
+- **`local-ai-warmup` LaunchAgent (wraps Ollama and LM Studio)**: if fewer than
+  50% of its health checks find an engine on 2027-01-31, remove the
+  LaunchAgent and make story 09 opt-in.
+- **The company overlay (story 10)**: if dotfiles has no public forks on
+  2027-06-30, fold the overlay docs into one page and stop growing the forking
+  guide.
+- **Shell config**: if the median shell startup is 300 ms or more at two
+  monthly audits in a row, remove the slowest init block (find it with
+  `zprof`) before adding anything new.
+
+## Prior art
+
+[`docs/competition/scorecard.md`](docs/competition/scorecard.md) compares
+dotfiles with chezmoi, GNU Stow, yadm, dotbot, and home-manager on one shared
+workload, with sources for every number. dotfiles is built on chezmoi (GET,
+then WRAP, rule 0); the doctor checks, self-repair, macOS settings, and
+LaunchAgents are what it adds on top.
+
 ## Core beliefs
 
 - **Self-healing beats documented.** Every fixable drift becomes a doctor check; check failures become tasks.
-- **Shell startup under 200ms is a hard contract.** Tracked by the `shell-startup` doctor check; regressions are P1.
+- **Shell startup under 200ms is a hard contract.** Measured by the shell-startup row in [`docs/metrics.md`](docs/metrics.md); regressions are P1.
 - **Multi-agent git safety is non-negotiable.** No `git reset --hard`, no `git checkout .`, no `git clean -fd`, no `git add -A` in any script or skill that runs in a multi-agent worktree. The class of bug — wiping another agent's changes — is too costly. Enforced by review and by the `commits-and-ci` rule synced from agentbrew.
 - **Privacy is enforced by automation, not by trust.** Three nested guards (pre-commit hook, pre-push hook, bats tests) make leaks impossible by construction. Adding a new identifier or contributor follows the SECURITY.md flow.
 

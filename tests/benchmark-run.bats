@@ -13,6 +13,8 @@ setup() {
   printf 'keep\n' > "$HOME/sentinel"
   # Small, offline, one-shot workload. Missing competitors become blocked.
   export BENCH_FILES=4 BENCH_REPS=1 BENCH_NO_FETCH=1
+  # Tests never save a scorecard unless a test asks for it.
+  export BENCH_SAVE=""
 }
 
 home_listing() {
@@ -67,6 +69,17 @@ home_listing() {
   [ "$status" -eq 0 ]
   [ "$(home_listing)" = "$before" ]
   [ "$(cat "$HOME/sentinel")" = "keep" ]
+}
+
+@test "benchmark-run: a full run saves its scorecard; a subset run does not" {
+  export BENCH_CACHE_DIR="$BATS_TEST_TMPDIR/empty-cache"
+  export BENCH_SAVE="$BATS_TEST_TMPDIR/state/scorecard.json"
+  BENCH_TOOLS="dotfiles chezmoi" run "$BENCH" --json
+  [ "$status" -eq 0 ]
+  [ ! -e "$BENCH_SAVE" ]
+  run "$BENCH" --json
+  [ "$status" -eq 0 ]
+  jq -e '.north_star.metrics_beaten >= 0' "$BENCH_SAVE"
 }
 
 @test "benchmark-run: table output names every tool and the north star" {

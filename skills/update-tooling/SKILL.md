@@ -228,8 +228,16 @@ edit generated agent configuration directories directly.
 Keep the development and applied checkouts separate. The applied checkout is
 the one returned by `chezmoi source-path`.
 
+The `dotfiles-sync` LaunchAgent runs `chezmoi apply` every 30 minutes and
+holds the chezmoi state lock while it runs. Then `chezmoi source-path` fails
+with "timeout obtaining persistent state lock" and prints nothing. Wait for
+that run to end (up to 5 minutes) before you read the path, and stop if it is
+still empty:
+
 ```bash
+for _ in $(seq 60); do pgrep -qf '^chezmoi apply' || break; sleep 5; done
 DOTFILES_APPLIED="$(chezmoi source-path)"
+[ -n "$DOTFILES_APPLIED" ] || { echo "chezmoi source-path failed; is chezmoi still locked?"; exit 1; }
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-sync"
 cd "$HOME" && env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" apply
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-reload-launchagents"

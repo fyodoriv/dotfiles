@@ -105,3 +105,9 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   bad="$(grep -iE '^ *(cd [^&]*&& )?(env -u DOTFILES_DIR )?"?[$a-z_]*agentbrew[a-z_]*"? sync( |$)' "$SKILL" | grep -v -- '--no-recommended' || true)"
   [ -z "$bad" ]
 }
+
+@test "update-tooling waits for the chezmoi lock before reading the applied path" {
+  grep -F -q "timeout obtaining persistent state lock" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+  grep -F -q "pgrep -qf '^chezmoi apply'" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+  grep -F -q '[ -n "$DOTFILES_APPLIED" ]' "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+}

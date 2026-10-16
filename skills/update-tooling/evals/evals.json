@@ -82,6 +82,16 @@
         "Runs applied AgentBrew and dotfiles commands with DOTFILES_DIR unset",
         "Keeps LaunchAgent repair and reload actions in the configured applied checkout, with loaded-only, Minsky, and Node-safe-mode guards"
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "update latest tooling (the dotfiles-sync LaunchAgent is running `chezmoi apply` right now)",
+      "expected_output": "The agent waits for the running chezmoi apply to finish before reading `chezmoi source-path`, and never runs `$DOTFILES_APPLIED/bin/...` with an empty path.",
+      "expectations": [
+        "Checks for a running `chezmoi apply` (the dotfiles-sync LaunchAgent) before calling `chezmoi source-path`",
+        "Stops with a clear message when `chezmoi source-path` prints nothing, instead of running `/bin/dotfiles` or `/bin/dotfiles-sync`",
+        "Does not kill the running dotfiles-sync job or remove the chezmoi lock"
+      ]
     }
   ]
 }

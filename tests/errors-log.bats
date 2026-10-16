@@ -34,6 +34,19 @@ teardown() { rm -rf "$TEST_DIR"; }
 @test "test runs turn the errors log off (Makefile and test_helper)" {
   grep -qE '^export DOTFILES_ERRORS_LOG *:?= *0' "$REPO_ROOT/Makefile"
   grep -qE '^export DOTFILES_ERRORS_LOG=0' "$REPO_ROOT/tests/test_helper.bash"
+  grep -qE '^export DOTFILES_STATS_LOG *:?= *0' "$REPO_ROOT/Makefile"
+  grep -qE '^export DOTFILES_STATS_LOG=0' "$REPO_ROOT/tests/test_helper.bash"
+}
+
+@test "log_run allow-lists its fields and DOTFILES_STATS_LOG=0 turns it off" {
+  local f="$TEST_DIR/stats.jsonl"
+  run env DOTFILES_STATS_LOG=1 DOTFILES_STATS_FILE="$f" bash -c "source '$REPO_ROOT/lib/stats.sh'; log_run 'sync; rm -rf /Users/me' 'lots'"
+  [ "$status" -eq 0 ]
+  jq -e '.task == "invalid" and .units == 1' "$f"
+  ! grep -q 'rm -rf' "$f"
+  rm -f "$f"
+  run env DOTFILES_STATS_LOG=0 DOTFILES_STATS_FILE="$f" bash -c "source '$REPO_ROOT/lib/stats.sh'; log_run sync"
+  [ ! -e "$f" ]
 }
 
 @test "a failing doctor check line ends with its fix and logs a US05 event" {

@@ -3,7 +3,7 @@
 - **Repo**: `tooling/dotfiles`
 - **Task**: `meet-new-project-requirements` (P0, TASKS.md)
 - **Author**: Claude Code goal session 2026-10-16
-- **Status**: in progress
+- **Status**: done 2026-10-16 (PRs #124-#130; score 11/24 → 19/19)
 - **Reviewer verdict**: approve with changes (reviewer subagent, 2026-10-16); changes folded in below
 
 ## Goal

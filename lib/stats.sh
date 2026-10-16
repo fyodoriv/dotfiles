@@ -36,7 +36,8 @@ _task_estimate() {
 #       (e.g. doctor reports 100 checks pass — pass units=100 if you
 #       want to scale; existing convention is units=1 for doctor).
 #
-# Side effects: appends one JSONL line to $DOTFILES_STATS_FILE
+# Side effects: appends one JSONL line to $DOTFILES_STATS_FILE (off when
+# DOTFILES_STATS_LOG=0; the Makefile and tests/test_helper.bash set it)
 # (default: ~/.dotfiles-stats.jsonl). Creates the parent directory if
 # missing. Silently returns if the directory cannot be created — never
 # fails the calling script. Stats is best-effort instrumentation, never
@@ -50,7 +51,12 @@ _task_estimate() {
 #   log_run sync                # 1 run × 3s = 3s
 #   log_run cleanup 5           # 5 units × 10s = 50s
 log_run() {
+  [ "${DOTFILES_STATS_LOG:-1}" = "0" ] && return 0
   local task="$1" units="${2:-1}"
+  # Allow-list both fields so no free text can reach the log
+  # (docs/observability.md#logs): a task is a short name, units a number.
+  [[ "$task" =~ ^[a-z0-9-]{1,40}$ ]] || task="invalid"
+  [[ "$units" =~ ^[0-9]{1,6}$ ]] || units=1
   local estimate
   estimate="$(_task_estimate "$task")"
   local seconds_saved=$((estimate * units))

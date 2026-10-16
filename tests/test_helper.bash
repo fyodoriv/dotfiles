@@ -5,8 +5,10 @@
 # which would point `bash -c` fixtures at the real checkout.
 unset BASH_ENV ENV
 
-# Tests never write the real errors log (lib/errors-log.sh).
+# Tests never write the real errors or stats logs (lib/errors-log.sh,
+# lib/stats.sh); a test that checks a write sets the variable back to 1.
 export DOTFILES_ERRORS_LOG=0
+export DOTFILES_STATS_LOG=0
 
 # Create isolated temp environment for each test
 setup() {

@@ -25,8 +25,10 @@ SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-
 # macOS interactive scheduling tier — all child processes inherit
 FULLPOWER := $(shell command -v taskpolicy >/dev/null 2>&1 && echo "taskpolicy -t 0 -l 0" || echo "")
 
-# Test runs never write the real errors log (lib/errors-log.sh).
+# Test runs never write the real errors or stats logs (lib/errors-log.sh,
+# lib/stats.sh); tests that check a write turn it back on.
 export DOTFILES_ERRORS_LOG := 0
+export DOTFILES_STATS_LOG := 0
 
 DEV_DEPS := shellcheck bats-core parallel chezmoi fd jq
 # python3 is bundled with macOS / GitHub Actions runners; we use it via

@@ -109,6 +109,19 @@ teardown() { rm -rf "$TEST_DIR"; }
   grep -q 'agentbrew-install run --yes --no-auto-repair' "$LOG"
 }
 
+@test "running the install twice succeeds and leaves the same files" {
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ]
+  local first_zshrc first_gitconfig
+  first_zshrc="$(cat "$HOME/.zshrc")"; first_gitconfig="$(cat "$HOME/.gitconfig")"
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"dotfiles is installed"* ]]
+  [ "$(cat "$HOME/.zshrc")" = "$first_zshrc" ]
+  [ "$(cat "$HOME/.gitconfig")" = "$first_gitconfig" ]
+  ls "$XDG_STATE_HOME/dotfiles/install-backups"/*/files.tar.gz >/dev/null
+}
+
 @test "optional steps warn instead of failing: a failing doctor --fix and agentbrew installer" {
   stub doctor 'echo "doctor $*" >> "$LOG"; exit 1'
   mkdir -p "$TEST_DIR/agentbrew/.git" "$TEST_DIR/agentbrew/scripts"

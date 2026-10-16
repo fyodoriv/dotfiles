@@ -3,6 +3,8 @@
 # Runs via LaunchAgent; exercises git operations in isolated repos.
 
 load test_helper
+# These tests check stats writes, so they turn the stats log back on.
+export DOTFILES_STATS_LOG=1
 
 SYNC_CMD="$BATS_TEST_DIRNAME/../bin/dotfiles-sync"
 

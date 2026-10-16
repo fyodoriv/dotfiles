@@ -15,7 +15,7 @@ answers. Agents start with [AGENTS.md](AGENTS.md).
 **Quick start** (a Mac with Homebrew; the installer names any other missing tool):
 
 ```bash
-git clone https://github.com/fyodoriv/dotfiles.git ~/apps/dotfiles && ~/apps/dotfiles/bin/dotfiles-install run --yes && ~/apps/dotfiles/bin/dotfiles-doctor
+[ -d ~/apps/dotfiles ] || git clone https://github.com/fyodoriv/dotfiles.git ~/apps/dotfiles; ~/apps/dotfiles/bin/dotfiles-install run --yes && ~/apps/dotfiles/bin/dotfiles-doctor
 ```
 
 It backs up your files and macOS settings, applies dotfiles, heals, verifies,

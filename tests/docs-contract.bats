@@ -69,4 +69,6 @@ AGENT_GUIDE_MAX_BYTES=10000
   [ "$(printf '%s\n' "$first" | grep -c .)" -eq 1 ] || { echo "first block is not one line: $first"; return 1; }
   grep -qF 'bin/dotfiles-install run --yes' <<<"$first" || { echo "first block does not run the installer: $first"; return 1; }
   grep -qE 'dotfiles-doctor$' <<<"$first" || { echo "first block does not end with the doctor: $first"; return 1; }
+  # Safe to run again: an existing clone is reused, not cloned over.
+  grep -qF '[ -d ~/apps/dotfiles ] || git clone' <<<"$first" || { echo "first block is not safe to re-run: $first"; return 1; }
 }

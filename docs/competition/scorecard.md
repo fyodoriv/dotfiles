@@ -26,12 +26,12 @@ value prints `(stub)` in `dotfiles metrics --table`; it never counts as 0.
 
 | Question | Metric | Better | Goal | Pivot | Command |
 |---|---|---|---|---|---|
-| How fast does a fresh home get the files? | `cold_apply_ms` | lower | ≤ chezmoi (2180) by 2027-04-30 | > 1.5 × chezmoi | `jq -e '.dotfiles.metrics.cold_apply_ms' ~/.local/state/dotfiles/scorecard.json` |
-| How much does a no-change re-apply cost? | `noop_reapply_ms` | lower | ≤ chezmoi + 5 ms by 2027-04-30 (now 57 vs 36) | > chezmoi + 50 ms | `jq -e '.dotfiles.metrics.noop_reapply_ms' ~/.local/state/dotfiles/scorecard.json` |
-| How fast does the tool report a hand edit? | `drift_detect_ms` (null when the tool misses the edit) | lower | ≤ chezmoi + 5 ms (now 46 vs 34) | > chezmoi + 50 ms, or null | `jq -e '.dotfiles.metrics.drift_detect_ms' ~/.local/state/dotfiles/scorecard.json` |
-| Does the tool see the hand edit at all? | `drift_detected` | true | true | false | `jq -e '.dotfiles.metrics.drift_detected' ~/.local/state/dotfiles/scorecard.json` |
-| Do two fresh homes get identical files? | `reproducibility_pct` | higher | 100 | < 100 | `jq -e '.dotfiles.metrics.reproducibility_pct' ~/.local/state/dotfiles/scorecard.json` |
-| How many commands does a person type on a fresh Mac? | `manual_bootstrap_steps` | lower | 1 by 2027-01-31 (now 4) | ≥ 3 on 2027-01-31 | `jq -e '.dotfiles.metrics.manual_bootstrap_steps' ~/.local/state/dotfiles/scorecard.json` |
+| How fast does a fresh home get the files? | `cold_apply_ms` | lower | ≤ chezmoi (2180) by 2027-04-30 | > 1.5 × chezmoi | `jq '.dotfiles.metrics.cold_apply_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How much does a no-change re-apply cost? | `noop_reapply_ms` | lower | ≤ chezmoi + 5 ms by 2027-04-30 (now 57 vs 36) | > chezmoi + 50 ms | `jq '.dotfiles.metrics.noop_reapply_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How fast does the tool report a hand edit? | `drift_detect_ms` (null when the tool misses the edit) | lower | ≤ chezmoi + 5 ms (now 46 vs 34) | > chezmoi + 50 ms, or null | `jq '.dotfiles.metrics.drift_detect_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| Does the tool see the hand edit at all? | `drift_detected` | true | true | false | `jq '.dotfiles.metrics.drift_detected \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| Do two fresh homes get identical files? | `reproducibility_pct` | higher | 100 | < 100 | `jq '.dotfiles.metrics.reproducibility_pct \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How many commands does a person type on a fresh Mac? | `manual_bootstrap_steps` | lower | 1 by 2027-01-31 (now 4) | ≥ 3 on 2027-01-31 | `jq '.dotfiles.metrics.manual_bootstrap_steps \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 
 The north star (metrics where dotfiles beats the best competitor) has goal
 ≥ 2 of 5 by 2027-04-30 and pivot 0 of 5 on that date; a missed pivot triggers
@@ -58,10 +58,10 @@ some tools support them, so they cannot be compared on equal terms.
 | Tool | Version | How the script gets it | Deploy mode | Drift check used |
 |---|---|---|---|---|
 | dotfiles | this repo | `bin/dotfiles apply --no-fix` and `dotfiles diff` | copy | `chezmoi diff` |
-| chezmoi | installed | `chezmoi` on PATH | copy | `chezmoi status` | `jq -e '.dotfiles.metrics.chezmoi' ~/.local/state/dotfiles/scorecard.json` |
-| GNU Stow | installed | `stow` on PATH, `--no-folding` | symlink | `stow --no` dry run reports a conflict | `jq -e '.dotfiles.metrics.stow' ~/.local/state/dotfiles/scorecard.json` |
+| chezmoi | installed | `chezmoi` on PATH | copy | `chezmoi status` | `jq '.dotfiles.metrics.chezmoi \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| GNU Stow | installed | `stow` on PATH, `--no-folding` | symlink | `stow --no` dry run reports a conflict | `jq '.dotfiles.metrics.stow \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | yadm | 3.3.0 | pinned script, SHA-256 checked, cached | copy (git work tree) | `yadm status` |
-| dotbot | 1.21.0 | `uv` venv in the cache | symlink | a re-run refuses to overwrite and exits non-zero | `jq -e '.dotfiles.metrics.uv' ~/.local/state/dotfiles/scorecard.json` |
+| dotbot | 1.21.0 | `uv` venv in the cache | symlink | a re-run refuses to overwrite and exits non-zero | `jq '.dotfiles.metrics.uv \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | home-manager | — | needs nix | symlink | blocked |
 
 The cache is `~/.cache/dotfiles-benchmark` (`BENCH_CACHE_DIR`). Nothing is

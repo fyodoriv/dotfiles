@@ -2,6 +2,8 @@
 # Tests for time-saved tracking (log_run, get_time_saved_summary, dotfiles-stats)
 
 load test_helper
+# These tests check stats writes, so they turn the stats log back on.
+export DOTFILES_STATS_LOG=1
 
 setup() {
   TEST_DIR="$(mktemp -d)"

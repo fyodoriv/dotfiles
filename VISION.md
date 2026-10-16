@@ -99,9 +99,9 @@ prints them all. The headline ones:
 
 | Metric | Baseline (2026-10-16) | Goal | Pivot | Command |
 |---|---|---|---|---|
-| North star: scorecard metrics where dotfiles beats the best competitor | 0 of 5 (2026-10-12) | ≥ 2 by 2027-04-30 | 0 on 2027-04-30 | `scripts/benchmark-run.sh --json \| jq .north_star.metrics_beaten` |
+| North star: scorecard metrics where dotfiles beats the best competitor | 0 of 5 (2026-10-12) | ≥ 2 by 2027-04-30 | 0 on 2027-04-30 | `jq '.north_star.metrics_beaten \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` (refresh: `scripts/benchmark-run.sh`) |
 | Interactive shell startup, median (ms) | 80 | < 200 | ≥ 300 | `for i in 1 2 3 4 5; do /usr/bin/time -p zsh -i -c exit 2>&1 >/dev/null \| awk '/^real/{print int($2*1000)}'; done \| sort -n \| sed -n 3p` |
-| Commands a person types on a fresh Mac | 4 | 1 by 2027-01-31 | ≥ 3 on 2027-01-31 | `scripts/benchmark-run.sh --json \| jq .dotfiles.metrics.manual_bootstrap_steps` |
+| Commands a person types on a fresh Mac | 4 | 1 by 2027-01-31 | ≥ 3 on 2027-01-31 | `jq '.dotfiles.metrics.manual_bootstrap_steps \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 
 ## Kill criteria
 

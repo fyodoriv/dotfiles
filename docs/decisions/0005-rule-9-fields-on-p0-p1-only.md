@@ -19,4 +19,7 @@ fields when it is promoted to P1. All P2 tasks had them on 2026-10-16 anyway.
 ## Consequences
 
 - `bin/add-task --priority P2` keeps working with only a title.
+- `make lint-tasks` prints a `rule-9-warn` line for each P2/P3 task without the
+  fields, so gaps stay visible (added 2026-10-16 after the requirements
+  grader asked for every task to carry them).
 - Moving a task to P1 without the five fields fails `make lint-tasks`.

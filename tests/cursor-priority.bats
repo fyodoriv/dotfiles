@@ -2,6 +2,8 @@
 # Functional tests for cursor-priority — interactive/background scheduling
 
 load test_helper
+# These tests check stats writes, so they turn the stats log back on.
+export DOTFILES_STATS_LOG=1
 
 PRIORITY_CMD="$BATS_TEST_DIRNAME/../bin/cursor-priority"
 REAL_DOTFILES="$BATS_TEST_DIRNAME/.."

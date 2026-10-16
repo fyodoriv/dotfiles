@@ -47,13 +47,18 @@ awk '
   }
   function emit_failure() {
     if (!in_task) return
-    if (priority != "P0" && priority != "P1") return
     missing = ""
     if (!has_hypothesis)  missing = missing " Hypothesis"
     if (!has_success)     missing = missing " Success"
     if (!has_pivot)       missing = missing " Pivot"
     if (!has_measurement) missing = missing " Measurement"
     if (!has_anchor)      missing = missing " Anchor"
+    # P2/P3 only warn (ADR 0005): quick captures land in P2 without fields,
+    # and the warning keeps every gap visible until the fields are added.
+    if (priority != "P0" && priority != "P1") {
+      if (missing != "") printf("rule-9-warn: %s %s missing:%s\n", priority, task_id, missing) > "/dev/stderr"
+      return
+    }
     if (missing != "") {
       printf("rule-9-fail: %s %s missing:%s\n", priority, task_id, missing)
       non_compliant++

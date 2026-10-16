@@ -2,8 +2,12 @@
 # the monthly audit in /tooling-checkup re-checks every line. Contract:
 # agentbrew skill-plugins/workflow/new-project/references/requirements-map.md
 # Each map line lands in the PR that makes it true, with a comment saying why.
-# Gaps left: TASKS.md task meet-new-project-requirements.
-map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/stories-e2e.bats tests/stranger-readiness.bats
+# e2e: tests/e2e/hermetic-install.sh runs the real install (real chezmoi,
+# lifecycle scripts, doctor, zsh) in a sandboxed scratch HOME; the US01 cases
+# are in dotfiles-install-e2e.bats and every other story's real command runs
+# after it via hermetic-exec.sh in stories-e2e.bats (happy + error case each).
+# stranger-readiness.bats renders a new user's home. make e2e runs them.
+map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/dotfiles-install-e2e.bats tests/e2e/stories-e2e.bats tests/stranger-readiness.bats
 # Checkup: /tooling-checkup is the one checkup command; its monthly pass runs
 # the doctor, the cached gate, the story e2e, the speed review, learnings, and
 # open P0s (tests/tooling-checkup-skill.bats).
@@ -13,6 +17,9 @@ map.checkup: skills/tooling-checkup/SKILL.md tests/tooling-checkup-skill.bats
 # test that reads a changed file by repo path; make test-force runs all.
 # tests/cached-run.bats proves an edit to one tracked or untracked file re-runs.
 map.caching: bin/cached-run bin/bats-affected tests/cached-run.bats tests/bats-affected.bats
+# Docs: docs/README.md maps every doc to the question it answers;
+# tests/docs-contract.bats fails on an unmapped doc, a broken map link, an
+# AGENTS.md over 10000 bytes or out of section order, or README drift.
 map.docs: docs/README.md tests/docs-contract.bats
 
 # VISION.md (root, where it has always lived) has Problem, Non-goals, Success
@@ -50,8 +57,8 @@ map.user-stories: docs/user-stories/README.md tests/e2e/stories-e2e.bats tests/u
 # line ends with its fix. tests/errors-log.bats enforces all of it.
 map.observability: docs/observability.md lib/errors-log.sh bin/dotfiles-doctor tests/errors-log.bats
 # Secrets: .gitignore ignores .env and .env.*; git-hooks/pre-commit scans every
-# commit for secrets and private references and git-hooks/pre-push blocks them
-# before github.com. No .metrics/ entry: gate timings live under
+# staged change for hardcoded secrets and private references; git-hooks/pre-push
+# blocks private references and private emails before github.com. No .metrics/ entry: gate timings live under
 # ~/.local/state/dotfiles, outside the repo (accepted push back).
 map.secrets: .gitignore git-hooks/pre-commit git-hooks/pre-push
 

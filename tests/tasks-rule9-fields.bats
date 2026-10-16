@@ -116,8 +116,10 @@ TASKS
 TASKS
   run "$SCRIPT"
   [ "$status" -eq 0 ]
-  # No warnings emitted at all (no P0/P1 entries)
+  # P2/P3 gaps only warn (ADR 0005); nothing fails.
   [[ "$output" != *"rule-9-fail:"* ]]
+  [[ "$output" == *"rule-9-warn: P2 p2-task missing: Hypothesis"* ]]
+  [[ "$output" == *"rule-9-warn: P3 p3-task missing: Hypothesis"* ]]
   [[ "$output" == *"total=0 non_compliant=0"* ]]
 }
 

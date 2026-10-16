@@ -20,9 +20,13 @@ never file contents, paths, or command output. Only the LaunchAgent text logs
 hold free text, and they never leave the Mac. The load samples name processes,
 so `dotfiles metrics --share` keeps only their numeric lines.
 
-Tests never write the real errors log: the Makefile and
-`tests/test_helper.bash` export `DOTFILES_ERRORS_LOG=0`, and
-`tests/errors-log.bats` fails if either line goes away.
+`log_run` allow-lists its fields too: a task is a short lowercase name and
+`units` a number; anything else is written as `invalid` and `1`.
+
+Tests never write the real errors or stats logs: the Makefile and
+`tests/test_helper.bash` export `DOTFILES_ERRORS_LOG=0` and
+`DOTFILES_STATS_LOG=0` (a test that checks a write turns it back on), and
+`tests/errors-log.bats` fails if those lines go away.
 
 ## Errors
 

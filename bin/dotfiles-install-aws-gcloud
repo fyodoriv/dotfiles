@@ -42,6 +42,9 @@ case "$(uname -m)" in
   *) gcloud_arch="x86_64" ;;
 esac
 aws_url="${DOTFILES_AWS_PKG_URL:-https://awscli.amazonaws.com/AWSCLIV2.pkg}"
+# Apple Developer ID team of the AWS CLI pkg signer. The company name on the
+# certificate changes (it now reads "AMZN Mobile LLC"); the team ID does not.
+aws_signer_team="94KV3E626L"
 gcloud_url="${DOTFILES_GCLOUD_TARBALL_URL:-https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-darwin-${gcloud_arch}.tar.gz}"
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-aws-gcloud.XXXXXX")"
@@ -64,7 +67,8 @@ if $want_aws; then
   else
     echo "→ installing AWS CLI v2 into $aws_dir"
     if curl -fsSL -o "$work/AWSCLIV2.pkg" "$aws_url" &&
-      pkgutil --check-signature "$work/AWSCLIV2.pkg" | grep -q "Amazon" &&
+      sig="$(pkgutil --check-signature "$work/AWSCLIV2.pkg")" &&
+      [[ "$sig" == *"Developer ID Installer: "*"($aws_signer_team)"* ]] &&
       pkgutil --expand-full "$work/AWSCLIV2.pkg" "$work/aws-pkg" &&
       [ -x "$work/aws-pkg/aws-cli.pkg/Payload/aws-cli/aws" ]; then
       mkdir -p "$bin_dir" "$(dirname "$aws_dir")"

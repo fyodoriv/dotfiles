@@ -17,7 +17,7 @@ changes nothing.
 ## Scope (in)
 
 - `bin/dotfiles-install-aws-gcloud [--aws|--gcloud] [--dry-run]`:
-  1. aws: download `AWSCLIV2.pkg`, require an Amazon signature
+  1. aws: download `AWSCLIV2.pkg`, require the AWS Developer ID team `94KV3E626L` in the signature
      (`pkgutil --check-signature`), `pkgutil --expand-full`, copy the
      `aws-cli` payload to `~/.local/aws-cli`, link `aws` and `aws_completer`.
   2. gcloud: download the macOS SDK tarball for the CPU, unpack it to

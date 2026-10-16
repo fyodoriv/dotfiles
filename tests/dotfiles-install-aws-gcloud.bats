@@ -15,7 +15,7 @@ setup() {
   mkdir -p "$STUB_BIN"
   export CALLS="$TEST_DIR/calls.log"
   : > "$CALLS"
-  export STUB_SIGNER="Developer ID Installer: Amazon.com Services LLC"
+  export STUB_SIGNER="Developer ID Installer: AMZN Mobile LLC (94KV3E626L)"
 
   cat > "$STUB_BIN/uname" <<'EOF'
 #!/bin/bash
@@ -105,6 +105,16 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 1 ]
   [[ "$output" == *"AWS CLI v2 install failed"* ]]
   [ ! -e "$HOME/.local/aws-cli" ]
+  [ ! -e "$HOME/.local/bin/aws" ]
+}
+
+@test "an Amazon-named signer from another team is refused" {
+  export STUB_SIGNER="Developer ID Installer: Amazon.com Services LLC (ABCDE12345)"
+
+  run "$SCRIPT" --aws
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"AWS CLI v2 install failed"* ]]
   [ ! -e "$HOME/.local/bin/aws" ]
 }
 

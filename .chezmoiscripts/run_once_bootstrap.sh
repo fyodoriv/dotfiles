@@ -74,16 +74,22 @@ if [ ! -f "$GITCONFIG_LOCAL" ] && [ -f "$GITCONFIG_EXAMPLE" ]; then
   echo ""
   echo "→ Setting up git identity (~/.gitconfig.local)..."
   cp "$GITCONFIG_EXAMPLE" "$GITCONFIG_LOCAL"
-  git_name=""
-  while [ -z "$git_name" ]; do
-    printf "  Your name (required): "
-    read -r git_name
-  done
-  git_email=""
-  while [ -z "$git_email" ]; do
-    printf "  Your email (required): "
-    read -r git_email
-  done
+  # bin/dotfiles-install passes the answers it already collected; without a
+  # terminal there is nobody to ask, so leave the placeholders for later.
+  git_name="${DOTFILES_GIT_NAME:-}"
+  git_email="${DOTFILES_GIT_EMAIL:-}"
+  if [ -t 0 ]; then
+    while [ -z "$git_name" ]; do
+      printf "  Your name (required): "
+      read -r git_name
+    done
+    while [ -z "$git_email" ]; do
+      printf "  Your email (required): "
+      read -r git_email
+    done
+  elif [ -z "$git_name" ] || [ -z "$git_email" ]; then
+    echo "  ○ No terminal: edit ~/.gitconfig.local to set your git name and email."
+  fi
   # Escape special characters for sed replacement (handles / \ & |)
   _sed_escape() { printf '%s' "$1" | sed 's/[\\&|]/\\&/g'; }
   if [ -n "$git_name" ]; then

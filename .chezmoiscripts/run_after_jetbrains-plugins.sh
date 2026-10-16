@@ -58,4 +58,7 @@ if [ "$_has_jb_ide" -eq 0 ]; then
 fi
 
 echo "→ Installing recommended JetBrains plugins..."
-"$INSTALLER"
+# A failed plugin download (network, renamed plugin id) must not fail the
+# whole apply: bin/dotfiles-install treats a failed apply as critical and
+# rolls the Mac back. The installer prints which plugins failed.
+"$INSTALLER" || echo "⚠ Some JetBrains plugins did not install; rerun: $INSTALLER"

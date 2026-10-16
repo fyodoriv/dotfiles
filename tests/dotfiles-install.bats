@@ -25,7 +25,10 @@ case "$1" in
     mkdir -p "$HOME/Library/LaunchAgents"; echo plist > "$HOME/Library/LaunchAgents/com.dotfiles.sync.plist"
     [ "${DOTFILES_SKIP_MACOS_DEFAULTS:-}" = 1 ] || { defaults write com.apple.dock autohide -bool true; defaults write com.apple.finder X -bool true; }
     exit "${FAIL_APPLY:-0}" ;;
-  verify) exit "${FAIL_VERIFY:-0}" ;;
+  verify)
+    # Real chezmoi verify always fails while scripts are included.
+    [[ " $* " == *" --exclude scripts "* ]] || exit 1
+    exit "${FAIL_VERIFY:-0}" ;;
 esac'
   stub defaults 'echo "defaults $*" >> "$LOG"
 case "$1" in

@@ -1,4 +1,4 @@
-.PHONY: help lint lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
+.PHONY: e2e e2e-if-needed help lint lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
 
 .DEFAULT_GOAL := help
 
@@ -93,8 +93,20 @@ test-force: ## Run full test suite (no cache)
 	@echo "═══ Tests ($(JOBS) parallel jobs) ═══"
 	@$(FULLPOWER) bats --jobs $(JOBS) --no-parallelize-within-files tests/
 
+# ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
+e2e: ## Run the hermetic install e2e (about 40 s; E2E_FULL=1 for the whole doctor)
+	@bats tests/e2e/
+
+e2e-if-needed: ## Run the install e2e only when an installer path changed
+	@if paths=$$(./tests/e2e/needs-e2e.sh); then \
+	  echo "═══ Install e2e: triggered by ═══"; echo "$$paths" | sed 's/^/  /'; \
+	  bats tests/e2e/; \
+	else \
+	  echo "✓ Install e2e skipped (no installer path changed)"; \
+	fi
+
 # ── Check: lint + task queue lint + test ─────────────────────────────
-check: lint lint-tasks test ## Lint + task queue lint + test (run before committing)
+check: lint lint-tasks test e2e-if-needed ## Lint + task queue lint + test + install e2e when needed
 	@echo ""
 	@echo "✓ All checks passed"
 

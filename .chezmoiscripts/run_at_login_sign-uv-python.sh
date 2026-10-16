@@ -2,6 +2,14 @@
 # Back-compat wrapper — superseded by run_at_login_endpoint-bootstrap.sh.
 set -euo pipefail
 
+# The hermetic install e2e (tests/e2e/hermetic-install.sh) sets this: these
+# steps sign and link binaries inside the Homebrew prefix, outside $HOME.
+# Their own bats tests cover them.
+if [ "${DOTFILES_SKIP_ENDPOINT_HARDENING:-}" = "1" ]; then
+  echo "○ Skipping endpoint hardening (DOTFILES_SKIP_ENDPOINT_HARDENING=1)"
+  exit 0
+fi
+
 _resolve_bootstrap() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null || true)"

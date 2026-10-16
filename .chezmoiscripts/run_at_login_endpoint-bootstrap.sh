@@ -6,6 +6,14 @@
 # loops exec jq, curl, or python3.13 before adhoc-sign-bottles / link-*-shim complete.
 set -euo pipefail
 
+# The hermetic install e2e (tests/e2e/hermetic-install.sh) sets this: these
+# steps sign and link binaries inside the Homebrew prefix, outside $HOME.
+# Their own bats tests cover them.
+if [ "${DOTFILES_SKIP_ENDPOINT_HARDENING:-}" = "1" ]; then
+  echo "○ Skipping endpoint hardening (DOTFILES_SKIP_ENDPOINT_HARDENING=1)"
+  exit 0
+fi
+
 _resolve_dotfiles_bin() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd 2>/dev/null || true)"
@@ -55,7 +63,10 @@ if [ -x "$_bin_dir/dotfiles-link-grep-shim" ]; then
   "$_bin_dir/dotfiles-link-grep-shim"
 fi
 if [ -x "$_bin_dir/dotfiles-link-python-shim" ]; then
-  "$_bin_dir/dotfiles-link-python-shim"
+  # On a first install uv python is not there yet; run_after_uv-python-setup
+  # installs it and links the shim later in the same apply.
+  "$_bin_dir/dotfiles-link-python-shim" ||
+    echo "⚠ uv-managed python not installed yet — run_after_uv-python-setup links it"
 fi
 
 touch "$_ready_file"

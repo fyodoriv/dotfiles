@@ -14,6 +14,19 @@ them. -->
 
 ## P2
 
+- [ ] Endpoint hardening runs only on Macs that need it
+  - **ID**: endpoint-hardening-only-where-needed
+  - **Tags**: endpoint, homebrew, new-users, portability
+  - **Details**: `run_after_endpoint-security.sh`, `run_at_login_endpoint-bootstrap.sh`, and `run_at_login_sign-uv-python.sh` ad-hoc sign Homebrew bottles and link shims into `/opt/homebrew/bin` on every apply, on every Mac. They exist for a managed endpoint-security agent. The hermetic install e2e (2026-10-16) showed they write outside `$HOME` on a new user's Mac too. Gate them on `dotfiles_managed_endpoint` or `owner_machine`, keep today's behaviour on the owner's Macs, and drop `DOTFILES_SKIP_ENDPOINT_HARDENING` from the e2e once the gate covers it.
+  - **Files**: `.chezmoiscripts/run_after_endpoint-security.sh`, `.chezmoiscripts/run_at_login_*.sh`, `tests/e2e/hermetic-install.sh`
+  - **Output**: code
+  - **Acceptance**: the e2e passes without `DOTFILES_SKIP_ENDPOINT_HARDENING`; the owner's apply still signs bottles.
+  - **Hypothesis**: Homebrew-prefix writes during a new user's install go from about 10 to 0.
+  - **Measurement**: `make e2e` with the skip variable removed (the sandbox fails any write outside the scratch HOME).
+  - **Success**: e2e green with no skip variable.
+  - **Pivot**: if a new user does need signing (an endpoint agent detected late), detect it at apply time instead of gating up front.
+  - **Anchor**: Basili et al. 1994 (GQM); hermetic install e2e findings 2026-10-16.
+
 - [ ] A new user's agents get only general rules from the dotfiles Agentfile
   - **ID**: agentfile-rules-owner-only-split
   - **Tags**: agentbrew, rules, new-users, portability

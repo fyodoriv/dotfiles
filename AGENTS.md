@@ -18,6 +18,7 @@ only the doc the routing table names. Do not read the README end to end.
 | One test file / one test | `bats tests/<name>.bats` / `bats -f '<test name>' tests/<name>.bats` |
 | Tests affected by a committed branch | `bin/bats-affected origin/feat/chezmoi \| xargs bats` |
 | Full suite (slow; run in the background) | `make test-all` |
+| Install e2e: real chezmoi, scripts, doctor, zsh in a sandboxed scratch HOME | `make e2e` (`make check` runs it when an installer path changes) |
 | Lint only / TASKS.md only | `make lint` / `make lint-tasks` |
 | Review the task queue (truth, usefulness, priority) | `/review-tasks` (tasks.md command, installed by the Agentfile) |
 | Apply to this Mac | `dotfiles apply` (needed after `Agentfile.yaml` edits) |
@@ -103,6 +104,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
 - **Agent perf `project`** is the repo of the session start directory, not of a `cd` target. Read a cross-repo session with `--all`.
+- **Install e2e** (`tests/e2e/`): OS-changing tools (`brew`, `defaults`, `launchctl`, …) are PATH shims and `sandbox-exec` blocks the real ones, so call them by name, never by absolute path (`tests/install-e2e-guard.bats`). A script that writes outside `$HOME` fails the e2e.
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
 
 ## Delivery

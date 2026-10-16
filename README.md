@@ -899,7 +899,9 @@ it keeps Ghostty, WebStorm, and Claude Code launched from a terminal app
 the Claude desktop app's Code tab interactive. Claude Code with no such
 ancestor (launchd jobs, Remote Control) and other agent and model workers
 yield under CPU contention. Test runners that agents start (vitest, tsc,
-biome, bats) also yield, so parallel agent gates cannot starve the desktop.
+biome, bats) run at nice 10, so they yield CPU to the desktop. They stay off
+background QoS, which would confine them to efficiency cores and throttle
+their disk I/O even on an idle Mac.
 
 The `load-sampler` LaunchAgent writes load, free memory, swap, the top CPU
 processes, and CPU busy % to `~/.local/state/dotfiles/load-samples.tsv` every

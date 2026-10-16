@@ -111,15 +111,31 @@ teardown() {
   grep -q "WebStorm" "$PGREP_LOG"
 }
 
-@test "cursor-priority backgrounds test runners that agents start" {
+@test "cursor-priority lowers the priority of test runners that agents start" {
   # vitest workers are node, bats runs as bash: both need full-argv patterns.
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
   grep -q -- "-f node_modules/vitest" "$PGREP_LOG"
   grep -q -- "-f bats-core" "$PGREP_LOG"
-  grep -q -- "-x biome" "$PGREP_LOG"
+  grep -q -- "-f /biome " "$PGREP_LOG"
   grep -q -- "-f node_modules/typescript/bin/tsc" "$PGREP_LOG"
+}
+
+@test "cursor-priority renices test runners but keeps them off background QoS" {
+  # Background QoS confines work to efficiency cores and throttles its I/O,
+  # even on an idle Mac: an agentbrew gate took 2.5 h and timed out.
+  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
+  cat > "$TEST_BIN/pgrep" <<'MOCK'
+#!/bin/bash
+echo "$@" >> "${PGREP_LOG:-/dev/null}"
+case "$*" in *node_modules/vitest*) echo 777 ;; *) exit 1 ;; esac
+MOCK
+  chmod +x "$TEST_BIN/pgrep"
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  grep -q -- "10 -p 777" "$RENICE_LOG"
+  ! grep -q -- "-b -p 777" "$TASKPOLICY_LOG"
 }
 
 @test "cursor-priority queries minsky processes by pattern" {

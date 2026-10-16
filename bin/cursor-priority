@@ -59,6 +59,18 @@ set_process_background_pattern() {
   done <<< "$process_ids"
 }
 
+set_process_nice_pattern() {
+  local pattern="$1"
+  local process_ids
+  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
+  [ -z "$process_ids" ] && return
+
+  while IFS= read -r process_id; do
+    [ -z "$process_id" ] && continue
+    renice 10 -p "$process_id" >/dev/null 2>&1 || true
+  done <<< "$process_ids"
+}
+
 is_descendant_of_interactive_app() {
   local current_pid="$1"
   local depth=0
@@ -142,11 +154,12 @@ else
   set_process_background "shellcheck"
   set_process_background "parallel"
   # Test runners that agents start run as node or bash, so `pgrep -x` misses
-  # them. Eleven parallel gates froze the desktop on 2026-10-15.
-  set_process_background_pattern "node_modules/vitest"
-  set_process_background_pattern "node_modules/typescript/bin/tsc"
-  set_process_background_pattern "bats-core"
-  set_process_background "biome"
+  # them. Eleven parallel gates froze the desktop on 2026-10-15. Renice only:
+  # background QoS throttled their I/O and stretched a gate to 2.5 hours.
+  set_process_nice_pattern "node_modules/vitest"
+  set_process_nice_pattern "node_modules/typescript/bin/tsc"
+  set_process_nice_pattern "bats-core"
+  set_process_nice_pattern "/biome "
 fi
 
 log_run cursor-priority

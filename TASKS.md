@@ -14,6 +14,58 @@ them. -->
 
 ## P2
 
+- [ ] Spotlight doctor checks prove indexing is off, not only that the marker file exists
+  - **ID**: spotlight-marker-checks-verify-exclusion
+  - **Tags**: spotlight, doctor, workflow, macos, correctness
+  - **Details**: Verified on `feat/chezmoi` at 2377a45. `modules/workflow/doctor.sh:52-54` reports "`$dir` excluded from Spotlight" when `[ -f "$dir/.metadata_never_index" ]` passes. `macos.sh:66-71` and `modules/agent-browser/doctor.sh:69-71` use the same marker. On this macOS the marker did not stop indexing: worktrees under `~/apps/tooling/wt` were indexed until #83 renamed the folder to `wt.noindex`. The repo already says so in `modules/workflow/doctor.sh:57-58`, `lib/agent-worktrees-noindex.sh:6-8`, and `docs/module-reference.md:107`. But `docs/module-reference.md:106` and `docs/security-model.md:142` still promise the marker excludes 11 dev dirs. `~/apps/.metadata_never_index` exists today, so the check passes whatever Spotlight does. Fix: test real exclusion (for example `mdfind -onlyin <dir>` for a known file, or the `.noindex` rename/symlink from #83 where safe), or reword the check as "marker present" and fix the docs.
+  - **Files**: modules/workflow/doctor.sh, macos.sh, modules/agent-browser/doctor.sh, docs/module-reference.md, docs/security-model.md, tests/module-workflow.bats
+  - **Acceptance**: No doctor check prints "excluded from Spotlight" unless a probe shows the dir is out of the index. The docs match what the checks prove.
+  - **Hypothesis**: Probing the index instead of the marker file drops false "excluded" passes from 11 of 11 marker dirs to 0.
+  - **Success**: A bats fixture where the marker exists but the probe finds an indexed file makes the check fail; real excluded dirs still pass.
+  - **Pivot**: If `mdfind` is too slow or flaky for doctor (over 1 s per dir), rename the check to "marker present" and move the real probe to `/tooling-checkup`.
+  - **Measurement**: `bats tests/module-workflow.bats` plus `dotfiles doctor --module workflow` on this Mac.
+  - **Anchor**: #83 (wt.noindex rename); Apple `mdutil(1)`/`mdfind(1)`.
+  - **Competitive-goal**: reproducibility_pct — a fresh apply must give the same, real Spotlight exclusion each time, not a marker that some macOS versions ignore.
+
+- [ ] `dotfiles-doctor --quiet` names each failing check
+  - **ID**: doctor-quiet-names-failing-checks
+  - **Tags**: doctor, cli, ux
+  - **Details**: Verified on `feat/chezmoi` at 2377a45. In quiet mode `bin/dotfiles-doctor:914-917` prints only counts: `✓ $pass_count  ✗ $fail_count  ⊘ $skip_count`. Today's `dotfiles apply` showed `✓ 511 ✗ 1 ⊘ 6` with no check name. The user must re-run without `--quiet` (a 500+ check pass) to learn which check failed. Append the failing check IDs (up to about 5, then "+N more") to the quiet line.
+  - **Files**: bin/dotfiles-doctor, tests/dotfiles-doctor.bats, docs/module-reference.md
+  - **Acceptance**: `dotfiles-doctor --fix --quiet` with one failing check prints that check's ID on the summary line; the all-pass line is unchanged.
+  - **Hypothesis**: Naming failed IDs in the quiet line cuts the extra full doctor runs needed to find a failure from 1 to 0.
+  - **Success**: A bats fixture with one failing check finds its ID in quiet output.
+  - **Pivot**: If callers parse the quiet line, put the IDs on a second line instead and keep line 1 byte-identical.
+  - **Measurement**: `bats -f quiet tests/dotfiles-doctor.bats`.
+  - **Anchor**: Nielsen 1994, heuristic 9 (help users recognize and diagnose errors).
+  - **Competitive-goal**: manual_bootstrap_steps — `dotfiles doctor --fix` is step 4 of bootstrap; an unnamed ✗ adds a manual re-run.
+
+- [ ] `tests/module-upgrade.bats` sets `auto_upgrade` itself so tests 2, 3, 4, 6, 8 pass
+  - **ID**: module-upgrade-bats-auto-upgrade-fixture
+  - **Tags**: tests, upgrade, bats
+  - **Details**: Verified on `feat/chezmoi` at 2377a45: `bats tests/module-upgrade.bats` → `not ok` 2, 3, 4, 6, 8 (lines 66, 72, 78, 95, 113). Cause: `modules/upgrade/doctor.sh:13` reads `chezmoi execute-template '{{ dig "auto_upgrade" "false" . }}'` and registers `upgrade.launchagent`/`upgrade.recent` only when it is `true`. The test `setup()` sets `HOME` to a temp dir with no chezmoi config, so the value is `false` (`HOME=$(mktemp -d) chezmoi execute-template ...` → `false`) and the checks the tests count never run. So the failure does not need this Mac's data; it should fail on any machine. Not on the AGENTS.md "Known base failures" list. Fix: stub `chezmoi` on `PATH` in `setup()` (or seed `$HOME/.config/chezmoi/chezmoi.toml` with `auto_upgrade = true`), and add one test for the `false` path.
+  - **Files**: tests/module-upgrade.bats
+  - **Acceptance**: `bats tests/module-upgrade.bats` passes 11 of 11, plus a new test that both checks are skipped when `auto_upgrade` is false.
+  - **Hypothesis**: Seeding `auto_upgrade` in the test fixture takes the file from 5 failures to 0 with no doctor code change.
+  - **Success**: 0 failures in `tests/module-upgrade.bats` on two runs.
+  - **Pivot**: If the gate in `modules/upgrade/doctor.sh` is wrong, fix the gate instead of the fixture.
+  - **Measurement**: `bats tests/module-upgrade.bats`.
+  - **Anchor**: Meszaros 2007, *xUnit Test Patterns* (fresh fixture; no hidden environment dependency).
+  - **Competitive-goal**: reproducibility_pct — the suite that guards a reproducible apply must itself give the same result on every machine.
+
+- [ ] `tests/cli.bats` "dotfiles cd" passes in a worktree whose path lacks "dotfiles"
+  - **ID**: cli-bats-cd-test-path-independent
+  - **Tags**: tests, cli, bats, worktrees
+  - **Details**: Verified on `feat/chezmoi` at 2377a45. `tests/cli.bats:85-90` asserts `[[ "$output" == *"dotfiles"* ]]`. `bin/dotfiles:245-246` prints `$DOTFILES_DIR`, which is the checkout path (`bin/dotfiles:10`). In a detached worktree at `~/apps/tooling/wt/df-cdprobe` the test failed: `not ok 1 dotfiles cd prints dotfiles directory` (line 88). Fix: assert that the output equals the repo root of the test checkout (`$DOTFILES_DIR`) and that `bin/dotfiles` exists under it.
+  - **Files**: tests/cli.bats
+  - **Acceptance**: The test passes in a worktree whose path has no "dotfiles", and still fails if `dotfiles cd` prints a wrong dir.
+  - **Hypothesis**: Asserting on the real repo root instead of a path substring takes failures in non-"dotfiles" worktrees from 1 to 0.
+  - **Success**: `bats -f 'dotfiles cd prints' tests/cli.bats` passes in such a worktree.
+  - **Pivot**: None needed; if `DOTFILES_DIR` is not reliable in the test, compare with `git rev-parse --show-toplevel`.
+  - **Measurement**: `bats -f 'dotfiles cd prints' tests/cli.bats` run from `~/apps/tooling/wt/<name-without-dotfiles>`.
+  - **Anchor**: Meszaros 2007, *xUnit Test Patterns* (no test dependency on the run location).
+  - **Competitive-goal**: reproducibility_pct — gate results must not depend on the checkout path.
+
 ## P3
 
 - [ ] Replace? Relocate: update-tooling orchestration
@@ -190,3 +242,44 @@ them. -->
   - **Details**: `bin/agent-browser-singleton-preflight`, `bin/agent-browser-reap-strays`, and the safe `~/.agent-browser/{ensure,launch}-chrome.sh` compatibility wrappers are intentionally thin host-local adapters over `agent-browser --cdp` and Chrome CDP. Revisit whether this layer should be contributed upstream to agent-browser, moved into agentbrew shared browser policy tooling, or kept in dotfiles because it depends on this repo's launchd profile/port contract.
   - **Files**: bin/agent-browser-singleton-preflight, bin/agent-browser-reap-strays, private_dot_agent-browser/executable_ensure-chrome.sh, private_dot_agent-browser/executable_launch-chrome.sh, modules/agent-browser/doctor.sh
   - **Acceptance**: Document one decision: upstream PR/filed issue, relocation to agentbrew, or "keep in dotfiles" with a current reason; if relocating, add/point to the implementation task in the owning repo.
+
+- [ ] Shellcheck scans every `lib/*.sh` file, not a hand-kept list
+  - **ID**: lint-scan-all-lib-scripts
+  - **Tags**: lint, shellcheck, makefile
+  - **Details**: Verified on `feat/chezmoi` at 2377a45. `Makefile` `SCRIPTS` lists some `lib/*.sh` files by name; about two thirds of `lib/*.sh` are not linted by `make lint`. Running `shellcheck -S warning` on the unlisted files finds 4 warnings in three files: `lib/apply-defaults.sh:52,55` SC2034, `lib/heal-stuck-agents.sh:273` SC2155, `lib/workspace-discovery.sh:36` SC2088. The SC2088 hit is a false positive (the `case` pattern matches a literal `~/` on purpose); it needs a `# shellcheck disable=SC2088` with a reason. Fix: use `$(wildcard lib/*.sh)` in `SCRIPTS` and clear or annotate the 4 warnings.
+  - **Files**: Makefile, lib/apply-defaults.sh, lib/heal-stuck-agents.sh, lib/workspace-discovery.sh
+  - **Acceptance**: `make lint` lints all `lib/*.sh` files and exits 0.
+  - **Competitive-goal**: reproducibility_pct — indirect: lint catches shell bugs in the libraries every apply sources.
+
+- [ ] `upgrade.poetry_runs` gets a safe, reversible `--fix`
+  - **ID**: doctor-poetry-runs-fix
+  - **Tags**: doctor, upgrade, poetry, uv
+  - **Details**: Verified on `feat/chezmoi` at 2377a45. `modules/upgrade/doctor.sh:55-57` registers `check "upgrade.poetry_runs" ... "'$_poetry_bin' --version" ""`: the fix argument is empty, so `dotfiles doctor --fix` only prints the manual commands from the description. Add a fix that moves the old binary and `~/Library/Application Support/pypoetry/venv` aside to `*.bak` (no delete), then runs `uv tool install poetry`. Skip the fix when `uv` is missing.
+  - **Files**: modules/upgrade/doctor.sh, tests/module-upgrade.bats, docs/module-reference.md
+  - **Acceptance**: With a fake broken non-uv poetry in a fixture, `--fix` leaves `*.bak` copies and a working uv-managed `poetry`; a second run is a no-op.
+  - **Competitive-goal**: manual_bootstrap_steps — the poetry repair moves from hand-typed commands into bootstrap step 4.
+
+- [ ] Document or silence npm "failed to copy trust settings" in sandboxed agent runs
+  - **ID**: npm-trust-settings-sandbox-noise
+  - **Tags**: npm, node, agent-sandbox, docs
+  - **Details**: Checked on this Mac on 2026-10-15. The message comes only from sandboxed agent shells with `NODE_USE_SYSTEM_CA=1`. Sandboxed `npm view semver version` printed `ERROR: failed to copy trust settings of system certificate-25291` 36 times. The same command with `env -u NODE_USE_SYSTEM_CA` printed it 0 times, and an unsandboxed run printed it 0 times. `NODE_USE_SYSTEM_CA` is not set anywhere in this repo (`rg NODE_USE_SYSTEM_CA` finds nothing), so it comes from the agent host. Decide: add an AGENTS.md Gotcha ("harmless; run npm unsandboxed or unset NODE_USE_SYSTEM_CA"), or file it with the owner of the host env.
+  - **Files**: AGENTS.md
+  - **Acceptance**: One recorded decision: a Gotcha line in AGENTS.md, or a filed upstream issue linked here.
+  - **Competitive-goal**: manual_bootstrap_steps — indirect: less noise in agent npm runs; no shared metric moves.
+
+- [ ] `tests/verify-counts.bats` "count prints live stats" stops counting the whole suite
+  - **ID**: verify-counts-count-test-speed
+  - **Tags**: tests, performance, bats, makefile
+  - **Details**: Verified on `feat/chezmoi` at 2377a45. `tests/verify-counts.bats:77-82` runs `make count`. `Makefile:110` runs `bats --count tests/*.bats` over every bats file. At load1 3.4 that took 17.6 s (`/usr/bin/time -p bats --count tests/*.bats`). An agent reported about 9 minutes at high load on 2026-10-15 (the sampler shows load1 peaks of 84 today). `bin/bats-affected:234-262` adds this file for many doc and Makefile changes, so the cost lands on many affected-test runs. Fix: let the test set a small `TESTS_GLOB` (for example one fixture file) for `make count`, or count `@test` lines with `rg -c` instead of `bats --count`.
+  - **Files**: Makefile, tests/verify-counts.bats
+  - **Acceptance**: The test runs in under 2 s at low load and still checks the `Modules:` and `macOS defaults:` lines.
+  - **Competitive-goal**: noop_reapply_ms — indirect: faster local gates; no shared metric moves.
+
+- [ ] Measure `mdworker` CPU for 10 minutes after a 10-worktree session (#83 open acceptance)
+  - **ID**: spotlight-wt-noindex-mdworker-measurement
+  - **Tags**: spotlight, measurement, worktrees
+  - **Output**: measurement
+  - **Details**: #83 (714cab5) moved agent worktrees to `~/apps/tooling/wt.noindex`. Its PR body says the pre-registered 10-minute `mdworker` CPU window was not run: two forced Mac resets killed the sampler. Only a 0% spot check with 12 worktrees exists. No open task covers it (`rg -i 'mdworker|spotlight' TASKS.md` finds nothing). Run it once during a `/tooling-checkup`, with no polling loop: sample at 0, 5, and 10 minutes.
+  - **Files**: none (record the result in the next tooling-checkup report or the #83 PR)
+  - **Acceptance**: Three samples recorded with time, load1, and worktree count. Success: `mdworker` total stays under 50% CPU in all three. If not, reopen the Spotlight work with the numbers.
+  - **Competitive-goal**: reproducibility_pct — indirect: confirms the #83 apply result holds on a busy Mac.

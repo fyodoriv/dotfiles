@@ -49,7 +49,7 @@ only the doc the routing table names. Do not read the README end to end.
 
 ### Ownership boundary
 
-dotfiles owns `~/.zshrc`, `~/.zshenv`, `~/.gitconfig`, `dot_config/` files, macOS defaults, and `com.dotfiles.*` LaunchAgents. agentbrew owns `~/.claude/`, `~/.cursor/mcp.json`, and agent skills and rules (through `Agentfile.yaml`). minsky owns the orchestrator. **Never have both repos write to the same target path.** Table: [docs/repo-map.md](docs/repo-map.md#ownership-boundary).
+dotfiles owns shell, git, `dot_config/`, macOS defaults, and `com.dotfiles.*` LaunchAgents; agentbrew owns `~/.claude/`, `~/.cursor/mcp.json`, skills, and rules. **Never have both repos write to the same target path.** Table: [docs/repo-map.md](docs/repo-map.md#ownership-boundary).
 
 ## Rules
 
@@ -66,7 +66,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 6. **New modules need `modules/<name>/doctor.sh`.**
 7. **The Brewfile is inlined** in `.chezmoiscripts/run_onchange_brew.sh.tmpl`.
 8. **Agent config is managed by agentbrew.** Edit sources and run `agentbrew sync`; never hand-edit generated agent config.
-9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. **Approved-family standing approval**: in `~/apps/tooling/**` and own `github.com/<owner>/*` repos, `/ship-it` means verify, commit, push, PR, read CI, and merge when green. Verify the PR author before admin/bypass PR merges. Never plain `--force`, hook bypasses, someone else's PR, or out-of-scope publishing.
+9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. In approved-family repos `/ship-it` means verify, commit, push, PR, and merge when green; never plain `--force`, someone else's PR, or out-of-scope publishing ([full text](docs/constitution.md#rules-for-editing)).
 10. **Prefer user-dir version managers** (uv, fnm, rustup, mise); no `#!/usr/bin/env` shebangs in dotfiles executables.
 11. **P0/P1 tasks need** single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, `Anchor`.
 12. **Proactive healing**: a recurring error becomes a same-session fix or a task with its blocker.
@@ -98,13 +98,13 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
-- **npm in the sandbox** prints `failed to copy trust settings` (host sets `NODE_USE_SYSTEM_CA=1`). Harmless; run npm unsandboxed or with `env -u NODE_USE_SYSTEM_CA`.
-- **Parallel agents**: run at most 3 gate-running agents at once. Eleven froze a 10-core Mac on 2026-10-15. Check `dotfiles-load-sampler --report 1` before adding more.
+- **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
+- **Parallel agents**: at most 3 gate-running agents (11 froze a Mac on 2026-10-15); check `dotfiles-load-sampler --report 1`.
 - **`BASH_ENV` resets `DOTFILES_DIR`** to the live checkout in child `bash`. Tests that spawn `bash` without `load test_helper` must use `env -u BASH_ENV`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
 - **Agent perf `project`** is the repo of the session start directory, not of a `cd` target. Read a cross-repo session with `--all`.
-- **Install e2e** (`tests/e2e/`): OS-changing tools (`brew`, `defaults`, `launchctl`, …) are PATH shims and `sandbox-exec` blocks the real ones, so call them by name, never by absolute path (`tests/install-e2e-guard.bats`). A script that writes outside `$HOME` fails the e2e.
+- **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name, never by absolute path; writes outside `$HOME` fail it (`tests/install-e2e-guard.bats`).
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
 
 ## Delivery

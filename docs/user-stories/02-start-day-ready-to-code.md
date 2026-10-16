@@ -84,6 +84,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `dotfiles-upgrade` | Upgrade all installed software through topgrade (opt-in: `auto_upgrade: true`) | Sundays 9:00 AM |
 | `memory-sync-projects` | Ingest Claude project memory into AgentBrew shared memory | 5:30 AM daily |
 | `adhoc-sign-bottles` | Ad-hoc sign Homebrew bottles and uv Pythons so endpoint security does not flag unsigned binaries | At login + daily |
+| `load-sampler` | Append one system-load row to `~/.local/state/dotfiles/load-samples.tsv`, so a freeze leaves evidence | At login + every 30s |
 | `local-ai-warmup` | GET-only local-AI health check (never spawns model publishers) | At login + every 30 min |
 
 ## Files Involved

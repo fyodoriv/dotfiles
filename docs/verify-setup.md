@@ -10,7 +10,7 @@ One command to verify everything:
 dotfiles doctor --quiet
 ```
 
-Expected output: `✓ N passed  ⊘ M skipped` with exit code 0. If it shows failures, run `dotfiles doctor --fix` first, then re-check.
+Expected output: `✓ N passed  ⊘ M skipped` with exit code 0. On failure the line is `✓ N  ✗ F  ⊘ M  failing: <check IDs>` (up to 5 IDs, then `+N more`) with exit code 1. Run `dotfiles doctor --fix` first, then re-check.
 
 ## Step-by-Step Verification
 

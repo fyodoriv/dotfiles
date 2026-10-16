@@ -6,7 +6,7 @@
 #   dotfiles-doctor --fix        Auto-fix all issues (respects .overrides)
 #   dotfiles-doctor --fix-all    Non-interactive auto-fix (alias for --fix, for CI/scripts)
 #   dotfiles-doctor --list       List all check IDs
-#   dotfiles-doctor --quiet      One-line summary (for prompts, scripts, morning embed)
+#   dotfiles-doctor --quiet      One-line summary; names up to 5 failing check IDs
 #   dotfiles-doctor --skip ID    Add a check to .overrides (skip it permanently)
 #   dotfiles-doctor --validate-overrides  Verify all .overrides entries are valid check IDs
 #   dotfiles-doctor --severity LEVEL  Run only modules at or above LEVEL (critical|important|performance|cosmetic)
@@ -902,6 +902,26 @@ unset _agentbrew_runtime_allowed _agentbrew_runtime_path
 _doctor_timing_report
 
 # ── Summary ──────────────────────────────────────────────────────────
+# Build a top-N preview of failing check IDs so the --quiet line and the
+# notification name the actual problems instead of just a count. macOS
+# notification text truncates around 256 chars in practice; 5 IDs fits well.
+_ids_preview() {
+  local -a ids=("$@")
+  local n=${#ids[@]}
+  if (( n == 0 )); then echo ""; return; fi
+  local top=("${ids[@]:0:5}")
+  # "${arr[*]}" with IFS uses only the first IFS character, so build
+  # ", "-separated output via printf and trim the trailing separator.
+  local joined
+  joined=$(printf '%s, ' "${top[@]}")
+  joined="${joined%, }"
+  if (( n > 5 )); then
+    echo "${joined} +$((n - 5)) more"
+  else
+    echo "${joined}"
+  fi
+}
+
 if $JSON_MODE; then
   # Output JSON array
   printf "["
@@ -913,7 +933,8 @@ if $JSON_MODE; then
   if (( fail_count > 0 )); then exit 1; else exit 0; fi
 elif $QUIET_MODE; then
   if (( fail_count > 0 )); then
-    echo -e "${GREEN}✓ $pass_count${NC}  ${RED}✗ $fail_count${NC}  ${DIM}⊘ $skip_count${NC}"
+    _quiet_ids=$(_ids_preview "${failed_check_ids[@]+"${failed_check_ids[@]}"}")
+    echo -e "${GREEN}✓ $pass_count${NC}  ${RED}✗ $fail_count${NC}  ${DIM}⊘ $skip_count${NC}${_quiet_ids:+  failing: $_quiet_ids}"
     exit 1
   else
     echo -e "${GREEN}✓ $pass_count passed${NC}  ${DIM}⊘ $skip_count skipped${NC}"
@@ -973,26 +994,6 @@ elif ! $LIST_MODE; then
   # Log detailed doctor run for trend tracking
   local_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1}" >> "$DOCTOR_TRENDS_FILE"
-
-  # Build a top-N preview of failing check IDs so the notification names
-  # the actual problems instead of just a count. macOS notification text
-  # truncates around 256 chars in practice; 5 IDs fits well.
-  _ids_preview() {
-    local -a ids=("$@")
-    local n=${#ids[@]}
-    if (( n == 0 )); then echo ""; return; fi
-    local top=("${ids[@]:0:5}")
-    # "${arr[*]}" with IFS uses only the first IFS character, so build
-    # ", "-separated output via printf and trim the trailing separator.
-    local joined
-    joined=$(printf '%s, ' "${top[@]}")
-    joined="${joined%, }"
-    if (( n > 5 )); then
-      echo "${joined} +$((n - 5)) more"
-    else
-      echo "${joined}"
-    fi
-  }
 
   if (( fail_count > 0 )); then
     _fail_preview=$(_ids_preview "${failed_check_ids[@]+"${failed_check_ids[@]}"}")

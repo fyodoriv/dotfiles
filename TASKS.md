@@ -27,19 +27,6 @@ them. -->
   - **Anchor**: #83 (wt.noindex rename); Apple `mdutil(1)`/`mdfind(1)`.
   - **Competitive-goal**: reproducibility_pct — a fresh apply must give the same, real Spotlight exclusion each time, not a marker that some macOS versions ignore.
 
-- [ ] `dotfiles-doctor --quiet` names each failing check
-  - **ID**: doctor-quiet-names-failing-checks
-  - **Tags**: doctor, cli, ux
-  - **Details**: Verified on `feat/chezmoi` at 2377a45. In quiet mode `bin/dotfiles-doctor:914-917` prints only counts: `✓ $pass_count  ✗ $fail_count  ⊘ $skip_count`. Today's `dotfiles apply` showed `✓ 511 ✗ 1 ⊘ 6` with no check name. The user must re-run without `--quiet` (a 500+ check pass) to learn which check failed. Append the failing check IDs (up to about 5, then "+N more") to the quiet line.
-  - **Files**: bin/dotfiles-doctor, tests/dotfiles-doctor.bats, docs/module-reference.md
-  - **Acceptance**: `dotfiles-doctor --fix --quiet` with one failing check prints that check's ID on the summary line; the all-pass line is unchanged.
-  - **Hypothesis**: Naming failed IDs in the quiet line cuts the extra full doctor runs needed to find a failure from 1 to 0.
-  - **Success**: A bats fixture with one failing check finds its ID in quiet output.
-  - **Pivot**: If callers parse the quiet line, put the IDs on a second line instead and keep line 1 byte-identical.
-  - **Measurement**: `bats -f quiet tests/dotfiles-doctor.bats`.
-  - **Anchor**: Nielsen 1994, heuristic 9 (help users recognize and diagnose errors).
-  - **Competitive-goal**: manual_bootstrap_steps — `dotfiles doctor --fix` is step 4 of bootstrap; an unnamed ✗ adds a manual re-run.
-
 ## P3
 
 - [ ] Agent time review suggests a speedup task only for steps that recur across sessions

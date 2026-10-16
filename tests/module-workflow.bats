@@ -15,6 +15,19 @@ setup() {
 
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/spotlight-probe.sh" "$TEST_DOTFILES/lib/"
+  # Stub mdls: report an item as indexed when its path is listed in
+  # $MDLS_INDEXED_FILE, else "(null)" (not in the Spotlight index).
+  MDLS_INDEXED_FILE="$TEST_DIR/mdls-indexed"
+  : > "$MDLS_INDEXED_FILE"
+  cat > "$TEST_DIR/mdls" <<STUB
+#!/bin/bash
+path="\${!#}"
+if grep -qxF "\$path" "$MDLS_INDEXED_FILE"; then printf '%s' "\$(basename "\$path")"; else printf '(null)'; fi
+STUB
+  chmod +x "$TEST_DIR/mdls"
+  export DOTFILES_MDLS_BIN="$TEST_DIR/mdls"
   # Unset DOTFILES_REPOS_DIR so the module falls back to $HOME/apps
   # (= $TEST_HOME/apps). Otherwise the parent env's repos dir leaks in.
   unset DOTFILES_REPOS_DIR
@@ -119,6 +132,37 @@ PLIST
   touch "$TEST_HOME/apps/.metadata_never_index"
   source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
   [ "$pass_count" -ge 1 ]
+}
+
+@test "workflow: spotlight check fails when the marker exists but the dir is indexed" {
+  mkdir -p "$TEST_HOME/apps/project"
+  touch "$TEST_HOME/apps/.metadata_never_index"
+  echo "$TEST_HOME/apps/project" > "$MDLS_INDEXED_FILE"
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  printf '%s\n' "${failed_descs[@]}" | grep -F "$TEST_HOME/apps out of the Spotlight index" | grep -qF "Search Privacy"
+}
+
+@test "workflow: spotlight check passes when the marker exists and the probe finds nothing indexed" {
+  mkdir -p "$TEST_HOME/apps/project"
+  touch "$TEST_HOME/apps/.metadata_never_index"
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  ! printf '%s\n' "${failed_descs[@]}" | grep -qF "Spotlight"
+}
+
+@test "workflow: spotlight check fails without the marker even when nothing is indexed" {
+  mkdir -p "$TEST_HOME/apps/project"
+  failed_descs=()
+  fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  printf '%s\n' "${failed_descs[@]}" | grep -qF "$TEST_HOME/apps out of the Spotlight index"
+}
+
+@test "workflow: no spotlight check prints 'excluded from Spotlight'" {
+  ! grep -n "excluded from Spotlight" "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh" "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
 }
 
 @test "workflow: spotlight fix creates metadata_never_index" {

@@ -45,13 +45,18 @@ for plist in "$HOME"/Library/LaunchAgents/com.dotfiles.*.plist; do
   check "$agent_id" "$agent_desc" "$agent_test" "$agent_fix"
 done
 
-# Spotlight exclusions
+# Spotlight exclusions. The marker alone proves nothing: some macOS versions
+# index a marked dir anyway, so the check also probes the index
+# (lib/spotlight-probe.sh). The fix writes the marker; when Spotlight still
+# indexes the dir, the fix fails and the description names the manual step.
+# shellcheck source=../../lib/spotlight-probe.sh
+source "$DOTFILES_DIR/lib/spotlight-probe.sh"
 for dir in "${DOTFILES_REPOS_DIR:-$HOME/apps}" "$HOME/.nvm" "$HOME/.gradle" "$HOME/.cache" "$HOME/.npm" "$HOME/.yarn" "$HOME/.docker" "$HOME/.pyenv" "$HOME/.local" "$HOME/.config" "$HOME/Library/Caches"; do
   [ ! -d "$dir" ] && continue
   local_name="$(basename "$dir")"
-  check "spotlight.$local_name" "$dir excluded from Spotlight" \
-    "[ -f '$dir/.metadata_never_index' ]" \
-    "touch '$dir/.metadata_never_index' 2>/dev/null"
+  check "spotlight.$local_name" "$dir out of the Spotlight index (if still indexed: System Settings → Spotlight → Search Privacy)" \
+    "[ -f '$dir/.metadata_never_index' ] && spotlight_dir_unindexed '$dir'" \
+    "touch '$dir/.metadata_never_index' 2>/dev/null && source '$DOTFILES_DIR/lib/spotlight-probe.sh' && spotlight_dir_unindexed '$dir'"
 done
 
 # Agent worktrees: a `.metadata_never_index` marker does not stop Spotlight

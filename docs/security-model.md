@@ -139,7 +139,7 @@ Enterprise environments with VPN or web proxy may affect:
 - **Performance**: animations disabled, Dock autohide instant, App Nap off
 - **Keyboard**: fastest key repeat, no auto-correct/smart-quotes/dashes
 - **Finder**: show hidden files, path bar, status bar, all extensions, column view
-- **Spotlight**: result categories limited to files/contacts/calendar, plus `.metadata_never_index` in dev directories (`~/apps`, `~/.cache`, `node_modules`, etc.)
+- **Spotlight**: result categories limited to files/contacts/calendar, plus `.metadata_never_index` markers in dev directories (`~/apps`, `~/.cache`, `node_modules`, etc.). Some macOS versions ignore the marker, so `dotfiles doctor` probes the index too (see [module-reference.md](module-reference.md)).
 - **Power**: AC high-performance mode, 15-minute display sleep/lock on AC and battery (via `sudo pmset`)
 - **Screenshots**: Desktop location, PNG format, no shadow
 - **Privacy**: Siri disabled, analytics opt-out, AirPlay off

@@ -66,9 +66,12 @@ check "agent-browser.tooling_theme" "tooling Chrome themed PURPLE (port 9225)" \
   "jq -e '.browser.theme.user_color2 == -6543440' \"\$HOME/.agent-browser/tooling-profile/Default/Preferences\" >/dev/null 2>&1" \
   "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9225"
 
-check "agent-browser.spotlight_excluded" "agent-browser dir excluded from Spotlight" \
-  "[ -f \"\$HOME/.agent-browser/.metadata_never_index\" ]" \
-  "touch \"\$HOME/.agent-browser/.metadata_never_index\" 2>/dev/null"
+# The marker alone proves nothing; also probe the index (lib/spotlight-probe.sh).
+# shellcheck source=../../lib/spotlight-probe.sh
+source "$DOTFILES_DIR/lib/spotlight-probe.sh"
+check "agent-browser.spotlight_excluded" "agent-browser dir out of the Spotlight index (marker + index probe)" \
+  "[ -f \"\$HOME/.agent-browser/.metadata_never_index\" ] && spotlight_dir_unindexed \"\$HOME/.agent-browser\"" \
+  "touch \"\$HOME/.agent-browser/.metadata_never_index\" 2>/dev/null && source '$DOTFILES_DIR/lib/spotlight-probe.sh' && spotlight_dir_unindexed \"\$HOME/.agent-browser\""
 
 # Search both zshrc and zshrc.ai-tools so the check matches reality —
 # AGENT_BROWSER_* exports live in zshrc.ai-tools (opt-in via use_ai_tools),

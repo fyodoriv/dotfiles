@@ -81,6 +81,11 @@ HELPER
   mkdir -p "$TEST_DOTFILES/lib"
   cp "$BATS_TEST_DIRNAME/../lib/agent-browser-session-env.sh" "$TEST_DOTFILES/lib/"
   cp "$BATS_TEST_DIRNAME/../lib/focus-steal-audit.sh" "$TEST_DOTFILES/lib/"
+  cp "$BATS_TEST_DIRNAME/../lib/spotlight-probe.sh" "$TEST_DOTFILES/lib/"
+  # Stub mdls: nothing is in the Spotlight index.
+  printf '#!/bin/bash\nprintf "(null)"\n' > "$TEST_DIR/mdls-null"
+  chmod +x "$TEST_DIR/mdls-null"
+  export DOTFILES_MDLS_BIN="$TEST_DIR/mdls-null"
   mkdir -p "$TEST_DOTFILES/dot_config/dotfiles"
   cp "$BATS_TEST_DIRNAME/../dot_config/dotfiles/env.sh.tmpl" "$TEST_DOTFILES/dot_config/dotfiles/"
   cp "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl" "$TEST_DOTFILES/launchagents/"

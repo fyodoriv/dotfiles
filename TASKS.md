@@ -14,19 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] Spotlight doctor checks prove indexing is off, not only that the marker file exists
-  - **ID**: spotlight-marker-checks-verify-exclusion
-  - **Tags**: spotlight, doctor, workflow, macos, correctness
-  - **Details**: Verified on `feat/chezmoi` at 2377a45. `modules/workflow/doctor.sh:52-54` reports "`$dir` excluded from Spotlight" when `[ -f "$dir/.metadata_never_index" ]` passes. `macos.sh:66-71` and `modules/agent-browser/doctor.sh:69-71` use the same marker. On this macOS the marker did not stop indexing: worktrees under `~/apps/tooling/wt` were indexed until #83 renamed the folder to `wt.noindex`. The repo already says so in `modules/workflow/doctor.sh:57-58`, `lib/agent-worktrees-noindex.sh:6-8`, and `docs/module-reference.md:107`. But `docs/module-reference.md:106` and `docs/security-model.md:142` still promise the marker excludes 11 dev dirs. `~/apps/.metadata_never_index` exists today, so the check passes whatever Spotlight does. Fix: test real exclusion (for example `mdfind -onlyin <dir>` for a known file, or the `.noindex` rename/symlink from #83 where safe), or reword the check as "marker present" and fix the docs.
-  - **Files**: modules/workflow/doctor.sh, macos.sh, modules/agent-browser/doctor.sh, docs/module-reference.md, docs/security-model.md, tests/module-workflow.bats
-  - **Acceptance**: No doctor check prints "excluded from Spotlight" unless a probe shows the dir is out of the index. The docs match what the checks prove.
-  - **Hypothesis**: Probing the index instead of the marker file drops false "excluded" passes from 11 of 11 marker dirs to 0.
-  - **Success**: A bats fixture where the marker exists but the probe finds an indexed file makes the check fail; real excluded dirs still pass.
-  - **Pivot**: If `mdfind` is too slow or flaky for doctor (over 1 s per dir), rename the check to "marker present" and move the real probe to `/tooling-checkup`.
-  - **Measurement**: `bats tests/module-workflow.bats` plus `dotfiles doctor --module workflow` on this Mac.
-  - **Anchor**: #83 (wt.noindex rename); Apple `mdutil(1)`/`mdfind(1)`.
-  - **Competitive-goal**: reproducibility_pct — a fresh apply must give the same, real Spotlight exclusion each time, not a marker that some macOS versions ignore.
-
 ## P3
 
 - [ ] Agent time review suggests a speedup task only for steps that recur across sessions

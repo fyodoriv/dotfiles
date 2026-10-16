@@ -103,7 +103,7 @@ unverifiable scans are always repeated.
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `agent.*` | All deployed `com.dotfiles.*` LaunchAgents loaded | `launchctl load` |
-| `spotlight.*` (11 dirs) | Dev directories excluded from Spotlight indexing (`~/apps`, `~/.cache`, `~/.npm`, `~/.yarn`, `~/.docker`, `~/.pyenv`, `~/.local`, `~/.config`, `~/Library/Caches`, etc.) | `touch .metadata_never_index` |
+| `spotlight.*` (11 dirs) | Dev directories (`~/apps`, `~/.cache`, `~/.npm`, `~/.yarn`, `~/.docker`, `~/.pyenv`, `~/.local`, `~/.config`, `~/Library/Caches`, etc.) have a `.metadata_never_index` marker **and** are out of the Spotlight index. The marker alone is not proof: on macOS 27, `~/apps` has it and is still indexed. The probe (`lib/spotlight-probe.sh`) runs `mdls -name _kMDItemFileName` on up to 3 direct children; `(null)` means not indexed. | `touch .metadata_never_index`. If the probe still finds an indexed item, the fix fails: add the dir in System Settings → Spotlight → Search Privacy. |
 | `spotlight.agent_worktrees` | `~/apps/tooling/wt` is a symlink to `wt.noindex`. Spotlight skips a `.noindex` folder; it ignores the `.metadata_never_index` marker there. Runs only when `~/apps/tooling` exists. | Rename `wt` to `wt.noindex` and link `wt` to it. Existing worktree paths keep working. |
 
 Spotlight check count varies based on which directories exist on your machine.
@@ -243,7 +243,7 @@ behavioral bootstrap, schema, and backup health.
 | `agent-browser.dashboard_theme` | dashboard Chrome themed BLUE (port 9223) | `dotfiles-set-persistent-chrome-themes 9223` |
 | `agent-browser.debug_chrome_theme` | debug Chrome themed ORANGE (port 9224) | `dotfiles-set-persistent-chrome-themes 9224` |
 | `agent-browser.tooling_theme` | tooling Chrome themed PURPLE (port 9225) | `dotfiles-set-persistent-chrome-themes 9225` |
-| `agent-browser.spotlight_excluded` | agent-browser dir excluded from Spotlight | `touch .metadata_never_index` |
+| `agent-browser.spotlight_excluded` | `~/.agent-browser` has the marker and the index probe finds no indexed child | `touch .metadata_never_index` |
 | `agent-browser.idle_timeout` | Idle timeout env var configured | None |
 | `agent-browser.env_timeout` | Default timeout env var configured | None |
 | `agent-browser.cdp_wrapper` | shell wrapper auto-uses `--cdp 9223` for default and dotfiles-assigned agent sessions | None |

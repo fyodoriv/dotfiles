@@ -164,8 +164,16 @@ second; it reads files the LaunchAgents already wrote):
 python3 <skill-dir>/scripts/machine_metrics.py --hours 24
 ```
 
-Add `--lag-reported` when the user mentions slow typing. Each line has a
-verdict:
+Add `--lag-reported` when the user mentions slow typing.
+
+Overload that a known heavy foreground app explains (default: `GeForceNOW`
+game streaming) is counted apart as `load_overload_rows_explained` and is
+never `act`. A row counts as explained when a listed app is in its top 3
+processes. `DOTFILES_EXPLAINED_LOAD` (comma or space separated) replaces the
+default list; `~/.config/dotfiles/explained-load` (one name per line) adds to
+it. `load_overload_rows` counts only the unexplained rows.
+
+Each line has a verdict:
 
 | Verdict | Do this |
 |---|---|

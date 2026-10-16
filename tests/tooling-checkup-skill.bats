@@ -399,7 +399,7 @@ JS
   local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
   : > "$samples"
   for i in $(seq 0 11); do
-    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tGeForceNOW:90.1 WindowServer:40.2 mds:10.0\t90\n' \
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tnode:90.1 WindowServer:40.2 mds:10.0\t90\n' \
       "$((now - 3600 + i * 30))" "$i" >> "$samples"
   done
   printf '%s\t2026-10-16T09:00:00\t3.0\t3.0\t3.0\t10\t60\t1200\t800\tclaude:5.0\t10\n' "$now" >> "$samples"
@@ -409,11 +409,51 @@ JS
   run python3 "$SCRIPTS/machine_metrics.py" --now "$now" --samples "$samples" --ps-file "$ps_file" \
     --state "$TEST_DIR/state.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"act     load_overload_rows"*" 12 "*"GeForceNOW x12"* ]]
+  [[ "$output" == *"act     load_overload_rows "*" 12 "*"node x12"* ]]
+  [[ "$output" == *"ok      load_overload_rows_explained"*" 0 "* ]]
   [[ "$output" == *"claude_sessions"*" 1 "* ]]
   [[ "$output" == *"ok      claude_background_pri"*" 0 "* ]]
   [[ "$output" == *"latency-check: skip (no trigger)"* ]]
   [[ "$output" == *"--metric machine_overload_rows_24h=12"* ]]
+}
+
+@test "machine metrics count overload explained by a known app apart, without act" {
+  local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
+  : > "$samples"
+  # 12 rows led by GeForceNOW, 2 led by WindowServer with GeForceNOW second,
+  # 3 unexplained rows led by node.
+  for i in $(seq 0 11); do
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tGeForceNOW:90.1 WindowServer:40.2 mds:10.0\t90\n' \
+      "$((now - 3600 + i * 30))" "$i" >> "$samples"
+  done
+  for i in 12 13; do
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tWindowServer:40.2 GeForceNOW:30.1 mds:10.0\t90\n' \
+      "$((now - 3600 + i * 30))" "$i" >> "$samples"
+  done
+  for i in 14 15 16; do
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tnode:90.1 git:20.0\t90\n' \
+      "$((now - 3600 + i * 30))" "$i" >> "$samples"
+  done
+  printf '  PID PRI TTY      COMM\n' > "$ps_file"
+  local common=(--now "$now" --samples "$samples" --ps-file "$ps_file" --state "$TEST_DIR/none.json"
+    --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log" --explained-file "$TEST_DIR/none.txt")
+
+  run env -u DOTFILES_EXPLAINED_LOAD python3 "$SCRIPTS/machine_metrics.py" "${common[@]}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"warn    load_overload_rows "*" 3 "*"node x3"* ]]
+  [[ "$output" == *"warn    load_overload_rows_explained"*" 14 "*"GeForceNOW x14"* ]]
+  [[ "$output" == *"--metric machine_overload_rows_24h=3"* ]]
+  [[ "$output" == *"--metric machine_overload_rows_explained_24h=14"* ]]
+
+  # An empty env list turns the default off: all 17 rows are unexplained.
+  run env DOTFILES_EXPLAINED_LOAD= python3 "$SCRIPTS/machine_metrics.py" "${common[@]}"
+  [[ "$output" == *"act     load_overload_rows "*" 17 "* ]]
+
+  # The file adds names to the list.
+  printf '# streaming and builds\nnode\n' > "$TEST_DIR/explained.txt"
+  run env -u DOTFILES_EXPLAINED_LOAD python3 "$SCRIPTS/machine_metrics.py" "${common[@]}" --explained-file "$TEST_DIR/explained.txt"
+  [[ "$output" == *"ok      load_overload_rows "*" 0 "* ]]
+  [[ "$output" == *"load_overload_rows_explained"*" 17 "* ]]
 }
 
 @test "machine metrics trigger the echo test for a PRI 4 terminal session or reported lag" {

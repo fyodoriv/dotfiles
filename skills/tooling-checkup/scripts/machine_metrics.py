@@ -28,7 +28,15 @@ DEFAULTS = {
     "upgrade_log": HOME / ".local/share/dotfiles/logs/dotfiles-upgrade.log",
     "state": HOME / ".local/state/tooling-checkup/last-run.json",
     "claude_json": HOME / ".claude.json",
+    "explained_file": HOME / ".config/dotfiles/explained-load",
 }
+
+# Known heavy foreground apps that explain overload on purpose (for example
+# game streaming). An overload row with one of them in its top 3 processes is
+# "explained": it is counted apart and never gets the `act` verdict.
+# DOTFILES_EXPLAINED_LOAD (comma or space separated) replaces this default;
+# ~/.config/dotfiles/explained-load (one name per line, # comments) adds to it.
+EXPLAINED_LOAD_DEFAULT = ("GeForceNOW",)
 
 # Thresholds. Overload means load1 above twice the core count.
 OVERLOAD_FACTOR = 2
@@ -80,7 +88,29 @@ def load_samples(path, hours, now):
     return rows
 
 
-def sampler_metrics(rows):
+def explained_leaders(path):
+    env = os.environ.get("DOTFILES_EXPLAINED_LOAD")
+    names = set(re.split(r"[,\s]+", env.strip())) - {""} if env is not None else set(EXPLAINED_LOAD_DEFAULT)
+    try:
+        for line in Path(path).read_text().splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                names.add(line)
+    except OSError:
+        pass
+    return names
+
+
+def top_names(row):
+    return [item.rsplit(":", 1)[0] for item in row["top"].split()]
+
+
+def offender_summary(rows):
+    offenders = Counter(name for r in rows for name in top_names(r))
+    return ", ".join(f"{name} x{n}" for name, n in offenders.most_common(3)) or "none"
+
+
+def sampler_metrics(rows, explained=frozenset()):
     out = []
     if not rows:
         out.append(("load_overload_rows", None, "unknown", "no load samples; is com.dotfiles.load-sampler loaded?"))
@@ -88,14 +118,15 @@ def sampler_metrics(rows):
     cpus = rows[-1]["cpus"] or 1
     peak = max(rows, key=lambda r: r["load1"])
     over = [r for r in rows if r["load1"] > OVERLOAD_FACTOR * cpus]
-    offenders = Counter()
-    for r in over:
-        for item in r["top"].split():
-            offenders[item.rsplit(":", 1)[0]] += 1
-    lead = ", ".join(f"{name} x{n}" for name, n in offenders.most_common(3)) or "none"
-    v = "act" if len(over) >= OVERLOAD_ACT_ROWS else "warn" if over else "ok"
-    out.append(("load_overload_rows", len(over), v,
-                f"load1 > {OVERLOAD_FACTOR * cpus}; peak {peak['load1']:.1f} at {peak['time']}; top in overload: {lead}"))
+    known = [r for r in over if explained.intersection(top_names(r))]
+    unknown = [r for r in over if not explained.intersection(top_names(r))]
+    v = "act" if len(unknown) >= OVERLOAD_ACT_ROWS else "warn" if unknown else "ok"
+    out.append(("load_overload_rows", len(unknown), v,
+                f"load1 > {OVERLOAD_FACTOR * cpus}, not explained; peak {peak['load1']:.1f} at {peak['time']}; "
+                f"top in overload: {offender_summary(unknown)}"))
+    out.append(("load_overload_rows_explained", len(known), "warn" if known else "ok",
+                f"overload with an explained app in the top 3 ({', '.join(sorted(explained)) or 'none listed'}); "
+                f"top: {offender_summary(known)}"))
     min_free = min(r["free"] for r in rows)
     out.append(("free_mem_min_pct", min_free, verdict(min_free, FREE_MEM_WARN, FREE_MEM_ACT, False), "lowest free memory"))
     max_swap = max(r["swap"] for r in rows)
@@ -177,6 +208,8 @@ def main():
     ap.add_argument("--upgrade-log", default=DEFAULTS["upgrade_log"])
     ap.add_argument("--state", default=DEFAULTS["state"])
     ap.add_argument("--claude-json", default=DEFAULTS["claude_json"])
+    ap.add_argument("--explained-file", default=DEFAULTS["explained_file"],
+                    help="extra explained-load process names, one per line")
     ap.add_argument("--ps-file", help="saved `ps -axo pid,pri,tty,comm` output (tests)")
     ap.add_argument("--now", type=int, help="epoch to use as now (tests)")
     ap.add_argument("--lag-reported", action="store_true", help="the user reported typing lag")
@@ -193,7 +226,8 @@ def main():
     else:
         ps_text = subprocess.run(["ps", "-axo", "pid,pri,tty,comm"], capture_output=True, text=True).stdout
 
-    metrics, extra = sampler_metrics(load_samples(args.samples, args.hours, now))
+    metrics, extra = sampler_metrics(load_samples(args.samples, args.hours, now),
+                                     explained_leaders(args.explained_file))
     metrics.append(disk_metric())
     metrics.append(upgrade_metric(args.upgrade_log))
     cm, triggers, sessions = claude_metrics(ps_text, args.claude_json, state)
@@ -203,6 +237,7 @@ def main():
 
     record = {
         "machine_overload_rows_24h": next(m[1] for m in metrics if m[0] == "load_overload_rows"),
+        "machine_overload_rows_explained_24h": next((m[1] for m in metrics if m[0] == "load_overload_rows_explained"), None),
         "machine_peak_load1_24h": extra.get("peak_load1"),
         "claude_sessions": sessions,
     }

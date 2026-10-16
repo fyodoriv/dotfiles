@@ -1,0 +1,42 @@
+#!/bin/bash
+# dotfiles-contribute — open a PR from your dotfiles (or agentbrew) branch
+# back to the upstream repo, forking it to your GitHub account when you lack
+# push access. A thin wrapper: `agentbrew contribute` does the work.
+#
+# Usage:
+#   dotfiles contribute [--repo dotfiles|agentbrew|<path>] [agentbrew contribute flags]
+#
+# Flags:
+#   --repo NAME   Which checkout to open the PR from (default: dotfiles).
+#                 `agentbrew` uses the agentbrew clone dotfiles found.
+#   --dry-run     Print the git and gh steps without running them.
+#   --help, -h    Print this message.
+# Every other flag (--title, --body-file, --base, --draft) passes through.
+set -euo pipefail
+
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
+
+repo="dotfiles"
+args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo) repo="${2:-}"; shift 2 ;;
+    --repo=*) repo="${1#--repo=}"; shift ;;
+    --help|-h) sed -n '2,15p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+
+case "$repo" in
+  dotfiles) dir="$DOTFILES_DIR" ;;
+  agentbrew)
+    # shellcheck source=../lib/agentbrew-locate.sh
+    source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+    dir="$(agentbrew_locate)" || { echo "dotfiles contribute: no agentbrew clone found (clone github.com/fyodoriv/agentbrew under ~/apps)" >&2; exit 1; }
+    ;;
+  *) dir="$repo" ;;
+esac
+[ -d "$dir" ] || { echo "dotfiles contribute: $dir is not a folder" >&2; exit 1; }
+
+cd "$dir"
+exec "${DOTFILES_AGENTBREW_BIN:-$DOTFILES_DIR/bin/agentbrew}" contribute ${args[@]+"${args[@]}"}

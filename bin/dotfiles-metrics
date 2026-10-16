@@ -1,0 +1,62 @@
+#!/bin/bash
+# dotfiles-metrics — one local report of how the tooling behaves on this Mac:
+# agent tool time, hook blocks and MCP health (from `agentbrew metrics`), plus
+# machine load (dotfiles-load-sampler) and automation runs (dotfiles-stats).
+# Nothing is uploaded.
+#
+# Usage:
+#   dotfiles metrics [--days N] [--share FILE]
+#
+# Flags:
+#   --days N      Window in days (default: 7).
+#   --share FILE  Write an aggregate-only Markdown snapshot to FILE, to attach
+#                 to an issue or PR. No project names, paths, or prompts.
+#   --help, -h    Print this message.
+set -euo pipefail
+
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
+AGENTBREW="${DOTFILES_AGENTBREW_BIN:-$DOTFILES_DIR/bin/agentbrew}"
+SAMPLER="${DOTFILES_LOAD_SAMPLER_BIN:-$DOTFILES_DIR/bin/dotfiles-load-sampler}"
+
+days=7
+share=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --days) days="${2:-7}"; shift 2 ;;
+    --share) share="${2:-}"; [ -n "$share" ] || { echo "dotfiles metrics: --share needs a file" >&2; exit 2; }; shift 2 ;;
+    --help|-h) sed -n '2,15p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    *) echo "dotfiles metrics: unknown flag $1" >&2; exit 2 ;;
+  esac
+done
+case "$days" in '' | *[!0-9]*) echo "dotfiles metrics: --days needs a number" >&2; exit 2 ;; esac
+hours=$((days * 24))
+
+# The full load report names the top processes; the shared one keeps only
+# the numeric lines.
+load_report() {
+  [ -x "$SAMPLER" ] || { echo "no load samples (dotfiles-load-sampler missing)"; return; }
+  "$SAMPLER" --report "$hours" 2>/dev/null || echo "no load samples yet"
+}
+load_summary() {
+  load_report | grep -E '^(last|overload|peak CPU|no load)' || true
+}
+
+if [ -n "$share" ]; then
+  {
+    if "$AGENTBREW" metrics --days "$days" --share 2>/dev/null | sed -n '/^## agentbrew metrics/,$p'; then :; fi
+    printf '\n### Machine load (%s days)\n\n' "$days"
+    load_summary | sed 's/^/- /'
+  } > "$share"
+  echo "Wrote $share. Review it, then attach it to an issue or PR."
+  exit 0
+fi
+
+if ! "$AGENTBREW" metrics --days "$days" 2>/dev/null | grep -v '^⚡'; then
+  echo "agentbrew metrics: not available (install agentbrew to see agent time and hooks)"
+fi
+printf '\nMachine load (last %s days)\n' "$days"
+load_report | sed 's/^/  /'
+if [ -x "$DOTFILES_DIR/bin/dotfiles-stats" ]; then
+  printf '\nAutomation runs\n'
+  bash "$DOTFILES_DIR/bin/dotfiles-stats" 2>/dev/null | sed -n '/Last 7 days/p' | sed 's/^ */  /'
+fi

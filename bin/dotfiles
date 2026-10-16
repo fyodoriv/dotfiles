@@ -83,6 +83,8 @@ Advanced:
   managed                      List all managed files
   status                       Show git status of dotfiles repo
   stats                        Show automation stats (runs, time saved, streak)
+  metrics [--share FILE]       Agent time, hook blocks, MCP health, machine load
+  contribute [--repo agentbrew] Open a PR upstream from your branch (forks for you)
   cheat                        Show all available commands and aliases
   edit                         Open the dotfiles repo in your editor
   cd                           Print the dotfiles directory (use: cd \$(dotfiles cd))
@@ -267,6 +269,16 @@ case "$cmd" in
   stats)
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-stats" "$@"
+    ;;
+
+  metrics)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-metrics" "$@"
+    ;;
+
+  contribute)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-contribute" "$@"
     ;;
 
   cheat)

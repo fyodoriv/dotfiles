@@ -367,6 +367,22 @@ Chezmoi runs lifecycle scripts in order:
 - [ ] Test with `core` profile on a clean machine
 - [ ] Share with the team
 
+## Send a fix back upstream
+
+You can open a PR to `fyodoriv/dotfiles` or `fyodoriv/agentbrew` from your own Mac without push access. You need the GitHub CLI signed in (`gh auth login`).
+
+```bash
+cd ~/apps/dotfiles
+git switch -c fix/short-name
+# edit, then: make check
+git commit -m "fix: what changed"
+dotfiles contribute --dry-run         # prints each git and gh step
+dotfiles contribute                   # forks, pushes to your fork, opens the PR
+dotfiles contribute --repo agentbrew  # same, from your agentbrew clone
+```
+
+To show the maintainer how the tooling behaves on your machine, attach the output of `dotfiles metrics --share metrics.md`. It holds only aggregates: no project names, paths, prompts, or process names. Nothing is uploaded unless you attach it.
+
 ## Further reading
 
 - [README.md](../README.md) — full feature overview

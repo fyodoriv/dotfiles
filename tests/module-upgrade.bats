@@ -183,3 +183,73 @@ _uv_stub() {  # `uv tool dir` prints $TEST_DIR/uv-tools
   source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
   ! printf '%s\n' "${failed_descs[@]}" | grep -qF "poetry"
 }
+
+# ── upgrade.poetry_runs --fix ────────────────────────────────────────
+# uv stub: `tool dir` prints $TEST_DIR/uv-tools; `tool install poetry`
+# makes a working uv-managed poetry and links it into ~/.local/bin.
+_uv_install_stub() {
+  mkdir -p "$TEST_DIR/stubbin"
+  cat > "$TEST_DIR/stubbin/uv" <<STUB
+#!/bin/bash
+if [ "\$1 \$2" = "tool dir" ]; then echo "$TEST_DIR/uv-tools"; exit 0; fi
+if [ "\$1 \$2 \$3" = "tool install poetry" ]; then
+  mkdir -p "$TEST_DIR/uv-tools/poetry/bin" "$TEST_HOME/.local/bin"
+  printf '#!/bin/bash\necho "Poetry (version 2.0.0)"\n' > "$TEST_DIR/uv-tools/poetry/bin/poetry"
+  chmod +x "$TEST_DIR/uv-tools/poetry/bin/poetry"
+  ln -sf "$TEST_DIR/uv-tools/poetry/bin/poetry" "$TEST_HOME/.local/bin/poetry"
+  exit 0
+fi
+exit 1
+STUB
+  chmod +x "$TEST_DIR/stubbin/uv"
+}
+
+_broken_official_poetry() {
+  _poetry_stub "$TEST_HOME/.local/bin" 1
+  mkdir -p "$TEST_HOME/Library/Application Support/pypoetry/venv/bin"
+  touch "$TEST_HOME/Library/Application Support/pypoetry/venv/bin/python"
+}
+
+@test "upgrade: poetry_runs --fix moves the broken poetry aside and installs it with uv" {
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/poetry-repair.sh" "$TEST_DOTFILES/lib/"
+  _broken_official_poetry
+  _uv_install_stub
+  export PATH="$TEST_HOME/.local/bin:$TEST_DIR/stubbin:$PATH"
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  [ -f "$TEST_HOME/.local/bin/poetry.bak" ]
+  [ -d "$TEST_HOME/Library/Application Support/pypoetry/venv.bak" ]
+  [ ! -e "$TEST_HOME/Library/Application Support/pypoetry/venv" ]
+  [ -L "$TEST_HOME/.local/bin/poetry" ]
+  "$TEST_HOME/.local/bin/poetry" --version
+}
+
+@test "upgrade: poetry_runs --fix is a no-op on the second run" {
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/poetry-repair.sh" "$TEST_DOTFILES/lib/"
+  _broken_official_poetry
+  _uv_install_stub
+  export PATH="$TEST_HOME/.local/bin:$TEST_DIR/stubbin:$PATH"
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  local before
+  before="$(ls -A "$TEST_HOME/.local/bin" "$TEST_HOME/Library/Application Support/pypoetry")"
+  checked_ids=()
+  check() { checked_ids+=("$1"); }
+  source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  ! printf '%s\n' "${checked_ids[@]}" | grep -qx "upgrade.poetry_runs"
+  [ "$before" = "$(ls -A "$TEST_HOME/.local/bin" "$TEST_HOME/Library/Application Support/pypoetry")" ]
+}
+
+@test "upgrade: poetry_runs has no fix when uv is missing" {
+  _broken_official_poetry
+  mkdir -p "$TEST_DIR/nouv"
+  ln -s "$(command -v chezmoi)" "$TEST_DIR/nouv/chezmoi"
+  for t in bash cat date dirname readlink grep; do ln -s "$(command -v "$t")" "$TEST_DIR/nouv/$t"; done
+  fix_args=()
+  check() { [ "$1" = "upgrade.poetry_runs" ] && fix_args+=("${4:-}"); return 0; }
+  PATH="$TEST_HOME/.local/bin:$TEST_DIR/nouv" source "$BATS_TEST_DIRNAME/../modules/upgrade/doctor.sh"
+  [ "${#fix_args[@]}" -eq 1 ]
+  [ -z "${fix_args[0]}" ]
+}

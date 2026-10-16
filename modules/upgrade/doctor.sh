@@ -52,9 +52,15 @@ if [ -n "$_poetry_bin" ]; then
   _poetry_uv_dir="$(uv tool dir 2>/dev/null || true)"
   _poetry_target="$(readlink "$_poetry_bin" 2>/dev/null || echo "$_poetry_bin")"
   if [ -z "$_poetry_uv_dir" ] || [[ "$_poetry_target" != "$_poetry_uv_dir"/* ]]; then
+    # --fix moves the old binary and venv aside to *.bak (no delete), then
+    # runs `uv tool install poetry` (lib/poetry-repair.sh). No fix without uv.
+    _poetry_fix=""
+    if command -v uv >/dev/null 2>&1; then
+      _poetry_fix="source '$DOTFILES_DIR/lib/poetry-repair.sh' && poetry_repair_to_uv '$_poetry_bin'"
+    fi
     check "upgrade.poetry_runs" \
       "non-uv poetry at $_poetry_bin runs (fix: mv '$_poetry_bin' '$_poetry_bin.bak' && mv ~/Library/Application\\ Support/pypoetry/venv ~/Library/Application\\ Support/pypoetry/venv.bak && uv tool install poetry)" \
-      "'$_poetry_bin' --version" ""
+      "'$_poetry_bin' --version" "$_poetry_fix"
   fi
 fi
-unset _poetry_bin _poetry_uv_dir _poetry_target
+unset _poetry_bin _poetry_uv_dir _poetry_target _poetry_fix

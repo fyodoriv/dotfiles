@@ -190,13 +190,6 @@ them. -->
   - **Files**: modules/security/doctor.sh (next to the existing `security.deployed_la_*` checks)
   - **Acceptance**: `dotfiles doctor` warns once, naming each deployed plist without a locale; no dotfiles code writes plists it does not own.
 
-- [ ] Replace? Relocate: agent-browser singleton helpers
-  - **ID**: replace-relocate-agent-browser-singleton-helpers
-  - **Tags**: scout, agent-browser, reuse, upstream
-  - **Details**: `bin/agent-browser-singleton-preflight`, `bin/agent-browser-reap-strays`, and the safe `~/.agent-browser/{ensure,launch}-chrome.sh` compatibility wrappers are intentionally thin host-local adapters over `agent-browser --cdp` and Chrome CDP. Revisit whether this layer should be contributed upstream to agent-browser, moved into agentbrew shared browser policy tooling, or kept in dotfiles because it depends on this repo's launchd profile/port contract.
-  - **Files**: bin/agent-browser-singleton-preflight, bin/agent-browser-reap-strays, private_dot_agent-browser/executable_ensure-chrome.sh, private_dot_agent-browser/executable_launch-chrome.sh, modules/agent-browser/doctor.sh
-  - **Acceptance**: Document one decision: upstream PR/filed issue, relocation to agentbrew, or "keep in dotfiles" with a current reason; if relocating, add/point to the implementation task in the owning repo.
-
 - [ ] `upgrade.poetry_runs` gets a safe, reversible `--fix`
   - **ID**: doctor-poetry-runs-fix
   - **Tags**: doctor, upgrade, poetry, uv

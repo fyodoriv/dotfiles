@@ -37,6 +37,7 @@ runs Phase 1, that part, and Phases 9 to 11:
 | clean up background processes | Phase 5 |
 | check machine metrics, or make Claude Code typing faster | Phase 6 |
 | check skills and rules against best practices | Phase 7 |
+| audit the new-project requirements now | Phase 7, monthly step (pass `--days 0` to `audit-due.sh`) |
 | find what makes agents slow | Phase 8 |
 
 ## Hard rules
@@ -198,8 +199,23 @@ Follow [reference/config-audit.md](reference/config-audit.md). Run
 `scripts/audit_agent_config.py --cache`, then make the judgment checks.
 Ship small fixes in the source repo. Put big changes in the questionnaire.
 
-**Done when:** every ERROR is fixed or listed with its owner, and the judgment
-checks are done.
+### Monthly: new-project requirements audit
+
+Once a month per repository, audit `agentbrew`, `dotfiles`, and `tasks.md`
+(and any other tooling repository with `.agents/requirements.yaml`) against the
+required areas of the `new-project` skill. `NP=~/.claude/skills/new-project`.
+
+1. `bash $NP/scripts/audit-due.sh <repo>`. Skip the repository when it prints `not due`.
+2. `bash $NP/scripts/check-setup.sh <repo> --profile tool`. Keep the score and the `FAIL` and `WAIVED` lines.
+3. Follow `$NP/references/requirements-map.md`, section 4: re-check each mapped
+   file and each waiver, keep one P0 task `meet-new-project-requirements` (in
+   `tasks.md`, the task whose title starts "tasks.md meets every new-project
+   requirement") that lists every gap, and turn a waiver seen in two or more
+   repositories into a requirement-change proposal on `new-project`.
+4. `bash $NP/scripts/audit-due.sh <repo> --record`.
+
+**Done when:** every ERROR is fixed or listed with its owner, the judgment
+checks are done, and each due repository has a recorded requirements audit.
 
 ## Phase 8: Agent time review
 
@@ -260,6 +276,7 @@ Put the verdict first. Use this template.
 
 ### Config audit
 - <n> errors, <n> warnings · fixed: <list> · open: <list with owner>
+- Requirements (monthly): <repo> <score> (<change>) · waived: <n> · not due: <repos>
 
 ### Agent time (7 days)
 - Tool time: <h> (<change> vs last run) · active <h> · output <n>M tokens

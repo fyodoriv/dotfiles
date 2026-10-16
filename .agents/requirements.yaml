@@ -1,0 +1,9 @@
+# Where dotfiles meets each new-project required area. check-setup.sh reads it;
+# the monthly audit in /tooling-checkup re-checks every line. Contract:
+# agentbrew skill-plugins/workflow/new-project/references/requirements-map.md
+# Only areas the audit (2026-10-16) found fully met are mapped; the rest are
+# gaps in TASKS.md task meet-new-project-requirements.
+map.e2e: tests/e2e/hermetic-install.sh tests/stranger-readiness.bats
+map.checkup: skills/tooling-checkup/SKILL.md
+map.caching: bin/cached-run bin/bats-affected
+map.docs: docs/README.md tests/docs-contract.bats

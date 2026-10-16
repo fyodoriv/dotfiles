@@ -10,6 +10,29 @@ them. -->
 
 ## P0
 
+- [ ] dotfiles meets every new-project requirement, or waives it with a reason
+  - **ID**: meet-new-project-requirements
+  - **Tags**: requirements, agents, observability, docs
+  - **Details**: The 2026-10-16 audit scored dotfiles 11/24 with `.agents/requirements.yaml` (7/22 before the map). By intent: e2e, tasks, checkup, and caching are met; vision, metrics, observability, user stories, setup, and self-improving are partial. Fix in this order:
+    1. Two tests fail on HEAD: cut `AGENTS.md` below 10000 bytes (`tests/docs-contract.bats` test 2); add the `load-sampler` row to `docs/user-stories/02-start-day-ready-to-code.md` (`tests/user-stories.bats` test 5).
+    2. `VISION.md`: a success metric (scorecard north star, shell startup under 200 ms), kill criteria phrased per wrapper ("deprecate wrapper X if metric Y trails by date Z"), and `## Prior art` linking `docs/competition/scorecard.md`.
+    3. `docs/competition/scorecard.md`: Goal and Pivot columns per metric; `(stub)` when data is missing.
+    4. `README.md`: `bin/dotfiles-install run` (or a one-liner around it) is the single first quick-start command, ending with `dotfiles-doctor`; demote the other entry points.
+    5. `docs/user-stories/*.md`: `Metric:` and `Tests:` lines per story; `tests/user-stories.bats` fails when a named test is missing.
+    6. New `docs/observability.md` (in the docs map): events in `~/.dotfiles-stats.jsonl` and `load-samples.tsv`, and an errors log contract. `bin/dotfiles-doctor` and the LaunchAgent jobs append failures with a `story` field to `~/.local/state/dotfiles/errors.jsonl`.
+    7. `make check` writes per-step durations to `~/.local/state/dotfiles/gate-timings.jsonl`, shown by `bin/dotfiles-metrics`; the speed review stays in `/tooling-checkup`.
+    8. New `docs/learnings.md` (predicted vs observed), seeded from closed hypotheses; `docs/decisions/` ADRs from the ROADMAP decision log.
+    9. `.gitignore`: `.env`, `.env.*`; extend the rule-9 lint to P2 or record why P2 is exempt.
+    Accepted push back (map or waive, do not build): no `scripts/*.sh` aliases for `bin/` commands; setup may prompt when macOS requires it; no external error reporter; timings live under `~/.local/state/dotfiles`, not `.metrics/`; no hermetic e2e for US-07 and US-09 (unit bats instead); the speed review lives in `/tooling-checkup`, not a second `RECURRING.md`.
+  - **Files**: `AGENTS.md`, `VISION.md`, `README.md`, `docs/`, `bin/dotfiles-doctor`, `Makefile`, `.gitignore`, `.agents/requirements.yaml`
+  - **Output**: code
+  - **Acceptance**: `check-setup.sh . --profile tool` reaches 100% with every remaining gap mapped or waived with a reason, and `make check` passes.
+  - **Hypothesis**: the setup score rises from 45% to 100%, honestly mapped or waived, and the monthly audit finds no new gap.
+  - **Measurement**: `bash ~/.claude/skills/new-project/scripts/check-setup.sh . --profile tool`
+  - **Success**: 100%, every waiver reasoned, `make check` green.
+  - **Pivot**: a gap that costs more than it returns here becomes a waiver, or a requirement-change PR on agentbrew `new-project`.
+  - **Anchor**: agentbrew `skill-plugins/workflow/new-project/references/requirements-map.md`; audit 2026-10-16.
+
 ## P1
 
 ## P2

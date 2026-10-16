@@ -119,6 +119,19 @@
         "Puts the third-party GeForceNOW load into the Phase 10 questionnaire instead of killing or disabling it",
         "Records the machine_overload_rows_24h and machine_peak_load1_24h metrics with checkup_state.py record"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "/tooling-checkup (the last new-project requirements audit for agentbrew was 35 days ago; dotfiles was 3 days ago)",
+      "expected_output": "Phase 7 runs the monthly requirements audit for agentbrew and tasks.md only, keeps one P0 meet-new-project-requirements task per repo up to date, records each run, and reports the scores in the Config audit section.",
+      "expectations": [
+        "Runs audit-due.sh for each tooling repo and skips dotfiles because it prints not due",
+        "Runs check-setup.sh --profile tool on each due repo and reports the score, FAIL, and WAIVED lines",
+        "Updates the existing meet-new-project-requirements P0 task instead of filing a duplicate",
+        "Proposes a requirement change on the new-project skill when the same waiver appears in two or more repos",
+        "Runs audit-due.sh --record for each audited repo",
+        "Adds a \"Requirements (monthly)\" line to the Config audit section of the report"
+      ]
     }
   ]
 }

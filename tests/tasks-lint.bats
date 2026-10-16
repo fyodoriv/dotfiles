@@ -22,7 +22,8 @@ teardown() {
 }
 
 @test "make check includes TASKS.md linting" {
-  grep -Eq '^check: .*lint-tasks' "$MAKEFILE"
+  # make check runs its steps through scripts/gate-timed.sh (check-steps).
+  grep -Eq 'gate-timed.sh lint-tasks .*lint-tasks$' "$MAKEFILE"
 }
 
 @test "CI lint job runs TASKS.md linting" {

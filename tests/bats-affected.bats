@@ -513,3 +513,17 @@ EOF
   sorted=$(echo "$result" | sort)
   [ "$result" = "$sorted" ]
 }
+
+@test "a changed file selects every test that reads it by repo path" {
+  # A test that reads "$REPO_ROOT/AGENTS.md" must run when AGENTS.md changes,
+  # even with no mapping rule; a fixture that only names TASKS.md must not.
+  printf '# agents\n' > "$TEST_REPO/AGENTS.md"
+  printf '# tasks\n' > "$TEST_REPO/TASKS.md"
+  printf '@test "x" { grep -q agents "$REPO_ROOT/AGENTS.md"; }\n' > "$TEST_REPO/tests/reads-agents.bats"
+  printf '@test "y" { printf x > "$TEST_DIR/TASKS.md"; }\n' > "$TEST_REPO/tests/fixture-tasks.bats"
+  git -C "$TEST_REPO" add -f AGENTS.md TASKS.md tests/reads-agents.bats tests/fixture-tasks.bats
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: path fixtures"
+  assert_affected_includes AGENTS.md reads-agents
+  result="$(affected_for TASKS.md | basenames)"
+  ! grep -qx fixture-tasks <<<"$result"
+}

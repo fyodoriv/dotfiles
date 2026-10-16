@@ -44,7 +44,8 @@ repo_root() {
 
 # Compute a fingerprint of the current working tree state.
 # Includes: HEAD SHA, all tracked file changes (staged + unstaged),
-# and untracked file names (respects .gitignore).
+# and untracked file names plus their contents (respects .gitignore), so an
+# edit to any file a step can read changes the key.
 repo_hash() {
   local root="$1"
   (
@@ -53,8 +54,14 @@ repo_hash() {
     git rev-parse HEAD 2>/dev/null || echo "initial"
     # All changes to tracked files (staged + unstaged vs HEAD)
     git diff HEAD 2>/dev/null || true
-    # Untracked file names (a new file should invalidate)
-    git ls-files --others --exclude-standard 2>/dev/null | LC_ALL=C sort
+    # Untracked files: names (a new file invalidates) and content hashes
+    # (an edit to an untracked file invalidates too)
+    local untracked
+    untracked="$(git ls-files --others --exclude-standard 2>/dev/null | LC_ALL=C sort)"
+    printf '%s\n' "$untracked"
+    if [ -n "$untracked" ]; then
+      printf '%s\n' "$untracked" | git hash-object --stdin-paths 2>/dev/null || true
+    fi
   ) | md5
 }
 

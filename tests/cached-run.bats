@@ -161,6 +161,31 @@ teardown() {
   [[ "$output" != *"cached"* ]]
 }
 
+@test "editing an untracked file's content invalidates cache (same command)" {
+  cd "$TEST_REPO"
+  echo "one" > "$TEST_REPO/untracked.txt"
+  run "$SCRIPT" echo "untracked-content"
+  [ "$status" -eq 0 ]
+  run "$SCRIPT" echo "untracked-content"
+  [[ "$output" == *"cached"* ]]
+
+  # Same name, new content: a step that reads this file must re-run.
+  echo "two" > "$TEST_REPO/untracked.txt"
+  run "$SCRIPT" echo "untracked-content"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"cached"* ]]
+}
+
+@test "editing a tracked file invalidates cache (same command)" {
+  cd "$TEST_REPO"
+  run "$SCRIPT" echo "tracked-content"
+  run "$SCRIPT" echo "tracked-content"
+  [[ "$output" == *"cached"* ]]
+  echo "changed" >> "$TEST_REPO/file.txt"
+  run "$SCRIPT" echo "tracked-content"
+  [[ "$output" != *"cached"* ]]
+}
+
 @test "reverting a change restores cache hit" {
   cd "$TEST_REPO"
   run "$SCRIPT" echo "original"

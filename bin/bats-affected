@@ -281,6 +281,18 @@ for file in "${changed_files[@]}"; do
   done
 done
 
+# ── Tests that read a changed file by repo path ──────────────────────
+# A test that reads "$REPO_ROOT/<file>" (or $DOTFILES_DIR, $root, or
+# $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
+# runs too. A test that only names a fixture file of the same name does not.
+for file in "${changed_files[@]}"; do
+  [[ "$file" == tests/* ]] && continue
+  escaped="$(printf '%s' "$file" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"
+  while IFS= read -r test_file; do
+    [ -n "$test_file" ] && affected+=("$test_file")
+  done < <(grep -lE -- "(REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.)\}?\"?/$escaped([^A-Za-z0-9_.-]|$)" "$TESTS_DIR"/*.bats 2>/dev/null || true)
+done
+
 # ── Deduplicate and sort ─────────────────────────────────────────────
 if [ "${#affected[@]}" -eq 0 ]; then
   exit 0

@@ -214,8 +214,27 @@ required areas of the `new-project` skill. `NP=~/.claude/skills/new-project`.
    repositories into a requirement-change proposal on `new-project`.
 4. `bash $NP/scripts/audit-due.sh <repo> --record`.
 
+### Monthly: repo health, stories, and gate speed review
+
+In the same monthly pass, for `dotfiles` (run from its checkout):
+
+1. Health: `bin/dotfiles-doctor --quiet`. Each failing check line names its fix.
+2. Cached gate: `make check`. `bin/cached-run` skips unchanged steps;
+   `make test-force` runs everything.
+3. Broken stories: `make e2e`. A failing test name starts with its story ID
+   (`USNN e2e: …`); report the story, not only the test.
+4. Speed review: `bin/dotfiles-metrics --table`. Compare the `make check`
+   row (from `~/.local/state/dotfiles/gate-timings.jsonl`) and every other
+   metric with its goal and pivot. Per-step times:
+   `jq -s 'group_by(.step) | map({step: .[0].step, median: (map(.seconds) | sort | .[length/2|floor])})' ~/.local/state/dotfiles/gate-timings.jsonl`.
+   A metric past its pivot becomes a P0 or P1 task with the numbers.
+5. Learnings: add a row to `docs/learnings.md` for each prediction closed
+   since the last checkup (predicted vs observed).
+6. Open P0s: list `## P0` in `TASKS.md`; each one goes to "Next: stability".
+
 **Done when:** every ERROR is fixed or listed with its owner, the judgment
-checks are done, and each due repository has a recorded requirements audit.
+checks are done, each due repository has a recorded requirements audit, and
+the monthly repo health line (doctor, gate, stories, gate speed) has numbers.
 
 ## Phase 8: Agent time review
 
@@ -277,6 +296,7 @@ Put the verdict first. Use this template.
 ### Config audit
 - <n> errors, <n> warnings · fixed: <list> · open: <list with owner>
 - Requirements (monthly): <repo> <score> (<change>) · waived: <n> · not due: <repos>
+- Repo health (monthly): doctor <n> failing · gate <pass/fail> · stories broken: <USNN list or none> · gate <median> s (goal 120, pivot 300)
 
 ### Agent time (7 days)
 - Tool time: <h> (<change> vs last run) · active <h> · output <n>M tokens

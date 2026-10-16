@@ -30,6 +30,7 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
 }
 
 @test "make check runs the install e2e only when needed" {
-  grep -qE '^check:.*e2e-if-needed' "$REPO_ROOT/Makefile"
+  grep -qE '^check:' "$REPO_ROOT/Makefile"
+  grep -qE 'gate-timed.sh e2e .*e2e-if-needed' "$REPO_ROOT/Makefile"
   grep -q 'needs-e2e.sh' "$REPO_ROOT/Makefile"
 }

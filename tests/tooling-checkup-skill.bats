@@ -84,6 +84,17 @@ make_tooling_root() {
   [ "$(grep -c '^\*\*Done when:\*\*' "$SKILL")" -eq 11 ]
 }
 
+@test "tooling-checkup monthly pass covers health, cached gate, stories, speed, learnings, and P0s" {
+  grep -F -q 'bin/dotfiles-doctor --quiet' "$SKILL"
+  grep -F -q 'Cached gate: `make check`' "$SKILL"
+  grep -F -q 'Broken stories: `make e2e`' "$SKILL"
+  grep -F -q 'gate-timings.jsonl' "$SKILL"
+  grep -F -q 'bin/dotfiles-metrics --table' "$SKILL"
+  grep -F -q 'docs/learnings.md' "$SKILL"
+  grep -F -q 'Open P0s' "$SKILL"
+  grep -F -q 'Repo health (monthly):' "$SKILL"
+}
+
 @test "tooling-checkup reference links resolve one level deep" {
   local link
   for link in $(grep -o '](reference/[^)]*)' "$SKILL" | sed 's/^](//; s/)$//'); do

@@ -4,8 +4,15 @@
 # Each map line lands in the PR that makes it true, with a comment saying why.
 # Gaps left: TASKS.md task meet-new-project-requirements.
 map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/stories-e2e.bats tests/stranger-readiness.bats
-map.checkup: skills/tooling-checkup/SKILL.md
-map.caching: bin/cached-run bin/bats-affected
+# Checkup: /tooling-checkup is the one checkup command; its monthly pass runs
+# the doctor, the cached gate, the story e2e, the speed review, learnings, and
+# open P0s (tests/tooling-checkup-skill.bats).
+map.checkup: skills/tooling-checkup/SKILL.md tests/tooling-checkup-skill.bats
+# Caching: bin/cached-run keys a step on HEAD, the tracked diff, and untracked
+# file names and contents; bin/bats-affected selects mapped tests plus every
+# test that reads a changed file by repo path; make test-force runs all.
+# tests/cached-run.bats proves an edit to one tracked or untracked file re-runs.
+map.caching: bin/cached-run bin/bats-affected tests/cached-run.bats tests/bats-affected.bats
 map.docs: docs/README.md tests/docs-contract.bats
 
 # VISION.md (root, where it has always lived) has Problem, Non-goals, Success
@@ -47,3 +54,10 @@ map.observability: docs/observability.md lib/errors-log.sh bin/dotfiles-doctor t
 # before github.com. No .metrics/ entry: gate timings live under
 # ~/.local/state/dotfiles, outside the repo (accepted push back).
 map.secrets: .gitignore git-hooks/pre-commit git-hooks/pre-push
+
+# Self-improving: make check times every step into
+# ~/.local/state/dotfiles/gate-timings.jsonl (scripts/gate-timed.sh; not
+# .metrics/, by accepted push back); the monthly speed review lives in
+# /tooling-checkup (accepted push back: no second RECURRING.md); and
+# docs/learnings.md logs predicted vs observed for each closed change.
+map.self-improving: Makefile scripts/gate-timed.sh skills/tooling-checkup/SKILL.md docs/learnings.md

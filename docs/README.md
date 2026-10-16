@@ -39,6 +39,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 
 | Doc | What it answers | Audience |
 |---|---|---|
+| [learnings.md](learnings.md) | What did we predict for each change, and what happened? | both |
 | [metrics.md](metrics.md) | Is dotfiles working? Each metric with its goal, pivot, and command | both |
 | [observability.md](observability.md) | What did dotfiles do, what failed, and how healthy is this Mac? Logs, the errors log, and the doctor | both |
 | [repo-map.md](repo-map.md) | Where does each file live, and which repo owns which path? | both |

@@ -1,0 +1,15 @@
+# Learnings
+
+Every non-trivial change states a prediction before the work (rule 11). This
+log records what was predicted and what was observed, so the next prediction
+is better calibrated. It is append-only: add a row when a change merges; never
+rewrite an old row. The monthly checkup reads it next to
+[metrics.md](metrics.md).
+
+| Date | Change | Predicted | Observed | Kept? | Lesson |
+|---|---|---|---|---|---|
+| 2026-10-16 | Fix two failing doc tests; trim AGENTS.md (#124) | 2 failing tests pass; no other change | Both passed, but the trim dropped two phrases `agent-artifact-coverage.bats` requires; the gate never ran that test | Yes, fixed in #127 | `bats-affected` must select tests that read a changed file by path (fixed in the speed-review PR) |
+| 2026-10-16 | Metrics with goal, pivot, command (#125) | check-setup 11/24 → 14/23 | 14/23 | Yes | A metric source that answers 0 for missing data needs `pipefail` and an explicit error, or the table shows a fake 0 |
+| 2026-10-16 | One-line setup, story metrics, story e2e (#126) | check-setup 14/23 → 16/23; all story e2e green | 16/23; 16 e2e green after fixing 2 `morning` bugs the e2e found | Yes | A hermetic e2e of the real command finds bugs unit tests with stubs miss (`set -e` on an empty repo, a missing `ps`) |
+| 2026-10-16 | Errors log; a fix on every doctor failure (#127) | check-setup 16/23 → 17/23 | 17/23 | Yes | Adding a lib to a sourced script breaks every test fixture that copies libs one by one; grep for the copy lists first |
+| 2026-10-16 | ADRs, `.env` ignore, rule 9 scope (#128) | check-setup 17/23 → 18/21 | 18/21 | Yes | Check the default path (`bin/add-task` defaults to P2) before tightening a lint on it |

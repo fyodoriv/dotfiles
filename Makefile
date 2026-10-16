@@ -1,4 +1,4 @@
-.PHONY: e2e e2e-if-needed help lint lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
+.PHONY: check-steps e2e e2e-if-needed help lint lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
 
 .DEFAULT_GOAL := help
 
@@ -9,7 +9,7 @@ BIN_SCRIPTS := $(shell for f in bin/*; do \
   file -b "$$f" 2>/dev/null | grep -qE 'shell script|POSIX shell script' && echo "$$f"; \
 done)
 
-SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-run.sh \
+SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-run.sh scripts/gate-timed.sh \
            $(wildcard private_dot_agent-browser/executable_*.sh) \
            $(wildcard lib/*.sh) \
            $(BIN_SCRIPTS) $(wildcard modules/*/doctor.sh) \
@@ -109,9 +109,18 @@ e2e-if-needed: ## Run the install e2e only when an installer path changed
 	fi
 
 # ── Check: lint + task queue lint + test ─────────────────────────────
-check: lint lint-tasks test e2e-if-needed ## Lint + task queue lint + test + install e2e when needed
+# Each step's duration goes to ~/.local/state/dotfiles/gate-timings.jsonl
+# (scripts/gate-timed.sh) for the monthly speed review in /tooling-checkup.
+check: ## Lint + task queue lint + test + install e2e when needed (timed)
+	@scripts/gate-timed.sh total $(MAKE) --no-print-directory check-steps
 	@echo ""
 	@echo "✓ All checks passed"
+
+check-steps:
+	@scripts/gate-timed.sh lint $(MAKE) --no-print-directory lint
+	@scripts/gate-timed.sh lint-tasks $(MAKE) --no-print-directory lint-tasks
+	@scripts/gate-timed.sh test $(MAKE) --no-print-directory test
+	@scripts/gate-timed.sh e2e $(MAKE) --no-print-directory e2e-if-needed
 
 audit: ## Run security and repo-hygiene audit
 	@./bin/dotfiles-audit

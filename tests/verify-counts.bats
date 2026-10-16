@@ -75,8 +75,11 @@ collect_volatile_count_hits() {
 }
 
 @test "count prints live stats" {
-  run make -C "$DOTFILES_DIR" count
+  # Count one small file: `bats --count tests/*.bats` parses the whole suite
+  # (17-50 s, minutes under load). The full count is `make count`.
+  run make -C "$DOTFILES_DIR" count COUNT_TESTS=tests/verify-counts.bats
   [ "$status" -eq 0 ]
+  [[ "$output" == *"Tests:"*"across 1 bats files"* ]]
   [[ "$output" == *"Modules:"* ]]
   [[ "$output" == *"macOS defaults:"* ]]
 }

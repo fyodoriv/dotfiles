@@ -206,14 +206,6 @@ them. -->
   - **Acceptance**: One recorded decision: a Gotcha line in AGENTS.md, or a filed upstream issue linked here.
   - **Competitive-goal**: manual_bootstrap_steps — indirect: less noise in agent npm runs; no shared metric moves.
 
-- [ ] `tests/verify-counts.bats` "count prints live stats" stops counting the whole suite
-  - **ID**: verify-counts-count-test-speed
-  - **Tags**: tests, performance, bats, makefile
-  - **Details**: Verified on `feat/chezmoi` at 2377a45. `tests/verify-counts.bats:77-82` runs `make count`. `Makefile:110` runs `bats --count tests/*.bats` over every bats file. At load1 3.4 that took 17.6 s (`/usr/bin/time -p bats --count tests/*.bats`). An agent reported about 9 minutes at high load on 2026-10-15 (the sampler shows load1 peaks of 84 today). `bin/bats-affected:234-262` adds this file for many doc and Makefile changes, so the cost lands on many affected-test runs. Fix: let the test set a small `TESTS_GLOB` (for example one fixture file) for `make count`, or count `@test` lines with `rg -c` instead of `bats --count`.
-  - **Files**: Makefile, tests/verify-counts.bats
-  - **Acceptance**: The test runs in under 2 s at low load and still checks the `Modules:` and `macOS defaults:` lines.
-  - **Competitive-goal**: noop_reapply_ms — indirect: faster local gates; no shared metric moves.
-
 - [ ] Measure `mdworker` CPU for 10 minutes after a 10-worktree session (#83 open acceptance)
   - **ID**: spotlight-wt-noindex-mdworker-measurement
   - **Tags**: spotlight, measurement, worktrees

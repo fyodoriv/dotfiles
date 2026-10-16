@@ -106,9 +106,12 @@ install-deps: ## Install required dev tools plus fmt/coverage helpers
 	brew install $(DEV_DEPS) $(OPTIONAL_DEV_DEPS)
 
 # ── Count: show live stats (never copy them into docs) ──
+# COUNT_TESTS narrows the bats files counted (tests/verify-counts.bats uses one
+# file, so the test does not parse the whole suite).
+COUNT_TESTS ?= tests/*.bats
 count: ## Show test, module, and check counts
-	@tests=$$(bats --count tests/*.bats 2>/dev/null | awk '{s+=$$1}END{print s}'); \
-	files=$$(ls tests/*.bats 2>/dev/null | wc -l | tr -d ' '); \
+	@tests=$$(bats --count $(COUNT_TESTS) 2>/dev/null | awk '{s+=$$1}END{print s}'); \
+	files=$$(ls $(COUNT_TESTS) 2>/dev/null | wc -l | tr -d ' '); \
 	modules=$$(ls -d modules/*/doctor.sh 2>/dev/null | wc -l | tr -d ' '); \
 	checks=$$(grep -rhc '^\s*check' modules/*/doctor.sh 2>/dev/null | awk '{s+=$$1}END{print s}'); \
 	macos_total=$$(jq 'length' data/macos-defaults.json); \

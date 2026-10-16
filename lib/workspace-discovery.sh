@@ -31,6 +31,8 @@ workspace_config_dir() {
 }
 
 _workspace_expand_tilde() {
+  # The "~/" pattern matches a literal tilde prefix on purpose.
+  # shellcheck disable=SC2088
   case "$1" in
     "~") printf '%s' "$HOME" ;;
     "~/"*) printf '%s/%s' "$HOME" "${1#\~/}" ;;

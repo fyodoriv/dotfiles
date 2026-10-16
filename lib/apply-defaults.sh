@@ -49,10 +49,8 @@ apply_defaults() {
     return 1
   fi
 
-  local prev_section=""
-
   # Read entries for this script, output tab-separated fields
-  while IFS=$'\t' read -r domain key dtype value currenthost expand_vars section; do
+  while IFS=$'\t' read -r domain key dtype value currenthost expand_vars _section; do
     # Expand $HOME if needed
     if [ "$expand_vars" = "true" ]; then
       value="${value//\$HOME/$HOME}"

@@ -270,7 +270,8 @@ dotfiles_heal_reset_ssh_mux_if_idle() {
 }
 
 dotfiles_heal_kickstart_network_resilience() {
-  local domain="gui/$(id -u)"
+  local domain
+  domain="gui/$(id -u)"
   launchctl kickstart -k "$domain/com.dotfiles.network-resilience" 2>/dev/null \
     || launchctl start com.dotfiles.network-resilience 2>/dev/null \
     || true

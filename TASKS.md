@@ -204,14 +204,6 @@ them. -->
   - **Files**: bin/agent-browser-singleton-preflight, bin/agent-browser-reap-strays, private_dot_agent-browser/executable_ensure-chrome.sh, private_dot_agent-browser/executable_launch-chrome.sh, modules/agent-browser/doctor.sh
   - **Acceptance**: Document one decision: upstream PR/filed issue, relocation to agentbrew, or "keep in dotfiles" with a current reason; if relocating, add/point to the implementation task in the owning repo.
 
-- [ ] Shellcheck scans every `lib/*.sh` file, not a hand-kept list
-  - **ID**: lint-scan-all-lib-scripts
-  - **Tags**: lint, shellcheck, makefile
-  - **Details**: Verified on `feat/chezmoi` at 2377a45. `Makefile` `SCRIPTS` lists some `lib/*.sh` files by name; about two thirds of `lib/*.sh` are not linted by `make lint`. Running `shellcheck -S warning` on the unlisted files finds 4 warnings in three files: `lib/apply-defaults.sh:52,55` SC2034, `lib/heal-stuck-agents.sh:273` SC2155, `lib/workspace-discovery.sh:36` SC2088. The SC2088 hit is a false positive (the `case` pattern matches a literal `~/` on purpose); it needs a `# shellcheck disable=SC2088` with a reason. Fix: use `$(wildcard lib/*.sh)` in `SCRIPTS` and clear or annotate the 4 warnings.
-  - **Files**: Makefile, lib/apply-defaults.sh, lib/heal-stuck-agents.sh, lib/workspace-discovery.sh
-  - **Acceptance**: `make lint` lints all `lib/*.sh` files and exits 0.
-  - **Competitive-goal**: reproducibility_pct — indirect: lint catches shell bugs in the libraries every apply sources.
-
 - [ ] `upgrade.poetry_runs` gets a safe, reversible `--fix`
   - **ID**: doctor-poetry-runs-fix
   - **Tags**: doctor, upgrade, poetry, uv

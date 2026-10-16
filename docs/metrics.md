@@ -49,4 +49,5 @@ Guards must not get worse, but they are not goals:
 | `~/.dotfiles-stats.jsonl` | `lib/stats.sh` `log_run` (one JSON line per automation run) | `dotfiles stats`, `dotfiles doctor --trends`, this table |
 | `~/.local/state/dotfiles/scorecard.json` | `scripts/benchmark-run.sh` (full runs only) | this table, [competition/scorecard.md](competition/scorecard.md) |
 | `~/.local/state/dotfiles/load-samples.tsv` | `bin/dotfiles-load-sampler` | `dotfiles metrics` |
+| `~/.local/state/dotfiles/errors.jsonl` | `lib/errors-log.sh` (see [observability.md](observability.md#errors)) | `jq`, the monthly audit |
 | `~/.local/share/dotfiles/logs/*.log` | each LaunchAgent | this table (local-AI row) |

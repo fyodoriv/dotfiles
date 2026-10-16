@@ -34,3 +34,11 @@ map.setup: README.md bin/dotfiles-install tests/docs-contract.bats tests/dotfile
 # runs real commands after a real sandboxed install). US07 and US09 use unit
 # bats (accepted push back). tests/user-stories.bats fails on any drift.
 map.user-stories: docs/user-stories/README.md tests/e2e/stories-e2e.bats tests/user-stories.bats
+
+# docs/observability.md has Logs (content-free JSONL stats, load samples,
+# LaunchAgent logs), Errors (lib/errors-log.sh: allow-listed fields only, each
+# event names its story, off in tests; no external reporter by accepted push
+# back), and Health check: bin/dotfiles-doctor instead of scripts/doctor.sh
+# (accepted push back: no scripts/ alias for a bin/ command); every failing
+# line ends with its fix. tests/errors-log.bats enforces all of it.
+map.observability: docs/observability.md lib/errors-log.sh bin/dotfiles-doctor tests/errors-log.bats

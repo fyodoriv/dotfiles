@@ -27,6 +27,8 @@ fi
 
 # shellcheck source=../lib/stats.sh
 source "$DOTFILES_DIR/lib/stats.sh"
+# shellcheck source=../lib/errors-log.sh
+source "$DOTFILES_DIR/lib/errors-log.sh"
 # shellcheck source=../lib/lock.sh
 source "$DOTFILES_DIR/lib/lock.sh"
 # shellcheck source=../lib/self-reload.sh
@@ -102,6 +104,7 @@ _chezmoi_apply() {
     return 0
   fi
   warn "[sync] chezmoi apply failed: $(printf '%s\n' "$out" | tail -n 1)"
+  log_error US05 sync apply_failed
   return 1
 }
 
@@ -140,6 +143,7 @@ if _is_applied_checkout; then
   _fetch_err=$(git fetch --quiet "$PULL_REMOTE" "$CANONICAL_BRANCH" 2>&1) || _fetch_rc=$?
   if [ "$_fetch_rc" -ne 0 ]; then
     warn "[sync] Fetch failed: $(_classify_push_error "$_fetch_err")"
+    log_error US05 sync fetch_failed
     exit 0
   fi
   if ! git merge --ff-only --quiet "$APPLIED_UPSTREAM" 2>/dev/null; then
@@ -183,6 +187,7 @@ else
     fi
   else
     warn "[sync] Pull failed: $(_classify_push_error "$_pull_err")"
+    log_error US05 sync pull_failed
   fi
 fi
 
@@ -283,7 +288,7 @@ if [ -n "$(git status --porcelain)" ]; then
   _direct_push_count=0
   for remote in "${REMOTES[@]}"; do
     _push_err=$(git push "$remote" --quiet 2>&1) \
-      || warn "[sync] Push to $remote failed: $(_classify_push_error "$_push_err")"
+      || { warn "[sync] Push to $remote failed: $(_classify_push_error "$_push_err")"; log_error US05 sync push_failed; }
     _direct_push_count=$((_direct_push_count + 1))
   done
   ok "[sync] Synced and pushed (${_direct_push_count} remote(s))."

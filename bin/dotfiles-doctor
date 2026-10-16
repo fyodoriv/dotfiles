@@ -120,6 +120,18 @@ source "$DOTFILES_DIR/lib/lock.sh"
 
 # shellcheck source=../lib/stats.sh
 source "$DOTFILES_DIR/lib/stats.sh"
+# shellcheck source=../lib/errors-log.sh
+source "$DOTFILES_DIR/lib/errors-log.sh"
+
+# Every failing line ends with its fix (docs/observability.md#health-check).
+_fix_hint() {
+  local fix_cmd="${1:-}" module="${_json_current_module:-<module>}"
+  if [ -n "$fix_cmd" ]; then
+    printf ' — fix: dotfiles doctor --fix --module %s' "$module"
+  else
+    printf ' — fix: no auto-fix; follow docs/module-reference.md (%s)' "$module"
+  fi
+}
 
 collect_known_check_ids() {
   _known_ids=()
@@ -428,7 +440,7 @@ _fix() {
     fixed "$desc"
   else
     $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
-    fail "$desc ${DIM}(fix failed or timed out)${NC}"
+    fail "$desc ${DIM}(fix failed or timed out)${NC} — fix: run it by hand: dotfiles doctor --json --module ${_json_current_module:-<module>} names the command"
   fi
 }
 
@@ -467,7 +479,7 @@ check() {
     fi
   else
     $JSON_MODE && _json_add "$id" "fail" "$desc" "$fix_cmd"
-    fail "$desc"
+    fail "$desc$(_fix_hint "$fix_cmd")"
     failed_check_ids+=("$id")
   fi
 }
@@ -532,7 +544,7 @@ check_symlink() {
     fi
   else
     $JSON_MODE && _json_add "$id" "fail" "$desc"
-    fail "$desc ${DIM}(not symlinked)${NC}"
+    fail "$desc ${DIM}(not symlinked)${NC}$(_fix_hint relink)"
     failed_check_ids+=("$id")
   fi
 }
@@ -572,7 +584,7 @@ check_managed() {
     fi
   else
     $JSON_MODE && _json_add "$id" "fail" "$desc"
-    fail "$desc ${DIM}(not managed)${NC}"
+    fail "$desc ${DIM}(not managed)${NC} — fix: chezmoi apply '$dst'"
     failed_check_ids+=("$id")
   fi
 }
@@ -623,7 +635,7 @@ check_defaults() {
     fi
   else
     $JSON_MODE && _json_add "$id" "fail" "$desc" "defaults write '$domain' '$key' '-${type}' '$fix_value'"
-    fail "$desc ${DIM}(is: $current, want: $expected)${NC}"
+    fail "$desc ${DIM}(is: $current, want: $expected)${NC}$(_fix_hint defaults)"
     failed_check_ids+=("$id")
   fi
 }
@@ -856,13 +868,13 @@ if command -v chezmoi &>/dev/null && ! $LIST_MODE; then
     message="${message# }"
     case "$result" in
       ok)      $JSON_MODE && _json_add "chezmoi.$check_name" "pass" "chezmoi $check_name: $message"; pass "chezmoi $check_name: $message" ;;
-      error)   $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message" ;;
-      failed)  $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message" ;;
+      error)   $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message — fix: run chezmoi doctor and follow its hint" ;;
+      failed)  $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message — fix: run chezmoi doctor and follow its hint" ;;
       warning) $JSON_MODE && _json_add "chezmoi.$check_name" "pass" "chezmoi $check_name: $message (warning)"; pass "chezmoi $check_name: $message ${DIM}(warning)${NC}" ;;
     esac
   done <<< "$chezmoi_output"
 elif ! $LIST_MODE; then
-  fail "chezmoi not installed"
+  fail "chezmoi not installed — fix: brew install chezmoi"
 fi
 
 # ── AgentBrew health checks ─────────────────────────────────────────
@@ -898,7 +910,7 @@ if $_agentbrew_runtime_allowed \
     pass "agentbrew status --ci — clean"
   else
     $JSON_MODE && _json_add "agentbrew.status" "fail" "agentbrew status --ci — drift detected" "agentbrew status --fix"
-    fail "agentbrew status --ci — drift detected (run: agentbrew status --fix)"
+    fail "agentbrew status --ci — drift detected — fix: agentbrew status --fix"
   fi
 fi
 unset _agentbrew_runtime_allowed _agentbrew_runtime_path
@@ -998,6 +1010,10 @@ elif ! $LIST_MODE; then
   # Log detailed doctor run for trend tracking
   local_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1}" >> "$DOCTOR_TRENDS_FILE"
+  # One errors-log event per failing check: story US05 (config heals itself).
+  for _failed_id in "${failed_check_ids[@]+"${failed_check_ids[@]}"}"; do
+    log_error US05 doctor check_failed "$_failed_id"
+  done
 
   if (( fail_count > 0 )); then
     _fail_preview=$(_ids_preview "${failed_check_ids[@]+"${failed_check_ids[@]}"}")

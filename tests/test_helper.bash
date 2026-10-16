@@ -5,6 +5,9 @@
 # which would point `bash -c` fixtures at the real checkout.
 unset BASH_ENV ENV
 
+# Tests never write the real errors log (lib/errors-log.sh).
+export DOTFILES_ERRORS_LOG=0
+
 # Create isolated temp environment for each test
 setup() {
   TEST_DIR="$(mktemp -d)"

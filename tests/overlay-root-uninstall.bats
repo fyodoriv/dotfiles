@@ -41,6 +41,7 @@ LIBEOF
   cat > "$TEST_DOTFILES/lib/lock.sh" <<'LOCKEOF'
 acquire_lock() { return 0; }
 LOCKEOF
+  cp "$BATS_TEST_DIRNAME/../lib/errors-log.sh" "$TEST_DOTFILES/lib/errors-log.sh"
   cat > "$TEST_DOTFILES/lib/stats.sh" <<'STATSEOF'
 log_run() { :; }
 STATSEOF

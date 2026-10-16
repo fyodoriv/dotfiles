@@ -66,7 +66,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 6. **New modules need `modules/<name>/doctor.sh`.**
 7. **The Brewfile is inlined** in `.chezmoiscripts/run_onchange_brew.sh.tmpl`.
 8. **Agent config is managed by agentbrew.** Edit sources and run `agentbrew sync`; never hand-edit generated agent config.
-9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. In approved-family repos `/ship-it` means verify, commit, push, PR, and merge when green; never plain `--force`, someone else's PR, or out-of-scope publishing ([full text](docs/constitution.md#rules-for-editing)).
+9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. **Approved-family standing approval**: `/ship-it` means verify, commit, push, PR, and merge when green; verify the author before admin/bypass PR merges; never plain `--force`, someone else's PR, or out-of-scope publishing ([full text](docs/constitution.md#rules-for-editing)).
 10. **Prefer user-dir version managers** (uv, fnm, rustup, mise); no `#!/usr/bin/env` shebangs in dotfiles executables.
 11. **P0/P1 tasks need** single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, `Anchor`.
 12. **Proactive healing**: a recurring error becomes a same-session fix or a task with its blocker.
@@ -103,7 +103,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`BASH_ENV` resets `DOTFILES_DIR`** to the live checkout in child `bash`. Tests that spawn `bash` without `load test_helper` must use `env -u BASH_ENV`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
-- **Agent perf `project`** is the repo of the session start directory, not of a `cd` target. Read a cross-repo session with `--all`.
+- **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.
 - **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name, never by absolute path; writes outside `$HOME` fail it (`tests/install-e2e-guard.bats`).
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
 

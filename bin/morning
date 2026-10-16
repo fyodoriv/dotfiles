@@ -12,6 +12,8 @@ fi
 
 # shellcheck source=../lib/stats.sh
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
+# shellcheck source=../lib/errors-log.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/errors-log.sh"
 
 echo ""
 echo -e "${BLUE}☀ Good morning! Setting up your dev environment...${NC}"
@@ -55,7 +57,12 @@ for dir in "$REPOS_DIR"/*/; do
   # A repo with no commits has no branch; skip it instead of exiting (set -e).
   branch=$(cd "$dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null) || continue
   [ "$branch" = "main" ] || [ "$branch" = "master" ] || continue
-  (cd "$dir" && _timeout 30 git pull --rebase --quiet 2>/dev/null) && echo -e "  ${GREEN}✓${NC} $name" && repos_pulled=$((repos_pulled + 1))
+  if (cd "$dir" && _timeout 30 git pull --rebase --quiet 2>/dev/null); then
+    echo -e "  ${GREEN}✓${NC} $name"; repos_pulled=$((repos_pulled + 1))
+  else
+    echo -e "  ${YELLOW}⚠${NC} $name: pull failed — fix: cd $dir && git pull --rebase"
+    log_error US02 morning pull_failed
+  fi
 done
 
 # 2. Run doctor (report only)

@@ -25,6 +25,9 @@ SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-
 # macOS interactive scheduling tier — all child processes inherit
 FULLPOWER := $(shell command -v taskpolicy >/dev/null 2>&1 && echo "taskpolicy -t 0 -l 0" || echo "")
 
+# Test runs never write the real errors log (lib/errors-log.sh).
+export DOTFILES_ERRORS_LOG := 0
+
 DEV_DEPS := shellcheck bats-core parallel chezmoi fd jq
 # python3 is bundled with macOS / GitHub Actions runners; we use it via
 # bin/dotfiles-coverage instead of kcov because kcov 43 produces empty

@@ -35,6 +35,17 @@ them. -->
 
 ## P1
 
+- [ ] The commit-msg hook keeps git trailers last when it adds the agent footer
+  - **ID**: commit-msg-footer-keeps-git-trailers-last
+  - **Tags**: git-hooks, agents, bug
+  - **Details**: `lib/strip-agent-attribution.sh` (run by `git-hooks/commit-msg`). When the hook strips a vendor attribution line, it appends `---` and the agent footer at the very end of the message. If the message ends with git trailers (`Task:`, `Task-Claim:`, `Signed-off-by:`), the footer becomes the last paragraph, so git no longer parses them (`git log --format='%(trailers:key=Task)'` is empty). On 2026-10-16 this failed the tasks.md required `claim-check` on PR #26 ("resolved task='' claim=''"). Fix: insert the footer before the trailing trailer block (use `git interpret-trailers --parse` to find it), and add a fixture test with a message ending in `Task:`/`Task-Claim:` trailers. agentbrew has a twin copy in `hooks/lib/` (task `strip-attribution-footer-keeps-git-trailers-last`).
+  - **Competitive-goal**: none — commit-hook correctness; no scorecard metric covers git hooks.
+  - **Measurement**: a `tests/` fixture that runs `git-hooks/commit-msg` on a message ending in `Task:`/`Task-Claim:` trailers and a stripped `Co-Authored-By:` line, then checks `git interpret-trailers --parse`.
+  - **Hypothesis**: placing the footer before the trailer block keeps trailers parseable; commits whose trailers the hook breaks drop from every agent commit with trailers to 0.
+  - **Success**: the new fixture passes, `git log -1 --format='%(trailers:key=Task-Claim,valueonly)'` prints the claim after the hook runs, and existing hook fixtures stay green.
+  - **Pivot**: if trailer detection misfires on plain prose endings, require a `Key: value` block that git itself parses (`git interpret-trailers --parse` non-empty) before moving anything.
+  - **Anchor**: git-interpret-trailers(1) (trailers must be the last paragraph); tasks.md docs/learnings.md row 2026-10-16.
+
 ## P2
 
 - [ ] Endpoint hardening runs only on Macs that need it

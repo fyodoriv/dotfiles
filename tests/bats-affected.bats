@@ -595,3 +595,16 @@ BATS
   assert_affected_includes agent-hooks/guard.sh reads-relative
   assert_affected_includes launchagents/x.plist.tmpl reads-bare
 }
+
+@test "a test that reads a file through a folder variable built from a repo root is selected" {
+  mkdir -p "$TEST_REPO/launchagents"
+  printf 'x\n' > "$TEST_REPO/launchagents/com.x.plist.tmpl"
+  cat > "$TEST_REPO/tests/reads-folder-var.bats" <<'BATS'
+REPO_ROOT="$BATS_TEST_DIRNAME/.."
+LAUNCHAGENTS="$REPO_ROOT/launchagents"
+@test "l" { grep -q x "$LAUNCHAGENTS/com.x.plist.tmpl"; }
+BATS
+  git -C "$TEST_REPO" add launchagents/com.x.plist.tmpl tests/reads-folder-var.bats
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: folder var"
+  assert_affected_includes launchagents/com.x.plist.tmpl reads-folder-var
+}

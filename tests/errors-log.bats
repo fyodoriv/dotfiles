@@ -95,3 +95,11 @@ teardown() { rm -rf "$TEST_DIR"; }
   run bash -c "grep -nE 'echo \"(Invalid|Unknown|ERROR|Module not found)' '$REPO_ROOT/bin/dotfiles-doctor' | grep -v 'fix: '"
   [ -z "$output" ] || { echo "doctor error lines without a fix: $output"; return 1; }
 }
+
+@test "an advisory warning with no remediation still names a fix" {
+  local mod="$TEST_DIR/extra/advisory-fix"
+  mkdir -p "$mod"
+  printf 'check_advisory "advisory-fix.w" "a warning with no remediation" "false" ""\n' > "$mod/doctor.sh"
+  run env HOME="$TEST_DIR/home" DOTFILES_STATS_LOG=0 EXTRA_DOCTOR_DIR="$TEST_DIR/extra" "$REPO_ROOT/bin/dotfiles-doctor" --module advisory-fix
+  [[ "$output" == *"a warning with no remediation"*"fix: "* ]] || { echo "$output"; return 1; }
+}

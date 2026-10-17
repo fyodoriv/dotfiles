@@ -293,10 +293,16 @@ done < <(find "$TESTS_DIR" -name '*.bats' -not -path "$TESTS_DIR/e2e/*" | LC_ALL
 # variable the file assigns from $BATS_TEST_DIRNAME or $BATS_TEST_FILENAME
 # (REAL_DOTFILES, ROOT, ...).
 bats_roots=()
+bats_derived=()
 for bats_file in "${all_bats[@]}"; do
   own="$(grep -E '^[[:space:]]*(export[[:space:]]+|local[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=.*BATS_TEST_(DIRNAME|FILENAME)' "$bats_file" 2>/dev/null |
     sed -E 's/^[[:space:]]*(export[[:space:]]+|local[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/' | sort -u | paste -sd'|' - || true)"
-  bats_roots+=("REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.${own:+|$own}")
+  roots_re="REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.${own:+|$own}"
+  bats_roots+=("$roots_re")
+  # Folder variables built from a root, one level deeper:
+  # LAUNCHAGENTS="$REPO_ROOT/launchagents" gives "LAUNCHAGENTS launchagents".
+  bats_derived+=("$(grep -oE "^[[:space:]]*(export[[:space:]]+|local[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=\"?\\\$\\{?($roots_re)\\}?/[A-Za-z0-9_./-]+" "$bats_file" 2>/dev/null |
+    sed -E 's/^[[:space:]]*(export[[:space:]]+|local[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)="?\$\{?[^/]*\}?\/(.*)$/\2 \3/; s#/$##' || true)")
 done
 # A test that reads "$REPO_ROOT/<file>" (or $DOTFILES_DIR, $root, or
 # $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
@@ -328,7 +334,16 @@ ${dir#tests/}"
   for i in "${!all_bats[@]}"; do
     if grep -qE -- "(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)|(^|[[:space:]\"'(=])$rel([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
       affected+=("${all_bats[$i]}")
+      continue
     fi
+    while read -r var sub; do
+      [ -n "$var" ] && [[ "$file" == "$sub/"* ]] || continue
+      rest="$(printf '%s' "${file#"$sub"/}" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"
+      if grep -qE -- "\\\$\{?$var\}?\"?/$rest([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
+        affected+=("${all_bats[$i]}")
+        break
+      fi
+    done <<< "${bats_derived[$i]}"
   done
 done
 

@@ -93,6 +93,7 @@ make_tooling_root() {
   grep -F -q 'docs/learnings.md' "$SKILL"
   grep -F -q 'Open P0s' "$SKILL"
   grep -F -q 'Repo health (monthly):' "$SKILL"
+  grep -F -q 'make changelog' "$SKILL"
 }
 
 @test "tooling-checkup reference links resolve one level deep" {

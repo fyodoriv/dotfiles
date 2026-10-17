@@ -321,8 +321,12 @@ ${dir#tests/}"
     continue
   fi
   escaped="$(printf '%s' "$file" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"
+  # bats runs from the repo root, so a test may also read a path as written
+  # ("./agent-hooks/x.sh", "launchagents/x.plist.tmpl"). A root-level file
+  # needs the "./" (a bare TASKS.md is usually a fixture name).
+  if [[ "$file" == */* ]]; then rel="(\./)?$escaped"; else rel="\./$escaped"; fi
   for i in "${!all_bats[@]}"; do
-    if grep -qE -- "(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
+    if grep -qE -- "(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)|(^|[[:space:]\"'(=])$rel([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
       affected+=("${all_bats[$i]}")
     fi
   done

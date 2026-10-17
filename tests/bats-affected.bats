@@ -583,3 +583,15 @@ BATS
   git -C "$TEST_REPO" commit -q --no-verify -m "chore: folder fixture"
   assert_affected_includes tests/fixtures/pkg-fixtures/simple/doctor/check.sh reads-folder
 }
+
+@test "a test that reads a file by a plain relative path is selected" {
+  mkdir -p "$TEST_REPO/agent-hooks" "$TEST_REPO/launchagents"
+  printf 'x\n' > "$TEST_REPO/agent-hooks/guard.sh"
+  printf 'HOOK=./agent-hooks/guard.sh\n@test "h" { bash "$HOOK"; }\n' > "$TEST_REPO/tests/reads-relative.bats"
+  printf '@test "k" { cat "launchagents/x.plist.tmpl"; }\n' > "$TEST_REPO/tests/reads-bare.bats"
+  printf 'x\n' > "$TEST_REPO/launchagents/x.plist.tmpl"
+  git -C "$TEST_REPO" add agent-hooks tests/reads-relative.bats tests/reads-bare.bats launchagents/x.plist.tmpl
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: relative fixtures"
+  assert_affected_includes agent-hooks/guard.sh reads-relative
+  assert_affected_includes launchagents/x.plist.tmpl reads-bare
+}

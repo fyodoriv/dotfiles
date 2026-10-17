@@ -78,3 +78,10 @@ map.secrets: .gitignore git-hooks/pre-commit git-hooks/pre-push
 # /tooling-checkup (accepted push back: no second RECURRING.md); and
 # docs/learnings.md logs predicted vs observed for each closed change.
 map.self-improving: Makefile scripts/gate-timed.sh skills/tooling-checkup/SKILL.md docs/learnings.md
+
+# Tool profile: CHANGELOG.md is generated from conventional commits by
+# scripts/changelog.sh, a wrapper around git-cliff with cliff.toml
+# (make changelog; the monthly checkup runs it because
+# dotfiles has no release tags), and tests/changelog.bats regenerates it from
+# its recorded commit to prove it was never edited by hand. LICENSE is MIT.
+map.tool: CHANGELOG.md scripts/changelog.sh cliff.toml tests/changelog.bats LICENSE

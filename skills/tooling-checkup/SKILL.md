@@ -231,6 +231,9 @@ In the same monthly pass, for `dotfiles` (run from its checkout):
 5. Learnings: add a row to `docs/learnings.md` for each prediction closed
    since the last checkup (predicted vs observed).
 6. Open P0s: list `## P0` in `TASKS.md`; each one goes to "Next: stability".
+7. Changelog: `make changelog` regenerates `CHANGELOG.md` from conventional
+   commits (dotfiles has no release tags, so the monthly pass is its
+   release). Ship the diff as a `docs(changelog):` PR; never edit it by hand.
 
 **Done when:** every ERROR is fixed or listed with its owner, the judgment
 checks are done, each due repository has a recorded requirements audit, and

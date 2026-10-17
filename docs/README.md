@@ -39,6 +39,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 
 | Doc | What it answers | Audience |
 |---|---|---|
+| [changelog-archive.md](changelog-archive.md) | What changed before CHANGELOG.md became generated (2026-10-16)? | human |
 | [learnings.md](learnings.md) | What did we predict for each change, and what happened? | both |
 | [metrics.md](metrics.md) | Is dotfiles working? Each metric with its goal, pivot, and command | both |
 | [observability.md](observability.md) | What did dotfiles do, what failed, and how healthy is this Mac? Logs, the errors log, and the doctor | both |

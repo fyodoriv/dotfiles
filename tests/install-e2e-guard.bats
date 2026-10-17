@@ -33,6 +33,11 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
   run bash -c "printf 'lib/output.sh\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
   [ "$status" -eq 0 ]
   [ "$output" = "lib/output.sh" ]
+  # Libs that a doctor module or a lifecycle script loads count too.
+  for lib in lib/gitconfig-user-migrate.sh lib/launchagent-duplicates.sh lib/self-reload.sh lib/agentbrew-locate.sh; do
+    run bash -c "printf '%s\n' '$lib' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
+    [ "$status" -eq 0 ] || { echo "no e2e for $lib"; return 1; }
+  done
   run bash -c "printf 'lib/errors-log.sh\nREADME.md\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
   [ "$status" -eq 0 ]
   [ "$output" = "lib/errors-log.sh" ]

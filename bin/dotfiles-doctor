@@ -220,7 +220,7 @@ while [ $# -gt 0 ]; do
         fi
       done
       if [ -z "$MODULE_FILTER_PATH" ]; then
-        echo "Module not found: $MODULE_FILTER"
+        echo "Module not found: $MODULE_FILTER — fix: pick one of the modules below"
         _avail=()
         for parent in "${MODULE_DIRS[@]}"; do
           [ -d "$parent" ] || continue
@@ -235,8 +235,7 @@ while [ $# -gt 0 ]; do
       if [ -z "${2:-}" ]; then echo "Usage: dotfiles-doctor --skip <check-id>"; exit 1; fi
       collect_known_check_ids
       if ! is_known_check_id "$2"; then
-        echo "Unknown check ID: $2"
-        echo "Run dotfiles-doctor --list to discover valid check IDs."
+        echo "Unknown check ID: $2 — fix: run dotfiles-doctor --list and pass a listed ID"
         exit 1
       fi
       if grep -qxF "$2" "$OVERRIDES_FILE" 2>/dev/null; then

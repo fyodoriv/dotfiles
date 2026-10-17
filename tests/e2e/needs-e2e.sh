@@ -19,13 +19,15 @@ else
   base="$(git merge-base HEAD "${1:-origin/feat/chezmoi}" 2>/dev/null || echo HEAD)"
   changed="$({ git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
 fi
-# Plus every lib the e2e commands load, two levels deep, so a change to a lib
-# the doctor or morning sources (lib/output.sh, ...) runs the story e2e too.
+# Plus every lib that the e2e runs, two levels deep: libs sourced by the e2e
+# commands, by the doctor modules the e2e checks (git, shell, sync), and by
+# the chezmoi lifecycle scripts the install runs.
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 E2E_CMDS="bin/dotfiles-install bin/dotfiles-doctor bin/morning bin/dotfiles bin/dotfiles-add bin/dotfiles-profile bin/dotfiles-stats bin/git-safe"
 libs_of() { (cd "$root" && grep -ohE 'lib/[A-Za-z0-9_.-]+\.(sh|awk|py)' "$@" 2>/dev/null | sort -u); }
+E2E_SOURCES="$E2E_CMDS modules/git/doctor.sh modules/shell/doctor.sh modules/sync/doctor.sh $(cd "$root" && ls .chezmoiscripts/* 2>/dev/null | tr '\n' ' ')"
 # shellcheck disable=SC2086 # word-split the command and lib lists on purpose
-first="$(libs_of $E2E_CMDS)"
+first="$(libs_of $E2E_SOURCES)"
 # shellcheck disable=SC2086
 libs="$( { printf '%s\n' "$first"; [ -n "$first" ] && libs_of $first; } | grep . | sort -u)"
 

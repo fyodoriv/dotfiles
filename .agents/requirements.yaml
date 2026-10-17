@@ -4,8 +4,9 @@
 # Each map line lands in the PR that makes it true, with a comment saying why.
 # e2e: tests/e2e/hermetic-install.sh runs the real install (real chezmoi,
 # lifecycle scripts, doctor, zsh) in a sandboxed scratch HOME; the US01 cases
-# are in dotfiles-install-e2e.bats and every other story's real command runs
-# after it via hermetic-exec.sh in stories-e2e.bats (happy + error case each).
+# are in dotfiles-install-e2e.bats, and the real commands of US02-US06, US08,
+# and US10 run after it via hermetic-exec.sh in stories-e2e.bats (happy + error
+# case each); US07 and US09 use unit bats (accepted push back).
 # Every test in tests/e2e/ is named "USNN e2e: ..." (tests/user-stories.bats
 # checks it), and make e2e runs exactly that folder.
 map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/dotfiles-install-e2e.bats tests/e2e/stories-e2e.bats
@@ -14,8 +15,10 @@ map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/dotf
 # open P0s (tests/tooling-checkup-skill.bats).
 map.checkup: skills/tooling-checkup/SKILL.md tests/tooling-checkup-skill.bats
 # Caching: bin/cached-run keys a step on HEAD, the tracked diff, and untracked
-# file names and contents; bin/bats-affected selects mapped tests plus every
-# test that reads a changed file by repo path; make test-force runs all.
+# file names and contents (gitignored files and environment variables are not
+# in the key; steps read tracked inputs); bin/bats-affected selects mapped
+# tests plus every test that reads a changed file by repo path, or a changed
+# tests/ helper or fixture by its relative path; make test-force runs all.
 # tests/cached-run.bats proves an edit to one tracked or untracked file re-runs.
 map.caching: bin/cached-run bin/bats-affected tests/cached-run.bats tests/bats-affected.bats
 # Docs: docs/README.md maps every doc to the question it answers;

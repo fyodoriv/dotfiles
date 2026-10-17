@@ -527,3 +527,12 @@ EOF
   result="$(affected_for TASKS.md | basenames)"
   ! grep -qx fixture-tasks <<<"$result"
 }
+
+@test "a changed test fixture selects every test that reads it" {
+  mkdir -p "$TEST_REPO/tests/fixtures"
+  printf 'stub\n' > "$TEST_REPO/tests/fixtures/mock-tool.sh"
+  printf '@test "z" { bash "$BATS_TEST_DIRNAME/fixtures/mock-tool.sh"; }\n' > "$TEST_REPO/tests/uses-fixture.bats"
+  git -C "$TEST_REPO" add tests/fixtures/mock-tool.sh tests/uses-fixture.bats
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: fixture"
+  assert_affected_includes tests/fixtures/mock-tool.sh uses-fixture
+}

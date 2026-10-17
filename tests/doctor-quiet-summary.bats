@@ -21,6 +21,7 @@ teardown() {
   [ "${#lines[@]}" -eq 1 ]
   [[ "${lines[0]}" == *"✗ 1"* ]]
   [[ "${lines[0]}" == *"failing: notification-fail-module.always_fails"* ]]
+  [[ "${lines[0]}" == *"— fix: dotfiles doctor --fix" ]]
 }
 
 @test "quiet: --fix --quiet names a check whose fix is missing" {
@@ -28,6 +29,9 @@ teardown() {
   run "$REPO_ROOT/bin/dotfiles-doctor" --module notification-fail-module --fix --quiet
   [ "$status" -eq 1 ]
   [[ "${lines[${#lines[@]}-1]}" == *"failing: notification-fail-module.always_fails"* ]]
+  # In the applied checkout the fix is by hand; elsewhere --fix is report-only,
+  # so the line points at dotfiles doctor --fix. Either way it names a fix.
+  [[ "${lines[${#lines[@]}-1]}" == *"— fix: "* ]]
 }
 
 @test "quiet: more than 5 failing checks are capped with +N more" {

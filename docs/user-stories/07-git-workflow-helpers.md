@@ -2,7 +2,7 @@
 
 > Create PRs, hotfixes, and code reviews — one command each, no ceremony.
 
-**Metric:** PRs merged to dotfiles in the last 30 days — see [docs/metrics.md](../metrics.md#metrics).
+**Metric:** Git helper runs (`pr`, `hotfix`, `review`) in the last 30 days — see [docs/metrics.md](../metrics.md#metrics).
 
 **Tests:** tests/pr.bats, tests/hotfix.bats, tests/review.bats. Unit bats only (accepted push back: `pr`, `hotfix`, and `review` need GitHub).
 

@@ -111,3 +111,18 @@ MD
   done
   [ -z "$bad" ] || { echo "rows with the wrong cell count:$bad"; return 1; }
 }
+
+@test "metrics: an empty window prints a real 0; a missing source fails (stub)" {
+  # The US08 row: minutes saved in the last 30 days.
+  local cmd
+  cmd="$(awk -F'`' '/^\| Minutes saved by automation/{print $2; exit}' "$REPO/docs/metrics.md" | sed 's/\\|/|/g')"
+  [ -n "$cmd" ]
+  mkdir -p "$TEST_DIR/home"
+  printf '{"task":"sync","timestamp":"2020-01-01T00:00:00Z","seconds_saved":3,"units":1}\n' > "$TEST_DIR/home/.dotfiles-stats.jsonl"
+  run env HOME="$TEST_DIR/home" bash -o pipefail -c "$cmd"
+  [ "$status" -eq 0 ]
+  [ "$output" = "0" ]
+  rm "$TEST_DIR/home/.dotfiles-stats.jsonl"
+  run env HOME="$TEST_DIR/home" bash -o pipefail -c "$cmd"
+  [ "$status" -ne 0 ]
+}

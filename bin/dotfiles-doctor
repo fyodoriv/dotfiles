@@ -950,7 +950,10 @@ if $JSON_MODE; then
 elif $QUIET_MODE; then
   if (( fail_count > 0 )); then
     _quiet_ids=$(_ids_preview "${failed_check_ids[@]+"${failed_check_ids[@]}"}")
-    echo -e "${GREEN}✓ $pass_count${NC}  ${RED}✗ $fail_count${NC}  ${DIM}⊘ $skip_count${NC}${_quiet_ids:+  failing: $_quiet_ids}"
+    # The quiet line carries a fix too (docs/observability.md#health-check).
+    if $FIX_MODE; then _quiet_fix="by hand; dotfiles doctor lists each check's fix"
+    else _quiet_fix="dotfiles doctor --fix"; fi
+    echo -e "${GREEN}✓ $pass_count${NC}  ${RED}✗ $fail_count${NC}  ${DIM}⊘ $skip_count${NC}${_quiet_ids:+  failing: $_quiet_ids} — fix: $_quiet_fix"
     exit 1
   else
     echo -e "${GREEN}✓ $pass_count passed${NC}  ${DIM}⊘ $skip_count skipped${NC}"

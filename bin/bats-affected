@@ -286,7 +286,15 @@ done
 # $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
 # runs too. A test that only names a fixture file of the same name does not.
 for file in "${changed_files[@]}"; do
-  [[ "$file" == tests/* ]] && continue
+  [[ "$file" == tests/*.bats ]] && continue
+  # A helper or fixture under tests/ is read by its path relative to tests/
+  # ("$BATS_TEST_DIRNAME/fixtures/x" or "fixtures/x").
+  if [[ "$file" == tests/* ]]; then
+    while IFS= read -r test_file; do
+      [ -n "$test_file" ] && affected+=("$test_file")
+    done < <(grep -lF -- "${file#tests/}" "$TESTS_DIR"/*.bats 2>/dev/null || true)
+    continue
+  fi
   escaped="$(printf '%s' "$file" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"
   while IFS= read -r test_file; do
     [ -n "$test_file" ] && affected+=("$test_file")

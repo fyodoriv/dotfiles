@@ -5,6 +5,8 @@
 
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+# shellcheck source=../lib/stats.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
 
 title="${1:-$(git log -1 --pretty=%s)}"
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -37,3 +39,4 @@ git push -u "$remote" "$branch" 2>/dev/null || git push --set-upstream "$remote"
 # Create PR via gh
 echo ""
 gh pr create --title "$title" --body "" --draft 2>/dev/null || gh pr view --web
+log_run pr

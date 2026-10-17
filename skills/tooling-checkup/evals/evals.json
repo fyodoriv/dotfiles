@@ -116,7 +116,7 @@
       "expectations": [
         "Runs machine_metrics.py once and reports load_overload_rows as act with the peak and the top processes",
         "Does not run echo_latency.py, because the script printed latency-check: skip",
-        "Puts the third-party GeForceNOW load into the Phase 10 questionnaire instead of killing or disabling it",
+        "Puts the third-party GeForceNOW load into the Phase 11 questionnaire instead of killing or disabling it",
         "Records the machine_overload_rows_24h and machine_peak_load1_24h metrics with checkup_state.py record"
       ]
     },
@@ -131,6 +131,18 @@
         "Proposes a requirement change on the new-project skill when the same waiver appears in two or more repos",
         "Runs audit-due.sh --record for each audited repo",
         "Adds a \"Requirements (monthly)\" line to the Config audit section of the report"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "/tooling-checkup — and look around for new ways I could work better with AI while you are at it.",
+      "expected_output": "Phase 9 runs on its own: the feed scan outside the sandbox, up to two web searches, the Altitude question on the top Phase 8 step, one lens-and-verdict line per opened item, a metric for each adopt or try, and ai_research.py record after the questionnaire.",
+      "expectations": [
+        "Runs ai_research.py scan outside the agent sandbox and names each feed error instead of hiding it",
+        "Reports only items that no earlier run has seen, and runs ai_research.py record only after Phase 11",
+        "Writes one line per opened item with a lens (Speed, Altitude, Depth, or Range) and a verdict (adopt, try, or skip)",
+        "Gives each adopt or try a metric and a command before it becomes a task, a /ship-it change, or a question",
+        "Installs nothing from a post and never proposes an xAI or Musk-affiliated product"
       ]
     }
   ]

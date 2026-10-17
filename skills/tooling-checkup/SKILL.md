@@ -7,8 +7,9 @@ description: >
   audits LaunchAgents and heavy processes, reads the recent machine and tooling
   metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals)
   and measures input latency only when a lag signal fires, reviews where agent
-  tool time went, and lints skills, rules, and AGENTS.md files against Anthropic's
-  best practices. Then it reports what changed since the last run, asks the
+  tool time went, lints skills, rules, and AGENTS.md files against Anthropic's
+  best practices, and researches new ways to work with AI (feeds plus web
+  search, judged by the Speed, Altitude, Depth, and Range lenses). Then it reports what changed since the last run, asks the
   owner a questionnaire, and applies the answers. Use when the user runs
   "/tooling-checkup", or asks to update all tooling and the machine, to tidy up
   background processes, or to check that agent config follows best practices.
@@ -20,15 +21,15 @@ disable-model-invocation: true
 # Tooling checkup
 
 The user runs this by hand every 2 or 3 days. It must be safe to repeat, and
-fast when nothing changed. Run eleven phases in order. Each phase ends with a
-**Done when** check. Phases 9, 10, and 11 always run, even when an earlier
+fast when nothing changed. Run twelve phases in order. Each phase ends with a
+**Done when** check. Phases 10, 11, and 12 always run, even when an earlier
 phase is blocked.
 
 `<skill-dir>` below means this skill's base directory.
 `TOOLING_ROOT` defaults to `~/apps/tooling`.
 
-**Scope.** `/tooling-checkup` alone runs all eleven phases. A request for one part
-runs Phase 1, that part, and Phases 9 to 11:
+**Scope.** `/tooling-checkup` alone runs all twelve phases. A request for one part
+runs Phase 1, that part, and Phases 10 to 12:
 
 | The user asks to… | Run |
 |---|---|
@@ -39,6 +40,7 @@ runs Phase 1, that part, and Phases 9 to 11:
 | check skills and rules against best practices | Phase 7 |
 | audit the new-project requirements now | Phase 7, monthly step (pass `--days 0` to `audit-due.sh`) |
 | find what makes agents slow | Phase 8 |
+| research new ways to work with AI | Phase 9 |
 
 ## Hard rules
 
@@ -82,7 +84,8 @@ Phase 1 compares the machine with it. Use it to keep a repeat run short:
 - Phase 7 replays the cached audit when no skill or rule file changed.
 - Phase 6 runs the slow echo test only when `machine_metrics.py` prints
   `latency-check: run`.
-- Phases 1, 3, 5, 6, and 8 always run. They check live state.
+- Phase 9 shows only feed items no earlier run has seen.
+- Phases 1, 3, 5, 6, 8, and 9 always run. They check live state.
 
 ## Phase 1: Take stock (read-only)
 
@@ -150,7 +153,7 @@ lists the heaviest processes.
 
 - Fix tooling-owned jobs in their source repo.
 - Unload an `off-rule` minsky job at once.
-- Put each third-party removal in the Phase 10 questionnaire. Disable only
+- Put each third-party removal in the Phase 11 questionnaire. Disable only
   after a yes, and only by moving the plist.
 
 **Done when:** every job that is not `keep` has an action, a question, or a
@@ -178,7 +181,7 @@ Each line has a verdict:
 
 | Verdict | Do this |
 |---|---|
-| `act` | Find the cause (the line names the top processes or pids). Fix it in its tooling source repo with `/ship-it`, or file a task with the numbers. A third-party cause goes to the Phase 10 questionnaire. |
+| `act` | Find the cause (the line names the top processes or pids). Fix it in its tooling source repo with `/ship-it`, or file a task with the numbers. A third-party cause goes to the Phase 11 questionnaire. |
 | `warn` | Report it. File a task when the same metric warned in the last run too. |
 | `ok`, `unknown` | Report `unknown` with its note; nothing else. |
 
@@ -257,7 +260,7 @@ and one speedup line per step that recurs in 2 or more sessions and costs
 
 | Line | Do this |
 |---|---|
-| `file` | Add the task id to that tooling repo's `TASKS.md`, with the step, its cost per day, and the fix. Ship it in Phase 11. |
+| `file` | Add the task id to that tooling repo's `TASKS.md`, with the step, its cost per day, and the fix. Ship it in Phase 12. |
 | `filed` | The task exists. Re-rank it when the cost grew. |
 | `report` | Not a tooling repo. Report it only. |
 | `inspect` | The key is redacted. Find the real step with `agent-perf.mjs report --session <id>`, then file or report it. |
@@ -271,7 +274,25 @@ questionnaire. Use the perf-review skill for deeper analysis.
 **Done when:** the review is printed with real numbers, and each `file`,
 `filed`, `report`, and `inspect` line has an action.
 
-## Phase 9: Report
+## Phase 9: AI-work research
+
+Look for new ways to work with AI, on your own, every run. Follow
+[reference/ai-work-research.md](reference/ai-work-research.md). In short:
+
+1. Run `python3 <skill-dir>/scripts/ai_research.py scan` outside the sandbox.
+   It prints only feed items that no earlier run has seen. Add up to two web
+   searches for what the feeds miss.
+2. Ask the Altitude question about the top recurring step from Phase 8: what
+   outcome could an agent own instead of this step?
+3. Judge each candidate with one lens (Speed, Altitude, Depth, Range) and one
+   verdict: `adopt`, `try`, or `skip`. Read only; install nothing from a post.
+4. Each `adopt` or `try` names its metric and command (an outside judge),
+   then becomes a `/ship-it` change, a task, or a Phase 11 question.
+
+**Done when:** the scan ran (or each feed error is named), each new item has
+a verdict line, and each `adopt` or `try` has a task, a change, or a question.
+
+## Phase 10: Report
 
 Put the verdict first. Use this template.
 
@@ -307,6 +328,10 @@ Put the verdict first. Use this template.
 - Per project: <project>: <top key> <total> · …
 - Speedups: filed <repo>/<task-id> (<min/day>) · fixed: <what> · none
 
+### AI-work research
+- Scanned: <n> new items from <n> feeds (<errors>) · searches: <queries>
+- Adopt/try: <idea> (<lens>) → <task, PR, or question> · skipped: <n>
+
 ### Needs you
 - <item> → <the exact question or command>
 
@@ -324,7 +349,7 @@ feature work in separate lists, up to three each. Recommend from the refreshed
 
 **Done when:** the report is written and each claim has evidence.
 
-## Phase 10: Ask the owner
+## Phase 11: Ask the owner
 
 Collect the questions: each "Needs you" item, each third-party job to remove,
 each big config change, and which next tasks to start. Skip a question an
@@ -340,17 +365,18 @@ question:
 
 **Done when:** every question has an answer, or the user chose to stop.
 
-## Phase 11: Apply the answers and record
+## Phase 12: Apply the answers and record
 
 1. Apply each answer: disable the approved jobs, ship the approved config
    changes with `/ship-it`, and file or re-rank tasks (with the Phase 8
-   speedup tasks).
+   speedup tasks and the Phase 9 research tasks).
 2. Run `bash <skill-dir>/scripts/inventory.sh` again and update the report.
+   Mark the Phase 9 items as seen: `python3 <skill-dir>/scripts/ai_research.py record`.
 3. Record this run:
 
    ```bash
    python3 <skill-dir>/scripts/checkup_state.py record --verdict "<verdict line>" \
-     <the Phase 6 `record:` metrics> <the Phase 8 `record:` metrics> \
+     <the Phase 6, 8, and 9 `record:` metrics> \
      [--metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> when the echo test ran]
    ```
 

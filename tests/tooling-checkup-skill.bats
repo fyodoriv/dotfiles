@@ -79,9 +79,9 @@ make_tooling_root() {
   grep -F -q 'checkup_state.py record' "$SKILL"
   grep -F -q 'agent_time_review.py --days 7' "$SKILL"
   grep -F -q '### Agent time (7 days)' "$SKILL"
-  grep -F -q 'runs all eleven phases' "$SKILL"
-  [ "$(grep -c '^## Phase ' "$SKILL")" -eq 11 ]
-  [ "$(grep -c '^\*\*Done when:\*\*' "$SKILL")" -eq 11 ]
+  grep -F -q 'runs all twelve phases' "$SKILL"
+  [ "$(grep -c '^## Phase ' "$SKILL")" -eq 12 ]
+  [ "$(grep -c '^\*\*Done when:\*\*' "$SKILL")" -eq 12 ]
 }
 
 @test "tooling-checkup monthly pass covers health, cached gate, stories, speed, learnings, and P0s" {
@@ -483,4 +483,58 @@ JS
   [ "$status" -eq 0 ]
   [ "$(jq -r '.latency_check.run' <<<"$output")" = "true" ]
   [ "$(jq -r '.latency_check.triggers[0]' <<<"$output")" = "the user reported lag" ]
+}
+
+@test "AI-work research phase uses the ambition lenses and records seen items" {
+  grep -F -q '## Phase 9: AI-work research' "$SKILL"
+  grep -F -q 'ai_research.py scan' "$SKILL"
+  grep -F -q 'ai_research.py record' "$SKILL"
+  grep -F -q '### AI-work research' "$SKILL"
+  local ref="$SKILL_DIR/reference/ai-work-research.md"
+  grep -F -q '| Altitude |' "$ref"
+  grep -F -q '| Depth |' "$ref"
+  grep -F -q '| Range |' "$ref"
+  grep -F -q 'outside judge' "$ref"
+  grep -F -q 'outside the agent sandbox' "$ref"
+}
+
+@test "AI research scan lists only unseen feed items and record marks them seen" {
+  local feeds="$TEST_DIR/feeds" now
+  mkdir -p "$feeds"
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  cat > "$feeds/atom.xml" <<XML
+<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><title>Fresh atom post</title><link rel="alternate" href="https://a.example.com/fresh"/><updated>$now</updated></entry>
+  <entry><title>Old atom post</title><link href="https://a.example.com/old"/><updated>2001-01-01T00:00:00Z</updated></entry>
+</feed>
+XML
+  cat > "$feeds/rss.xml" <<XML
+<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item><title>Undated rss post</title><link>https://r.example.com/one</link></item>
+</channel></rss>
+XML
+  export TOOLING_CHECKUP_STATE_DIR="$TEST_DIR/state"
+  export TOOLING_CHECKUP_AI_FEEDS="atom file://$feeds/atom.xml
+rss file://$feeds/rss.xml
+broken file://$feeds/missing.xml"
+
+  run python3 "$SCRIPTS/ai_research.py" scan
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"new: "*" atom | Fresh atom post | https://a.example.com/fresh"* ]]
+  [[ "$output" == *"new: undated rss | Undated rss post | https://r.example.com/one"* ]]
+  [[ "$output" != *"Old atom post"* ]]
+  [[ "$output" == *"source: broken error:"* ]]
+  [[ "$output" == *"research: 2 new item(s), 1 feed error(s)"* ]]
+  [[ "$output" == *"record: --metric ai_research_new=2"* ]]
+
+  run python3 "$SCRIPTS/ai_research.py" record
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"recorded: 2 item(s) as seen"* ]]
+
+  run python3 "$SCRIPTS/ai_research.py" scan
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"research: 0 new item(s)"* ]]
+  ! grep -q "$TEST_HOME" "$TEST_DIR/state/ai-research-seen.json"
 }

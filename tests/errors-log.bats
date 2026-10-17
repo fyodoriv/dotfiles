@@ -75,3 +75,15 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -e "$s" ]
   [ ! -e "$DOTFILES_ERRORS_FILE" ]
 }
+
+@test "--validate-overrides failing lines carry their fix" {
+  local dir="$TEST_DIR/df"
+  mkdir -p "$dir"
+  cp -R "$REPO_ROOT/bin" "$REPO_ROOT/lib" "$REPO_ROOT/modules" "$dir/"
+  printf 'no.such.check\n' > "$dir/.overrides"
+  run env HOME="$TEST_DIR/home" DOTFILES_STATS_LOG=0 "$dir/bin/dotfiles-doctor" --validate-overrides
+  [ "$status" -eq 1 ]
+  local bad
+  bad="$(printf '%s\n' "$output" | grep -iE 'unknown|no\.such\.check' | grep -v -- '— fix: ' || true)"
+  [ -z "$bad" ] || { echo "lines without a fix: $bad"; return 1; }
+}

@@ -383,12 +383,12 @@ if $VALIDATE_OVERRIDES_MODE; then
   done < "$OVERRIDES_FILE"
 
   if [ ${#_unknown[@]} -gt 0 ]; then
-    echo "Unknown check IDs in .overrides:"
+    echo "Unknown check IDs in .overrides — fix: remove each line below from $OVERRIDES_FILE (dotfiles doctor --list shows valid IDs):"
     for uid in "${_unknown[@]}"; do
-      echo "  - $uid"
+      echo "  - $uid — fix: delete this line from .overrides"
     done
     echo ""
-    echo "${#_unknown[@]} unknown override(s), $_valid valid."
+    echo "${#_unknown[@]} unknown override(s), $_valid valid — fix: delete the unknown lines from .overrides."
     exit 1
   else
     echo "All overrides are valid ($_valid override(s) checked against ${#_known_ids[@]} known IDs)."

@@ -10,7 +10,7 @@ set -uo pipefail
 
 # Paths that change what `dotfiles-install` does on a new Mac, plus the
 # commands the story e2e drives (stories-e2e.bats).
-TRIGGERS='^(bin/dotfiles-install|bin/dotfiles-doctor|bin/morning|bin/dotfiles$|bin/dotfiles-add|bin/dotfiles-profile|bin/dotfiles-stats|bin/git-safe|lib/overlay-locate\.sh|lib/stats\.sh|modules/git/|modules/shell/|modules/sync/|INSTALL\.md|\.chezmoi\.yaml\.tmpl|\.chezmoiignore|\.chezmoiscripts/|tests/e2e/|launchagents/|dot_gitconfig[^/]*|symlink_dot_zsh[^/]*|home/zsh[^/]*|dot_config/|private_dot_[^/]*|modify_[^/]*)'
+TRIGGERS='^(bin/dotfiles-install|bin/dotfiles-doctor|bin/morning|bin/dotfiles$|bin/dotfiles-add|bin/dotfiles-profile|bin/dotfiles-stats|bin/git-safe|lib/overlay-locate\.sh|lib/stats\.sh|data/|modules/git/|modules/shell/|modules/sync/|INSTALL\.md|\.chezmoi\.yaml\.tmpl|\.chezmoiignore|\.chezmoiscripts/|tests/e2e/|launchagents/|dot_gitconfig[^/]*|symlink_dot_zsh[^/]*|home/zsh[^/]*|dot_config/|private_dot_[^/]*|modify_[^/]*)'
 
 if [ "${1:-}" = "--stdin" ]; then
   changed="$(cat)"
@@ -25,10 +25,16 @@ fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 E2E_CMDS="bin/dotfiles-install bin/dotfiles-doctor bin/dotfiles-heal-stuck-agents bin/morning bin/dotfiles bin/dotfiles-add bin/dotfiles-profile bin/dotfiles-stats bin/git-safe"
 libs_of() { (cd "$root" && grep -ohE 'lib/[A-Za-z0-9_.-]+\.(sh|awk|py)' "$@" 2>/dev/null | sort -u); }
-E2E_SOURCES="$E2E_CMDS modules/git/doctor.sh modules/shell/doctor.sh modules/sync/doctor.sh $(cd "$root" && ls .chezmoiscripts/* 2>/dev/null | tr '\n' ' ')"
+# Repo files the lifecycle scripts run ({{ .chezmoi.sourceDir }}/macos.sh,
+# $DOTFILES_DIR/bin/x, ...) are part of the install too: they trigger the e2e
+# and their libs are scanned.
+targets="$(cd "$root" && grep -ohE '(\.chezmoi\.sourceDir \}\}|\$\{?(DOTFILES_DIR|CHEZMOI_SOURCE_DIR)\}?)/[A-Za-z0-9_./-]+' .chezmoiscripts/* 2>/dev/null |
+  sed -E 's#^(\.chezmoi\.sourceDir \}\}|\$\{?(DOTFILES_DIR|CHEZMOI_SOURCE_DIR)\}?)/##; s#/$##' | sort -u |
+  while IFS= read -r t; do [ -f "$t" ] && printf '%s\n' "$t"; done)"
+E2E_SOURCES="$E2E_CMDS modules/git/doctor.sh modules/shell/doctor.sh modules/sync/doctor.sh $(cd "$root" && ls .chezmoiscripts/* 2>/dev/null | tr '\n' ' ') $(printf '%s ' $targets)"
 # shellcheck disable=SC2086 # word-split the command and lib lists on purpose
 first="$(libs_of $E2E_SOURCES)"
 # shellcheck disable=SC2086
-libs="$( { printf '%s\n' "$first"; [ -n "$first" ] && libs_of $first; } | grep . | sort -u)"
+libs="$( { printf '%s\n' "$first" "$targets"; [ -n "$first" ] && libs_of $first; } | grep . | sort -u)"
 
 { grep -E "$TRIGGERS" <<<"$changed" || true; grep -xF -f <(printf '%s\n' "$libs") <<<"$changed" || true; } | sort -u | grep .

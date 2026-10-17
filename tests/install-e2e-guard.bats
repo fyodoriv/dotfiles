@@ -34,7 +34,10 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
   [ "$status" -eq 0 ]
   [ "$output" = "lib/output.sh" ]
   # Libs that a doctor module or a lifecycle script loads count too.
-  for lib in lib/gitconfig-user-migrate.sh lib/launchagent-duplicates.sh lib/self-reload.sh lib/agentbrew-locate.sh; do
+  # So do the repo files a lifecycle script runs (macos.sh) and their libs
+  # and data (lib/apply-defaults.sh, data/macos-defaults.json).
+  for lib in lib/gitconfig-user-migrate.sh lib/launchagent-duplicates.sh lib/self-reload.sh lib/agentbrew-locate.sh \
+      macos.sh lib/apply-defaults.sh data/macos-defaults.json bin/jetbrains-install-plugins; do
     run bash -c "printf '%s\n' '$lib' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
     [ "$status" -eq 0 ] || { echo "no e2e for $lib"; return 1; }
   done

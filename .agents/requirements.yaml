@@ -22,8 +22,10 @@ map.checkup: skills/tooling-checkup/SKILL.md tests/tooling-checkup-skill.bats
 # from $BATS_TEST_DIRNAME or $BATS_TEST_FILENAME), or a changed tests/ helper
 # or fixture by its relative path; the gate calls this checkout's
 # ./bin/cached-run;
-# tests/e2e/needs-e2e.sh triggers the e2e on any lib that its commands, the
-# doctor modules it checks (git, shell, sync), or the lifecycle scripts load; make
+# tests/e2e/needs-e2e.sh triggers the e2e on the repo files the lifecycle
+# scripts run (macos.sh, bin/...), data/, and any lib that its commands, the
+# doctor modules it checks (git, shell, sync), the lifecycle scripts, or those
+# run targets load; make
 # test-force runs all, tests/plugin included.
 # tests/cached-run.bats proves an edit to one tracked or untracked file re-runs.
 map.caching: bin/cached-run bin/bats-affected tests/e2e/needs-e2e.sh tests/cached-run.bats tests/bats-affected.bats tests/install-e2e-guard.bats

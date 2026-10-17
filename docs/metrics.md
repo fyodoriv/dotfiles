@@ -34,7 +34,7 @@ Rules:
 | Minutes saved by automation in the last 30 days | ≥ 90 (baseline 94) | < 30 | `jq -se --arg s "$(date -u -v-30d +%FT%TZ)" '[.[] \| select(.timestamp>=$s) \| .seconds_saved] \| (add // 0) / 60 \| floor' ~/.dotfiles-stats.jsonl` | US08 |
 | Local-AI health checks that found an engine, last 2000 log lines (%) | ≥ 80 by 2027-01-31 (baseline 25) | < 50 on 2027-01-31 | `tail -2000 ~/.local/share/dotfiles/logs/local-ai-warmup.log \| awk '/health check start/{n++} /no inference engine reachable/{w++} END{if(n==0) exit 1; print int((n-w)*100/n)}'` | US09 |
 | Public forks of dotfiles | ≥ 3 by 2027-06-30 (baseline 0) | 0 on 2027-06-30 | `gh api repos/fyodoriv/dotfiles --jq .forks_count` | US10 |
-| `make check` total time, median of the last 10 passing runs (s) | ≤ 120 (baseline: first runs from 2026-10-16) | > 300 | `jq -se '[.[] \| select(.step=="total" and .status==0) \| .seconds] \| .[-10:] \| if length==0 then error("no runs") else sort \| .[length/2 \| floor] end' ~/.local/state/dotfiles/gate-timings.jsonl` | contributors |
+| `make check` total time, median of the last 10 passing runs (s) | ≤ 120 (baseline 18 on 2026-10-16) | > 300 | `jq -se '[.[] \| select(.step=="total" and .status==0) \| .seconds] \| .[-10:] \| if length==0 then error("no runs") else sort \| .[length/2 \| floor] end' ~/.local/state/dotfiles/gate-timings.jsonl` | contributors |
 
 ## Guards
 

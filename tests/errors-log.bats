@@ -87,3 +87,11 @@ teardown() { rm -rf "$TEST_DIR"; }
   bad="$(printf '%s\n' "$output" | grep -iE 'unknown|no\.such\.check' | grep -v -- '— fix: ' || true)"
   [ -z "$bad" ] || { echo "lines without a fix: $bad"; return 1; }
 }
+
+@test "doctor error lines and the lock lines it prints carry their fix" {
+  # Lock failures end the doctor run (acquire_lock || exit 0), so they count.
+  run bash -c "grep -nE 'warn \"\\[lock\\] (Cannot|Skipping)' '$REPO_ROOT/lib/lock.sh' | grep -v 'fix: '"
+  [ -z "$output" ] || { echo "lock lines without a fix: $output"; return 1; }
+  run bash -c "grep -nE 'echo \"(Invalid|Unknown|ERROR|Module not found)' '$REPO_ROOT/bin/dotfiles-doctor' | grep -v 'fix: '"
+  [ -z "$output" ] || { echo "doctor error lines without a fix: $output"; return 1; }
+}

@@ -67,12 +67,12 @@ acquire_lock() {
       if [ -d "$lock_parent" ]; then
         continue
       fi
-      warn "[lock] Cannot create lock at $DOTFILES_LOCK"
+      warn "[lock] Cannot create lock at $DOTFILES_LOCK — fix: mkdir -p \"$lock_parent\" and check it is writable"
       return 1
     fi
 
     if [ -d "$DOTFILES_LOCK" ]; then
-      warn "[lock] Cannot acquire — $DOTFILES_LOCK is a directory"
+      warn "[lock] Cannot acquire — $DOTFILES_LOCK is a directory — fix: rmdir \"$DOTFILES_LOCK\" (it should be a file)"
       return 1
     fi
 
@@ -83,7 +83,7 @@ acquire_lock() {
 
     # Check if the locking process is still alive
     if _lock_owner_alive "$lock_pid"; then
-      warn "[lock] Skipping — locked by $lock_caller (pid $lock_pid)"
+      warn "[lock] Skipping — locked by $lock_caller (pid $lock_pid) — fix: wait for it to finish, then run again"
       return 1
     fi
     # Stale lock — process is dead, or its PID was reused by another program
@@ -96,7 +96,7 @@ acquire_lock() {
       continue
     fi
 
-    warn "[lock] Cannot remove stale lock at $DOTFILES_LOCK"
+    warn "[lock] Cannot remove stale lock at $DOTFILES_LOCK — fix: rm -f \"$DOTFILES_LOCK\" (check its owner and permissions)"
     return 1
   done
 }

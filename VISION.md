@@ -122,7 +122,7 @@ wrapper goes, not a new deadline.
   2027-06-30, fold the overlay docs into one page and stop growing the forking
   guide.
 - **Shell config**: if the median shell startup is 300 ms or more at two
-  monthly audits in a row, remove the slowest init block (find it with
+  monthly audits in a row (first audit 2026-11-16), remove the slowest init block (find it with
   `zprof`) before adding anything new.
 
 ## Prior art

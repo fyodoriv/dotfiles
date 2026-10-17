@@ -205,7 +205,7 @@ while [ $# -gt 0 ]; do
       SEVERITY_FILTER="$2"
       case "$SEVERITY_FILTER" in
         critical|important|performance|cosmetic) ;;
-        *) echo "Invalid severity: $SEVERITY_FILTER (valid: critical, important, performance, cosmetic)"; exit 1 ;;
+        *) echo "Invalid severity: $SEVERITY_FILTER — fix: pass one of critical, important, performance, cosmetic"; exit 1 ;;
       esac
       shift
       ;;
@@ -267,7 +267,7 @@ if $FIX_MODE && ! dotfiles_is_applied_checkout "$DOTFILES_DIR"; then
     printf '○ Doctor --fix is report-only outside the applied checkout; run %s/bin/dotfiles-doctor --fix\n' \
       "$DOCTOR_APPLIED_ROOT" >&2
   else
-    printf '○ Doctor --fix is report-only because chezmoi has no configured applied source checkout\n' >&2
+    printf '○ Doctor --fix is report-only because chezmoi has no configured applied source checkout — fix: chezmoi init --source <your dotfiles checkout>\n' >&2
   fi
   FIX_MODE=false
   REPORT_ONLY_FIX_MODE=true
@@ -1003,7 +1003,7 @@ elif ! $LIST_MODE; then
     if $REPORT_ONLY_FIX_MODE && [ -n "$DOCTOR_APPLIED_ROOT" ]; then
       echo -e "  Fixes are report-only here; run ${YELLOW}$DOCTOR_APPLIED_ROOT/bin/dotfiles-doctor --fix${NC}"
     elif $REPORT_ONLY_FIX_MODE; then
-      echo -e "  Fixes are report-only here until chezmoi has a configured source checkout"
+      echo -e "  Fixes are report-only here until chezmoi has a configured source checkout — fix: ${YELLOW}chezmoi init --source <your dotfiles checkout>${NC}"
     else
       echo -e "  Run ${YELLOW}dotfiles-doctor --fix${NC} to auto-repair"
     fi

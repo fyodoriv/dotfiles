@@ -305,10 +305,19 @@ for file in "${changed_files[@]}"; do
   [[ "$file" == tests/*.bats ]] && continue
   # A helper or fixture under tests/ is read by its path relative to tests/
   # ("$BATS_TEST_DIRNAME/fixtures/x" or "fixtures/x").
+  # A test may also read the folder that holds it (a fixture tree), so each
+  # parent folder up to tests/fixtures/<name> counts as read too.
   if [[ "$file" == tests/* ]]; then
+    reads="${file#tests/}"
+    dir="$(dirname "$file")"
+    while [ "$dir" != tests ] && [ "$dir" != tests/fixtures ] && [ "$dir" != . ]; do
+      reads="$reads
+${dir#tests/}"
+      dir="$(dirname "$dir")"
+    done
     while IFS= read -r test_file; do
       [ -n "$test_file" ] && affected+=("$test_file")
-    done < <(grep -lF -- "${file#tests/}" "${all_bats[@]}" 2>/dev/null || true)
+    done < <(grep -lF -f <(printf '%s\n' "$reads") "${all_bats[@]}" 2>/dev/null || true)
     continue
   fi
   escaped="$(printf '%s' "$file" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"

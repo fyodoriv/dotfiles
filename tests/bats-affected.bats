@@ -571,3 +571,15 @@ BATS
   grep -qx reads-via-filename <<<"$result"
   ! grep -qx fixture-only <<<"$result"
 }
+
+@test "a file inside a fixture folder selects tests that read the folder" {
+  mkdir -p "$TEST_REPO/tests/fixtures/pkg-fixtures/simple/doctor"
+  printf 'x\n' > "$TEST_REPO/tests/fixtures/pkg-fixtures/simple/doctor/check.sh"
+  cat > "$TEST_REPO/tests/reads-folder.bats" <<'BATS'
+FIX="$DOTFILES_DIR/tests/fixtures/pkg-fixtures/simple"
+@test "d" { ls "$FIX"; }
+BATS
+  git -C "$TEST_REPO" add tests/fixtures/pkg-fixtures tests/reads-folder.bats
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: folder fixture"
+  assert_affected_includes tests/fixtures/pkg-fixtures/simple/doctor/check.sh reads-folder
+}

@@ -23,7 +23,7 @@ fi
 # commands, by the doctor modules the e2e checks (git, shell, sync), and by
 # the chezmoi lifecycle scripts the install runs.
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-E2E_CMDS="bin/dotfiles-install bin/dotfiles-doctor bin/morning bin/dotfiles bin/dotfiles-add bin/dotfiles-profile bin/dotfiles-stats bin/git-safe"
+E2E_CMDS="bin/dotfiles-install bin/dotfiles-doctor bin/dotfiles-heal-stuck-agents bin/morning bin/dotfiles bin/dotfiles-add bin/dotfiles-profile bin/dotfiles-stats bin/git-safe"
 libs_of() { (cd "$root" && grep -ohE 'lib/[A-Za-z0-9_.-]+\.(sh|awk|py)' "$@" 2>/dev/null | sort -u); }
 E2E_SOURCES="$E2E_CMDS modules/git/doctor.sh modules/shell/doctor.sh modules/sync/doctor.sh $(cd "$root" && ls .chezmoiscripts/* 2>/dev/null | tr '\n' ' ')"
 # shellcheck disable=SC2086 # word-split the command and lib lists on purpose

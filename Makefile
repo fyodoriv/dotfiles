@@ -88,11 +88,11 @@ test: ## Run affected tests only (cached, git-aware)
 	else \
 	  count=$$(echo "$$affected" | wc -l | tr -d ' '); \
 	  echo "═══ Tests: $$count affected file(s) ($(JOBS) jobs) ═══"; \
-	  echo "$$affected" | xargs $(FULLPOWER) cached-run bats --jobs $(JOBS) --no-parallelize-within-files; \
+	  echo "$$affected" | xargs $(FULLPOWER) ./bin/cached-run bats --jobs $(JOBS) --no-parallelize-within-files; \
 	fi
 
 test-all: ## Run full test suite (cached)
-	@$(FULLPOWER) cached-run bats --jobs $(JOBS) --no-parallelize-within-files tests/ tests/plugin/
+	@$(FULLPOWER) ./bin/cached-run bats --jobs $(JOBS) --no-parallelize-within-files tests/ tests/plugin/
 
 test-force: ## Run full test suite (no cache)
 	@echo "═══ Tests ($(JOBS) parallel jobs) ═══"

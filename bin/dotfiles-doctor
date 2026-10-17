@@ -94,7 +94,7 @@ _resolve_extra_doctor_dir() {
   
   # Reject colon-separated paths (one overlay at a time)
   if [ -n "$overlay_root" ] && [[ "$overlay_root" == *:* ]]; then
-    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
+    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time. — fix: set EXTRA_OVERLAY_ROOT to one path" >&2
     return 1
   fi
   

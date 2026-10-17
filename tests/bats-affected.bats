@@ -550,3 +550,24 @@ EOF
   grep -qE '^test-all:' "$DOTFILES_DIR/Makefile"
   [ "$(grep -cE 'no-parallelize-within-files tests/ tests/plugin/$' "$DOTFILES_DIR/Makefile")" -eq 2 ]
 }
+
+@test "a test that reads a changed file through any repo-root variable is selected" {
+  printf 'x\n' > "$TEST_REPO/.chezmoiignore"
+  cat > "$TEST_REPO/tests/reads-via-real.bats" <<'BATS'
+REAL_DOTFILES="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+@test "r" { grep -q x "$REAL_DOTFILES/.chezmoiignore"; }
+BATS
+  cat > "$TEST_REPO/tests/reads-via-filename.bats" <<'BATS'
+ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
+@test "s" { grep -q x "$ROOT/.chezmoiignore"; }
+BATS
+  cat > "$TEST_REPO/tests/fixture-only.bats" <<'BATS'
+@test "f" { printf x > "$TEST_DIR/.chezmoiignore"; }
+BATS
+  git -C "$TEST_REPO" add -f .chezmoiignore tests/reads-via-real.bats tests/reads-via-filename.bats tests/fixture-only.bats
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: var fixtures"
+  result="$(affected_for .chezmoiignore | basenames)"
+  grep -qx reads-via-real <<<"$result"
+  grep -qx reads-via-filename <<<"$result"
+  ! grep -qx fixture-only <<<"$result"
+}

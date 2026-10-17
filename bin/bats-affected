@@ -288,6 +288,16 @@ all_bats=()
 while IFS= read -r bats_file; do
   all_bats+=("$bats_file")
 done < <(find "$TESTS_DIR" -name '*.bats' -not -path "$TESTS_DIR/e2e/*" | LC_ALL=C sort)
+
+# Per test file: the variables that point into the repo. Fixed names plus any
+# variable the file assigns from $BATS_TEST_DIRNAME or $BATS_TEST_FILENAME
+# (REAL_DOTFILES, ROOT, ...).
+bats_roots=()
+for bats_file in "${all_bats[@]}"; do
+  own="$(grep -E '^[[:space:]]*(export[[:space:]]+|local[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=.*BATS_TEST_(DIRNAME|FILENAME)' "$bats_file" 2>/dev/null |
+    sed -E 's/^[[:space:]]*(export[[:space:]]+|local[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/' | sort -u | paste -sd'|' - || true)"
+  bats_roots+=("REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.${own:+|$own}")
+done
 # A test that reads "$REPO_ROOT/<file>" (or $DOTFILES_DIR, $root, or
 # $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
 # runs too. A test that only names a fixture file of the same name does not.
@@ -302,9 +312,11 @@ for file in "${changed_files[@]}"; do
     continue
   fi
   escaped="$(printf '%s' "$file" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"
-  while IFS= read -r test_file; do
-    [ -n "$test_file" ] && affected+=("$test_file")
-  done < <(grep -lE -- "(REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.)\}?\"?/$escaped([^A-Za-z0-9_.-]|$)" "${all_bats[@]}" 2>/dev/null || true)
+  for i in "${!all_bats[@]}"; do
+    if grep -qE -- "(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
+      affected+=("${all_bats[$i]}")
+    fi
+  done
 done
 
 # ── Deduplicate and sort ─────────────────────────────────────────────

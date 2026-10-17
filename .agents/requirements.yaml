@@ -6,8 +6,9 @@
 # lifecycle scripts, doctor, zsh) in a sandboxed scratch HOME; the US01 cases
 # are in dotfiles-install-e2e.bats and every other story's real command runs
 # after it via hermetic-exec.sh in stories-e2e.bats (happy + error case each).
-# stranger-readiness.bats renders a new user's home. make e2e runs them.
-map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/dotfiles-install-e2e.bats tests/e2e/stories-e2e.bats tests/stranger-readiness.bats
+# Every test in tests/e2e/ is named "USNN e2e: ..." (tests/user-stories.bats
+# checks it), and make e2e runs exactly that folder.
+map.e2e: tests/e2e/hermetic-install.sh tests/e2e/hermetic-exec.sh tests/e2e/dotfiles-install-e2e.bats tests/e2e/stories-e2e.bats
 # Checkup: /tooling-checkup is the one checkup command; its monthly pass runs
 # the doctor, the cached gate, the story e2e, the speed review, learnings, and
 # open P0s (tests/tooling-checkup-skill.bats).

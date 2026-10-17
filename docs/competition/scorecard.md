@@ -72,7 +72,7 @@ metrics stay `null`. Only the doc-sourced step count is kept.
 
 ### Manual bootstrap steps (sources)
 
-Count of commands on a fresh Mac that already has Homebrew and git.
+Count of commands on a fresh Mac that already has Homebrew and git. The dotfiles count is measured from the README quick start by `scripts/benchmark-run.sh`; the competitor counts come from their own docs (cited below) and are set in the script.
 
 | Tool | Steps | Commands | Source |
 |---|---|---|---|

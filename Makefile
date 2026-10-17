@@ -92,11 +92,11 @@ test: ## Run affected tests only (cached, git-aware)
 	fi
 
 test-all: ## Run full test suite (cached)
-	@$(FULLPOWER) cached-run bats --jobs $(JOBS) --no-parallelize-within-files tests/
+	@$(FULLPOWER) cached-run bats --jobs $(JOBS) --no-parallelize-within-files tests/ tests/plugin/
 
 test-force: ## Run full test suite (no cache)
 	@echo "═══ Tests ($(JOBS) parallel jobs) ═══"
-	@$(FULLPOWER) bats --jobs $(JOBS) --no-parallelize-within-files tests/
+	@$(FULLPOWER) bats --jobs $(JOBS) --no-parallelize-within-files tests/ tests/plugin/
 
 # ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
 e2e: ## Run the hermetic install and story e2e (about 100 s; E2E_FULL=1 for the whole doctor)

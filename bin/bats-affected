@@ -107,7 +107,7 @@ for file in "${changed_files[@]}"; do
   for pattern in "${run_all_patterns[@]}"; do
     if [[ "$file" == "$pattern" || "$file" == "$pattern"* ]]; then
       # Output all test files and exit
-      printf '%s\n' "$TESTS_DIR"/*.bats | sort
+      find "$TESTS_DIR" -name '*.bats' -not -path "$TESTS_DIR/e2e/*" | sort
       exit 0
     fi
   done
@@ -282,6 +282,12 @@ for file in "${changed_files[@]}"; do
 done
 
 # ── Tests that read a changed file by repo path ──────────────────────
+# Search every bats file, subfolders included (tests/plugin/); tests/e2e/ runs
+# through tests/e2e/needs-e2e.sh instead.
+all_bats=()
+while IFS= read -r bats_file; do
+  all_bats+=("$bats_file")
+done < <(find "$TESTS_DIR" -name '*.bats' -not -path "$TESTS_DIR/e2e/*" | LC_ALL=C sort)
 # A test that reads "$REPO_ROOT/<file>" (or $DOTFILES_DIR, $root, or
 # $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
 # runs too. A test that only names a fixture file of the same name does not.
@@ -292,13 +298,13 @@ for file in "${changed_files[@]}"; do
   if [[ "$file" == tests/* ]]; then
     while IFS= read -r test_file; do
       [ -n "$test_file" ] && affected+=("$test_file")
-    done < <(grep -lF -- "${file#tests/}" "$TESTS_DIR"/*.bats 2>/dev/null || true)
+    done < <(grep -lF -- "${file#tests/}" "${all_bats[@]}" 2>/dev/null || true)
     continue
   fi
   escaped="$(printf '%s' "$file" | sed 's/[][\\.*^$/+?(){}|]/\\&/g')"
   while IFS= read -r test_file; do
     [ -n "$test_file" ] && affected+=("$test_file")
-  done < <(grep -lE -- "(REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.)\}?\"?/$escaped([^A-Za-z0-9_.-]|$)" "$TESTS_DIR"/*.bats 2>/dev/null || true)
+  done < <(grep -lE -- "(REPO_ROOT|DOTFILES_DIR|REPO|root|BATS_TEST_DIRNAME/\.\.)\}?\"?/$escaped([^A-Za-z0-9_.-]|$)" "${all_bats[@]}" 2>/dev/null || true)
 done
 
 # ── Deduplicate and sort ─────────────────────────────────────────────

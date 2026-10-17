@@ -29,6 +29,15 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
   [ "$status" -eq 1 ]
 }
 
+@test "needs-e2e triggers on a lib that the e2e commands load" {
+  run bash -c "printf 'lib/output.sh\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
+  [ "$status" -eq 0 ]
+  [ "$output" = "lib/output.sh" ]
+  run bash -c "printf 'lib/errors-log.sh\nREADME.md\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
+  [ "$status" -eq 0 ]
+  [ "$output" = "lib/errors-log.sh" ]
+}
+
 @test "make check runs the install e2e only when needed" {
   grep -qE '^check:' "$REPO_ROOT/Makefile"
   grep -qE 'gate-timed.sh e2e .*e2e-if-needed' "$REPO_ROOT/Makefile"

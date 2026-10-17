@@ -536,3 +536,17 @@ EOF
   git -C "$TEST_REPO" commit -q --no-verify -m "chore: fixture"
   assert_affected_includes tests/fixtures/mock-tool.sh uses-fixture
 }
+
+@test "tests in subfolders are selected when they read a changed fixture" {
+  mkdir -p "$TEST_REPO/tests/plugin" "$TEST_REPO/tests/fixtures/plugin-fixtures"
+  printf 'x\n' > "$TEST_REPO/tests/fixtures/plugin-fixtures/p.txt"
+  printf '@test "p" { cat "$BATS_TEST_DIRNAME/../fixtures/plugin-fixtures/p.txt"; }\n' > "$TEST_REPO/tests/plugin/reads-plugin-fixture.bats"
+  git -C "$TEST_REPO" add tests/plugin tests/fixtures/plugin-fixtures
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: plugin fixture"
+  assert_affected_includes tests/fixtures/plugin-fixtures/p.txt reads-plugin-fixture
+}
+
+@test "make test-all and test-force also run tests/plugin" {
+  grep -qE '^test-all:' "$DOTFILES_DIR/Makefile"
+  [ "$(grep -cE 'no-parallelize-within-files tests/ tests/plugin/$' "$DOTFILES_DIR/Makefile")" -eq 2 ]
+}

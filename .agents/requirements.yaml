@@ -17,10 +17,12 @@ map.checkup: skills/tooling-checkup/SKILL.md tests/tooling-checkup-skill.bats
 # Caching: bin/cached-run keys a step on HEAD, the tracked diff, and untracked
 # file names and contents (gitignored files and environment variables are not
 # in the key; steps read tracked inputs); bin/bats-affected selects mapped
-# tests plus every test that reads a changed file by repo path, or a changed
-# tests/ helper or fixture by its relative path; make test-force runs all.
+# tests plus every bats file (subfolders included) that reads a changed file by
+# repo path, or a changed tests/ helper or fixture by its relative path;
+# tests/e2e/needs-e2e.sh triggers the e2e on any lib its commands load; make
+# test-force runs all, tests/plugin included.
 # tests/cached-run.bats proves an edit to one tracked or untracked file re-runs.
-map.caching: bin/cached-run bin/bats-affected tests/cached-run.bats tests/bats-affected.bats
+map.caching: bin/cached-run bin/bats-affected tests/e2e/needs-e2e.sh tests/cached-run.bats tests/bats-affected.bats tests/install-e2e-guard.bats
 # Docs: docs/README.md maps every doc to the question it answers;
 # tests/docs-contract.bats fails on an unmapped doc, a broken map link, an
 # AGENTS.md over 10000 bytes or out of section order, or README drift.

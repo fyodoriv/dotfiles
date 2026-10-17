@@ -19,4 +19,14 @@ else
   base="$(git merge-base HEAD "${1:-origin/feat/chezmoi}" 2>/dev/null || echo HEAD)"
   changed="$({ git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
 fi
-grep -E "$TRIGGERS" <<<"$changed"
+# Plus every lib the e2e commands load, two levels deep, so a change to a lib
+# the doctor or morning sources (lib/output.sh, ...) runs the story e2e too.
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+E2E_CMDS="bin/dotfiles-install bin/dotfiles-doctor bin/morning bin/dotfiles bin/dotfiles-add bin/dotfiles-profile bin/dotfiles-stats bin/git-safe"
+libs_of() { (cd "$root" && grep -ohE 'lib/[A-Za-z0-9_.-]+\.(sh|awk|py)' "$@" 2>/dev/null | sort -u); }
+# shellcheck disable=SC2086 # word-split the command and lib lists on purpose
+first="$(libs_of $E2E_CMDS)"
+# shellcheck disable=SC2086
+libs="$( { printf '%s\n' "$first"; [ -n "$first" ] && libs_of $first; } | grep . | sort -u)"
+
+{ grep -E "$TRIGGERS" <<<"$changed" || true; grep -xF -f <(printf '%s\n' "$libs") <<<"$changed" || true; } | sort -u | grep .

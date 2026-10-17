@@ -75,11 +75,12 @@ A new Mac ships with conservative defaults — slow key repeat, Spotlight crawli
 ## Installation
 
 ```bash
-chezmoi init --source ~/apps/dotfiles --apply   # prompts for profile: core or full
+~/apps/dotfiles/bin/dotfiles-install plan        # explain what will change; change nothing
+~/apps/dotfiles/bin/dotfiles-install run --yes   # back up, apply, heal, verify (prompts: core or full)
 dotfiles doctor --fix                            # verify and auto-repair
 ```
 
-That's it. Chezmoi deploys all config files, installs Homebrew packages, applies macOS defaults, loads LaunchAgents, and syncs agent config via agentbrew — all from a single command. The doctor step verifies everything installed correctly and auto-fixes any issues.
+Plain chezmoi works too (`chezmoi init --source ~/apps/dotfiles --apply`), without the backup. Chezmoi deploys all config files, installs Homebrew packages, applies macOS defaults, loads LaunchAgents, and syncs agent config via agentbrew — all from a single command. The doctor step verifies everything installed correctly and auto-fixes any issues.
 
 > **Prefer a guided setup?** Run `dotfiles quickstart` instead — it checks prerequisites, walks you through chezmoi init, and runs doctor automatically.
 >

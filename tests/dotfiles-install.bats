@@ -109,6 +109,22 @@ teardown() { rm -rf "$TEST_DIR"; }
   grep -q 'agentbrew-install run --yes --no-auto-repair' "$LOG"
 }
 
+@test "preflight installs a missing tool with Homebrew instead of stopping" {
+  stub brew "echo \"brew \$*\" >> \"\$LOG\"; [ \"\$1\" = install ] && printf '#!/bin/bash\\nexit 0\\n' > \"$STUBS/\$2\" && chmod +x \"$STUBS/\$2\"; exit 0"
+  run env DOTFILES_INSTALL_TOOLS="git e2e-missing-tool" bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  grep -q 'brew install e2e-missing-tool' "$LOG"
+  [[ "$output" == *"e2e-missing-tool (installed)"* ]]
+}
+
+@test "preflight stops with the fix when Homebrew cannot install a tool" {
+  stub brew 'echo "brew $*" >> "$LOG"; exit 1'
+  run env DOTFILES_INSTALL_TOOLS="e2e-missing-tool" bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ e2e-missing-tool: brew install e2e-missing-tool"* ]]
+  [[ "$output" == *"Nothing was changed"* ]]
+}
+
 @test "running the install twice succeeds and leaves the same files" {
   run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
   [ "$status" -eq 0 ]

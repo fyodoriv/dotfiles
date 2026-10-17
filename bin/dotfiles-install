@@ -47,8 +47,13 @@ preflight() {
   else say "  ✗ Xcode Command Line Tools: run 'xcode-select --install' (a macOS dialog opens)"; ok=1; fi
   if command -v brew >/dev/null 2>&1; then say "  ✓ Homebrew"
   else say "  ✗ Homebrew: install it from https://brew.sh (it asks for your Mac password)"; ok=1; fi
-  for tool in git jq chezmoi; do
+  # With Homebrew present, install a missing tool instead of stopping, so the
+  # README one-liner works on a Mac that has only Homebrew.
+  for tool in ${DOTFILES_INSTALL_TOOLS:-git jq chezmoi}; do
     if command -v "$tool" >/dev/null 2>&1; then say "  ✓ $tool"
+    elif command -v brew >/dev/null 2>&1 && say "  → $tool: brew install $tool" &&
+      brew install "$tool" >/dev/null 2>&1 && command -v "$tool" >/dev/null 2>&1; then
+      say "  ✓ $tool (installed)"
     else say "  ✗ $tool: brew install $tool"; ok=1; fi
   done
   return "$ok"

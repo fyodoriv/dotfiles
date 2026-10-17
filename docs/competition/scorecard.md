@@ -31,7 +31,7 @@ value prints `(stub)` in `dotfiles metrics --table`; it never counts as 0.
 | How fast does the tool report a hand edit? | `drift_detect_ms` (null when the tool misses the edit) | lower | ≤ chezmoi + 5 ms (now 46 vs 34) | > chezmoi + 50 ms, or null | `jq '.dotfiles.metrics.drift_detect_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | Does the tool see the hand edit at all? | `drift_detected` | true | true | false | `jq '.dotfiles.metrics.drift_detected \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | Do two fresh homes get identical files? | `reproducibility_pct` | higher | 100 | < 100 | `jq '.dotfiles.metrics.reproducibility_pct \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
-| How many commands does a person type on a fresh Mac? | `manual_bootstrap_steps` | lower | 1 by 2027-01-31 (now 4) | ≥ 3 on 2027-01-31 | `jq '.dotfiles.metrics.manual_bootstrap_steps \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How many commands does a person type on a fresh Mac? | `manual_bootstrap_steps` | lower | 1 by 2027-01-31 (now 1, met 2026-10-16) | ≥ 3 on 2027-01-31 | `jq '.dotfiles.metrics.manual_bootstrap_steps \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 
 The north star (metrics where dotfiles beats the best competitor) has goal
 ≥ 2 of 5 by 2027-04-30 and pivot 0 of 5 on that date; a missed pivot triggers
@@ -58,10 +58,10 @@ some tools support them, so they cannot be compared on equal terms.
 | Tool | Version | How the script gets it | Deploy mode | Drift check used |
 |---|---|---|---|---|
 | dotfiles | this repo | `bin/dotfiles apply --no-fix` and `dotfiles diff` | copy | `chezmoi diff` |
-| chezmoi | installed | `chezmoi` on PATH | copy | `chezmoi status` | `jq '.dotfiles.metrics.chezmoi \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
-| GNU Stow | installed | `stow` on PATH, `--no-folding` | symlink | `stow --no` dry run reports a conflict | `jq '.dotfiles.metrics.stow \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| chezmoi | installed | `chezmoi` on PATH | copy | `chezmoi status` |
+| GNU Stow | installed | `stow` on PATH, `--no-folding` | symlink | `stow --no` dry run reports a conflict |
 | yadm | 3.3.0 | pinned script, SHA-256 checked, cached | copy (git work tree) | `yadm status` |
-| dotbot | 1.21.0 | `uv` venv in the cache | symlink | a re-run refuses to overwrite and exits non-zero | `jq '.dotfiles.metrics.uv \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| dotbot | 1.21.0 | `uv` venv in the cache | symlink | a re-run refuses to overwrite and exits non-zero |
 | home-manager | — | needs nix | symlink | blocked |
 
 The cache is `~/.cache/dotfiles-benchmark` (`BENCH_CACHE_DIR`). Nothing is
@@ -76,7 +76,7 @@ Count of commands on a fresh Mac that already has Homebrew and git.
 
 | Tool | Steps | Commands | Source |
 |---|---|---|---|
-| dotfiles | 4 | `brew install chezmoi`, `git clone`, `chezmoi init --apply`, `dotfiles doctor --fix` | [README § Installation](../../README.md#installation) |
+| dotfiles | 1 (measured) | the README quick-start line: clone if missing, `bin/dotfiles-install run --yes` (installs git, jq, and chezmoi with Homebrew when missing), `dotfiles-doctor` | [README quick start](../../README.md); `scripts/benchmark-run.sh` counts the command lines of its first code block |
 | chezmoi | 1 | `sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply <user>` | <https://www.chezmoi.io/quick-start/> |
 | GNU Stow | 3 | `brew install stow`, `git clone`, `stow <packages>` | <https://www.gnu.org/software/stow/manual/stow.html> |
 | yadm | 2 | `brew install yadm`, `yadm clone <url>` | <https://yadm.io/docs/getting_started> |
@@ -85,27 +85,27 @@ Count of commands on a fresh Mac that already has Homebrew and git.
 
 ## Latest results
 
-Host: Darwin-arm64. Workload: 120 files, 3 runs, median. Date: 2026-10-12.
+Host: Darwin-arm64. Workload: 120 files, 3 runs, median. Date: 2026-10-16.
 
 | Tool | Status | Cold apply (ms) | No-op re-apply (ms) | Drift detect (ms) | Reproducible (%) | Manual steps |
 |---|---|---|---|---|---|---|
-| dotfiles | ok | 2046 | 57 | 46 | 100 | 4 |
-| chezmoi | ok | 2180 | 36 | 34 | 100 | 1 |
-| GNU Stow | ok | 55 | 53 | 53 | 100 | 3 |
-| yadm | ok | 3232 | 350 | 346 | 100 | 2 |
-| dotbot | ok | 71 | 63 | 66 | 100 | 2 |
+| dotfiles | ok | 2401 | 57 | 41 | 100 | 1 |
+| chezmoi | ok | 2326 | 45 | 32 | 100 | 1 |
+| GNU Stow | ok | 48 | 47 | 47 | 100 | 3 |
+| yadm | ok | 4164 | 445 | 442 | 100 | 2 |
+| dotbot | ok | 66 | 56 | 56 | 100 | 2 |
 | home-manager | blocked | — | — | — | — | 5 |
 
 Blocked: home-manager. Nix is not installed. Installing it needs admin rights
 and a new APFS volume, which is outside the benchmark budget.
 
-North star: dotfiles beats the best competitor on **0 of 5** metrics.
+North star: dotfiles beats the best competitor on **0 of 5** metrics. It now
+ties chezmoi on manual steps (1 each).
 
 ## Where dotfiles is behind
 
-- **Bootstrap steps.** dotfiles needs 4 commands. chezmoi needs 1. A
-  one-line `curl | sh` installer that clones and applies would close most of
-  the gap.
+- **Bootstrap steps.** dotfiles now needs 1 command (the README quick-start
+  line; 2026-10-16), the same as chezmoi. A tie does not count as a win.
 - **Cold apply.** Copy-mode tools (dotfiles, chezmoi, yadm) are 30–60 times
   slower than symlink tools (stow, dotbot) on a fresh home. dotfiles uses
   chezmoi, so it shares chezmoi's cost.

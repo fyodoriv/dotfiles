@@ -82,6 +82,15 @@ home_listing() {
   jq -e '.north_star.metrics_beaten >= 0' "$BENCH_SAVE"
 }
 
+@test "benchmark-run: dotfiles bootstrap steps are measured from the README quick start" {
+  BENCH_TOOLS="dotfiles chezmoi" run "$BENCH" --json
+  [ "$status" -eq 0 ]
+  local readme
+  readme="$(awk '/^```/{if (f) exit; f = 1; next} f && $0 !~ /^[[:space:]]*(#|$)/' "$BATS_TEST_DIRNAME/../README.md" | wc -l | tr -d ' ')"
+  [ "$readme" -ge 1 ]
+  echo "$output" | jq -e --argjson n "$readme" '.dotfiles.metrics.manual_bootstrap_steps == $n'
+}
+
 @test "benchmark-run: table output names every tool and the north star" {
   BENCH_TOOLS="dotfiles chezmoi" run "$BENCH"
   [ "$status" -eq 0 ]

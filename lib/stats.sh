@@ -50,8 +50,16 @@ _task_estimate() {
 #   # ... do the work ...
 #   log_run sync                # 1 run × 3s = 3s
 #   log_run cleanup 5           # 5 units × 10s = 50s
+# The stats log is on, except DOTFILES_STATS_LOG=0, and except inside a bats
+# test unless that test sets DOTFILES_STATS_LOG=1, so no test can write the
+# real ~/.dotfiles-stats.jsonl.
+dotfiles_stats_log_on() {
+  case "${DOTFILES_STATS_LOG:-}" in 0) return 1 ;; 1) return 0 ;; esac
+  [ -z "${BATS_TEST_FILENAME:-}" ]
+}
+
 log_run() {
-  [ "${DOTFILES_STATS_LOG:-1}" = "0" ] && return 0
+  dotfiles_stats_log_on || return 0
   local task="$1" units="${2:-1}"
   # Allow-list both fields so no free text can reach the log
   # (docs/observability.md#logs): a task is a short name, units a number.

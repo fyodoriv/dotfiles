@@ -10,7 +10,7 @@ See [../README.md](../../README.md) for installation and CLI reference.
 
 | # | Use Case | One-liner | Command |
 |---|----------|-----------|---------|
-| 1 | [Set up a new Mac](01-fully-configured-mac.md) | Stock macOS to fully configured in one command | `chezmoi init --apply` |
+| 1 | [Set up a new Mac](01-fully-configured-mac.md) | Stock macOS to fully configured in one command | `bin/dotfiles-install run --yes` |
 | 2 | [Start the day ready to code](02-start-day-ready-to-code.md) | Pull, health check, dashboard | `morning` |
 | 3 | [Add and maintain config](03-add-and-maintain-config.md) | Scaffolding commands for files, tools, defaults, modules | `dotfiles add` |
 | 4 | [Switch profiles and customize](04-switch-profiles-and-customize.md) | Core/full profiles + personal overrides | `dotfiles profile` |

@@ -208,9 +208,9 @@ required areas of the `new-project` skill. `NP=~/.claude/skills/new-project`.
 1. `bash $NP/scripts/audit-due.sh <repo>`. Skip the repository when it prints `not due`.
 2. `bash $NP/scripts/check-setup.sh <repo> --profile tool`. Keep the score and the `FAIL` and `WAIVED` lines.
 3. Follow `$NP/references/requirements-map.md`, section 4: re-check each mapped
-   file and each waiver, keep one P0 task `meet-new-project-requirements` (in
-   `tasks.md`, the task whose title starts "tasks.md meets every new-project
-   requirement") that lists every gap, and turn a waiver seen in two or more
+   file and each waiver, keep one P0 task `meet-new-project-requirements` in
+   that repository's own task backend that lists every gap (remove it when the
+   repository reaches 100% by intent), and turn a waiver seen in two or more
    repositories into a requirement-change proposal on `new-project`.
 4. `bash $NP/scripts/audit-due.sh <repo> --record`.
 

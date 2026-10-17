@@ -54,10 +54,15 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-bench.XXXXXX")"
 trap 'chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
 
 # Commands a person types on a fresh Mac that already has Homebrew and git.
-# Sources are listed in docs/competition/scorecard.md.
+# dotfiles is measured: the command lines of the README's first code block
+# (the quick start). Competitors come from their docs, listed in
+# docs/competition/scorecard.md.
+readme_steps() {
+  awk '/^```/{if (f) exit; f = 1; next} f && $0 !~ /^[[:space:]]*(#|$)/' "$DOTFILES_DIR/README.md" | wc -l | tr -d ' '
+}
 manual_steps() {
   case "$1" in
-    dotfiles) echo 4 ;;      # brew install chezmoi; git clone; chezmoi init --apply; dotfiles doctor --fix
+    dotfiles) readme_steps ;;
     chezmoi) echo 1 ;;       # sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply <user>
     stow) echo 3 ;;          # brew install stow; git clone; stow <packages>
     yadm) echo 2 ;;          # brew install yadm; yadm clone <url>

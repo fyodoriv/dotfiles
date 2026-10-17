@@ -24,7 +24,13 @@ _errors_allow() {
 }
 
 log_error() {
-  [ "${DOTFILES_ERRORS_LOG:-1}" = "0" ] && return 0
+  # Off with DOTFILES_ERRORS_LOG=0, and inside a bats test unless the test
+  # sets DOTFILES_ERRORS_LOG=1, so no test writes the real log.
+  case "${DOTFILES_ERRORS_LOG:-}" in
+    0) return 0 ;;
+    1) ;;
+    *) [ -n "${BATS_TEST_FILENAME:-}" ] && return 0 ;;
+  esac
   local story source code check line
   story="$(_errors_allow "${1:-}" '^US[0-9]{2}$')"
   source="$(_errors_allow "${2:-}" '^(doctor|sync|morning)$')"

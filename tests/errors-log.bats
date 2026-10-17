@@ -67,3 +67,11 @@ teardown() { rm -rf "$TEST_DIR"; }
   run bash -c "grep -nE '\\bfail \"' '$REPO_ROOT/bin/dotfiles-doctor' | grep -vE 'fix: |_fix_hint'"
   [ -z "$output" ] || { echo "fail lines without a fix: $output"; return 1; }
 }
+
+@test "inside bats, both logs stay off unless the test turns them on" {
+  local s="$TEST_DIR/s.jsonl"
+  run env -u DOTFILES_STATS_LOG -u DOTFILES_ERRORS_LOG DOTFILES_STATS_FILE="$s" bash -c "source '$REPO_ROOT/lib/stats.sh'; source '$REPO_ROOT/lib/errors-log.sh'; log_run sync; log_error US05 sync push_failed"
+  [ "$status" -eq 0 ]
+  [ ! -e "$s" ]
+  [ ! -e "$DOTFILES_ERRORS_FILE" ]
+}

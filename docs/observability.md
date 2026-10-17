@@ -23,10 +23,10 @@ so `dotfiles metrics --share` keeps only their numeric lines.
 `log_run` allow-lists its fields too: a task is a short lowercase name and
 `units` a number; anything else is written as `invalid` and `1`.
 
-Tests never write the real errors or stats logs: the Makefile and
-`tests/test_helper.bash` export `DOTFILES_ERRORS_LOG=0` and
-`DOTFILES_STATS_LOG=0` (a test that checks a write turns it back on), and
-`tests/errors-log.bats` fails if those lines go away.
+Tests never write the real errors or stats logs: both logs stay off inside
+any bats test unless the test sets `DOTFILES_ERRORS_LOG=1` or
+`DOTFILES_STATS_LOG=1`, and the Makefile and `tests/test_helper.bash` also
+export both as `0`. `tests/errors-log.bats` fails if any of this goes away.
 
 ## Errors
 

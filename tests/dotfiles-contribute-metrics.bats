@@ -101,3 +101,13 @@ MD
     fi
   done <<< "$output"
 }
+
+@test "metrics docs: every table row has as many cells as its header" {
+  local f bad=""
+  for f in "$REPO/docs/metrics.md" "$REPO/docs/competition/scorecard.md" "$REPO/VISION.md"; do
+    bad="$bad$(sed 's/\\|//g' "$f" | awk -v f="$(basename "$f")" '
+      /^\|/ { n = gsub(/\|/, "|"); if (!inrow) { want = n; inrow = 1 } else if (n != want) print " " f ":" NR }
+      !/^\|/ { inrow = 0 }')"
+  done
+  [ -z "$bad" ] || { echo "rows with the wrong cell count:$bad"; return 1; }
+}

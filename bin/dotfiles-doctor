@@ -1009,7 +1009,7 @@ elif ! $LIST_MODE; then
 
   # Log detailed doctor run for trend tracking
   local_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  [ "${DOTFILES_STATS_LOG:-1}" = "0" ] || echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1}" >> "$DOCTOR_TRENDS_FILE"
+  dotfiles_stats_log_on && echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1}" >> "$DOCTOR_TRENDS_FILE"
   # One errors-log event per failing check: story US05 (config heals itself).
   for _failed_id in "${failed_check_ids[@]+"${failed_check_ids[@]}"}"; do
     log_error US05 doctor check_failed "$_failed_id"

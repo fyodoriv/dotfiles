@@ -46,10 +46,14 @@ if [ "${E2E_BREAK:-}" = "1" ]; then
     > "$SCRATCH/home/apps/dotfiles/.chezmoiscripts/run_after_zz-e2e-injected-failure.sh"
 fi
 
-# Heal with the real doctor; scope it unless E2E_FULL=1.
-doctor_args="--fix --module git --module shell --module sync"
-[ "${E2E_FULL:-}" = "1" ] && doctor_args="--fix"
-printf '#!/bin/bash\nexec bash "%s/home/apps/dotfiles/bin/dotfiles-doctor" %s "$@"\n' "$SCRATCH" "$doctor_args" > "$SCRATCH/doctor"
+# Heal with the real doctor; scope it to the git, shell, and sync modules
+# unless E2E_FULL=1. The doctor takes one --module, so run each in turn and
+# fail when any of them fails.
+if [ "${E2E_FULL:-}" = "1" ]; then
+  printf '#!/bin/bash\nexec bash "%s/home/apps/dotfiles/bin/dotfiles-doctor" --fix "$@"\n' "$SCRATCH" > "$SCRATCH/doctor"
+else
+  printf '#!/bin/bash\nrc=0\nfor m in git shell sync; do\n  bash "%s/home/apps/dotfiles/bin/dotfiles-doctor" --fix --module "$m" "$@" || rc=1\ndone\nexit "$rc"\n' "$SCRATCH" > "$SCRATCH/doctor"
+fi
 chmod +x "$SCRATCH/doctor"
 
 for tool in "${OS_TOOLS[@]}"; do

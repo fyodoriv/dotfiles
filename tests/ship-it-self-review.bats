@@ -19,5 +19,5 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
 }
 
 @test "ship-it command names the self-review step in its delivery chain" {
-  grep -q 'self-review (Step 6a)' "$CMD"
+  grep -q 'CI → review (6a) → merge' "$CMD"
 }

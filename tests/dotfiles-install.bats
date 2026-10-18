@@ -96,7 +96,8 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 1 ]
   [ ! -e "$HOME/.config" ] || { echo "left behind: $(cd "$HOME" && find .config)"; return 1; }
   [[ "$output" == *"not chezmoi targets, so restore keeps them"* ]] || { echo "$output"; return 1; }
-  [[ "$output" == *"~/.cache/e2e-tool"* ]]
+  [[ "$output" == *"      ~/.cache"* ]]
+  [[ "$output" != *"~/.cache/e2e-tool"* ]]
   [ -e "$HOME/.cache/e2e-tool/data" ]
 }
 

@@ -597,8 +597,11 @@ A green gate checks what the tests cover. A review asks what could still go
 wrong. Before you self-merge a PR that no human has reviewed, review its diff
 once:
 
-1. Run the built-in `/code-review` on the PR (`/code-review <PR number>`), or
-   the `requesting-code-review` skill when `/code-review` is not available.
+1. Run the built-in `/code-review` on the PR at `medium` effort
+   (`/code-review medium <PR number>`), or the `requesting-code-review`
+   skill when `/code-review` is not available. Use `low` only for a
+   one-file change: `low` runs no verify pass, so its findings carry no
+   CONFIRMED or PLAUSIBLE verdict.
 2. Fix each real finding in the same PR (CONFIRMED ones, and at `low`
    effort, which has no verify pass, each one you check by hand), re-run the
    gate, and push.

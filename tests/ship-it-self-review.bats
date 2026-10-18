@@ -8,6 +8,8 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
 @test "ship-it reference has a self-review step before merge, with a skip rule" {
   grep -q '^## 6a\. Self-review before merge' "$REF"
   grep -q '/code-review' "$REF"
+  grep -q '/code-review medium <PR number>' "$REF"
+  grep -q 'its findings carry no' "$REF"
   grep -q 'Skip rule: skip the review for a diff that touches only docs' "$REF"
   grep -q '## Review' "$REF"
   # The step sits between CI (6) and Merge (7).

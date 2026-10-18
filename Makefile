@@ -81,22 +81,33 @@ lint-tasks-rule9: ## Fail when P0/P1 tasks lack the 5 rule-9 fields
 # in by setting `unset BATS_NO_PARALLELIZE_WITHIN_FILE` in their setup_file().
 # Currently opted in: doctor.bats (was 826s serial), morning.bats (280s).
 JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+# bats --jobs needs GNU parallel. The core Brewfile does not install it, so
+# without `parallel` on PATH the test targets run bats serially (slower, same
+# tests). Install it with `brew install parallel` or `make install-deps`.
+HAS_PARALLEL := $(shell command -v parallel >/dev/null 2>&1 && echo yes)
+ifeq ($(HAS_PARALLEL),yes)
+BATS_JOBS := --jobs $(JOBS) --no-parallelize-within-files
+JOBS_LABEL := $(JOBS) jobs
+else
+BATS_JOBS :=
+JOBS_LABEL := serial: GNU parallel not found
+endif
 test: ## Run affected tests only (cached, git-aware)
 	@affected=$$(./bin/bats-affected); \
 	if [ -z "$$affected" ]; then \
 	  echo "✓ No affected test files (nothing changed)"; \
 	else \
 	  count=$$(echo "$$affected" | wc -l | tr -d ' '); \
-	  echo "═══ Tests: $$count affected file(s) ($(JOBS) jobs) ═══"; \
-	  echo "$$affected" | xargs $(FULLPOWER) ./bin/cached-run bats --jobs $(JOBS) --no-parallelize-within-files; \
+	  echo "═══ Tests: $$count affected file(s) ($(JOBS_LABEL)) ═══"; \
+	  echo "$$affected" | xargs $(FULLPOWER) ./bin/cached-run bats $(BATS_JOBS); \
 	fi
 
 test-all: ## Run full test suite (cached)
-	@$(FULLPOWER) ./bin/cached-run bats --jobs $(JOBS) --no-parallelize-within-files tests/ tests/plugin/
+	@$(FULLPOWER) ./bin/cached-run bats $(BATS_JOBS) tests/ tests/plugin/
 
 test-force: ## Run full test suite (no cache)
-	@echo "═══ Tests ($(JOBS) parallel jobs) ═══"
-	@$(FULLPOWER) bats --jobs $(JOBS) --no-parallelize-within-files tests/ tests/plugin/
+	@echo "═══ Tests ($(JOBS_LABEL)) ═══"
+	@$(FULLPOWER) bats $(BATS_JOBS) tests/ tests/plugin/
 
 # ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
 e2e: ## Run the hermetic install and story e2e (about 100 s; E2E_FULL=1 for the whole doctor)

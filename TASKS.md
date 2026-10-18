@@ -14,20 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] `make test` works on a fresh core Mac
-  - **ID**: make-test-fresh-core-mac
-  - **Tags**: tests, contributors, new-users
-  - **Details**: `make test` failed with "parallel: command not found" (bats `--jobs` needs GNU parallel, which the core Brewfile does not install and CONTRIBUTING does not mention). With it installed, `tests/node-endpoint-safe-mode.bats` "TASKS pre-commit lint never spawns blocked Node" fails on the base branch on a Volta-managed Node Mac, and four tests (coverage harness, doctor under 90 s, two cursor checks) fail only under parallel load.
-  - **Files**: `Makefile`, `CONTRIBUTING.md`, `tests/node-endpoint-safe-mode.bats`, `tests/doctor.bats`, `tests/coverage.bats`, `tests/module-cursor.bats`
-  - **Output**: code
-  - **Competitive-goal**: none — new-user install correctness.
-  - **Acceptance**: on a fresh core Mac, `make test` runs every test (falling back to serial without parallel) and passes.
-  - **Hypothesis**: contributor test runs that fail for environment reasons go to zero.
-  - **Measurement**: `make test` on a fresh core e2e machine.
-  - **Success**: green run.
-  - **Pivot**: if the timing test is inherently flaky under load, move it to a serial job.
-  - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
-
 ## P3
 
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack

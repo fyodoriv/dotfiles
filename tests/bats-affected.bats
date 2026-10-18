@@ -548,7 +548,7 @@ EOF
 
 @test "make test-all and test-force also run tests/plugin" {
   grep -qE '^test-all:' "$DOTFILES_DIR/Makefile"
-  [ "$(grep -cE 'no-parallelize-within-files tests/ tests/plugin/$' "$DOTFILES_DIR/Makefile")" -eq 2 ]
+  [ "$(grep -cE 'bats \$\(BATS_JOBS\) tests/ tests/plugin/$' "$DOTFILES_DIR/Makefile")" -eq 2 ]
 }
 
 @test "a test that reads a changed file through any repo-root variable is selected" {

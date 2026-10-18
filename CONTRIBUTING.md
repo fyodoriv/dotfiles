@@ -42,6 +42,15 @@ make coverage     # run bats through bin/dotfiles-coverage line coverage
 required for `make check`/tests (`shellcheck`, `bats-core`, `parallel`,
 `chezmoi`, `fd`, `jq`) and the optional `shfmt` helper for
 formatting.
+GNU `parallel` lets bats run test files side by side (`bats --jobs`). The
+core profile does not install it. Without it, `make test`, `make test-all`,
+and `make test-force` run the same tests in serial mode, which is slower;
+the header line says `serial: GNU parallel not found`. Run
+`brew install parallel` to get the faster runs.
+Timing tests (for example "doctor --quiet completes in under 90 seconds")
+skip instead of failing when the 1-minute load is above the CPU count
+(`host_is_saturated` in `tests/test_helper.bash`). Run that file alone to
+time it.
 `make coverage` is handled by the in-tree `bin/dotfiles-coverage` harness, so
 no extra Homebrew formula is required for coverage. `make lint-tasks` also
 needs Node/npm for the pinned

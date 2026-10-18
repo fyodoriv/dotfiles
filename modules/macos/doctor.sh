@@ -105,7 +105,8 @@ check "macos.dock_no_static_only" "Dock static-only disabled (shows folders)" \
   "defaults delete com.apple.dock static-only 2>/dev/null; killall Dock 2>/dev/null"
 
 # ── Dock folders ─────────────────────────────────────────────────────
-if command -v dockutil &>/dev/null; then
+# dockutil and the Dock folder layout come with the full profile only.
+if [ "${DOTFILES_PROFILE:-full}" = "full" ] && command -v dockutil &>/dev/null; then
   check "macos.dock_applications" "Dock: Applications folder" \
     "dockutil --find Applications 2>/dev/null | grep -q persistent-others" \
     "dockutil --add /Applications --view grid --display folder --sort name --no-restart && killall Dock 2>/dev/null"

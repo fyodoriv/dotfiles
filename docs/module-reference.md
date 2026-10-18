@@ -6,6 +6,7 @@
 - Modules under **Critical / Important / Performance / Cosmetic** headings reflect severity, not profile.
 - Core modules run in both `core` and `full` profiles.
 - Full-only modules run only when `profile: full`.
+- On `profile: core`, checks for tools that only `full` installs are skipped unless the tool is installed: tmux and Ghostty (`terminal`), JetBrains IDEs and `~/.ideavimrc`, VS Code, agent-browser, Dock folders (`macos`), and the `extras` configs. A fresh core Mac then shows no failure for a tool it never installed.
 - `enterprise` — requires `dotfiles enterprise on` (`is_enterprise: true`).
 - `ai-tools` — requires `use_ai_tools: true` in chezmoi config.
 
@@ -228,6 +229,8 @@ behavioral bootstrap, schema, and backup health.
 
 ### agent-browser
 
+On `profile: core`, the module runs only when the `agent-browser` CLI is installed.
+
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `agent-browser.installed` | agent-browser CLI installed | None |
@@ -344,7 +347,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | Screenshots | `screenshot_type`, `screenshot_shadow` | 2 | PNG format, no shadow |
 | Input | `mouse_speed`, `trackpad_speed`, `tap_to_click`, `three_finger_drag` | 4 | Speed settings, tap-to-click |
 | System | `app_nap`, `crash_reporter`, `save_to_disk`, `expand_save`, `no_quarantine`, `password_after_sleep`, `password_after_sleep_delay`, `screensaver_idle_time`, `pmset_display_sleep_15`, `pmset_battery_sleep_15`, `pmset_battery_disk_sleep_15`, `tiling_edge` | 12 | App Nap off, save to disk, 15-minute idle lock, Gatekeeper quarantine off |
-| Dock folders | `dock_applications`, `dock_downloads` | 2 | Applications grid + Downloads stack (requires dockutil) |
+| Dock folders | `dock_applications`, `dock_downloads` | 2 | Applications grid + Downloads stack (requires dockutil; full profile only) |
 | Dock reset | `dock_no_static_only` | 1 | Dock not in static-only mode |
 
 ---
@@ -352,6 +355,8 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 ## Cosmetic
 
 ### jetbrains (conditional)
+
+On `profile: core`, an IDE settings folder counts only when its app is in `/Applications` or `~/Applications` (`JETBRAINS_APP_DIRS` overrides the list), and `symlink.ideavimrc` is skipped.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
@@ -361,6 +366,8 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `jetbrains.keymap` | WebStorm keymap installed | None |
 
 ### terminal
+
+On `profile: core`, the tmux and Ghostty checks are skipped (core installs neither).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
@@ -495,7 +502,7 @@ The minsky orchestrator checkout, its PATH shim, and its CLI. `MINSKY_REPO` over
 
 ### vscode (dynamic)
 
-VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor module. Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
+VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor module. On `profile: core`, the module runs only when the app is installed (`VSCODE_APP` overrides its path). Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

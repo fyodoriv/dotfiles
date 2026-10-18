@@ -1,6 +1,12 @@
 #!/bin/bash
 # Doctor checks for agent-browser module
 
+# The core profile does not install agent-browser. Check it there only once
+# the person installs it.
+if [ "${DOTFILES_PROFILE:-full}" != "full" ] && ! command -v agent-browser >/dev/null 2>&1; then
+  return 0 2>/dev/null || exit 0
+fi
+
 check "agent-browser.installed" "agent-browser CLI installed" \
   "command -v agent-browser" \
   ""

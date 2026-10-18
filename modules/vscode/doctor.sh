@@ -11,13 +11,18 @@
 
 _VC_LOCAL="${VSCODE_LOCAL_DIR:-$HOME/.local/share/dotfiles-vscode}"
 _VC_USER_DIR="$HOME/Library/Application Support/Code/User"
-_VC_APP="/Applications/Visual Studio Code.app"
+_VC_APP="${VSCODE_APP:-/Applications/Visual Studio Code.app}"
 # The app bundle ships the CLI; use it when `code` is not on PATH.
 _VC_BIN="$(command -v code 2>/dev/null || true)"
 if [ -z "$_VC_BIN" ] && [ -x "$_VC_APP/Contents/Resources/app/bin/code" ]; then
   _VC_BIN="$_VC_APP/Contents/Resources/app/bin/code"
 fi
 : "${_VC_BIN:=/usr/local/bin/code}"
+# The core profile does not install VS Code. Check it there only when the
+# app is installed.
+if [ "${DOTFILES_PROFILE:-full}" != "full" ] && [ ! -d "$_VC_APP" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 if [ -n "${EXTRA_OVERLAY_ROOT:-}" ]; then
   _VC_OVERLAY_ROOT="$EXTRA_OVERLAY_ROOT"
 elif command -v chezmoi >/dev/null 2>&1; then

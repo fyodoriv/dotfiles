@@ -84,7 +84,7 @@ _jb_apply_plugins() {
 
 # Emit "<slug>\t<dir>" for the latest version of each detected IDE.
 # slug = lowercase IDE name without version (e.g. "webstorm", "goland").
-_jb_find_ides() {
+_jb_find_ide_dirs() {
   local jb_root="$HOME/Library/Application Support/JetBrains"
   [ -d "$jb_root" ] || return 0
   find "$jb_root" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | \
@@ -97,6 +97,34 @@ _jb_find_ides() {
       [ -n "$slug" ] && printf '%s\t%s\n' "$slug" "$dir"
     done | \
     awk -F'\t' '{ last[$1] = $2 } END { for (s in last) print s "\t" last[s] }'
+}
+
+# True when an app for the IDE slug is installed. App names lose spaces and
+# case ("IntelliJ IDEA CE.app" -> "intellijideace"); a name that starts with
+# the slug matches. JETBRAINS_APP_DIRS is a colon-separated list.
+_jb_ide_installed() {
+  local slug="$1" dir app name
+  [ "$slug" = "ideaic" ] && slug="intellijideace"
+  local IFS=:
+  for dir in ${JETBRAINS_APP_DIRS:-/Applications:$HOME/Applications}; do
+    for app in "$dir"/*.app; do
+      [ -d "$app" ] || continue
+      name="$(basename "$app" .app | tr -d ' ' | tr '[:upper:]' '[:lower:]')"
+      case "$name" in "$slug"*) return 0 ;; esac
+    done
+  done
+  return 1
+}
+
+# The detected IDEs to check. The core profile does not install JetBrains
+# IDEs, so there a settings folder counts only when its app is installed.
+_jb_find_ides() {
+  local slug dir
+  _jb_find_ide_dirs | while IFS=$'\t' read -r slug dir; do
+    if [ "${DOTFILES_PROFILE:-full}" = "full" ] || _jb_ide_installed "$slug"; then
+      printf '%s\t%s\n' "$slug" "$dir"
+    fi
+  done
 }
 
 # Map IDE slug to its vmoptions filename.
@@ -116,10 +144,12 @@ _jb_vmo_file() {
   esac
 }
 
-# ── IdeaVim (always) ────────────────────────────────────────────────────────
-check_symlink "symlink.ideavimrc" \
-  "$DOTFILES_DIR/home/ideavimrc" \
-  "$HOME/.ideavimrc"
+# ── IdeaVim (full profile; core does not install ~/.ideavimrc) ─────────────
+if [ "${DOTFILES_PROFILE:-full}" = "full" ]; then
+  check_symlink "symlink.ideavimrc" \
+    "$DOTFILES_DIR/home/ideavimrc" \
+    "$HOME/.ideavimrc"
+fi
 
 # ── Per-IDE settings ─────────────────────────────────────────────────────────
 while IFS=$'\t' read -r _jb_slug _jb_dir; do
@@ -201,7 +231,8 @@ done < <(_jb_find_ides)
 #      whether WebStorm is running.
 #   3. The operator can run `bin/jetbrains-install-plugins` on demand.
 _JB_RECOMMENDED="$DOTFILES_DIR/jetbrains/recommended_plugins.txt"
-if [ -f "$_JB_RECOMMENDED" ]; then
+# On core, recommend plugins only when a JetBrains IDE is installed.
+if [ -f "$_JB_RECOMMENDED" ] && { [ "${DOTFILES_PROFILE:-full}" = "full" ] || [ -n "$(_jb_find_ides)" ]; }; then
   _jb_recommended_installed() {
     local plugin="$1"
     # Check each detected IDE's plugins dir for the plugin.

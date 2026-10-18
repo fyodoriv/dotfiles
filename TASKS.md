@@ -14,20 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] The core profile doctor checks only core tools
-  - **ID**: core-doctor-skips-full-tools
-  - **Tags**: doctor, profiles, new-users
-  - **Details**: On a core Mac, half of the doctor failures were full-profile tools: Ghostty and its config, the lazygit config, JetBrains plugins for five IDEs that are not installed, VS Code and the `code` CLI, agent-browser, and the Dock Downloads folder. They read as broken setup to a new user. Gate those modules on `DOTFILES_PROFILE=full` (as `obsidian` does) or on the app being installed.
-  - **Files**: `modules/terminal/doctor.sh`, `modules/jetbrains/doctor.sh`, `modules/vscode/doctor.sh`, `modules/agent-browser/doctor.sh`, `modules/macos/doctor.sh`
-  - **Output**: code
-  - **Competitive-goal**: none — new-user install correctness.
-  - **Acceptance**: `dotfiles doctor` on a fresh core profile reports no failure for a tool the core profile does not install.
-  - **Hypothesis**: doctor failures on a fresh core Mac drop by about half.
-  - **Measurement**: `dotfiles doctor --json` on a core e2e run.
-  - **Success**: zero failures from full-only tools.
-  - **Pivot**: if a check matters on core, make it advisory instead of skipping it.
-  - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
-
 - [ ] `make test` works on a fresh core Mac
   - **ID**: make-test-fresh-core-mac
   - **Tags**: tests, contributors, new-users

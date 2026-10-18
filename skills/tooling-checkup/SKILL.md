@@ -4,17 +4,16 @@ description: >
   One-command health pass for the tooling repositories and the whole Mac. Ships
   outstanding tooling work, refreshes the tooling checkouts and agent config,
   upgrades Homebrew, npm, uv, pipx, mise, and Claude Code, runs `claude doctor`,
-  audits LaunchAgents and heavy processes, reads the recent machine and tooling
-  metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals)
-  and measures input latency only when a lag signal fires, reviews where agent
-  tool time went, lints skills, rules, and AGENTS.md files against Anthropic's
-  best practices, and researches new ways to work with AI (feeds plus web
-  search, judged by the Speed, Altitude, Depth, and Range lenses). Then it reports what changed since the last run, asks the
-  owner a questionnaire, and applies the answers. Use when the user runs
-  "/tooling-checkup", or asks to update all tooling and the machine, to tidy up
-  background processes, or to check that agent config follows best practices.
-  Don't use for a refresh without package upgrades (use update-tooling) or for
-  one task in one repository (use ship-it).
+  audits LaunchAgents and heavy processes, reads recent machine and tooling
+  metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals),
+  reviews where agent tool time went, lints skills, rules, and AGENTS.md files
+  against best practices, and researches new ways to work with AI. Then it
+  reports what changed since the last run, asks the owner a questionnaire, and
+  applies the answers. Use when the user runs "/tooling-checkup", or asks to
+  update all tooling and the machine, to tidy up background processes, or to
+  check that agent config follows best practices. Don't use for a refresh
+  without package upgrades (use update-tooling) or for one task in one
+  repository (use ship-it).
 disable-model-invocation: true
 ---
 

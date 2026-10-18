@@ -2,7 +2,9 @@
 
 load test_helper
 
-ROOT="$BATS_TEST_DIRNAME/.."
+# Resolve the path: the audit skips any path with a `tests` part, so
+# "tests/.." would make it see 0 skills.
+ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 SKILL_DIR="$ROOT/skills/tooling-checkup"
 SKILL="$SKILL_DIR/SKILL.md"
 EVALS="$SKILL_DIR/evals/evals.json"
@@ -49,6 +51,7 @@ make_tooling_root() {
 @test "tooling-checkup passes its own best-practice audit" {
   run python3 "$SCRIPTS/audit_agent_config.py" --skills "$SKILL_DIR"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"audit: 1 skill(s)"* ]]
   [[ "$output" == *"0 error(s), 0 warning(s)"* ]]
   [ "$(wc -l < "$SKILL")" -lt 500 ]
 }

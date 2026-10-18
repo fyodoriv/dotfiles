@@ -63,7 +63,7 @@ them. -->
   - **Measurement**: count `fix:` follow-up commits that touch a file changed by a merged agent PR within 7 days, per week, across agentbrew and dotfiles (`git log --since`), for 4 weeks before and 4 weeks after.
   - **Hypothesis**: a pre-merge review catches defects the gate misses; follow-up fixes per week drop by 30% or more.
   - **Success**: 30% or fewer follow-up fixes, with added time per PR under 3 minutes.
-  - **Pivot**: under 10% drop, or over 5 minutes per PR -> limit the review to code diffs over 50 lines, or drop it.
+  - **Pivot**: under 10% drop, or over 5 minutes per PR -> limit the review to large code diffs, or drop it.
   - **Anchor**: Osmani, Lunt, Wang 2026 (via simonwillison.net/2026/Oct/16/code-review); Bacchelli, Bird 2013 (expectations of modern code review).
 
 - [ ] `dotfiles add` keeps a nested config file at its own path

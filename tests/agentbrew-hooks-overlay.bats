@@ -85,7 +85,7 @@ render_all() {
 @test "hooks overlay: the owner's Mac turns the owner-only hooks on" {
   run render_all ""
   [ "$status" -eq 0 ]
-  for hook in perf-task-review async-human-comms-blocks gdoc-surgical-edit-only; do
+  for hook in perf-task-review poll-loop-hint async-human-comms-blocks gdoc-surgical-edit-only; do
     [[ "$output" == *"  - $hook"* ]]
   done
 }

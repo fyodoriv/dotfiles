@@ -171,6 +171,11 @@ fi
 if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
   AGENTFILE_PATHS+=("$EXTRA_AGENTFILE")
 fi
+# owner_machine=true (chezmoi data, or DOTFILES_OWNER_MACHINE): owner-only rules.
+if [ "${DOTFILES_OWNER_MACHINE:-$(chezmoi execute-template '{{ dig "owner_machine" true . }}' 2>/dev/null || echo true)}" = "true" ] \
+    && [ -f "$DOTFILES_DIR/config/agentfile-owner-rules.yaml" ]; then
+  AGENTFILE_PATHS+=("$DOTFILES_DIR/config/agentfile-owner-rules.yaml")
+fi
 # use_cursor=false (chezmoi data, or DOTFILES_USE_CURSOR=false): exclude Cursor.
 NO_CURSOR_AGENTFILE="$DOTFILES_DIR/config/agentfile-no-cursor.yaml"
 if [ "${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo true)}" = "false" ] \

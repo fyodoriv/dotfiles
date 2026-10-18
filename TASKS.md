@@ -14,19 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] A new user's agents get only general rules from the dotfiles Agentfile
-  - **ID**: agentfile-rules-owner-only-split
-  - **Tags**: agentbrew, rules, new-users, portability
-  - **Details**: `Agentfile.yaml` `rules:` deploys to every Mac that runs dotfiles. Some lines are the owner's personal workflow, not general advice: the "**Needed from you:**" closing line, the memory-MCP calls (`get_bootstrap_profile`, `commit_session_legacy`), the Augment/Windsurf/Devin notes, and the approved-family delivery pointer. A new user gets them too. Split them into an owner-only rules block that `dotfiles apply` merges only when `owner_machine` is true (like the hooks overlay), and keep only general rules in `Agentfile.yaml`.
-  - **Files**: `Agentfile.yaml`, `bin/dotfiles-apply` or the Agentfile merge step, `tests/stranger-readiness.bats`
-  - **Output**: code
-  - **Acceptance**: a stranger render (owner_machine false) produces an agentbrew Agentfile without the owner-only lines; the owner's still has them.
-  - **Hypothesis**: owner-only rule lines a new user's agents load go from about 8 to 0, with no change on the owner's Macs.
-  - **Measurement**: `bats tests/stranger-readiness.bats` (new case greps the merged Agentfile for the owner-only lines).
-  - **Success**: 0 owner-only lines for a stranger, all present for the owner.
-  - **Pivot**: if the merge step cannot see `owner_machine`, move the owner lines to the owner's local `~/.config/agentbrew/shared-rules.md` instead.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); finding from the 2026-10-16 portability audit.
-
 ## P3
 
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack

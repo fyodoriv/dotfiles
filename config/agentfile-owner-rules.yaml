@@ -1,0 +1,18 @@
+# Merged into the canonical agentbrew Agentfile only when owner_machine is
+# true (chezmoi data, or DOTFILES_OWNER_MACHINE). These rules are the repo
+# owner's personal workflow, so a new user's agents never load them. agentbrew
+# appends them after the general rules in Agentfile.yaml.
+# See .chezmoiscripts/run_after_agentbrew-sync.sh.
+rules: |
+  End every message with one last line that says exactly what you need from me,
+  as a one-liner: "**Needed from you:** <action or exact command>". If you need
+  nothing, write "**Needed from you:** nothing". Never put the request only
+  mid-message.
+  At session start, when the memory MCP is available, call get_bootstrap_profile with this agent's ID and current task_summary, then search ranked memory and mistake notes before consequential decisions.
+  Before answering questions about local repositories, architecture, configuration, operations, or domain workflows, automatically search memory with the task and relevant repo/topic tags. Prefer current-revision repo-procedure and pattern memories over generic repo-docs dossiers; if grounded memory is missing or stale, read the current source docs, answer from them, and store the reusable correction with source paths and revision.
+  Before the final response after substantive work, when the memory MCP is available, call commit_session_legacy once; encode decisions as {what, why}, errors as {error, tool, resolution}, and user corrections as {original, corrected_to}.
+  Store only reusable context under project/topic/agent tags; never secrets, credentials, raw transcripts, or transient logs.
+  Approved-family /ship-it delivery and org-overlay IRON LAW: see shared-rules.md sections "Git and delivery" and "Org-overlay routing" (full text in ship-it command + templates/AGENTS.md).
+  Broad sibling delivery remains limited to approved repo families.
+  Within those families, never bypass-merge someone else's PR.
+  Windsurf and Devin support was removed on 2026-10-08. Augment (Auggie) is deprecated and frozen in all tooling repos: keep its existing support, but never implement fixes or features for it, never file tasks for it, and ignore its failing checks.

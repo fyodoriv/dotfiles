@@ -102,3 +102,55 @@ _render_home() {
   grep -q 'OWNER_MACHINE:-true}" = "false"' "$REPO/modules/personal-machine/doctor.sh"
   grep -q 'OWNER_MACHINE:-true}" = "false"' "$REPO/modules/minsky/doctor.sh"
 }
+
+# Run the real apply-time agentbrew step with a stub agentbrew whose merge
+# concatenates its inputs, then print the merged Agentfile.
+_merged_agentfile() {
+  _init_config "$1"
+  mkdir -p "$NEW_HOME/.config/chezmoi" "$TEST_DIR/bin"
+  cp "$TEST_DIR/cfg.yaml" "$NEW_HOME/.config/chezmoi/chezmoi.yaml"
+  cat > "$TEST_DIR/bin/agentbrew" <<'STUB'
+#!/bin/bash
+[ "$1 $2" = "agentfile merge" ] || exit 0
+[ "${3:-}" = "--help" ] && { echo "Usage: agentbrew agentfile merge <agentfiles...>"; exit 0; }
+shift 2
+inputs=()
+while [ $# -gt 0 ]; do
+  case "$1" in --output) out="$2"; shift 2 ;; *) inputs+=("$1"); shift ;; esac
+done
+mkdir -p "$(dirname "$out")"
+cat "${inputs[@]}" > "$out"
+STUB
+  chmod +x "$TEST_DIR/bin/agentbrew"
+  env -i HOME="$NEW_HOME" PATH="$TEST_DIR/bin:$(dirname "$(command -v chezmoi)"):/usr/bin:/bin" \
+    CHEZMOI_SOURCE_DIR="$SRC" bash "$SRC/.chezmoiscripts/run_after_agentbrew-sync.sh" >/dev/null 2>&1
+  cat "$NEW_HOME/.config/agentbrew/Agentfile.yaml"
+}
+
+OWNER_RULE_PATTERN='Needed from you|get_bootstrap_profile|commit_session_legacy|search memory|Augment|Windsurf|Devin|Approved-family|approved repo families'
+
+@test "base Agentfile.yaml rules carry no owner-only lines" {
+  run grep -nE "$OWNER_RULE_PATTERN" "$REPO/Agentfile.yaml"
+  [ "$status" -ne 0 ] || { echo "owner-only rule in Agentfile.yaml: $output"; return 1; }
+}
+
+@test "new user's merged agentbrew Agentfile has general rules but no owner-only lines" {
+  cp "$REPO/Agentfile.yaml" "$SRC/"
+  [ -d "$REPO/config" ] && cp -R "$REPO/config/." "$SRC/config/"
+  cp "$REPO/.chezmoiscripts/run_after_agentbrew-sync.sh" "$SRC/.chezmoiscripts/"
+  run _merged_agentfile alex@example.com
+  [[ "$output" == *"lifecycle scope"* ]] || { echo "general rules missing: $output"; return 1; }
+  run grep -E "$OWNER_RULE_PATTERN" <<<"$output"
+  [ "$status" -ne 0 ] || { echo "owner-only rule reached a new user: $output"; return 1; }
+}
+
+@test "owner's merged agentbrew Agentfile keeps every owner-only line" {
+  cp "$REPO/Agentfile.yaml" "$SRC/"
+  [ -d "$REPO/config" ] && cp -R "$REPO/config/." "$SRC/config/"
+  cp "$REPO/.chezmoiscripts/run_after_agentbrew-sync.sh" "$SRC/.chezmoiscripts/"
+  run _merged_agentfile fyodor@sent.com
+  for want in 'Needed from you' get_bootstrap_profile commit_session_legacy 'search memory' \
+      Augment Windsurf Approved-family 'approved repo families' 'lifecycle scope'; do
+    [[ "$output" == *"$want"* ]] || { echo "owner Agentfile lacks: $want"; return 1; }
+  done
+}

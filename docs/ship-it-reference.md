@@ -599,7 +599,9 @@ once:
 
 1. Run the built-in `/code-review` on the PR (`/code-review <PR number>`), or
    the `requesting-code-review` skill when `/code-review` is not available.
-2. Fix each CONFIRMED finding in the same PR, re-run the gate, and push.
+2. Fix each real finding in the same PR (CONFIRMED ones, and at `low`
+   effort, which has no verify pass, each one you check by hand), re-run the
+   gate, and push.
 3. List every finding you did not fix in the PR body under `## Review`, each
    with one line on why (false positive, out of scope, filed as a task).
 

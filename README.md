@@ -718,6 +718,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 |-------|-------------|
 | `com.dotfiles.atuin-daemon` | Shell history sync daemon |
 | `com.dotfiles.sleepwatcher` | Run scripts on sleep/wake events |
+| `com.dotfiles.chrome-dock-guard` | Event-driven: when a hidden agent Chrome takes the front (Dock click, Cmd-Tab), raise or start your own Chrome (`logs/chrome-dock-guard.log`) |
 | `com.dotfiles.pmset-drift-watch` | Read-only: log each power-settings change with the processes alive at that moment (`logs/pmset-drift.log`) |
 | `com.dotfiles.load-sampler` | Read-only: append load, memory, swap, and top CPU processes every 30s (`~/.local/state/dotfiles/load-samples.tsv`) |
 
@@ -1007,6 +1008,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
 | `rancher-desktop` | Start Rancher Desktop and wait until the Docker API answers | At login |
+| `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV` for tests) | Always running (LaunchAgent) |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 

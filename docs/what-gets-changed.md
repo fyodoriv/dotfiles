@@ -148,6 +148,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `network-resilience` | Periodic | all | Monitor and recover network connectivity |
 | `atuin-daemon` | At load | all | Background shell history daemon (if atuin installed) |
 | `rancher-desktop` | At load | all | Rancher Desktop integration (if app installed); turns Kubernetes off unless `DOTFILES_RANCHER_KUBERNETES=1` |
+| `chrome-dock-guard` | At load, always running | all | Raises or starts your own Chrome when a hidden agent Chrome takes the front; never touches the agent Chromes; skips without `swiftc` |
 | `pmset-drift-watch` | On power-plist write + every 5 min | all | Read-only log of power-settings changes and the processes alive at that moment |
 | `load-sampler` | Every 30s | all | Read-only 7-day load, memory, and top-process history in `~/.local/state/dotfiles/load-samples.tsv` |
 | `morning` | Configurable (default 8:30 AM) | full | Morning briefing |

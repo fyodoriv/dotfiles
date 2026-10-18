@@ -1,0 +1,37 @@
+#!/bin/bash
+# Keep a Dock click on Chrome from landing in a hidden agent Chrome.
+#
+# The launchd agent Chromes (9223/9224/9225) run the real Google Chrome.app
+# headless, so macOS can activate one of them when you click Chrome in the
+# Dock. It has no window, so Chrome looks stuck. This wrapper compiles
+# lib/chrome-dock-guard.swift once (cached by source hash) and runs it. The
+# watcher raises your Chrome, or starts it, whenever an agent Chrome becomes
+# active. Run by the com.dotfiles.chrome-dock-guard LaunchAgent.
+#
+# Usage: dotfiles-chrome-dock-guard                 run the watcher
+#        dotfiles-chrome-dock-guard --classify ARGV  print automation|user
+#
+# Exit codes: 0 = ran, or skipped because swiftc is missing; 1 = build failed.
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE="${DOTFILES_CHROME_DOCK_GUARD_SOURCE:-$SCRIPT_DIR/../lib/chrome-dock-guard.swift}"
+BIN="${DOTFILES_CHROME_DOCK_GUARD_BIN:-$HOME/.local/share/dotfiles/bin/chrome-dock-guard}"
+SWIFTC="${DOTFILES_SWIFTC:-$(command -v swiftc || true)}"
+
+if [ -z "$SWIFTC" ] || [ ! -x "$SWIFTC" ]; then
+  echo "chrome-dock-guard: skip — swiftc not found (install Xcode Command Line Tools)"
+  exit 0
+fi
+
+want_sha="$(shasum -a 256 "$SOURCE" | cut -d' ' -f1)"
+if [ ! -x "$BIN" ] || [ "$(cat "$BIN.sha" 2>/dev/null || true)" != "$want_sha" ]; then
+  mkdir -p "$(dirname "$BIN")"
+  "$SWIFTC" -O -o "$BIN.tmp" "$SOURCE" || { echo "chrome-dock-guard: build failed" >&2; exit 1; }
+  mv -f "$BIN.tmp" "$BIN"
+  printf '%s\n' "$want_sha" > "$BIN.sha"
+fi
+
+exec "$BIN" "$@"

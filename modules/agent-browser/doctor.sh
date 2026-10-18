@@ -154,3 +154,9 @@ check "agent-browser.agent_session_isolation" "AGENT_BROWSER_SESSION set when in
 check "agent-browser.agent_session_wired" "agent-browser session env wired for agent contexts" \
   "[ -f \"\$DOTFILES_DIR/lib/agent-browser-session-env.sh\" ] && grep -q 'AGENT_BROWSER_SESSION=\"devin-' \"\$DOTFILES_DIR/lib/agent-browser-session-env.sh\" && grep -q 'AGENT_BROWSER_SESSION=\"claude-' \"\$DOTFILES_DIR/lib/agent-browser-session-env.sh\" && grep -q 'agent-browser-session-env.sh' \"\$DOTFILES_DIR/home/zshrc.ai-tools\" \"\$DOTFILES_DIR/dot_config/dotfiles/env.sh.tmpl\" 2>/dev/null" \
   ""
+
+# The launchd agent Chromes share Google Chrome.app's identity, so a Dock click
+# can land in a hidden one. The guard hands that click to the user's Chrome.
+check "agent-browser.chrome_dock_guard" "Chrome Dock guard launchagent installed (Dock click never lands in a hidden agent Chrome)" \
+  "[ -f \"\$HOME/Library/LaunchAgents/com.dotfiles.chrome-dock-guard.plist\" ] || [ -f \"\$DOTFILES_DIR/launchagents/com.dotfiles.chrome-dock-guard.plist.tmpl\" ]" \
+  ""

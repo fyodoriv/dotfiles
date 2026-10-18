@@ -607,6 +607,11 @@ once:
    gate, and push.
 3. List every finding you did not fix in the PR body under `## Review`, each
    with one line on why (false positive, out of scope, filed as a task).
+4. For a contributor's PR, also ask one question the review tool does not:
+   does it change what the owner's own machine does today (a default, a
+   LaunchAgent, a permission, a merged config value)? A fix for a new user
+   must keep the owner's current behaviour unless the owner opts in. Check
+   the owner's real config value, and add a test for the owner case.
 
 Skip rule: skip the review for a diff that touches only docs, task queues, or
 skill prose with no code (`*.md`, `TASKS.md`, `evals/*.json`). Say

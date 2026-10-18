@@ -10,6 +10,7 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -q '/code-review' "$REF"
   grep -q '/code-review medium <PR number>' "$REF"
   grep -q 'its findings carry no' "$REF"
+  grep -q "change what the owner's own machine does today" "$REF"
   grep -q 'Skip rule: skip the review for a diff that touches only docs' "$REF"
   grep -q '## Review' "$REF"
   # The step sits between CI (6) and Merge (7).

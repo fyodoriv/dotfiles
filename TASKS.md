@@ -53,6 +53,19 @@ them. -->
 
 ## P2
 
+- [ ] `/ship-it` runs an automated review before it self-merges a tooling PR
+  - **ID**: ship-it-self-review-before-merge
+  - **Tags**: ship-it, review, quality
+  - **Details**: `/ship-it` merges agent-made tooling PRs as soon as the local gate is green; no reviewer reads them. The Claude Code team runs a Claude review on every change before a human looks (Osmani, Lunt, Wang, "How the Claude Code team does code review", quoted by Simon Willison 2026-10-16). Try a review step in `commands/ship-it.md` and `docs/ship-it-reference.md`: before the merge, run the built-in `/code-review` on the PR diff, fix CONFIRMED findings, and list the rest in the PR body. Owner approved filing this in `/tooling-checkup` 2026-10-18.
+  - **Files**: `commands/ship-it.md`, `docs/ship-it-reference.md`, `tests/`
+  - **Output**: code
+  - **Acceptance**: the ship-it reference has the review step with its skip rule (docs-only diffs), and a test checks the step is present.
+  - **Measurement**: count `fix:` follow-up commits that touch a file changed by a merged agent PR within 7 days, per week, across agentbrew and dotfiles (`git log --since`), for 4 weeks before and 4 weeks after.
+  - **Hypothesis**: a pre-merge review catches defects the gate misses; follow-up fixes per week drop by 30% or more.
+  - **Success**: 30% or fewer follow-up fixes, with added time per PR under 3 minutes.
+  - **Pivot**: under 10% drop, or over 5 minutes per PR -> limit the review to code diffs over 50 lines, or drop it.
+  - **Anchor**: Osmani, Lunt, Wang 2026 (via simonwillison.net/2026/Oct/16/code-review); Bacchelli, Bird 2013 (expectations of modern code review).
+
 - [ ] `dotfiles add` keeps a nested config file at its own path
   - **ID**: dotfiles-add-nested-path
   - **Tags**: us03, add, bug

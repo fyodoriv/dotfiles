@@ -186,14 +186,18 @@ home_paths() {
 
 # Install scripts also write caches and tools outside the chezmoi targets
 # (for example ~/.cache/uv). Removing those is not safe, so list them.
+# Sets LEFTOVER_COUNT for critical(), so it never claims a full restore.
+LEFTOVER_COUNT=0
 report_leftovers() {
   local left n
+  LEFTOVER_COUNT=0
   [ -f "$1/home-before.txt" ] || return 0
   # Keep only the top new path of each new tree: ~/.cache, not ~/.cache/uv.
   left="$(LC_ALL=C comm -13 "$1/home-before.txt" <(home_paths) |
     awk 'last == "" || index($0, last "/") != 1 { print; last = $0 }')"
   [ -n "$left" ] || return 0
   n="$(printf '%s\n' "$left" | wc -l | tr -d ' ')"
+  LEFTOVER_COUNT="$n"
   say "  ! $n new path(s) in your home folder are not chezmoi targets, so restore keeps them."
   say "    The install scripts made them (caches, tools, local config). Delete them by hand if you do not want them:"
   printf '%s\n' "$left" | head -20 | sed 's|^\./|      ~/|'
@@ -246,7 +250,11 @@ critical() {
   say ""
   say "✗ Critical error during $1. Restoring your previous setup..."
   if do_restore "$BACKUP_ID"; then
-    say "Your Mac is back to how it was before (Homebrew packages stay installed)."
+    if [ "${LEFTOVER_COUNT:-0}" -gt 0 ]; then
+      say "Your managed files and settings are back to how they were, apart from the new path(s) listed above (Homebrew packages stay installed)."
+    else
+      say "Your Mac is back to how it was before (Homebrew packages stay installed)."
+    fi
   else
     say "Automatic restore failed. Restore by hand: bash $REPO_DIR/bin/dotfiles-install restore $BACKUP_ID"
   fi

@@ -98,6 +98,9 @@ teardown() { rm -rf "$TEST_DIR"; }
   [[ "$output" == *"not chezmoi targets, so restore keeps them"* ]] || { echo "$output"; return 1; }
   [[ "$output" == *"      ~/.cache"* ]]
   [[ "$output" != *"~/.cache/e2e-tool"* ]]
+  # Paths were kept, so it must not claim the Mac is exactly as before.
+  [[ "$output" != *"Your Mac is back to how it was before"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"apart from the new path(s) listed above"* ]] || { echo "$output"; return 1; }
   [ -e "$HOME/.cache/e2e-tool/data" ]
 }
 
@@ -138,6 +141,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   FAIL_VERIFY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
   [ "$status" -eq 1 ]
   [[ "$output" == *"Critical error during verification"* ]]
+  [[ "$output" == *"Your Mac is back to how it was before"* ]] || { echo "$output"; return 1; }
   [ "$(cat "$HOME/.zshrc")" = "# my zshrc" ]
   [ ! -e "$HOME/.gitconfig" ]
   [ ! -e "$HOME/Library/LaunchAgents/com.dotfiles.sync.plist" ]

@@ -67,6 +67,21 @@ fixture_git() {
   [ "$(cat "$SCRATCH/home/.e2erc")" = "e2e=1" ]
 }
 
+@test "US03 e2e: dotfiles add keeps a nested file at its path under HOME" {
+  mkdir -p "$SCRATCH/home/.config/e2etool"
+  printf 'nested=1\n' > "$SCRATCH/home/.config/e2etool/e2e.conf"
+  run in_home bin/dotfiles add "$SCRATCH/home/.config/e2etool/e2e.conf"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ -f "$SCRATCH/home/apps/dotfiles/home/config/e2etool/e2e.conf" ]
+  rm "$SCRATCH/home/.config/e2etool/e2e.conf"
+  run in_home chezmoi apply --source . "$SCRATCH/home/.config/e2etool/e2e.conf"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ -L "$SCRATCH/home/.config/e2etool/e2e.conf" ]
+  [[ "$(readlink "$SCRATCH/home/.config/e2etool/e2e.conf")" == "$SCRATCH/home/apps/dotfiles/home/"* ]]
+  [ "$(cat "$SCRATCH/home/.config/e2etool/e2e.conf")" = "nested=1" ]
+  [ ! -e "$SCRATCH/home/.e2e.conf" ]
+}
+
 @test "US03 e2e: dotfiles add refuses a file that does not exist" {
   run in_home bin/dotfiles add "$SCRATCH/home/.no-such-file"
   [ "$status" -eq 1 ]

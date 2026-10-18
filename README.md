@@ -521,6 +521,9 @@ dotfiles defaults-add <domain> <key> <val> <type>  # add a macOS default
 dotfiles profile [core|full]                    # show or switch profile
 ```
 
+`dotfiles add` keeps a nested file at its path under `~`: `~/.config/tool/tool.conf`
+links back to `~/.config/tool/tool.conf`, not `~/.tool.conf`.
+
 ### Time tracking
 
 Every automated task records how much manual time it saved:

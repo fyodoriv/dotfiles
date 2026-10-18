@@ -10,6 +10,7 @@
 
 ```bash
 dotfiles add ~/.my-tool-config              # symlink mode (default)
+dotfiles add ~/.config/tool/tool.conf       # nested file keeps its path
 dotfiles add ~/.npmrc --copy                # copy mode
 dotfiles add ~/.ssh/config --copy --module ssh  # copy + specific module
 ```
@@ -26,7 +27,7 @@ Defaults to symlink mode (`--copy` switches to copy), auto-detects the doctor mo
 | Other tools may overwrite | | ✓ |
 | Needs restricted permissions | | ✓ (private) |
 
-- **Symlink** — content in `home/`, symlinked to `~/`. Edit source, changes appear instantly.
+- **Symlink** — content in `home/`, symlinked to `~/`. Edit source, changes appear instantly. A nested file keeps its path: `~/.config/tool/tool.conf` is stored as `home/config/tool/tool.conf`, and `dot_config/tool/symlink_tool.conf.tmpl` links it back to `~/.config/tool/tool.conf`.
 - **Copy** — prefixed `dot_*` at repo root, copied on `dotfiles apply`.
 - **Private** — `private_dot_*`, copied with 0700 permissions.
 - **Template** — add `.tmpl` suffix for profile-conditional rendering.

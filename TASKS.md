@@ -12,20 +12,6 @@ them. -->
 
 ## P1
 
-- [ ] The US05 doctor clean-run rate is back above its pivot
-  - **ID**: us05-doctor-rate-below-pivot
-  - **Tags**: us05, doctor, metrics, stability
-  - **Details**: `dotfiles metrics --table` showed the US05 row (doctor runs with no failure, last 30 runs) at 70% on 2026-10-16, past its pivot of 80% (baseline 93%). Most failing rows came from bats runs that called the real doctor without test_helper and wrote to `~/.dotfiles-stats.jsonl` (bursts within seconds, with fixture check counts); #131 stopped that. Check whether real runs still fail: run `dotfiles doctor` daily for a week, then read the row again. If real failures remain, fix the failing checks; if not, record in docs/learnings.md that the breach was test pollution.
-  - **Files**: `docs/metrics.md`, `docs/learnings.md`, failing `modules/*/doctor.sh`
-  - **Output**: code
-  - **Competitive-goal**: none — US05 outcome metric, not a scorecard metric.
-  - **Acceptance**: the US05 row reads 80% or more from real runs, or learnings records the pollution with evidence.
-  - **Hypothesis**: with test runs isolated, the last 30 real doctor runs pass at 90% or more.
-  - **Measurement**: `bin/dotfiles-metrics --table` (US05 row).
-  - **Success**: 90% or more by 2026-10-31.
-  - **Pivot**: below 80% by 2026-10-31 means real failing checks; fix them before new doctor work.
-  - **Anchor**: docs/metrics.md US05 row; checkup rule "a metric past its pivot becomes a P0 or P1 task".
-
 - [ ] Coverage traces tests that load test_helper, and the full suite is green on the owner's Mac
   - **ID**: coverage-trap-and-full-suite-green
   - **Tags**: tests, coverage, stability
@@ -41,33 +27,6 @@ them. -->
   - **Anchor**: Beck 2002 (test-driven development: a red bar must mean something); requirements run 2026-10-16.
 
 ## P2
-
-- [ ] `/ship-it` runs an automated review before it self-merges a tooling PR
-  - **ID**: ship-it-self-review-before-merge
-  - **Tags**: ship-it, review, quality
-  - **Details**: `/ship-it` merges agent-made tooling PRs as soon as the local gate is green; no reviewer reads them. The Claude Code team runs a Claude review on every change before a human looks (Osmani, Lunt, Wang, "How the Claude Code team does code review", quoted by Simon Willison 2026-10-16). Try a review step in `commands/ship-it.md` and `docs/ship-it-reference.md`: before the merge, run the built-in `/code-review` on the PR diff, fix CONFIRMED findings, and list the rest in the PR body. Owner approved filing this in `/tooling-checkup` 2026-10-18.
-  - **Files**: `commands/ship-it.md`, `docs/ship-it-reference.md`, `tests/`
-  - **Output**: code
-  - **Acceptance**: the ship-it reference has the review step with its skip rule (docs-only diffs), and a test checks the step is present.
-  - **Measurement**: count `fix:` follow-up commits that touch a file changed by a merged agent PR within 7 days, per week, across agentbrew and dotfiles (`git log --since`), for 4 weeks before and 4 weeks after.
-  - **Hypothesis**: a pre-merge review catches defects the gate misses; follow-up fixes per week drop by 30% or more.
-  - **Success**: 30% or fewer follow-up fixes, with added time per PR under 3 minutes.
-  - **Pivot**: under 10% drop, or over 5 minutes per PR -> limit the review to large code diffs, or drop it.
-  - **Anchor**: Osmani, Lunt, Wang 2026 (via simonwillison.net/2026/Oct/16/code-review); Bacchelli, Bird 2013 (expectations of modern code review).
-
-- [ ] `dotfiles add` keeps a nested config file at its own path
-  - **ID**: dotfiles-add-nested-path
-  - **Tags**: us03, add, bug
-  - **Details**: In symlink mode, `bin/dotfiles-add ~/.config/tool/tool.conf` copies the file to `home/tool.conf` and writes `symlink_dot_tool.conf.tmpl`, so `dotfiles apply` links `~/.tool.conf` instead of `~/.config/tool/tool.conf`. Found while writing the US03 story e2e (2026-10-16), which uses a top-level dotfile for now. Keep the path under `$HOME` (for example `dot_config/tool/symlink_tool.conf.tmpl`), and add a nested-file case to `tests/e2e/stories-e2e.bats`.
-  - **Files**: `bin/dotfiles-add`, `tests/dotfiles-add-family.bats`, `tests/e2e/stories-e2e.bats`
-  - **Output**: code
-  - **Competitive-goal**: none — US03 correctness; no scorecard metric covers `dotfiles add`.
-  - **Acceptance**: after `dotfiles add ~/.config/x/y.conf` and `dotfiles apply`, `~/.config/x/y.conf` is a symlink into the repo, and no `~/.y.conf` appears.
-  - **Hypothesis**: nested files that `dotfiles add` deploys to the wrong path go from 1 of 1 to 0 of 1.
-  - **Measurement**: `make e2e` (new US03 nested-file case).
-  - **Success**: the nested case passes.
-  - **Pivot**: if chezmoi's own `chezmoi add --follow` covers this, drop symlink mode for nested files and call it (GET over IMPLEMENT).
-  - **Anchor**: US03 story e2e finding 2026-10-16.
 
 - [ ] Endpoint hardening runs only on Macs that need it
   - **ID**: endpoint-hardening-only-where-needed

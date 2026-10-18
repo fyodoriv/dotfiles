@@ -7,6 +7,7 @@
 # Usage:
 #   dotfiles metrics [--days N] [--share FILE]
 #   dotfiles metrics --table
+#   dotfiles metrics --baseline
 #
 # Flags:
 #   --days N      Window in days (default: 7).
@@ -15,6 +16,8 @@
 #   --table       Run every command in docs/metrics.md and print each metric
 #                 with its value, goal, and pivot. A failing command prints
 #                 (stub), never a made-up 0.
+#   --baseline    Print zsh start median, free disk, and LaunchAgent count:
+#                 the same lines `dotfiles-install plan` shows before install.
 #   --help, -h    Print this message.
 set -euo pipefail
 
@@ -30,7 +33,11 @@ while [ "$#" -gt 0 ]; do
     --days) days="${2:-7}"; shift 2 ;;
     --share) share="${2:-}"; [ -n "$share" ] || { echo "dotfiles metrics: --share needs a file" >&2; exit 2; }; shift 2 ;;
     --table) table=1; shift ;;
-    --help|-h) sed -n '2,19p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    --baseline)
+      # shellcheck source=../lib/mac-baseline.sh
+      source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib/mac-baseline.sh"
+      baseline_report ""; exit 0 ;;
+    --help|-h) sed -n '2,22p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "dotfiles metrics: unknown flag $1" >&2; exit 2 ;;
   esac
 done

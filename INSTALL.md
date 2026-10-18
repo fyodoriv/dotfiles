@@ -43,6 +43,9 @@ Show the person, in your own short words:
   Mac password once or twice; power and network. A line with `→ … will be
   installed` is a tool that `run` installs with Homebrew; `plan` installs
   nothing,
+- their Mac today, from the "Your Mac today" lines: zsh start median, free
+  disk, LaunchAgents, and the disk the chosen profile will use (after the
+  install, `dotfiles metrics --baseline` prints the same lines to compare),
 - what will change: shell and git config, Homebrew packages, macOS settings,
   background jobs, then agentbrew,
 - that a backup is made first: config files, LaunchAgents, the chezmoi

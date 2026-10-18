@@ -56,6 +56,15 @@ teardown() { rm -rf "$TEST_DIR"; }
   ! grep -q 'secret-proc' "$TEST_DIR/m.md"
 }
 
+@test "metrics --baseline shows the same numbers as the install plan" {
+  mkdir -p "$TEST_DIR/bin"; printf '#!/bin/bash\nexit 0\n' > "$TEST_DIR/bin/zsh"; chmod +x "$TEST_DIR/bin/zsh"
+  run env PATH="$TEST_DIR/bin:$PATH" DOTFILES_DIR="$REPO" bash "$REPO/bin/dotfiles-metrics" --baseline
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" =~ zsh\ start:\ median\ [0-9]+\ ms ]] || { echo "$output"; return 1; }
+  [[ "$output" =~ Free\ disk:\ [0-9]+\.[0-9]\ GB ]]
+  [[ "$output" =~ LaunchAgents:\ [0-9]+ ]]
+}
+
 @test "metrics rejects a non-numeric --days" {
   run env DOTFILES_DIR="$REPO" bash "$REPO/bin/dotfiles-metrics" --days soon
   [ "$status" -eq 2 ]

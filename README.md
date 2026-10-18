@@ -69,7 +69,7 @@ A new Mac ships with conservative defaults — slow key repeat, Spotlight crawli
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, cursor-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
-- **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac; `--share FILE` writes a privacy-safe snapshot; `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you.
+- **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac; `--share FILE` writes a privacy-safe snapshot; `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot; `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you.
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
 
 ## Installation
@@ -976,6 +976,7 @@ dotfiles stats [--oneliner] [--recalc]            Automation stats (runs, time s
 dotfiles install plan|run|restore                 One-step install with backup and auto-restore (see INSTALL.md)
 dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP health, machine load (local only)
 dotfiles metrics --table                         Every docs/metrics.md metric: value, goal, pivot ((stub) if no data)
+dotfiles metrics --baseline                      zsh start median, free disk, LaunchAgent count (same lines as install plan)
 dotfiles contribute [--repo agentbrew|PATH]       Open a PR upstream from your branch; forks the repo for you
 dotfiles edit                                     Open dotfiles repo in $EDITOR
 dotfiles cheat                                    Command reference card

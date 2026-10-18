@@ -56,20 +56,6 @@ them. -->
   - **Pivot**: if the timing test is inherently flaky under load, move it to a serial job.
   - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
 
-- [ ] `dotfiles-install plan` shows today's numbers before it promises gains
-  - **ID**: install-plan-shows-baseline
-  - **Tags**: install, metrics, ux
-  - **Details**: The README promises a fast shell, but this Mac already started zsh in 70 ms (60 ms after). Showing the person's own baseline in `plan` (shell start, disk free, LaunchAgent count) sets honest expectations, and `dotfiles metrics` can show the same numbers after.
-  - **Files**: `bin/dotfiles-install`, `bin/dotfiles-metrics`
-  - **Output**: code
-  - **Competitive-goal**: none — new-user install correctness.
-  - **Acceptance**: `plan` prints the current zsh start median, free disk and the expected disk use of the chosen profile.
-  - **Hypothesis**: people can judge the trade (disk, background jobs, speed) before they say yes.
-  - **Measurement**: bats test on the plan output.
-  - **Success**: the three numbers appear.
-  - **Pivot**: if measuring is slow, show only disk and LaunchAgent counts.
-  - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
-
 ## P3
 
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack

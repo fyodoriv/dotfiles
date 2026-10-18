@@ -101,6 +101,19 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ -e "$HOME/.cache/e2e-tool/data" ]
 }
 
+@test "plan shows this Mac's baseline: zsh start median, free disk, and the profile's disk use" {
+  stub zsh 'echo "zsh $*" >> "$LOG"; exit 0'
+  run bash "$REPO/bin/dotfiles-install" plan
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" =~ zsh\ start:\ median\ [0-9]+\ ms\ of\ 3\ runs ]] || { echo "$output"; return 1; }
+  [[ "$output" =~ Free\ disk:\ [0-9]+\.[0-9]\ GB ]] || { echo "$output"; return 1; }
+  [[ "$output" =~ Expected\ disk\ use\ \(core\):\ about\ [0-9.]+\ GB ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"dotfiles metrics --baseline"* ]]
+  [ "$(grep -c '^zsh -i -c exit' "$LOG")" -eq 3 ]
+  run bash "$REPO/bin/dotfiles-install" plan --profile full
+  [[ "$output" =~ Expected\ disk\ use\ \(full\):\ about\ [0-9.]+\ GB ]] || { echo "$output"; return 1; }
+}
+
 @test "run refuses without --yes" {
   run bash "$REPO/bin/dotfiles-install" run
   [ "$status" -eq 2 ]

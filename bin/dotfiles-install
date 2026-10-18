@@ -33,6 +33,9 @@ LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 DOCTOR="${DOTFILES_INSTALL_DOCTOR:-$REPO_DIR/bin/dotfiles-doctor}"
 AGENTBREW_URL="${DOTFILES_INSTALL_AGENTBREW_URL:-https://github.com/fyodoriv/agentbrew.git}"
 
+# shellcheck source=../lib/mac-baseline.sh
+source "$REPO_DIR/lib/mac-baseline.sh"
+
 say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
 usage() { sed -n '2,27p' "$0" | sed -E 's/^# ?//'; }
@@ -85,6 +88,9 @@ cmd_plan() {
   say "  - 10-20 minutes for core, 30-60 for full (Homebrew downloads)."
   say "  - Your Mac password once or twice (Homebrew; power settings are skipped without it)."
   say "  - Stay on power and network. You can keep working; apps may restart."
+  step "Your Mac today (compare after the install: dotfiles metrics --baseline)"
+  baseline_report "  - "
+  say "  - Expected disk use ($profile): $(baseline_profile_disk "$profile")"
   step "What will happen"
   say "  1. Back up to $BACKUP_ROOT/<time>/:"
   say "     your chezmoi config, every config file dotfiles will manage (~/.zshrc,"

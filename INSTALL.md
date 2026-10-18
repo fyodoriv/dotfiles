@@ -38,9 +38,11 @@ bash <DIR>/bin/dotfiles-install plan
 
 Show the person, in your own short words:
 
-- what they need: Xcode Command Line Tools, Homebrew, git, jq, chezmoi;
-  10-20 minutes (core) or 30-60 (full); their Mac password once or twice;
-  power and network,
+- what they need: Xcode Command Line Tools, Homebrew, git, Homebrew jq
+  (not `/usr/bin/jq`), chezmoi; 10-20 minutes (core) or 30-60 (full); their
+  Mac password once or twice; power and network. A line with `→ … will be
+  installed` is a tool that `run` installs with Homebrew; `plan` installs
+  nothing,
 - what will change: shell and git config, Homebrew packages, macOS settings,
   background jobs, then agentbrew,
 - that a backup is made first: config files, LaunchAgents, the chezmoi

@@ -41,8 +41,22 @@ defaults_domains() {
   jq -r '[.[]? | .domain? // empty] | unique | .[]' "$REPO_DIR/data/macos-defaults.json" 2>/dev/null
 }
 
+# The endpoint scripts accept only Homebrew jq, never /usr/bin/jq.
+brew_jq_present() {
+  local prefix
+  for prefix in ${DOTFILES_BREW_PREFIX:-$(brew --prefix 2>/dev/null) /opt/homebrew /usr/local}; do
+    [ -x "$prefix/bin/jq" ] && return 0
+  done
+  return 1
+}
+
+tool_label() { if [ "$1" = jq ]; then printf 'jq (Homebrew)'; else printf '%s' "$1"; fi; }
+tool_present() { if [ "$1" = jq ]; then brew_jq_present; else command -v "$1" >/dev/null 2>&1; fi; }
+
+# preflight [check|install]: `check` (plan) reports what `run` will install
+# and changes nothing; `install` (run) installs a missing tool with Homebrew.
 preflight() {
-  local ok=0
+  local mode="${1:-install}" ok=0 tool label
   if xcode-select -p >/dev/null 2>&1 || [ -n "${DOTFILES_INSTALL_SKIP_XCODE_CHECK:-}" ]; then say "  ✓ Xcode Command Line Tools"
   else say "  ✗ Xcode Command Line Tools: run 'xcode-select --install' (a macOS dialog opens)"; ok=1; fi
   if command -v brew >/dev/null 2>&1; then say "  ✓ Homebrew"
@@ -50,11 +64,13 @@ preflight() {
   # With Homebrew present, install a missing tool instead of stopping, so the
   # README one-liner works on a Mac that has only Homebrew.
   for tool in ${DOTFILES_INSTALL_TOOLS:-git jq chezmoi}; do
-    if command -v "$tool" >/dev/null 2>&1; then say "  ✓ $tool"
-    elif command -v brew >/dev/null 2>&1 && say "  → $tool: brew install $tool" &&
-      brew install "$tool" >/dev/null 2>&1 && command -v "$tool" >/dev/null 2>&1; then
-      say "  ✓ $tool (installed)"
-    else say "  ✗ $tool: brew install $tool"; ok=1; fi
+    label="$(tool_label "$tool")"
+    if tool_present "$tool"; then say "  ✓ $label"
+    elif ! command -v brew >/dev/null 2>&1; then say "  ✗ $label: brew install $tool"; ok=1
+    elif [ "$mode" = check ]; then say "  → $label: will be installed (brew install $tool)"
+    elif say "  → $label: brew install $tool" && brew install "$tool" >/dev/null 2>&1 && tool_present "$tool"; then
+      say "  ✓ $label (installed)"
+    else say "  ✗ $label: brew install $tool"; ok=1; fi
   done
   return "$ok"
 }
@@ -64,7 +80,7 @@ cmd_plan() {
   [ "${1:-}" = "--profile" ] && profile="${2:-core}"
   say "dotfiles install plan (profile: $profile; nothing has changed yet)"
   step "What you need"
-  preflight
+  preflight check
   say "  - 10-20 minutes for core, 30-60 for full (Homebrew downloads)."
   say "  - Your Mac password once or twice (Homebrew; power settings are skipped without it)."
   say "  - Stay on power and network. You can keep working; apps may restart."
@@ -206,7 +222,7 @@ cmd_run() {
   case "$profile" in core|full) ;; *) say "--profile must be core or full"; exit 2 ;; esac
 
   step "1/6 Check prerequisites"
-  preflight || { say "Install the missing tools above, then run again. Nothing was changed."; exit 1; }
+  preflight install || { say "Install the missing tools above, then run again. Nothing was changed."; exit 1; }
 
   step "2/6 Back up current settings"
   BACKUP_ID="$(date +%Y%m%d-%H%M%S)"

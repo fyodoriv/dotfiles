@@ -14,20 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] `dotfiles-install plan` lists what `run` will actually need
-  - **ID**: install-plan-prereqs-match-run
-  - **Tags**: install, new-users, ux
-  - **Details**: On a Mac without chezmoi, `plan` printed "→ chezmoi: brew install chezmoi" and then "✓ chezmoi (installed)". It also passes `jq` on `/usr/bin/jq`, while the endpoint scripts refuse anything but Homebrew jq (the first `run` then aborted until that was fixed). Make `plan` and `preflight` say "will be installed" for chezmoi and Homebrew jq instead of a check mark.
-  - **Files**: `bin/dotfiles-install`, `tests/dotfiles-install*.bats`
-  - **Output**: code
-  - **Competitive-goal**: none — new-user install correctness.
-  - **Acceptance**: with no chezmoi and only `/usr/bin/jq`, `plan` shows both as "will be installed" and no ✓ for them.
-  - **Hypothesis**: contradictory prerequisite lines in `plan` go to zero.
-  - **Measurement**: bats test with a PATH stub that lacks chezmoi and Homebrew jq.
-  - **Success**: the test passes.
-  - **Pivot**: if `preflight` must stay strict, install chezmoi and jq in `run` before the check.
-  - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
-
 - [ ] A rolled-back install leaves nothing behind
   - **ID**: install-rollback-removes-created-files
   - **Tags**: install, rollback, safety

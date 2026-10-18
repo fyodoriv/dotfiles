@@ -40,7 +40,9 @@ esac'
   for tool in launchctl brew killall xcode-select; do stub "$tool" "echo \"$tool \$*\" >> \"\$LOG\""; done
   stub zsh 'exit 0'
   stub doctor 'echo "doctor $*" >> "$LOG"'
-  export PATH="$STUBS:$PATH" LOG STORE DOTFILES_INSTALL_DOCTOR="$STUBS/doctor"
+  # Homebrew jq lives under the brew prefix; the endpoint scripts need it.
+  mkdir -p "$TEST_DIR/brew/bin"; printf '#!/bin/bash\nexit 0\n' > "$TEST_DIR/brew/bin/jq"; chmod +x "$TEST_DIR/brew/bin/jq"
+  export PATH="$STUBS:$PATH" LOG STORE DOTFILES_INSTALL_DOCTOR="$STUBS/doctor" DOTFILES_BREW_PREFIX="$TEST_DIR/brew"
 }
 
 teardown() { rm -rf "$TEST_DIR"; }
@@ -54,6 +56,25 @@ teardown() { rm -rf "$TEST_DIR"; }
   done
   [ ! -e "$XDG_STATE_HOME/dotfiles" ]
   [ "$(cat "$HOME/.zshrc")" = "# my zshrc" ]
+}
+
+@test "plan says will be installed for missing chezmoi and Homebrew jq, and installs nothing" {
+  rm -f "$STUBS/chezmoi" "$TEST_DIR/brew/bin/jq"
+  run env PATH="$STUBS:/usr/bin:/bin" /bin/bash "$REPO/bin/dotfiles-install" plan
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"chezmoi: will be installed"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"jq (Homebrew): will be installed"* ]] || { echo "$output"; return 1; }
+  if printf '%s\n' "$output" | grep -E '✓ (chezmoi|jq)'; then return 1; fi
+  if grep -q 'brew install' "$LOG" 2>/dev/null; then cat "$LOG"; return 1; fi
+}
+
+@test "run installs Homebrew jq when only /usr/bin/jq is on PATH" {
+  rm -f "$TEST_DIR/brew/bin/jq"
+  stub brew "echo \"brew \$*\" >> \"\$LOG\"; [ \"\$1 \$2\" = 'install jq' ] && printf '#!/bin/bash\\nexit 0\\n' > \"$TEST_DIR/brew/bin/jq\" && chmod +x \"$TEST_DIR/brew/bin/jq\"; exit 0"
+  run env PATH="$STUBS:/usr/bin:/bin" /bin/bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  grep -q 'brew install jq' "$LOG"
+  [[ "$output" == *"jq (Homebrew) (installed)"* ]]
 }
 
 @test "run refuses without --yes" {

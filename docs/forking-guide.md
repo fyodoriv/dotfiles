@@ -37,6 +37,7 @@ All values are prompted once at `chezmoi init` and stored in `~/.config/chezmoi/
 | `use_encryption` | `false` | Enable age encryption for secrets |
 | `owner_machine` | derived: `true` only for the upstream owner's git email | Owner-only doctor checks and the `auto_sync` default. Leave it `false` on your Mac. |
 | `auto_sync` | same as `owner_machine` | Auto-commit and push this checkout every 30 min. Keep it `false` on a fork unless you want unreviewed pushes. |
+| `managed_endpoint` | same as `owner_machine` | Sign Homebrew bottles and link shims into the Homebrew prefix for a managed endpoint-security agent. Set `true` only if your Mac runs one. |
 | `global_git_hooks` | `true` | Use `git-hooks/` for every repo on the Mac. `false` keeps each repo's own hooks. |
 
 **For your team:** change the defaults in `.chezmoi.yaml.tmpl` to match your organization. For example, set `work_email_domain` default to `yourcompany.com` and `github_enterprise_host` to `github.yourcompany.com`.

@@ -33,7 +33,7 @@ On `chezmoi apply`, scripts in `.chezmoiscripts/` run automatically in this orde
 4. run_onchange_launchagents.sh.tmpl ← LaunchAgents (re-runs when templates change)
 5. run_after_agentbrew-sync.sh    ← AI agent config sync (every apply)
 6. run_after_cache-inits.sh       ← Shell init caching (every apply)
-7. run_after_endpoint-security.sh ← Re-sign Homebrew bottles + uv pythons + endpoint shims (every apply)
+7. run_after_endpoint-security.sh ← Re-sign Homebrew bottles + uv pythons + endpoint shims (every apply; managed_endpoint only)
 8. run_after_install_local_llm.sh.tmpl ← Local-LLM pipx/model bootstrap when opted in
 ```
 

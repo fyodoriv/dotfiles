@@ -91,6 +91,6 @@ cd "$SCRATCH/home/apps/dotfiles" || exit 1
 env -i HOME="$SCRATCH/home" USER="${USER:-e2e}" LOGNAME="${USER:-e2e}" SHELL=/bin/zsh TERM=dumb \
   TMPDIR="$SCRATCH/tmp" LANG=en_US.UTF-8 \
   PATH="$SCRATCH/shims:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
-  DOTFILES_INSTALL_SKIP_XCODE_CHECK=1 DOTFILES_SKIP_ENDPOINT_HARDENING=1 \
+  DOTFILES_INSTALL_SKIP_XCODE_CHECK=1 \
   DOTFILES_INSTALL_DOCTOR="$SCRATCH/doctor" \
   sandbox-exec -f "$SCRATCH/profile.sb" bash bin/dotfiles-install "$@" > "$SCRATCH/run.log" 2>&1

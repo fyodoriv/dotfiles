@@ -6,11 +6,11 @@
 # brew bundle changes and weekly topgrade runs.
 set -euo pipefail
 
-# The hermetic install e2e (tests/e2e/hermetic-install.sh) sets this: these
-# steps sign and link binaries inside the Homebrew prefix, outside $HOME.
-# Their own bats tests cover them.
-if [ "${DOTFILES_SKIP_ENDPOINT_HARDENING:-}" = "1" ]; then
-  echo "○ Skipping endpoint hardening (DOTFILES_SKIP_ENDPOINT_HARDENING=1)"
+# Endpoint hardening writes outside $HOME, so it runs only on a managed
+# endpoint. .chezmoi.yaml.tmpl sets DOTFILES_MANAGED_ENDPOINT from
+# managed_endpoint (default: owner_machine); unset keeps the old behaviour.
+if [ "${DOTFILES_MANAGED_ENDPOINT:-1}" = "0" ]; then
+  echo "○ Skipping endpoint hardening (managed_endpoint is false)"
   exit 0
 fi
 

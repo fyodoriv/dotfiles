@@ -19,5 +19,5 @@ cd "$SCRATCH/home/apps/dotfiles" || exit 2
 exec env -i HOME="$SCRATCH/home" USER="${USER:-e2e}" LOGNAME="${USER:-e2e}" SHELL=/bin/zsh TERM=dumb \
   TMPDIR="$SCRATCH/tmp" LANG=en_US.UTF-8 \
   PATH="$SCRATCH/home/apps/dotfiles/bin:$SCRATCH/shims:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
-  DOTFILES_SKIP_ENDPOINT_HARDENING=1 GIT_CONFIG_NOSYSTEM=1 \
+  GIT_CONFIG_NOSYSTEM=1 \
   sandbox-exec -f "$SCRATCH/profile.sb" "$@"

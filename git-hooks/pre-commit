@@ -274,6 +274,21 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
     exit 1
   fi
 
+  # ── 4b. Home paths in home/ (dotfiles repo only) ─────────────────────
+  # ~/.zshrc and friends are symlinks to home/, so an installer that
+  # appends `export PATH=/Users/<name>/...` edits a tracked file. Block a
+  # staged line that adds a literal /Users/<name> path there; the line
+  # belongs in ~/.zshrc.local (dotfiles-sync moves pure appends there).
+  home_path_hits="$(git diff --cached --unified=0 --no-color -- home/ 2>/dev/null |
+    awk '/^\+\+\+ b\// { file = substr($0, 7); next }
+         /^\+/ && /\/Users\/[A-Za-z0-9._-]+/ { print "  " file ": " substr($0, 2) }')"
+  if [ -n "$home_path_hits" ]; then
+    printf '%s✗ Staged lines in home/ add a home path (/Users/<name>):%s\n' "$RED" "$RST" >&2
+    printf '%s%s%s\n' "$DIM" "$home_path_hits" "$RST" >&2
+    printf '\n%sUse $HOME or ~ instead, or move the line to ~/.zshrc.local.%s\n\n' "$YEL" "$RST" >&2
+    exit 1
+  fi
+
   # ── 5. TASKS.md format check (dotfiles repo only) ────────────────────
   # When TASKS.md is staged, validate it against the @tasks-md/lint spec
   # so malformed entries can't land. Same npx pinning as `make lint-tasks`.

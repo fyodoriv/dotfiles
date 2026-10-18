@@ -1215,7 +1215,7 @@ In `~/.zshenv.secrets` — this file is gitignored and sourced automatically by 
 
 ### Where do I put personal aliases?
 
-`~/.zshrc.local` — sourced at the end of `.zshrc`, gitignored, never overwritten.
+`~/.zshrc.local` — sourced at the end of `.zshrc`, gitignored, never overwritten. When an installer appends lines to `~/.zshrc` (a link to the tracked `home/zshrc`), `dotfiles-sync` and `dotfiles doctor --fix` move them to `~/.zshrc.local`.
 
 ### How do I add a new tool?
 

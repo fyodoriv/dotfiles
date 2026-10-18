@@ -14,20 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] Installers that append to `~/.zshrc` never change the repo
-  - **ID**: zshrc-appends-stay-local
-  - **Tags**: privacy, shell, sync
-  - **Details**: `~/.zshrc` is a symlink to `home/zshrc`, so the opencode installer's `export PATH=/Users/<name>/.opencode/bin:$PATH` landed in a tracked repo file. With `auto_sync: true`, `dotfiles-sync` would commit and push a home path to the public repo. Detect lines appended to `home/zshrc` and move them to `~/.zshrc.local` (or block the commit when a staged diff adds `/Users/`).
-  - **Files**: `bin/dotfiles-sync`, `git-hooks/pre-commit`, `modules/shell/doctor.sh`
-  - **Output**: code
-  - **Competitive-goal**: none — new-user install correctness.
-  - **Acceptance**: after `echo 'export X=$HOME/bin' >> ~/.zshrc`, `dotfiles-sync` commits nothing from `home/zshrc` and the line is in `~/.zshrc.local`.
-  - **Hypothesis**: personal paths reaching the public repo through shell rc appends go to zero.
-  - **Measurement**: bats test plus the existing leak gate.
-  - **Success**: the test passes and the leak gate flags `/Users/` in `home/`.
-  - **Pivot**: if moving lines is surprising, warn in `doctor` and refuse the sync instead.
-  - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
-
 - [ ] The core profile doctor checks only core tools
   - **ID**: core-doctor-skips-full-tools
   - **Tags**: doctor, profiles, new-users

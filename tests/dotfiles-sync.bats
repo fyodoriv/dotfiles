@@ -35,6 +35,7 @@ setup_file() {
   cp "$BATS_TEST_DIRNAME/../lib/lock.sh" "$tmpl/dotfiles/lib/lock.sh"
   cp "$BATS_TEST_DIRNAME/../lib/self-reload.sh" "$tmpl/dotfiles/lib/self-reload.sh"
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$tmpl/dotfiles/lib/push-error-classify.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$tmpl/dotfiles/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$tmpl/dotfiles/lib/agentbrew-locate.sh"
 
   git -C "$tmpl/dotfiles" add -A
@@ -179,6 +180,7 @@ teardown() {
   cp "$BATS_TEST_DIRNAME/../lib/lock.sh" "$NOT_GIT/lib/lock.sh"
   cp "$BATS_TEST_DIRNAME/../lib/self-reload.sh" "$NOT_GIT/lib/self-reload.sh"
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$NOT_GIT/lib/push-error-classify.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$NOT_GIT/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$NOT_GIT/lib/agentbrew-locate.sh"
 
   run "$NOT_GIT/bin/dotfiles-sync"
@@ -197,6 +199,7 @@ teardown() {
   cp "$BATS_TEST_DIRNAME/../lib/lock.sh" "$NO_REMOTE/lib/lock.sh"
   cp "$BATS_TEST_DIRNAME/../lib/self-reload.sh" "$NO_REMOTE/lib/self-reload.sh"
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$NO_REMOTE/lib/push-error-classify.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$NO_REMOTE/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$NO_REMOTE/lib/agentbrew-locate.sh"
   git -C "$NO_REMOTE" init --quiet
   git -C "$NO_REMOTE" add -A

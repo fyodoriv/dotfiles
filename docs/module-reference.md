@@ -152,6 +152,7 @@ Spotlight check count varies based on which directories exist on your machine.
 | `shell.node_options` | `NODE_OPTIONS` max-old-space-size configured (auto-detects RAM) | None |
 | `shell.ulimit` | `ulimit -n 65535` in `.zshrc` | None |
 | `shell.homebrew_no_autoupdate` | `HOMEBREW_NO_AUTO_UPDATE=1` set | None |
+| `shell.zshrc_no_appends` | No installer lines appended to the tracked `home/zshrc` (`~/.zshrc` links to it) | Move the appended lines to `~/.zshrc.local` |
 
 ### editor
 

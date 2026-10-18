@@ -156,7 +156,7 @@ STUB
   git init --quiet "$fx/dotfiles"
   mkdir -p "$fx/dotfiles/bin" "$fx/dotfiles/lib"
   for f in bin/dotfiles-sync; do cp "$REPO_ROOT/$f" "$fx/dotfiles/$f"; done
-  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload; do
+  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload zshrc-appends; do
     cp "$REPO_ROOT/lib/$f.sh" "$fx/dotfiles/lib/$f.sh"
   done
   # Stub follow-up helper: records each call.
@@ -202,7 +202,7 @@ STUB
   git init --quiet "$fx/dotfiles"
   mkdir -p "$fx/dotfiles/bin" "$fx/dotfiles/lib"
   cp "$REPO_ROOT/bin/dotfiles-sync" "$fx/dotfiles/bin/"
-  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload; do
+  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload zshrc-appends; do
     cp "$REPO_ROOT/lib/$f.sh" "$fx/dotfiles/lib/$f.sh"
   done
   printf '#!/bin/bash\necho followup >> "%s/followup.log"\n' "$TEST_DIR" > "$fx/dotfiles/bin/dotfiles-reload-launchagents"

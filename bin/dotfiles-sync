@@ -35,6 +35,8 @@ source "$DOTFILES_DIR/lib/lock.sh"
 source "$DOTFILES_DIR/lib/self-reload.sh"
 # shellcheck source=../lib/push-error-classify.sh
 source "$DOTFILES_DIR/lib/push-error-classify.sh"
+# shellcheck source=../lib/zshrc-appends.sh
+source "$DOTFILES_DIR/lib/zshrc-appends.sh"
 
 cd "$DOTFILES_DIR" || { warn "[sync] Cannot cd to dotfiles dir"; exit 1; }
 
@@ -97,6 +99,24 @@ fi
 CANONICAL_BRANCH="$(git symbolic-ref --short "refs/remotes/$PULL_REMOTE/HEAD" 2>/dev/null | sed "s@^$PULL_REMOTE/@@" || true)"
 CURRENT_BRANCH="$(git branch --show-current 2>/dev/null || true)"
 
+# ~/.zshrc is a symlink to home/zshrc, so an installer that appends a PATH
+# line changes a tracked file. Move a pure append to ~/.zshrc.local (which
+# home/zshrc sources) so a home path never reaches the public repo.
+_move_zshrc_appends() {
+  local text moved
+  text="$(zshrc_appended_text "$DOTFILES_DIR")" || return 0
+  if $DRY_RUN; then
+    moved="$(printf '%s\n' "$text" | grep -c . || true)"
+    info "[sync] [dry-run] Would move $moved line(s) appended to home/zshrc into ~/.zshrc.local"
+    return 0
+  fi
+  if moved="$(zshrc_move_appends "$DOTFILES_DIR" "$HOME/.zshrc.local")"; then
+    ok "[sync] Moved $moved line(s) appended to home/zshrc into ~/.zshrc.local"
+  else
+    warn "[sync] Could not move the lines appended to home/zshrc"
+  fi
+}
+
 # Re-apply chezmoi from this checkout. On failure, show chezmoi's last error line.
 _chezmoi_apply() {
   local out
@@ -131,6 +151,7 @@ _is_applied_checkout() {
 
 if _is_applied_checkout; then
   APPLIED_UPSTREAM="$PULL_REMOTE/$CANONICAL_BRANCH"
+  _move_zshrc_appends
   if $DRY_RUN; then
     info "[sync] [dry-run] Applied checkout: would fast-forward '$CURRENT_BRANCH' to $APPLIED_UPSTREAM and re-apply chezmoi (no commit, no push)."
     exit 0
@@ -171,6 +192,8 @@ elif [ "$CURRENT_BRANCH" != "$CANONICAL_BRANCH" ]; then
   fi
   exit 0
 fi
+
+_move_zshrc_appends
 
 # Pull remote changes first (rebase to keep history clean)
 if $DRY_RUN; then

@@ -108,7 +108,7 @@
 }
 
 @test "Agentfile automatically retrieves grounded repository procedures" {
-  local agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
+  local agentfile="$BATS_TEST_DIRNAME/../config/agentfile-owner-rules.yaml"
 
   grep -q "automatically search memory" "$agentfile"
   grep -q "current-revision repo-procedure" "$agentfile"
@@ -392,7 +392,7 @@
 }
 
 @test "Agentfile broad delivery mandate remains limited to approved repo families" {
-  local agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
+  local agentfile="$BATS_TEST_DIRNAME/../config/agentfile-owner-rules.yaml"
   local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
 

@@ -147,11 +147,13 @@ EOF
 }
 
 @test "Agentfile inline rules cover delivery safety invariants" {
-  local agentfile
+  local agentfile owner_rules
   agentfile="$(repo_root)/Agentfile.yaml"
+  # Owner-only rules merge only on the owner's Macs (run_after_agentbrew-sync.sh).
+  owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml"
 
-  grep -q "approved repo families" "$agentfile"
-  grep -q "never bypass-merge someone else's PR" "$agentfile"
+  grep -q "approved repo families" "$owner_rules"
+  grep -q "never bypass-merge someone else's PR" "$owner_rules"
   grep -q "Every PR needs uncommitted visual proof" "$agentfile"
 }
 
@@ -168,7 +170,7 @@ EOF
 
 @test "Agentfile inline rules use task-aware structured memory lifecycle calls" {
   local agentfile
-  agentfile="$(repo_root)/Agentfile.yaml"
+  agentfile="$(repo_root)/config/agentfile-owner-rules.yaml"
 
   grep -q "get_bootstrap_profile.*task_summary" "$agentfile"
   grep -q "search ranked memory and mistake notes" "$agentfile"

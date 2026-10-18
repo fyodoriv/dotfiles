@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # Windsurf and Devin support was removed on 2026-10-08. Augment (Auggie) stays
 # deprecated and frozen (AGENTS.md § Deprecated agents): doctor skips its
-# module, and the freeze rule reaches every agent through the Agentfile rules.
+# module, and the freeze rule reaches the owner's agents through the owner-only
+# Agentfile rules (config/agentfile-owner-rules.yaml).
 
 DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 
@@ -16,9 +17,9 @@ DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
   grep -q 'DOTFILES_DEPRECATED_AGENT_CHECKS' "$DOTFILES_DIR/bin/dotfiles-doctor"
 }
 
-@test "Agentfile rules carry the removal and freeze policy to every agent" {
-  grep -q 'Windsurf and Devin support was removed on 2026-10-08' "$DOTFILES_DIR/Agentfile.yaml"
-  grep -q 'Augment (Auggie) is deprecated and frozen' "$DOTFILES_DIR/Agentfile.yaml"
+@test "owner Agentfile rules carry the removal and freeze policy to the owner's agents" {
+  grep -q 'Windsurf and Devin support was removed on 2026-10-08' "$DOTFILES_DIR/config/agentfile-owner-rules.yaml"
+  grep -q 'Augment (Auggie) is deprecated and frozen' "$DOTFILES_DIR/config/agentfile-owner-rules.yaml"
 }
 
 @test "network-watchdog executable check lives in the resilience module" {

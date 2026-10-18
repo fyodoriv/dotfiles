@@ -21,7 +21,8 @@
 # Phases: preflight -> backup (chezmoi config, every file chezmoi manages,
 # dotfiles LaunchAgents, each macOS settings domain) -> apply -> heal ->
 # verify -> agentbrew. A failed apply or verify restores the backup by itself.
-# Homebrew packages that were installed stay installed after a restore.
+# A restore removes the targets and folders the run created. Homebrew
+# packages stay installed; script caches and tools stay and are listed.
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -96,7 +97,9 @@ cmd_plan() {
   say "  5. Install agentbrew (AI agent skills and rules) with its own installer, unless you opt out."
   step "If something goes wrong"
   say "  A critical error in apply or verify restores the backup automatically:"
-  say "  files, LaunchAgents, and macOS settings. Homebrew packages stay installed."
+  say "  files, LaunchAgents, and macOS settings, and it removes the files and folders"
+  say "  the install created. Homebrew packages stay installed; caches and tools the"
+  say "  install scripts made stay too, and the restore lists them."
   say "  Undo by hand any time: bash $REPO_DIR/bin/dotfiles-install restore"
   step "Your choices (the agent asks you these)"
   say "  - Profile: core (recommended) or full"
@@ -119,6 +122,13 @@ backup_files() {
     [ -n "$rel" ] || continue
     if [ -e "$HOME/$rel" ] || [ -L "$HOME/$rel" ]; then existing+=("$rel"); else printf '%s\n' "$rel" >> "$dir/absent.txt"; fi
   done < <(chezmoi managed --source "$REPO_DIR" --include files,symlinks 2>/dev/null)
+  # Directories apply may create (for example ~/.agent-browser). Restore
+  # removes the ones that were absent, so a rollback leaves nothing behind.
+  touch "$dir/absent-dirs.txt"
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    [ -e "$HOME/$rel" ] || [ -L "$HOME/$rel" ] || printf '%s\n' "$rel" >> "$dir/absent-dirs.txt"
+  done < <(chezmoi managed --source "$REPO_DIR" --include dirs 2>/dev/null)
   if [ -d "$LAUNCH_AGENTS_DIR" ]; then
     : > "$dir/launchagents.txt"
     for plist in "$LAUNCH_AGENTS_DIR"/com.dotfiles.*.plist; do
@@ -162,6 +172,40 @@ restore_defaults() {
   killall cfprefsd Dock Finder SystemUIServer >/dev/null 2>&1 || true
 }
 
+# HOME paths up to 3 levels deep, for the "left behind" report after a restore.
+# ~/Library is skipped: other apps write there all the time.
+home_paths() {
+  (cd "$HOME" && find . -maxdepth 3 -path ./Library -prune -o -print 2>/dev/null) | LC_ALL=C sort
+}
+
+# Install scripts also write caches and tools outside the chezmoi targets
+# (for example ~/.cache/uv). Removing those is not safe, so list them.
+report_leftovers() {
+  local left n
+  [ -f "$1/home-before.txt" ] || return 0
+  # Keep only the top new path of each new tree: ~/.cache, not ~/.cache/uv.
+  left="$(LC_ALL=C comm -13 "$1/home-before.txt" <(home_paths) |
+    awk 'last == "" || index($0, last "/") != 1 { print; last = $0 }')"
+  [ -n "$left" ] || return 0
+  n="$(printf '%s\n' "$left" | wc -l | tr -d ' ')"
+  say "  ! $n new path(s) in your home folder are not chezmoi targets, so restore keeps them."
+  say "    The install scripts made them (caches, tools, local config). Delete them by hand if you do not want them:"
+  printf '%s\n' "$left" | head -20 | sed 's|^\./|      ~/|'
+  [ "$n" -le 20 ] || say "      ... and $((n - 20)) more"
+}
+
+# Remove the directories that did not exist before the run. Never remove one
+# that holds the backups. Backups made before absent-dirs.txt skip this.
+remove_created_dirs() {
+  local rel
+  [ -f "$1/absent-dirs.txt" ] || return 0
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    case "$BACKUP_ROOT/" in "$HOME/$rel/"*) continue ;; esac
+    rm -rf "${HOME:?}/$rel"
+  done < "$1/absent-dirs.txt"
+}
+
 do_restore() {
   local id="${1:-$(latest_backup)}" dir rel plist
   [ -n "$id" ] || { say "No backup found in $BACKUP_ROOT"; return 1; }
@@ -176,6 +220,7 @@ do_restore() {
     done
   fi
   while IFS= read -r rel; do [ -n "$rel" ] && rm -rf "${HOME:?}/$rel"; done < "$dir/absent.txt"
+  remove_created_dirs "$dir"
   while IFS= read -r rel; do [ -n "$rel" ] && rm -rf "${HOME:?}/$rel"; done < "$dir/present.txt"
   (cd "$HOME" && tar -xzf "$dir/files.tar.gz") || return 1
   while IFS= read -r rel; do
@@ -188,6 +233,7 @@ do_restore() {
   fi
   restore_defaults "$dir"
   say "  ✓ Restored files, LaunchAgents, chezmoi config, and macOS settings from backup $id"
+  report_leftovers "$dir"
 }
 
 critical() {
@@ -203,7 +249,7 @@ critical() {
 }
 
 cmd_run() {
-  local yes=0 profile=core name="" email="" macos=1 agentbrew=1 ab_dir="" ab_flags="" dir
+  local yes=0 profile=core name="" email="" macos=1 agentbrew=1 ab_dir="" ab_flags="" dir rel
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --yes) yes=1 ;;
@@ -228,6 +274,10 @@ cmd_run() {
   BACKUP_ID="$(date +%Y%m%d-%H%M%S)"
   dir="$BACKUP_ROOT/$BACKUP_ID"
   mkdir -p "$dir" || { say "Cannot create $dir. Nothing was changed."; exit 1; }
+  # chezmoi init below creates ~/.config/chezmoi; restore removes it if it is new.
+  : > "$dir/absent-dirs.txt"
+  for rel in .config .config/chezmoi; do [ -e "$HOME/$rel" ] || printf '%s\n' "$rel" >> "$dir/absent-dirs.txt"; done
+  home_paths > "$dir/home-before.txt"
   [ -f "$CHEZMOI_CONFIG" ] && cp "$CHEZMOI_CONFIG" "$dir/chezmoi.yaml"
   chezmoi init --source "$REPO_DIR" --promptDefaults \
     --promptChoice "Installation profile (full = all modules, core = essential only)=$profile" \

@@ -53,4 +53,12 @@ teardown() { rm -rf "$SCRATCH"; }
   [ "$(cat "$home/.gitconfig")" = "$(printf '[user]\n\tname = Original')" ]
   [ ! -e "$home/.config/chezmoi/chezmoi.yaml" ]
   ! ls "$home/Library/LaunchAgents"/com.dotfiles.*.plist >/dev/null 2>&1
+  # Targets and folders that apply created are gone; script leftovers are listed.
+  [ ! -e "$home/.agent-browser" ]
+  [ ! -e "$home/.config" ]
+  local backup rel; backup="$(ls -d "$home/.local/state/dotfiles/install-backups"/*/)"
+  while IFS= read -r rel; do
+    [ -z "$rel" ] || [ ! -e "$home/$rel" ] || { echo "left behind: $rel"; return 1; }
+  done < <(cat "$backup/absent.txt" "$backup/absent-dirs.txt")
+  grep -q 'not chezmoi targets, so restore keeps them' "$SCRATCH/run.log"
 }

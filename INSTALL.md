@@ -47,8 +47,9 @@ Show the person, in your own short words:
   background jobs, then agentbrew,
 - that a backup is made first: config files, LaunchAgents, the chezmoi
   config, and every macOS settings domain the install may touch,
-- that a critical error restores the backup by itself, but Homebrew packages
-  stay installed,
+- that a critical error restores the backup by itself and removes the files
+  and folders the install created, but Homebrew packages stay installed, and
+  caches and tools the install scripts made stay too (restore lists them),
 - how to undo later: `bash <DIR>/bin/dotfiles-install restore`.
 
 If a prerequisite is missing, help install it first. Homebrew and the Xcode
@@ -91,7 +92,8 @@ The script backs up, runs `chezmoi apply`, heals with `dotfiles doctor
 --fix`, verifies with `chezmoi verify` and a clean zsh start, and then runs
 agentbrew's installer. On a critical error it restores the backup by itself
 and exits 1. Then tell the person what failed and that their setup is back,
-and offer to open an issue with the output.
+show them any paths the restore listed as kept, and offer to open an issue
+with the output.
 
 ## 5. Finish
 

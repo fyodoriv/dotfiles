@@ -14,20 +14,6 @@ them. -->
 
 ## P2
 
-- [ ] A rolled-back install leaves nothing behind
-  - **ID**: install-rollback-removes-created-files
-  - **Tags**: install, rollback, safety
-  - **Details**: After the first `run` aborted and restored the backup, `~/.agent-browser/` (created by chezmoi apply, absent before) was still there. The backup already records `absent.txt`; restore could remove the targets it lists that apply created.
-  - **Files**: `bin/dotfiles-install` (restore)
-  - **Output**: code
-  - **Competitive-goal**: none — new-user install correctness.
-  - **Acceptance**: an apply that fails after creating a new target leaves `$HOME` identical (file list) to before the run.
-  - **Hypothesis**: leftover files after a rollback go to zero.
-  - **Measurement**: bats test comparing `find $HOME` before and after a forced failure.
-  - **Success**: the lists match.
-  - **Pivot**: if removing is risky, list the leftovers in the restore output instead.
-  - **Anchor**: first install on a Mac new to the tools, 2026-10-18 (dotfiles core + agentbrew recommended set).
-
 - [ ] Installers that append to `~/.zshrc` never change the repo
   - **ID**: zshrc-appends-stay-local
   - **Tags**: privacy, shell, sync

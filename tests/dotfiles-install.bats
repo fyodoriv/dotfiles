@@ -18,10 +18,12 @@ setup() {
   stub() { printf '#!/bin/bash\n%s\n' "$2" > "$STUBS/$1"; chmod +x "$STUBS/$1"; }
   stub chezmoi 'echo "chezmoi $*" >> "$LOG"
 case "$1" in
-  init) echo new-config > "$HOME/.config/chezmoi/chezmoi.yaml" ;;
-  managed) printf ".zshrc\n.gitconfig\n" ;;
+  init) mkdir -p "$HOME/.config/chezmoi"; echo new-config > "$HOME/.config/chezmoi/chezmoi.yaml" ;;
+  managed) case "$*" in *dirs*) printf ".agent-browser\n" ;; *) printf ".zshrc\n.gitconfig\n.agent-browser/config.json\n" ;; esac ;;
   apply)
     echo "# dotfiles zshrc" > "$HOME/.zshrc"; echo "[user]" > "$HOME/.gitconfig"
+    mkdir -p "$HOME/.agent-browser"; echo "{}" > "$HOME/.agent-browser/config.json"
+    [ -z "${SCRIPT_CACHE:-}" ] || { mkdir -p "$HOME/.cache/e2e-tool"; echo x > "$HOME/.cache/e2e-tool/data"; }
     mkdir -p "$HOME/Library/LaunchAgents"; echo plist > "$HOME/Library/LaunchAgents/com.dotfiles.sync.plist"
     [ "${DOTFILES_SKIP_MACOS_DEFAULTS:-}" = 1 ] || { defaults write com.apple.dock autohide -bool true; defaults write com.apple.finder X -bool true; }
     exit "${FAIL_APPLY:-0}" ;;
@@ -75,6 +77,27 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   grep -q 'brew install jq' "$LOG"
   [[ "$output" == *"jq (Homebrew) (installed)"* ]]
+}
+
+@test "a failed apply removes the targets it created, so the file list matches the one before" {
+  mkdir -p "$HOME/Library/LaunchAgents"
+  # Everything but the backup itself (under ~/.local/state) must match.
+  list() { (cd "$HOME" && find . | grep -vxE '\./\.local(/state.*)?' | LC_ALL=C sort); }
+  local before; before="$(list)"
+  FAIL_APPLY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  [ ! -e "$HOME/.agent-browser" ] || { echo "left behind: $(cd "$HOME" && find .agent-browser)"; return 1; }
+  diff <(printf '%s\n' "$before") <(list)
+}
+
+@test "a failed run removes a chezmoi config folder it created and lists script leftovers it keeps" {
+  rm -rf "$HOME/.config"
+  SCRIPT_CACHE=1 FAIL_APPLY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  [ ! -e "$HOME/.config" ] || { echo "left behind: $(cd "$HOME" && find .config)"; return 1; }
+  [[ "$output" == *"not chezmoi targets, so restore keeps them"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"~/.cache/e2e-tool"* ]]
+  [ -e "$HOME/.cache/e2e-tool/data" ]
 }
 
 @test "run refuses without --yes" {

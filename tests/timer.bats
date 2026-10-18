@@ -5,6 +5,16 @@ load test_helper
 
 TIMER_CMD="$BATS_TEST_DIRNAME/../bin/timer"
 
+# Stub the voice and banner commands, so a test run never speaks
+# "Focus timer complete" or posts a notification on the Mac.
+_silent_bin="$BATS_RUN_TMPDIR/timer-silent-bin"
+mkdir -p "$_silent_bin"
+for _cmd in say terminal-notifier osascript afplay; do
+  printf '#!/bin/sh\nexit 0\n' >"$_silent_bin/$_cmd"
+  chmod +x "$_silent_bin/$_cmd"
+done
+export PATH="$_silent_bin:$PATH"
+
 # ── Script basics ────────────────────────────────────────────────
 
 @test "timer script exists and is executable" {

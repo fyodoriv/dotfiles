@@ -591,6 +591,25 @@ Run `gh pr checks --watch` or the repo's documented CI watcher. If any check fai
 
 **Slow E2E automation checks are non-blocking.** Checks whose names match `*e2e*` or `*automation*` are often slow and flaky by design. Never wait for them, never treat their failure or pending state as a `/ship-it` blocker, and never fix code to make them pass unless the user explicitly asks. Proceed to Step 7 (Merge) when substantive checks pass: lint, unit tests, typecheck, security/Wiz/semgrep, build, and Jenkins `pr-head` build.
 
+## 6a. Self-review before merge
+
+A green gate checks what the tests cover. A review asks what could still go
+wrong. Before you self-merge a PR that no human has reviewed, review its diff
+once:
+
+1. Run the built-in `/code-review` on the PR (`/code-review <PR number>`), or
+   the `requesting-code-review` skill when `/code-review` is not available.
+2. Fix each CONFIRMED finding in the same PR, re-run the gate, and push.
+3. List every finding you did not fix in the PR body under `## Review`, each
+   with one line on why (false positive, out of scope, filed as a task).
+
+Skip rule: skip the review for a diff that touches only docs, task queues, or
+skill prose with no code (`*.md`, `TASKS.md`, `evals/*.json`). Say
+`Review: skipped — docs-only diff` in the PR body.
+
+Measure it: count `fix:` commits that touch a file a merged agent PR changed
+within the 7 days after it merged, per week, before and after this step.
+
 ## 7. Merge
 
 Run **§ Repo bypass allowlist** detection first. When required checks are green and repo rules allow merge, merge the PR using the repo's normal merge method and delete the branch when safe. If normal merge is blocked, capture the exact merge blocker, then:

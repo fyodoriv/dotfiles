@@ -24,7 +24,7 @@ an explicitly requested implementation or delivery.
 
 ## Session auto-ship (default)
 
-**verify → commit → push/PR → CI → merge when allowed → Steps 12–13.** Do not ask “ready to commit?”, “should I push?”, or tell the user to run delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
+**verify → commit → push/PR → CI → self-review (Step 6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?”, “should I push?”, or tell the user to run delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
 
 ### Push early, let CI verify (IRON LAW)
 

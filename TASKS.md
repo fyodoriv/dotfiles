@@ -12,20 +12,6 @@ them. -->
 
 ## P1
 
-- [ ] The US05 doctor clean-run rate is back above its pivot
-  - **ID**: us05-doctor-rate-below-pivot
-  - **Tags**: us05, doctor, metrics, stability
-  - **Details**: `dotfiles metrics --table` showed the US05 row (doctor runs with no failure, last 30 runs) at 70% on 2026-10-16, past its pivot of 80% (baseline 93%). Most failing rows came from bats runs that called the real doctor without test_helper and wrote to `~/.dotfiles-stats.jsonl` (bursts within seconds, with fixture check counts); #131 stopped that. Check whether real runs still fail: run `dotfiles doctor` daily for a week, then read the row again. If real failures remain, fix the failing checks; if not, record in docs/learnings.md that the breach was test pollution.
-  - **Files**: `docs/metrics.md`, `docs/learnings.md`, failing `modules/*/doctor.sh`
-  - **Output**: code
-  - **Competitive-goal**: none — US05 outcome metric, not a scorecard metric.
-  - **Acceptance**: the US05 row reads 80% or more from real runs, or learnings records the pollution with evidence.
-  - **Hypothesis**: with test runs isolated, the last 30 real doctor runs pass at 90% or more.
-  - **Measurement**: `bin/dotfiles-metrics --table` (US05 row).
-  - **Success**: 90% or more by 2026-10-31.
-  - **Pivot**: below 80% by 2026-10-31 means real failing checks; fix them before new doctor work.
-  - **Anchor**: docs/metrics.md US05 row; checkup rule "a metric past its pivot becomes a P0 or P1 task".
-
 - [ ] Coverage traces tests that load test_helper, and the full suite is green on the owner's Mac
   - **ID**: coverage-trap-and-full-suite-green
   - **Tags**: tests, coverage, stability

@@ -20,6 +20,9 @@ runs. The wrappers stay because:
 - The commit footer goes before a trailing git trailer block (`Task:`,
   `Signed-off-by:`), so git still reads those trailers. With no trailer
   block, the footer goes at the end.
+  To check trailers like `git log` does, run
+  `git interpret-trailers --parse --no-divider`: without the flag, git stops
+  at the footer's `---` line and misses them.
 
 `dotfiles/lib/strip-agent-attribution.sh` is the **single source of truth**
 for the agent-attribution regex set. Both the dotfiles wrappers and the

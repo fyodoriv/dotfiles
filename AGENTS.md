@@ -96,7 +96,6 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 
 - **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits and pushes its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
-- **Trailers and `---`**: `git interpret-trailers --parse` stops at a `---` line (patch divider), so it misses trailers that `git log %(trailers)` reads. Add `--no-divider` to match `git log`. The strip-attribution footer goes before a trailing trailer block for this reason.
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.

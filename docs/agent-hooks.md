@@ -17,6 +17,9 @@ runs. The wrappers stay because:
 - The wrapper's MUTATE logic (strip foreign attribution + append canonical
   Fyodor footer) is harder to express as a Claude Code hook (PreToolUse
   can't cleanly rewrite tool_input). The hook WARNS; the wrapper MUTATES.
+- The commit footer goes before a trailing git trailer block (`Task:`,
+  `Signed-off-by:`), so git still reads those trailers. With no trailer
+  block, the footer goes at the end.
 
 `dotfiles/lib/strip-agent-attribution.sh` is the **single source of truth**
 for the agent-attribution regex set. Both the dotfiles wrappers and the

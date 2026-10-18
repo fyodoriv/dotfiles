@@ -429,3 +429,77 @@ SCRIPT
   [ "$status" -ne 0 ]
   [[ "$output" == *"repo-local commit-msg ran"* ]]
 }
+
+# ── Agent footer keeps git trailers last ──────────────────────────
+# git reads trailers only from the last paragraph. `--no-divider` makes
+# `git interpret-trailers` read them like `git log %(trailers)` does:
+# without it, git treats the footer's `---` line as a patch divider.
+
+parse_trailers() {
+  git interpret-trailers --parse --no-divider < "$MSG_FILE"
+}
+
+@test "commit-msg puts the agent footer before Task trailers" {
+  write_msg "feat: add feature
+
+Some details here.
+
+Task: fix-the-thing
+Task-Claim: abc123
+Co-Authored-By: Claude <noreply@anthropic.com>
+"
+  run env AGENT_FOOTER_NAME=Fyodor "$HOOK" "$MSG_FILE"
+  [ "$status" -eq 0 ]
+  run parse_trailers
+  [[ "$output" == *"Task: fix-the-thing"* ]]
+  [[ "$output" == *"Task-Claim: abc123"* ]]
+  run grep -c "Written by an agent, not Fyodor" "$MSG_FILE"
+  [ "$output" = "1" ]
+  run grep -c "Co-Authored-By: Claude" "$MSG_FILE"
+  [ "$output" = "0" ]
+  run tail -1 "$MSG_FILE"
+  [ "$output" = "Task-Claim: abc123" ]
+}
+
+@test "commit-msg keeps Task trailers readable by git log after the hook" {
+  local repo="$TEST_DIR/repo"
+  git init --quiet "$repo"
+  write_msg "feat: add feature
+
+Task: fix-the-thing
+Task-Claim: abc123
+Co-Authored-By: Claude <noreply@anthropic.com>
+"
+  run env AGENT_FOOTER_NAME=Fyodor "$HOOK" "$MSG_FILE"
+  [ "$status" -eq 0 ]
+  git -C "$repo" -c user.name=t -c user.email=t@example.com \
+    commit --quiet --allow-empty --no-verify --cleanup=verbatim -F "$MSG_FILE"
+  run git -C "$repo" log -1 --format='%(trailers:key=Task-Claim,valueonly)'
+  [ "$output" = "abc123" ]
+}
+
+@test "commit-msg appends the agent footer at the end when there are no trailers" {
+  write_msg "feat: add feature
+
+Some details here.
+Co-Authored-By: Claude <noreply@anthropic.com>
+"
+  run env AGENT_FOOTER_NAME=Fyodor "$HOOK" "$MSG_FILE"
+  [ "$status" -eq 0 ]
+  run tail -1 "$MSG_FILE"
+  [ "$output" = "_🤖 Written by an agent, not Fyodor. Ping me if this looks off._" ]
+  run tail -2 "$MSG_FILE"
+  [[ "$output" == "---"* ]]
+}
+
+@test "commit-msg leaves a plain prose ending unchanged and adds no footer" {
+  write_msg "feat: add feature
+
+Fixes the bug: it was slow.
+"
+  local before
+  before="$(cat "$MSG_FILE")"
+  run env AGENT_FOOTER_NAME=Fyodor "$HOOK" "$MSG_FILE"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MSG_FILE")" = "$before" ]
+}

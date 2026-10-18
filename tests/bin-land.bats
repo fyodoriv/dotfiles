@@ -50,7 +50,8 @@ teardown() {
 }
 
 @test "land refuses inside an agent shell even with the terminal override" {
-  run env LAND_ALLOW_NON_TTY=1 CURSOR_AGENT=1 bash "$SCRIPT" .
+  run env -u AGENT_PUBLIC_WRITE_GUARD -u DEVIN_SESSION_ID -u CLAUDE_CODE_SSE_PORT -u CLAUDECODE \
+    LAND_ALLOW_NON_TTY=1 CURSOR_AGENT=1 bash "$SCRIPT" .
   [ "$status" -eq 3 ]
   [[ "$output" == *"CURSOR_AGENT is set"* ]]
 }

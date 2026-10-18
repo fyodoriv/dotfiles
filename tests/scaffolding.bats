@@ -190,6 +190,9 @@ EOF
   # Strip the hooksPath line from both files and compare
   local home_content tmpl_content
   home_content=$(grep -v 'hooksPath' "$real_dotfiles/home/gitconfig")
-  tmpl_content=$(grep -v 'hooksPath' "$real_dotfiles/dot_gitconfig.tmpl")
+  # The template also has chezmoi directives and an owner-only [dotfiles]
+  # block (its comment through the next blank line); home/gitconfig has neither.
+  tmpl_content=$(grep -v 'hooksPath' "$real_dotfiles/dot_gitconfig.tmpl" |
+    awk '/\{\{/ { next } /^# Owner-only agent policy/ { skip = 1 } skip && /^$/ { skip = 0; next } !skip')
   [ "$home_content" = "$tmpl_content" ]
 }

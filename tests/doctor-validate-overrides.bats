@@ -59,10 +59,10 @@ MODEOF
   chmod +x "$TEST_DOTFILES/bin/dotfiles-doctor"
 
   # Override DOTFILES_DIR inside the copied script
-  sed -i '' 's|DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"|DOTFILES_DIR="'"$TEST_DOTFILES"'"|' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  sed -i.bak 's|DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"|DOTFILES_DIR="'"$TEST_DOTFILES"'"|' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
   # Disable chezmoi calls
-  sed -i '' 's|IS_ENTERPRISE="$(chezmoi .*"|IS_ENTERPRISE="false"|' "$TEST_DOTFILES/bin/dotfiles-doctor"
-  sed -i '' 's|DOTFILES_PROFILE="$(chezmoi .*"|DOTFILES_PROFILE="full"|' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  sed -i.bak 's|IS_ENTERPRISE="$(chezmoi .*"|IS_ENTERPRISE="false"|' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
+  sed -i.bak 's|DOTFILES_PROFILE="$(chezmoi .*"|DOTFILES_PROFILE="full"|' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
 }
 
 teardown() {

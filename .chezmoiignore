@@ -16,6 +16,7 @@ ARCHITECTURE.md
 Agentfile.yaml
 CHANGELOG.md
 CLAUDE.md
+cliff.toml
 CONTRIBUTING.md
 LICENSE
 Makefile

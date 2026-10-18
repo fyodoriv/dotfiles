@@ -30,6 +30,9 @@ for arg in "$@"; do printf ' <%s>' "$arg"; done
 printf '\nprofile=%s\n' "${AGENT_BROWSER_PROFILE-__unset__}"
 EOF
   chmod +x "$STUB_BIN/curl" "$STUB_BIN/agent-browser"
+  # Keep the script from prepending the live dotfiles shims (bin/curl) ahead
+  # of the stubs; a real managed Chrome on 9224 would answer otherwise.
+  export DOTFILES_DIR="$TEST_DIR/no-dotfiles"
   export TEST_DIR
   export PATH="$STUB_BIN:$PATH"
 }

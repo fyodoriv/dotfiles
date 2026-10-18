@@ -12,20 +12,6 @@ them. -->
 
 ## P1
 
-- [ ] Coverage traces tests that load test_helper, and the full suite is green on the owner's Mac
-  - **ID**: coverage-trap-and-full-suite-green
-  - **Tags**: tests, coverage, stability
-  - **Details**: `bin/dotfiles-coverage` installs its trace hook through `BASH_ENV=lib/coverage-trap.sh`, but `tests/test_helper.bash` runs `unset BASH_ENV ENV`, so every test that loads the helper records no lines and `tests/coverage.bats` "single test file" fails (AGENTS.md lists it as a known base failure). Keep the unset for the host bash-env, but not for the coverage trap. The same full-suite run (2026-10-16, ea81f8d) also failed tests that pass when run alone or that depend on this Mac: add-task-backend, add-unmanage, agent-browser-reap-strays, agent-browser-singleton-preflight, bin-land, chromework-install, doctor-severity-filter and doctor-validate-overrides (`sed -i ''` under the GNU sed shim on PATH), overlay-root-doctor and overlay-root-uninstall (mocks lack `lib/dotfiles-source-dir.sh`), module-jetbrains, and others. Fix or isolate each, then drop the known-failure line from AGENTS.md.
-  - **Files**: `tests/test_helper.bash`, `lib/coverage-trap.sh`, `tests/coverage.bats`, the failing test files
-  - **Output**: code
-  - **Competitive-goal**: none — gate trust; a red full suite hides real regressions (one hid in #124).
-  - **Acceptance**: `make test-force` exits 0 on the owner's Mac, and `dotfiles-coverage run tests/cheat.bats` reports covered lines above 0.
-  - **Hypothesis**: full-suite failures on unchanged feat/chezmoi go from 14 to 0, so any red run is a real regression.
-  - **Measurement**: `make test-force; echo $?` and `bats tests/coverage.bats`.
-  - **Success**: 0 failures.
-  - **Pivot**: a test that only fails on a managed endpoint gets a skip guard with the reason, not a fix.
-  - **Anchor**: Beck 2002 (test-driven development: a red bar must mean something); requirements run 2026-10-16.
-
 ## P2
 
 - [ ] Endpoint hardening runs only on Macs that need it

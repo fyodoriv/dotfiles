@@ -42,7 +42,7 @@ removed_checks=0
 for doctor_file in "$DOTFILES_DIR"/modules/*/doctor.sh; do
   [ ! -f "$doctor_file" ] && continue
   if grep -q "$check_id_base" "$doctor_file" 2>/dev/null; then
-    sed -i '' "/$check_id_base/d" "$doctor_file"
+    sed -i.bak "/$check_id_base/d" "$doctor_file" && rm -f "$doctor_file.bak"
     echo "✓ Removed doctor check from $(basename "$(dirname "$doctor_file")")/doctor.sh"
     removed_checks=$((removed_checks + 1))
   fi

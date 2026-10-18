@@ -38,16 +38,16 @@ fi
 if $enterprise; then
   marker='{{ if .is_enterprise'
   grep -q "^$marker" "$brew_file" || { echo "Error: enterprise section not found in brew file" >&2; exit 1; }
-  sed -i '' "/^{{ if .is_enterprise/,/^{{ end/{ /^{{ end/i\\
+  sed -i.bak "/^{{ if .is_enterprise/,/^{{ end/{ /^{{ end/i\\
 $brew_line
-  }" "$brew_file"
+  }" "$brew_file" && rm -f "$brew_file.bak"
   section="enterprise"
 elif $full_only; then
   marker='{{ if eq .profile "full"'
   grep -q "^$marker" "$brew_file" || { echo "Error: full-only section not found in brew file" >&2; exit 1; }
-  sed -i '' "/^{{ if eq .profile \"full\"/,/^{{ end/{ /^{{ end/i\\
+  sed -i.bak "/^{{ if eq .profile \"full\"/,/^{{ end/{ /^{{ end/i\\
 $brew_line
-  }" "$brew_file"
+  }" "$brew_file" && rm -f "$brew_file.bak"
   section="full-only"
 else
   if $cask_mode; then
@@ -56,8 +56,8 @@ else
     marker="# ── Core: Prompt"
   fi
   grep -qF "$marker" "$brew_file" || { echo "Error: marker '$marker' not found in brew file" >&2; exit 1; }
-  sed -i '' "/$marker/i\\
-$brew_line" "$brew_file"
+  sed -i.bak "/$marker/i\\
+$brew_line" "$brew_file" && rm -f "$brew_file.bak"
   section="core"
 fi
 # Verify the insertion actually landed

@@ -139,8 +139,9 @@ EOF
 }
 
 @test "TASKS pre-commit lint never spawns blocked Node" {
-  grep -q 'TeamIdentifier=HX7739G8FX' git-hooks/pre-commit
-  grep -q 'TASKS.md npx lint deferred to CI' git-hooks/pre-commit
+  # Since #72 the hook skips npx only where the endpoint marker exists.
+  grep -q 'endpoint-node-publisher-blocked' git-hooks/pre-commit
+  grep -q 'TASKS.md lint skipped' git-hooks/pre-commit
 }
 
 @test "agent Node opt-in keeps agentbrew jobs on that Node and still stops Topgrade" {

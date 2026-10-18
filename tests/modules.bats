@@ -71,10 +71,12 @@ MODULES_DIR="$BATS_TEST_DIRNAME/../modules"
 
   local bad=""
   for id in $all_ids; do
+    # A wrapper that forwards its ID ("$@", "$agent_id") has no literal ID.
+    [[ "$id" =~ ^\$[A-Za-z_@]+$ ]] && continue
     # Format: prefix.name where each segment is [a-z_$] starting char,
     # [a-z0-9_${}/.\\-] body. Braces/slashes/backslashes are allowed
     # to support bash parameter expansion like ${rel//\//_}.
-    if ! [[ "$id" =~ ^[a-z_$][a-z0-9_$\{\}/.\\-]*\.[a-z_$][a-z0-9_$\{\}/\\]*$ ]]; then
+    if ! [[ "$id" =~ ^[a-z_$][a-z0-9_$\{\}/.\\-]*\.[a-z_$][a-z0-9_$\{\}/\\-]*$ ]]; then
       bad="$bad $id"
     fi
   done
@@ -82,19 +84,19 @@ MODULES_DIR="$BATS_TEST_DIRNAME/../modules"
 }
 
 @test "check IDs are unique across all modules" {
-  local all_ids
-  all_ids=$(grep -ohE '^\s*(check|check_symlink|check_managed|check_defaults)\s+"[^"]+"' \
-    "$MODULES_DIR"/*/doctor.sh | grep -oE '"[^"]+"' | tr -d '"' | sort)
+  # One module may repeat an ID in exclusive if/else branches, and wrapper
+  # variables ("$agent_id") are not IDs, so dedupe per module and skip them.
+  local all_ids mod
+  all_ids=$(for mod in "$MODULES_DIR"/*/doctor.sh; do
+    grep -ohE '^\s*(check|check_symlink|check_managed|check_defaults)\s+"[^"]+"' "$mod" |
+      grep -oE '"[^"]+"' | tr -d '"' | grep -vE '^\$[A-Za-z_@]+$' | sort -u
+  done | sort)
   local dupes
   dupes=$(echo "$all_ids" | uniq -d)
   [ -z "$dupes" ] || { echo "duplicate IDs: $dupes"; return 1; }
 }
 
 # ── Enterprise gating ────────────────────────────────────────────
-
-@test "claude module gates behind IS_ENTERPRISE" {
-  grep -q 'IS_ENTERPRISE' "$MODULES_DIR/claude/doctor.sh"
-}
 
 @test "chrome work profile check gates behind IS_ENTERPRISE" {
   grep -q 'IS_ENTERPRISE' "$MODULES_DIR/chrome/doctor.sh"

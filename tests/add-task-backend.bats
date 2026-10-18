@@ -74,7 +74,8 @@ fi
 JQMOCK
   chmod +x "$WORKDIR/mocks/jq"
   
-  run "$TARGET_REPO_GITHUB/bin/add-task" --title "Test GitHub issue" --priority P1 --dry-run
+  run "$TARGET_REPO_GITHUB/bin/add-task" --title "Test GitHub issue" --priority P1 --dry-run \
+    --hypothesis h --success s --pivot p --measurement m --anchor a
   [ "$status" -eq 0 ]
   # Should mention github-issues or issue creation, not TASKS.md
   [[ "$output" == *"github"* ]] || [[ "$output" == *"issue"* ]] || [[ "$output" == *"Would"* ]]
@@ -97,7 +98,8 @@ exit 0
 TASKSMOCK
   chmod +x "$WORKDIR/mocks/tasks"
 
-  run "$TARGET_REPO_GITHUB/bin/add-task" --title "Delegated issue" --priority P1 --tags infra,backend
+  run "$TARGET_REPO_GITHUB/bin/add-task" --title "Delegated issue" --priority P1 --tags infra,backend \
+    --hypothesis h --success s --pivot p --measurement m --anchor a
   [ "$status" -eq 0 ]
   [[ "$output" == *"created GitHub Issue"* ]]
   grep -q "create" "$TASKS_ARGS_FILE"
@@ -114,7 +116,8 @@ TASKSMOCK
   printf '#!/bin/bash\nexit 1\n' > "$WORKDIR/mocks/npx"
   chmod +x "$WORKDIR/mocks/tasks" "$WORKDIR/mocks/npx"
   
-  run "$TARGET_REPO_GITHUB/bin/add-task" --title "GitHub issue fallback" --priority P1
+  run "$TARGET_REPO_GITHUB/bin/add-task" --title "GitHub issue fallback" --priority P1 \
+    --hypothesis h --success s --pivot p --measurement m --anchor a
   [ "$status" -eq 0 ]
   # Should have created an issue-intent file in the target repo directory
   ls "$TARGET_REPO_GITHUB"/.issue-intent-* >/dev/null 2>&1

@@ -316,7 +316,8 @@ EOF
   [ "$status" -eq 0 ]
   decompiled="$(osadecompile "$CHROMEWORK_APP_DIR")"
   echo "$decompiled" | grep -Fq 'chromework-open-url'
-  ! echo "$decompiled" | grep -q ' >/dev/null 2>&1 &'
+  # The activate helper backgrounds on purpose (--survive-handoff); open-url must not.
+  ! echo "$decompiled" | grep ' >/dev/null 2>&1 &' | grep -vq -- '--survive-handoff'
 }
 
 @test "chromework-install: missing survive-handoff triggers rebuild" {

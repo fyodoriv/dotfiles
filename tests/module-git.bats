@@ -12,6 +12,12 @@ setup() {
   mkdir -p "$TEST_DOTFILES/home"
   mkdir -p "$TEST_DOTFILES/bin"
   mkdir -p "$TEST_DOTFILES/git-hooks"
+  # The module sources these libs; stub the xcode git probe so the host
+  # license state cannot fail the run.
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/xcode-license.sh" \
+    "$BATS_TEST_DIRNAME/../lib/gitconfig-user-migrate.sh" "$TEST_DOTFILES/lib/"
+  export XCODE_LICENSE_PROBE=/usr/bin/true
 
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
@@ -138,6 +144,12 @@ teardown() {
   TEST_HOME="$TEST_DIR/home"
   TEST_DOTFILES="$TEST_DIR/dotfiles"
   mkdir -p "$TEST_HOME" "$TEST_DOTFILES/home" "$TEST_DOTFILES/bin" "$TEST_DOTFILES/git-hooks"
+  # The module sources these libs; stub the xcode git probe so the host
+  # license state cannot fail the run.
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/xcode-license.sh" \
+    "$BATS_TEST_DIRNAME/../lib/gitconfig-user-migrate.sh" "$TEST_DOTFILES/lib/"
+  export XCODE_LICENSE_PROBE=/usr/bin/true
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
   export GIT_CONFIG_GLOBAL="$TEST_DIR/gitconfig"
@@ -231,7 +243,9 @@ teardown() {
 }
 
 @test "git: shipped wip alias commits only staged changes" {
-  run git config --file "$BATS_TEST_DIRNAME/../dot_gitconfig.tmpl" alias.wip
+  # The template has chezmoi directives that git cannot parse; drop them.
+  grep -v '{{' "$BATS_TEST_DIRNAME/../dot_gitconfig.tmpl" > "$TEST_DIR/gitconfig.plain"
+  run git config --file "$TEST_DIR/gitconfig.plain" alias.wip
   [ "$status" -eq 0 ]
   [ "$output" = "commit -m wip" ]
 }

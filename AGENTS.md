@@ -100,9 +100,9 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
 - **Parallel agents**: at most 3 gate-running agents (11 froze a Mac on 2026-10-15); check `dotfiles-load-sampler --report 1`.
-- **`BASH_ENV` resets `DOTFILES_DIR`** to the live checkout in child `bash`. Tests that spawn `bash` without `load test_helper` must use `env -u BASH_ENV`.
+- **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: set `DOTFILES_DIR` to a temp dir in tests.
+- **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
-- **Known base failures** (fail on unchanged `feat/chezmoi` too): `tests/coverage.bats` "single test file" report.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.
 - **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name, never by absolute path; writes outside `$HOME` fail it (`tests/install-e2e-guard.bats`).
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
@@ -110,7 +110,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 ## Delivery
 
 1. Branch `type/description` (`feat`, `fix`, `docs`, `chore`, …) in a worktree; commit `type: description` (≤72 chars).
-2. Run `make check`; name any known base failure.
+2. Run `make check`; a red test is a real regression.
 3. Push the branch and open a PR to `feat/chezmoi`. PR body: `## Summary` (why + what), `## Details`, `## Docs`, then validation and `## Visual proof`. Template: [docs/ship-it-reference.md](docs/ship-it-reference.md).
 4. Squash-merge when green, remove the worktree and branch, and `git pull` the live checkout.
 

@@ -550,7 +550,10 @@ EOF
 
   # The remote is listed only through the pipe. The owner-public pattern
   # check is the second reader, so it must still see the list.
+  # A bin/git wrapper on the host PATH would read the pipe first (it makes
+  # its own copy), so the hook runs with a system-only PATH.
   run env -u OSS_READINESS_INTERNAL_PATTERN OSS_READINESS_ENV_FILE="$EMPTY_ENV_FILE" \
+    PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
     bash -c 'cd "$1" && DOTFILES_PUBLIC_PUSH_ALLOWLIST=<(echo github.com/fyodoriv/zz-pipe-example) "$2" origin "$3" <<EOF
 refs/heads/topic $4 refs/heads/topic 0000000000000000000000000000000000000000
 EOF

@@ -26,6 +26,9 @@ printf 'preflight called\n'
 MOCK
   chmod +x "$DOTFILES_DIR/bin/agent-browser-singleton-preflight"
   export PREFLIGHT_LOG
+  # The session block sources this lib from $DOTFILES_DIR.
+  mkdir -p "$DOTFILES_DIR/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/agent-browser-session-env.sh" "$DOTFILES_DIR/lib/"
 }
 
 teardown() {

@@ -203,7 +203,9 @@ needs_rebuild() {
   echo "$decompiled" | grep -q -- '--no-activate' || return 0
   echo "$decompiled" | grep -q -- "--user-data-dir=" && return 0
   echo "$decompiled" | grep -q 'on workChromeHasVisibleWindows' && return 0
-  echo "$decompiled" | grep -q ' >/dev/null 2>&1 &' && return 0
+  # Only the activate helper may run in the background (it must outlive the
+  # applet); a backgrounded open-url call is the legacy async form.
+  echo "$decompiled" | grep ' >/dev/null 2>&1 &' | grep -vq -- '--survive-handoff' && return 0
   return 1
 }
 

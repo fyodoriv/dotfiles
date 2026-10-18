@@ -89,7 +89,9 @@ dotfiles_resolve_fnm_node_bin() {
   [ -n "$home" ] || return 1
   local node_ver="" fnm_dir="$home/.local/share/fnm"
   if [ -f "$home/.node-version" ]; then
-    node_ver="$(sed 's/^v//' "$home/.node-version" 2>/dev/null || true)"
+    # Builtins only: PATH may hold endpoint shims before sed is usable.
+    IFS= read -r node_ver < "$home/.node-version" || true
+    node_ver="${node_ver#v}"
   fi
   [ -n "$node_ver" ] || return 1
   local node_bin="$fnm_dir/node-versions/v${node_ver}/installation/bin"

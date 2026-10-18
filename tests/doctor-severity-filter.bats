@@ -68,15 +68,15 @@ MODEOF
   # Copy the real doctor script and patch it for isolated testing
   cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/dotfiles-doctor"
   chmod +x "$TEST_DOTFILES/bin/dotfiles-doctor"
-  sed -i '' 's|DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"|DOTFILES_DIR="'"$TEST_DOTFILES"'"|' "$TEST_DOTFILES/bin/dotfiles-doctor"
-  sed -i '' 's|IS_ENTERPRISE="$(chezmoi .*"|IS_ENTERPRISE="false"|' "$TEST_DOTFILES/bin/dotfiles-doctor"
-  sed -i '' 's|DOTFILES_PROFILE="$(chezmoi .*"|DOTFILES_PROFILE="full"|' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  sed -i.bak 's|DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"|DOTFILES_DIR="'"$TEST_DOTFILES"'"|' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
+  sed -i.bak 's|IS_ENTERPRISE="$(chezmoi .*"|IS_ENTERPRISE="false"|' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
+  sed -i.bak 's|DOTFILES_PROFILE="$(chezmoi .*"|DOTFILES_PROFILE="full"|' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
   # Disable chezmoi health checks section
-  sed -i '' 's|if command -v chezmoi|if false \&\& command -v chezmoi|g' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  sed -i.bak 's|if command -v chezmoi|if false \&\& command -v chezmoi|g' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
   # Disable agentbrew health checks section
-  sed -i '' 's|if command -v agentbrew|if false \&\& command -v agentbrew|g' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  sed -i.bak 's|if command -v agentbrew|if false \&\& command -v agentbrew|g' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
   # Disable stats file writing
-  sed -i '' '/echo.*"task":"doctor".*>> "\$DOCTOR_TRENDS_FILE"/d' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  sed -i.bak '/echo.*"task":"doctor".*>> "\$DOCTOR_TRENDS_FILE"/d' "$TEST_DOTFILES/bin/dotfiles-doctor" && rm -f "$TEST_DOTFILES/bin/dotfiles-doctor.bak"
 
   touch "$TEST_DOTFILES/.overrides"
 }

@@ -28,6 +28,12 @@ setup() {
   export DOTFILES_DIR="$TEST_DOTFILES"
   export CURSOR_LOCAL_DIR="$CURSOR_LOCAL"
   export PATH="$(dirname "$CURSOR_BIN"):$PATH"
+  # Stub launchctl so the at-login check reads a fake registered agent,
+  # not this Mac's real LaunchAgents.
+  mkdir -p "$TEST_DIR/stub-bin"
+  printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/stub-bin/launchctl"
+  chmod +x "$TEST_DIR/stub-bin/launchctl"
+  export PATH="$TEST_DIR/stub-bin:$PATH"
 
   OVERRIDES_FILE="$TEST_DOTFILES/.overrides"
   touch "$OVERRIDES_FILE"

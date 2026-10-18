@@ -3,7 +3,12 @@
 
 # The host bash-env.sh re-exports DOTFILES_DIR and PATH in every child bash,
 # which would point `bash -c` fixtures at the real checkout.
-unset BASH_ENV ENV
+# Keep the coverage trace hook (bin/dotfiles-coverage sets BASH_ENV to
+# lib/coverage-trap.sh); unsetting it would record zero covered lines.
+case "${BASH_ENV:-}" in
+*/lib/coverage-trap.sh) unset ENV ;;
+*) unset BASH_ENV ENV ;;
+esac
 
 # Tests never write the real errors or stats logs (lib/errors-log.sh,
 # lib/stats.sh); a test that checks a write sets the variable back to 1.

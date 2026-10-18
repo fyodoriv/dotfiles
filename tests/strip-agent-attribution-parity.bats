@@ -7,7 +7,9 @@ AGENTBREW_LIB="${DOTFILES_AGENTBREW_STRIP_LIB:-$BATS_TEST_DIRNAME/../../agentbre
 
 _normalize_strip_lib() {
   # Shebang differs by design (/bin/sh vs /usr/bin/env sh); compare logic only.
-  tail -n +2 "$1" | sed '/^[[:space:]]*$/d'
+  # agentbrew's security lint needs a trailing "# pipefail-ok" note on pipes;
+  # it is a lint marker, not logic, so drop it before comparing.
+  tail -n +2 "$1" | sed -e 's/[[:space:]]*# pipefail-ok.*$//' -e '/^[[:space:]]*$/d'
 }
 
 @test "strip-agent-attribution: agentbrew copy matches dotfiles lib (logic)" {

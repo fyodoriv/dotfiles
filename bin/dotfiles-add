@@ -48,12 +48,32 @@ if $copy_mode; then
   echo "check_managed \"managed.$check_id_base\" \"$src_path\" \"$target_file\"" >> "$DOTFILES_DIR/modules/$module/doctor.sh"
   echo "✓ Added $target_file (copy mode) → module '$module'"
 else
-  stripped="${base#.}"
-  cp "$target_file" "$DOTFILES_DIR/home/$stripped"
-  src_path="$DOTFILES_DIR/home/$stripped"
+  home_abs="$(cd "$HOME" && pwd -P)"
+  target_phys="$(cd "$(dirname "$target_file")" && pwd -P)/$base"
+  rel=""
+  case "$target_phys" in "$home_abs"/*/*) rel="${target_phys#"$home_abs"/}" ;; esac
+  if [ -n "$rel" ]; then
+    # Nested file (for example ~/.config/tool/tool.conf): mirror its path
+    # under HOME, so apply links the same path and not ~/.<name>.
+    copy_rel="${rel#.}"
+    src_dir="" dir_rel="$(dirname "$rel")"
+    IFS='/' read -ra parts <<< "$dir_rel"
+    for part in "${parts[@]}"; do
+      case "$part" in .*) part="dot_${part#.}" ;; esac
+      src_dir="${src_dir:+$src_dir/}$part"
+    done
+    case "$base" in .*) tmpl_base="dot_${base#.}" ;; *) tmpl_base="$base" ;; esac
+    tmpl_name="$src_dir/symlink_${tmpl_base}.tmpl"
+    check_id_base="${rel//[^a-zA-Z0-9_]/_}"
+  else
+    copy_rel="${base#.}"
+    tmpl_name="symlink_dot_${copy_rel}.tmpl"
+  fi
+  mkdir -p "$(dirname "$DOTFILES_DIR/home/$copy_rel")" "$(dirname "$DOTFILES_DIR/$tmpl_name")"
+  cp "$target_file" "$DOTFILES_DIR/home/$copy_rel"
+  src_path="$DOTFILES_DIR/home/$copy_rel"
   # Create chezmoi symlink template so `chezmoi apply` deploys the symlink
-  tmpl_name="symlink_dot_${stripped}.tmpl"
-  echo '{{ .chezmoi.sourceDir }}/home/'"$stripped" > "$DOTFILES_DIR/$tmpl_name"
+  echo '{{ .chezmoi.sourceDir }}/home/'"$copy_rel" > "$DOTFILES_DIR/$tmpl_name"
   echo "check_symlink \"symlink.$check_id_base\" \"$src_path\" \"$target_file\"" >> "$DOTFILES_DIR/modules/$module/doctor.sh"
   echo "✓ Added $target_file (symlink mode) → module '$module'"
 fi

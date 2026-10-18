@@ -67,6 +67,7 @@ dotfiles apply           # deploy the change
 ```bash
 dotfiles add ~/.some-config              # symlink mode (default)
 dotfiles add ~/.some-config --copy       # copy mode
+dotfiles add ~/.config/tool/tool.conf    # nested file keeps its path
 ```
 
 ### I already have a dotfiles setup. Can I migrate?

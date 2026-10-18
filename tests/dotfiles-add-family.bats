@@ -132,3 +132,57 @@ _help_for() {
     done
   done
 }
+
+# A scratch dotfiles repo (bin/dotfiles-add, .chezmoiignore, a tools module)
+# and a scratch HOME, so `dotfiles add` and `chezmoi apply` never touch the
+# real checkout or the real HOME.
+_scratch_repo() {
+  SCRATCH="$(cd "$BATS_TEST_TMPDIR" && pwd -P)"
+  export HOME="$SCRATCH/home"
+  FAKE_REPO="$SCRATCH/dotfiles"
+  mkdir -p "$HOME" "$FAKE_REPO/bin" "$FAKE_REPO/home" "$FAKE_REPO/modules/tools"
+  cp "$REPO_ROOT/bin/dotfiles-add" "$FAKE_REPO/bin/"
+  cp "$REPO_ROOT/.chezmoiignore" "$FAKE_REPO/"
+  : > "$FAKE_REPO/modules/tools/doctor.sh"
+  # .chezmoiignore reads these two keys without a default.
+  printf 'data:\n  profile: core\n  is_enterprise: false\n' > "$SCRATCH/chezmoi.yaml"
+}
+
+_apply() {
+  chezmoi apply --source "$FAKE_REPO" --destination "$HOME" \
+    --config "$SCRATCH/chezmoi.yaml" --cache "$SCRATCH/cache" \
+    --persistent-state "$SCRATCH/state.boltdb" "$@"
+}
+
+@test "dotfiles add: a nested file keeps its path under HOME after apply" {
+  _scratch_repo
+  mkdir -p "$HOME/.config/x"
+  printf 'y=1\n' > "$HOME/.config/x/y.conf"
+  run "$FAKE_REPO/bin/dotfiles-add" "$HOME/.config/x/y.conf"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ -f "$FAKE_REPO/home/config/x/y.conf" ]
+  [ -f "$FAKE_REPO/dot_config/x/symlink_y.conf.tmpl" ]
+  rm "$HOME/.config/x/y.conf"
+  run _apply "$HOME/.config/x/y.conf"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ -L "$HOME/.config/x/y.conf" ]
+  [ "$(readlink "$HOME/.config/x/y.conf")" = "$FAKE_REPO/home/config/x/y.conf" ]
+  [ "$(cat "$HOME/.config/x/y.conf")" = "y=1" ]
+  [ ! -e "$HOME/.y.conf" ]
+  [ ! -e "$FAKE_REPO/symlink_dot_y.conf.tmpl" ]
+}
+
+@test "dotfiles add: a top-level dotfile still lands in home/ and links after apply" {
+  _scratch_repo
+  printf 'top=1\n' > "$HOME/.toprc"
+  run "$FAKE_REPO/bin/dotfiles-add" "$HOME/.toprc"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ -f "$FAKE_REPO/home/toprc" ]
+  [ "$(cat "$FAKE_REPO/symlink_dot_toprc.tmpl")" = '{{ .chezmoi.sourceDir }}/home/toprc' ]
+  grep -qF 'symlink._toprc' "$FAKE_REPO/modules/tools/doctor.sh"
+  rm "$HOME/.toprc"
+  run _apply "$HOME/.toprc"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ -L "$HOME/.toprc" ]
+  [ "$(cat "$HOME/.toprc")" = "top=1" ]
+}

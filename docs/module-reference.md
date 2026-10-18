@@ -436,7 +436,7 @@ Gate: skipped entirely when `use_cursor: false` in chezmoi config (default `true
 
 ### local-ai (conditional)
 
-Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`), plus `opencode serve` on `:4096`. Model checks run only for the engine that is installed or up.
+Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`), plus `opencode serve` on `:4096`. Model checks run only for the engine that is installed or up. The module runs only when `local_ai_agents` is on (default: `use_local_ai` or `owner_machine`).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

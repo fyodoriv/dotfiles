@@ -144,6 +144,19 @@
         "Gives each adopt or try a metric and a command before it becomes a task, a /ship-it change, or a question",
         "Installs nothing from a post and never proposes an xAI or Musk-affiliated product"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "/tooling-checkup (I contribute to fyodoriv/agentbrew from my fork; two of my PRs there are open, one has a red check and one has an unresolved review comment)",
+      "expected_output": "Phase 2 lists the user's open PRs on the repos they do not own, fixes the red check on its branch, answers and resolves the review thread, and does not merge without write access.",
+      "expectations": [
+        "Lists open PRs with gh pr list --author @me for each checkout's origin repository",
+        "Fixes the red check on the PR branch and pushes to the user's fork, not to the owner's repository",
+        "Changes the code or answers the review comment, then resolves the thread",
+        "Merges only with ADMIN, MAINTAIN, or WRITE permission, green checks and an approval; otherwise leaves it for the owner",
+        "Reports each open PR as green with zero unresolved threads, or with its blocker",
+        "Skips repositories the user owns and never rebases or force-pushes a PR branch"
+      ]
     }
   ]
 }

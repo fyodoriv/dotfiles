@@ -77,7 +77,8 @@ time, tool versions, repository heads, the verdict, and measured numbers.
 Phase 1 compares the machine with it. Use it to keep a repeat run short:
 
 - Phase 2 has nothing to do when the inventory prints no `ship`, `salvage`,
-  or `security` line.
+  or `security` line, and there is no open pull request of yours on a repo
+  you do not own.
 - Phase 4 skips the long upgrade when the last upgrade is under 12 hours old
   and Homebrew has nothing outdated (see the reference file).
 - Phase 7 replays the cached audit when no skill or rule file changed.
@@ -115,8 +116,31 @@ Act on each inventory line by its verdict:
 | `pipeline`, `bot`, `skip`, `advisory` | Report only. |
 | `unknown` | Fetch again and check by hand. Never delete. |
 
-**Done when:** every `ship`, `salvage`, and `security` item is merged, or it
-is listed with its reason and next step.
+### Your pull requests on tooling repos you do not own
+
+A contributor's work sits in open pull requests on the owner's repository,
+so the inventory shows no `ship` line for it. For each checkout's `origin`
+(`gh repo view --json nameWithOwner,parent`; when `origin` is your fork, use
+its `parent`), find the owner. Skip a repo you own: its owner equals
+`gh api user --jq .login`, and the inventory already covers it. Else list
+your PRs with `gh pr list --repo <owner/repo> --author @me --state open`,
+then for each:
+
+- **Red check:** fix it on the PR branch and push to your fork.
+- **Unresolved review thread** (`gh api graphql`, `reviewThreads.isResolved`):
+  change the code or answer, then resolve the thread.
+- **Conflict:** merge the default branch into the PR branch and push. Do not
+  rebase or force-push: the owner may have pushed fixes to that branch.
+- **Merge** only when `gh repo view --json viewerPermission` is `ADMIN`,
+  `MAINTAIN`, or `WRITE`, every check is green, and the PR is approved. Else
+  leave it for the owner.
+
+When this Mac runs a local branch that carries unmerged fixes, rebuild it
+after merges: the default branch plus each fix branch still open.
+
+**Done when:** every `ship`, `salvage`, and `security` item is merged, and
+each of your open PRs is green with zero unresolved threads, or each one is
+listed with its reason and next step.
 
 ## Phase 3: Refresh tooling
 

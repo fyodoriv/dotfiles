@@ -6,6 +6,13 @@
 # Auto-discovered by ~/bin/dotfiles-doctor when this file exists. To skip:
 # `dotfiles doctor --skip local-ai.<id>`.
 
+# local_ai_agents=false (chezmoi data): the stack is off on this Mac, so skip
+# the module. Its fixes would otherwise download opencode (curl | bash) and load
+# the opencode-serve, Ollama and warmup LaunchAgents. Unset means on.
+if [ "${LOCAL_AI_AGENTS:-true}" = "false" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 # ── Detect which engines are installed (informational; no fail) ─────
 _lmstudio_installed() { [ -d "/Applications/LM Studio.app" ] && [ -x "$HOME/.lmstudio/bin/lms" ]; }
 _ollama_installed()   { command -v ollama >/dev/null 2>&1; }

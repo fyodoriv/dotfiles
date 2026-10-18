@@ -58,15 +58,22 @@ _agentbrew_global_agentfile_in_sync() {
   fi
   [ "${#paths[@]}" -gt 0 ] || return 0
 
-  local expected status
+  local expected status layer=""
+  # Match run_after_agentbrew-sync.sh: this Mac's Claude model/effort goes last.
+  if [ -f "$DOTFILES_DIR/lib/claude-model-layer.sh" ]; then
+    # shellcheck source=../lib/claude-model-layer.sh
+    source "$DOTFILES_DIR/lib/claude-model-layer.sh"
+    layer="$(mktemp "${TMPDIR:-/tmp}/dotfiles-claude-model.XXXXXX")" || return 1
+    if claude_model_layer_write "$layer"; then paths+=("$layer"); else rm -f "$layer"; layer=""; fi
+  fi
   expected="$(mktemp "${TMPDIR:-/tmp}/agentbrew-agentfile.XXXXXX")" || return 1
   if ! agentbrew agentfile merge "${paths[@]}" --output "$expected" >/dev/null 2>&1; then
-    rm -f "$expected"
+    rm -f "$expected" "$layer"
     return 1
   fi
   cmp -s "$expected" "$global_agentfile"
   status=$?
-  rm -f "$expected"
+  rm -f "$expected" "$layer"
   return "$status"
 }
 

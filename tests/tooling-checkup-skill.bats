@@ -541,3 +541,21 @@ broken file://$feeds/missing.xml"
   [[ "$output" == *"research: 0 new item(s)"* ]]
   ! grep -q "$TEST_HOME" "$TEST_DIR/state/ai-research-seen.json"
 }
+
+@test "tooling-checkup gets a contributor's own PRs green without merging them" {
+  grep -q '^### Your pull requests on tooling repos you do not own' "$SKILL_DIR/SKILL.md"
+  grep -q 'gh pr list --repo <owner/repo> --author @me --state open' "$SKILL_DIR/SKILL.md"
+  grep -q 'viewerPermission' "$SKILL_DIR/SKILL.md"
+}
+
+@test "contributor PR step leaves the owner's checkup and history alone" {
+  # The owner's own repos skip the step, so the owner's run is unchanged.
+  grep -F -q 'gh api user --jq .login' "$SKILL_DIR/SKILL.md"
+  grep -F -q 'Skip a repo you own' "$SKILL_DIR/SKILL.md"
+  # A fork checkout lists PRs on its parent repo.
+  grep -F -q 'parent' "$SKILL_DIR/SKILL.md"
+  # Conflicts merge the default branch in; no force-push.
+  ! grep -q 'force-with-lease' "$SKILL_DIR/SKILL.md"
+  # The fast path must not skip Phase 2 while a contributor PR is open.
+  grep -F -q 'no open pull request of yours' "$SKILL_DIR/SKILL.md"
+}

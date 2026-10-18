@@ -16,6 +16,8 @@ USE_CURSOR="{{ dig "use_cursor" true . }}"
 AUTO_SYNC="{{ dig "auto_sync" true . }}"
 CLAUDE_REMOTE_CONTROL="{{ dig "claude_remote_control" false . }}"
 IS_ENTERPRISE="{{ dig "is_enterprise" false . }}"
+# local_ai_agents: use_local_ai or owner_machine unless set (see .chezmoi.yaml.tmpl).
+LOCAL_AI_AGENTS="{{ dig "local_ai_agents" (or (dig "use_local_ai" false .) (dig "owner_machine" false .)) . }}"
 ENDPOINT_HARDENING="{{ dig "endpoint_hardening" true . }}"
 
 # Tool-presence / profile check — skip agents that shouldn't load
@@ -73,6 +75,10 @@ should_skip_agent() {
     claude-remote-control)
       [ "${CLAUDE_REMOTE_CONTROL:-false}" != "true" ] && return 0
       [ ! -x "$HOME/.local/bin/claude" ] && return 0 ;;
+    # Local-AI stack (opencode serve on :4096, Ollama, model warmup): only
+    # when local_ai_agents is on.
+    ollama|opencode-serve|local-ai-warmup)
+      [ "${LOCAL_AI_AGENTS:-false}" != "true" ] && return 0 ;;
     # Retired: AgentBrew owns com.agentbrew.mcp-memory and maintenance.
     mcp-memory|mcp-memory-maintain)
       return 0 ;;

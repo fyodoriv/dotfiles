@@ -183,6 +183,17 @@ if [ "${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" tru
   AGENTFILE_PATHS+=("$NO_CURSOR_AGENTFILE")
 fi
 
+# This Mac's Claude model/effort, merged last (lib/claude-model-layer.sh).
+# shellcheck source=../lib/claude-model-layer.sh
+[ -f "$DOTFILES_DIR/lib/claude-model-layer.sh" ] && source "$DOTFILES_DIR/lib/claude-model-layer.sh"
+if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
+  CLAUDE_MODEL_LAYER="$(mktemp "${TMPDIR:-/tmp}/dotfiles-claude-model.XXXXXX")"
+  trap 'rm -f "$CLAUDE_MODEL_LAYER"' EXIT
+  if declare -F claude_model_layer_write >/dev/null && claude_model_layer_write "$CLAUDE_MODEL_LAYER"; then
+    AGENTFILE_PATHS+=("$CLAUDE_MODEL_LAYER")
+  fi
+fi
+
 if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
   GLOBAL_AGENTFILE="$HOME/.config/agentbrew/Agentfile.yaml"
   if _agentbrew_supports_agentfile_merge; then

@@ -74,6 +74,9 @@ OWNER_MACHINE="${DOTFILES_OWNER_MACHINE:-$(chezmoi execute-template '{{ dig "own
 USE_CURSOR="${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo "true")}"
 # shellcheck disable=SC2034  # used by sourced doctor modules
 USE_LOCAL_AI="${DOTFILES_USE_LOCAL_AI:-$(chezmoi execute-template '{{ dig "use_local_ai" false . }}' 2>/dev/null || echo "true")}"
+# shellcheck disable=SC2034  # used by sourced doctor modules
+# local_ai_agents: same default as run_onchange_launchagents.sh.tmpl.
+LOCAL_AI_AGENTS="${DOTFILES_LOCAL_AI_AGENTS:-$(chezmoi execute-template '{{ dig "local_ai_agents" (or (dig "use_local_ai" false .) (dig "owner_machine" false .)) . }}' 2>/dev/null || echo "true")}"
 
 # ── Module discovery roots ───────────────────────────────────────────
 # Modules live under "$DOTFILES_DIR/modules/" by default. An optional overlay

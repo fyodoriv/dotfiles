@@ -49,8 +49,13 @@ if { [ -z "${DOTFILES_CLAUDE_MODEL:-}" ] || [ -z "${DOTFILES_CLAUDE_EFFORT:-}" ]
 fi
 DESIRED_MODEL="${DOTFILES_CLAUDE_MODEL:-${_data_model:-$DESIRED_MODEL}}"
 _effort="${DOTFILES_CLAUDE_EFFORT:-${_data_effort:-$DESIRED_EFFORT}}"
+# Only the keys this Mac overrides (lib/claude-model-layer.sh); empty = unset.
+_override_model="${DOTFILES_CLAUDE_MODEL:-${_data_model:-}}"
+_override_effort=""
 case "$_effort" in
-  low|medium|high|xhigh) DESIRED_EFFORT="$_effort" ;;
+  low|medium|high|xhigh)
+    DESIRED_EFFORT="$_effort"
+    _override_effort="${DOTFILES_CLAUDE_EFFORT:-${_data_effort:-}}" ;;
   *) echo "⚠ Claude effort '$_effort' is not persistable (low/medium/high/xhigh) — keeping $DESIRED_EFFORT" >&2 ;;
 esac
 unset _data_model _data_effort _effort
@@ -60,6 +65,11 @@ if [ "${1:-}" = "--print-desired" ]; then
   printf '%s %s\n' "$DESIRED_MODEL" "$DESIRED_EFFORT"
   exit 0
 fi
+if [ "${1:-}" = "--print-override" ]; then
+  printf '%s|%s\n' "$_override_model" "$_override_effort"
+  exit 0
+fi
+unset _override_model _override_effort
 
 # Skip if Claude Code isn't installed (no ~/.local/bin/claude binary).
 [ -e "$HOME/.local/bin/claude" ] || exit 0

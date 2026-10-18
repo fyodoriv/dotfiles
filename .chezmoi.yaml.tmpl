@@ -100,6 +100,14 @@
 {{- if hasKey . "endpoint_hardening" -}}
 {{-   $endpointHardening = .endpoint_hardening -}}
 {{- end -}}
+{{/* local_ai_agents loads the local-AI LaunchAgents (opencode serve on
+     :4096, Ollama, model warmup) and runs the local-ai doctor module, whose
+     fixes install opencode. Default: use_local_ai or owner_machine, so a new
+     user's Mac gets none and the owner's Macs keep opencode serve. */ -}}
+{{- $localAiAgents := or $useLocalAi $ownerMachine -}}
+{{- if hasKey . "local_ai_agents" -}}
+{{-   $localAiAgents = .local_ai_agents -}}
+{{- end -}}
 {{/* global_git_hooks wires git-hooks/ as core.hooksPath for every repo
      (leak gates + commit-msg cleanup). Opt out with false. */ -}}
 {{- $globalGitHooks := true -}}
@@ -139,6 +147,7 @@ data:
   claude_remote_control: {{ $claudeRemoteControl }}
   use_ai_tools: {{ $useAiTools }}
   use_local_ai: {{ $useLocalAi }}
+  local_ai_agents: {{ $localAiAgents }}
   use_cursor: {{ $useCursor }}
   use_encryption: {{ $useEncryption }}
   age_recipient: {{ $ageRecipient | quote }}

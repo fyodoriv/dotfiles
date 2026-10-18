@@ -4,7 +4,7 @@
 # use_cursor: {{ dig "use_cursor" true . }}
 # auto_sync: {{ dig "auto_sync" true . }}
 # claude_remote_control: {{ dig "claude_remote_control" false . }}
-# managed_endpoint: {{ dig "managed_endpoint" true . }}
+# endpoint_hardening: {{ dig "endpoint_hardening" true . }}
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 # self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
 set -euo pipefail
@@ -16,7 +16,7 @@ USE_CURSOR="{{ dig "use_cursor" true . }}"
 AUTO_SYNC="{{ dig "auto_sync" true . }}"
 CLAUDE_REMOTE_CONTROL="{{ dig "claude_remote_control" false . }}"
 IS_ENTERPRISE="{{ dig "is_enterprise" false . }}"
-MANAGED_ENDPOINT="{{ dig "managed_endpoint" true . }}"
+ENDPOINT_HARDENING="{{ dig "endpoint_hardening" true . }}"
 
 # Tool-presence / profile check — skip agents that shouldn't load
 # Core profile only gets essential agents: sync, doctor, git-maintain,
@@ -27,9 +27,9 @@ should_skip_agent() {
     # CDP debug ports are a localhost attack vector — require full profile
     agent-browser-chrome|debug-chrome|tooling-chrome|chrome-debug)
       [ "$PROFILE" != "full" ] && return 0 ;;
-    # Signs and links inside the Homebrew prefix; managed endpoints only
+    # Signs and links inside the Homebrew prefix; endpoint_hardening only
     endpoint-bootstrap)
-      [ "$MANAGED_ENDPOINT" != "true" ] && return 0 ;;
+      [ "$ENDPOINT_HARDENING" != "true" ] && return 0 ;;
     # chrome-heal only repairs enterprise Chrome Work-profile routing
     chrome-profile)
       [ "${IS_ENTERPRISE:-false}" != "true" ] && return 0 ;;

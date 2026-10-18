@@ -33,7 +33,7 @@ teardown() { rm -rf "$SCRATCH"; }
   # Background jobs landed in the scratch HOME, never in the real one.
   ls "$home/Library/LaunchAgents"/com.dotfiles.*.plist >/dev/null
   # A new user's Mac is not a managed endpoint: no Homebrew-prefix signing.
-  grep -q 'Skipping endpoint hardening (managed_endpoint is false)' "$SCRATCH/run.log"
+  grep -q 'Skipping endpoint hardening (endpoint_hardening is false)' "$SCRATCH/run.log"
   # Settings changes went to the shim, not to the Mac.
   grep -q '^defaults write' "$SCRATCH/os-calls.log"
   # A backup with the original files exists.

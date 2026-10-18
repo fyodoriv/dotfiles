@@ -92,13 +92,13 @@
 {{- if hasKey . "auto_sync" -}}
 {{-   $autoSync = .auto_sync -}}
 {{- end -}}
-{{/* managed_endpoint turns on the endpoint-hardening scripts: they ad-hoc
-     sign Homebrew bottles and link shims into the Homebrew prefix for a
-     managed endpoint-security agent, so they write outside $HOME.
+{{/* endpoint_hardening turns on the endpoint-hardening scripts: they ad-hoc
+     sign Homebrew bottles and link shims into the Homebrew prefix for an
+     endpoint-security agent, so they write outside $HOME.
      Default: owner_machine. Set true on any Mac with such an agent. */ -}}
-{{- $managedEndpoint := $ownerMachine -}}
-{{- if hasKey . "managed_endpoint" -}}
-{{-   $managedEndpoint = .managed_endpoint -}}
+{{- $endpointHardening := $ownerMachine -}}
+{{- if hasKey . "endpoint_hardening" -}}
+{{-   $endpointHardening = .endpoint_hardening -}}
 {{- end -}}
 {{/* global_git_hooks wires git-hooks/ as core.hooksPath for every repo
      (leak gates + commit-msg cleanup). Opt out with false. */ -}}
@@ -111,7 +111,7 @@ sourceDir: {{ .chezmoi.sourceDir | quote }}
 
 # Plain .sh lifecycle scripts read this; they cannot read template data.
 scriptEnv:
-  DOTFILES_MANAGED_ENDPOINT: {{ if $managedEndpoint }}"1"{{ else }}"0"{{ end }}
+  DOTFILES_ENDPOINT_HARDENING: {{ if $endpointHardening }}"1"{{ else }}"0"{{ end }}
 
 encryption: age
 age:
@@ -134,7 +134,7 @@ data:
   auto_upgrade: {{ $autoUpgrade }}
   auto_sync: {{ $autoSync }}
   owner_machine: {{ $ownerMachine }}
-  managed_endpoint: {{ $managedEndpoint }}
+  endpoint_hardening: {{ $endpointHardening }}
   global_git_hooks: {{ $globalGitHooks }}
   claude_remote_control: {{ $claudeRemoteControl }}
   use_ai_tools: {{ $useAiTools }}

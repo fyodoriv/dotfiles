@@ -221,7 +221,7 @@ These chezmoi scripts run automatically during `chezmoi apply`:
 | `run_onchange_macos.sh.tmpl` | When defaults change | Apply macOS `defaults write` settings |
 | `run_onchange_launchagents.sh.tmpl` | When plist files change | Deploy and load LaunchAgents |
 | `run_after_cache-inits.sh` | Every apply | Cache fzf, zoxide, starship, fnm init scripts to `~/.cache/zsh/` |
-| `run_after_endpoint-security.sh` | Every apply where `managed_endpoint` is true (default: `owner_machine`) | Re-sign Homebrew bottles, uv pythons, and dotfiles endpoint shims (managed-endpoint drift) |
+| `run_after_endpoint-security.sh` | Every apply where `endpoint_hardening` is true (default: `owner_machine`) or `DOTFILES_MANAGED_ENDPOINT=1` | Re-sign Homebrew bottles, uv pythons, and dotfiles endpoint shims (managed-endpoint drift) |
 | `run_after_aws-gcloud.sh.tmpl` | Every apply (enterprise only) | Install AWS CLI v2 and the Google Cloud SDK into user dirs with `bin/dotfiles-install-aws-gcloud`; skips tools already installed |
 | `run_after_agentbrew-sync.sh` | Every apply | Sync agent config from `Agentfile.yaml` (non-fatal) |
 

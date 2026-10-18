@@ -2,11 +2,11 @@
 # Back-compat wrapper — superseded by run_at_login_endpoint-bootstrap.sh.
 set -euo pipefail
 
-# Endpoint hardening writes outside $HOME, so it runs only on a managed
-# endpoint. .chezmoi.yaml.tmpl sets DOTFILES_MANAGED_ENDPOINT from
-# managed_endpoint (default: owner_machine); unset keeps the old behaviour.
-if [ "${DOTFILES_MANAGED_ENDPOINT:-1}" = "0" ]; then
-  echo "○ Skipping endpoint hardening (managed_endpoint is false)"
+# Endpoint hardening writes outside $HOME. .chezmoi.yaml.tmpl sets
+# DOTFILES_ENDPOINT_HARDENING from endpoint_hardening (default: owner_machine);
+# unset keeps the old behaviour. A managed endpoint (safe mode) always hardens.
+if [ "${DOTFILES_ENDPOINT_HARDENING:-1}" = "0" ] && [ "${DOTFILES_MANAGED_ENDPOINT:-0}" != "1" ]; then
+  echo "○ Skipping endpoint hardening (endpoint_hardening is false)"
   exit 0
 fi
 

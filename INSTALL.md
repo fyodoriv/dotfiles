@@ -93,6 +93,12 @@ Get a clear yes to the plan, then run it in a terminal the person can see
 bash <DIR>/bin/dotfiles-install run --yes --profile core --name "..." --email "..." [more flags]
 ```
 
+Measure first. The first thing `run` does, before preflight or any change,
+is save this Mac's "before" numbers to the install receipt: zsh start, free
+disk, LaunchAgents, and the agent setup already there (Claude Code skills,
+hooks, CLAUDE.md size, permission mode). Do not install anything by hand
+before `run`, or the "before" numbers stop being before.
+
 The script backs up, runs `chezmoi apply`, heals with `dotfiles doctor
 --fix`, verifies with `chezmoi verify` and a clean zsh start, and then runs
 agentbrew's installer. On a critical error it restores the backup by itself
@@ -108,6 +114,10 @@ Tell the person:
 - where the backup is and how to undo (`dotfiles-install restore`),
 - `dotfiles doctor` checks health; `dotfiles metrics` shows how the tools
   behave on their Mac,
+- what the install changed: run `dotfiles metrics --gains` now (time to
+  configured, before vs now), and again in about a week, when the automation
+  minutes have had time to add up. Share it with the owner if they ask,
+  for example in the install feedback issue,
 - if anything in the install was wrong or confusing, they can fix it and
   send it upstream from their own fork. Offer to do it with them: create a
   branch, make the fix, add or update a test (`tests/*.bats`) and the docs,

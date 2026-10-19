@@ -130,6 +130,23 @@ teardown() { rm -rf "$TEST_DIR"; }
   jq -e '(.before.taken_at | type) == "string" and (.run.finished_at | type) == "string"' "$receipt"
 }
 
+@test "the before snapshot also records the agent setup that was there" {
+  mkdir -p "$HOME/.claude/skills/a" "$HOME/.claude/skills/b"
+  printf '%s\n' '{"permissions":{"defaultMode":"default"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"x"}]}]}}' > "$HOME/.claude/settings.json"
+  printf 'hello\n' > "$HOME/.claude/CLAUDE.md"
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  receipt="$XDG_STATE_HOME/dotfiles/install-receipt.json"
+  jq -e '.before.claude_skills == 2 and .before.claude_hooks == 1' "$receipt"
+  jq -e '.before.claude_md_bytes == 6 and .before.claude_permissions == "default"' "$receipt"
+}
+
+@test "with no Claude setup the agent fields are zero and none" {
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  jq -e '.before.claude_skills == 0 and .before.claude_hooks == 0 and .before.claude_md_bytes == 0 and .before.claude_permissions == "none"' \
+    "$XDG_STATE_HOME/dotfiles/install-receipt.json"
+}
+
 @test "a failed run records the failure in the receipt" {
   FAIL_APPLY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
   [ "$status" -eq 1 ]
@@ -147,7 +164,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 
 @test "metrics --gains shows before vs now, time to configured, and labels estimates" {
   mkdir -p "$XDG_STATE_HOME/dotfiles"
-  printf '%s\n' '{"profile":"core","before":{"taken_at":"2026-10-01T10:00:00Z","zsh_ms":400,"free_gb":200.5,"launchagents":3},"run":{"started_at":"2026-10-01T10:00:00Z","finished_at":"2026-10-01T10:14:00Z","seconds":840,"ok":true}}' \
+  printf '%s\n' '{"profile":"core","before":{"taken_at":"2026-10-01T10:00:00Z","zsh_ms":400,"free_gb":200.5,"launchagents":3,"claude_skills":5,"claude_hooks":0,"claude_md_bytes":0,"claude_permissions":"default"},"run":{"started_at":"2026-10-01T10:00:00Z","finished_at":"2026-10-01T10:14:00Z","seconds":840,"ok":true}}' \
     > "$XDG_STATE_HOME/dotfiles/install-receipt.json"
   printf '%s\n' '{"task":"sync","timestamp":"2026-10-05T10:00:00Z","seconds_saved":120,"units":1}' \
     '{"task":"sync","timestamp":"2026-09-01T10:00:00Z","seconds_saved":999,"units":1}' > "$HOME/.dotfiles-stats.jsonl"
@@ -155,6 +172,8 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   [[ "$output" == *"zsh start"*"400"* ]] || { echo "$output"; return 1; }
   [[ "$output" == *"LaunchAgents"*"3"* ]]
+  [[ "$output" == *"Claude skills"*"5"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"Claude permissions"*"default"* ]]
   [[ "$output" == *"Time to configured: 14 min"* ]]
   # Only stats rows after the install count, and they are called estimates.
   [[ "$output" == *"2 min"*"estimate"* ]] || { echo "$output"; return 1; }

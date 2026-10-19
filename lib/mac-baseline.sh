@@ -48,6 +48,38 @@ baseline_report() {
   printf '%sLaunchAgents: %s in ~/Library/LaunchAgents\n' "$pad" "$(baseline_launchagents)"
 }
 
+# Agent setup on this Mac before the install: Claude Code skills, hook
+# commands, always-loaded CLAUDE.md size, and the permission mode. Plain
+# shell (jq may not exist yet). CLAUDE_CONFIG_DIR moves Claude's folder.
+_claude_dir() { printf '%s' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; }
+baseline_claude_skills() {
+  local n=0 entry
+  for entry in "$(_claude_dir)/skills"/*; do [ -e "$entry" ] && n=$((n + 1)); done
+  printf '%s\n' "$n"
+}
+baseline_claude_hooks() {
+  local f n
+  f="$(_claude_dir)/settings.json"
+  [ -f "$f" ] || { printf '0\n'; return; }
+  # Count the "command" key only; "type": "command" holds the same word.
+  n="$(grep -o '"command"[[:space:]]*:' "$f" 2>/dev/null | wc -l | tr -d ' ')"
+  printf '%s\n' "${n:-0}"
+}
+baseline_claude_md_bytes() {
+  local f n
+  f="$(_claude_dir)/CLAUDE.md"
+  [ -f "$f" ] || { printf '0\n'; return; }
+  n="$(wc -c <"$f" | tr -d ' ')"
+  printf '%s\n' "${n:-0}"
+}
+baseline_claude_permissions() {
+  local f mode
+  f="$(_claude_dir)/settings.json"
+  [ -f "$f" ] || { printf 'none\n'; return; }
+  mode="$(grep -o '"defaultMode"[[:space:]]*:[[:space:]]*"[A-Za-z]*"' "$f" 2>/dev/null | head -1 | sed -E 's/.*"([A-Za-z]*)"$/\1/')"
+  printf '%s\n' "${mode:-default}"
+}
+
 # ── Install receipt ──────────────────────────────────────────────────────
 # The before/after record of one install, so `dotfiles metrics --gains` can
 # show what changed. Plain shell, no jq: the snapshot is taken at the very
@@ -71,8 +103,9 @@ receipt_begin() {
   RECEIPT_START_S="$(date +%s)"
   if [ ! -s "$dir/install-before.json" ]; then
     ms="$(baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || ms=""
-    printf '{"taken_at":"%s","zsh_ms":%s,"free_gb":%s,"launchagents":%s}\n' \
+    printf '{"taken_at":"%s","zsh_ms":%s,"free_gb":%s,"launchagents":%s,"claude_skills":%s,"claude_hooks":%s,"claude_md_bytes":%s,"claude_permissions":"%s"}\n' \
       "$RECEIPT_STARTED_AT" "${ms:-null}" "$(baseline_free_gb)" "$(baseline_launchagents)" \
+      "$(baseline_claude_skills)" "$(baseline_claude_hooks)" "$(baseline_claude_md_bytes)" "$(baseline_claude_permissions)" \
       >"$dir/install-before.json" 2>/dev/null || true
   fi
 }
@@ -118,6 +151,10 @@ gains_report() {
   printf '%-22s %10s %10s\n' "zsh start (ms)" "$before_ms" "${now_ms:-n/a}"
   printf '%-22s %10s %10s\n' "Free disk (GB)" "$before_gb" "$now_gb"
   printf '%-22s %10s %10s\n' "LaunchAgents" "$before_la" "$now_la"
+  printf '%-22s %10s %10s\n' "Claude skills" "$(jq -r '.before.claude_skills // "n/a"' "$receipt")" "$(baseline_claude_skills)"
+  printf '%-22s %10s %10s\n' "Claude hooks" "$(jq -r '.before.claude_hooks // "n/a"' "$receipt")" "$(baseline_claude_hooks)"
+  printf '%-22s %10s %10s\n' "CLAUDE.md (bytes)" "$(jq -r '.before.claude_md_bytes // "n/a"' "$receipt")" "$(baseline_claude_md_bytes)"
+  printf '%-22s %10s %10s\n' "Claude permissions" "$(jq -r '.before.claude_permissions // "n/a"' "$receipt")" "$(baseline_claude_permissions)"
   if [ -n "$secs" ]; then
     if [ "$secs" -ge 60 ]; then printf 'Time to configured: %s min' "$(((secs + 30) / 60))"; else printf 'Time to configured: %s s' "$secs"; fi
     [ "$ok" = "true" ] && printf '\n' || printf ' (the run did not finish: %s)\n' "$(jq -r '.run.failed_step // "unknown step"' "$receipt")"

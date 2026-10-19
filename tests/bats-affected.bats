@@ -76,9 +76,11 @@ setup_file() {
 }
 
 setup() {
-  # Reset working tree to clean committed state (no per-test git init)
-  git -C "$TEST_REPO" checkout . 2>/dev/null
-  git -C "$TEST_REPO" clean -fd 2>/dev/null
+  # Reset index and working tree to the committed state (no per-test git init).
+  # Unstaging matters: a file a test stages stays a changed file in every
+  # later selector run, and each changed file costs a scan of every test.
+  git -C "$TEST_REPO" reset -q --hard 2>/dev/null
+  git -C "$TEST_REPO" clean -fdq 2>/dev/null
 }
 
 teardown() {
@@ -450,18 +452,27 @@ assert_affected_includes() {
 }
 
 @test "every verify-counts doc path list entry triggers verify-counts.bats" {
+  # One selector run per doc path, in a small repo that holds only
+  # verify-counts.bats: a run there costs a fraction of a run in TEST_REPO,
+  # because the selector scans every test file for each changed file.
   # shellcheck source=verify-counts-doc-paths.sh
   source "$DOTFILES_DIR/tests/verify-counts-doc-paths.sh"
+  local docs_repo="$BATS_TEST_TMPDIR/docs-repo" result
+  mkdir -p "$docs_repo/bin" "$docs_repo/tests"
+  cp "$TEST_REPO/bin/bats-affected" "$docs_repo/bin/bats-affected"
+  cp "$TEST_REPO/tests/verify-counts-doc-paths.sh" "$TEST_REPO/tests/verify-counts.bats" "$docs_repo/tests/"
+  git -C "$docs_repo" init -q
+  git -C "$docs_repo" add -A
+  git -C "$docs_repo" -c user.email=test@test.com -c user.name=Test commit -q --no-verify -m "chore: init"
   for doc in "${VERIFY_COUNTS_DOC_FILES[@]}"; do
-    mkdir -p "$(dirname "$TEST_REPO/$doc")"
-    echo "# doc" > "$TEST_REPO/$doc"
-    git -C "$TEST_REPO" add "$doc"
-    assert_affected_includes "$doc" "verify-counts" || {
-      echo "missing verify-counts mapping for: $doc"
+    mkdir -p "$(dirname "$docs_repo/$doc")"
+    echo "# doc" > "$docs_repo/$doc"
+    result=$(cd "$docs_repo" && bash bin/bats-affected)
+    [ "$result" = "$docs_repo/tests/verify-counts.bats" ] || {
+      echo "missing verify-counts mapping for: $doc (got: $result)"
       return 1
     }
-    git -C "$TEST_REPO" reset -q HEAD -- "$doc" 2>/dev/null || true
-    git -C "$TEST_REPO" checkout -q -- "$doc" 2>/dev/null || rm -f "$TEST_REPO/$doc"
+    rm -f "$docs_repo/$doc"
   done
 }
 

@@ -107,3 +107,4 @@ The `setup()` function creates isolated temp directories:
 - Doctor module tests typically override `pass()`, `fail()`, `fixed()`, `skipped()` to just increment counters (see `doctor.bats` for the pattern)
 - `run` captures stdout in `$output` and exit code in `$status`
 - Use `[[ ]]` for pattern matching, `[ ]` for strict equality
+- A git fixture repo shared through `setup_file` needs `git reset -q --hard` and `git clean -fdq` in `setup`. `git checkout .` leaves staged files behind, so one test's changes leak into every later test and can hide a missing mapping (see `bats-affected.bats`)

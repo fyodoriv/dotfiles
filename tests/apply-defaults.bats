@@ -505,3 +505,73 @@ JSON
   [ "$status" -eq 1 ]
   [[ "$output" == *"invalid macOS defaults data"* ]]
 }
+
+@test "apply_defaults skips keys listed in the skip file" {
+  cat > "$TEST_DOTFILES/data/macos-defaults.json" <<'JSON'
+[
+  {"domain": "com.apple.screencapture", "key": "show-thumbnail", "type": "bool", "value": false, "section": "Screenshots", "script": "core"},
+  {"domain": "com.apple.screencapture", "key": "type", "type": "string", "value": "png", "section": "Screenshots", "script": "core"}
+]
+JSON
+  mkdir -p "$HOME/.config/dotfiles"
+  printf '# keep the screenshot preview\ncom.apple.screencapture show-thumbnail\n' > "$HOME/.config/dotfiles/macos-defaults-skip"
+  source "$TEST_DOTFILES/lib/apply-defaults.sh"
+  apply_defaults core
+  run grep -c 'show-thumbnail' "$MOCK_LOG"
+  [ "$output" = 0 ]
+  grep -q 'write com.apple.screencapture type -string png' "$MOCK_LOG"
+}
+
+@test "apply_defaults writes every key when there is no skip file" {
+  cat > "$TEST_DOTFILES/data/macos-defaults.json" <<'JSON'
+[
+  {"domain": "com.apple.screencapture", "key": "show-thumbnail", "type": "bool", "value": false, "section": "Screenshots", "script": "core"}
+]
+JSON
+  source "$TEST_DOTFILES/lib/apply-defaults.sh"
+  apply_defaults core
+  grep -q 'write com.apple.screencapture show-thumbnail -bool false' "$MOCK_LOG"
+}
+
+@test "apply_defaults skips a listed key that contains spaces" {
+  cat > "$TEST_DOTFILES/data/macos-defaults.json" <<'JSON'
+[
+  {"domain": "com.apple.assistant.support", "key": "Assistant Enabled", "type": "bool", "value": false, "section": "Siri", "script": "core"},
+  {"domain": "com.apple.screencapture", "key": "type", "type": "string", "value": "png", "section": "Screenshots", "script": "core"}
+]
+JSON
+  mkdir -p "$HOME/.config/dotfiles"
+  printf 'com.apple.assistant.support Assistant Enabled\r\n' > "$HOME/.config/dotfiles/macos-defaults-skip"
+  source "$TEST_DOTFILES/lib/apply-defaults.sh"
+  apply_defaults core
+  run grep -c 'Assistant Enabled' "$MOCK_LOG"
+  [ "$output" = 0 ]
+  grep -q 'write com.apple.screencapture type -string png' "$MOCK_LOG"
+}
+
+@test "an unreadable skip file cannot abort a set -euo pipefail apply" {
+  [ "$(id -u)" -ne 0 ] || skip "root reads any file"
+  cat > "$TEST_DOTFILES/data/macos-defaults.json" <<'JSON'
+[
+  {"domain": "com.apple.screencapture", "key": "type", "type": "string", "value": "png", "section": "Screenshots", "script": "core"}
+]
+JSON
+  mkdir -p "$HOME/.config/dotfiles"
+  printf 'com.apple.screencapture type\n' > "$HOME/.config/dotfiles/macos-defaults-skip"
+  chmod 000 "$HOME/.config/dotfiles/macos-defaults-skip"
+  run bash -c "set -euo pipefail; source '$TEST_DOTFILES/lib/apply-defaults.sh'; apply_defaults core; echo reached-end"
+  chmod 600 "$HOME/.config/dotfiles/macos-defaults-skip"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *reached-end* ]]
+  grep -q 'write com.apple.screencapture type -string png' "$MOCK_LOG"
+}
+
+@test "with no skip file every row of the real data is written" {
+  cp "$REAL_DEFAULTS_JSON" "$TEST_DOTFILES/data/macos-defaults.json"
+  for s in core visual apps; do
+    (source "$TEST_DOTFILES/lib/apply-defaults.sh"; apply_defaults "$s")
+  done
+  rows="$(jq '[.[] | select(.script == "core" or .script == "visual" or .script == "apps")] | length' "$REAL_DEFAULTS_JSON")"
+  [ "$rows" -gt 0 ]
+  [ "$(wc -l < "$MOCK_LOG" | tr -d ' ')" -eq "$rows" ]
+}

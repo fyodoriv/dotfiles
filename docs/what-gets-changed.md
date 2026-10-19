@@ -46,6 +46,8 @@ These files in the repo's `home/` directory are symlinked into `~/`:
 
 Applied via `defaults write` in chezmoi lifecycle scripts. All settings are defined in `data/macos-defaults.json` and split into three tiers:
 
+To keep one of your own settings, list it in `~/.config/dotfiles/macos-defaults-skip`, one `domain key` per line (for example `com.apple.screencapture show-thumbnail`; the key may contain spaces). Applies never write a listed key. Run `defaults delete <domain> <key>` once to get the macOS default back. If `dotfiles doctor` checks that key, also add its check ID to the doctor overrides.
+
 ### Core defaults (all profiles)
 
 | Category | Count | Key changes |

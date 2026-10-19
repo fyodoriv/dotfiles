@@ -676,6 +676,13 @@ exists, ship/preserve/report it instead of deleting.
 
 ### Local branches and stashes
 
+Squash-merged branches are not ancestors of the default branch, so the safe
+lowercase delete refuses them, and the `block-dangerous-git` hook blocks the
+forced delete. Do not work around the hook. Prove each one redundant
+(`gh pr view <n> --json state` is MERGED and no open PR uses the branch), then
+list them in the report under "Needs you" with one forced-delete command for the
+owner to run.
+
 Owner rule: clean up local branches and stashes whenever it is safe. Do not
 wait to be asked. Research every local branch and stash in each repo you
 touched, plus every approved-family checkout the run inventoried:

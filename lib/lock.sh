@@ -76,8 +76,23 @@ acquire_lock() {
       return 1
     fi
 
-    local lock_pid lock_caller
+    local lock_pid lock_caller tries=0 fresh_empty
     lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "")
+    # The winner creates the file, then writes its PID. An empty, fresh file
+    # is a write in progress, not a stale lock: wait briefly for the PID, and
+    # if it never comes while the file is young, treat the lock as held.
+    # Judge freshness once, before waiting: mtime has one-second resolution,
+    # so re-checking the age inside the wait could flip a held lock to stale.
+    [ -z "$lock_pid" ] && [ "$(_lock_age)" -lt 2 ] && fresh_empty=1 || fresh_empty=0
+    while [ "$fresh_empty" = 1 ] && [ -z "$lock_pid" ] && [ -e "$DOTFILES_LOCK" ]; do
+      if [ "$tries" -ge 10 ]; then
+        warn "[lock] Skipping — another dotfiles command is taking the lock — fix: wait for it to finish, then run again"
+        return 1
+      fi
+      sleep 0.1
+      tries=$((tries + 1))
+      lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "")
+    done
     lock_caller=$(sed -n '2p' "$DOTFILES_LOCK" 2>/dev/null || echo "unknown")
     lock_caller="${lock_caller:-unknown}"
 

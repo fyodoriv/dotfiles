@@ -138,6 +138,26 @@ EOF
   [ "$failures" -eq $((worker_count - 1)) ]
 }
 
+@test "a lock file still being written (empty, fresh) counts as held" {
+  # acquire_lock creates the file, then writes the PID. Between the two, a
+  # second caller saw an empty PID, took it as stale, and also won the lock.
+  source "$LOCK_LIB"
+  : > "$DOTFILES_LOCK"
+  run acquire_lock "second-caller"
+  [ "$status" -eq 1 ] || { echo "stole a lock that was still being written: $output"; return 1; }
+  [ -f "$DOTFILES_LOCK" ]
+  [ ! -s "$DOTFILES_LOCK" ]
+}
+
+@test "an empty lock file left by a crash is stale once it is old" {
+  source "$LOCK_LIB"
+  : > "$DOTFILES_LOCK"
+  touch -t 202001010000 "$DOTFILES_LOCK"
+  run acquire_lock "new-caller"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stale lock"* ]]
+}
+
 @test "acquire_lock steals stale lock (dead PID)" {
   source "$LOCK_LIB"
   # Use a PID that's certainly dead

@@ -8,6 +8,7 @@
 #   dotfiles metrics [--days N] [--share FILE]
 #   dotfiles metrics --table
 #   dotfiles metrics --baseline
+#   dotfiles metrics --gains
 #
 # Flags:
 #   --days N      Window in days (default: 7).
@@ -18,6 +19,10 @@
 #                 (stub), never a made-up 0.
 #   --baseline    Print zsh start median, free disk, and LaunchAgent count:
 #                 the same lines `dotfiles-install plan` shows before install.
+#   --gains       Compare this Mac now with the install receipt that
+#                 `dotfiles-install run` saved: zsh start, free disk,
+#                 LaunchAgents, time to configured, and automation minutes
+#                 since the install (an estimate).
 #   --help, -h    Print this message.
 set -euo pipefail
 
@@ -37,7 +42,11 @@ while [ "$#" -gt 0 ]; do
       # shellcheck source=../lib/mac-baseline.sh
       source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib/mac-baseline.sh"
       baseline_report ""; exit 0 ;;
-    --help|-h) sed -n '2,22p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    --gains)
+      # shellcheck source=../lib/mac-baseline.sh
+      source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib/mac-baseline.sh"
+      gains_report; exit $? ;;
+    --help|-h) sed -n '2,25p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "dotfiles metrics: unknown flag $1" >&2; exit 2 ;;
   esac
 done

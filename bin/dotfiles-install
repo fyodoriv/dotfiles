@@ -247,6 +247,7 @@ do_restore() {
 }
 
 critical() {
+  receipt_finish false "$1"
   say ""
   say "✗ Critical error during $1. Restoring your previous setup..."
   if do_restore "$BACKUP_ID"; then
@@ -280,6 +281,8 @@ cmd_run() {
   done
   [ "$yes" -eq 1 ] || { say "Show the plan first (dotfiles-install plan), then rerun with --yes."; exit 2; }
   case "$profile" in core|full) ;; *) say "--profile must be core or full"; exit 2 ;; esac
+  # Before anything changes: the "before" half of the install receipt.
+  receipt_begin "$profile"
 
   step "1/6 Check prerequisites"
   preflight install || { say "Install the missing tools above, then run again. Nothing was changed."; exit 1; }
@@ -331,10 +334,12 @@ cmd_run() {
     say "  skipped (you chose not to install agentbrew)"
   fi
 
+  receipt_finish true
   step "Done"
   say "dotfiles is installed. Backup: $dir"
   say "Undo any time: bash $REPO_DIR/bin/dotfiles-install restore $BACKUP_ID"
   say "Open a new terminal to load the new shell. See how it runs: dotfiles metrics"
+  say "In a week, see what changed since the install: dotfiles metrics --gains"
   say ""
   say "Found something to fix in dotfiles while installing? Send it upstream:"
   say "  cd $REPO_DIR && git switch -c fix/<short-name>"

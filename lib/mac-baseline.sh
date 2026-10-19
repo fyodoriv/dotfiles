@@ -47,3 +47,84 @@ baseline_report() {
   printf '%sFree disk: %s GB\n' "$pad" "$(baseline_free_gb)"
   printf '%sLaunchAgents: %s in ~/Library/LaunchAgents\n' "$pad" "$(baseline_launchagents)"
 }
+
+# ── Install receipt ──────────────────────────────────────────────────────
+# The before/after record of one install, so `dotfiles metrics --gains` can
+# show what changed. Plain shell, no jq: the snapshot is taken at the very
+# start of `run`, before preflight installs anything (jq included).
+# Files (state-dir scope, kept until the user deletes them):
+#   install-before.json   the first snapshot; never overwritten, so it stays
+#                         pre-install even when `run` is repeated
+#   install-receipt.json  profile + that snapshot + the latest run's outcome
+
+receipt_dir() { printf '%s/dotfiles' "${XDG_STATE_HOME:-$HOME/.local/state}"; }
+
+_receipt_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# receipt_begin <profile>: take the before snapshot once, and start the clock.
+receipt_begin() {
+  local dir ms
+  dir="$(receipt_dir)"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  RECEIPT_PROFILE="$1"
+  RECEIPT_STARTED_AT="$(_receipt_now)"
+  RECEIPT_START_S="$(date +%s)"
+  if [ ! -s "$dir/install-before.json" ]; then
+    ms="$(baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || ms=""
+    printf '{"taken_at":"%s","zsh_ms":%s,"free_gb":%s,"launchagents":%s}\n' \
+      "$RECEIPT_STARTED_AT" "${ms:-null}" "$(baseline_free_gb)" "$(baseline_launchagents)" \
+      >"$dir/install-before.json" 2>/dev/null || true
+  fi
+}
+
+# receipt_finish <ok:true|false> [failed step]: write the receipt. Never fails
+# the install: a receipt is a record, not a step.
+receipt_finish() {
+  [ -n "${RECEIPT_START_S:-}" ] || return 0
+  local dir before failed=""
+  dir="$(receipt_dir)"
+  before="$(cat "$dir/install-before.json" 2>/dev/null)" || before=""
+  [ -n "$before" ] || before="null"
+  # Step names come from this script; keep JSON safe anyway.
+  [ -z "${2:-}" ] || failed=",\"failed_step\":\"$(printf '%s' "$2" | tr -d '"\\')\""
+  printf '{"profile":"%s","before":%s,"run":{"started_at":"%s","finished_at":"%s","seconds":%s,"ok":%s%s}}\n' \
+    "${RECEIPT_PROFILE:-core}" "$before" "$RECEIPT_STARTED_AT" "$(_receipt_now)" \
+    "$(($(date +%s) - RECEIPT_START_S))" "$1" "$failed" >"$dir/install-receipt.json" 2>/dev/null || true
+  RECEIPT_START_S=""
+}
+
+# gains_report: before (from the receipt) vs now, time to configured, and the
+# automation minutes since the install. Needs jq, which the install adds.
+gains_report() {
+  local receipt stats before_ms before_gb before_la now_ms now_gb now_la secs ok finished saved
+  receipt="$(receipt_dir)/install-receipt.json"
+  if [ ! -s "$receipt" ]; then
+    printf 'No install receipt yet. dotfiles-install run saves one; then run this again.\n'
+    return 0
+  fi
+  command -v jq >/dev/null 2>&1 || { printf 'dotfiles metrics --gains needs jq (brew install jq).\n'; return 1; }
+  before_ms="$(jq -r '.before.zsh_ms // "n/a"' "$receipt")"
+  before_gb="$(jq -r '.before.free_gb // "n/a"' "$receipt")"
+  before_la="$(jq -r '.before.launchagents // "n/a"' "$receipt")"
+  secs="$(jq -r '.run.seconds // empty' "$receipt")"
+  ok="$(jq -r '.run.ok // empty' "$receipt")"
+  finished="$(jq -r '.run.finished_at // empty' "$receipt")"
+  now_ms="$(baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || now_ms="n/a"
+  now_gb="$(baseline_free_gb)"
+  now_la="$(baseline_launchagents)"
+
+  printf 'Since the install (%s, profile %s)\n' "$(jq -r '.before.taken_at // "unknown"' "$receipt")" "$(jq -r '.profile' "$receipt")"
+  printf '%-22s %10s %10s\n' "Metric" "Before" "Now"
+  printf '%-22s %10s %10s\n' "zsh start (ms)" "$before_ms" "${now_ms:-n/a}"
+  printf '%-22s %10s %10s\n' "Free disk (GB)" "$before_gb" "$now_gb"
+  printf '%-22s %10s %10s\n' "LaunchAgents" "$before_la" "$now_la"
+  if [ -n "$secs" ]; then
+    if [ "$secs" -ge 60 ]; then printf 'Time to configured: %s min' "$(((secs + 30) / 60))"; else printf 'Time to configured: %s s' "$secs"; fi
+    [ "$ok" = "true" ] && printf '\n' || printf ' (the run did not finish: %s)\n' "$(jq -r '.run.failed_step // "unknown step"' "$receipt")"
+  fi
+  stats="${DOTFILES_STATS_FILE:-$HOME/.dotfiles-stats.jsonl}"
+  if [ -n "$finished" ] && [ -s "$stats" ]; then
+    saved="$(jq -rs --arg t "$finished" '[.[] | select((.timestamp // "") >= $t) | (.seconds_saved // 0)] | add // 0 | (. / 60 | floor)' "$stats" 2>/dev/null)" || saved=""
+    [ -z "$saved" ] || printf 'Automation since the install: %s min saved (estimate: each script adds a fixed time per run)\n' "$saved"
+  fi
+}

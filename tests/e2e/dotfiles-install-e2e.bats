@@ -40,6 +40,15 @@ teardown() { rm -rf "$SCRATCH"; }
   ls "$home/.local/state/dotfiles/install-backups"/*/files.tar.gz >/dev/null
   # It ends by pointing at the fork-PR path.
   grep -q 'dotfiles contribute' "$SCRATCH/run.log"
+  # The install receipt holds real before numbers and the outcome.
+  local receipt="$home/.local/state/dotfiles/install-receipt.json"
+  jq -e '.run.ok == true and .run.seconds >= 0 and .profile == "core"' "$receipt"
+  jq -e '.before.zsh_ms > 0 and .before.free_gb > 0 and .before.launchagents == 0' "$receipt"
+  # And metrics --gains turns it into a before/now table.
+  run env HOME="$home" XDG_STATE_HOME="$home/.local/state" DOTFILES_BASELINE_ZSH_RUNS=1 \
+    bash "$REPO/bin/dotfiles-metrics" --gains
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"Before"*"Now"* ]] && [[ "$output" == *"Time to configured:"* ]] || { echo "$output"; return 1; }
 }
 
 @test "US01 e2e: a failure after files were written restores the Mac by itself" {
@@ -48,6 +57,8 @@ teardown() { rm -rf "$SCRATCH"; }
   [ "$status" -eq 1 ]
   local home="$SCRATCH/home"
   grep -q 'Critical error during chezmoi apply' "$SCRATCH/run.log"
+  # The receipt survives the restore and names the failed step.
+  jq -e '.run.ok == false and .run.failed_step == "chezmoi apply"' "$SCRATCH/home/.local/state/dotfiles/install-receipt.json"
   grep -q 'Restored files, LaunchAgents, chezmoi config, and macOS settings' "$SCRATCH/run.log"
   [ "$(cat "$home/.zshrc")" = "# e2e original zshrc" ]
   [ "$(cat "$home/.gitconfig")" = "$(printf '[user]\n\tname = Original')" ]

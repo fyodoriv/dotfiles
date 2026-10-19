@@ -44,8 +44,10 @@ Show the person, in your own short words:
   installed` is a tool that `run` installs with Homebrew; `plan` installs
   nothing,
 - their Mac today, from the "Your Mac today" lines: zsh start median, free
-  disk, LaunchAgents, and the disk the chosen profile will use (after the
-  install, `dotfiles metrics --baseline` prints the same lines to compare),
+  disk, LaunchAgents, and the disk the chosen profile will use. `run` saves
+  the same numbers before it changes anything, in an install receipt
+  (`~/.local/state/dotfiles/install-receipt.json`, with the time to
+  configured); later, `dotfiles metrics --gains` prints before vs now,
 - what will change: shell and git config, Homebrew packages, macOS settings,
   background jobs, then agentbrew,
 - that a backup is made first: config files, LaunchAgents, the chezmoi

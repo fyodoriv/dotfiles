@@ -979,6 +979,7 @@ dotfiles install plan|run|restore                 One-step install with backup a
 dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP health, machine load (local only)
 dotfiles metrics --table                         Every docs/metrics.md metric: value, goal, pivot ((stub) if no data)
 dotfiles metrics --baseline                      zsh start median, free disk, LaunchAgent count (same lines as install plan)
+dotfiles metrics --gains                         Before vs now from the install receipt, time to configured, minutes saved (estimate)
 dotfiles contribute [--repo agentbrew|PATH]       Open a PR upstream from your branch; forks the repo for you
 dotfiles edit                                     Open dotfiles repo in $EDITOR
 dotfiles cheat                                    Command reference card

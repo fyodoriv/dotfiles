@@ -117,6 +117,56 @@ teardown() { rm -rf "$TEST_DIR"; }
   [[ "$output" =~ Expected\ disk\ use\ \(full\):\ about\ [0-9.]+\ GB ]] || { echo "$output"; return 1; }
 }
 
+@test "run saves an install receipt: the before snapshot, its time, and the outcome" {
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  receipt="$XDG_STATE_HOME/dotfiles/install-receipt.json"
+  [ -f "$receipt" ] || { echo "no receipt at $receipt"; return 1; }
+  jq -e '.profile == "core"' "$receipt"
+  jq -e '(.before.zsh_ms | type) == "number" and (.before.free_gb | type) == "number"' "$receipt"
+  # The snapshot is taken before apply adds com.dotfiles.sync.plist.
+  jq -e '.before.launchagents == 0' "$receipt"
+  jq -e '.run.ok == true and (.run.seconds | type) == "number" and .run.seconds >= 0' "$receipt"
+  jq -e '(.before.taken_at | type) == "string" and (.run.finished_at | type) == "string"' "$receipt"
+}
+
+@test "a failed run records the failure in the receipt" {
+  FAIL_APPLY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  jq -e '.run.ok == false and .run.failed_step == "chezmoi apply"' "$XDG_STATE_HOME/dotfiles/install-receipt.json"
+}
+
+@test "a second run keeps the first before snapshot" {
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  first="$(jq -r '.before.taken_at' "$XDG_STATE_HOME/dotfiles/install-receipt.json")"
+  sleep 1
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ]
+  jq -e --arg t "$first" '.before.taken_at == $t and .before.launchagents == 0' "$XDG_STATE_HOME/dotfiles/install-receipt.json"
+}
+
+@test "metrics --gains shows before vs now, time to configured, and labels estimates" {
+  mkdir -p "$XDG_STATE_HOME/dotfiles"
+  printf '%s\n' '{"profile":"core","before":{"taken_at":"2026-10-01T10:00:00Z","zsh_ms":400,"free_gb":200.5,"launchagents":3},"run":{"started_at":"2026-10-01T10:00:00Z","finished_at":"2026-10-01T10:14:00Z","seconds":840,"ok":true}}' \
+    > "$XDG_STATE_HOME/dotfiles/install-receipt.json"
+  printf '%s\n' '{"task":"sync","timestamp":"2026-10-05T10:00:00Z","seconds_saved":120,"units":1}' \
+    '{"task":"sync","timestamp":"2026-09-01T10:00:00Z","seconds_saved":999,"units":1}' > "$HOME/.dotfiles-stats.jsonl"
+  run bash "$REPO/bin/dotfiles-metrics" --gains
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"zsh start"*"400"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"LaunchAgents"*"3"* ]]
+  [[ "$output" == *"Time to configured: 14 min"* ]]
+  # Only stats rows after the install count, and they are called estimates.
+  [[ "$output" == *"2 min"*"estimate"* ]] || { echo "$output"; return 1; }
+  [[ "$output" != *"999"* ]]
+}
+
+@test "metrics --gains without a receipt says how to get one" {
+  run bash "$REPO/bin/dotfiles-metrics" --gains
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No install receipt yet"*"dotfiles-install run"* ]]
+}
+
 @test "run refuses without --yes" {
   run bash "$REPO/bin/dotfiles-install" run
   [ "$status" -eq 2 ]

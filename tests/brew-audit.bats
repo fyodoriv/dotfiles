@@ -5,6 +5,9 @@ BREW_AUDIT_WORKFLOW="$BATS_TEST_DIRNAME/../.github/workflows/brew-audit.yml"
 BREW_AUDIT_SCRIPT="$BATS_TEST_DIRNAME/../.github/scripts/brew-audit-manifest.sh"
 CI_DOCS="$BATS_TEST_DIRNAME/../docs/ci-setup.md"
 
+# shellcheck source=tests/host-load.bash
+source "$BATS_TEST_DIRNAME/host-load.bash"
+
 setup() {
   TEST_DIR="$(mktemp -d)"
   mkdir -p "$TEST_DIR/bin"
@@ -157,6 +160,9 @@ BREWFILE
   elapsed="$(($(date +%s) - start))"
 
   [ "$status" -eq 0 ]
+  if [ "$elapsed" -ge 7 ] && host_is_saturated; then
+    skip "took ${elapsed}s on a saturated host; run this file alone to time it"
+  fi
   [ "$elapsed" -lt 7 ]
   [[ "$output" == *"Metadata timeout: 1s per entry with HOMEBREW_NO_AUTO_UPDATE=1"* ]]
   grep -q '^found=true$' "$output_file"

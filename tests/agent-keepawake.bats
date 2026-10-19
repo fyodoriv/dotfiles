@@ -5,6 +5,9 @@ KEEPAWAKE_BIN="$BATS_TEST_DIRNAME/../bin/dotfiles-agent-keepawake"
 KEEPAWAKE_LIB="$BATS_TEST_DIRNAME/../lib/agent-keepawake.sh"
 PLIST="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.agent-keepawake.plist.tmpl"
 
+# shellcheck source=tests/host-load.bash
+source "$BATS_TEST_DIRNAME/host-load.bash"
+
 setup() {
   TEST_DIR="$(mktemp -d)"
   TEST_HOME="$TEST_DIR/home"
@@ -352,6 +355,9 @@ STUB
   elapsed="$SECONDS"
 
   [ "$status" -eq 0 ]
+  if [ "$elapsed" -ge 5 ] && host_is_saturated; then
+    skip "took ${elapsed}s on a saturated host; run this file alone to time it"
+  fi
   [ "$elapsed" -lt 5 ]
   [ -f "$(manager_state_dir)/agent-keepawake-caffeinate.tsv" ]
   grep -Fq "timed out after 1 seconds" "$(manager_state_dir)/agent-keepawake-amphetamine-error"

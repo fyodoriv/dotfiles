@@ -18,7 +18,7 @@ set -eu
 # agentbrew ships them off by default; only the owner's Macs
 # (owner_machine) turn them on. A new user gets none of them.
 # DOTFILES_OVERLAY_HOOKS replaces the list (tests use it).
-HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs async-human-comms-blocks jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint{{ end }}}"
+HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs async-human-comms-blocks jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint usage-tip{{ end }}}"
 
 input=$(cat)
 

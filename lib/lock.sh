@@ -52,16 +52,18 @@ acquire_lock() {
   lock_parent=$(dirname "$DOTFILES_LOCK")
 
   while true; do
-    # noclobber turns the lock write into an atomic create instead of a
-    # check-then-write race between concurrent dotfiles commands.
-    if (
-      set -o noclobber
-      printf '%s\n%s\n' "$$" "$caller" > "$DOTFILES_LOCK"
-    ) 2>/dev/null; then
+    # Write the PID to a private temp file, then hard-link it into place.
+    # `ln` fails if the lock exists, so exactly one caller wins, and the lock
+    # file never exists without its PID (no empty-file window to misread).
+    local tmp_lock="$DOTFILES_LOCK.$$.tmp"
+    if printf '%s\n%s\n' "$$" "$caller" > "$tmp_lock" 2>/dev/null &&
+      ln "$tmp_lock" "$DOTFILES_LOCK" 2>/dev/null; then
+      rm -f "$tmp_lock"
       # shellcheck disable=SC2064 # expand $DOTFILES_LOCK at registration so cleanup still works after the variable is unset
       trap "rm -f '$DOTFILES_LOCK'" EXIT
       return 0
     fi
+    rm -f "$tmp_lock"
 
     if [ ! -e "$DOTFILES_LOCK" ]; then
       if [ -d "$lock_parent" ]; then
@@ -78,12 +80,12 @@ acquire_lock() {
 
     local lock_pid lock_caller tries=0 fresh_empty
     lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "")
-    # The winner creates the file, then writes its PID. An empty, fresh file
-    # is a write in progress, not a stale lock: wait briefly for the PID, and
+    # An empty, fresh file is a write in progress (older dotfiles versions
+    # created the file before writing its PID), not a stale lock: wait briefly for the PID, and
     # if it never comes while the file is young, treat the lock as held.
     # Judge freshness once, before waiting: mtime has one-second resolution,
     # so re-checking the age inside the wait could flip a held lock to stale.
-    [ -z "$lock_pid" ] && [ "$(_lock_age)" -lt 2 ] && fresh_empty=1 || fresh_empty=0
+    [ -z "$lock_pid" ] && [ "$(_lock_age)" -lt 10 ] && fresh_empty=1 || fresh_empty=0
     while [ "$fresh_empty" = 1 ] && [ -z "$lock_pid" ] && [ -e "$DOTFILES_LOCK" ]; do
       if [ "$tries" -ge 10 ]; then
         warn "[lock] Skipping — another dotfiles command is taking the lock — fix: wait for it to finish, then run again"

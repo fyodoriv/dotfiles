@@ -53,6 +53,30 @@ CAPS_ONLY='(
   grep -q 'UserKeyMapping":\[\]' "$HIDUTIL_LOG"
 }
 
+# Real `hidutil property --get` output: one row per HID service, so a single
+# Caps Lock → Control remap shows up many times.
+CAPS_MULTI='RegistryID  Key                   Value
+1000009cc   UserKeyMapping   (
+        {
+        HIDKeyboardModifierMappingDst = 30064771296;
+        HIDKeyboardModifierMappingSrc = 30064771129;
+    }
+)
+1000008b2   UserKeyMapping   (null)
+100000a5c   UserKeyMapping   (
+        {
+        HIDKeyboardModifierMappingDst = 30064771296;
+        HIDKeyboardModifierMappingSrc = 30064771129;
+    }
+)'
+
+@test "capslock_control=false clears the remap when hidutil lists it once per device" {
+  CAPSLOCK_CONTROL=false HIDUTIL_MAPPING="$CAPS_MULTI"
+  run capslock_clear_live_mapping
+  [ "$status" -eq 0 ]
+  grep -q 'UserKeyMapping":\[\]' "$HIDUTIL_LOG"
+}
+
 @test "capslock_control=false leaves other remaps alone and warns" {
   CAPSLOCK_CONTROL=false
   HIDUTIL_MAPPING='({HIDKeyboardModifierMappingDst=30064771296;HIDKeyboardModifierMappingSrc=30064771129;},{HIDKeyboardModifierMappingDst=30064771113;HIDKeyboardModifierMappingSrc=30064771300;})'

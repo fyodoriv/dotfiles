@@ -239,19 +239,21 @@ done
 # ── Caps Lock opt-out — clear the live remap too ────────────────────
 # Unloading com.dotfiles.capslock-control does not undo the hidutil mapping it
 # set at login. Clear it, but only when Caps Lock → Control is the only remap:
-# other remaps are the person's own.
+# other remaps are the person's own. hidutil lists the mapping once per HID
+# device, so compare the distinct source and target keys, not the row count.
 capslock_clear_live_mapping() {
   [ "${CAPSLOCK_CONTROL:-true}" = "false" ] || return 0
   command -v hidutil >/dev/null 2>&1 || return 0
-  local mapping
-  mapping="$(hidutil property --get UserKeyMapping 2>/dev/null | tr -d ' \n')" || return 0
+  local mapping srcs dsts
+  mapping="$(hidutil property --get UserKeyMapping 2>/dev/null)" || return 0
   # 30064771129 = 0x700000039 (Caps Lock), 30064771296 = 0x7000000E0 (Left Control)
-  case "$mapping" in
+  srcs="$(printf '%s\n' "$mapping" | grep -oE 'MappingSrc *= *[0-9]+' | grep -oE '[0-9]+$' | sort -u || true)"
+  dsts="$(printf '%s\n' "$mapping" | grep -oE 'MappingDst *= *[0-9]+' | grep -oE '[0-9]+$' | sort -u || true)"
+  case "$srcs" in
     *30064771129*) ;;
     *) return 0 ;;
   esac
-  if [ "$(printf '%s' "$mapping" | grep -o 'HIDKeyboardModifierMappingSrc' | wc -l | tr -d ' ')" = "1" ] \
-    && printf '%s' "$mapping" | grep -q 30064771296; then
+  if [ "$srcs" = "30064771129" ] && [ "$dsts" = "30064771296" ]; then
     hidutil property --set '{"UserKeyMapping":[]}' >/dev/null 2>&1 \
       && echo "✓ Caps Lock works as Caps Lock again (cleared the live Control remap)"
   else

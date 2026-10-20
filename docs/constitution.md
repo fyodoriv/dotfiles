@@ -125,8 +125,8 @@ directly.
 - **Org-gated MCPs DO NOT belong here.** Any MCP whose runtime depends on
   org-internal infrastructure (corporate identity provider, internal API
   gateway, behind-VPN endpoint, marketplace entitlement) goes into the
-  org's overlay Agentfile (e.g. `~/apps/dotfiles-<org>/Agentfile.yaml`)
-  loaded via the `EXTRA_AGENTFILE` hook. The litmus test: if a fresh
+  org's company plugin Agentfile (`contributes.agentbrew`, see
+  `docs/plugins.md`). The litmus test: if a fresh
   contributor outside the org runs `dotfiles apply`, does the MCP work?
   If no, it goes in the overlay. The `tests/no-internal-refs.bats` guard
   catches configured private identifiers when a private overlay supplies

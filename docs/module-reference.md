@@ -435,7 +435,7 @@ checks apply to any user with Chrome.
 |----|---------------|----------|
 | `claude.settings_mcp_allowed` | MCP server allowed in settings | `agentbrew sync` |
 
-Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in the overlay repo's `modules/claude-<org>/doctor.sh` and are auto-discovered via the `EXTRA_DOCTOR_DIR` hook.
+Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in a company plugin's `contributes.doctor_modules` (see [plugins.md](plugins.md)).
 
 ### local-ai (conditional)
 

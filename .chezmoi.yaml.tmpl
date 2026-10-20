@@ -15,10 +15,6 @@
 {{- if hasKey . "brew_skip" -}}
 {{-   $brewSkip = .brew_skip -}}
 {{- end -}}
-{{- $extraOverlayRoot := "" -}}
-{{- if hasKey . "extra_overlay_root" -}}
-{{-   $extraOverlayRoot = .extra_overlay_root -}}
-{{- end -}}
 {{- $claudeRemoteControl := false -}}
 {{- if hasKey . "claude_remote_control" -}}
 {{-   $claudeRemoteControl = .claude_remote_control -}}
@@ -171,9 +167,6 @@ data:
   git_personal_enabled: {{ $gitPersonalEnabled }}
   git_personal_name: {{ $gitPersonalName | quote }}
   git_personal_email: {{ $gitPersonalEmail | quote }}
-{{- if $extraOverlayRoot }}
-  extra_overlay_root: {{ $extraOverlayRoot | quote }}
-{{- end }}
 {{- if $claudeModel }}
   claude_model: {{ $claudeModel | quote }}
 {{- end }}

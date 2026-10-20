@@ -21,11 +21,7 @@ fi
 if [ "${DOTFILES_PROFILE:-full}" != "full" ] && [ ! -d "$_VC_APP" ]; then
   return 0 2>/dev/null || exit 0
 fi
-# shellcheck source=../../lib/plugin.sh
-source "$DOTFILES_DIR/lib/plugin.sh"
-_VC_OVERLAY_ROOT="$(plugin_overlay_root --no-discover 2>/dev/null || true)"
 _VC_EXT_LISTS=("$DOTFILES_DIR/vscode/extensions.txt")
-[ -n "$_VC_OVERLAY_ROOT" ] && [ -f "$_VC_OVERLAY_ROOT/vscode/extensions.txt" ] && _VC_EXT_LISTS+=("$_VC_OVERLAY_ROOT/vscode/extensions.txt")
 
 # ── VS Code installed ─────────────────────────────────────────────────────
 check "vscode.installed" \
@@ -41,16 +37,15 @@ check "vscode.cli" \
 # ── Settings.json (with optional per-machine override) ────────────────────
 _vc_settings_source="$DOTFILES_DIR/vscode/settings.json"
 _vc_generated_settings="$_VC_LOCAL/settings.generated.json"
-_vc_overlay_settings="$_VC_OVERLAY_ROOT/vscode/settings.json"
 if [ -f "$DOTFILES_DIR/vscode/settings.json" ]; then
   _vc_settings_source="$_vc_generated_settings"
   mkdir -p "$_VC_LOCAL"
-  python3 - "$DOTFILES_DIR/vscode/settings.json" "$_vc_settings_source" "$_vc_overlay_settings" <<'PY'
+  python3 - "$DOTFILES_DIR/vscode/settings.json" "$_vc_settings_source" <<'PY'
 import json
 import os
 import sys
 
-base_path, output_path, overlay_path = sys.argv[1:]
+base_path, output_path = sys.argv[1:]
 
 def merge(left, right):
     if isinstance(left, dict) and isinstance(right, dict):
@@ -75,8 +70,6 @@ if os.path.exists(output_path):
     for key in ("mcpServers", "mcp"):
         if key in current:
             merged[key] = merge(merged.get(key, {}), current[key])
-if os.path.exists(overlay_path):
-    merged = merge(merged, load(overlay_path))
 with open(output_path, "w", encoding="utf-8") as handle:
     json.dump(merged, handle, indent=2)
     handle.write("\n")

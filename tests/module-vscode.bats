@@ -91,44 +91,6 @@ _setup_vscode_installed() {
       > "$TEST_DOTFILES/modules/vscode/doctor.sh"
 }
 
-@test "vscode: overlay settings merge with base settings" {
-  _setup_vscode_installed
-  export EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay"
-  mkdir -p "$EXTRA_OVERLAY_ROOT/vscode"
-  printf '{"mcpServers": {"overlay": {"command": "overlay"}}}\n' > "$EXTRA_OVERLAY_ROOT/vscode/settings.json"
-  FIX_MODE=true
-
-  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
-
-  [ -f "$VC_LOCAL/settings.generated.json" ]
-  grep -q '"base"' "$VC_LOCAL/settings.generated.json"
-  grep -q '"overlay"' "$VC_LOCAL/settings.generated.json"
-  [ "$(readlink "$VC_USER_DIR/settings.json")" = "$VC_LOCAL/settings.generated.json" ]
-}
-
-@test "vscode: overlay settings relink stale source symlink when app is missing" {
-  mkdir -p "$VC_USER_DIR" "$TEST_DOTFILES/vscode" "$TEST_DOTFILES/modules/vscode"
-  printf '{"mcpServers": {"base": {"command": "base"}}}\n' > "$TEST_DOTFILES/vscode/settings.json"
-  printf '[]\n' > "$TEST_DOTFILES/vscode/keybindings.json"
-  printf '\n' > "$TEST_DOTFILES/vscode/extensions.txt"
-  ln -s "$TEST_DOTFILES/vscode/settings.json" "$VC_USER_DIR/settings.json"
-  export EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay"
-  mkdir -p "$EXTRA_OVERLAY_ROOT/vscode"
-  printf '{"mcpServers": {"overlay": {"command": "overlay"}}}\n' > "$EXTRA_OVERLAY_ROOT/vscode/settings.json"
-  sed -e "s|/Applications/Visual Studio Code.app|$VC_APP|" \
-      -e "s|\$HOME/Library/Application Support/Code/User|$VC_USER_DIR|" \
-      "$BATS_TEST_DIRNAME/../modules/vscode/doctor.sh" \
-      > "$TEST_DOTFILES/modules/vscode/doctor.sh"
-  FIX_MODE=true
-
-  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
-
-  [ -f "$VC_LOCAL/settings.generated.json" ]
-  grep -q '"overlay"' "$VC_LOCAL/settings.generated.json"
-  ! grep -q '"overlay"' "$TEST_DOTFILES/vscode/settings.json"
-  [ "$(readlink "$VC_USER_DIR/settings.json")" = "$VC_LOCAL/settings.generated.json" ]
-}
-
 @test "vscode: base settings materialize generated settings without overlay" {
   mkdir -p "$VC_USER_DIR" "$TEST_DOTFILES/vscode" "$TEST_DOTFILES/modules/vscode"
   printf '{"editor.fontSize": 15, "mcpServers": {"base": {"command": "base"}}}\n' > "$TEST_DOTFILES/vscode/settings.json"

@@ -30,7 +30,7 @@ STUB
   export NOTIFY_LOG="$TEST_DIR/notify.log"
   export PATH="$MOCK_BIN:$PATH"
   # Point at the fixture module dir (sibling to this test file)
-  export EXTRA_DOCTOR_DIR="$REPO_ROOT/tests/fixtures"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$REPO_ROOT/tests/fixtures"
 }
 
 _enable_doctor_notify() {
@@ -49,7 +49,7 @@ teardown() {
 
 @test "notification: failing-doctor fires terminal-notifier with check-ID preview" {
   _enable_doctor_notify
-  # Run the failing fixture under EXTRA_DOCTOR_DIR. dotfiles-doctor will
+  # Run the failing fixture under DOTFILES_DOCTOR_FIXTURE_DIR. dotfiles-doctor will
   # exit 1 because of the synthetic failure — that's expected; we care
   # about the notify side effect.
   run "$REPO_ROOT/bin/dotfiles-doctor" --module notification-fail-module
@@ -81,7 +81,7 @@ teardown() {
 
 @test "notification: default off — no terminal-notifier without DOTFILES_DOCTOR_NOTIFY=1" {
   unset DOTFILES_DOCTOR_NOTIFY
-  export EXTRA_DOCTOR_DIR="$REPO_ROOT/tests/fixtures"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$REPO_ROOT/tests/fixtures"
   run "$REPO_ROOT/bin/dotfiles-doctor" --module notification-fail-module
   [ "$status" -eq 1 ]
   [ ! -f "$NOTIFY_LOG" ] || [ ! -s "$NOTIFY_LOG" ]
@@ -98,7 +98,7 @@ check "notification-green-module.always_passes" \
   "true" \
   ""
 GREEN
-  export EXTRA_DOCTOR_DIR="$TEST_DIR/extra-doctor-dir"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra-doctor-dir"
   run "$REPO_ROOT/bin/dotfiles-doctor" --module notification-green-module
   [ "$status" -eq 0 ]
   # No notification on green runs — file should either not exist

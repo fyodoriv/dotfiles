@@ -19,7 +19,7 @@ See [../README.md](../../README.md) for installation and CLI reference.
 | 7 | [Git workflow helpers](07-git-workflow-helpers.md) | PR, hotfix, review scripts | `pr`, `hotfix`, `review` |
 | 8 | [Time saved by automation](08-time-saved-by-automation.md) | Runs, time saved, streak | `dotfiles stats` |
 | 9 | [Run AI coding agents on a local model](09-run-local-models-fast.md) | Local LLM fallback for agent loops | `dotfiles doctor --module local-llm` |
-| 10 | [Add your company's config without forking](10-fork-for-your-company.md) | Private overlay repo plugs in via `extra_overlay_root` | `dotfiles apply` |
+| 10 | [Add your company's config without forking](10-fork-for-your-company.md) | Signed, pinned company plugin (`dotfiles plugin add`) | `dotfiles apply` |
 
 ## Metric and Tests lines
 

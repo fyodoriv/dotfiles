@@ -110,7 +110,7 @@ Full design in [`SECURITY.md`](SECURITY.md).
 
 `Agentfile.yaml` at repo root declares the machine's MCP servers, skills, rules, and sources. On `chezmoi apply`, `.chezmoiscripts/run_after_agentbrew-sync.sh` runs `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` (or the `tsx ~/apps/agentbrew/src/cli.ts sync` fallback). The `agentbrew` doctor module verifies the result.
 
-The `EXTRA_AGENTFILE` env var loads an org overlay (`~/apps/dotfiles-<org>/Agentfile.yaml`) without forking the core repo. Org-gated MCPs DO NOT belong in this repo's Agentfile — see [`AGENTS.md` § "Agentfile Lifecycle"](AGENTS.md#agentfile-lifecycle).
+A company plugin adds an org Agentfile (`contributes.agentbrew`, [docs/plugins.md](docs/plugins.md)) without forking the core repo. Org-gated MCPs DO NOT belong in this repo's Agentfile — see [`AGENTS.md` § "Agentfile Lifecycle"](AGENTS.md#agentfile-lifecycle).
 
 ## Verification
 

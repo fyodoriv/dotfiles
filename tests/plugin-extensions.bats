@@ -11,9 +11,8 @@ setup() {
   export HOME="$TEST_DIR/home"
   export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share"
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-  export DOTFILES_PLUGINS_V2=1
   export MARKER="$TEST_DIR/ran"
-  unset EXTRA_OVERLAY_ROOT DOTFILES_PLUGINS_LOCK DOTFILES_PLUGINS_HOME
+  unset DOTFILES_PLUGINS_LOCK DOTFILES_PLUGINS_HOME
   mkdir -p "$HOME" "$TEST_DIR/stub"
   printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/stub/chezmoi"
   printf '#!/bin/sh\necho "brew $*" >> "%s"\n[ -z "${BREW_FAIL:-}" ]\n' "$MARKER" > "$TEST_DIR/stub/brew"

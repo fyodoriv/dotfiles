@@ -64,7 +64,7 @@ STUB
   export DOTFILES_REAL_GH="$GH_STUB"
   unset GH_HOST GH_REPO GH_TOKEN GITHUB_TOKEN MINSKY_PIPELINE \
     DOTFILES_ALLOW_GH_PRIVATE_REFS DOTFILES_GH_ALLOW_PRIVATE_REFS \
-    XDG_CONFIG_HOME EXTRA_OVERLAY_ROOT DOTFILES_REPOS_DIR \
+    XDG_CONFIG_HOME DOTFILES_REPOS_DIR \
     STUB_VISIBILITY STUB_PRIVATE_SLUGS STUB_LOOKUP_FAIL
   # Human context: no footer or PR-create approval rules in the way.
   unset AGENT_PUBLIC_WRITE_GUARD DEVIN_MODEL DEVIN_SESSION_ID \
@@ -339,8 +339,8 @@ YML
 
 @test "an overlay with no pattern file blocks a public write (issue #145 S1)" {
   mkdir -p "$HOME/apps/tooling/dotfiles-acme"
-  printf 'mcp: []\n' > "$HOME/apps/tooling/dotfiles-acme/Agentfile.yaml"
-  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
+  printf 'schema: 1\nname: acme\nversion: 1.0.0\n' > "$HOME/apps/tooling/dotfiles-acme/dotfiles-plugin.yaml"
+  XDG_CONFIG_HOME="$HOME/.config" bash "$REPO_ROOT/bin/dotfiles-plugin" add --dev "$HOME/apps/tooling/dotfiles-acme" --yes >/dev/null
   rm -f "$OSS_READINESS_ENV_FILE"
   run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "plain text"
   assert_blocked "overlay is installed"

@@ -3,7 +3,7 @@
 #
 # After the OSS split, the only check this module owns is the
 # `claude.model_wrapper` wrapper. Any company-specific branch lives in
-# an overlay module loaded via the EXTRA_DOCTOR_DIR hook.
+# a company plugin (docs/plugins.md).
 
 load test_helper
 

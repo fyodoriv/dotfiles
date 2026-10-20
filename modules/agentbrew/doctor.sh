@@ -34,15 +34,17 @@ _agentbrew_global_agentfile_in_sync() {
   local paths=()
   [ -f "$AGENTFILE" ] && paths+=("$AGENTFILE")
 
-  local extra_agentfile="${EXTRA_AGENTFILE:-}"
-  if [ -z "$extra_agentfile" ] && [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
-    # shellcheck source=../../lib/plugin.sh
-    source "$DOTFILES_DIR/lib/plugin.sh" 2>/dev/null || true
-    local rc=0
-    extra_agentfile="$(plugin_overlay_path Agentfile.yaml 2>/dev/null)" || rc=$?
-    [ "$rc" -ne 2 ] || return 1
+  # Company plugins add Agentfile layers (contributes.agentbrew).
+  if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+    local _plib _pf
+    for _plib in plugin plugin-capabilities plugin-extensions; do
+      # shellcheck source=/dev/null
+      source "$DOTFILES_DIR/lib/$_plib.sh"
+    done
+    while IFS= read -r _pf; do
+      [ -n "$_pf" ] && paths+=("$_pf")
+    done < <(plugin_agentfiles)
   fi
-  [ -n "$extra_agentfile" ] && [ -f "$extra_agentfile" ] && paths+=("$extra_agentfile")
   # Match run_after_agentbrew-sync.sh: same optional layers, same helper.
   if [ -f "$DOTFILES_DIR/lib/agentfile-layers.sh" ]; then
     # shellcheck source=../lib/agentfile-layers.sh

@@ -409,3 +409,17 @@ plugin_lint() {
   printf '%s\n' "$problems"
   return 1
 }
+
+# ── Agentfile layers ───────────────────────────────────────────────────
+# A plugin's contributes.agentbrew folder may hold Agentfile.yaml (data:
+# MCP servers, skills, rules). Prints each verified plugin's file, in lock
+# order, for dotfiles apply to merge before agentbrew sync.
+plugin_agentfiles() {
+  local name path dir
+  while IFS=$'\t' read -r name path; do
+    [ -n "$name" ] || continue
+    dir="$(plugin_contribution "$path" agentbrew)" || continue
+    [ -f "$dir/Agentfile.yaml" ] && printf '%s\n' "$dir/Agentfile.yaml"
+  done < <(plugin_verified_list 2>/dev/null)
+  return 0
+}

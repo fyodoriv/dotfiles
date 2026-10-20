@@ -34,7 +34,7 @@ EOF
   chmod +x "$fake_bin/python3" "$fake_bin/codesign" "$fake_bin/chezmoi"
 
   run env HOME="$BATS_TEST_TMPDIR/home" PATH="$fake_bin:/usr/bin:/bin" \
-    EXTRA_DOCTOR_DIR="$overlay_modules" \
+    DOTFILES_DOCTOR_FIXTURE_DIR="$overlay_modules" \
     bin/dotfiles-doctor --module mcp-orchestrator
 
   [ "$status" -eq 0 ]

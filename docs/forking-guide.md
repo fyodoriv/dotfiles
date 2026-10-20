@@ -108,28 +108,16 @@ If your company uses GitHub Enterprise:
 
 2. **Edit enterprise SSH config** — update `private_dot_ssh/config.enterprise.tmpl` with your organization's SSH hosts.
 
-## Authoring an organization overlay
+## Authoring an organization plugin
 
 Org-specific configuration (private Homebrew taps, internal MCP servers, custom
 doctor checks, role-based onboarding docs) does **not** belong in this OSS
 repo. The supported pattern is a signed, pinned **company plugin**:
 [plugins.md](plugins.md) (`dotfiles plugin new <org>`).
 
-Legacy v1 overlay (removed in the next major; convert with
-`dotfiles plugin migrate`): a repo named `dotfiles-<org>`, set explicitly with
-`EXTRA_OVERLAY_ROOT` or the chezmoi key `extra_overlay_root`. It is never
-auto-discovered. Hooks:
-
-| Hook                | Overlay path                | Loaded by                                            |
-| ------------------- | --------------------------- | ---------------------------------------------------- |
-| `EXTRA_DOCTOR_DIR`  | `modules/<name>/doctor.sh`  | `bin/dotfiles-doctor`                                |
-| `EXTRA_BREWFILE`    | `brewfile/Brewfile`         | `.chezmoiscripts/run_onchange_brew.sh.tmpl`          |
-| `EXTRA_VALIDATE_DIR`| `validate/<name>.sh`        | `bin/dotfiles-validate`                              |
-| `EXTRA_AGENTFILE`   | `Agentfile.yaml`            | `.chezmoiscripts/run_after_agentbrew-sync.sh`        |
-
-If the overlay isn't installed, every hook is a no-op — the OSS dotfiles
-repo works standalone exactly as the public release intends. When the
-overlay is present, its content layers on top.
+The v1 overlay (`EXTRA_*` variables, chezmoi `extra_*` keys) was removed. A
+leftover setting stops `dotfiles doctor`, `validate`, and `apply` with one
+line. Convert an old overlay with `dotfiles plugin migrate <dir>`.
 
 ## Customizing the enterprise module
 

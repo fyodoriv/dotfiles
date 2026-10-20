@@ -55,7 +55,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   printf 'check "fix-hint.auto" "has an auto-fix" "false" "true"\n' >> "$mod/doctor.sh"
   printf 'check "fix-hint.manual" "has no auto-fix" "false" ""\n' >> "$mod/doctor.sh"
   run env HOME="$TEST_DIR/home" DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl" DOTFILES_ERRORS_LOG=1 \
-    EXTRA_DOCTOR_DIR="$TEST_DIR/extra" "$REPO_ROOT/bin/dotfiles-doctor" --module fix-hint
+    DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra" "$REPO_ROOT/bin/dotfiles-doctor" --module fix-hint
   [ "$status" -eq 1 ]
   [[ "$output" == *"has an auto-fix — fix: dotfiles doctor --fix --module fix-hint"* ]]
   [[ "$output" == *"has no auto-fix — fix: no auto-fix; follow docs/module-reference.md (fix-hint)"* ]]
@@ -100,6 +100,6 @@ teardown() { rm -rf "$TEST_DIR"; }
   local mod="$TEST_DIR/extra/advisory-fix"
   mkdir -p "$mod"
   printf 'check_advisory "advisory-fix.w" "a warning with no remediation" "false" ""\n' > "$mod/doctor.sh"
-  run env HOME="$TEST_DIR/home" DOTFILES_STATS_LOG=0 EXTRA_DOCTOR_DIR="$TEST_DIR/extra" "$REPO_ROOT/bin/dotfiles-doctor" --module advisory-fix
+  run env HOME="$TEST_DIR/home" DOTFILES_STATS_LOG=0 DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra" "$REPO_ROOT/bin/dotfiles-doctor" --module advisory-fix
   [[ "$output" == *"a warning with no remediation"*"fix: "* ]] || { echo "$output"; return 1; }
 }

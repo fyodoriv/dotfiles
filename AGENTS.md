@@ -76,7 +76,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 
 ### Agentfile lifecycle
 
-`dotfiles apply` merges `Agentfile.yaml` with any overlay Agentfile into `~/.config/agentbrew/Agentfile.yaml` and runs `agentbrew sync`. Org-gated MCPs go in the overlay, never here. Never edit generated agent config under `~/.claude/`. Full text: [docs/constitution.md](docs/constitution.md#agentfile-lifecycle).
+`dotfiles apply` merges `Agentfile.yaml` with any plugin Agentfile into `~/.config/agentbrew/Agentfile.yaml` and runs `agentbrew sync`. Org-gated MCPs go in a plugin, never here. Never edit generated agent config under `~/.claude/`. Full text: [docs/constitution.md](docs/constitution.md#agentfile-lifecycle).
 
 ### Hook-based enforcement
 

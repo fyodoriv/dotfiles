@@ -177,29 +177,12 @@ else
 fi
 {{ end -}}
 
-# ── Optional overlay Brewfile ────────────────────────────────────
-# Organisation-specific overlays (a private repo at ~/apps/dotfiles-<org>/)
-# can plug an additional Brewfile in via $EXTRA_BREWFILE. Set explicitly
-# as an env var, or via chezmoi data key `extra_brewfile`. Skip silently
-# when neither is set or the file does not exist. Mirrors the
-# $EXTRA_DOCTOR_DIR convention in bin/dotfiles-doctor.
-#
-# Alternatively, $EXTRA_OVERLAY_ROOT (single-path) auto-derives the Brewfile
-# path as $EXTRA_OVERLAY_ROOT/brewfile/Brewfile when $EXTRA_BREWFILE is not
-# set explicitly. Colon-separated $EXTRA_OVERLAY_ROOT is rejected — one
-# overlay at a time. See docs/user-stories/10-fork-for-your-company.md.
-EXTRA_BREWFILE="${EXTRA_BREWFILE:-{{ dig "extra_brewfile" "" . }}}"
-if [ -z "$EXTRA_BREWFILE" ] && [ -f "{{ .chezmoi.sourceDir }}/lib/plugin.sh" ]; then
+# The v1 overlay Brewfile setting was removed (issue #145); a
+# leftover setting stops here with one clear line.
+if [ -f "{{ .chezmoi.sourceDir }}/lib/plugin.sh" ]; then
   # shellcheck source=/dev/null
   source "{{ .chezmoi.sourceDir }}/lib/plugin.sh"
-  _overlay_rc=0
-  EXTRA_BREWFILE="$(plugin_overlay_path --no-discover brewfile/Brewfile)" || _overlay_rc=$?
-  [ "$_overlay_rc" -ne 2 ] || exit 1
-fi
-if [ -n "$EXTRA_BREWFILE" ] && [ -f "$EXTRA_BREWFILE" ]; then
-  echo "→ Running overlay brew bundle from $EXTRA_BREWFILE..."
-  brew bundle --no-upgrade --file="$EXTRA_BREWFILE"
-  echo "✓ Overlay Brewfile applied"
+  plugin_v1_guard || exit 1
 fi
 
 # ── Company plugin Brewfiles (issue #145, step 6a) ───────────────

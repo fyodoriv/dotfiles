@@ -213,10 +213,7 @@ EOF
   grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
   mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
 
-  mkdir -p "$TEST_DIR/dotfiles-acme"
-  export EXTRA_OVERLAY_ROOT="$TEST_DIR/dotfiles-acme"
   echo "mcp: [context7]" > "$TEST_DOTFILES/Agentfile.yaml"
-  echo "mcp: [acme-internal-mcp]" > "$EXTRA_OVERLAY_ROOT/Agentfile.yaml"
   echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
   echo "mcp: [stale]" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
 
@@ -327,10 +324,7 @@ AGENTBREW_EOF
   grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
   mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
 
-  mkdir -p "$TEST_DIR/dotfiles-acme"
-  export EXTRA_OVERLAY_ROOT="$TEST_DIR/dotfiles-acme"
   echo "mcp: [context7]" > "$TEST_DOTFILES/Agentfile.yaml"
-  echo "mcp: [acme-internal-mcp]" > "$EXTRA_OVERLAY_ROOT/Agentfile.yaml"
   echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
   echo "mcp: [stale]" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
 

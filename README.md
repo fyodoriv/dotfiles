@@ -285,14 +285,23 @@ This repo works for any macOS team. To adopt it at your organization:
 
 1. **Fork the repo** and clone your fork
 2. **Edit `.chezmoi.yaml.tmpl`** — change `work_email_domain` and `github_enterprise_host` defaults to your organization
-3. **Keep organization-specific config out of the fork** — put it in an overlay repo; see [docs/forking-guide.md#authoring-an-organization-overlay](docs/forking-guide.md#authoring-an-organization-overlay)
+3. **Keep organization-specific config out of the fork** — put it in a signed company plugin; see [docs/plugins.md](docs/plugins.md)
 4. **Customize the Brewfile** — add or remove packages in `.chezmoiscripts/run_onchange_brew.sh.tmpl`
 5. **Run `dotfiles doctor`** to verify your customized fork works
 6. **Run `dotfiles validate` before sharing** — see the [adoption checklist](docs/adoption-checklist.md#4-write-team-specific-docs) and [team rollout guide](docs/team-onboarding.md#pre-announcement-validation-gate)
 
-Enterprise mode (`is_enterprise: true`) installs generic tools (AWS CLI, K8s, Gradle, Java 21) — useful at any company. Organization-specific packages belong in an overlay repo, not the base repo.
+Enterprise mode (`is_enterprise: true`) installs generic tools (AWS CLI, K8s, Gradle, Java 21) — useful at any company. Organization-specific packages belong in a company plugin, not the base repo.
 
 See [docs/forking-guide.md](docs/forking-guide.md) for the full customization guide and team adoption checklist.
+
+> **BREAKING (issue #145):** the v1 overlay is gone — `EXTRA_OVERLAY_ROOT`,
+> `EXTRA_DOCTOR_DIR`, `EXTRA_BREWFILE`, `EXTRA_VALIDATE_DIR`,
+> `EXTRA_AGENTFILE`, the chezmoi `extra_*` keys, and the older tooling-app
+> plugin system. A leftover setting stops `dotfiles doctor`, `validate`, and
+> `apply` with one line. To migrate, on the machine with the overlay run
+> `dotfiles plugin migrate <overlay dir>`, review the draft manifest, sign a
+> tag, `dotfiles plugin add <url>@<tag> --signer <key>`, then remove the old
+> settings. Steps: [docs/plugins.md](docs/plugins.md#migrating-from-the-v1-overlay).
 
 ## Enterprise setup
 
@@ -371,7 +380,7 @@ Every `dotfiles` command auto-checks for updates (fetches at most once/hour). Wh
 
 Checks are auto-discovered from `modules/*/doctor.sh`. Adding a new module automatically adds its checks — no editing the doctor script.
 An organization overlay is never auto-discovered from a folder name. It comes
-from `extra_overlay_root` or from `plugins.lock` ([docs/plugins.md](docs/plugins.md)).
+from `plugins.lock` ([docs/plugins.md](docs/plugins.md)).
 
 The `workspace` module extends the view beyond this repo: `dotfiles-workspace status` rolls up every declared workspace folder (repos, dirty/ahead state, TASKS.md queue estimates) — see [docs/workspace.md](docs/workspace.md).
 

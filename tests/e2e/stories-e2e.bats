@@ -152,19 +152,21 @@ fixture_git() {
   [[ "$output" == *"No runs recorded yet"* ]]
 }
 
-@test "US10 e2e: an overlay module's check runs in the doctor" {
-  local overlay="$SCRATCH/home/apps/dotfiles-acme"
-  mkdir -p "$overlay/modules/acme"
-  printf '#!/bin/bash\ncheck "acme.marker" "acme overlay marker exists" "test -f \\"$HOME/.acme-marker\\""\n' \
-    > "$overlay/modules/acme/doctor.sh"
+@test "US10 e2e: a company plugin's check runs in the doctor" {
+  local plugin="$SCRATCH/home/apps/dotfiles-acme"
+  mkdir -p "$plugin/doctor/acme"
+  printf 'schema: 1\nname: acme\nversion: 1.0.0\ncontributes:\n  doctor_modules: doctor\n' > "$plugin/dotfiles-plugin.yaml"
+  printf 'check "acme.marker" "acme plugin marker exists" "test -f \\"$HOME/.acme-marker\\""\n' \
+    > "$plugin/doctor/acme/doctor.sh"
   touch "$SCRATCH/home/.acme-marker"
-  run in_home env EXTRA_OVERLAY_ROOT="$overlay" bin/dotfiles-doctor --module acme
-  [[ "$output" == *"✓ acme overlay marker exists"* ]] || { echo "$output"; return 1; }
+  run in_home bin/dotfiles-plugin add --dev "$plugin" --yes
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  run in_home bin/dotfiles-doctor --list
+  [[ "$output" == *"acme/acme.marker"* ]] || { echo "$output"; return 1; }
 }
 
-@test "US10 e2e: two overlay roots at once are refused" {
-  local overlay="$SCRATCH/home/apps/dotfiles-acme"
-  run in_home env EXTRA_OVERLAY_ROOT="$overlay:$overlay" bin/dotfiles-doctor --module acme
+@test "US10 e2e: a leftover v1 overlay setting stops with the migration hint" {
+  run in_home env EXTRA_OVERLAY_ROOT="$SCRATCH/home/apps/dotfiles-acme" bin/dotfiles-doctor --list
   [ "$status" -eq 1 ]
-  [[ "$output" == *"One overlay at a time"* ]]
+  [[ "$output" == *"dotfiles plugin migrate"* ]]
 }

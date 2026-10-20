@@ -14,8 +14,7 @@ setup() {
   export HOME="$TEST_DIR/home"
   export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share"
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-  export DOTFILES_PLUGINS_V2=1
-  unset EXTRA_OVERLAY_ROOT DOTFILES_PLUGINS_LOCK DOTFILES_PLUGINS_HOME
+  unset DOTFILES_PLUGINS_LOCK DOTFILES_PLUGINS_HOME
   mkdir -p "$HOME" "$TEST_DIR/stub"
   printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/stub/chezmoi"
   chmod +x "$TEST_DIR/stub/chezmoi"
@@ -69,11 +68,6 @@ lookup() {
   bash -c 'source "$1/lib/plugin.sh"; plugin_overlay_root' _ "$REPO_ROOT"
 }
 
-@test "v2 commands need DOTFILES_PLUGINS_V2=1" {
-  DOTFILES_PLUGINS_V2= run bash "$REPO_ROOT/bin/dotfiles-plugin-v2" list
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"DOTFILES_PLUGINS_V2=1"* ]]
-}
 
 @test "add pins commit, tree hash and capabilities in a 0600 lock" {
   run add_signed

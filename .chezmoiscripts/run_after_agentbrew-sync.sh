@@ -116,27 +116,24 @@ else
   exit 0
 fi
 
-# ── Optional overlay Agentfile ────────────────────────────────────
-# Organisation-specific overlays (a private repo at ~/apps/dotfiles-<org>/)
-# can plug an additional Agentfile in via $EXTRA_AGENTFILE, OR a full
-# overlay tree via $EXTRA_OVERLAY_ROOT (single-path) which auto-derives the
-# Agentfile path as $EXTRA_OVERLAY_ROOT/Agentfile.yaml. Colon-separated
-# $EXTRA_OVERLAY_ROOT is rejected — one overlay at a time.
-# See docs/user-stories/10-fork-for-your-company.md.
-# shellcheck source=../lib/plugin.sh
-source "$DOTFILES_DIR/lib/plugin.sh"
-EXTRA_AGENTFILE="${EXTRA_AGENTFILE:-}"
-if [ -z "$EXTRA_AGENTFILE" ]; then
-  _overlay_rc=0
-  _overlay_root="$(plugin_overlay_root)" || _overlay_rc=$?
-  [ "$_overlay_rc" -ne 2 ] || exit 1
-  if [ -n "$_overlay_root" ]; then
-    echo "→ Overlay at $_overlay_root"
-    EXTRA_AGENTFILE="$_overlay_root/Agentfile.yaml"
-  fi
+# ── Company plugin Agentfiles ─────────────────────────────────────
+# Verified plugins in plugins.lock add Agentfile layers through
+# contributes.agentbrew (docs/plugins.md). The v1 overlay was removed;
+# a leftover EXTRA_* setting stops here with one clear line.
+PLUGIN_AGENTFILES=()
+if [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
+  # shellcheck source=../lib/plugin.sh
+  source "$DOTFILES_DIR/lib/plugin.sh"
+  plugin_v1_guard || exit 1
 fi
-if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
-  echo "→ Including overlay Agentfile at $EXTRA_AGENTFILE"
+if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+  for _plib in plugin-capabilities plugin-extensions; do
+    # shellcheck source=/dev/null
+    source "$DOTFILES_DIR/lib/$_plib.sh"
+  done
+  while IFS= read -r _pf; do
+    [ -n "$_pf" ] && PLUGIN_AGENTFILES+=("$_pf") && echo "→ Including plugin Agentfile at $_pf"
+  done < <(plugin_agentfiles)
 fi
 
 _agentbrew_supports_agentfile_merge() {
@@ -161,9 +158,7 @@ if [ -f "$AGENTFILE" ]; then
 else
   echo "○ No Agentfile.yaml in dotfiles — skipping base agent sync"
 fi
-if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
-  AGENTFILE_PATHS+=("$EXTRA_AGENTFILE")
-fi
+AGENTFILE_PATHS+=(${PLUGIN_AGENTFILES[@]+"${PLUGIN_AGENTFILES[@]}"})
 # Owner-only rules layer (lib/agentfile-layers.sh).
 # shellcheck source=../lib/agentfile-layers.sh
 source "$DOTFILES_DIR/lib/agentfile-layers.sh"
@@ -199,10 +194,10 @@ if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
       echo "→ Syncing agentbrew from dotfiles Agentfile..."
       _sync_from_agentfile "$AGENTFILE"
     fi
-    if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
-      echo "→ Syncing agentbrew from overlay Agentfile at $EXTRA_AGENTFILE..."
-      _sync_from_agentfile "$EXTRA_AGENTFILE" --no-prune
-    fi
+    for _pf in ${PLUGIN_AGENTFILES[@]+"${PLUGIN_AGENTFILES[@]}"}; do
+      echo "→ Syncing agentbrew from plugin Agentfile at $_pf..."
+      _sync_from_agentfile "$_pf" --no-prune
+    done
   fi
 fi
 

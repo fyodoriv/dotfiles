@@ -13,7 +13,7 @@ setup() {
   cat > "$TEST_DIR/extra/relink-module/doctor.sh" <<DOCTOR
 check_symlink "relink-module.rc" "$TEST_DIR/new/rc" "$DST"
 DOCTOR
-  export EXTRA_DOCTOR_DIR="$TEST_DIR/extra"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra"
   # --fix only acts from the chezmoi source checkout, so report this repo as it.
   mkdir -p "$TEST_DIR/bin"
   cat > "$TEST_DIR/bin/chezmoi" <<STUB

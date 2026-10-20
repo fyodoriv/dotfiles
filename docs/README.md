@@ -51,7 +51,6 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [agent-hooks.md](agent-hooks.md) | Which hooks and wrappers enforce agent rules? | agent |
 | [privacy-gates.md](privacy-gates.md) | Which gates stop private data from reaching GitHub? | both |
 | [plugins.md](plugins.md) | How does a company plugin install, pin, sign, and extend dotfiles? | both |
-| [plugin-system.md](plugin-system.md) | Legacy v1 tooling-app plugins (removed in the next major) | both |
 | [faq.md](faq.md) | Short answers to common questions. | human |
 
 ## Explanation — understand why

@@ -1,29 +1,16 @@
 #!/bin/bash
-# The one overlay ("plugin") lookup for the whole core (issue #145, step 3).
-# Every caller (doctor, validate, brew, vscode, agentbrew, oss-readiness,
-# agentbrew sync) uses these functions. Do not copy the lookup inline.
+# Company plugins (issue #145): lock, manifest, verify, and the lookup.
+# Every caller uses these functions. Do not copy the lookup inline.
 #
-# Resolution order:
-#   1. $EXTRA_OVERLAY_ROOT (explicit env — highest priority)
-#   2. chezmoi data key `extra_overlay_root`
-#   3. The first plugin in plugins.lock that still matches its lock entry.
-#      Folder names never make code trusted: there is no auto-discovery
-#      (issue #145 gap S3).
+# A plugin is active only when it is listed in plugins.lock and still
+# matches it (plugin_verify). Folder names never make code trusted.
+# The v1 overlay (EXTRA_* variables, chezmoi extra_* keys) was removed in
+# step 11b; plugin_v1_guard turns a leftover setting into one clear error.
 #
 # Usage (sourced):
 #   source "$DOTFILES_DIR/lib/plugin.sh"
-#   if root="$(plugin_overlay_root)"; then ...; fi
-#   file="$(plugin_overlay_path Agentfile.yaml)"
-#
-# --no-discover (first argument of either function) skips step 3: only a
-# v1 overlay (env or chezmoi key) counts. Callers that read the v1 overlay
-# layout (doctor modules/, validate/, brewfile/, vscode/) pass it. v2 plugins
-# reach those features through lib/plugin-extensions.sh instead, where their
-# code runs in a child process and their data is capability-checked.
-#
-# plugin_overlay_root prints the path and returns 0, returns 1 when there is
-# no overlay, and returns 2 (with a message on stderr) for a colon-separated
-# list, because only one overlay is allowed.
+#   plugin_v1_guard || exit 1
+#   if root="$(plugin_overlay_root)"; then ...; fi   # first verified plugin
 #
 # Lock file (machine-local, mode 0600, never in a repo):
 #   ${DOTFILES_PLUGINS_LOCK:-~/.config/dotfiles/plugins.lock}
@@ -146,50 +133,40 @@ plugin_verify() {
   return 0
 }
 
-_plugin_find_overlay_root() {
-  local discover="${1:-1}" configured candidate
+# Settings from the removed v1 overlay.
+_PLUGIN_V1_VARS="EXTRA_OVERLAY_ROOT EXTRA_DOCTOR_DIR EXTRA_BREWFILE EXTRA_VALIDATE_DIR EXTRA_AGENTFILE"
 
-  if [ -n "${EXTRA_OVERLAY_ROOT:-}" ]; then
-    printf '%s' "$EXTRA_OVERLAY_ROOT"
-    return 0
-  fi
-
-  if command -v chezmoi &>/dev/null; then
-    configured="$(
-      chezmoi execute-template '{{ dig "extra_overlay_root" "" . }}' 2>/dev/null || true
-    )"
-    if [ -n "$configured" ] && [ -d "$configured" ]; then
-      printf '%s' "$configured"
-      return 0
+# plugin_v1_guard: fails with one line when a v1 overlay setting is left.
+plugin_v1_guard() {
+  local v key
+  for v in $_PLUGIN_V1_VARS; do
+    if [ -n "${!v:-}" ]; then
+      echo "dotfiles: $v (v1 overlay) was removed; convert the overlay with 'dotfiles plugin migrate <dir>', install it with 'dotfiles plugin add', and unset $v (see docs/plugins.md)" >&2
+      return 1
     fi
-  fi
+  done
+  # Read the chezmoi config file directly: cheap, and no chezmoi call.
+  local cfg
+  for cfg in "${XDG_CONFIG_HOME:-$HOME/.config}"/chezmoi/chezmoi.yaml "${XDG_CONFIG_HOME:-$HOME/.config}"/chezmoi/chezmoi.toml; do
+    [ -f "$cfg" ] || continue
+    key="$(grep -oE '^[[:space:]]*(extra_overlay_root|extra_doctor_dir|extra_brewfile)[[:space:]]*[:=][[:space:]]*["'"'"']?[^[:space:]"'"'"']' "$cfg" 2>/dev/null |
+      head -1 | sed -E 's/^[[:space:]]*([a-z_]+).*/\1/')"
+    if [ -n "$key" ]; then
+      echo "dotfiles: chezmoi key $key (v1 overlay) was removed; convert the overlay with 'dotfiles plugin migrate <dir>', then delete the key from $cfg (see docs/plugins.md)" >&2
+      return 1
+    fi
+  done
+  return 0
+}
 
-  [ "$discover" -eq 1 ] || return 1
+# Prints the root of the first plugin in plugins.lock that passes
+# plugin_verify, or fails.
+plugin_overlay_root() {
+  local candidate
   for candidate in $(plugin_lock_names); do
     plugin_verify "$candidate" >/dev/null 2>&1 || continue
     plugin_lock_get "$candidate" path
     return 0
   done
   return 1
-}
-
-plugin_overlay_root() {
-  local root discover=1
-  [ "${1:-}" != --no-discover ] || discover=0
-  root="$(_plugin_find_overlay_root "$discover")" || return 1
-  if [[ "$root" == *:* ]]; then
-    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time. — fix: set EXTRA_OVERLAY_ROOT to one path" >&2
-    return 2
-  fi
-  printf '%s' "$root"
-}
-
-# Prints <overlay root>/<relative path> when an overlay exists. Same return
-# codes as plugin_overlay_root. The path may not exist; callers check.
-plugin_overlay_path() {
-  local root rc=0 flag=""
-  if [ "${1:-}" = --no-discover ]; then flag=--no-discover; shift; fi
-  root="$(plugin_overlay_root $flag)" || rc=$?
-  [ "$rc" -eq 0 ] || return "$rc"
-  printf '%s/%s' "$root" "$1"
 }

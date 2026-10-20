@@ -33,6 +33,12 @@ done
 
 # shellcheck source=../lib/output.sh
 source "$DOTFILES_DIR/lib/output.sh"
+# The v1 overlay was removed (issue #145); a leftover setting fails clearly.
+if [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
+  # shellcheck source=../lib/plugin.sh
+  source "$DOTFILES_DIR/lib/plugin.sh"
+  plugin_v1_guard || exit 1
+fi
 # shellcheck source=../lib/secret-scan.sh
 source "$DOTFILES_DIR/lib/secret-scan.sh"
 
@@ -179,54 +185,6 @@ if ! $QUICK_MODE; then
   fi
 else
   audit_warn "Skipped TASKS.md lint, shellcheck, and tests (--quick mode)"
-fi
-
-# ── Overlay validate scripts ─────────────────────────────────────
-# An organisation-specific overlay (a private repo at ~/apps/dotfiles-<org>/)
-# can plug additional validation checks in via $EXTRA_VALIDATE_DIR. Every
-# *.sh file in that directory is sourced in the same shell so it can call
-# pass/fail/audit_warn from lib/output.sh and contribute to the totals.
-# Mirrors the $EXTRA_DOCTOR_DIR convention in bin/dotfiles-doctor.
-#
-# Alternatively, EXTRA_OVERLAY_ROOT=<path> can be set to derive EXTRA_VALIDATE_DIR
-# from <path>/validate/. This is the single-path approach for company overlays.
-# Existing EXTRA_VALIDATE_DIR takes precedence if explicitly set.
-_resolve_extra_validate_dir() {
-  local rc=0
-  # shellcheck source=../lib/plugin.sh
-  source "$DOTFILES_DIR/lib/plugin.sh"
-  plugin_overlay_path --no-discover validate || rc=$?
-  [ "$rc" -ne 2 ]
-}
-
-EXTRA_VALIDATE_DIR="${EXTRA_VALIDATE_DIR:-}"
-# If EXTRA_VALIDATE_DIR is not set, try to derive it from EXTRA_OVERLAY_ROOT
-if [ -z "$EXTRA_VALIDATE_DIR" ]; then
-  EXTRA_VALIDATE_DIR="$(_resolve_extra_validate_dir)" || exit 1
-fi
-
-if [ -n "$EXTRA_VALIDATE_DIR" ] && [ -d "$EXTRA_VALIDATE_DIR" ]; then
-  shopt -s nullglob
-  overlay_scripts=("$EXTRA_VALIDATE_DIR"/*.sh)
-  shopt -u nullglob
-  if [ "${#overlay_scripts[@]}" -gt 0 ]; then
-    echo -e "  ${BLUE}─── Overlay validate scripts ───${NC}"
-    for overlay_script in "${overlay_scripts[@]}"; do
-      [ -f "$overlay_script" ] || continue
-      overlay_script_name="$(basename "$overlay_script")"
-      # Relax shell options BEFORE sourcing so an overlay's strict mode
-      # can't kill the run; reset AFTER so the next overlay starts clean.
-      # Counters update because we source in the current shell.
-      set +e +u
-      # shellcheck disable=SC1090
-      source "$overlay_script"
-      overlay_source_status=$?
-      set +e +u
-      if [ "$overlay_source_status" -ne 0 ]; then
-        fail "Overlay validate script failed (exit $overlay_source_status): $overlay_script_name"
-      fi
-    done
-  fi
 fi
 
 # ── Company plugin validate scripts (issue #145, step 6e) ───────

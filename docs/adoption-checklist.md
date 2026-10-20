@@ -47,7 +47,7 @@ A step-by-step checklist for rolling out this dotfiles repo to your team. Each s
 - [ ] Document any checks your team should skip: `dotfiles doctor --skip <check-id>`
 - [ ] Run `dotfiles validate --quick` while iterating on docs or config changes for a fast pre-share safety check; quick mode reports that TASKS.md lint, shellcheck, and tests were skipped
 - [ ] Run full `dotfiles validate` before announcing the fork — full validation includes hardcoded-path checks across shared config, enterprise-hostname checks, secret scans, tracked `.env` checks, script hygiene, TASKS.md lint, shellcheck, and the bats suite
-- [ ] If your overlay ships its own validate scripts (via `EXTRA_VALIDATE_DIR`), run them too before announcing the fork
+- [ ] If your company plugin ships validate scripts (`contributes.validate`), `dotfiles validate` runs them; check they pass before announcing the fork
 
 ## 5. Roll out to the team
 

@@ -19,7 +19,7 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-  export EXTRA_DOCTOR_DIR="$REPO_ROOT/tests/fixtures"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$REPO_ROOT/tests/fixtures"
   # `--fix` only runs fixes from the applied checkout (`chezmoi source-path`).
   # From a worktree that guard makes every fix report-only, so a "fix
   # succeeded" case fails and a "fix failed" case passes for the wrong
@@ -74,7 +74,7 @@ check "json-fix-success-module.fix_command_succeeds" \\
   "[ -f '$target' ]" \\
   "touch '$target'"
 DOCTOR
-  export EXTRA_DOCTOR_DIR="$TEST_DIR/extra"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra"
   local out
   out="$("$REPO_ROOT/bin/dotfiles-doctor" --module json-fix-success-module --json --fix 2>/dev/null)"
   local status
@@ -118,7 +118,7 @@ check_defaults "defaults-bool-module.test_bool" \\
   "$domain" TestBool "0" bool
 DOCTOR
 
-  export EXTRA_DOCTOR_DIR="$TEST_DIR/extra"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra"
   local out
   out="$("$REPO_ROOT/bin/dotfiles-doctor" --module defaults-bool-module --json --fix 2>/dev/null)"
 

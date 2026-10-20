@@ -8,13 +8,11 @@ A company **plugin** is a git repo with `dotfiles-plugin.yaml` at its root.
 The core installs it pinned and signed, and runs only what it declares.
 Private data never goes into the public core.
 
-Preview: the plugin commands need `DOTFILES_PLUGINS_V2=1` until the next
-major version removes the v1 overlay (see [Legacy v1 overlay](#legacy-v1-overlay)).
+The v1 overlay was removed; see [Migrating from the v1 overlay](#migrating-from-the-v1-overlay).
 
 ## Quick start
 
 ```sh
-export DOTFILES_PLUGINS_V2=1
 dotfiles plugin new acme                     # scaffold dotfiles-acme/
 # edit dotfiles-acme/dotfiles-plugin.yaml, push it, then release:
 git -C dotfiles-acme tag -s v1.0.0 -m v1.0.0 # SSH-signed annotated tag
@@ -55,7 +53,7 @@ contributes:
   options: {chrome.restore_session: true, mas.skip_ids: ["123456789"]}
   blocked_software: blocked.yaml
   leak_patterns: leak-patterns.yaml   # reserved
-  agentbrew: agentbrew                # reserved for agentbrew
+  agentbrew: agentbrew                # folder with Agentfile.yaml (MCP servers, skills, rules)
 ```
 
 ## Install, lock, and verify
@@ -118,6 +116,7 @@ Only verified plugins contribute (`lib/plugin-extensions.sh`).
 | Settings (VS Code) | Deep merge, later wins: core default < plugin < user (`~/.config/dotfiles/settings/vscode.user.json`) < a plugin's `_force`. Conflicts show as doctor warnings. |
 | Shell | One generated loader (`~/.local/state/dotfiles/plugin-shell.zsh`), sourced by `home/zshrc` before `~/.zshrc.local`. Needs `shell_fragment: true`. |
 | Git hooks | The core pre-commit and pre-push run the plugin's `hooks/<name>` (declared in `capabilities.hooks`) after the leak gates, then the repo-local hook. |
+| Agentfile | `contributes.agentbrew/Agentfile.yaml` is merged into `~/.config/agentbrew/Agentfile.yaml` on apply, before `agentbrew sync`. |
 | Blocked software | `apps`, `casks`, `formulae` lists; the doctor check `plugins.<name>.blocked_software` fails while any is installed. |
 
 ## Core options
@@ -167,15 +166,29 @@ its own healer.
 options, and lint against a core checkout in `DOTFILES_CORE`), and a CI
 workflow (those tests, shellcheck, gitleaks).
 
-## Legacy v1 overlay
+## Migrating from the v1 overlay
 
-Until the next major version, a v1 overlay still works when set explicitly:
-`EXTRA_OVERLAY_ROOT=<dir>` or the chezmoi key `extra_overlay_root`. It reads
-`modules/`, `validate/`, `brewfile/Brewfile`, `vscode/`, `hooks/`,
-`Agentfile.yaml`, and `oss-readiness.env` from that folder. Convert one with
-`dotfiles plugin migrate <dir>`. The older tooling-app plugin system
-(`dotfiles plugin add <path>` without `DOTFILES_PLUGINS_V2`) is described in
-[plugin-system.md](plugin-system.md) and goes away in the same release.
+**Breaking change (issue #145, step 11b).** These were removed:
+`EXTRA_OVERLAY_ROOT`, `EXTRA_DOCTOR_DIR`, `EXTRA_BREWFILE`,
+`EXTRA_VALIDATE_DIR`, `EXTRA_AGENTFILE`, the chezmoi keys
+`extra_overlay_root` / `extra_doctor_dir` / `extra_brewfile`, the older
+tooling-app plugin system, and the `DOTFILES_PLUGINS_V2` gate (plugin
+commands always work now). A leftover setting stops `dotfiles doctor`,
+`validate`, and `apply` with one line that names it.
+
+On the machine that has the old overlay:
+
+1. `dotfiles plugin migrate <overlay dir>` writes `dotfiles-plugin.yaml.draft`
+   (doctor `modules/`, `validate/`, `brewfile/Brewfile`, `hooks/`,
+   `vscode/settings.json`, and `Agentfile.yaml` as `agentbrew: .`) and lists
+   the files it could not map. `oss-readiness.env` keeps working from the
+   plugin root.
+2. Review the draft, rename it to `dotfiles-plugin.yaml`, commit, and sign a
+   tag: `git tag -s v1.0.0 -m v1.0.0`.
+3. `dotfiles plugin add <git-url or path>@v1.0.0 --signer "<public key>"`
+   (or `dotfiles plugin add --dev <dir>` while you iterate).
+4. Unset the `EXTRA_*` variables and delete the `extra_*` keys from
+   `~/.config/chezmoi/chezmoi.yaml`, then `dotfiles apply`.
 
 ## Files
 
@@ -186,7 +199,7 @@ Until the next major version, a v1 overlay still works when set explicitly:
 | `lib/plugin-capabilities.sh` | Capability checks and helpers |
 | `lib/plugin-extensions.sh` | Extension points, options, lint |
 | `lib/plugin-sandbox-runner.sh` | Child-process runner for plugin checks |
-| `bin/dotfiles-plugin-v2` | `dotfiles plugin …` commands |
+| `bin/dotfiles-plugin` | `dotfiles plugin …` commands |
 | `bin/dotfiles-mcp-launch` | Secrets-by-reference launcher |
 | `bin/dotfiles-leak`, `lib/leak-allow.sh` | Human-only bypass |
 | `modules/plugins/doctor.sh` | Verified, lint, and blocked-software checks |

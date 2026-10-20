@@ -32,7 +32,7 @@ The 10 numbered user stories under [`docs/user-stories/`](docs/user-stories/) ar
 | Single canonical repo on github.com with pre-push privacy gate | ✅ Stable | `github.com/fyodoriv/dotfiles` on `feat/chezmoi`; `git-hooks/pre-push` |
 | `Agentfile.yaml` ↔ agentbrew sync | ✅ Stable | `.chezmoiscripts/run_after_agentbrew-sync.sh` |
 | Global git hooks (secret scan + commit-msg) | ✅ Stable | `git-hooks/pre-commit`, `git-hooks/commit-msg`, `git-hooks/pre-push` |
-| Company plugin contract (#145) | ✅ Preview (`DOTFILES_PLUGINS_V2=1`) | Replaces the `EXTRA_*` overlay hooks in the next major |
+| Company plugin contract (#145) | ✅ Stable | Replaced the `EXTRA_*` overlay hooks (removed; see docs/plugins.md) |
 | Endpoint-policy compliance for python venvs | ✅ Stable | `modules/security/doctor.sh` flags `Python.framework` paths |
 | Adoption checklist for fresh contributors | ✅ Stable | [`docs/adoption-checklist.md`](docs/adoption-checklist.md) |
 | Team onboarding flow | ✅ Stable | [`docs/team-onboarding.md`](docs/team-onboarding.md) |

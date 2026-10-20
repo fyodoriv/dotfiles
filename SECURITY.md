@@ -198,7 +198,7 @@ After the gates pass, the hooks run the overlay's own `hooks/pre-commit` or
 
 ### Company plugin trust (preview)
 
-With `DOTFILES_PLUGINS_V2=1`, a company plugin runs only when it is listed in
+A company plugin runs only when it is listed in
 `~/.config/dotfiles/plugins.lock` and still matches it: commit, tree hash, no
 changed files, approved capabilities, and a signer that is still trusted.
 Release tags must be SSH-signed by a key in

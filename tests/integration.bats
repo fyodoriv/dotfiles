@@ -409,7 +409,7 @@ reinit_config() {
     --promptDefaults </dev/null >/dev/null 2>&1
 }
 
-@test "re-init keeps age recipient, morning time, and overlay root" {
+@test "re-init keeps age recipient and morning time, and drops the removed v1 overlay root" {
   cat > "$TEST_HOME/.config/chezmoi/chezmoi.yaml" << EOF2
 sourceDir: "$REAL_DOTFILES"
 encryption: age
@@ -429,7 +429,7 @@ EOF2
   grep -q '^  age_recipient: "age1testrecipient"$' "$cfg"
   grep -q '^  morning_hour: 9$' "$cfg"
   grep -q '^  morning_minute: 0$' "$cfg"
-  grep -q '^  extra_overlay_root: "/tmp/overlay"$' "$cfg"
+  ! grep -q 'extra_overlay_root' "$cfg"
 }
 
 @test "fresh init uses defaults and omits overlay root" {

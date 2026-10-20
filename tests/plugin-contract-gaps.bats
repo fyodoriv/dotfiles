@@ -21,7 +21,7 @@ setup() {
   export GIT_CONFIG_GLOBAL=/dev/null
   export GIT_CONFIG_NOSYSTEM=1
   export MARKER="$TEST_DIR/plugin-code-ran"
-  unset EXTRA_OVERLAY_ROOT EXTRA_DOCTOR_DIR OSS_READINESS_ENV_FILE \
+  unset OSS_READINESS_ENV_FILE \
     OSS_READINESS_INTERNAL_PATTERN OSS_READINESS_PRIVATE_EMAIL_PATTERN \
     DOTFILES_PUBLIC_PUSH_ALLOWLIST DOTFILES_PRIVATE_PUSH_ALLOWLIST
   mkdir -p "$HOME/apps/tooling" "$XDG_CONFIG_HOME" "$TEST_DIR/stub"
@@ -65,20 +65,20 @@ make_push_repo() {
     commit -qm init
 }
 
+# install_plugin <dir>: make <dir> a verified dev plugin in plugins.lock,
+# with its git hooks declared.
+install_plugin() {
+  printf 'schema: 1\nname: acme\nversion: 1.0.0\ncapabilities:\n  hooks: [pre-push, pre-commit]\n' \
+    > "$1/dotfiles-plugin.yaml"
+  bash "$REPO_ROOT/bin/dotfiles-plugin" add --dev "$1" --yes >/dev/null
+}
+
 core_push() {
   git -C "$1" -c core.hooksPath="$REPO_ROOT/git-hooks" push -q origin HEAD:refs/heads/main
 }
 
 # ── today: overlay lookup ─────────────────────────────────────────────
 
-@test "today: EXTRA_OVERLAY_ROOT wins over auto-discovery" {
-  make_overlay "$HOME/apps/tooling/dotfiles-found"
-  mkdir -p "$TEST_DIR/explicit"
-  source "$REPO_ROOT/lib/plugin.sh"
-  EXTRA_OVERLAY_ROOT="$TEST_DIR/explicit" run plugin_overlay_root
-  [ "$status" -eq 0 ]
-  [ "$output" = "$TEST_DIR/explicit" ]
-}
 
 @test "today: no overlay folder means no overlay" {
   source "$REPO_ROOT/lib/plugin.sh"
@@ -110,8 +110,8 @@ core_push() {
 # S1: with an overlay installed and no pattern data, a leak gate must block.
 s1_push_blocks_without_patterns() {
   make_overlay "$HOME/apps/tooling/dotfiles-acme"
-  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
   rm -f "$HOME/apps/tooling/dotfiles-acme/hooks/pre-push"
+  install_plugin "$HOME/apps/tooling/dotfiles-acme"
   make_push_repo "$TEST_DIR/repo" 1
   ! core_push "$TEST_DIR/repo"
 }
@@ -175,7 +175,8 @@ EOF
 s4_overlay_hook_runs_on_push() {
   make_overlay "$TEST_DIR/overlay"
   make_push_repo "$TEST_DIR/repo" 0
-  EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay" core_push "$TEST_DIR/repo"
+  install_plugin "$TEST_DIR/overlay"
+  core_push "$TEST_DIR/repo"
   [ -f "$MARKER" ]
 }
 
@@ -185,7 +186,7 @@ s4_overlay_hook_runs_on_push() {
 
 s1_commit_blocks_without_patterns() {
   make_overlay "$HOME/apps/tooling/dotfiles-acme"
-  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
+  install_plugin "$HOME/apps/tooling/dotfiles-acme"
   make_push_repo "$TEST_DIR/repo" 1
   printf 'more\n' >> "$TEST_DIR/repo/notes.txt"
   git -C "$TEST_DIR/repo" add notes.txt
@@ -200,8 +201,8 @@ s1_commit_blocks_without_patterns() {
 
 @test "S1: a gated push goes through when the overlay pattern loads" {
   make_overlay "$HOME/apps/tooling/dotfiles-acme"
-  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
   rm -f "$HOME/apps/tooling/dotfiles-acme/hooks/pre-push"
+  install_plugin "$HOME/apps/tooling/dotfiles-acme"
   printf "OSS_READINESS_INTERNAL_PATTERN='zz-not-in-repo'\n" > "$HOME/apps/tooling/dotfiles-acme/oss-readiness.env"
   make_push_repo "$TEST_DIR/repo" 1
   run core_push "$TEST_DIR/repo"
@@ -212,7 +213,8 @@ s1_commit_blocks_without_patterns() {
   make_overlay "$TEST_DIR/overlay"
   printf '#!/bin/sh\ncat > "%s"\nexit 7\n' "$MARKER" > "$TEST_DIR/overlay/hooks/pre-push"
   make_push_repo "$TEST_DIR/repo" 0
-  EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay" run core_push "$TEST_DIR/repo"
+  install_plugin "$TEST_DIR/overlay"
+  run core_push "$TEST_DIR/repo"
   [ "$status" -ne 0 ]
   grep -q 'refs/heads/main' "$MARKER"
 }
@@ -224,7 +226,8 @@ s1_commit_blocks_without_patterns() {
   make_push_repo "$TEST_DIR/repo" 0
   printf 'more\n' >> "$TEST_DIR/repo/notes.txt"
   git -C "$TEST_DIR/repo" add notes.txt
-  EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay" git -C "$TEST_DIR/repo" -c core.hooksPath="$REPO_ROOT/git-hooks" \
+  install_plugin "$TEST_DIR/overlay"
+  git -C "$TEST_DIR/repo" -c core.hooksPath="$REPO_ROOT/git-hooks" \
     -c user.name=t -c user.email=t@example.com commit -qm "chore: more"
   [ -f "$MARKER" ]
 }

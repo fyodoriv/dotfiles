@@ -133,7 +133,7 @@ Enterprise-only prompts (when `is_enterprise: true`):
 
 **Skipping Homebrew packages:** If a package can't be installed (VPN restriction, corporate policy, personal preference), add it to `brew_skip` in `~/.config/chezmoi/chezmoi.yaml`:
 
-A company plugin can add names through the core option `brew.skip` ([docs/plugin-system.md](docs/plugin-system.md)).
+A company plugin can add names through the core option `brew.skip` ([docs/plugins.md](docs/plugins.md)).
 
 
 ```yaml
@@ -371,7 +371,7 @@ Every `dotfiles` command auto-checks for updates (fetches at most once/hour). Wh
 
 Checks are auto-discovered from `modules/*/doctor.sh`. Adding a new module automatically adds its checks — no editing the doctor script.
 An organization overlay is never auto-discovered from a folder name. It comes
-from `extra_overlay_root` or from `plugins.lock` ([docs/plugin-system.md](docs/plugin-system.md)).
+from `extra_overlay_root` or from `plugins.lock` ([docs/plugins.md](docs/plugins.md)).
 
 The `workspace` module extends the view beyond this repo: `dotfiles-workspace status` rolls up every declared workspace folder (repos, dirty/ahead state, TASKS.md queue estimates) — see [docs/workspace.md](docs/workspace.md).
 

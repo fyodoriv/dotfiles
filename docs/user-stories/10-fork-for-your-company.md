@@ -8,6 +8,22 @@
 
 This story is the **overlay** path. It's different from the [forking guide](../forking-guide.md), which describes forking the whole dotfiles repo to change defaults org-wide. Use this one when you want to **keep dotfiles as-is** (so you get future updates for free) and just plug in a tiny company-specific layer.
 
+## Recommended: a company plugin
+
+The current contract is a signed, pinned plugin: see [plugins.md](../plugins.md).
+
+```bash
+export DOTFILES_PLUGINS_V2=1
+dotfiles plugin new <company>            # scaffold dotfiles-<company>/
+# push it, then release an SSH-signed tag: git tag -s v1.0.0 -m v1.0.0
+dotfiles plugin add <git-url>@v1.0.0 --signer "$(cat release-key.pub)"
+dotfiles apply
+dotfiles plugin remove <company>         # symmetric uninstall
+```
+
+The rest of this page describes the legacy v1 overlay. It still works until
+the next major version; convert one with `dotfiles plugin migrate <dir>`.
+
 ## When to use this vs forking
 
 | You want… | Use this overlay story | Use the [forking guide](../forking-guide.md) |
@@ -44,7 +60,7 @@ mkdir -p ~/apps/dotfiles-<company>/{modules,validate,brewfile}
 chezmoi edit-config
 # add: extra_overlay_root: ~/apps/dotfiles-<company>
 
-# 5. Apply — dotfiles auto-discovers the overlay
+# 5. Apply — dotfiles loads the overlay you named (no auto-discovery)
 dotfiles apply
 ```
 

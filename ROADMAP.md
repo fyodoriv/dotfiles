@@ -19,7 +19,7 @@ The 10 numbered user stories under [`docs/user-stories/`](docs/user-stories/) ar
 | 07 | Git workflow helpers | ✅ Stable |
 | 08 | Time saved by automation | ✅ Stable — `bin/dotfiles-stats` |
 | 09 | Run local models fast (Ollama + qwen3-coder) | 🟡 In progress — watching Ollama PRs #8134, #15980 (speculative decoding for qwen3-coder) |
-| 10 | Fork for your company | ✅ Stable — overlay model via `EXTRA_AGENTFILE` |
+| 10 | Fork for your company | ✅ Stable — signed, pinned company plugins ([docs/plugins.md](docs/plugins.md)); v1 overlay until the next major |
 
 ## Infrastructure tracker
 
@@ -32,7 +32,7 @@ The 10 numbered user stories under [`docs/user-stories/`](docs/user-stories/) ar
 | Single canonical repo on github.com with pre-push privacy gate | ✅ Stable | `github.com/fyodoriv/dotfiles` on `feat/chezmoi`; `git-hooks/pre-push` |
 | `Agentfile.yaml` ↔ agentbrew sync | ✅ Stable | `.chezmoiscripts/run_after_agentbrew-sync.sh` |
 | Global git hooks (secret scan + commit-msg) | ✅ Stable | `git-hooks/pre-commit`, `git-hooks/commit-msg`, `git-hooks/pre-push` |
-| `EXTRA_AGENTFILE` overlay hook | ✅ Stable | `~/apps/dotfiles-<org>/Agentfile.yaml` rides this |
+| Company plugin contract (#145) | ✅ Preview (`DOTFILES_PLUGINS_V2=1`) | Replaces the `EXTRA_*` overlay hooks in the next major |
 | Endpoint-policy compliance for python venvs | ✅ Stable | `modules/security/doctor.sh` flags `Python.framework` paths |
 | Adoption checklist for fresh contributors | ✅ Stable | [`docs/adoption-checklist.md`](docs/adoption-checklist.md) |
 | Team onboarding flow | ✅ Stable | [`docs/team-onboarding.md`](docs/team-onboarding.md) |

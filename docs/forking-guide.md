@@ -112,11 +112,13 @@ If your company uses GitHub Enterprise:
 
 Org-specific configuration (private Homebrew taps, internal MCP servers, custom
 doctor checks, role-based onboarding docs) does **not** belong in this OSS
-repo. The supported pattern is an "overlay" repo that plugs into a small
-public extension API.
+repo. The supported pattern is a signed, pinned **company plugin**:
+[plugins.md](plugins.md) (`dotfiles plugin new <org>`).
 
-Recommended layout: a second repo named `dotfiles-<org>` at
-`~/apps/dotfiles-<org>/`. Auto-discovered hooks:
+Legacy v1 overlay (removed in the next major; convert with
+`dotfiles plugin migrate`): a repo named `dotfiles-<org>`, set explicitly with
+`EXTRA_OVERLAY_ROOT` or the chezmoi key `extra_overlay_root`. It is never
+auto-discovered. Hooks:
 
 | Hook                | Overlay path                | Loaded by                                            |
 | ------------------- | --------------------------- | ---------------------------------------------------- |

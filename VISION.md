@@ -14,7 +14,7 @@ goals:
     description: No @company.example identifier, no secret, no organization reference outside the configured private-reference gate ever reaches github.com/fyodoriv/dotfiles.
   - id: G4
     name: Forkable for any org via overlay
-    description: EXTRA_AGENTFILE hook lets a company layer its MCP servers / skills / rules without forking the core repo.
+    description: A signed, pinned company plugin (docs/plugins.md) lets a company layer its checks, packages, and settings without forking the core repo.
 non_goals:
   - id: NG1
     name: Not a generic dotfiles framework
@@ -43,7 +43,7 @@ steps, and keeps it there with doctor checks that find and fix drift.
 
 **Primary user: any macOS developer who wants their config to be reproducible and to heal itself.** Clone the repo, run `chezmoi init --source ~/apps/dotfiles --apply`, run `dotfiles doctor --fix`, and you have a fully-configured Mac — Homebrew + casks + tap, macOS defaults across Finder/Spotlight/keyboard, shell with starship + atuin + zoxide + fnm + uv, terminal (Ghostty), git, SSH, launch agents, AI agent tooling, and 21 self-healing module check sets that auto-detect and offer to fix drift.
 
-**Secondary user: any team that wants to fork these dotfiles for their company.** The privacy-and-secrets architecture (see `SECURITY.md`) cleanly separates public-safe content from organization-internal content. The `EXTRA_AGENTFILE` overlay hook lets an org layer its own MCP servers, skills, and rules without forking the core repo. The forking guide is in [`docs/forking-guide.md`](docs/forking-guide.md); an org overlay (for example `~/apps/dotfiles-<org>/`) rides this exact mechanism.
+**Secondary user: any team that wants to fork these dotfiles for their company.** The privacy-and-secrets architecture (see `SECURITY.md`) cleanly separates public-safe content from organization-internal content. A signed, pinned company plugin ([`docs/plugins.md`](docs/plugins.md)) lets an org layer its own checks, packages, and settings without forking the core repo. The forking guide is in [`docs/forking-guide.md`](docs/forking-guide.md).
 
 ## Strategy: self-healing > documented manual steps
 
@@ -89,7 +89,7 @@ New capabilities earn a new user story; new user stories carry a numeric thresho
 - **Not a generic dotfiles framework.** dotfiles is macOS + chezmoi + the author's stack. Linux support and other shell ecosystems (fish, nu) are forks' problems.
 - **Not a secrets manager.** Secrets live in `op` (1Password CLI) and `age`-encrypted files. dotfiles fetches; it never stores.
 - **Not an agent config tool.** `agentbrew` owns `~/.claude/`, etc. dotfiles owns only the `Agentfile.yaml` manifest.
-- **Not a system for sharing org-internal tooling.** Org-gated MCPs / skills / scripts live in an overlay repo (e.g. `~/apps/dotfiles-<org>/`) and are loaded via the `EXTRA_AGENTFILE` hook. The litmus test: if a fresh contributor outside the org runs `dotfiles apply`, does the MCP work? If no, it's overlay content.
+- **Not a system for sharing org-internal tooling.** Org-gated MCPs / skills / scripts live in an overlay repo (e.g. `~/apps/dotfiles-<org>/`) and are loaded as a company plugin ([`docs/plugins.md`](docs/plugins.md)). The litmus test: if a fresh contributor outside the org runs `dotfiles apply`, does the MCP work? If no, it's overlay content.
 
 ## Success
 
@@ -142,4 +142,4 @@ LaunchAgents are what it adds on top.
 
 ## Reversibility
 
-The `EXTRA_AGENTFILE` overlay is reversible by simply not loading it (`unset EXTRA_AGENTFILE`). The doctor checks are advisory — `--fix` is opt-in per check. Nothing dotfiles does to the host system is one-way.
+A company plugin is reversible with `dotfiles plugin remove <name>`. The doctor checks are advisory — `--fix` is opt-in per check. Nothing dotfiles does to the host system is one-way.

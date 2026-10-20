@@ -1,4 +1,8 @@
-# Tooling-app Plugin System
+# Tooling-app Plugin System (legacy v1)
+
+> Legacy. Company plugins now use the v2 contract in [plugins.md](plugins.md).
+> This v1 tooling-app system and the `EXTRA_*` overlay go away in the next
+> major version.
 
 **Status:** Draft (proposed 2026-05-15) · **Owner:** dotfiles + agentbrew · **Branch:** `feat/tooling-plugins` (proposed)
 
@@ -312,138 +316,6 @@ Each install creates `~/.config/dotfiles/plugins/<name>/install-state.json`:
 `remove` reads this and reverses everything. `heal` re-runs install,
 which is idempotent on existing symlinks and re-creates anything missing.
 
-### One overlay lookup
-
-`lib/plugin.sh` is the only place that finds the company overlay
-(issue #145, step 3). Use `plugin_overlay_root` or
-`plugin_overlay_path <relative path>`. Both return 2 for a colon-separated
-`EXTRA_OVERLAY_ROOT`. Order: `EXTRA_OVERLAY_ROOT`, the chezmoi key
-`extra_overlay_root`, then the first plugin in `plugins.lock` that still
-matches its lock. Folders named `dotfiles-*` are never auto-discovered
-(step 4 closed gap S3). `--no-discover` skips the lock step: the v1 overlay
-layout (doctor `modules/`, `validate/`, `brewfile/`, `vscode/`) is read only
-from a v1 overlay. v2 plugins use the typed extension points below. `tests/overlay-locate.bats` fails when a
-core file copies the lookup inline.
-
-### Contract v2 preview: manifest and plugins.lock
-
-Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
-
-- A plugin is a git repo with `dotfiles-plugin.yaml` at its root. The schema
-  is `config/dotfiles-plugin.schema.json`. Its shared keys (`schema`, `name`,
-  `version`, `requires_core`, `capabilities`, `contributes`) match
-  agentbrew's `agentbrew-plugin.yaml`. Unknown keys, absolute paths, and
-  `..` paths are refused.
-- `dotfiles plugin add <git-url>@<tag> [--yes]` clones the tag, validates
-  the manifest, shows the capabilities, and asks once (`--yes` skips the
-  prompt; no terminal and no `--yes` refuses). It runs no plugin code. It
-  installs to `~/.local/share/dotfiles/plugins/<name>` and writes
-  `~/.config/dotfiles/plugins.lock` (mode 0600): source, ref, version,
-  commit, `tree_hash`, `capabilities_sha`, path, dev, locked_at.
-- `dotfiles plugin add --dev <path>` links a local checkout. It is not
-  pinned, and doctor warns on every run.
-- `dotfiles plugin remove <name>`, `list`, and `verify [<name>]`.
-- A plugin whose commit, tree, files, or capabilities differ from the lock
-  is disabled: the lookup skips it and `plugins.<name>.verified` fails.
-- Signed tags (step 5). A release ref must be an annotated tag signed with
-  an SSH key. The trusted keys live in one file shared with agentbrew:
-  `~/.config/agent-plugins/allowed_signers` (or
-  `$AGENT_PLUGINS_ALLOWED_SIGNERS`), git `gpg.ssh.allowedSignersFile`
-  format, principal = plugin name. `git verify-tag` runs against a scratch
-  file with only this plugin's keys, so a key trusted for another plugin, or
-  the user's own git config, cannot widen trust.
-- `add --signer <key>` shows a new signer with the capabilities. Approval
-  writes it to the shared file. The lock records the `signer`.
-- `dotfiles plugin trust <name> --signer <key> [--yes]` adds a signer after
-  one approval; `--revoke` removes it. A plugin whose locked signer is no
-  longer trusted is disabled (`signer revoked`).
-- Capabilities are deny by default (`lib/plugin-capabilities.sh`). The core
-  runs plugin steps through helpers that check the manifest first:
-  `plugin_defaults_write`, `plugin_launchagent_check`, `plugin_brew_tap`,
-  and `plugin_sudo` (also needs a person at a terminal). An undeclared step
-  exits 3 with `capability not declared: <kind> <value> (plugin <name>)`.
-  A locked plugin's `hooks/<name>` runs only when `capabilities.hooks`
-  lists it.
-- Typed extension points (`lib/plugin-extensions.sh`, step 6). Only plugins
-  that pass `plugin verify` contribute; others are skipped and reported.
-  - Brewfile (`contributes.brewfile`): one `brew bundle --file` pass per
-    plugin after the core pass, in `run_onchange_brew.sh`. Each `tap` must be
-    in `capabilities.brew.taps`; casks need `capabilities.brew.casks: true`.
-    A failed bundle prints `unreachable (plugin <name>)`. The script re-runs
-    when `plugins.lock` changes.
-  - LaunchAgents (`contributes.launchagents`, a folder of `*.plist`
-    templates): the core replaces `@HOME@` and `@PLUGIN_DIR@`, checks each
-    `Label` against `capabilities.launchagents`, installs it to
-    `~/Library/LaunchAgents`, and reloads it only when it changed.
-    `plugin remove` unloads and deletes them. Plugins never edit core plists.
-  - Shell (`contributes.shell`, needs `capabilities.shell_fragment: true`):
-    the core writes `~/.local/state/dotfiles/plugin-shell.zsh`, which
-    sources each verified fragment in lock order. `home/zshrc` loads it
-    after core setup and before `~/.zshrc.local`. `dotfiles apply`
-    (`run_after_plugin-extensions.sh`), `plugin add`, and `plugin remove`
-    regenerate it.
-  - Settings (`contributes.settings.vscode`, a JSON file): deep merge with
-    priority default (core) < plugin (lock order) < user
-    (`~/.config/dotfiles/settings/vscode.user.json`) < force (a plugin's
-    `_force` object), the NixOS `mkDefault`/`mkForce` model. The vscode
-    doctor applies it to `settings.generated.json` and prints each conflict
-    (`settings conflict (vscode): <key>: <layers>`) as a warning.
-  - Doctor modules (`contributes.doctor_modules/<module>/doctor.sh`, with
-    an optional `severity` file) and validate scripts (`contributes.validate/*.sh`)
-    run in a child process (`lib/plugin-sandbox-runner.sh`), never in the
-    core shell. The child gets a cleaned environment (HOME, USER, LOGNAME,
-    TMPDIR, LANG, a fixed PATH; no `DOTFILES_*`, no tokens), the plugin root
-    as its folder, and a timeout (`DOTFILES_PLUGIN_TIMEOUT`, default 60 s).
-    Check ids show as `<plugin>/<id>`. A hang or crash fails
-    `<plugin>/<module>.ran`. Plugin checks report only; fix commands do not run.
-- Core options (step 7). A plugin sets values in `contributes.options` only
-  for options declared in `config/plugin-options.yaml`; anything else fails
-  `plugin add`. Booleans: the last plugin in lock order wins. Lists: union.
-  `dotfiles plugin options` prints each effective value, who set it, and
-  boolean conflicts.
-  - `mas.skip_ids`: `dotfiles-mas-upgrade` skips these App Store ids.
-  - `brew.skip`: removed from the core Brewfile before `brew bundle`.
-  - `chrome.purpose_headed` (drops `--headless=new`) and
-    `chrome.restore_session` (adds `--restore-last-session`): applied to the
-    rendered `com.dotfiles.agent-browser-chrome` plist by
-    `run_onchange_launchagents.sh` (`lib/chrome-purpose-options.sh`). Plugins
-    no longer patch the core plist.
-  - `spotlight.exclude_worktrees` (default true): when a plugin sets it to
-    false, the workflow doctor skips `spotlight.agent_worktrees`.
-- Blocked software (`contributes.blocked_software`, a YAML file with
-  `apps`, `casks`, `formulae` lists): the core scan (`lib/blocked-software.sh`)
-  adds the doctor check `plugins.<name>.blocked_software`, which fails while
-  any listed item is installed.
-- Data-only contributions are the pattern. The core owns the logic; a plugin
-  passes data (options, lists, settings, leak patterns). For example, an
-  endpoint-agent dialog healer reads its known dialog titles from a
-  plugin-supplied `heal.env` file instead of shipping its own healer. When a
-  plugin needs new behavior, add a core option or data point and keep the
-  plugin to values. Rule of thumb: if a fresh external user could use it
-  without company identity, network, or entitlement, it belongs in the core.
-- Secrets by reference (step 8). Manifests name secrets
-  (`capabilities.secrets: [keychain:acme-jira-token]`), never values.
-  `bin/dotfiles-mcp-launch --secret JIRA_TOKEN=keychain:acme-jira-token
-  [--ca-bundle <file>] [--path-minimal] -- <command>` resolves a secret only
-  inside the process that needs it. `dotfiles plugin lint <name>` and the
-  doctor check `plugins.<name>.lint` flag a shell fragment that exports a
-  token from `security …`, and any `@latest` or unpinned `npx -y` in plugin
-  files.
-- Unattended pushes and the bypass (step 9). `dotfiles-sync` commits
-  locally but pushes to a public remote (`config/public-push-remotes.txt`)
-  only when a person runs it at a terminal; a LaunchAgent run writes
-  `~/.local/state/dotfiles/sync-needs-review` instead. The leak-gate bypass
-  is `dotfiles leak allow --once [<sha>]`, refused without a terminal; the
-  `DOTFILES_ALLOW_GH_PRIVATE_REFS` variable no longer works.
-- Authoring (step 10). `dotfiles plugin new <name> [<dir>]` scaffolds a
-  plugin repo from `data/plugin-template/`: manifest, `.gitignore` (agent run
-  folders, `__pycache__/`, `.worktrees/`, `.DS_Store`, env files), an example
-  doctor module and validate script, `tests/plugin.bats` (schema, options,
-  lint against a core checkout in `DOTFILES_CORE`), and a CI workflow (those
-  tests, shellcheck, gitleaks). `dotfiles plugin migrate <v1 overlay dir>`
-  writes `dotfiles-plugin.yaml.draft` from the v1 layout, lists every file
-  it could not map, and changes nothing else.
-
 ### Doctor integration
 
 Two layers of checks land automatically:
@@ -549,7 +421,6 @@ Phase 3 — Devin opt-out:
 | `tests/plugin/heal.bats` | US-3 | partial breakage detected, repaired idempotently |
 | `tests/plugin/manifest-validation.bats` | (cross-cutting) | bad schemaVersion / missing name / bad path errors cleanly |
 | `tests/plugin/conflict-mcp.bats` | (open question) | two plugins with same MCP name → warn + last-wins |
-| `tests/plugin-contract-gaps.bats` | issue #145 | today's overlay lookup and hook chain; security gaps S1–S4 as `known_gap` tests that fail once a gap closes |
 
 ## References
 

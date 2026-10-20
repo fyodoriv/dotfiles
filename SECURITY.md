@@ -204,7 +204,7 @@ changed files, approved capabilities, and a signer that is still trusted.
 Release tags must be SSH-signed by a key in
 `~/.config/agent-plugins/allowed_signers` for that plugin name. This file is
 shared with agentbrew. Folder names never make code trusted. Details:
-[docs/plugin-system.md](docs/plugin-system.md).
+[docs/plugins.md](docs/plugins.md).
 
 ### Approved private repos
 

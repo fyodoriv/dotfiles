@@ -296,3 +296,11 @@ lookup() {
   [ "$(yq -r '.capabilities.brew.taps[0]' "$o/dotfiles-plugin.yaml.draft")" = corp/tap ]
   [ "$(yq -r '.contributes.settings.vscode' "$o/dotfiles-plugin.yaml.draft")" = vscode/settings.json ]
 }
+
+@test "11: every core path docs/plugins.md cites exists" {
+  cd "$REPO_ROOT"
+  missing="$(grep -oE '`(lib|bin|config|modules|data|home)/[^` ]+`' docs/plugins.md | tr -d '`' | sort -u |
+    while read -r f; do [ -e "$f" ] || echo "$f"; done)"
+  echo "$missing"
+  [ -z "$missing" ]
+}

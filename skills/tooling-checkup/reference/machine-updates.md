@@ -28,6 +28,18 @@ env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-upgrade"
 It can take 5 to 20 minutes. Run it in the background and keep working on
 Phases 5 to 8. Its log is `~/.local/share/dotfiles/logs/dotfiles-upgrade.log`.
 
+Start it only after Phase 3 (the dotfiles apply) is done; both take the
+dotfiles lock. When the lock is taken, the upgrade prints `[lock] Skipping`
+and exits 0 without a Summary section. Check the log when it ends:
+
+```bash
+env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-lock-checked" \
+  --log ~/.local/share/dotfiles/logs/dotfiles-upgrade.log
+```
+
+Exit 75 means "did not run". Re-run the upgrade once the lock is free, or
+report it as not run.
+
 The wrapper exits early in endpoint Node safe mode
 (`~/.local/state/dotfiles/endpoint-node-publisher-blocked`). Report that as
 "skipped: safe mode". Do not set the opt-in variable yourself.

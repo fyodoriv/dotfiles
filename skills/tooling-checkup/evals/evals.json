@@ -170,6 +170,17 @@
         "Asks the consent item in the Phase 11 questionnaire",
         "Runs gh pr ready and /ship-it only once nothing is pending and the gate is green"
       ]
+    },
+    {
+      "prompt": "/tooling-checkup — the last dotfiles-upgrade log has a [lock] Skipping line and no Summary section, and new-project is not in ~/.claude/skills.",
+      "expected_output": "Phase 3 apply finishes before the Phase 4 upgrade starts; the upgrade log check reports did not run and the upgrade is re-run; the monthly audit finds new-project in its agentbrew source.",
+      "expectations": [
+        "Finishes the Phase 3 dotfiles apply before it starts dotfiles-upgrade",
+        "Runs dotfiles-lock-checked --log on the upgrade log and reports did not run on exit 75",
+        "Does not use the 12-hour fast path on the strength of a lock-skipped upgrade",
+        "Resolves NP from the agentbrew source when ~/.claude/skills/new-project is missing"
+      ],
+      "id": 15
     }
   ]
 }

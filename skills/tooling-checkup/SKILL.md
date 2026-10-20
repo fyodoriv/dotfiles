@@ -175,13 +175,20 @@ safety rules. Its step 5 (next work) feeds this skill's report.
 **Done when:** `update-tooling` steps 1 to 4 are done, with each skipped
 checkout and each failed check named.
 
+Finish Phase 3 before you start Phase 4. The dotfiles apply and
+`dotfiles-upgrade` take the same dotfiles lock; a background upgrade makes the
+apply skip.
+
 ## Phase 4: Upgrade the machine
 
 Follow [reference/machine-updates.md](reference/machine-updates.md). In short:
 
 1. Run `dotfiles-upgrade` (Topgrade: Homebrew and casks, npm and pnpm globals,
-   uv, pipx, mise, gh extensions) unless the fast path applies. Run it in the
-   background and go on with Phases 5 to 8.
+   uv, pipx, mise, gh extensions) unless the fast path applies. Start it only
+   after Phase 3 is done. Run it in the background and go on with Phases 5
+   to 8. When it ends, run `dotfiles-lock-checked --log <upgrade log>`. Exit
+   75 means "did not run" (a `[lock] Skipping` line and no Summary section),
+   even though the upgrade exited 0: re-run it once the lock is free.
 2. Run `claude update`. Compare `claude --version` before and after.
 3. Run `claude doctor` again. Report every line that is not OK.
 4. Check what is still outdated. Report macOS updates; never install them.
@@ -251,7 +258,14 @@ Ship small fixes in the source repo. Put big changes in the questionnaire.
 
 Once a month per repository, audit `agentbrew`, `dotfiles`, and `tasks.md`
 (and any other tooling repository with `.agents/requirements.yaml`) against the
-required areas of the `new-project` skill. `NP=~/.claude/skills/new-project`.
+required areas of the `new-project` skill. Use the installed skill, or its
+source in the agentbrew checkout when it is not installed:
+
+```bash
+NP=~/.claude/skills/new-project
+[ -d "$NP" ] || NP="$(fd -t d -H '^new-project$' ~/apps/tooling/agentbrew -E node_modules | head -1)"
+[ -n "$NP" ] && [ -f "$NP/scripts/check-setup.sh" ] || echo "new-project skill not found; skip this audit and report it"
+```
 
 1. `bash $NP/scripts/audit-due.sh <repo>`. Skip the repository when it prints `not due`.
 2. `bash $NP/scripts/check-setup.sh <repo> --profile tool`. Keep the score and the `FAIL` and `WAIVED` lines.

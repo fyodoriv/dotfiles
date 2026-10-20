@@ -1033,6 +1033,7 @@ scratch work.
 
 | Script | Description |
 |--------|-------------|
+| `dotfiles-lock-checked` | Run a dotfiles command; treat a `[lock] Skipping`/`Timed out` run as not applied, wait, re-run, exit 75 if still locked. `--log FILE` checks a `dotfiles-upgrade` log (lock skip or no Summary = did not run) |
 | `cheat` | Quick cheatsheet for all custom commands and shortcuts |
 | `note` | Append timestamped notes to a daily markdown file |
 | `status` | System dashboard: fastfetch, dotfiles version, agent status |

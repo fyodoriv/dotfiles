@@ -92,6 +92,17 @@
         "Stops with a clear message when `chezmoi source-path` prints nothing, instead of running `/bin/dotfiles` or `/bin/dotfiles-sync`",
         "Does not kill the running dotfiles-sync job or remove the chezmoi lock"
       ]
+    },
+    {
+      "prompt": "Update my tooling. Note: a dotfiles-upgrade is running in another terminal right now.",
+      "expected_output": "The apply step runs dotfiles-sync and dotfiles apply through dotfiles-lock-checked, sees the lock skip, waits and re-runs, and reports the step as not applied if the lock never frees.",
+      "expectations": [
+        "Runs dotfiles-sync and dotfiles apply through dotfiles-lock-checked",
+        "Treats a [lock] Skipping or [lock] Timed out line as not applied even when the command exits 0",
+        "Waits for the lock owner and re-runs instead of moving on",
+        "Reports \"not applied\" with the lock owner when the helper exits 75"
+      ],
+      "id": 9
     }
   ]
 }

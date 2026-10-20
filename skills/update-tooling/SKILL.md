@@ -238,10 +238,19 @@ still empty:
 for _ in $(seq 60); do pgrep -qf '^chezmoi apply' || break; sleep 5; done
 DOTFILES_APPLIED="$(chezmoi source-path)"
 [ -n "$DOTFILES_APPLIED" ] || { echo "chezmoi source-path failed; is chezmoi still locked?"; exit 1; }
-env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-sync"
-cd "$HOME" && env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" apply
+CHECKED="$DOTFILES_APPLIED/bin/dotfiles-lock-checked"
+env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles-sync"
+cd "$HOME" && env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-reload-launchagents"
 ```
+
+A dotfiles command that finds the dotfiles lock taken prints
+`[lock] Skipping` or `[lock] Timed out` and still exits 0. Never count that
+as applied. `dotfiles-lock-checked` runs the command, finds those lines,
+waits for the lock owner, and re-runs it (3 tries, 60 s apart by default). It
+exits 75 when the lock never frees: report that step as "not applied" with
+the lock owner from the output. Do not go on to the next apply step as if it
+ran.
 
 The applied-checkout helper only fast-forwards and reapplies chezmoi. Never
 run an applied-checkout update against a dirty or diverged worktree.

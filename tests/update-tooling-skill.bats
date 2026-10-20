@@ -43,7 +43,7 @@ AGENTFILE="$ROOT/Agentfile.yaml"
 }
 
 @test "update-tooling applies and verifies the right machine layers" {
-  grep -F -q 'env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-sync"' "$SKILL"
+  grep -F -q 'env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles-sync"' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --pull --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" mcp probe --deep' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" measure context' "$SKILL"
@@ -110,4 +110,11 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -F -q "timeout obtaining persistent state lock" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
   grep -F -q "pgrep -qf '^chezmoi apply'" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
   grep -F -q '[ -n "$DOTFILES_APPLIED" ]' "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+}
+
+@test "update-tooling checks apply output for a lock skip" {
+  grep -F -q 'CHECKED="$DOTFILES_APPLIED/bin/dotfiles-lock-checked"' "$SKILL"
+  grep -F -q '"$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles-sync"' "$SKILL"
+  grep -F -q '"$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply' "$SKILL"
+  grep -q 'not applied' "$SKILL"
 }

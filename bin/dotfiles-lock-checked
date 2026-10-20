@@ -1,0 +1,74 @@
+#!/bin/bash
+# Run a dotfiles command and detect a silent dotfiles-lock skip.
+# dotfiles commands print "[lock] Skipping" or "[lock] Timed out" and still
+# exit 0 when another dotfiles command holds the lock. This wrapper treats
+# that output as "not applied": it waits, re-runs, and exits 75 if the lock
+# never frees.
+#
+# Usage:
+#   dotfiles-lock-checked [--retries N] [--wait SECONDS] -- COMMAND [ARGS...]
+#   dotfiles-lock-checked --log FILE
+#
+# --log checks a dotfiles-upgrade log: a lock skip, or no Summary section,
+# means the upgrade did not run.
+#
+# Exit codes: the command's own code; 75 = not applied / did not run;
+# 2 = usage error.
+set -uo pipefail
+
+retries=3
+wait_s=60
+log_file=""
+
+usage() { sed -n '9,10p' "$0" | sed 's/^# //' >&2; exit 2; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --retries) retries="${2:-}"; shift 2 ;;
+    --wait) wait_s="${2:-}"; shift 2 ;;
+    --log) log_file="${2:-}"; shift 2 ;;
+    --) shift; break ;;
+    -h|--help) usage ;;
+    *) break ;;
+  esac
+done
+
+LOCK_RE='\[lock\] (Skipping|Timed out)'
+
+if [ -n "$log_file" ]; then
+  if [ ! -s "$log_file" ]; then
+    echo "did not run: no log at $log_file" >&2
+    exit 75
+  fi
+  if grep -qE "$LOCK_RE" "$log_file" && ! grep -q 'Summary' "$log_file"; then
+    echo "did not run: lock-skipped (see $log_file)" >&2
+    exit 75
+  fi
+  if ! grep -q 'Summary' "$log_file"; then
+    echo "did not run: no Summary section in $log_file" >&2
+    exit 75
+  fi
+  echo "ran: Summary found in $log_file"
+  exit 0
+fi
+
+[ $# -gt 0 ] || usage
+
+out_file="$(mktemp "${TMPDIR:-/tmp}/dotfiles-lock-checked.XXXXXX")"
+trap 'rm -f "$out_file"' EXIT
+
+attempt=0
+while :; do
+  "$@" 2>&1 | tee "$out_file"
+  rc=${PIPESTATUS[0]}
+  if ! grep -qE "$LOCK_RE" "$out_file"; then
+    exit "$rc"
+  fi
+  if [ "$attempt" -ge "$retries" ]; then
+    echo "not applied: $1 was lock-skipped $((attempt + 1)) time(s); the lock owner is still running" >&2
+    exit 75
+  fi
+  attempt=$((attempt + 1))
+  echo "lock-skipped: waiting ${wait_s}s for the lock owner, then re-run ($attempt/$retries)" >&2
+  sleep "$wait_s"
+done

@@ -591,3 +591,13 @@ broken file://$feeds/missing.xml"
   grep -F -q 'Phase 11' "$SKILL_DIR/SKILL.md"
   grep -F -q 'gh pr ready <n>' "$SKILL_DIR/SKILL.md"
 }
+
+@test "tooling-checkup applies before the upgrade and checks the upgrade log" {
+  grep -q 'Finish Phase 3 before you start Phase 4' "$SKILL"
+  grep -q 'dotfiles-lock-checked --log' "$SKILL"
+  grep -q 'dotfiles-lock-checked' "$SKILL_DIR/reference/machine-updates.md"
+}
+
+@test "tooling-checkup resolves new-project from its source when not installed" {
+  grep -q "\[ -d \"\$NP\" \] || NP=" "$SKILL"
+}

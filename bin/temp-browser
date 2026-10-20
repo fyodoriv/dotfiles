@@ -17,7 +17,11 @@
 #
 # Env: TEMP_BROWSER_STATE_DIR, TEMP_BROWSER_PORT (9230),
 #      TEMP_BROWSER_LEASE_SECONDS (3600), TEMP_BROWSER_CHROME (Chrome binary),
-#      TEMP_BROWSER_READY_TIMEOUT (seconds to wait for CDP, 15; 0 skips).
+#      TEMP_BROWSER_READY_TIMEOUT (seconds to wait for CDP, 15; 0 skips),
+#      TEMP_BROWSER_HEADED=1 (headed window, opened in the background),
+#      TEMP_BROWSER_LAUNCH (hook: gets <profile> <port>, prints the browser pid).
+#
+# Exit codes: 0 ok, 1 error, 2 usage, 3 busy (held by another owner).
 set -euo pipefail
 
 STATE_DIR="${TEMP_BROWSER_STATE_DIR:-$HOME/.local/state/temp-browser}"
@@ -26,12 +30,21 @@ PORT="${TEMP_BROWSER_PORT:-9230}"
 LEASE="${TEMP_BROWSER_LEASE_SECONDS:-3600}"
 CHROME="${TEMP_BROWSER_CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 READY_TIMEOUT="${TEMP_BROWSER_READY_TIMEOUT:-15}"
+HEADED="${TEMP_BROWSER_HEADED:-0}"
+LAUNCH_HOOK="${TEMP_BROWSER_LAUNCH:-}"
+OPEN_BIN="${TEMP_BROWSER_OPEN:-open}"
 
 usage() {
   cat <<'EOF'
 Usage: temp-browser acquire --owner <id> --reason <text>
        temp-browser status
        temp-browser release --owner <id>
+
+Env: TEMP_BROWSER_HEADED=1 opens a headed window in the background.
+     TEMP_BROWSER_LAUNCH=<cmd> launches the browser: it gets <profile> <port>
+     and prints the browser pid on its last stdout line.
+Exit 0 ok, 1 error, 2 usage, Exit 3 busy: another owner holds the lock
+(acquire) or the lock is not yours (release). The holder and reason go to stderr.
 EOF
 }
 
@@ -101,6 +114,44 @@ wait_ready() {
   return 1
 }
 
+chrome_app() {
+  case "$CHROME" in
+    *.app/Contents/MacOS/*) echo "${CHROME%%.app/*}.app" ;;
+    *) echo "$CHROME" ;;
+  esac
+}
+
+# Prints the browser pid. Never raises or focuses a window.
+launch_browser() {
+  local profile="$1" out pid
+  local flags=(--remote-debugging-port="$PORT" --user-data-dir="$profile"
+    --no-first-run --no-default-browser-check)
+  if [ -n "$LAUNCH_HOOK" ]; then
+    out="$("$LAUNCH_HOOK" "$profile" "$PORT" </dev/null)" || return 1
+    pid="$(printf '%s\n' "$out" | tail -n 1 | tr -d '[:space:]')"
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    echo "$pid"
+    return 0
+  fi
+  if [ "$HEADED" = "1" ]; then
+    # -g: do not bring the app to the front. -n: a new instance.
+    "$OPEN_BIN" -g -n -a "$(chrome_app)" --args "${flags[@]}" about:blank \
+      >"$STATE_DIR/browser.log" 2>&1 </dev/null || return 1
+    local i
+    for i in $(seq 1 50); do
+      pid="$(pgrep -f -- "--user-data-dir=$profile" | head -n 1 || true)"
+      [ -n "$pid" ] && { echo "$pid"; return 0; }
+      sleep 0.1
+    done
+    return 1
+  fi
+  [ -x "$CHROME" ] || { echo "temp-browser: browser not found: $CHROME" >&2; return 1; }
+  # Headless and backgrounded: it never takes focus or opens a window.
+  nohup "$CHROME" --headless=new "${flags[@]}" \
+    about:blank >"$STATE_DIR/browser.log" 2>&1 </dev/null &
+  echo "$!"
+}
+
 cmd_acquire() {
   parse_opts "$@"
   if [ -z "$OWNER" ] || [ -z "$REASON" ]; then
@@ -130,16 +181,13 @@ cmd_acquire() {
   printf '%s\n' "$PORT" > "$LOCK/port"
   printf '%s\n' "$profile" > "$LOCK/profile"
   echo $(($(date +%s) + LEASE)) > "$LOCK/expires"
-  if [ ! -x "$CHROME" ]; then
-    echo "temp-browser: browser not found: $CHROME" >&2
+  local pid
+  if ! pid="$(launch_browser "$profile")" || ! pid_alive "$pid"; then
+    echo "temp-browser: browser launch failed" >&2
     discard_lock
     exit 1
   fi
-  # Headless and backgrounded: it never takes focus or opens a window.
-  nohup "$CHROME" --headless=new --remote-debugging-port="$PORT" \
-    --user-data-dir="$profile" --no-first-run --no-default-browser-check \
-    about:blank >"$STATE_DIR/browser.log" 2>&1 </dev/null &
-  printf '%s\n' "$!" > "$LOCK/pid"
+  printf '%s\n' "$pid" > "$LOCK/pid"
   if ! wait_ready; then
     echo "temp-browser: browser did not expose CDP on port $PORT" >&2
     discard_lock

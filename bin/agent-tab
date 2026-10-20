@@ -1,0 +1,156 @@
+#!/bin/bash
+# agent-tab: owner, reason, and lease per tab of the shared agents Chrome.
+#
+# Agents share one agents Chrome (CDP port 9223). This tool opens tabs
+# through CDP and records who owns each one, why, and until when. An agent
+# cannot close another agent's tab while its lease is live. Anyone can
+# close a tab whose lease expired. It never raises or focuses a window.
+#
+# Lifecycle scope: the tab records live on disk in
+# $AGENT_TAB_STATE_DIR/tabs.json, per user account. Close deletes a record.
+# Writes take a mkdir lock and replace the file with mv (atomic).
+#
+# Usage:
+#   agent-tab open --owner <id> --reason <text> [--lease <s>] <url>  # prints tab id
+#   agent-tab list
+#   agent-tab close --owner <id> <tab>
+#   agent-tab renew --owner <id> [--lease <s>] <tab>
+#
+# Env: AGENT_TAB_STATE_DIR, AGENT_TAB_PORT (9223),
+#      AGENT_TAB_LEASE_SECONDS (3600).
+#
+# Exit codes: 0 ok, 1 error, 2 usage, 3 busy (live tab held by another owner).
+# shellcheck disable=SC2016  # jq filters use $vars on purpose.
+set -euo pipefail
+
+STATE_DIR="${AGENT_TAB_STATE_DIR:-$HOME/.local/state/agent-tab}"
+STATE="$STATE_DIR/tabs.json"
+LOCK="$STATE_DIR/lock"
+PORT="${AGENT_TAB_PORT:-9223}"
+LEASE="${AGENT_TAB_LEASE_SECONDS:-3600}"
+CDP="http://127.0.0.1:$PORT"
+
+usage() {
+  cat <<'EOF'
+Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
+       agent-tab list
+       agent-tab close --owner <id> <tab>
+       agent-tab renew --owner <id> [--lease <seconds>] <tab>
+Exit 0 ok, 1 error, 2 usage, Exit 3 busy: the tab has a live lease held by
+another owner. The holder and reason go to stderr.
+EOF
+}
+
+die() { echo "agent-tab: $1" >&2; exit "${2:-1}"; }
+
+lock() {
+  mkdir -p "$STATE_DIR"
+  local i=0
+  until mkdir "$LOCK" 2>/dev/null; do
+    i=$((i + 1))
+    [ "$i" -lt 100 ] || die "state lock busy: $LOCK"
+    sleep 0.05
+  done
+  trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+  [ -f "$STATE" ] || echo '{}' > "$STATE"
+}
+
+# Applies a jq filter to the state and replaces the file atomically.
+write_state() {
+  local tmp
+  tmp="$(mktemp "$STATE_DIR/tabs.json.tmp.XXXXXX")"
+  if jq "$@" "$STATE" > "$tmp"; then
+    mv "$tmp" "$STATE"
+  else
+    rm -f "$tmp"
+    die "state update failed"
+  fi
+}
+
+rec() { jq -r --arg id "$1" --arg k "$2" '.[$id][$k] // empty' "$STATE"; }
+
+parse_opts() {
+  OWNER="" REASON="" LEASE_OPT="" ARG=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --owner) OWNER="${2:-}"; shift 2 || shift ;;
+      --reason) REASON="${2:-}"; shift 2 || shift ;;
+      --lease) LEASE_OPT="${2:-}"; shift 2 || shift ;;
+      -*) usage >&2; die "unknown option: $1" 2 ;;
+      *) ARG="$1"; shift ;;
+    esac
+  done
+  [ -z "$LEASE_OPT" ] || LEASE="$LEASE_OPT"
+  case "$LEASE" in ''|*[!0-9]*) die "--lease needs seconds" 2 ;; esac
+}
+
+# Exits 3 unless OWNER may change the tab (own tab, or expired lease).
+check_holder() {
+  local id="$1" holder expires
+  holder="$(rec "$id" owner)"
+  expires="$(rec "$id" expires)"
+  [ "$holder" = "$OWNER" ] && return 0
+  [ "${expires:-0}" -le "$(date +%s)" ] && return 0
+  die "busy, tab $id held by $holder: $(rec "$id" reason) (lease expires $(fmt_time "$expires"))" 3
+}
+
+fmt_time() {
+  date -r "$1" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d "@$1" '+%Y-%m-%d %H:%M:%S'
+}
+
+cmd_open() {
+  parse_opts "$@"
+  [ -n "$OWNER" ] && [ -n "$REASON" ] && [ -n "$ARG" ] ||
+    die "open needs --owner, --reason, and a url" 2
+  local out id
+  # /json/new makes a background target; it never brings the tab forward.
+  out="$(curl -sf --max-time 5 -X PUT "$CDP/json/new?$ARG")" ||
+    die "agents Chrome not reachable on port $PORT"
+  id="$(printf '%s' "$out" | jq -r '.id // empty')"
+  [ -n "$id" ] || die "CDP did not return a tab id"
+  lock
+  write_state --arg id "$id" --arg o "$OWNER" --arg r "$REASON" --arg u "$ARG" \
+    --argjson e "$(($(date +%s) + LEASE))" \
+    '.[$id] = {owner: $o, reason: $r, url: $u, expires: $e}'
+  echo "$id"
+}
+
+cmd_list() {
+  [ -f "$STATE" ] || { echo "agent-tab: no tabs"; return 0; }
+  jq -r --argjson now "$(date +%s)" '
+    to_entries[] | [.key, .value.owner,
+      (if .value.expires > $now then "live" else "expired" end),
+      (.value.expires | todate), .value.reason, .value.url] | @tsv' "$STATE"
+}
+
+cmd_close() {
+  parse_opts "$@"
+  [ -n "$OWNER" ] && [ -n "$ARG" ] || die "close needs --owner and a tab id" 2
+  lock
+  [ -n "$(rec "$ARG" owner)" ] || die "tab $ARG is not tracked"
+  check_holder "$ARG"
+  curl -sf --max-time 5 "$CDP/json/close/$ARG" >/dev/null ||
+    echo "agent-tab: tab $ARG already gone in Chrome" >&2
+  write_state --arg id "$ARG" 'del(.[$id])'
+  echo "agent-tab: closed $ARG"
+}
+
+cmd_renew() {
+  parse_opts "$@"
+  [ -n "$OWNER" ] && [ -n "$ARG" ] || die "renew needs --owner and a tab id" 2
+  lock
+  [ -n "$(rec "$ARG" owner)" ] || die "tab $ARG is not tracked"
+  [ "$(rec "$ARG" owner)" = "$OWNER" ] || check_holder "$ARG"
+  write_state --arg id "$ARG" --arg o "$OWNER" \
+    --argjson e "$(($(date +%s) + LEASE))" '.[$id].expires = $e | .[$id].owner = $o'
+  echo "agent-tab: renewed $ARG"
+}
+
+case "${1:-}" in
+  open) shift; cmd_open "$@" ;;
+  list) shift; cmd_list ;;
+  close) shift; cmd_close "$@" ;;
+  renew) shift; cmd_renew "$@" ;;
+  -h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

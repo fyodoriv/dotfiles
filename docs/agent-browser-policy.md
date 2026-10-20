@@ -30,12 +30,43 @@ temp-browser release --owner "$AGENT_BROWSER_SESSION"  # stops the browser, dele
 - An expired lease or a browser that exited is discarded (browser stopped, profile deleted) and taken over.
 - The same owner can acquire again; that renews the lease and prints the port.
 - The browser runs `--headless=new` in the background. It never raises or focuses a window.
+- `TEMP_BROWSER_HEADED=1` starts a headed window, for passkey, hardware-key, or visible sign-ins. It launches with `open -g -n -a`: a new instance, kept in the background. It never activates or raises a window; you bring it forward yourself.
+- `TEMP_BROWSER_LAUNCH=<cmd>` replaces the launch. temp-browser runs `<cmd> <profile> <port>`. The command must start a browser with that profile and CDP port and print its pid on the last stdout line. temp-browser records that pid in the lock and stops it on release. The hook must not raise or focus a window.
 - Calls that need isolation (`--session-name`, `--profile`, `--extension`) go to the temporary browser through this lock. The `home/zshrc.ai-tools` wrapper hands them to `bin/agent-browser-temp-route`. It takes the lock and runs `agent-browser --cdp <temp port> ...`.
   - Owner: the `--session-name` value, else `$AGENT_ID`, else `$AGENT_BROWSER_SESSION`. With none, the call fails (exit 2).
   - Reason: `$AGENT_BROWSER_TEMP_REASON`, default `isolated agent-browser session`.
   - Held by another agent: the call fails (exit 3) and prints the holder and the reason. agent-browser does not run.
   - `--profile <dir>` is dropped, because the temporary browser always starts with a fresh profile.
   - `agent-browser ... close` releases the lock. Otherwise the lease expires.
+
+### Exit code contract
+
+Wrappers can rely on these codes for `temp-browser`, `agent-browser-temp-route`, and `agent-tab`:
+
+| Code | Meaning |
+|------|---------|
+| 0 | OK |
+| 1 | Error (browser did not start, Chrome not reachable, tab not tracked) |
+| 2 | Usage error |
+| 3 | Busy: another owner holds the lock or the tab. The holder and the reason go to stderr. Wait, or pick another resource. |
+
+`tests/temp-browser.bats` and `tests/agent-tab.bats` pin `exit 3`.
+
+### Tab leases in the agents Chrome: `agent-tab`
+
+Agents share the agents Chrome (9223). `agent-tab` records who owns each tab, so agents never close each other's tabs.
+
+```bash
+tab="$(agent-tab open --owner "$AGENT_ID" --reason "check dashboard" https://example.com)"
+agent-tab list                                   # id, owner, live/expired, expiry, reason, url
+agent-tab renew --owner "$AGENT_ID" --lease 1800 "$tab"
+agent-tab close --owner "$AGENT_ID" "$tab"
+```
+
+- Records live in `~/.local/state/agent-tab/tabs.json`. Writes take a `mkdir` lock and replace the file with `mv` (atomic).
+- `open` uses CDP `PUT /json/new`; `close` uses `/json/close/<id>`. Neither raises a window.
+- Default lease is 1 hour (`--lease`, `AGENT_TAB_LEASE_SECONDS`).
+- Closing or renewing another owner's tab with a live lease exits 3 and prints the holder and the reason. After the lease expires, anyone can close it.
 
 The `home/zshrc.ai-tools` wrapper routes normal operator calls and dotfiles-assigned agent sessions to `agent-browser --cdp 9223` when the dashboard Chrome is reachable. Launchd Chromes run `--headless=new` so CDP tab create never opens a GUI window. After agent-browser, the wrapper logs suspected focus steals to `~/.local/share/dotfiles/logs/focus-steal.log` only — it never hides Chrome or `osascript activate`s another app (both can switch Spaces). Use `--headed` or `AGENT_BROWSER_ALLOW_FOCUS=1` when you want Chrome to stay frontmost for SSO. Preserve tab safety with per-agent daemons plus own-tab discipline: open your own tab, act only on tabs you opened, and close extra tabs at task end.
 

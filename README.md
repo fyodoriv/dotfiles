@@ -732,7 +732,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 |-------|-------------|
 | `com.dotfiles.agent-browser-chrome` | The one agents Chrome on port 9223 |
 
-At most three browsers run: your own Chrome, the agents Chrome on `9223`, and one locked temporary browser (`temp-browser acquire|status|release`, fresh profile each time). `~/.agent-browser/config.json` sets `"cdp": "9223"`, so agent-browser attaches by default and fails instead of starting its own browser. Keep own-tab discipline: open your own tab, work only there, and close extra tabs at task end. The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired; `dotfiles apply` removes them. See [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
+At most three browsers run: your own Chrome, the agents Chrome on `9223`, and one locked temporary browser (`temp-browser acquire|status|release`, fresh profile each time). `~/.agent-browser/config.json` sets `"cdp": "9223"`, so agent-browser attaches by default and fails instead of starting its own browser. Keep own-tab discipline (`agent-tab` records it): open your own tab, work only there, and close extra tabs at task end. The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired; `dotfiles apply` removes them. See [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
 
 The managed agents Chrome is `RunAtLoad` only, with `KeepAlive=false`. If you quit Chrome while shutting down or logging out, launchd and `dotfiles doctor --fix` must not reopen it. They come back on the next login, or you can restart one explicitly with `launchctl start <agent-label>`.
 
@@ -1021,7 +1021,8 @@ scratch work.
 |--------|-------------|
 | `new-project` | Scaffold a react/node/lib/python project with best-practice defaults |
 | `setup-chrome` | Apply dev-friendly Chrome settings and performance flags |
-| `temp-browser` | One locked, disposable agent browser: `acquire --owner <id> --reason <text>` prints the CDP port (fresh headless profile); `status`; `release --owner <id>` stops it and deletes the profile |
+| `temp-browser` | One locked, disposable agent browser: `acquire --owner <id> --reason <text>` prints the CDP port (fresh headless profile); `status`; `release --owner <id>` stops it and deletes the profile. `TEMP_BROWSER_HEADED=1` opens a headed window in the background (no focus); `TEMP_BROWSER_LAUNCH=<cmd>` launches it your way. Exit 3 = busy |
+| `agent-tab` | Owner, reason, and lease per tab of the agents Chrome (9223): `open --owner --reason [--lease] <url>`, `list`, `close --owner <id> <tab>`, `renew`. Closing another owner's live tab exits 3 |
 | `agent-browser-temp-route` | Routes agent-browser calls with `--session-name`, `--profile`, or `--extension` to `temp-browser` through its lock; fails with the holder and reason when held |
 | `setup-dock` | Reset Dock to a developer-essential app layout |
 

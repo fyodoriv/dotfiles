@@ -144,3 +144,77 @@ teardown() {
 @test "temp-browser never raises windows" {
   ! grep -qE 'osascript|activate|open -a' "$SCRIPT"
 }
+
+@test "busy exit code is 3 (documented contract)" {
+  "$SCRIPT" acquire --owner agent-a --reason r >/dev/null
+  run "$SCRIPT" acquire --owner agent-b --reason r2
+  [ "$status" -eq 3 ]
+  run "$SCRIPT" release --owner agent-b
+  [ "$status" -eq 3 ]
+  run "$SCRIPT" --help
+  [[ "$output" == *"Exit 3"* ]]
+  grep -q 'exit 3' "$BATS_TEST_DIRNAME/../docs/agent-browser-policy.md"
+}
+
+@test "TEMP_BROWSER_LAUNCH hook gets profile and port; its pid is recorded" {
+  cat > "$TEST_DIR/hook" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$@" > "${TEMP_BROWSER_STATE_DIR}/hook-args"
+nohup sleep 300 >/dev/null 2>&1 </dev/null &
+echo "launching" >&2
+echo "$!"
+STUB
+  chmod +x "$TEST_DIR/hook"
+  export TEMP_BROWSER_LAUNCH="$TEST_DIR/hook"
+  run "$SCRIPT" acquire --owner a --reason r
+  [ "$status" -eq 0 ]
+  [ "${lines[-1]}" = "9399" ]
+  profile="$(cat "$TEMP_BROWSER_STATE_DIR/lock/profile")"
+  [ "$(sed -n 1p "$TEMP_BROWSER_STATE_DIR/hook-args")" = "$profile" ]
+  [ "$(sed -n 2p "$TEMP_BROWSER_STATE_DIR/hook-args")" = "9399" ]
+  pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
+  kill -0 "$pid"
+  [ ! -e "$TEMP_BROWSER_STATE_DIR/launch-args" ]
+}
+
+@test "TEMP_BROWSER_LAUNCH hook that prints no pid frees the lock" {
+  printf '#!/bin/bash\necho nope\n' > "$TEST_DIR/hook"
+  chmod +x "$TEST_DIR/hook"
+  export TEMP_BROWSER_LAUNCH="$TEST_DIR/hook"
+  run "$SCRIPT" acquire --owner a --reason r
+  [ "$status" -eq 1 ]
+  [ ! -e "$TEMP_BROWSER_STATE_DIR/lock" ]
+}
+
+@test "TEMP_BROWSER_HEADED=1 launches in the background without headless" {
+  cat > "$TEST_DIR/fake-open" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$@" > "${TEMP_BROWSER_STATE_DIR}/open-args"
+while [ "$#" -gt 0 ] && [ "$1" != "--args" ]; do shift; done
+shift
+nohup "$FAKE_CHROME_LOOP" "$@" >/dev/null 2>&1 </dev/null &
+STUB
+  cat > "$TEST_DIR/chrome-loop" <<'STUB'
+#!/bin/bash
+while :; do sleep 1; done
+STUB
+  chmod +x "$TEST_DIR/fake-open" "$TEST_DIR/chrome-loop"
+  export FAKE_CHROME_LOOP="$TEST_DIR/chrome-loop"
+  export TEMP_BROWSER_OPEN="$TEST_DIR/fake-open"
+  export TEMP_BROWSER_HEADED=1
+  run "$SCRIPT" acquire --owner a --reason r
+  [ "$status" -eq 0 ]
+  args="$TEMP_BROWSER_STATE_DIR/open-args"
+  grep -qx -- '-g' "$args"
+  grep -qx -- '-n' "$args"
+  ! grep -q -- '--headless' "$args"
+  grep -qx -- '--remote-debugging-port=9399' "$args"
+  profile="$(cat "$TEMP_BROWSER_STATE_DIR/lock/profile")"
+  pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
+  ps -p "$pid" -o command= | grep -q -- "--user-data-dir=$profile"
+}
+
+@test "headed launch never activates or raises" {
+  ! grep -qE 'osascript|activate|open -a|open -n -a' "$SCRIPT"
+  grep -q -- '-g -n -a' "$SCRIPT"
+}

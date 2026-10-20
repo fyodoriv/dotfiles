@@ -34,7 +34,7 @@ without those runtimes.
 | Severity | Modules | Meaning |
 |----------|---------|---------|
 | 🚨 Critical | security, ssh, workflow | Security and safety |
-| ⚙️ Important | agent-browser, agentbrew, chezmoi, chrome, editor, git, local-bin, memory, personal-machine, resilience, shell, sync, upgrade | Core developer config |
+| ⚙️ Important | agent-browser, agentbrew, chezmoi, chrome, editor, git, local-bin, memory, personal-machine, plugins, resilience, shell, sync, upgrade | Core developer config |
 | ⚡ Performance | macos, tools | System performance |
 | 💅 Cosmetic | claude, enterprise, extras, jetbrains, local-ai, local-llm, minsky, obsidian, prompt, terminal, vscode, workspace | Personal preference |
 

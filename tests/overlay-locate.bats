@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
-# Regression tests for auto-discovering additive dotfiles overlays.
+# Tests for the one overlay lookup in lib/plugin.sh. Folders are never
+# auto-discovered; plugins come from plugins.lock (tests/plugin-v2.bats).
 
 load test_helper
 
@@ -38,8 +39,10 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
-@test "auto-discovery skips a deployed checkout of the base repository" {
-  [ "$(plugin_overlay_root)" = "$TEST_OVERLAY" ]
+@test "folders named dotfiles-* are never auto-discovered (issue #145 S3)" {
+  run plugin_overlay_root
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
 }
 
 @test "an explicit overlay path takes precedence over source-replica filtering" {
@@ -61,8 +64,8 @@ teardown() {
   [ "$output" = "$TEST_OVERLAY/validate" ]
 }
 
-@test "plugin_overlay_path joins the discovered root and the path" {
-  run plugin_overlay_path Agentfile.yaml
+@test "plugin_overlay_path joins the root and the path" {
+  EXTRA_OVERLAY_ROOT="$TEST_OVERLAY" run plugin_overlay_path Agentfile.yaml
   [ "$status" -eq 0 ]
   [ "$output" = "$TEST_OVERLAY/Agentfile.yaml" ]
 }

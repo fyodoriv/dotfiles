@@ -17,6 +17,10 @@
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Contract v2 preview (issue #145): manifest + plugins.lock.
+if [ "${DOTFILES_PLUGINS_V2:-}" = 1 ]; then
+  exec bash "$DOTFILES_DIR/bin/dotfiles-plugin-v2" "$@"
+fi
 SUPPORTED_SCHEMA_VERSION=1
 PLUGINS_DIR="${HOME}/.config/dotfiles/plugins"
 LOG_DIR="${HOME}/.local/share/dotfiles/logs/plugins"

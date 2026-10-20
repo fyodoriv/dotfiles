@@ -367,8 +367,8 @@ Every `dotfiles` command auto-checks for updates (fetches at most once/hour). Wh
 ### Health checks
 
 Checks are auto-discovered from `modules/*/doctor.sh`. Adding a new module automatically adds its checks — no editing the doctor script.
-When an organization overlay is auto-discovered, other checkouts of the base
-repository are excluded so their modules do not run twice.
+An organization overlay is never auto-discovered from a folder name. It comes
+from `extra_overlay_root` or from `plugins.lock` ([docs/plugin-system.md](docs/plugin-system.md)).
 
 The `workspace` module extends the view beyond this repo: `dotfiles-workspace status` rolls up every declared workspace folder (repos, dirty/ahead state, TASKS.md queue estimates) — see [docs/workspace.md](docs/workspace.md).
 

@@ -180,6 +180,16 @@ Spotlight check count varies based on which directories exist on your machine.
 | `tool.fastfetch` | fastfetch installed | `brew install fastfetch` |
 | `tool.gtimeout` | gtimeout installed (bounds doctor and hook timeouts) | `brew install coreutils` |
 
+### plugins
+
+One check per company plugin in `plugins.lock` (issue #145). A plugin that no
+longer matches its lock (commit, tree hash, changed files, or capabilities) is
+disabled, and this check prints the difference. Dev links print a warning.
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `plugins.<name>.verified` | Checkout matches its `plugins.lock` entry | None (remove and add again) |
+
 ### sync
 
 | ID | What it checks | Auto-fix |

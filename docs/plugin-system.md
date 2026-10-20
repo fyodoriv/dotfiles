@@ -317,9 +317,36 @@ which is idempotent on existing symlinks and re-creates anything missing.
 `lib/plugin.sh` is the only place that finds the company overlay
 (issue #145, step 3). Use `plugin_overlay_root` or
 `plugin_overlay_path <relative path>`. Both return 2 for a colon-separated
-`EXTRA_OVERLAY_ROOT`. Pass `--no-discover` to skip folder auto-discovery.
-vscode, brew, and validate pass it, as they did before. `tests/overlay-locate.bats`
-fails when a core file copies the lookup inline.
+`EXTRA_OVERLAY_ROOT`. Order: `EXTRA_OVERLAY_ROOT`, the chezmoi key
+`extra_overlay_root`, then the first plugin in `plugins.lock` that still
+matches its lock. Folders named `dotfiles-*` are never auto-discovered
+(step 4 closed gap S3). `--no-discover` skips the lock step; vscode, brew,
+and validate pass it until step 6. `tests/overlay-locate.bats` fails when a
+core file copies the lookup inline.
+
+### Contract v2 preview: manifest and plugins.lock
+
+Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
+
+- A plugin is a git repo with `dotfiles-plugin.yaml` at its root. The schema
+  is `config/dotfiles-plugin.schema.json`. Its shared keys (`schema`, `name`,
+  `version`, `requires_core`, `capabilities`, `contributes`) match
+  agentbrew's `agentbrew-plugin.yaml`. Unknown keys, absolute paths, and
+  `..` paths are refused.
+- `dotfiles plugin add <git-url>@<tag> [--yes]` clones the tag, validates
+  the manifest, shows the capabilities, and asks once (`--yes` skips the
+  prompt; no terminal and no `--yes` refuses). It runs no plugin code. It
+  installs to `~/.local/share/dotfiles/plugins/<name>` and writes
+  `~/.config/dotfiles/plugins.lock` (mode 0600): source, ref, version,
+  commit, `tree_hash`, `capabilities_sha`, path, dev, locked_at.
+- `dotfiles plugin add --dev <path>` links a local checkout. It is not
+  pinned, and doctor warns on every run.
+- `dotfiles plugin remove <name>`, `list`, and `verify [<name>]`.
+- A plugin whose commit, tree, files, or capabilities differ from the lock
+  is disabled: the lookup skips it and `plugins.<name>.verified` fails.
+- Next (step 5): signed tags checked against the allowed-signers file shared
+  with agentbrew, `~/.config/agent-plugins/allowed_signers`
+  (`$AGENT_PLUGINS_ALLOWED_SIGNERS`).
 
 ### Doctor integration
 

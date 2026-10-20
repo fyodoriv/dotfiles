@@ -5,10 +5,8 @@
 #
 # - "today:" tests pin the current overlay lookup and hook chain, so the
 #   refactor in later steps cannot change them by accident.
-# - "gap S<n>:" tests state the SECURE behavior. Today they fail, so they run
-#   through `known_gap`, which passes while the gap is open and FAILS once the
-#   gap closes. The step that closes a gap must delete its `known_gap` wrapper.
-#   Gap ids match the "Security gaps" table in issue #145.
+# - "closed S<n>:" tests state the SECURE behavior for each gap in the
+#   "Security gaps" table of issue #145. Steps 1-4 proved and closed S1-S4.
 
 load test_helper
 
@@ -35,18 +33,6 @@ setup() {
 
 teardown() {
   rm -rf "$TEST_DIR"
-}
-
-# known_gap <id> <fn>: passes while <fn> (an assertion of the secure
-# behavior) fails. When <fn> passes, the gap is closed: fail loudly so the
-# closing step removes the wrapper and keeps <fn> as a normal test.
-known_gap() {
-  local id="$1"
-  shift
-  if ( "$@" ) >/dev/null 2>&1; then
-    echo "gap $id is closed: remove known_gap from this test (issue #145)" >&2
-    return 1
-  fi
 }
 
 # make_overlay <dir>: a folder that today's lookup treats as an overlay.
@@ -119,12 +105,12 @@ core_push() {
   [ -f "$MARKER" ]
 }
 
-# ── gaps: secure behavior ─────────────────────────────────────────────
-# "closed" tests are plain assertions. "gap" tests still run via known_gap.
+# ── closed gaps: secure behavior ─────────────────────────────────────────────
 
 # S1: with an overlay installed and no pattern data, a leak gate must block.
 s1_push_blocks_without_patterns() {
   make_overlay "$HOME/apps/tooling/dotfiles-acme"
+  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
   rm -f "$HOME/apps/tooling/dotfiles-acme/hooks/pre-push"
   make_push_repo "$TEST_DIR/repo" 1
   ! core_push "$TEST_DIR/repo"
@@ -177,12 +163,12 @@ EOF
   [ ! -f "$MARKER" ]
 }
 
-@test "gap S3: auto-discovery must not pick an unpinned dotfiles-* folder" {
-  known_gap S3 s3_lookup_ignores_unpinned_folder
+@test "closed S3: auto-discovery must not pick an unpinned dotfiles-* folder" {
+  s3_lookup_ignores_unpinned_folder
 }
 
-@test "gap S3: doctor must never run a module from an unpinned folder" {
-  known_gap S3 s3_doctor_never_runs_unpinned_module
+@test "closed S3: doctor must never run a module from an unpinned folder" {
+  s3_doctor_never_runs_unpinned_module
 }
 
 # S4: an installed overlay's own pre-push hook must run in a real push.
@@ -199,6 +185,7 @@ s4_overlay_hook_runs_on_push() {
 
 s1_commit_blocks_without_patterns() {
   make_overlay "$HOME/apps/tooling/dotfiles-acme"
+  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
   make_push_repo "$TEST_DIR/repo" 1
   printf 'more\n' >> "$TEST_DIR/repo/notes.txt"
   git -C "$TEST_DIR/repo" add notes.txt
@@ -213,6 +200,7 @@ s1_commit_blocks_without_patterns() {
 
 @test "S1: a gated push goes through when the overlay pattern loads" {
   make_overlay "$HOME/apps/tooling/dotfiles-acme"
+  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
   rm -f "$HOME/apps/tooling/dotfiles-acme/hooks/pre-push"
   printf "OSS_READINESS_INTERNAL_PATTERN='zz-not-in-repo'\n" > "$HOME/apps/tooling/dotfiles-acme/oss-readiness.env"
   make_push_repo "$TEST_DIR/repo" 1

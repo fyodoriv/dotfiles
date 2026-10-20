@@ -340,6 +340,7 @@ YML
 @test "an overlay with no pattern file blocks a public write (issue #145 S1)" {
   mkdir -p "$HOME/apps/tooling/dotfiles-acme"
   printf 'mcp: []\n' > "$HOME/apps/tooling/dotfiles-acme/Agentfile.yaml"
+  export EXTRA_OVERLAY_ROOT="$HOME/apps/tooling/dotfiles-acme"
   rm -f "$OSS_READINESS_ENV_FILE"
   run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "plain text"
   assert_blocked "overlay is installed"

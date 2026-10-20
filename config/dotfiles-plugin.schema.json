@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fyodoriv/dotfiles/config/dotfiles-plugin.schema.json",
+  "title": "dotfiles-plugin.yaml",
+  "description": "Manifest of a dotfiles company plugin (issue #145). Schema version 1. Shared keys match agentbrew-plugin.yaml. lib/plugin.sh validates this subset: type, const, pattern, required, properties, additionalProperties false, items, uniqueItems, $ref.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "name", "version"],
+  "properties": {
+    "schema": { "const": 1 },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$" },
+    "requires_core": { "type": "string", "pattern": "." },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "brew": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "taps": { "$ref": "#/$defs/names" },
+            "casks": { "type": "boolean" }
+          }
+        },
+        "launchagents": { "$ref": "#/$defs/names" },
+        "defaults_write": { "$ref": "#/$defs/names" },
+        "network_hosts": { "$ref": "#/$defs/names" },
+        "sudo": { "type": "boolean" },
+        "shell_fragment": { "type": "boolean" },
+        "hooks": { "$ref": "#/$defs/names" },
+        "secrets": { "$ref": "#/$defs/names" }
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "doctor_modules": { "$ref": "#/$defs/relPath" },
+        "validate": { "$ref": "#/$defs/relPath" },
+        "brewfile": { "$ref": "#/$defs/relPath" },
+        "launchagents": { "$ref": "#/$defs/relPath" },
+        "hooks": { "$ref": "#/$defs/relPath" },
+        "settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "vscode": { "$ref": "#/$defs/relPath" }
+          }
+        },
+        "shell": { "$ref": "#/$defs/relPath" },
+        "options": { "type": "object" },
+        "leak_patterns": { "$ref": "#/$defs/relPath" },
+        "blocked_software": { "$ref": "#/$defs/relPath" },
+        "agentbrew": { "$ref": "#/$defs/relPath" }
+      }
+    }
+  },
+  "$defs": {
+    "names": { "type": "array", "items": { "type": "string", "pattern": "." }, "uniqueItems": true },
+    "relPath": { "type": "string", "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$" }
+  }
+}

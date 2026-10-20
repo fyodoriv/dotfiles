@@ -110,11 +110,28 @@ Act on each inventory line by its verdict:
 | Verdict | Do this |
 |---|---|
 | `ship` | Deliver it with `/ship-it` when it is the user's or an agent's finished work. When it is half done or you cannot tell, report it with its next step. |
+| `ship` on a `PR #N` line | Get it finished (below). |
 | `salvage` | Look first: `git status`, `git diff`, `git stash show -p`. Commit useful work to a branch and ship it. Report what you kept. |
 | `clean-up` | Delete the merged local branch (`git branch -d`, never `-D`). |
 | `security` | Fix the critical alert: take the dependabot pull request or bump the package yourself. Ship it with `/ship-it`. |
 | `pipeline`, `bot`, `skip`, `advisory` | Report only. |
 | `unknown` | Fetch again and check by hand. Never delete. |
+
+### Open pull requests on your repos
+
+Each `ship  PR #N` line is an open pull request. Try to finish it now, in
+this order (the `wrap-up` skill's "Continue open work" section has the same
+steps):
+
+1. **Draft from `wrap-up`:** read its `## Pending` list and its task. Do the
+   first item that is not blocked; when every item needs the owner, report it.
+2. **Conflict:** merge the default branch into the PR branch and push.
+3. **Red check:** reproduce it, fix it, push.
+4. **Unresolved review thread:** change the code or answer, then resolve it.
+5. **Green, nothing pending, approved where the repo needs it:** mark it
+   ready and merge with `/ship-it`.
+
+A PR that only waits on a person stays open; report it with who it waits on.
 
 ### Your pull requests on tooling repos you do not own
 

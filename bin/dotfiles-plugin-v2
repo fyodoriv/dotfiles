@@ -12,6 +12,10 @@
 #   dotfiles plugin verify [<name>]               re-check the lock against disk
 #   dotfiles plugin options                       effective core option values
 #   dotfiles plugin lint <name>                   exported secrets, unpinned packages
+#   dotfiles plugin new <name> [<dir>]            scaffold a plugin repo (manifest,
+#                                                 .gitignore, tests, CI workflow)
+#   dotfiles plugin migrate <v1 overlay dir>      write a draft manifest; list
+#                                                 files it could not map
 #   dotfiles plugin trust <name> --signer <key> [--revoke] [--yes]
 #                                                 add or remove a trusted signer
 #
@@ -199,6 +203,55 @@ cmd_trust() {
   echo "✓ Trusted signer for $name in $(plugin_signers_file)"
 }
 
+cmd_new() {
+  local name="${1:-}" dir tmpl
+  [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || die "usage: dotfiles plugin new <name> [<dir>] (name: a-z, 0-9, -)"
+  dir="${2:-dotfiles-$name}"
+  [ ! -e "$dir" ] || die "already exists: $dir"
+  tmpl="$DOTFILES_DIR/data/plugin-template"
+  mkdir -p "$dir"
+  cp -R "$tmpl/." "$dir/"
+  mv "$dir/gitignore" "$dir/.gitignore"
+  find "$dir" -type f \( -name '*.yaml' -o -name '*.md' \) -exec sed -i.bak "s/@NAME@/$name/g" {} \; -exec rm -f {}.bak \;
+  git -C "$dir" init -q 2>/dev/null || true
+  echo "✓ Created plugin $name in $dir"
+  echo "  Next: edit dotfiles-plugin.yaml, run its tests (DOTFILES_CORE=$DOTFILES_DIR bats $dir/tests),"
+  echo "  then release a signed tag and run: dotfiles plugin add <git-url>@<tag>"
+}
+
+cmd_migrate() {
+  local src="${1:-}" draft hooks unmapped f
+  [ -d "$src" ] || die "usage: dotfiles plugin migrate <v1 overlay dir>"
+  src="$(cd "$src" && pwd -P)"
+  draft="$src/dotfiles-plugin.yaml.draft"
+  hooks="$(find "$src/hooks" -maxdepth 1 -type f -perm -111 -exec basename {} \; 2>/dev/null | sort | paste -sd, -)"
+  {
+    echo "schema: 1"
+    echo "name: $(basename "$src" | sed 's/^dotfiles-//' | tr '[:upper:]_' '[:lower:]-')"
+    echo "version: 0.1.0"
+    echo "capabilities:"
+    echo "  sudo: false"
+    [ -z "$hooks" ] || echo "  hooks: [$hooks]"
+    [ ! -f "$src/brewfile/Brewfile" ] || echo "  brew: {taps: [$(sed -nE 's/^[[:space:]]*tap[[:space:]]+"([^"]+)".*/\1/p' "$src/brewfile/Brewfile" | paste -sd, -)], casks: $(grep -qE '^[[:space:]]*cask ' "$src/brewfile/Brewfile" && echo true || echo false)}"
+    echo "contributes:"
+    [ ! -d "$src/modules" ] || echo "  doctor_modules: modules"
+    [ ! -d "$src/validate" ] || echo "  validate: validate"
+    [ ! -f "$src/brewfile/Brewfile" ] || echo "  brewfile: brewfile/Brewfile"
+    [ ! -d "$src/hooks" ] || echo "  hooks: hooks"
+    [ ! -f "$src/vscode/settings.json" ] || echo "  settings: {vscode: vscode/settings.json}"
+  } > "$draft"
+  echo "✓ Wrote $draft (nothing else changed)"
+  unmapped="$(cd "$src" && git ls-files 2>/dev/null || find . -type f | sed 's|^\./||')"
+  echo "Files the draft does not cover (map them by hand, or move the logic into a core option):"
+  while IFS= read -r f; do
+    case "$f" in
+      modules/* | validate/* | brewfile/Brewfile | hooks/* | vscode/settings.json | dotfiles-plugin.yaml* | README* | .gitignore) ;;
+      *) echo "  $f" ;;
+    esac
+  done <<< "$unmapped"
+  echo "Review the draft, rename it to dotfiles-plugin.yaml, release a signed tag, then: dotfiles plugin add <url>@<tag>"
+}
+
 cmd_list() {
   local name state
   for name in $(plugin_lock_names); do
@@ -223,6 +276,8 @@ case "${1:-}" in
   list) cmd_list ;;
   verify) shift; cmd_verify "$@" ;;
   trust) shift; cmd_trust "$@" ;;
+  new) shift; cmd_new "$@" ;;
+  migrate) shift; cmd_migrate "$@" ;;
   lint)
     shift
     # shellcheck source=../lib/plugin-capabilities.sh

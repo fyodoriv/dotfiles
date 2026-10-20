@@ -260,3 +260,39 @@ lookup() {
   [[ "$output" == *"approval needed"* ]]
   [ ! -f "$SIGNERS" ]
 }
+
+@test "10: plugin new scaffolds a plugin whose own tests pass against this core" {
+  cd "$TEST_DIR"
+  run bash "$CLI" new acme-tools
+  [ "$status" -eq 0 ]
+  [ -f dotfiles-acme-tools/.gitignore ]
+  [ -f dotfiles-acme-tools/.github/workflows/ci.yml ]
+  [ "$(yq -r .name dotfiles-acme-tools/dotfiles-plugin.yaml)" = acme-tools ]
+  ! grep -rq '@NAME@' dotfiles-acme-tools
+  DOTFILES_CORE="$REPO_ROOT" run bats dotfiles-acme-tools/tests
+  echo "$output"
+  [ "$status" -eq 0 ]
+  run bash "$CLI" new Bad_Name
+  [ "$status" -ne 0 ]
+}
+
+@test "10: plugin migrate drafts a manifest from a v1 overlay and lists unmapped files" {
+  local o="$TEST_DIR/dotfiles-corp"
+  mkdir -p "$o/modules/m" "$o/hooks" "$o/brewfile" "$o/vscode" "$o/misc"
+  echo 'check "a" "a" "true" ""' > "$o/modules/m/doctor.sh"
+  printf '#!/bin/sh\n' > "$o/hooks/pre-push"; chmod +x "$o/hooks/pre-push"
+  printf 'tap "corp/tap"\ncask "corp-app"\n' > "$o/brewfile/Brewfile"
+  echo '{}' > "$o/vscode/settings.json"
+  echo x > "$o/misc/patch-chrome.sh"
+  run bash "$CLI" migrate "$o"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"misc/patch-chrome.sh"* ]]
+  [[ "$output" != *"modules/m/doctor.sh"* ]]
+  [ ! -f "$o/dotfiles-plugin.yaml" ]
+  run bash -c 'source "$1/lib/plugin.sh"; plugin_validate_manifest "$2"' _ "$REPO_ROOT" "$o/dotfiles-plugin.yaml.draft"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(yq -r '.capabilities.hooks[0]' "$o/dotfiles-plugin.yaml.draft")" = pre-push ]
+  [ "$(yq -r '.capabilities.brew.taps[0]' "$o/dotfiles-plugin.yaml.draft")" = corp/tap ]
+  [ "$(yq -r '.contributes.settings.vscode' "$o/dotfiles-plugin.yaml.draft")" = vscode/settings.json ]
+}

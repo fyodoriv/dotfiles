@@ -435,6 +435,14 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
   `~/.local/state/dotfiles/sync-needs-review` instead. The leak-gate bypass
   is `dotfiles leak allow --once [<sha>]`, refused without a terminal; the
   `DOTFILES_ALLOW_GH_PRIVATE_REFS` variable no longer works.
+- Authoring (step 10). `dotfiles plugin new <name> [<dir>]` scaffolds a
+  plugin repo from `data/plugin-template/`: manifest, `.gitignore` (agent run
+  folders, `__pycache__/`, `.worktrees/`, `.DS_Store`, env files), an example
+  doctor module and validate script, `tests/plugin.bats` (schema, options,
+  lint against a core checkout in `DOTFILES_CORE`), and a CI workflow (those
+  tests, shellcheck, gitleaks). `dotfiles plugin migrate <v1 overlay dir>`
+  writes `dotfiles-plugin.yaml.draft` from the v1 layout, lists every file
+  it could not map, and changes nothing else.
 
 ### Doctor integration
 

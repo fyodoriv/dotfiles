@@ -1,0 +1,19 @@
+name: plugin-ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/checkout@v4
+        with: { repository: fyodoriv/dotfiles, ref: feat/chezmoi, path: .dotfiles-core }
+      - run: brew install bats-core shellcheck yq jq gitleaks
+      - name: Schema, options, lint
+        run: DOTFILES_CORE="$PWD/.dotfiles-core" bats tests/
+      - name: Shellcheck
+        run: find . -name '*.sh' -not -path './.dotfiles-core/*' -print0 | xargs -0 -r shellcheck -S warning
+      - name: Secret scan
+        run: gitleaks detect --no-banner --redact

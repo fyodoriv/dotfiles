@@ -1,0 +1,9 @@
+schema: 1
+name: @NAME@
+version: 0.1.0
+# Deny by default: list only what this plugin needs.
+capabilities:
+  sudo: false
+contributes:
+  doctor_modules: doctor
+  validate: validate

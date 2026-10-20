@@ -317,3 +317,74 @@ plugin_validate_run() {
     done
   done < <(plugin_verified_list 2>/dev/null)
 }
+
+# ── 7. Core options ────────────────────────────────────────────────────
+# config/plugin-options.yaml declares every option a plugin may set.
+
+plugin_options_file() {
+  printf '%s' "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config/plugin-options.yaml"
+}
+
+# plugin_validate_options <manifest>: prints one error per line and fails
+# for an unknown option or a value of the wrong type.
+plugin_validate_options() {
+  local errors
+  errors="$(yq -o=json '.contributes.options // {}' "$1" | jq -r --slurpfile reg <(yq -o=json '.' "$(plugin_options_file)") '
+    to_entries[] | .key as $k | .value as $v | ($reg[0].options[$k]) as $o
+    | if $o == null then "option \($k): unknown (see config/plugin-options.yaml)"
+      elif $o.type == "boolean" and ($v | type) != "boolean" then "option \($k): must be boolean"
+      elif $o.type == "list" and ($v | type) != "array" then "option \($k): must be a list"
+      else empty end')"
+  [ -z "$errors" ] && return 0
+  printf '%s\n' "$errors"
+  return 1
+}
+
+# plugin_option <key>: prints the effective value. Booleans print true or
+# false; lists print one item per line. Plugins are read in lock order.
+plugin_option() {
+  local key="$1" reg type value name path v
+  reg="$(plugin_options_file)"
+  type="$(K="$key" yq -r '.options[strenv(K)].type // ""' "$reg")"
+  [ -n "$type" ] || { echo "unknown option: $key" >&2; return 2; }
+  if [ "$type" = boolean ]; then
+    value="$(K="$key" yq -r '.options[strenv(K)].default' "$reg")"
+    while IFS=$'\t' read -r name path; do
+      [ -n "$name" ] || continue
+      v="$(K="$key" yq -r '.contributes.options[strenv(K)] | select(. != null)' "$path/dotfiles-plugin.yaml")"
+      [ -z "$v" ] || value="$v"
+    done < <(plugin_verified_list 2>/dev/null)
+    printf '%s\n' "$value"
+  else
+    {
+      K="$key" yq -r '.options[strenv(K)].default[]' "$reg"
+      while IFS=$'\t' read -r name path; do
+        [ -n "$name" ] || continue
+        K="$key" yq -r '.contributes.options[strenv(K)] // [] | .[]' "$path/dotfiles-plugin.yaml"
+      done < <(plugin_verified_list 2>/dev/null)
+    } | awk 'NF && !seen[$0]++'
+  fi
+}
+
+# plugin_options_report: every option, its effective value, and which
+# plugins set it. Booleans set to different values by two plugins print
+# "conflict".
+plugin_options_report() {
+  local key setters values name path v
+  for key in $(yq -r '.options | keys | .[]' "$(plugin_options_file)"); do
+    setters="" values=""
+    while IFS=$'\t' read -r name path; do
+      [ -n "$name" ] || continue
+      v="$(K="$key" yq -o=json -I0 '.contributes.options[strenv(K)] | select(. != null)' "$path/dotfiles-plugin.yaml")"
+      [ -n "$v" ] || continue
+      setters="$setters $name"
+      values="$values"$'\n'"$v"
+    done < <(plugin_verified_list 2>/dev/null)
+    printf '%s = %s' "$key" "$(plugin_option "$key" | paste -sd, -)"
+    [ -z "$setters" ] || printf '  (set by:%s)' "$setters"
+    [ "$(printf '%s' "$values" | sed '/^$/d' | sort -u | wc -l | tr -d ' ')" -le 1 ] ||
+      [ "$(K="$key" yq -r '.options[strenv(K)].type' "$(plugin_options_file)")" != boolean ] ||
+      printf '  conflict'
+    printf '\n'
+  done
+}

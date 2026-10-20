@@ -396,6 +396,15 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     as its folder, and a timeout (`DOTFILES_PLUGIN_TIMEOUT`, default 60 s).
     Check ids show as `<plugin>/<id>`. A hang or crash fails
     `<plugin>/<module>.ran`. Plugin checks report only; fix commands do not run.
+- Core options (step 7). A plugin sets values in `contributes.options` only
+  for options declared in `config/plugin-options.yaml`; anything else fails
+  `plugin add`. Booleans: the last plugin in lock order wins. Lists: union.
+  `dotfiles plugin options` prints each effective value, who set it, and
+  boolean conflicts.
+  - `mas.skip_ids`: `dotfiles-mas-upgrade` skips these App Store ids.
+  - `brew.skip`: removed from the core Brewfile before `brew bundle`.
+  - `chrome.purpose_headed`, `chrome.restore_session`,
+    `spotlight.exclude_worktrees`: declared; wiring lands in the next PRs.
 
 ### Doctor integration
 

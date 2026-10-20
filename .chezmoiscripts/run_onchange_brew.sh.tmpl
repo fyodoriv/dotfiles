@@ -141,6 +141,18 @@ BREWFILE_EOF
 {{ range .brew_skip -}}
 sed -i.bak '/^brew "{{ . }}"/d;/^cask "{{ . }}"/d' "$RENDERED" && rm -f "$RENDERED.bak"
 {{ end -}}
+# Company plugins add names through the core option brew.skip (issue #145).
+if [ -f "{{ .chezmoi.sourceDir }}/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+  for _plib in plugin plugin-capabilities plugin-extensions; do
+    # shellcheck source=/dev/null
+    source "{{ .chezmoi.sourceDir }}/lib/$_plib.sh"
+  done
+  while IFS= read -r _skip; do
+    [ -n "$_skip" ] || continue
+    _skip_re="$(printf '%s' "$_skip" | sed 's/[][\/.^$*]/\\&/g')"
+    sed -i.bak "/^brew \"$_skip_re\"/d;/^cask \"$_skip_re\"/d" "$RENDERED" && rm -f "$RENDERED.bak"
+  done < <(plugin_option brew.skip 2>/dev/null)
+fi
 
 brew bundle --no-upgrade --file="$RENDERED"
 echo "✓ Homebrew packages up to date"

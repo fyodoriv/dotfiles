@@ -10,6 +10,7 @@
 #   dotfiles plugin remove <name>                 delete checkout and lock entry
 #   dotfiles plugin list                          name, ref, commit, state
 #   dotfiles plugin verify [<name>]               re-check the lock against disk
+#   dotfiles plugin options                       effective core option values
 #   dotfiles plugin trust <name> --signer <key> [--revoke] [--yes]
 #                                                 add or remove a trusted signer
 #
@@ -105,6 +106,11 @@ cmd_add() {
   fi
 
   errors="$(plugin_validate_manifest "$manifest")" || die "invalid manifest:"$'\n'"$errors"
+  # shellcheck source=../lib/plugin-capabilities.sh
+  source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+  # shellcheck source=../lib/plugin-extensions.sh
+  source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+  errors="$(plugin_validate_options "$manifest")" || die "invalid manifest:"$'\n'"$errors"
   name="$(yq -r '.name' "$manifest")"
   [ -z "$(plugin_lock_get "$name" path 2>/dev/null)" ] ||
     die "plugin $name is already installed; remove it first"
@@ -216,6 +222,12 @@ case "${1:-}" in
   list) cmd_list ;;
   verify) shift; cmd_verify "$@" ;;
   trust) shift; cmd_trust "$@" ;;
+  options)
+    # shellcheck source=../lib/plugin-capabilities.sh
+    source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+    # shellcheck source=../lib/plugin-extensions.sh
+    source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+    plugin_options_report ;;
   -h | --help | help | "") usage ;;
   *) die "unknown command: $1" ;;
 esac

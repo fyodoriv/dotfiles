@@ -1,0 +1,30 @@
+# Core options a company plugin may set through contributes.options
+# (issue #145, step 7). A plugin key that is not listed here fails
+# validation. Rule of thumb: if a fresh external user could use it without
+# company identity, network, or entitlement, it belongs in the core as an
+# option, and the plugin only sets the value.
+#
+# type: boolean | list
+# Merge across plugins: boolean = the last plugin in lock order wins
+# (dotfiles plugin options prints conflicts); list = union.
+options:
+  chrome.purpose_headed:
+    type: boolean
+    default: false
+    description: Run the purpose Chrome LaunchAgents with a visible window instead of --headless=new.
+  chrome.restore_session:
+    type: boolean
+    default: false
+    description: Start the purpose Chrome LaunchAgents with --restore-last-session.
+  spotlight.exclude_worktrees:
+    type: boolean
+    default: true
+    description: Keep agent worktree folders out of the Spotlight index.
+  mas.skip_ids:
+    type: list
+    default: []
+    description: App Store ids that dotfiles-mas-upgrade never upgrades (for example MDM-managed apps).
+  brew.skip:
+    type: list
+    default: []
+    description: Homebrew formulae and casks to leave out of the core Brewfile (for example org-blocked casks).

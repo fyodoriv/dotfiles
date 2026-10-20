@@ -19,7 +19,8 @@
 # upgrade always fails. Two guards keep the step green:
 #   1. DOTFILES_MAS_SKIP_IDS: space- or comma-separated App Store ids never
 #      upgraded here. Default: 310633997 (WhatsApp; the owner chose to skip
-#      it). Set it to "" to skip nothing extra.
+#      it). Set it to "" to skip nothing extra. Company plugins add ids
+#      through the core option mas.skip_ids (config/plugin-options.yaml).
 #   2. Any other upgrade that fails with a sudo password prompt is reported as
 #      "skipped (needs sudo)", not as a failure: no unattended run can pass it.
 #      Other failures still fail the step.
@@ -33,6 +34,15 @@ MAS_BIN="${MAS_BIN:-mas}"
 XCODE_MAS_ID="${XCODE_MAS_ID:-497799835}"
 DOTFILES_MAS_SKIP_IDS="${DOTFILES_MAS_SKIP_IDS-310633997}"
 skip_ids=" ${DOTFILES_MAS_SKIP_IDS//,/ } "
+# Company plugins add ids through the core option mas.skip_ids (issue #145).
+_dotfiles_dir="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -f "$_dotfiles_dir/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+  for _plib in plugin plugin-capabilities plugin-extensions; do
+    # shellcheck source=/dev/null
+    source "$_dotfiles_dir/lib/$_plib.sh"
+  done
+  skip_ids="$skip_ids$(plugin_option mas.skip_ids 2>/dev/null | tr '\n' ' ')"
+fi
 export MAS_NO_AUTO_INDEX=1   # suppress mas's Spotlight auto-reindex warning noise
 
 if ! command -v "$MAS_BIN" >/dev/null 2>&1; then

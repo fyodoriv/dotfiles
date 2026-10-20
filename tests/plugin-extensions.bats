@@ -268,3 +268,60 @@ MOD
   [[ "$output" == *"W:acme: careful"* ]]
   [[ "$output" == *"F:plugin acme validate script b.sh failed (exit 4"* ]]
 }
+
+# install_named <name> <options yaml>: a second dev plugin with options.
+install_named() {
+  local dir="$TEST_DIR/dotfiles-$1"
+  mkdir -p "$dir"
+  printf 'schema: 1\nname: %s\nversion: 1.0.0\ncontributes:\n  options:\n%s\n' "$1" "$2" > "$dir/dotfiles-plugin.yaml"
+  bash "$CLI" add --dev "$dir" --yes
+}
+
+@test "7: an unknown or mistyped option is refused at add" {
+  run install_named acme '    chrome.unknown_knob: true'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"option chrome.unknown_knob: unknown"* ]]
+  run install_named acme '    mas.skip_ids: 123'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"option mas.skip_ids: must be a list"* ]]
+}
+
+@test "7: booleans use the last plugin in lock order, lists merge" {
+  install_named aaa $'    chrome.restore_session: true\n    brew.skip: [foo]'
+  install_named bbb $'    chrome.restore_session: false\n    brew.skip: [bar, foo]'
+  run ext plugin_option chrome.restore_session
+  [ "$output" = false ]
+  run ext plugin_option brew.skip
+  [ "$output" = $'foo\nbar' ]
+  run ext plugin_option spotlight.exclude_worktrees
+  [ "$output" = true ]
+  run bash "$CLI" options
+  [[ "$output" == *"chrome.restore_session = false  (set by: aaa bbb)  conflict"* ]]
+  [[ "$output" == *"brew.skip = foo,bar  (set by: aaa bbb)"* ]]
+}
+
+@test "7: mas.skip_ids from a plugin keeps dotfiles-mas-upgrade away from that app" {
+  install_named acme '    mas.skip_ids: ["123456789"]'
+  cat > "$TEST_DIR/stub/mas" <<'STUB'
+#!/bin/bash
+case "$1" in
+  outdated) echo "123456789 Managed (1.0 -> 1.1)" ;;
+  upgrade) echo "upgrade $2" >> "$MARKER" ;;
+esac
+STUB
+  chmod +x "$TEST_DIR/stub/mas"
+  DOTFILES_MAS_SKIP_IDS="" MAS_BIN="$TEST_DIR/stub/mas" run bash "$REPO_ROOT/bin/dotfiles-mas-upgrade"
+  [ "$status" -eq 0 ]
+  [ ! -f "$MARKER" ]
+}
+
+@test "7: brew.skip from a plugin removes the entry from the core Brewfile" {
+  install_named acme '    brew.skip: [blocked-cask]'
+  printf 'brew "jq"\ncask "blocked-cask"\n' > "$TEST_DIR/Brewfile"
+  awk '/^# Company plugins add names through the core option brew.skip/ { c = 1 } c { print } c && /^fi$/ { exit }' \
+    "$REPO_ROOT/.chezmoiscripts/run_onchange_brew.sh.tmpl" |
+    sed "s|{{ .chezmoi.sourceDir }}|$REPO_ROOT|g" > "$TEST_DIR/block.sh"
+  RENDERED="$TEST_DIR/Brewfile" run bash -c 'RENDERED="$1"; source "$2"' _ "$TEST_DIR/Brewfile" "$TEST_DIR/block.sh"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/Brewfile")" = 'brew "jq"' ]
+}

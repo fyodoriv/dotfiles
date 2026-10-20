@@ -133,6 +133,9 @@ Enterprise-only prompts (when `is_enterprise: true`):
 
 **Skipping Homebrew packages:** If a package can't be installed (VPN restriction, corporate policy, personal preference), add it to `brew_skip` in `~/.config/chezmoi/chezmoi.yaml`:
 
+A company plugin can add names through the core option `brew.skip` ([docs/plugin-system.md](docs/plugin-system.md)).
+
+
 ```yaml
 data:
   brew_skip:

@@ -135,12 +135,27 @@ then for each:
   `MAINTAIN`, or `WRITE`, every check is green, and the PR is approved. Else
   leave it for the owner.
 
+### Your open pull requests on tooling repos you own
+
+Draft pull requests that `/wrap-up` or an earlier session parked are
+unfinished work too. For each tooling repo you own, list them with
+`gh pr list --author @me --state open --json number,title,isDraft,url`, then
+for each one read its `## Pending` list and its task:
+
+- **Pending item you can do now:** do it on the PR branch, run the repo's
+  gate, push, and tick the item.
+- **Red check, review thread, or conflict:** fix it as for a contributor PR
+  above.
+- **Blocked** (a setting, an approval, an outside service): leave the PR as a
+  draft and report the blocker and the owner's next step.
+- **Nothing pending and green:** mark it ready and deliver it with `/ship-it`.
+
 When this Mac runs a local branch that carries unmerged fixes, rebuild it
 after merges: the default branch plus each fix branch still open.
 
 **Done when:** every `ship`, `salvage`, and `security` item is merged, and
-each of your open PRs is green with zero unresolved threads, or each one is
-listed with its reason and next step.
+each of your open PRs (drafts included) is merged, or green with zero unresolved
+threads, or listed with its blocker and next step.
 
 ## Phase 3: Refresh tooling
 

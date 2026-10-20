@@ -559,3 +559,10 @@ broken file://$feeds/missing.xml"
   # The fast path must not skip Phase 2 while a contributor PR is open.
   grep -F -q 'no open pull request of yours' "$SKILL_DIR/SKILL.md"
 }
+
+@test "tooling-checkup finishes the owner's own open and draft PRs" {
+  grep -q '^### Your open pull requests on tooling repos you own' "$SKILL_DIR/SKILL.md"
+  grep -F -q 'gh pr list --author @me --state open --json number,title,isDraft,url' "$SKILL_DIR/SKILL.md"
+  grep -F -q '## Pending' "$SKILL_DIR/SKILL.md"
+  grep -F -q 'drafts included' "$SKILL_DIR/SKILL.md"
+}

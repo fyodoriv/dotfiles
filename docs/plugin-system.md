@@ -312,6 +312,15 @@ Each install creates `~/.config/dotfiles/plugins/<name>/install-state.json`:
 `remove` reads this and reverses everything. `heal` re-runs install,
 which is idempotent on existing symlinks and re-creates anything missing.
 
+### One overlay lookup
+
+`lib/plugin.sh` is the only place that finds the company overlay
+(issue #145, step 3). Use `plugin_overlay_root` or
+`plugin_overlay_path <relative path>`. Both return 2 for a colon-separated
+`EXTRA_OVERLAY_ROOT`. Pass `--no-discover` to skip folder auto-discovery.
+vscode, brew, and validate pass it, as they did before. `tests/overlay-locate.bats`
+fails when a core file copies the lookup inline.
+
 ### Doctor integration
 
 Two layers of checks land automatically:

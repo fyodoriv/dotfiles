@@ -21,13 +21,9 @@ fi
 if [ "${DOTFILES_PROFILE:-full}" != "full" ] && [ ! -d "$_VC_APP" ]; then
   return 0 2>/dev/null || exit 0
 fi
-if [ -n "${EXTRA_OVERLAY_ROOT:-}" ]; then
-  _VC_OVERLAY_ROOT="$EXTRA_OVERLAY_ROOT"
-elif command -v chezmoi >/dev/null 2>&1; then
-  _VC_OVERLAY_ROOT="$(chezmoi execute-template '{{ dig "extra_overlay_root" "" . }}' 2>/dev/null || echo "")"
-else
-  _VC_OVERLAY_ROOT=""
-fi
+# shellcheck source=../../lib/plugin.sh
+source "$DOTFILES_DIR/lib/plugin.sh"
+_VC_OVERLAY_ROOT="$(plugin_overlay_root --no-discover 2>/dev/null || true)"
 _VC_EXT_LISTS=("$DOTFILES_DIR/vscode/extensions.txt")
 [ -n "$_VC_OVERLAY_ROOT" ] && [ -f "$_VC_OVERLAY_ROOT/vscode/extensions.txt" ] && _VC_EXT_LISTS+=("$_VC_OVERLAY_ROOT/vscode/extensions.txt")
 

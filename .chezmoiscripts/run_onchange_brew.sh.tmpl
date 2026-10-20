@@ -176,15 +176,12 @@ fi
 # set explicitly. Colon-separated $EXTRA_OVERLAY_ROOT is rejected — one
 # overlay at a time. See docs/user-stories/10-fork-for-your-company.md.
 EXTRA_BREWFILE="${EXTRA_BREWFILE:-{{ dig "extra_brewfile" "" . }}}"
-if [ -z "$EXTRA_BREWFILE" ]; then
-  _overlay_root="${EXTRA_OVERLAY_ROOT:-{{ dig "extra_overlay_root" "" . }}}"
-  if [ -n "$_overlay_root" ]; then
-    if [[ "$_overlay_root" == *:* ]]; then
-      echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
-      exit 1
-    fi
-    EXTRA_BREWFILE="$_overlay_root/brewfile/Brewfile"
-  fi
+if [ -z "$EXTRA_BREWFILE" ] && [ -f "{{ .chezmoi.sourceDir }}/lib/plugin.sh" ]; then
+  # shellcheck source=/dev/null
+  source "{{ .chezmoi.sourceDir }}/lib/plugin.sh"
+  _overlay_rc=0
+  EXTRA_BREWFILE="$(plugin_overlay_path --no-discover brewfile/Brewfile)" || _overlay_rc=$?
+  [ "$_overlay_rc" -ne 2 ] || exit 1
 fi
 if [ -n "$EXTRA_BREWFILE" ] && [ -f "$EXTRA_BREWFILE" ]; then
   echo "→ Running overlay brew bundle from $EXTRA_BREWFILE..."

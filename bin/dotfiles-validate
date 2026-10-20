@@ -192,19 +192,11 @@ fi
 # from <path>/validate/. This is the single-path approach for company overlays.
 # Existing EXTRA_VALIDATE_DIR takes precedence if explicitly set.
 _resolve_extra_validate_dir() {
-  local overlay_root
-  overlay_root="${EXTRA_OVERLAY_ROOT:-}"
-  
-  # Reject colon-separated paths (one overlay at a time)
-  if [ -n "$overlay_root" ] && [[ "$overlay_root" == *:* ]]; then
-    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
-    return 1
-  fi
-  
-  # Derive EXTRA_VALIDATE_DIR from EXTRA_OVERLAY_ROOT if set
-  if [ -n "$overlay_root" ]; then
-    echo "$overlay_root/validate"
-  fi
+  local rc=0
+  # shellcheck source=../lib/plugin.sh
+  source "$DOTFILES_DIR/lib/plugin.sh"
+  plugin_overlay_path --no-discover validate || rc=$?
+  [ "$rc" -ne 2 ]
 }
 
 EXTRA_VALIDATE_DIR="${EXTRA_VALIDATE_DIR:-}"

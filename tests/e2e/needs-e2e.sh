@@ -10,7 +10,7 @@ set -uo pipefail
 
 # Paths that change what `dotfiles-install` does on a new Mac, plus the
 # commands the story e2e drives (stories-e2e.bats).
-TRIGGERS='^(bin/dotfiles-install|bin/dotfiles-doctor|bin/morning|bin/dotfiles$|bin/dotfiles-add|bin/dotfiles-profile|bin/dotfiles-stats|bin/git-safe|lib/overlay-locate\.sh|lib/stats\.sh|data/|modules/git/|modules/shell/|modules/sync/|INSTALL\.md|\.chezmoi\.yaml\.tmpl|\.chezmoiignore|\.chezmoiscripts/|tests/e2e/|launchagents/|dot_gitconfig[^/]*|symlink_dot_zsh[^/]*|home/zsh[^/]*|dot_config/|private_dot_[^/]*|modify_[^/]*)'
+TRIGGERS='^(bin/dotfiles-install|bin/dotfiles-doctor|bin/morning|bin/dotfiles$|bin/dotfiles-add|bin/dotfiles-profile|bin/dotfiles-stats|bin/git-safe|lib/plugin\.sh|lib/stats\.sh|data/|modules/git/|modules/shell/|modules/sync/|INSTALL\.md|\.chezmoi\.yaml\.tmpl|\.chezmoiignore|\.chezmoiscripts/|tests/e2e/|launchagents/|dot_gitconfig[^/]*|symlink_dot_zsh[^/]*|home/zsh[^/]*|dot_config/|private_dot_[^/]*|modify_[^/]*)'
 
 if [ "${1:-}" = "--stdin" ]; then
   changed="$(cat)"

@@ -21,6 +21,7 @@ setup() {
   export DOTFILES_CI=true
 
   cp "$BATS_TEST_DIRNAME/../bin/dotfiles-validate" "$TEST_DOTFILES/bin/" 2>/dev/null || true
+  cp "$BATS_TEST_DIRNAME/../lib/plugin.sh" "$TEST_DOTFILES/lib/"
 
   # Minimal lib stubs so dotfiles-validate can source its deps. Mirrors the
   # pattern in tests/dotfiles-doctor-extra-dir.bats and tests/validate.bats.

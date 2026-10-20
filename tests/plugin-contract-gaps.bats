@@ -88,15 +88,15 @@ core_push() {
 @test "today: EXTRA_OVERLAY_ROOT wins over auto-discovery" {
   make_overlay "$HOME/apps/tooling/dotfiles-found"
   mkdir -p "$TEST_DIR/explicit"
-  source "$REPO_ROOT/lib/overlay-locate.sh"
-  EXTRA_OVERLAY_ROOT="$TEST_DIR/explicit" run overlay_locate
+  source "$REPO_ROOT/lib/plugin.sh"
+  EXTRA_OVERLAY_ROOT="$TEST_DIR/explicit" run plugin_overlay_root
   [ "$status" -eq 0 ]
   [ "$output" = "$TEST_DIR/explicit" ]
 }
 
 @test "today: no overlay folder means no overlay" {
-  source "$REPO_ROOT/lib/overlay-locate.sh"
-  run overlay_locate
+  source "$REPO_ROOT/lib/plugin.sh"
+  run plugin_overlay_root
   [ "$status" -eq 1 ]
   [ -z "$output" ]
 }
@@ -150,8 +150,8 @@ s2_glob_env_is_not_sourced() {
 # S3: a folder named dotfiles-* must not become trusted code.
 s3_lookup_ignores_unpinned_folder() {
   make_overlay "$HOME/apps/tooling/dotfiles-evil"
-  source "$REPO_ROOT/lib/overlay-locate.sh"
-  ! overlay_locate
+  source "$REPO_ROOT/lib/plugin.sh"
+  ! plugin_overlay_root
 }
 
 s3_doctor_never_runs_unpinned_module() {
@@ -159,7 +159,7 @@ s3_doctor_never_runs_unpinned_module() {
   local core="$TEST_DIR/core"
   mkdir -p "$core/bin" "$core/lib" "$core/modules/builtin"
   cp "$REPO_ROOT/bin/dotfiles-doctor" "$core/bin/"
-  for lib in errors-log.sh dotfiles-source-dir.sh dotfiles-endpoint-paths.sh overlay-locate.sh; do
+  for lib in errors-log.sh dotfiles-source-dir.sh dotfiles-endpoint-paths.sh plugin.sh; do
     cp "$REPO_ROOT/lib/$lib" "$core/lib/"
   done
   cat > "$core/lib/output.sh" <<'EOF'

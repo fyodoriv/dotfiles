@@ -88,21 +88,11 @@ LOCAL_AI_AGENTS="${DOTFILES_LOCAL_AI_AGENTS:-$(chezmoi execute-template '{{ dig 
 # from <path>/modules/. This is the single-path approach for company overlays.
 # Existing EXTRA_DOCTOR_DIR takes precedence if explicitly set.
 _resolve_extra_doctor_dir() {
-  local overlay_root
-  # shellcheck source=../lib/overlay-locate.sh
-  source "$DOTFILES_DIR/lib/overlay-locate.sh"
-  overlay_root="$(overlay_locate 2>/dev/null || true)"
-  
-  # Reject colon-separated paths (one overlay at a time)
-  if [ -n "$overlay_root" ] && [[ "$overlay_root" == *:* ]]; then
-    echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time. — fix: set EXTRA_OVERLAY_ROOT to one path" >&2
-    return 1
-  fi
-  
-  # Derive EXTRA_DOCTOR_DIR from overlay root when set
-  if [ -n "$overlay_root" ]; then
-    echo "$overlay_root/modules"
-  fi
+  local rc=0
+  # shellcheck source=../lib/plugin.sh
+  source "$DOTFILES_DIR/lib/plugin.sh"
+  plugin_overlay_path modules || rc=$?
+  [ "$rc" -ne 2 ]
 }
 
 EXTRA_DOCTOR_DIR="${EXTRA_DOCTOR_DIR:-$(chezmoi execute-template '{{ dig "extra_doctor_dir" "" . }}' 2>/dev/null || echo "")}"

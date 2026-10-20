@@ -12,6 +12,8 @@ setup() {
   VC_BIN="$TEST_HOME/.local/bin/code"
 
   mkdir -p "$TEST_HOME" "$TEST_DOTFILES/vscode" "$TEST_DOTFILES/modules/vscode" "$VC_LOCAL"
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/plugin.sh" "$TEST_DOTFILES/lib/"
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
   export VSCODE_LOCAL_DIR="$VC_LOCAL"

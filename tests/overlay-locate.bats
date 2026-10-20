@@ -31,7 +31,7 @@ setup() {
   chezmoi() { return 1; }
   export -f chezmoi
 
-  source "$BATS_TEST_DIRNAME/../lib/overlay-locate.sh"
+  source "$BATS_TEST_DIRNAME/../lib/plugin.sh"
 }
 
 teardown() {
@@ -39,10 +39,37 @@ teardown() {
 }
 
 @test "auto-discovery skips a deployed checkout of the base repository" {
-  [ "$(overlay_locate)" = "$TEST_OVERLAY" ]
+  [ "$(plugin_overlay_root)" = "$TEST_OVERLAY" ]
 }
 
 @test "an explicit overlay path takes precedence over source-replica filtering" {
   EXTRA_OVERLAY_ROOT="$TEST_APPLIED"
-  [ "$(overlay_locate)" = "$TEST_APPLIED" ]
+  [ "$(plugin_overlay_root)" = "$TEST_APPLIED" ]
+}
+
+@test "a colon-separated overlay root is refused with status 2" {
+  EXTRA_OVERLAY_ROOT="$TEST_OVERLAY:$TEST_APPLIED" run plugin_overlay_root
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"single path"* ]]
+}
+
+@test "--no-discover skips auto-discovery but keeps the explicit root" {
+  run plugin_overlay_root --no-discover
+  [ "$status" -eq 1 ]
+  EXTRA_OVERLAY_ROOT="$TEST_OVERLAY" run plugin_overlay_path --no-discover validate
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TEST_OVERLAY/validate" ]
+}
+
+@test "plugin_overlay_path joins the discovered root and the path" {
+  run plugin_overlay_path Agentfile.yaml
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TEST_OVERLAY/Agentfile.yaml" ]
+}
+
+@test "no core file copies the overlay lookup inline (issue #145 step 3)" {
+  cd "$BATS_TEST_DIRNAME/.."
+  run bash -c "grep -rnE 'dig \"extra_overlay_root\"|\\\$\\{?EXTRA_OVERLAY_ROOT' bin lib modules .chezmoiscripts git-hooks home 2>/dev/null | grep -v '^lib/plugin.sh:' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'"
+  echo "$output"
+  [ -z "$output" ]
 }

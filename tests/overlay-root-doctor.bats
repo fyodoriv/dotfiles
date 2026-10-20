@@ -45,7 +45,7 @@ LOCKEOF
 
   cp "$BATS_TEST_DIRNAME/../lib/errors-log.sh" "$TEST_DOTFILES/lib/errors-log.sh"
   # dotfiles-doctor sources these real libs at startup.
-  for lib in dotfiles-source-dir.sh dotfiles-endpoint-paths.sh overlay-locate.sh; do
+  for lib in dotfiles-source-dir.sh dotfiles-endpoint-paths.sh plugin.sh; do
     cp "$BATS_TEST_DIRNAME/../lib/$lib" "$TEST_DOTFILES/lib/$lib"
   done
   cat > "$TEST_DOTFILES/lib/stats.sh" <<'STATSEOF'

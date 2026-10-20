@@ -60,10 +60,10 @@ oss_readiness_parse_env_file() {
 oss_readiness_overlay_root() {
   local lib_dir
   lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  [ -f "$lib_dir/overlay-locate.sh" ] || return 1
-  # shellcheck source=lib/overlay-locate.sh
-  source "$lib_dir/overlay-locate.sh"
-  overlay_locate 2>/dev/null
+  [ -f "$lib_dir/plugin.sh" ] || return 1
+  # shellcheck source=lib/plugin.sh
+  source "$lib_dir/plugin.sh"
+  plugin_overlay_root 2>/dev/null
 }
 
 # Loads the private patterns. Order: $OSS_READINESS_ENV_FILE, then the

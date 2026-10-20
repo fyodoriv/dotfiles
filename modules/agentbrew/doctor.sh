@@ -35,19 +35,12 @@ _agentbrew_global_agentfile_in_sync() {
   [ -f "$AGENTFILE" ] && paths+=("$AGENTFILE")
 
   local extra_agentfile="${EXTRA_AGENTFILE:-}"
-  if [ -z "$extra_agentfile" ] && [ -n "${EXTRA_OVERLAY_ROOT:-}" ]; then
-    [[ "$EXTRA_OVERLAY_ROOT" == *:* ]] && return 1
-    extra_agentfile="$EXTRA_OVERLAY_ROOT/Agentfile.yaml"
-  fi
-  if [ -z "$extra_agentfile" ] && [ -f "$DOTFILES_DIR/lib/overlay-locate.sh" ]; then
-    # shellcheck source=../lib/overlay-locate.sh
-    source "$DOTFILES_DIR/lib/overlay-locate.sh" 2>/dev/null || true
-    local _overlay_root=""
-    _overlay_root="$(overlay_locate 2>/dev/null || true)"
-    if [ -n "$_overlay_root" ]; then
-      [[ "$_overlay_root" == *:* ]] && return 1
-      extra_agentfile="$_overlay_root/Agentfile.yaml"
-    fi
+  if [ -z "$extra_agentfile" ] && [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
+    # shellcheck source=../../lib/plugin.sh
+    source "$DOTFILES_DIR/lib/plugin.sh" 2>/dev/null || true
+    local rc=0
+    extra_agentfile="$(plugin_overlay_path Agentfile.yaml 2>/dev/null)" || rc=$?
+    [ "$rc" -ne 2 ] || return 1
   fi
   [ -n "$extra_agentfile" ] && [ -f "$extra_agentfile" ] && paths+=("$extra_agentfile")
   # Match run_after_agentbrew-sync.sh: same optional layers, same helper.

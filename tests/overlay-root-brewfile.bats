@@ -34,9 +34,14 @@ WRAPEOF
     capture && /^if \[ -n "\$EXTRA_BREWFILE" \]/ { capture = 0; print "echo \"EXTRA_BREWFILE=$EXTRA_BREWFILE\""; next }
     capture { print }
   ' "$BREW_TMPL" \
-    | sed 's@{{ dig "[^"]*" "" \. }}@@g' \
+    | sed 's@{{ dig "[^"]*" "" \. }}@@g; s@{{ \.chezmoi\.sourceDir }}@'"$BATS_TEST_DIRNAME/.."'@g' \
     >> "$RESOLVE_SCRIPT"
   chmod +x "$RESOLVE_SCRIPT"
+  # No chezmoi data on the test machine.
+  mkdir -p "$TEST_DIR/stub"
+  printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/stub/chezmoi"
+  chmod +x "$TEST_DIR/stub/chezmoi"
+  export PATH="$TEST_DIR/stub:$PATH"
 }
 
 teardown() {

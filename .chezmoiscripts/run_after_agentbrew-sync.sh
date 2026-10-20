@@ -123,22 +123,15 @@ fi
 # Agentfile path as $EXTRA_OVERLAY_ROOT/Agentfile.yaml. Colon-separated
 # $EXTRA_OVERLAY_ROOT is rejected — one overlay at a time.
 # See docs/user-stories/10-fork-for-your-company.md.
-# shellcheck source=../lib/overlay-locate.sh
-source "$DOTFILES_DIR/lib/overlay-locate.sh"
+# shellcheck source=../lib/plugin.sh
+source "$DOTFILES_DIR/lib/plugin.sh"
 EXTRA_AGENTFILE="${EXTRA_AGENTFILE:-}"
 if [ -z "$EXTRA_AGENTFILE" ]; then
-  _overlay_root="${EXTRA_OVERLAY_ROOT:-}"
-  if [ -z "$_overlay_root" ]; then
-    _overlay_root="$(overlay_locate || true)"
-    if [ -n "$_overlay_root" ]; then
-      echo "→ Auto-discovered overlay at $_overlay_root"
-    fi
-  fi
+  _overlay_rc=0
+  _overlay_root="$(plugin_overlay_root)" || _overlay_rc=$?
+  [ "$_overlay_rc" -ne 2 ] || exit 1
   if [ -n "$_overlay_root" ]; then
-    if [[ "$_overlay_root" == *:* ]]; then
-      echo "ERROR: EXTRA_OVERLAY_ROOT must be a single path, not colon-separated. One overlay at a time." >&2
-      exit 1
-    fi
+    echo "→ Overlay at $_overlay_root"
     EXTRA_AGENTFILE="$_overlay_root/Agentfile.yaml"
   fi
 fi

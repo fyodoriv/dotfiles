@@ -363,6 +363,13 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
   exits 3 with `capability not declared: <kind> <value> (plugin <name>)`.
   A locked plugin's `hooks/<name>` runs only when `capabilities.hooks`
   lists it.
+- Typed extension points (`lib/plugin-extensions.sh`, step 6). Only plugins
+  that pass `plugin verify` contribute; others are skipped and reported.
+  - Brewfile (`contributes.brewfile`): one `brew bundle --file` pass per
+    plugin after the core pass, in `run_onchange_brew.sh`. Each `tap` must be
+    in `capabilities.brew.taps`; casks need `capabilities.brew.casks: true`.
+    A failed bundle prints `unreachable (plugin <name>)`. The script re-runs
+    when `plugins.lock` changes.
 
 ### Doctor integration
 

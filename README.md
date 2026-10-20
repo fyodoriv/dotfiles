@@ -123,6 +123,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Git personal name | `git_personal_name` | _(empty, only if split enabled)_ | Commit author name used for `github.com` remotes |
 | Git personal email | `git_personal_email` | _(empty, only if split enabled)_ | Commit email for `github.com` remotes — consider `<username>@users.noreply.github.com` for privacy |
 | *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install. Edit `~/.config/chezmoi/chezmoi.yaml` directly — see example below. |
+| *(not prompted)* | `obsidian` | `false` | Install Obsidian (full profile) and run the `obsidian` doctor checks. Opt-in. |
 
 Enterprise-only prompts (when `is_enterprise: true`):
 
@@ -143,7 +144,7 @@ data:
     - "rancher"
 ```
 
-Then run `dotfiles apply` — the listed packages will be excluded from `brew bundle`.
+Then run `dotfiles apply` — the listed packages will be excluded from `brew bundle`. The doctor also skips each `tool.<name>` check for a listed name.
 
 ### Profile comparison
 

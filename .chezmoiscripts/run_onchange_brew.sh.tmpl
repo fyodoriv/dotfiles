@@ -78,8 +78,10 @@ brew "tmux"
 cask "ghostty"
 cask "font-jetbrains-mono-nerd-font"
 
-# ── Full: Notes & Knowledge ───────────────────────────────────────
+{{ if dig "obsidian" false . -}}
+# ── Full: Notes & Knowledge (opt-in: obsidian: true, #236) ───────
 cask "obsidian"
+{{ end -}}
 
 # ── Full: Extras ─────────────────────────────────────────────────
 brew "difftastic"

@@ -6,6 +6,13 @@ if [ "${DOTFILES_PROFILE:-full}" != "full" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
+# Opt-in (#236): set `obsidian: true` in ~/.config/chezmoi/chezmoi.yaml.
+# brew_skip (or the brew.skip core option) listing obsidian always wins.
+if [ "${OBSIDIAN_ENABLED:-false}" != "true" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+case " ${BREW_SKIP:-} " in *" obsidian "*) return 0 2>/dev/null || exit 0 ;; esac
+
 VAULT_DIR="${OBSIDIAN_VAULT:-$HOME/notes}"
 
 check "tool.obsidian" \

@@ -15,6 +15,10 @@
 {{- if hasKey . "brew_skip" -}}
 {{-   $brewSkip = .brew_skip -}}
 {{- end -}}
+{{- $obsidian := false -}}
+{{- if hasKey . "obsidian" -}}
+{{-   $obsidian = .obsidian -}}
+{{- end -}}
 {{- $claudeRemoteControl := false -}}
 {{- if hasKey . "claude_remote_control" -}}
 {{-   $claudeRemoteControl = .claude_remote_control -}}
@@ -148,6 +152,7 @@ data:
 {{- else }}
     []
 {{- end }}
+  obsidian: {{ $obsidian }}
   auto_upgrade: {{ $autoUpgrade }}
   auto_sync: {{ $autoSync }}
   owner_machine: {{ $ownerMachine }}

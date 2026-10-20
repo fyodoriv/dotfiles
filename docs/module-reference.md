@@ -485,7 +485,9 @@ The minsky orchestrator checkout, its PATH shim, and its CLI. `MINSKY_REPO` over
 | `minsky.observer_log_present` | advisory — `<repo>/.minsky/observer.log` present | — (hint: `minsky --once`) |
 | `minsky.iter_log_recent` | advisory — `iter-once.log` present | — (hint: `minsky --once`) |
 
-### obsidian — full-only
+### obsidian — full-only, opt-in
+
+Runs only when chezmoi data has `obsidian: true`. Skipped when `brew_skip` or the `brew.skip` core option lists `obsidian`. Any `tool.<name>` check is skipped when `brew_skip` lists `<name>`.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

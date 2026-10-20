@@ -16,6 +16,8 @@ setup() {
   export DOTFILES_DIR="$TEST_DOTFILES"
   export DOTFILES_PROFILE="full"
   export OBSIDIAN_VAULT="$VAULT"
+  export OBSIDIAN_ENABLED=true
+  export BREW_SKIP=""
 
   OVERRIDES_FILE="$TEST_DOTFILES/.overrides"
   touch "$OVERRIDES_FILE"
@@ -85,4 +87,19 @@ teardown() {
   echo '{"vimMode": false}' > "$VAULT/.obsidian/app.json"
   source "$TEST_DOTFILES/modules/obsidian/doctor.sh"
   [ "$fail_count" -ge 1 ]
+}
+
+# #236: Obsidian is opt-in.
+@test "obsidian: skips when the obsidian chezmoi key is not true" {
+  OBSIDIAN_ENABLED=false
+  source "$TEST_DOTFILES/modules/obsidian/doctor.sh"
+  [ "$pass_count" -eq 0 ]
+  [ "$fail_count" -eq 0 ]
+}
+
+@test "obsidian: skips when brew_skip lists obsidian, even if opted in" {
+  BREW_SKIP="git obsidian"
+  source "$TEST_DOTFILES/modules/obsidian/doctor.sh"
+  [ "$pass_count" -eq 0 ]
+  [ "$fail_count" -eq 0 ]
 }

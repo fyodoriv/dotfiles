@@ -103,6 +103,28 @@ if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2
   unset _plib
   _plugins_v2=true
 fi
+# brew_skip: chezmoi brew_skip plus the brew.skip core option (#236). A
+# tool.<name> check is skipped when <name> is listed. Space-separated.
+# shellcheck disable=SC2034  # used by sourced doctor modules
+if [ -n "${DOTFILES_BREW_SKIP+x}" ]; then
+  BREW_SKIP="$DOTFILES_BREW_SKIP"
+else
+  BREW_SKIP="$(chezmoi execute-template '{{ range (dig "brew_skip" list .) }}{{ . }} {{ end }}' 2>/dev/null || true)"
+  if $_plugins_v2; then
+    BREW_SKIP="$BREW_SKIP $(plugin_option brew.skip 2>/dev/null | tr '\n' ' ')"
+  fi
+fi
+# obsidian: opt-in chezmoi key; the obsidian module is skipped unless true.
+# shellcheck disable=SC2034  # used by sourced doctor modules
+OBSIDIAN_ENABLED="${DOTFILES_OBSIDIAN:-$(chezmoi execute-template '{{ dig "obsidian" false . }}' 2>/dev/null || echo "false")}"
+
+# brew_skipped <check-id>: true for tool.<name> when <name> is in BREW_SKIP.
+brew_skipped() {
+  case "$1" in tool.*) ;; *) return 1 ;; esac
+  case " $BREW_SKIP " in *" ${1#tool.} "*) return 0 ;; esac
+  return 1
+}
+
 run_plugin_modules() {
   $_plugins_v2 || return 0
   local _pn _pr _pm
@@ -455,7 +477,7 @@ check() {
     return
   fi
 
-  if is_overridden "$id"; then
+  if is_overridden "$id" || brew_skipped "$id"; then
     $JSON_MODE && _json_add "$id" "skip" "$desc"
     skipped "$desc"
     return
@@ -496,7 +518,7 @@ check_advisory() {
     return
   fi
 
-  if is_overridden "$id"; then
+  if is_overridden "$id" || brew_skipped "$id"; then
     $JSON_MODE && _json_add "$id" "skip" "$desc"
     skipped "$desc"
     return
@@ -521,7 +543,7 @@ check_symlink() {
     return
   fi
 
-  if is_overridden "$id"; then
+  if is_overridden "$id" || brew_skipped "$id"; then
     $JSON_MODE && _json_add "$id" "skip" "$desc"
     skipped "$desc"
     return
@@ -558,7 +580,7 @@ check_managed() {
     return
   fi
 
-  if is_overridden "$id"; then
+  if is_overridden "$id" || brew_skipped "$id"; then
     $JSON_MODE && _json_add "$id" "skip" "$desc"
     skipped "$desc"
     return
@@ -601,7 +623,7 @@ check_defaults() {
     return
   fi
 
-  if is_overridden "$id"; then
+  if is_overridden "$id" || brew_skipped "$id"; then
     $JSON_MODE && _json_add "$id" "skip" "$desc"
     skipped "$desc"
     return

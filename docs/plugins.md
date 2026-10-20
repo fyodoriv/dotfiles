@@ -131,7 +131,7 @@ last plugin in lock order wins. Lists: union.
 | `chrome.restore_session` | It starts with `--restore-last-session`. |
 | `spotlight.exclude_worktrees` | Default true. False skips the agent-worktree Spotlight check. |
 | `mas.skip_ids` | `dotfiles-mas-upgrade` never upgrades these App Store ids. |
-| `brew.skip` | Removed from the core Brewfile. |
+| `brew.skip` | Removed from the core Brewfile; the doctor skips their `tool.<name>` checks. |
 
 Rule of thumb: if a fresh external user could use it without company
 identity, network, or entitlement, it belongs in the core as an option. The

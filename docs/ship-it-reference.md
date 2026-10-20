@@ -484,6 +484,7 @@ Respect the guard. Never retry around it with other permissions, shells, encodin
 - Enterprise GitHub hosts in your hook allowlist should pass when the remote resolves; fail-closed denials often mean cwd/remote resolution failed — fix with explicit `-C` / `origin` / `GH_HOST`. A denial that names an unresolved `origin` means the hook could not find it from the agent workspace parent — always `cd` into the repo checkout (e.g. `~/apps/tooling/dotfiles`) before push/`gh`.
 - Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the `land` command described above.
 - Dry-run first when verifying: `git push --dry-run -u origin <branch>`.
+- **Node-version pre-push rejection:** when a repo's pre-push hook rejects the push because the Node version is not the pinned one, run `eval "$(fnm env)" && fnm use` in the checkout (it reads `.nvmrc`), then retry the push.
 
 **Parallel workers on one shared file:** when several workers ship small PRs that all edit one file (for example `TASKS.md`), each worker fetches and rebases onto `origin/<base>` right before every push, then re-runs the task linter and the affected tests after the rebase, not only before it. Check mergeability right after the push. After the merge, delete the branch and remove the worktree.
 
@@ -606,6 +607,8 @@ unready.
 
 Run `gh pr checks --watch` or the repo's documented CI watcher. If any check fails, inspect the failing log, fix root cause, verify locally, commit, push, and watch again. Repeat until checks pass or a hard external blocker remains.
 
+**PR-body gates after a body edit:** a body edit starts a new run (the `edited` event). Read that run. Do not re-run the old failed run: it reuses the old body and hides the passing run. If the old failed run stays on the head commit and keeps the PR red after the new run passes, get a new head by rebasing onto the base. Do not push an empty commit to re-trigger checks.
+
 **Slow E2E automation checks are non-blocking.** Checks whose names match `*e2e*` or `*automation*` are often slow and flaky by design. Never wait for them, never treat their failure or pending state as a `/ship-it` blocker, and never fix code to make them pass unless the user explicitly asks. Proceed to Step 7 (Merge) when substantive checks pass: lint, unit tests, typecheck, security/Wiz/semgrep, build, and Jenkins `pr-head` build.
 
 ## 6a. Self-review before merge
@@ -655,6 +658,12 @@ Run **§ Repo bypass allowlist** detection first. When required checks are green
 7. If any condition other than an unbypassable review gate is false, report the exact blocker and what was already merged.
 
 Wait for every check before you merge, required or not: `gh pr checks <n> --watch`. Do not poll with a foreground `sleep` loop (agent shells block it). `gh pr merge` accepts a PR while non-required checks are still pending, so a green required set is not enough.
+
+Merge details:
+
+- `gh pr merge --match-head-commit` takes the full 40-character SHA (`git rev-parse HEAD`). Some hosts reject a short SHA.
+- **Strict branch protection** (branch must be up to date): after each merge, rebase every other open PR of this session with `gh pr update-branch <n> --rebase` before its watcher merges it. Otherwise the next merge fails with "required status checks are expected".
+- **Serial merge watchers:** a watcher that times out while it waits for its predecessor must not merge out of order without a trace. It logs the timeout and the order it used, and the final report names it.
 
 After `gh pr merge --delete-branch` from the live checkout, the PR's worktree is unregistered but its folder stays. Remove the folder by its real path (`~/apps/tooling/wt.noindex/<name>`; `git worktree remove` on the `wt` symlink path says "is not a working tree"), then run `git worktree prune`.
 

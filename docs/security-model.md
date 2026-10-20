@@ -293,11 +293,29 @@ The security module runs at `critical` severity in `dotfiles doctor` and is chec
 - **Does not delete**: the dotfiles repo itself, any regular (non-symlink) files
 - **Dry-run mode**: `dotfiles uninstall --dry-run` shows what would be removed
 
+## Weekly Metrics File (opt-in)
+
+Off by default. Set `weekly_metrics: true` in `~/.config/chezmoi/chezmoi.yaml`
+(or `DOTFILES_WEEKLY_METRICS=true`). Then each full `dotfiles-doctor` run
+writes `~/.local/share/dotfiles/metrics/weekly-<YYYY-Www>.json`.
+
+- Format: the shared provider schema `config/weekly-metrics.schema.json`
+  (copied from agentbrew). Only `tool`, `version`, `week`, and `machine_id`
+  are strings. Every metric is a number: doctor checks passed and total,
+  doctor runs, heal fixes applied, sync and upgrade runs, and failed
+  `com.dotfiles.*` LaunchAgents. No paths, names, or content.
+- `machine_id` is random and local (`machine-id`, mode 600). It reuses
+  agentbrew's id when one exists.
+- The file is local. dotfiles never sends it. agentbrew owns the exit
+  (`agentbrew metrics share`, also opt-in).
+- `AGENTBREW_EVENTS=0` turns the file off.
+- Test: `tests/weekly-metrics.bats`.
+
 ## What This Repo Does NOT Do
 
 - Does not install kernel extensions or system extensions
 - Does not modify `/etc/` or `/Library/` (system-wide) directories
 - Does not run any daemons as root
 - Does not modify other users' files or configuration
-- Does not phone home or send telemetry
+- Does not phone home or send telemetry. The opt-in weekly metrics file (below) stays local; only `agentbrew metrics share` can send it, and only after you opt in there too.
 - Does not store passwords or tokens in tracked files

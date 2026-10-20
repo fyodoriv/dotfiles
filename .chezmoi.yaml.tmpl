@@ -19,6 +19,11 @@
 {{- if hasKey . "claude_remote_control" -}}
 {{-   $claudeRemoteControl = .claude_remote_control -}}
 {{- end -}}
+{{/*  weekly_metrics: opt-in weekly aggregate metrics file (lib/weekly-metrics.sh). */ -}}
+{{- $weeklyMetrics := false -}}
+{{- if hasKey . "weekly_metrics" -}}
+{{-   $weeklyMetrics = .weekly_metrics -}}
+{{- end -}}
 {{/*  Optional Claude Code model/effort override (run_after_claude-settings-model.sh) */ -}}
 {{- $claudeModel := "" -}}
 {{- if hasKey . "claude_model" -}}
@@ -155,6 +160,7 @@ data:
   capslock_control: {{ $capslockControl }}
   global_git_hooks: {{ $globalGitHooks }}
   claude_remote_control: {{ $claudeRemoteControl }}
+  weekly_metrics: {{ $weeklyMetrics }}
   use_ai_tools: {{ $useAiTools }}
   use_local_ai: {{ $useLocalAi }}
   local_ai_agents: {{ $localAiAgents }}

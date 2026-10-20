@@ -171,6 +171,17 @@
         "Never retries with another flag or tool to bypass the blocked delete",
         "Ends with one owner command listing the branches"
       ]
+    },
+    {
+      "id": 15,
+      "prompt": "/ship-it — I pushed one more fix to my PR's branch, but another session squash-merged that PR a few minutes earlier.",
+      "expected_output": "After the merge, ship-it fetches the base, finds the last fix is not on it, and carries it in a new PR from the base instead of pushing to the merged branch.",
+      "expectations": [
+        "Checks that the branch's tree is on the base after state is MERGED (merge-tree or an equal content check)",
+        "Reports the missing commit instead of claiming it shipped",
+        "Cherry-picks it onto a new branch from the base and ships that PR",
+        "Does not push more commits to the merged PR's branch"
+      ]
     }
   ]
 }

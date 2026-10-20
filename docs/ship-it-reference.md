@@ -248,6 +248,21 @@ gh api -X PUT "repos/$OWNER/$REPO/pulls/$PR/merge" -f merge_method=squash 2>&1 |
 
 Use `merge_method=merge` or `rebase` only when the repo's default merge method requires it.
 
+**After the merge, confirm every push landed.** A squash merge takes the PR
+head at merge time. A commit pushed to the branch after that is not on the
+base, although the push succeeded (another session may have merged the PR
+first). After `state` is `MERGED`, fetch the base and check that the branch's
+tree is on it:
+
+```bash
+git fetch origin "$BASE"
+[ "$(git merge-tree --write-tree "origin/$BASE" "$BRANCH")" = "$(git rev-parse "origin/$BASE^{tree}")" ] \
+  && echo "every pushed change is on $BASE" || echo "MISSING: carry the rest in a new PR from $BASE"
+```
+
+When something is missing, cherry-pick the missing commits onto a new branch
+from the base and ship that PR. Never push more commits to a merged PR's branch.
+
 **When each step typically succeeds vs fails:**
 
 | Step | Allowlist repos | Other repos |

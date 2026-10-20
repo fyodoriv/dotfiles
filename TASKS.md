@@ -12,6 +12,16 @@ them. -->
 
 ## P1
 
+- [ ] `/tooling-checkup` finishes open PRs and `/wrap-up` is on every machine (land fyodoriv/dotfiles#191)
+  - **ID**: land-checkup-finishes-prs
+  - **Details**: After fyodoriv/agentbrew#292 merges (agentbrew task `land-wrap-up`): on the Mac run `make check`
+    on `dev/pensive-clarke-ooif1u`, squash-merge #191, `git pull` the live checkout, then `dotfiles apply`.
+  - **Hypothesis**: open PRs stall because no recurring command drives them; the checkup finishing them cuts PRs open more than 7 days.
+  - **Success**: #191 merged, `make check` green, `/wrap-up` listed by `agentbrew status`
+  - **Pivot**: `make check` fails on this diff → fix on the branch, re-run
+  - **Measurement**: `gh pr list --author @me --state open` across tooling repos at each checkup
+  - **Anchor**: owner on 2026-10-20: "run /wrap-up on these changes, I will archive this and continue later from mac"
+
 ## P2
 
 ## P3

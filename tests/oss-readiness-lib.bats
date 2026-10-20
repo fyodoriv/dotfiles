@@ -109,3 +109,25 @@ _mk_pem_header() { printf -- '-----BEGIN %s-----' 'OPENSSH PRIVATE KEY'; }
   run oss_readiness_scan_secrets "$TMP_FILE"
   [ "$status" -ne 0 ]
 }
+
+@test "parse_env_file: reads values as data and supports the append idiom" {
+  local marker="$TMP_FILE.ran"
+  cat > "$TMP_FILE" <<EOF
+# comment
+OSS_READINESS_INTERNAL_PATTERN='a|b c'
+export OSS_READINESS_PATTERN_VERSION=3
+OSS_READINESS_ALLOWED_ROOTS='r1 r2'
+OSS_READINESS_ALLOWED_ROOTS="\${OSS_READINESS_ALLOWED_ROOTS:-} r3"
+UNRELATED_KEY=nope
+touch "$marker"
+OSS_READINESS_PRIVATE_EMAIL_PATTERN=\$(touch "$marker")
+EOF
+  unset OSS_READINESS_ALLOWED_ROOTS UNRELATED_KEY
+  oss_readiness_parse_env_file "$TMP_FILE"
+  [ "$OSS_READINESS_INTERNAL_PATTERN" = 'a|b c' ]
+  [ "$OSS_READINESS_PATTERN_VERSION" = 3 ]
+  [ "$OSS_READINESS_ALLOWED_ROOTS" = 'r1 r2 r3' ]
+  [ -z "${UNRELATED_KEY:-}" ]
+  [ ! -f "$marker" ]
+  rm -f "$marker"
+}

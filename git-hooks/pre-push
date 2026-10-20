@@ -11,7 +11,8 @@
 #     matches the private-identifier pattern. The message lists paths only.
 #
 # With no overlay, both patterns are empty and the checks have nothing to
-# match. After the gate, this hook delegates to a repo-local
+# match. With an overlay but no loaded pattern, the push is blocked. After
+# the gate, this hook runs the overlay's `hooks/pre-push`, then a repo-local
 # `hooks/pre-push` if one exists (husky / lefthook / project-specific hook).
 #
 # History: PR #59 once replaced this file with a pure lefthook stub via a
@@ -32,6 +33,40 @@ if [ "$remote_name" = "--self-test" ]; then
   echo "pre-push self-test OK"
   exit 0
 fi
+
+# shellcheck source=../lib/oss-readiness.sh
+source "$DOTFILES_DIR/lib/oss-readiness.sh"
+payload=""
+
+# Keeps the per-ref payload (stdin) in a file, so the scan, the overlay
+# hook, and the repo-local hook each read it from the start.
+save_payload() {
+  [ -z "$payload" ] || return 0
+  payload="$(mktemp "${TMPDIR:-/tmp}/pre-push-payload.XXXXXX")"
+  cat > "$payload"
+}
+
+# Runs the installed overlay's hooks/pre-push (issue #145 gap S4), then the
+# repo-local hooks/pre-push. Both get the payload on stdin. Exits with the
+# first failing status. With no overlay hook and no saved payload, the
+# repo-local hook reads the original stdin, as before.
+run_chained_hooks() {
+  local status=0 overlay_root
+  overlay_root="$(oss_readiness_overlay_root || true)"
+  if [ -n "$overlay_root" ] && [ -x "$overlay_root/hooks/pre-push" ]; then
+    save_payload
+    oss_readiness_run_overlay_hook pre-push "$@" < "$payload" || status=$?
+  fi
+  if [ "$status" -eq 0 ] && [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
+    if [ -n "$payload" ]; then
+      "$CURRENT_REPO/hooks/pre-push" "$@" < "$payload" || status=$?
+    else
+      "$CURRENT_REPO/hooks/pre-push" "$@" || status=$?
+    fi
+  fi
+  [ -z "$payload" ] || rm -f "$payload"
+  exit "$status"
+}
 
 # ── Repo-scope check ────────────────────────────────────────────────
 # This hook is wired globally via `core.hooksPath`, so it fires for
@@ -83,17 +118,12 @@ if [ -n "$remote_key" ] && [ -r "$PRIVATE_REPO_ALLOWLIST" ] &&
 fi
 
 if [ "$gated_repo" -eq 0 ]; then
-  # Different repo — defer. Delegate to repo-local hooks/pre-push so
-  # husky / lefthook / custom project hooks still fire here.
-  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
-    [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"
-    exec "$CURRENT_REPO/hooks/pre-push" "$@"
-  fi
-  exit 0
+  # Different repo — defer. Run the overlay hook and the repo-local
+  # hooks/pre-push so husky / lefthook / custom project hooks still fire.
+  [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"
+  run_chained_hooks "$@"
 fi
 
-# shellcheck source=../lib/oss-readiness.sh
-source "$DOTFILES_DIR/lib/oss-readiness.sh"
 oss_readiness_load_private_env "$(basename "$CURRENT_REPO")" >/dev/null 2>&1 || true
 
 if [ -t 2 ]; then
@@ -116,12 +146,21 @@ if oss_readiness_is_owner_public "$remote_key"; then
   fi
 fi
 
+# ── Fail closed when an overlay is installed ───────────────────────────
+# An overlay brings private patterns. If none loaded, the scan below would
+# match nothing, so block instead (issue #145 gap S1).
+if ! env_problem="$(oss_readiness_check_overlay_patterns)"; then
+  printf '%s✗ Push blocked: %s.%s\n' "$RED" "$env_problem" "$RST" >&2
+  exit 1
+fi
+
 # Hosts gh is signed in to. The generic marker scan treats every one other
 # than github.com as an enterprise host.
 gh_hosts="$(awk '/^[^[:space:]#][^:]*:/ { h = $0; sub(/:.*/, "", h); gsub(/["'"'"']/, "", h); print tolower(h) }' \
   "${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}/hosts.yml" 2>/dev/null | tr '\n' ' ' || true)"
 marker_dir="$(mktemp -d "${TMPDIR:-/tmp}/pre-push-markers.XXXXXX")"
-trap 'rm -rf "$marker_dir"; [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"' EXIT
+save_payload
+trap 'rm -rf "$marker_dir" "$payload"; [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"' EXIT
 
 # ── Read stdin: per-ref pre-push payload ───────────────────────────────
 # Format: <local ref> <local sha> <remote ref> <remote sha>\n …
@@ -287,30 +326,16 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
     printf '%sUse a public identity, then amend the affected commits before pushing.%s\n' "$YEL" "$RST" >&2
     scan_failed=1
   fi
-done
+done < "$payload"
 
 if [ "$scan_failed" -ne 0 ]; then
   printf '\n%spush blocked by dotfiles pre-push hook%s\n' "$RED" "$RST" >&2
   exit 1
 fi
 
-# ── Delegate to repo-local hook ────────────────────────────────────────
-# After our leak gates pass, hand off to the repo's own pre-push hook
-# if it has one. `exec` replaces this process so the downstream hook's
-# exit code becomes ours.
-#
-# IMPORTANT: stdin was consumed by the scan loop above. For repo-local
-# hooks that need the per-ref payload, document that the global hook
-# is positional: the local hook receives <remote_name> <remote_url> via
-# argv but NOT the per-ref payload via stdin. That's a limitation of
-# chaining pre-push hooks via exec. Most repo-local hooks don't need
-# stdin (husky / lefthook / project commit checks operate on the
-# working tree), so this is acceptable.
-if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-push" ]; then
-  # exec skips the EXIT trap.
-  rm -rf "$marker_dir"
-  [ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"
-  exec "$CURRENT_REPO/hooks/pre-push" "$@"
-fi
-
-exit 0
+# ── Delegate to the overlay hook, then the repo-local hook ────────────
+# After our leak gates pass, run the installed overlay's hooks/pre-push and
+# then the repo's own hooks/pre-push. Each gets the per-ref payload on stdin.
+rm -rf "$marker_dir"
+[ -z "$allowlist_snapshot" ] || rm -f "$allowlist_snapshot"
+run_chained_hooks "$@"

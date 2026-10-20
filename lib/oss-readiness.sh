@@ -23,44 +23,98 @@ OSS_READINESS_SECRET_PATTERNS=(
   '-----BEGIN [A-Z ]*PRIVATE KEY-----'
 )
 
+# Keys a pattern file may set. Any other line is ignored.
+OSS_READINESS_ENV_KEYS=" OSS_READINESS_INTERNAL_PATTERN OSS_READINESS_PRIVATE_EMAIL_PATTERN OSS_READINESS_PATTERN_VERSION OSS_READINESS_ALLOWED_ROOTS OSS_READINESS_REPO "
+
+# Reads a pattern file as DATA. It never runs the file (issue #145 gap S2).
+# Each line is KEY=VALUE for a key in OSS_READINESS_ENV_KEYS, with an optional
+# "export " prefix. A value in single quotes is literal. A value in double
+# quotes may start with ${KEY:-} or $KEY of the same key, to append to it.
+# Every other line, including comments, is ignored.
+oss_readiness_parse_env_file() {
+  local file="$1" line key value
+  [ -f "$file" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#export }"
+    [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+    case "$OSS_READINESS_ENV_KEYS" in *" $key "*) ;; *) continue ;; esac
+    if [[ "$value" =~ ^\'(.*)\'$ ]]; then
+      value="${BASH_REMATCH[1]}"
+    elif [[ "$value" =~ ^\"(.*)\"$ ]]; then
+      value="${BASH_REMATCH[1]}"
+      case "$value" in
+        "\${$key:-}"*) value="${!key:-}${value#"\${$key:-}"}" ;;
+        "\${$key}"*) value="${!key:-}${value#"\${$key}"}" ;;
+        "\$$key"*) value="${!key:-}${value#"\$$key"}" ;;
+      esac
+    fi
+    printf -v "$key" '%s' "$value"
+    export "${key?}"
+  done < "$file"
+  return 0
+}
+
+# Prints the overlay root when one is configured or found, else nothing.
+oss_readiness_overlay_root() {
+  local lib_dir
+  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  [ -f "$lib_dir/overlay-locate.sh" ] || return 1
+  # shellcheck source=lib/overlay-locate.sh
+  source "$lib_dir/overlay-locate.sh"
+  overlay_locate 2>/dev/null
+}
+
+# Loads the private patterns. Order: $OSS_READINESS_ENV_FILE, then the
+# well-known local file, then the overlay root. Files are parsed, never
+# sourced, and folders found by glob are never read (issue #145 gap S2).
 oss_readiness_load_private_env() {
-  local repo="${1:-dotfiles}" candidate overlay_root
+  local candidate overlay_root
   if [ -n "${OSS_READINESS_ENV_FILE:-}" ] && [ -f "$OSS_READINESS_ENV_FILE" ]; then
-    # shellcheck source=/dev/null
-    source "$OSS_READINESS_ENV_FILE"
+    oss_readiness_parse_env_file "$OSS_READINESS_ENV_FILE"
     return 0
   fi
 
   # Well-known local-only candidate. Never committed; not part of any repo.
   candidate="${XDG_CONFIG_HOME:-$HOME/.config}/oss-readiness/oss-readiness.env"
   if [ -f "$candidate" ]; then
-    # shellcheck source=/dev/null
-    source "$candidate"
+    oss_readiness_parse_env_file "$candidate"
     return 0
   fi
 
-  overlay_root="${EXTRA_OVERLAY_ROOT:-}"
-  if [ -z "$overlay_root" ] && command -v chezmoi >/dev/null 2>&1; then
-    overlay_root="$(chezmoi execute-template '{{ dig "extra_overlay_root" "" . }}' 2>/dev/null || true)"
-  fi
+  overlay_root="$(oss_readiness_overlay_root || true)"
   if [ -n "$overlay_root" ] && [ -f "$overlay_root/oss-readiness.env" ]; then
-    # shellcheck source=/dev/null
-    source "$overlay_root/oss-readiness.env"
+    oss_readiness_parse_env_file "$overlay_root/oss-readiness.env"
     return 0
   fi
-
-  for candidate in \
-    "${DOTFILES_REPOS_DIR:-$HOME/apps}/tooling"/*/oss-readiness.env \
-    "${DOTFILES_REPOS_DIR:-$HOME/apps}"/*/oss-readiness.env
-  do
-    [ -f "$candidate" ] || continue
-    if grep -qE "^OSS_READINESS_REPO=${repo}$" "$candidate" 2>/dev/null; then
-      # shellcheck source=/dev/null
-      source "$candidate"
-      return 0
-    fi
-  done
   return 1
+}
+
+# Fails, and prints the reason, when an overlay is installed but no private
+# pattern is loaded. The leak gates then block instead of scanning with an
+# empty pattern (issue #145 gap S1).
+oss_readiness_check_overlay_patterns() {
+  local overlay_root
+  [ -z "${OSS_READINESS_INTERNAL_PATTERN:-}" ] || return 0
+  overlay_root="$(oss_readiness_overlay_root || true)"
+  [ -n "$overlay_root" ] || return 0
+  echo "an overlay is installed ($overlay_root), but no private pattern is loaded; add OSS_READINESS_INTERNAL_PATTERN to ~/.config/oss-readiness/oss-readiness.env or to the overlay's oss-readiness.env"
+  return 1
+}
+
+# Runs the installed overlay's own hook "$1" (hooks/<name>), when it is
+# executable. Extra arguments go to the hook. Stdin goes to the hook.
+# Returns the hook's exit status, or 0 when there is no such hook
+# (issue #145 gap S4).
+oss_readiness_run_overlay_hook() {
+  local name="$1" overlay_root hook
+  shift
+  overlay_root="$(oss_readiness_overlay_root || true)"
+  [ -n "$overlay_root" ] || return 0
+  hook="$overlay_root/hooks/$name"
+  [ -x "$hook" ] || return 0
+  "$hook" "$@"
 }
 
 _oss_readiness_config_dir() {

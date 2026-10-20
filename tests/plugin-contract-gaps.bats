@@ -119,7 +119,8 @@ core_push() {
   [ -f "$MARKER" ]
 }
 
-# ── gaps: secure behavior, failing today ──────────────────────────────
+# ── gaps: secure behavior ─────────────────────────────────────────────
+# "closed" tests are plain assertions. "gap" tests still run via known_gap.
 
 # S1: with an overlay installed and no pattern data, a leak gate must block.
 s1_push_blocks_without_patterns() {
@@ -129,8 +130,8 @@ s1_push_blocks_without_patterns() {
   ! core_push "$TEST_DIR/repo"
 }
 
-@test "gap S1: an overlay with no pattern data must block a gated push" {
-  known_gap S1 s1_push_blocks_without_patterns
+@test "closed S1: an overlay with no pattern data must block a gated push" {
+  s1_push_blocks_without_patterns
 }
 
 # S2: a pattern file found by glob must never run as code.
@@ -142,8 +143,8 @@ s2_glob_env_is_not_sourced() {
   [ ! -f "$MARKER" ]
 }
 
-@test "gap S2: a glob-matched oss-readiness.env must not be sourced" {
-  known_gap S2 s2_glob_env_is_not_sourced
+@test "closed S2: a glob-matched oss-readiness.env must not be sourced" {
+  s2_glob_env_is_not_sourced
 }
 
 # S3: a folder named dotfiles-* must not become trusted code.
@@ -192,6 +193,50 @@ s4_overlay_hook_runs_on_push() {
   [ -f "$MARKER" ]
 }
 
-@test "gap S4: an overlay pre-push hook must run during git push" {
-  known_gap S4 s4_overlay_hook_runs_on_push
+@test "closed S4: an overlay pre-push hook must run during git push" {
+  s4_overlay_hook_runs_on_push
+}
+
+s1_commit_blocks_without_patterns() {
+  make_overlay "$HOME/apps/tooling/dotfiles-acme"
+  make_push_repo "$TEST_DIR/repo" 1
+  printf 'more\n' >> "$TEST_DIR/repo/notes.txt"
+  git -C "$TEST_DIR/repo" add notes.txt
+  run git -C "$TEST_DIR/repo" -c core.hooksPath="$REPO_ROOT/git-hooks" \
+    -c user.name=t -c user.email=t@example.com commit -qm "chore: more"
+  [ "$status" -ne 0 ] && [[ "$output" == *"overlay is installed"* ]]
+}
+
+@test "closed S1: an overlay with no pattern data must block a gated commit" {
+  s1_commit_blocks_without_patterns
+}
+
+@test "S1: a gated push goes through when the overlay pattern loads" {
+  make_overlay "$HOME/apps/tooling/dotfiles-acme"
+  rm -f "$HOME/apps/tooling/dotfiles-acme/hooks/pre-push"
+  printf "OSS_READINESS_INTERNAL_PATTERN='zz-not-in-repo'\n" > "$HOME/apps/tooling/dotfiles-acme/oss-readiness.env"
+  make_push_repo "$TEST_DIR/repo" 1
+  run core_push "$TEST_DIR/repo"
+  [ "$status" -eq 0 ]
+}
+
+@test "S4: a failing overlay pre-push hook blocks the push and gets the payload" {
+  make_overlay "$TEST_DIR/overlay"
+  printf '#!/bin/sh\ncat > "%s"\nexit 7\n' "$MARKER" > "$TEST_DIR/overlay/hooks/pre-push"
+  make_push_repo "$TEST_DIR/repo" 0
+  EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay" run core_push "$TEST_DIR/repo"
+  [ "$status" -ne 0 ]
+  grep -q 'refs/heads/main' "$MARKER"
+}
+
+@test "S4: an overlay pre-commit hook runs during git commit" {
+  make_overlay "$TEST_DIR/overlay"
+  printf '#!/bin/sh\ntouch "%s"\n' "$MARKER" > "$TEST_DIR/overlay/hooks/pre-commit"
+  chmod +x "$TEST_DIR/overlay/hooks/pre-commit"
+  make_push_repo "$TEST_DIR/repo" 0
+  printf 'more\n' >> "$TEST_DIR/repo/notes.txt"
+  git -C "$TEST_DIR/repo" add notes.txt
+  EXTRA_OVERLAY_ROOT="$TEST_DIR/overlay" git -C "$TEST_DIR/repo" -c core.hooksPath="$REPO_ROOT/git-hooks" \
+    -c user.name=t -c user.email=t@example.com commit -qm "chore: more"
+  [ -f "$MARKER" ]
 }

@@ -820,6 +820,16 @@ gh_public_leak_guard() {
     _ghpl_cleanup
     exit 1
   fi
+  # An installed overlay brings private patterns. If none loaded, the scan
+  # would match nothing, so block a public write instead (issue #145 gap S1).
+  if compgen -G "$_ghpl_tmp/p*" >/dev/null &&
+     declare -F oss_readiness_check_overlay_patterns >/dev/null &&
+     ! _ghpl_env_problem="$(oss_readiness_check_overlay_patterns 2>/dev/null)" &&
+     _ghpl_confirm_public; then
+    echo "gh wrapper: blocked a write to public $_ghpl_target: $_ghpl_env_problem." >&2
+    _ghpl_cleanup
+    exit 1
+  fi
   hits="$(_ghpl_scan)"
   if [ -z "$hits" ] || ! _ghpl_confirm_public; then
     _ghpl_cleanup; trap - EXIT

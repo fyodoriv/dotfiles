@@ -496,9 +496,10 @@ pattern. It also blocks files changed in the push (read at the pushed commit)
 that match the private-identifier pattern, and lists paths only. Each pushed
 commit's added lines, file names, and message are checked too; that message
 lists commit ids only. Both patterns come from the org
-overlay's `oss-readiness.env`, which `lib/oss-readiness.sh` loads. With no
-overlay, those two checks have nothing to match. The hook then delegates to
-the repo-local `hooks/pre-push`.
+overlay's `oss-readiness.env`, which `lib/oss-readiness.sh` parses as data. With no
+overlay, those two checks have nothing to match; with an overlay but no
+pattern, the push is blocked. The hook then runs the overlay's
+`hooks/pre-push`, then the repo-local `hooks/pre-push`.
 
 The structural deletion guard remains active for `bin/`, `tests/`, `lib/`,
 `modules/`, and `skills/`. It has two audited exceptions:

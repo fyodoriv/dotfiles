@@ -337,6 +337,16 @@ YML
   assert_posted
 }
 
+@test "an overlay with no pattern file blocks a public write (issue #145 S1)" {
+  mkdir -p "$HOME/apps/tooling/dotfiles-acme"
+  printf 'mcp: []\n' > "$HOME/apps/tooling/dotfiles-acme/Agentfile.yaml"
+  rm -f "$OSS_READINESS_ENV_FILE"
+  run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "plain text"
+  assert_blocked "overlay is installed"
+  STUB_PRIVATE_SLUGS="octo/tool" run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "plain text"
+  assert_posted
+}
+
 @test "another user's post to an owner public repo does not need the pattern file" {
   rm -f "$OSS_READINESS_ENV_FILE"
   run "$GH_WRAPPER" pr comment 8 -R fyodoriv/dotfiles --body "plain text"

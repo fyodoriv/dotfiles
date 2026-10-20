@@ -181,12 +181,20 @@ Private overlays provide `oss-readiness.env`, which defines:
 
 `lib/oss-readiness.sh` looks for the file in this order: `OSS_READINESS_ENV_FILE`,
 the local-only `${XDG_CONFIG_HOME:-$HOME/.config}/oss-readiness/oss-readiness.env`,
-the overlay root, then sibling repos under `~/apps`. Keep the local file out of
-every repo.
+then the overlay root. Keep the local file out of every repo.
+
+The file is data. `oss_readiness_parse_env_file` reads `KEY=VALUE` lines for
+the `OSS_READINESS_*` keys only; it never runs the file. A value in double
+quotes may start with `${KEY:-}` to append to the same key. Folders found by
+glob are never read.
 
 With no overlay, both patterns are empty and those checks have nothing to
 match. That is allowed only for other people's pushes and posts, such as a
-contributor pushing to a fork.
+contributor pushing to a fork. With an overlay installed and no pattern
+loaded, the pre-commit, pre-push, and `gh` guards block instead.
+
+After the gates pass, the hooks run the overlay's own `hooks/pre-commit` or
+`hooks/pre-push`, then the repo-local hook. A failing overlay hook blocks.
 
 ### Approved private repos
 

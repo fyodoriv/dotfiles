@@ -102,7 +102,7 @@ Nothing rewrites history. The privacy gates run before a
 commit leaves the machine:
 1. `git-hooks/pre-commit` blocks forbidden files, private identifiers, secrets, and private committer emails
 2. `git-hooks/pre-push` blocks commits whose author or committer email matches the private-email pattern, for pushes of dotfiles, agentbrew, and every repo in `config/public-push-remotes.txt` to github.com; it also blocks private references in pushed file contents, file names, and commit messages
-3. Both private patterns come from the org overlay's `oss-readiness.env`; with no overlay, those checks have nothing to match
+3. Both private patterns come from the org overlay's `oss-readiness.env`, parsed as data; with no overlay, those checks have nothing to match; with an overlay but no pattern, the gates block
 
 Full design in [`SECURITY.md`](SECURITY.md).
 

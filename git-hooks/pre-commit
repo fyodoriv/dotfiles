@@ -40,6 +40,23 @@ if [ "${1:-}" = "--self-test" ]; then
   exit 0
 fi
 
+# Runs the installed overlay's hooks/pre-commit (issue #145 gap S4), then
+# the repo-local hooks/pre-commit. Exits with the first failing status.
+delegate_hooks() {
+  if ! declare -F oss_readiness_run_overlay_hook >/dev/null &&
+    [ -f "$DOTFILES_DIR/lib/oss-readiness.sh" ]; then
+    # shellcheck source=../lib/oss-readiness.sh
+    source "$DOTFILES_DIR/lib/oss-readiness.sh"
+  fi
+  if declare -F oss_readiness_run_overlay_hook >/dev/null; then
+    oss_readiness_run_overlay_hook pre-commit "$@" || exit $?
+  fi
+  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
+    exec "$CURRENT_REPO/hooks/pre-commit" "$@"
+  fi
+  exit 0
+}
+
 # ── Repo-scope checks ───────────────────────────────────────────────
 # This hook is wired globally via `core.hooksPath = ~/apps/tooling/dotfiles/git-hooks`,
 # so it fires for EVERY git repo on the machine — not just dotfiles.
@@ -65,9 +82,7 @@ fi
 if [ "$has_leak_gate" -eq 0 ] && [ "$is_dotfiles_repo" -eq 0 ]; then
   # Different repo entirely — delegate to repo-local hooks/pre-commit
   # before exiting so husky / lefthook / custom hooks still fire.
-  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
-    exec "$CURRENT_REPO/hooks/pre-commit" "$@"
-  fi
+  delegate_hooks "$@"
   exit 0
 fi
 
@@ -93,6 +108,14 @@ else
   RED='' YEL='' DIM='' RST=''
 fi
 
+# ── Fail closed when an overlay is installed ───────────────────────────
+# An overlay brings private patterns. If none loaded, the scan would match
+# nothing, so block instead (issue #145 gap S1).
+if [ "$has_leak_gate" -eq 1 ] && ! env_problem="$(oss_readiness_check_overlay_patterns)"; then
+  printf '%s✗ Commit blocked: %s.%s\n' "$RED" "$env_problem" "$RST" >&2
+  exit 1
+fi
+
 # ── Resolve list of staged files (Added, Copied, Modified, Renamed) ────
 # Deletions are NOT in this list — section 4 below uses its own diff-filter=D.
 mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR -z 2>/dev/null | tr '\0' '\n')
@@ -101,9 +124,7 @@ mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR -z 2>/dev
 # no deletions, no renames-only) we have nothing to do here.
 total_staged_count=$(git diff --cached --name-only -z 2>/dev/null | tr -cd '\0' | wc -c | tr -d ' ')
 if [ "$total_staged_count" -eq 0 ]; then
-  if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
-    exec "$CURRENT_REPO/hooks/pre-commit" "$@"
-  fi
+  delegate_hooks "$@"
   exit 0
 fi
 
@@ -324,8 +345,4 @@ fi
 # if it has one. This is the seam where husky, lefthook (when properly
 # installed in the repo), and custom project hooks plug in. `exec`
 # replaces this process so the downstream hook's exit code becomes ours.
-if [ -n "$CURRENT_REPO" ] && [ -x "$CURRENT_REPO/hooks/pre-commit" ]; then
-  exec "$CURRENT_REPO/hooks/pre-commit" "$@"
-fi
-
-exit 0
+delegate_hooks "$@"

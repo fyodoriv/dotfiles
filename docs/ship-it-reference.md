@@ -881,10 +881,8 @@ The reload helper bootouts then bootstraps these labels (in order):
 
 - `com.dotfiles.gui-path` — `launchctl setenv PATH` for GUI apps and agents
 - `com.dotfiles.network-resilience` — DNS/connectivity after sleep
-- `com.dotfiles.heal-stuck-agents` — stuck git SSH + sandbox shell heal (30 min)
 - `com.dotfiles.agent-keepawake` — process-scoped `caffeinate -ims` and owned
-  Amphetamine protection while Cursor or Claude Code runs on AC or battery ≥20%
-- `com.dotfiles.cursor-at-login`
+  Amphetamine protection while Claude Code runs on AC or battery ≥20%
 - `com.dotfiles.dotfiles-doctor`
 - `com.dotfiles.chrome-profile` — hourly Work profile + ChromeWork default-browser heal
 - `com.dotfiles.agent-browser-chrome`, `com.dotfiles.debug-chrome`,

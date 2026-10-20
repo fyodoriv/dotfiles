@@ -27,7 +27,7 @@ dotfiles stats --oneliner    # single line (embedded in morning/status)
 
   By task:
     sync                  412 runs   ~2h 45m saved
-    cursor-priority       280 runs   ~1h 10m saved
+    app-priority       280 runs   ~1h 10m saved
     doctor                 52 runs   ~8m saved
     cleanup                48 runs   ~48m saved
     git-maintain           35 runs   ~11m saved
@@ -43,7 +43,7 @@ dotfiles stats --oneliner    # single line (embedded in morning/status)
 | `audit` | Manual (security audit) | 2s / run | — |
 | `cleanup` | LaunchAgent (weekly) | 10s / cache | Cache locations cleaned |
 | `git-maintain` | LaunchAgent (daily) | 5s / repo | Repos in `~/apps` |
-| `cursor-priority` | LaunchAgent (every 60s) | 0s (background) | Flat |
+| `app-priority` | LaunchAgent (every 60s) | 0s (background) | Flat |
 | `morning` | Manual (daily) | 15s / repo | Repos pulled |
 
 Estimates are conservative — minimum manual time you'd spend doing the same task by hand.

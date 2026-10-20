@@ -329,20 +329,6 @@ check_symlink "cursor.symlink.tasks" \
   "$_cr_tasks_source" \
   "$_CR_USER_DIR/tasks.json"
 
-# ── Stale agent sandbox shells (vitest / tail -f / watch:pr) ─────────
-# shellcheck source=../../lib/heal-stuck-agents.sh
-source "$DOTFILES_DIR/lib/heal-stuck-agents.sh"
-
-check "cursor.stale_agent_shells" \
-  "No stale Cursor agent sandbox shells (vitest/tail -f/watch:pr >30 min)" \
-  "[ \"\$(dotfiles_heal_count_stale_agent_shells)\" -eq 0 ]" \
-  "'$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents' --fix --quiet"
-
-check "cursor.runaway_agent_helpers" \
-  "No runaway Cursor helper crawls (>90% CPU for >60 sec)" \
-  "[ \"\$(dotfiles_heal_count_runaway_agent_helpers)\" -eq 0 ]" \
-  "'$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents' --fix --quiet"
-
 # Skip app-dependent checks if Cursor isn't installed.
 [ -d "$_CR_APP" ] || return 0
 
@@ -467,18 +453,8 @@ if command -v agentbrew >/dev/null 2>&1 && _cr_memory_service_registered; then
     "agentbrew memory fix; then manually reload or fully restart Cursor"
 fi
 
-# ── Login startup (macos-apps.sh + LaunchAgent) ───────────────────────────
-check "cursor.at_login_launchagent" \
-  "cursor-at-login verifies full AgentBrew memory discovery before open -g -a Cursor" \
-  "[ -x \"\$DOTFILES_DIR/bin/cursor-at-login\" ] && grep -q 'bin/cursor-at-login</string>' \"\$DOTFILES_DIR/launchagents/com.dotfiles.cursor-at-login.plist.tmpl\" && grep -q 'CURSOR_LOGIN_WAIT_FOR_MEMORY' \"\$DOTFILES_DIR/launchagents/com.dotfiles.cursor-at-login.plist.tmpl\" && grep -q 'memory doctor' \"\$DOTFILES_DIR/bin/cursor-at-login\" && grep -q 'memory fix' \"\$DOTFILES_DIR/bin/cursor-at-login\" && grep -q 'exec \"\$open_bin\" -g -a Cursor' \"\$DOTFILES_DIR/bin/cursor-at-login\"" \
-  "agentbrew memory fix && chezmoi apply"
-
+# ── Login startup (macos-apps.sh) ──────────────────────────────────────
 if [ -d "$_CR_APP" ]; then
-  check "cursor.at_login_loaded" \
-    "com.dotfiles.cursor-at-login LaunchAgent registered" \
-    "launchctl print \"gui/\$(id -u)/com.dotfiles.cursor-at-login\" >/dev/null 2>&1" \
-    "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/com.dotfiles.cursor-at-login.plist\" 2>/dev/null || launchctl load \"\$HOME/Library/LaunchAgents/com.dotfiles.cursor-at-login.plist\" 2>/dev/null"
-
   check "cursor.no_webstorm_login_item" \
     "WebStorm not in macOS Login Items (Cursor replaces it at login)" \
     "! osascript -e 'tell application \"System Events\" to get the name of every login item' 2>/dev/null | grep -q WebStorm" \

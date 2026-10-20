@@ -168,8 +168,7 @@ All agents install to `~/Library/LaunchAgents/com.dotfiles.*`. All run as the cu
 | `debug-chrome` | At login, not kept alive | Debug-work Chrome with CDP on port 9224 | Localhost CDP is an attack surface; agents attach instead of launching its profile; manual close for logout/shutdown is respected |
 | `tooling-chrome` | At login, not kept alive | Tooling-repo Chrome with CDP on port 9225 | Localhost CDP is an attack surface; agents attach instead of launching its profile; manual close for logout/shutdown is respected |
 | `chrome-debug` | On-demand | Chrome with CDP on port 9222 | Localhost CDP is an attack surface; started manually to minimize exposure window |
-| `cursor-priority` | Every 60s | Boosts IDE process scheduling via `taskpolicy` | |
-| `cursor-at-login` | At login | Launches Cursor in background via `open -g -a Cursor` | No focus steal at login |
+| `app-priority` | Every 60s | Boosts IDE process scheduling via `taskpolicy` | |
 | `morning` | Daily 08:30 | Morning briefing (read-only) | |
 | `sleepwatcher` | Persistent | Runs `~/.sleep`/`~/.wakeup` on system events | |
 

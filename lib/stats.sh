@@ -18,7 +18,7 @@ _task_estimate() {
     audit)            echo 2 ;;
     cleanup)          echo 10 ;;
     git-maintain)     echo 5 ;;
-    cursor-priority)  echo 0 ;;
+    app-priority)  echo 0 ;;
     morning)          echo 15 ;;
     *)                echo 0 ;;
   esac
@@ -28,7 +28,7 @@ _task_estimate() {
 #
 # Args:
 #   $1  task name. Must match one of the keys in _task_estimate (sync,
-#       doctor, audit, cleanup, git-maintain, cursor-priority, morning).
+#       doctor, audit, cleanup, git-maintain, app-priority, morning).
 #       Unknown task names are silently logged with seconds_saved=0; the
 #       JSONL line is still appended so total run counts stay accurate.
 #   $2  units (optional, default 1). Multiplier for the per-unit estimate.

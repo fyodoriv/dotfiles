@@ -906,28 +906,24 @@ mlx_lm server`.
 
 ---
 
-## Stuck Cursor agents
+## Stuck agent git sessions
 
-Cursor agents can appear frozen mid-task when these failure modes stack:
+Agents can appear frozen mid-task when a git fetch hangs:
 
-1. **Transient DNS failure** for `agentn.us.api5.cursor.sh` — Cursor's cloud transport hits `THROW eoe, willRetry=false` (permanent fail until **Developer → Reload Window**). Dotfiles cannot restart Cursor; `network-watchdog` and `dotfiles-heal-stuck-agents` flush DNS to help recovery, but Reload Window is still required if the agent session already entered permanent-fail state.
+1. **Hung `git-upload-pack` SSH sessions** to your GHE host — editor and agent git workers can wait forever. SSH keepalive + `ConnectTimeout` in `~/.ssh/config` (chezmoi-managed) prevents new hangs; doctor check `security.git_ssh_hung_upload_pack` detects sessions older than 30 minutes.
 
-2. **Hung `git-upload-pack` SSH sessions** to your GHE host — Cursor extension-host git workers never time out. SSH keepalive + `ConnectTimeout` in `~/.ssh/config` (chezmoi-managed) prevents new hangs; doctor check `security.git_ssh_hung_upload_pack` detects sessions older than 30 minutes.
-
-3. **Stale agent sandbox shells** — long-running `vitest`, `tail -f`, or duplicate `watch:pr` in Cursor agent terminals. Doctor check `cursor.stale_agent_shells` flags processes older than 30 minutes under the Cursor process tree.
-
-4. **Runaway ignore discovery** — Cursor can leave its internal `rg --files --follow` helper crawling a workspace for hours. macOS reports 100% CPU per core, so a value such as 700% means seven saturated cores. Doctor check `cursor.runaway_agent_helpers` narrowly detects only this non-interactive helper under Cursor, after it exceeds 90% CPU for 60 seconds; ordinary searches and test commands are not matched.
+2. **Idle SSH mux sockets** — a stale `ControlMaster` socket can block new git sessions. The heal resets it only when it has no active sessions.
 
 **Manual heal (no focus steal):**
 
 ```bash
 dotfiles-heal-stuck-agents              # report counts
 dotfiles-heal-stuck-agents --dry-run  # preview kills/resets
-dotfiles-heal-stuck-agents --fix      # kill runaway helpers, hung git workers, stale shells; reset idle mux
+dotfiles-heal-stuck-agents --fix      # kill hung git workers; reset idle mux
 dotfiles doctor --fix                 # also runs heal proactively before module checks
 ```
 
-**Automatic heal:** LaunchAgent `com.dotfiles.heal-stuck-agents` runs `dotfiles-heal-stuck-agents --fix --quiet` every 30 seconds (and at login) when Cursor is installed and profile is `full`. A Mac with only Claude Code or Codex does not get this agent: three of its five matchers (stale shells, runaway `rg` crawls, the Cursor API DNS check) match Cursor only. The agent-neutral hung git check still runs there through `dotfiles doctor --fix`. The 30-second pass skips network recovery; `com.dotfiles.network-resilience` owns periodic DNS recovery. Logs: `~/.local/share/dotfiles/logs/heal-stuck-agents.log`.
+**Automatic heal:** `dotfiles doctor --fix` (daily LaunchAgent) and `dotfiles-agent-wake-recover` run `dotfiles-heal-stuck-agents --fix --quiet`. There is no separate LaunchAgent. `com.dotfiles.network-resilience` owns periodic DNS recovery. Logs: `~/.local/share/dotfiles/logs/heal-stuck-agents.log`.
 
 **SSH canonical fix:** `~/.ssh/config` sets `ConnectTimeout 15`, `ServerAliveInterval` / `ServerAliveCountMax`, and `ControlPersist 300` on `Host *` (plus optional per-GHE-host block when `ghe_ssh_host` is configured in chezmoi). Re-apply with `chezmoi apply` or `dotfiles doctor --module ssh --fix`. Set `DOTFILES_GHE_SSH_HOST` or chezmoi `ghe_ssh_host` so heal/mux logic targets your enterprise Git host.
 

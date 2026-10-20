@@ -48,9 +48,9 @@ cat ~/.config/ghostty/config                           # owned by dotfiles
    `ps -o pid,nice,pri,comm -p "$(pgrep -x claude | paste -sd, -)"`.
    An interactive Claude Code session must not show `PRI 4` (the darwin
    background band). In that band, timers fire about 200 ms late, so every
-   redraw waits. The `cursor-priority` LaunchAgent keeps Claude Code with a
+   redraw waits. The `app-priority` LaunchAgent keeps Claude Code with a
    terminal-app ancestor (Ghostty, WebStorm, Terminal, and others)
-   interactive. If a session still shows `PRI 4`, fix `bin/cursor-priority`
+   interactive. If a session still shows `PRI 4`, fix `bin/app-priority`
    in the dotfiles source. To clear one live session now:
    `taskpolicy -B -t 0 -l 0 -p <pid>`.
 2. **Fewer open sessions.** Several sessions share `~/.claude.json` and lock

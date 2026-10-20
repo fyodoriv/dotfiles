@@ -439,8 +439,6 @@ Gate: skipped entirely when `use_cursor: false` in chezmoi config (default `true
 | `cursor.model_parity` | Agent/CLI model matches Claude Code | `run_after_cursor-agent-parity.sh --check-model` fix path |
 | `cursor.agent_settings_parity` | CLI vimMode + Glass editor prefs match editor settings.json | `run_after_cursor-agent-parity.sh` |
 | `cursor.vitest_discovery_guard` | Vitest extension excludes mirror/worktree/doc paths from config scan | Regenerate settings via doctor `--fix` |
-| `cursor.at_login_launchagent` | `cursor-at-login` LaunchAgent uses `open -g -a Cursor` | `chezmoi apply` |
-| `cursor.at_login_loaded` | `com.dotfiles.cursor-at-login` registered (when Cursor installed) | `launchctl bootstrap` / `chezmoi apply` |
 | `cursor.no_webstorm_login_item` | WebStorm removed from Login Items | `chezmoi apply` (macos-apps.sh) or osascript delete |
 
 ### local-ai (conditional)

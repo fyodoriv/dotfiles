@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.dotfiles.cursor-priority</string>
+    <string>com.dotfiles.app-priority</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin/cursor-priority</string>
+        <string>{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin/app-priority</string>
     </array>
     <key>StartInterval</key>
     <integer>60</integer>
@@ -16,9 +16,9 @@
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/cursor-priority.log</string>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/app-priority.log</string>
     <key>StandardErrorPath</key>
-    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/cursor-priority.log</string>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/app-priority.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>LANG</key>

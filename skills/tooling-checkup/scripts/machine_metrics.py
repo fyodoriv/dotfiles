@@ -178,7 +178,7 @@ def claude_metrics(ps_text, claude_json, state):
     background = [pid for pid, pri in sessions if pri <= BACKGROUND_PRI]
     out.append(("claude_sessions", len(sessions), "warn" if len(sessions) > SESSIONS_WARN else "ok", "interactive sessions (with a tty)"))
     out.append(("claude_background_pri", len(background), "act" if background else "ok",
-                "sessions in the PRI 4 band; fix bin/cursor-priority" + (f" (pids {', '.join(map(str, background))})" if background else "")))
+                "sessions in the PRI 4 band; fix bin/app-priority" + (f" (pids {', '.join(map(str, background))})" if background else "")))
     if background:
         triggers.append(f"{len(background)} session(s) at PRI {BACKGROUND_PRI}")
     if len(sessions) > SESSIONS_WARN:

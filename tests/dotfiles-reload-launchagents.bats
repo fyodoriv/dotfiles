@@ -45,9 +45,7 @@ _deploy_core_plists() {
   for label in \
     com.dotfiles.gui-path \
     com.dotfiles.network-resilience \
-    com.dotfiles.heal-stuck-agents \
     com.dotfiles.agent-keepawake \
-    com.dotfiles.cursor-at-login \
     com.dotfiles.dotfiles-doctor \
     com.dotfiles.chrome-profile \
     com.dotfiles.agent-browser-chrome \
@@ -95,9 +93,9 @@ STUB
   [ "$status" -eq 0 ]
 
   [ -f "$TEST_DIR/launchctl.log" ]
-  grep -c 'bootout' "$TEST_DIR/launchctl.log" | grep -q '^10$'
-  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^10$'
-  grep -q 'com.dotfiles.heal-stuck-agents' "$TEST_DIR/launchctl.log"
+  grep -c 'bootout' "$TEST_DIR/launchctl.log" | grep -q '^8$'
+  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^8$'
+  grep -q 'com.dotfiles.network-resilience' "$TEST_DIR/launchctl.log"
   grep -q 'com.dotfiles.gui-path' "$TEST_DIR/launchctl.log"
   grep -q 'com.dotfiles.agent-keepawake' "$TEST_DIR/launchctl.log"
   grep -q 'com.dotfiles.chrome-profile' "$TEST_DIR/launchctl.log"
@@ -148,7 +146,7 @@ STUB
   [ "$status" -eq 0 ]
 
   grep -q 'remote-debugging-port=9223' "$TEST_DIR/pkill.log"
-  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^1[0-9]$'
+  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^9$'
 }
 
 @test "dry-run prints actions without calling launchctl" {
@@ -171,26 +169,22 @@ STUB
 }
 
 @test "profile-skipped agents are reported as not applicable, not as not deployed" {
-  # A Mac without Cursor and without the enterprise flag: dotfiles apply
-  # skips heal-stuck-agents, cursor-at-login, and chrome-profile on purpose.
+  # A Mac without the enterprise flag: dotfiles apply skips chrome-profile
+  # on purpose.
   local label
   for label in com.dotfiles.gui-path com.dotfiles.dotfiles-doctor; do
     printf '%s\n' '<?xml version="1.0"?><plist/>' > "$TEST_HOME/Library/LaunchAgents/${label}.plist"
   done
 
-  DOTFILES_USE_CURSOR=false DOTFILES_IS_ENTERPRISE=false DOTFILES_PROFILE=full \
+  DOTFILES_IS_ENTERPRISE=false DOTFILES_PROFILE=full \
     run bash "$RELOAD_CMD"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"com.dotfiles.heal-stuck-agents — not applicable for this profile"* ]]
-  [[ "$output" == *"com.dotfiles.cursor-at-login — not applicable for this profile"* ]]
   [[ "$output" == *"com.dotfiles.chrome-profile — not applicable for this profile"* ]]
-  [[ "$output" != *"heal-stuck-agents — plist not deployed"* ]]
-  [[ "$output" != *"cursor-at-login — plist not deployed"* ]]
   [[ "$output" != *"chrome-profile — plist not deployed"* ]]
 }
 
 @test "an agent apply should deploy still warns when its plist is missing" {
-  DOTFILES_USE_CURSOR=false DOTFILES_IS_ENTERPRISE=false DOTFILES_PROFILE=full \
+  DOTFILES_IS_ENTERPRISE=false DOTFILES_PROFILE=full \
     run bash "$RELOAD_CMD"
   [ "$status" -eq 0 ]
   [[ "$output" == *"com.dotfiles.gui-path — plist not deployed"* ]]

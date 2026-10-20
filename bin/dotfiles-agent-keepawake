@@ -1,5 +1,5 @@
 #!/bin/bash
-# Keep macOS awake only while Cursor or Claude Code is running.
+# Keep macOS awake only while Claude Code is running.
 #
 # The manager creates one caffeinate -ims child per tracked process. It also
 # owns a short-lived Amphetamine session for reliable lid-closed work. Both are
@@ -41,7 +41,7 @@ done < <(dotfiles_agent_list_tracked_processes)
 
 if [ "$DRY_RUN" = true ]; then
   if [ "${#tracked_pids[@]}" -eq 0 ]; then
-    echo "dry-run: no tracked Cursor or Claude Code process — would release manager-owned sleep protection"
+    echo "dry-run: no tracked Claude Code process — would release manager-owned sleep protection"
     exit 0
   fi
 

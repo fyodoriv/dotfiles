@@ -4,6 +4,6 @@
 #
 # One path per line, relative to repo root. Comments (#) and blank lines are ignored.
 
-bin/cursor-priority
+bin/app-priority
 home/gitconfig
 macos.sh

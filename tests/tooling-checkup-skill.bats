@@ -320,7 +320,7 @@ EOF
   grep -q '^1\. \*\*Scheduling band\.\*\*' "$guide"
   grep -q 'PRI 4' "$guide"
   grep -q 'taskpolicy -B -t 0 -l 0 -p' "$guide"
-  grep -q 'bin/cursor-priority' "$guide"
+  grep -q 'bin/app-priority' "$guide"
 }
 
 # Fake agentbrew perf CLI: prints $PERF_FIXTURES/<all|project>.json for `report`.

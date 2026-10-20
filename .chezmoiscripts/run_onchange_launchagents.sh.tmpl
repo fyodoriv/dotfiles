@@ -1,7 +1,6 @@
 #!/bin/bash
 # Re-run when LaunchAgent plist files change.
 # launchagents hash: {{ range $path := (joinPath .chezmoi.sourceDir "launchagents" "*.plist*" | glob) }}{{ $rel := trimPrefix (print $.chezmoi.sourceDir "/") $path }}{{ $rel }}={{ include $rel | sha256sum }};{{ end }}
-# use_cursor: {{ dig "use_cursor" true . }}
 # auto_sync: {{ dig "auto_sync" true . }}
 # claude_remote_control: {{ dig "claude_remote_control" false . }}
 # endpoint_hardening: {{ dig "endpoint_hardening" true . }}
@@ -13,7 +12,6 @@ set -euo pipefail
 SOURCE_DIR="{{ .chezmoi.sourceDir }}"
 PROFILE="{{ .profile }}"
 AUTO_UPGRADE="{{ dig "auto_upgrade" "false" . }}"
-USE_CURSOR="{{ dig "use_cursor" true . }}"
 AUTO_SYNC="{{ dig "auto_sync" true . }}"
 CLAUDE_REMOTE_CONTROL="{{ dig "claude_remote_control" false . }}"
 IS_ENTERPRISE="{{ dig "is_enterprise" false . }}"
@@ -46,30 +44,16 @@ should_skip_agent() {
     # Silent system-wide upgrades require explicit opt-in
     dotfiles-upgrade)
       [ "$AUTO_UPGRADE" != "true" ] && return 0 ;;
-    # Personal productivity agents — full profile only
-    cursor-at-login)
-      [ "$USE_CURSOR" = "false" ] && return 0
-      [ "$PROFILE" != "full" ] && return 0
-      [ ! -d "/Applications/Cursor.app" ] && return 0 ;;
-    # Cursor only: 3 of its 5 matchers need Cursor (its process tree, its
-    # ripgrep crawl, its API host). The agent-neutral hung git check runs on
-    # every Mac through `dotfiles doctor --fix`. DOTFILES_CURSOR_APP: tests.
-    heal-stuck-agents)
-      [ "$USE_CURSOR" = "false" ] && return 0
-      [ "$PROFILE" != "full" ] && return 0
-      [ ! -d "${DOTFILES_CURSOR_APP:-/Applications/Cursor.app}" ] && return 0 ;;
     agent-keepawake)
       [ "$PROFILE" != "full" ] && return 0
-      [ ! -d "/Applications/Cursor.app" ] \
-        && [ ! -x "$HOME/.local/bin/claude" ] \
+      [ ! -x "$HOME/.local/bin/claude" ] \
         && ! command -v claude >/dev/null 2>&1 \
         && return 0 ;;
     cascade-caffeinate)
       return 0 ;;
-    cursor-priority)
+    app-priority)
       [ "$PROFILE" != "full" ] && return 0
-      ! command -v cursor &>/dev/null \
-        && ! pgrep -x "ghostty" &>/dev/null \
+      ! pgrep -x "ghostty" &>/dev/null \
         && ! pgrep -x "WebStorm" &>/dev/null \
         && [ ! -d "/Applications/Ghostty.app" ] \
         && [ ! -d "/Applications/WebStorm.app" ] \

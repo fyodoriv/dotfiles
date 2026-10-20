@@ -67,7 +67,7 @@ A new Mac ships with conservative defaults — slow key repeat, Spotlight crawli
 - **149 macOS defaults** applied via lifecycle scripts — key repeat, Spotlight pruning/exclusions, 15-minute idle lock, Finder, animations, analytics, power management. See [notable changes](docs/onboarding.md#step-2-initialize-chezmoi).
 - **~30ms shell startup** (200ms CI budget) — fnm replaces NVM, tool inits cached to disk, lazy loading everywhere.
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
-- **LaunchAgents** — sync, doctor, cleanup, git-maintain, cursor-priority, morning, and more.
+- **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
 - **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac; `--share FILE` writes a privacy-safe snapshot; `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot; `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you.
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
@@ -538,7 +538,7 @@ Every automated task records how much manual time it saved:
 | `doctor` | LaunchAgent (weekly) | 2s (flat) | — |
 | `cleanup` | LaunchAgent (weekly) | 10s / cache | Number of cache locations cleaned |
 | `git-maintain` | LaunchAgent (daily) | 5s / repo | Number of repos in `~/apps` |
-| `cursor-priority` | LaunchAgent (every 60s) | 0 (bookkeeping) | — |
+| `app-priority` | LaunchAgent (every 60s) | 0 (bookkeeping) | — |
 | `morning` | Manual (daily) | 15s / repo | Number of repos pulled |
 
 ```bash
@@ -690,11 +690,10 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 
 | Agent | Script | Schedule | What it does |
 |-------|--------|----------|-------------|
-| `com.dotfiles.cursor-priority` | `cursor-priority` | Every 60s | Prioritize interactive apps; background agent/model and verification workers so they yield under contention |
+| `com.dotfiles.app-priority` | `app-priority` | Every 60s | Prioritize interactive apps; background agent/model and verification workers so they yield under contention |
 | `com.dotfiles.dotfiles-sync` | `dotfiles-sync` | Every 30 min | Auto-commit tracked/staged changes + push/pull dotfiles repo |
 | `com.dotfiles.tooling-sync` | `tooling-sync` | Every hour | Pull agentbrew and minsky; push agentbrew TASKS.md edits |
 | `com.dotfiles.network-resilience` | `network-watchdog` | Every 5 min + after wake | Restore DNS/connectivity after sleep |
-| `com.dotfiles.heal-stuck-agents` | `dotfiles-heal-stuck-agents --fix --quiet` | Every 30 sec | Kill runaway Cursor helper crawls above 90% CPU after 60 sec; also heal hung git SSH + stale agent shells |
 | `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Cursor or Claude Code runs on AC or battery ≥20%; releases when both exit, and quarantines rejected scripting commands |
 | `com.dotfiles.git-maintain` | `git-maintain` | Daily 4:00 AM | git gc, prune branches in `~/apps` repos |
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
@@ -729,7 +728,6 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 |-------|-------------|
 | `com.dotfiles.capslock-control` | Remap CapsLock to Control |
 | `com.dotfiles.gui-path` | Export PATH to GUI session environment |
-| `com.dotfiles.cursor-at-login` | Launch Cursor in background (`open -g -a Cursor`, no focus steal) |
 | `com.dotfiles.rancher-desktop` | Start Rancher Desktop, keep Kubernetes off, wait until the Docker API answers (one restart if it does not) |
 
 **Browser automation (started at login, not kept alive — attach via CDP)**
@@ -928,7 +926,7 @@ Measured on M3 Max, 64GB RAM, 300+ package JS/TS monorepo:
 
 Ghostty keeps scrollback in memory for every terminal surface. The managed
 config uses Ghostty's upstream 10 MB cap to prevent verbose commands from
-retaining 100 MB per tab. The `cursor-priority` LaunchAgent runs every minute:
+retaining 100 MB per tab. The `app-priority` LaunchAgent runs every minute:
 it keeps Ghostty, WebStorm, and Claude Code launched from a terminal app
 (Ghostty, WebStorm, Terminal, iTerm2, WezTerm, kitty, Alacritty, Warp) or from
 the Claude desktop app's Code tab interactive. Claude Code with no such
@@ -1005,7 +1003,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | Script | Description | Schedule |
 |--------|-------------|----------|
 | `cleanup` | Reclaim disk from caches, logs, and build artifacts | Weekly (Sun 3 AM) |
-| `cursor-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
+| `app-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
@@ -1087,8 +1085,6 @@ User-configurable variables that customize dotfiles behavior. Set them in `~/.zs
 | `AGENT_BROWSER_NO_AUTO_CDP` | (unset) | Opt out of default/implicit-session auto-attach to port 9223. Does not permit launching against launchd-owned profiles. |
 | `AGENT_BROWSER_ALLOW_FOCUS` | (unset) | When set (or with `--headed`), skip post-command focus-steal logging. Headless CDP is the default; dotfiles never hides Chrome or re-activates your prior app. |
 | `AGENT_BROWSER_ARGS` | (unset globally) | Optional launch args for cold-path agent-browser Chrome spawns only. The shell wrapper sets `--headless=new` inline on the cold path; it is cleared on `--cdp` attach so launchd Chromes never inherit extra flags. |
-| `HEAL_RUNAWAY_AGENT_MAX_CPU_PERCENT` | `90` | Maximum CPU percentage (100% = one core) allowed for Cursor's non-interactive `rg --files --follow` ignore-discovery helper after the grace period. |
-| `HEAL_RUNAWAY_AGENT_MIN_AGE_SEC` | `60` | Grace period before a helper over the CPU threshold is treated as runaway and terminated. |
 
 **Enterprise secrets** (set in `~/.zshenv.secrets`, never tracked in git):
 

@@ -796,7 +796,7 @@ run_module_doctor_inner() {
   fi
 }
 
-# ── Proactive heal for stuck Cursor agents (before module checks) ────
+# ── Proactive heal for stuck agent git sessions (before module checks) ─
 if $FIX_MODE && ! $LIST_MODE && ! $JSON_MODE && [ -x "$DOTFILES_DIR/bin/dotfiles-heal-stuck-agents" ]; then
   _heal_args=(--fix)
   $QUIET_MODE && _heal_args+=(--quiet)

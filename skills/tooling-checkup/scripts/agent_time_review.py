@@ -50,7 +50,7 @@ FIX_PATTERNS = [
                 r"bats|npx vitest|vitest|jest|pytest)\b"),
      "full gate or test run: use affected-test selection in the inner loop "
      "(`bin/bats-affected`, `vitest --changed`, `pytest --lf`) and run the full gate once; "
-     "if `ps -o pri,comm` shows PRI 4, the runner is on background QoS (see `bin/cursor-priority`)"),
+     "if `ps -o pri,comm` shows PRI 4, the runner is on background QoS (see `bin/app-priority`)"),
     (re.compile(r"^git (fetch|clone|pull)\b"),
      "network git: fetch once per session, clone with `--filter=blob:none`"),
     (re.compile(r"^agent:"),

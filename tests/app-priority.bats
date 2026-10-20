@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# Functional tests for cursor-priority — interactive/background scheduling
+# Functional tests for app-priority — interactive/background scheduling
 
 load test_helper
 # These tests check stats writes, so they turn the stats log back on.
 export DOTFILES_STATS_LOG=1
 
-PRIORITY_CMD="$BATS_TEST_DIRNAME/../bin/cursor-priority"
+PRIORITY_CMD="$BATS_TEST_DIRNAME/../bin/app-priority"
 REAL_DOTFILES="$BATS_TEST_DIRNAME/.."
 
 setup() {
@@ -70,18 +70,18 @@ teardown() {
 
 # ── Script basics ────────────────────────────────────────────────
 
-@test "cursor-priority script exists and is executable" {
+@test "app-priority script exists and is executable" {
   [ -f "$PRIORITY_CMD" ]
   [ -x "$PRIORITY_CMD" ]
 }
 
-@test "cursor-priority has correct shebang" {
+@test "app-priority has correct shebang" {
   head -1 "$PRIORITY_CMD" | grep -q '#!/bin/bash'
 }
 
 # ── --help output ────────────────────────────────────────────────
 
-@test "cursor-priority --help prints usage" {
+@test "app-priority --help prints usage" {
   run "$PRIORITY_CMD" --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"priority"* ]] || [[ "$output" == *"scheduling"* ]]
@@ -89,23 +89,23 @@ teardown() {
 
 # ── Default process list (no config file) ────────────────────────
 
-@test "cursor-priority runs without errors using defaults" {
+@test "app-priority runs without errors using defaults" {
   # Remove any config file, use mock bins so pgrep returns nothing
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
 }
 
-@test "cursor-priority queries default processes via pgrep" {
+@test "app-priority queries default processes via pgrep" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
-  # pgrep should have been called for Cursor, Slack, etc.
-  grep -q "Cursor" "$PGREP_LOG"
+  # pgrep should have been called for Slack, Google Chrome, etc.
+  grep -q "Google Chrome" "$PGREP_LOG"
   grep -q "Slack" "$PGREP_LOG"
 }
 
-@test "cursor-priority keeps Ghostty and WebStorm interactive by default" {
+@test "app-priority keeps Ghostty and WebStorm interactive by default" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
@@ -113,7 +113,7 @@ teardown() {
   grep -q "WebStorm" "$PGREP_LOG"
 }
 
-@test "cursor-priority lowers the priority of test runners that agents start" {
+@test "app-priority lowers the priority of test runners that agents start" {
   # vitest workers are node, bats runs as bash: both need full-argv patterns.
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
@@ -124,7 +124,7 @@ teardown() {
   grep -q -- "-f node_modules/typescript/bin/tsc" "$PGREP_LOG"
 }
 
-@test "cursor-priority renices test runners but keeps them off background QoS" {
+@test "app-priority renices test runners but keeps them off background QoS" {
   # Background QoS confines work to efficiency cores and throttles its I/O,
   # even on an idle Mac: an agentbrew gate took 2.5 h and timed out.
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
@@ -140,7 +140,7 @@ MOCK
   ! grep -q -- "-b -p 777" "$TASKPOLICY_LOG"
 }
 
-@test "cursor-priority queries minsky processes by pattern" {
+@test "app-priority queries minsky processes by pattern" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
@@ -149,7 +149,7 @@ MOCK
 
 # ── Config file support ──────────────────────────────────────────
 
-@test "cursor-priority reads from config file" {
+@test "app-priority reads from config file" {
   local config_dir="$HOME/.config/dotfiles"
   mkdir -p "$config_dir"
   printf '%s\n' "Firefox" "kitty" > "$config_dir/priority-apps.txt"
@@ -160,7 +160,7 @@ MOCK
   grep -q "kitty" "$PGREP_LOG"
 }
 
-@test "cursor-priority config file ignores comments and blank lines" {
+@test "app-priority config file ignores comments and blank lines" {
   local config_dir="$HOME/.config/dotfiles"
   mkdir -p "$config_dir"
   printf '%s\n' "# comment" "" "Firefox" "  # another comment" "kitty" > "$config_dir/priority-apps.txt"
@@ -173,7 +173,7 @@ MOCK
   grep -q "kitty" "$PGREP_LOG"
 }
 
-@test "cursor-priority config uses pgrep -f for patterns with dots or wildcards" {
+@test "app-priority config uses pgrep -f for patterns with dots or wildcards" {
   local config_dir="$HOME/.config/dotfiles"
   mkdir -p "$config_dir"
   printf '%s\n' "node.*myapp" "Exact" > "$config_dir/priority-apps.txt"
@@ -186,7 +186,7 @@ MOCK
   grep -q -- "-x" "$PGREP_LOG"
 }
 
-@test "cursor-priority with config does not use defaults" {
+@test "app-priority with config does not use defaults" {
   local config_dir="$HOME/.config/dotfiles"
   mkdir -p "$config_dir"
   printf '%s\n' "CustomApp" > "$config_dir/priority-apps.txt"
@@ -194,13 +194,13 @@ MOCK
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
   grep -q "CustomApp" "$PGREP_LOG"
-  ! grep -q "Cursor" "$PGREP_LOG"
+  ! grep -q "Google Chrome" "$PGREP_LOG"
   ! grep -q "Slack" "$PGREP_LOG"
 }
 
 # ── taskpolicy invocation ────────────────────────────────────────
 
-@test "cursor-priority calls taskpolicy when processes are found" {
+@test "app-priority calls taskpolicy when processes are found" {
   local config_dir="$HOME/.config/dotfiles"
   mkdir -p "$config_dir"
   printf '%s\n' "bats" > "$config_dir/priority-apps.txt"
@@ -221,7 +221,7 @@ MOCK
   grep -q "12345" "$TASKPOLICY_LOG"
 }
 
-@test "cursor-priority backgrounds agent workers by default" {
+@test "app-priority backgrounds agent workers by default" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   cat > "$TEST_BIN/pgrep" <<'MOCK'
 #!/bin/bash
@@ -238,7 +238,7 @@ MOCK
   grep -q "mlx_lm.server" "$PGREP_LOG"
 }
 
-@test "cursor-priority keeps WebStorm Claude interactive" {
+@test "app-priority keeps WebStorm Claude interactive" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   cat > "$TEST_BIN/pgrep" <<'MOCK'
 #!/bin/bash
@@ -270,7 +270,7 @@ MOCK
   ! grep -q -- "10 -p 12345" "$RENICE_LOG"
 }
 
-@test "cursor-priority keeps terminal-launched Claude interactive" {
+@test "app-priority keeps terminal-launched Claude interactive" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   cat > "$TEST_BIN/pgrep" <<'MOCK'
 #!/bin/bash
@@ -301,7 +301,7 @@ MOCK
   ! grep -q -- "10 -p 12345" "$RENICE_LOG"
 }
 
-@test "cursor-priority keeps Claude Desktop Code-tab sessions interactive" {
+@test "app-priority keeps Claude Desktop Code-tab sessions interactive" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   cat > "$TEST_BIN/pgrep" <<'MOCK'
 #!/bin/bash
@@ -332,7 +332,7 @@ MOCK
   ! grep -q -- "10 -p 12345" "$RENICE_LOG"
 }
 
-@test "cursor-priority backgrounds Claude with no terminal ancestor" {
+@test "app-priority backgrounds Claude with no terminal ancestor" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   cat > "$TEST_BIN/pgrep" <<'MOCK'
 #!/bin/bash
@@ -360,17 +360,17 @@ MOCK
 
 # ── Stats logging ────────────────────────────────────────────────
 
-@test "cursor-priority logs run to stats file" {
+@test "app-priority logs run to stats file" {
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
-  # Stats file should have an entry for cursor-priority
+  # Stats file should have an entry for app-priority
   [ -f "$HOME/.dotfiles-stats.jsonl" ]
-  grep -q "cursor-priority" "$HOME/.dotfiles-stats.jsonl"
+  grep -q "app-priority" "$HOME/.dotfiles-stats.jsonl"
 }
 
 # ── XDG_CONFIG_HOME support ──────────────────────────────────────
 
-@test "cursor-priority respects XDG_CONFIG_HOME for config file" {
+@test "app-priority respects XDG_CONFIG_HOME for config file" {
   local xdg_dir="$TEST_DIR/xdg_config"
   mkdir -p "$xdg_dir/dotfiles"
   printf '%s\n' "XDGApp" > "$xdg_dir/dotfiles/priority-apps.txt"

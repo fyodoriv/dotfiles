@@ -29,7 +29,6 @@ set_app_responsiveness_defaults() {
   defaults write "$app_bundle_identifier" NSDisableAutomaticTermination -bool true 2>/dev/null || true
 }
 
-set_app_responsiveness_defaults "Cursor" "com.todesktop.230313mzl4w4u92"
 set_app_responsiveness_defaults "Slack" "com.tinyspeck.slackmacgap"
 set_app_responsiveness_defaults "Google Chrome" "com.google.Chrome"
 set_app_responsiveness_defaults "Microsoft Outlook" "com.microsoft.Outlook"
@@ -40,8 +39,7 @@ set_app_responsiveness_defaults "Terminal" "com.apple.Terminal"
 # ── Login items: apps that start on boot ──────────────────────────────
 # Declarative list of apps that should be login items. Adds missing ones,
 # removes legacy dotfiles-managed items, does NOT remove other user extras.
-# Cursor starts via com.dotfiles.cursor-at-login LaunchAgent (open -g -a Cursor)
-# so it does not steal focus at login. Uses osascript — the only reliable way
+# Uses osascript — the only reliable way
 # to manage login items on macOS.
 _login_items="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null || echo "")"
 _removed_login_apps=(
@@ -50,7 +48,7 @@ _removed_login_apps=(
 for _name in "${_removed_login_apps[@]}"; do
   if [[ "$_login_items" == *"$_name"* ]]; then
     osascript -e "tell application \"System Events\" to delete login item \"$_name\"" 2>/dev/null || true
-    echo "  ✓ Removed $_name from login items (replaced by Cursor LaunchAgent)"
+    echo "  ✓ Removed $_name from login items (legacy dotfiles login item)"
   fi
 done
 _desired_login_apps=(

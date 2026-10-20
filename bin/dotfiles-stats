@@ -46,7 +46,7 @@ if [ "${1:-}" = "--recalc" ]; then
       elif .task == "doctor" then 2
       elif .task == "cleanup" then (10 * (.units // 1))
       elif .task == "git-maintain" then (5 * (.units // 1))
-      elif .task == "cursor-priority" then 0
+      elif .task == "app-priority" then 0
       elif .task == "morning" then (15 * (.units // 1))
       else 0
       end
@@ -65,7 +65,7 @@ if [ ! -f "$STATS_FILE" ] || [ ! -s "$STATS_FILE" ]; then
   echo ""
   echo -e "  ${DIM}No runs recorded yet. Stats will appear after automated tasks run.${NC}"
   echo ""
-  echo -e "  Tracked tasks: sync, doctor, cleanup, git-maintain, cursor-priority, morning"
+  echo -e "  Tracked tasks: sync, doctor, cleanup, git-maintain, app-priority, morning"
   exit 0
 fi
 

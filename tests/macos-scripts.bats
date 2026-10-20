@@ -268,14 +268,8 @@ MOCK
     "$TEST_DOTFILES/macos-apps.sh"
 }
 
-@test "macos-apps.sh removes WebStorm login item and leaves Cursor to LaunchAgent" {
+@test "macos-apps.sh removes the legacy WebStorm login item" {
   ! grep -q 'WebStorm:/Applications/WebStorm.app' "$TEST_DOTFILES/macos-apps.sh"
   grep -q '_removed_login_apps=(' "$TEST_DOTFILES/macos-apps.sh"
   grep -q '"WebStorm"' "$TEST_DOTFILES/macos-apps.sh"
-  [ -f "$TEST_DOTFILES/launchagents/com.dotfiles.cursor-at-login.plist.tmpl" ]
-  grep -q 'bin/cursor-at-login</string>' "$TEST_DOTFILES/launchagents/com.dotfiles.cursor-at-login.plist.tmpl"
-  grep -q 'CURSOR_LOGIN_WAIT_FOR_MEMORY' "$TEST_DOTFILES/launchagents/com.dotfiles.cursor-at-login.plist.tmpl"
-  grep -q 'launchagent-path' "$TEST_DOTFILES/launchagents/com.dotfiles.cursor-at-login.plist.tmpl"
-  grep -q 'memory fix' "$TEST_DOTFILES/bin/cursor-at-login"
-  grep -q 'exec "$open_bin" -g -a Cursor' "$TEST_DOTFILES/bin/cursor-at-login"
 }

@@ -155,7 +155,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `load-sampler` | Every 30s | all | Read-only 7-day load, memory, and top-process history in `~/.local/state/dotfiles/load-samples.tsv` |
 | `morning` | Configurable (default 8:30 AM) | full | Morning briefing |
 | `sleepwatcher` | At load | full | Run scripts on sleep/wake events |
-| `cursor-priority` | At load | full | Set process priority for Cursor IDE |
+| `app-priority` | At load | full | Keep interactive apps and terminal-launched agents responsive; background agent and model workers |
 | `agent-browser-chrome` | At load, not kept alive | full | Dashboard / SSO Chrome with remote debugging on port 9223; manual close for logout/shutdown is respected |
 | `debug-chrome` | At load, not kept alive | full | Debug-work Chrome with remote debugging on port 9224; manual close for logout/shutdown is respected |
 | `tooling-chrome` | At load, not kept alive | full | Tooling-repo Chrome with remote debugging on port 9225; manual close for logout/shutdown is respected |
@@ -244,7 +244,7 @@ The following files and data are explicitly preserved and never created, modifie
 | `~/.config/chezmoi/key.txt` | age encryption key |
 | Existing browser profiles | Chrome/Safari profiles, bookmarks, extensions |
 | macOS iCloud settings | iCloud Drive, Photos, Keychain sync |
-| macOS user account settings | Login items (Ghostty via macos-apps.sh; Cursor via `com.dotfiles.cursor-at-login`; other non-dotfiles items untouched), wallpaper, screen resolution |
+| macOS user account settings | Login items (Ghostty via macos-apps.sh; other non-dotfiles items untouched), wallpaper, screen resolution |
 | `~/Library/` (except LaunchAgents) | Application data, preferences not in `defaults write` scope |
 
 `dotfiles uninstall` only removes symlinks pointing into the dotfiles repo and unloads `com.dotfiles.*` LaunchAgents. It does not revert macOS defaults -- those persist until manually changed in System Settings.

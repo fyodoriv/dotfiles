@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared process-scoped keepawake helpers for Cursor and Claude Code.
+# Shared process-scoped keepawake helpers for Claude Code.
 # Sourced by bin/dotfiles-agent-keepawake and resilience doctor checks.
 #
 # The manager owns only the child caffeinate processes and Amphetamine session
@@ -15,10 +15,6 @@ REPLY_CHILD_PID=""
 REPLY_OSASCRIPT_OUTPUT=""
 REPLY_AMPHETAMINE_QUARANTINE_OPERATION=""
 REPLY_AMPHETAMINE_QUARANTINE_KIND=""
-
-AGENT_KEEPAWAKE_IDE_PATHS=(
-  "/Applications/Cursor.app/Contents/MacOS/Cursor"
-)
 
 dotfiles_agent_state_dir() {
   printf '%s\n' "${DOTFILES_AGENT_KEEPAWAKE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles}"
@@ -184,10 +180,6 @@ dotfiles_agent_claude_paths() {
 }
 
 dotfiles_agent_tracked_paths() {
-  local agent_path
-  for agent_path in "${AGENT_KEEPAWAKE_IDE_PATHS[@]}"; do
-    printf '%s\n' "$agent_path"
-  done
   dotfiles_agent_claude_paths
 }
 
@@ -215,7 +207,7 @@ dotfiles_agent_list_tracked_processes() {
 }
 
 # Compatibility API for existing callers. It now returns the first tracked
-# Cursor or Claude Code process, while the manager itself handles every PID.
+# Claude Code process, while the manager itself handles every PID.
 dotfiles_agent_find_ide_pid() {
   local pid agent_path
   REPLY_PID=""

@@ -37,7 +37,6 @@ read -ra TARGETS <<< "$(_load_targets | tr '\n' ' ')"
 DNS_HOST="${TARGETS[0]#https://}"
 DNS_HOST="${DNS_HOST#http://}"
 DNS_HOST="${DNS_HOST%%/*}"
-CURSOR_AGENT_DNS_HOST="${DOTFILES_CURSOR_AGENT_DNS_HOST:-agentn.us.api5.cursor.sh}"
 
 # Use Apple's signed TCP probe instead of curl. The network watchdog runs in
 # the background and may be triggered repeatedly by launchd; ad-hoc-signed
@@ -155,27 +154,6 @@ wait_for_dns() {
   return 1
 }
 
-# ── Phase 2b: Cursor agent API DNS (transient blip → permanent agent fail) ─
-check_cursor_agent_dns() {
-  if [ ! -d "/Applications/Cursor.app" ]; then
-    return 0
-  fi
-  if host -W 2 "$CURSOR_AGENT_DNS_HOST" >/dev/null 2>&1; then
-    log "$(ok "Cursor agent API DNS OK ($CURSOR_AGENT_DNS_HOST)")"
-    return 0
-  fi
-  log "$(warn "Cursor agent API DNS failing — flushing cache")"
-  sudo -n dscacheutil -flushcache 2>/dev/null || true
-  sudo -n killall -HUP mDNSResponder 2>/dev/null || true
-  sleep 2
-  if host -W 3 "$CURSOR_AGENT_DNS_HOST" >/dev/null 2>&1; then
-    log "$(ok "Cursor agent API DNS recovered after flush")"
-    return 0
-  fi
-  log "$(warn "Cursor agent API DNS still failing — Reload Window may be required")"
-  return 1
-}
-
 # ── Phase 3: Optional VPN process check ─────────────────────────────
 # Set NETWORK_WATCHDOG_VPN_PROCESS to a process name to wait for it. Empty
 # (the default) skips the check.
@@ -223,7 +201,6 @@ failures=0
 
 wait_for_wifi   || failures=$((failures + 1))
 wait_for_dns    || failures=$((failures + 1))
-check_cursor_agent_dns || failures=$((failures + 1))
 check_vpn_process || true  # non-fatal: the VPN may be intentionally off
 check_connectivity || failures=$((failures + 1))
 

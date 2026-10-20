@@ -64,8 +64,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `tooling-sync` | Pull agentbrew and minsky; push agentbrew TASKS.md edits | Every hour |
 | `dotfiles-doctor` | Health check + auto-fix | Weekly |
 | `git-maintain` | `git maintenance` on all repos | Daily |
-| `cursor-priority` | Keep Ghostty, WebStorm, and terminal-launched Claude Code interactive; background agent and model workers | Every 60s |
-| `cursor-at-login` | Launch Cursor in background at login (`open -g -a Cursor`) | At login |
+| `app-priority` | Keep Ghostty, WebStorm, and terminal-launched Claude Code interactive; background agent and model workers | Every 60s |
 | `morning` | Morning startup routine | 8:30 AM daily |
 | `capslock-control` | Caps Lock → Control remapping | At login |
 | `gui-path` | Sync shell PATH to GUI apps | At login |
@@ -85,7 +84,6 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `opencode-serve` | Run OpenCode IDE server on localhost:4096 | At login |
 | `endpoint-bootstrap` | Sign uv Pythons and core tools, link shims, and publish the ready sentinel before other agents start | At login |
 | `agent-keepawake` | Keep the Mac awake while Cursor or Claude Code runs on AC or battery ≥20%; release protection when both exit | At login + every 5s |
-| `heal-stuck-agents` | Clear hung git SSH sessions, stale sandbox shells, and runaway helpers that stall Cursor agents | At login + every 30s |
 | `dotfiles-upgrade` | Upgrade all installed software through topgrade (opt-in: `auto_upgrade: true`) | Sundays 9:00 AM |
 | `memory-sync-projects` | Ingest Claude project memory into AgentBrew shared memory | 5:30 AM daily |
 | `adhoc-sign-bottles` | Ad-hoc sign Homebrew bottles and uv Pythons so endpoint security does not flag unsigned binaries | At login + daily |

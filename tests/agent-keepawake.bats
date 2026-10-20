@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for the process-scoped Cursor and Claude Code sleep manager.
+# Tests for the process-scoped Claude Code sleep manager.
 
 KEEPAWAKE_BIN="$BATS_TEST_DIRNAME/../bin/dotfiles-agent-keepawake"
 KEEPAWAKE_LIB="$BATS_TEST_DIRNAME/../lib/agent-keepawake.sh"
@@ -21,6 +21,7 @@ setup() {
   OSASCRIPT_OPERATION_LOG="$TEST_DIR/osascript-operations.log"
   PMSET_OUTPUT_FILE="$TEST_DIR/pmset-output"
   CLAUDE_PATH="$TEST_DIR/claude-code"
+  CLAUDE2_PATH="$TEST_DIR/claude-code-2"
   TARGET_PIDS="$TEST_DIR/target-pids"
   ORIGINAL_HOME="$HOME"
 
@@ -150,7 +151,7 @@ STUB
   export DOTFILES_AGENT_PS_BIN="$STUB_BIN/ps"
   export DOTFILES_AGENT_CAFFEINATE_BIN="$STUB_BIN/caffeinate"
   export DOTFILES_AGENT_OSASCRIPT_BIN="$STUB_BIN/osascript"
-  export DOTFILES_AGENT_CLAUDE_PATHS="$CLAUDE_PATH"
+  export DOTFILES_AGENT_CLAUDE_PATHS="$CLAUDE_PATH:$CLAUDE2_PATH"
   export AMPHETAMINE_APP_PATH="$TEST_DIR/Amphetamine.app"
   export PS_COMMANDS_DIR PS_SNAPSHOT_FILE CAFFEINATE_CHILD_PIDS
   export AMPHETAMINE_STATE AMPHETAMINE_CLOSED_DISPLAY_STATE
@@ -216,15 +217,15 @@ osascript_operation_count() {
   [ "$status" -eq 0 ]
 }
 
-@test "manager discovers every Cursor and Claude Code executable PID" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
-  cursor_pid="$REPLY_TARGET_PID"
+@test "manager discovers every Claude Code executable PID" {
+  start_tracked_process "$CLAUDE2_PATH"
+  second_pid="$REPLY_TARGET_PID"
   start_tracked_process "$CLAUDE_PATH" " --resume"
   claude_pid="$REPLY_TARGET_PID"
 
   run dotfiles_agent_list_tracked_processes
   [ "$status" -eq 0 ]
-  [[ "$output" == *"$cursor_pid"$'\t'/Applications/Cursor.app/Contents/MacOS/Cursor* ]]
+  [[ "$output" == *"$second_pid"$'\t'"$CLAUDE2_PATH"* ]]
   [[ "$output" == *"$claude_pid"$'\t'"$CLAUDE_PATH"* ]]
   [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 2 ]
 }
@@ -256,9 +257,9 @@ STUB
   [ "$status" -ne 0 ]
 }
 
-@test "manager owns one caffeinate child per Cursor and Claude Code process" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
-  cursor_pid="$REPLY_TARGET_PID"
+@test "manager owns one caffeinate child per Claude Code process" {
+  start_tracked_process "$CLAUDE2_PATH"
+  second_pid="$REPLY_TARGET_PID"
   start_tracked_process "$CLAUDE_PATH" " --resume"
   claude_pid="$REPLY_TARGET_PID"
 
@@ -267,7 +268,7 @@ STUB
 
   state_file="$(manager_state_dir)/agent-keepawake-caffeinate.tsv"
   [ "$(wc -l < "$state_file" | tr -d ' ')" -eq 2 ]
-  grep -Fq "$cursor_pid" "$state_file"
+  grep -Fq "$second_pid" "$state_file"
   grep -Fq "$claude_pid" "$state_file"
   [ -f "$(manager_state_dir)/agent-keepawake-amphetamine-owner" ]
   [ "$(cat "$AMPHETAMINE_STATE")" = "true" ]
@@ -279,8 +280,8 @@ STUB
 }
 
 @test "manager releases only its owned protection below the battery threshold" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
-  cursor_pid="$REPLY_TARGET_PID"
+  start_tracked_process "$CLAUDE2_PATH"
+  second_pid="$REPLY_TARGET_PID"
   start_tracked_process "$CLAUDE_PATH" " --resume"
   claude_pid="$REPLY_TARGET_PID"
   set_battery_percent 20
@@ -297,12 +298,12 @@ STUB
   [ ! -f "$(manager_state_dir)/agent-keepawake-amphetamine-owner" ]
   [ "$(cat "$AMPHETAMINE_STATE")" = "false" ]
   grep -Fq "end session" "$OSASCRIPT_LOG"
-  grep -Fq "$cursor_pid" "$PS_SNAPSHOT_FILE"
+  grep -Fq "$second_pid" "$PS_SNAPSHOT_FILE"
   grep -Fq "$claude_pid" "$PS_SNAPSHOT_FILE"
 }
 
 @test "manager releases its own children as soon as the tracked process set is empty" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
 
   run bash "$KEEPAWAKE_BIN"
   [ "$status" -eq 0 ]
@@ -318,7 +319,7 @@ STUB
 }
 
 @test "manager leaves a pre-existing user Amphetamine session untouched" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   printf 'true\n' > "$AMPHETAMINE_STATE"
 
   run bash "$KEEPAWAKE_BIN"
@@ -334,7 +335,7 @@ STUB
 }
 
 @test "Automation denial keeps caffeinate protection and records lid-close degradation" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL=1
 
   run bash "$KEEPAWAKE_BIN"
@@ -346,7 +347,7 @@ STUB
 }
 
 @test "Automation timeout keeps caffeinate protection and releases the manager lock" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_HANG=1
   export DOTFILES_AGENT_OSASCRIPT_TIMEOUT_SECONDS=1
   SECONDS=0
@@ -365,7 +366,7 @@ STUB
 }
 
 @test "protocol rejection of the session-state query is shown once and quarantined" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL_FOR="session-state"
 
   run bash "$KEEPAWAKE_BIN"
@@ -381,7 +382,7 @@ STUB
 }
 
 @test "protocol rejection of session start is not retried every manager pass" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL_FOR="start-session"
 
   run bash "$KEEPAWAKE_BIN"
@@ -395,7 +396,7 @@ STUB
 }
 
 @test "closed-display state rejection rolls back the new manager session" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL_FOR="closed-display-state"
 
   run bash "$KEEPAWAKE_BIN"
@@ -410,7 +411,7 @@ STUB
 }
 
 @test "closed-display enable rejection rolls back the new manager session" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL_FOR="enable-closed-display"
 
   run bash "$KEEPAWAKE_BIN"
@@ -426,7 +427,7 @@ STUB
 }
 
 @test "failed rollback retains pending ownership until Amphetamine recovers" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL_FOR="enable-closed-display,end-session"
 
   run bash "$KEEPAWAKE_BIN"
@@ -452,7 +453,7 @@ STUB
 }
 
 @test "a no-op closed-display enable is rolled back and reported" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_ENABLE_NOOP=1
 
   run bash "$KEEPAWAKE_BIN"
@@ -464,7 +465,7 @@ STUB
 }
 
 @test "end-session rejection retains ownership and is not retried every pass" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   run bash "$KEEPAWAKE_BIN"
   [ "$status" -eq 0 ]
   [ -f "$(manager_state_dir)/agent-keepawake-amphetamine-owner" ]
@@ -482,7 +483,7 @@ STUB
 }
 
 @test "a transient Amphetamine timeout waits for the bounded retry window" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export DOTFILES_AGENT_OSASCRIPT_TIMEOUT_SECONDS=1
   export DOTFILES_AGENT_AMPHETAMINE_RETRY_SECONDS=10
   export DOTFILES_AGENT_KEEPAWAKE_NOW_EPOCH=100
@@ -506,7 +507,7 @@ STUB
 }
 
 @test "an Amphetamine app update retries a quarantined protocol command" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
   export OSASCRIPT_FAIL_FOR="start-session"
 
   run bash "$KEEPAWAKE_BIN"
@@ -522,7 +523,7 @@ STUB
 }
 
 @test "dry-run reports the process-scoped decision without creating state" {
-  start_tracked_process "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  start_tracked_process "$CLAUDE2_PATH"
 
   run bash "$KEEPAWAKE_BIN" --dry-run
   [ "$status" -eq 0 ]
@@ -532,7 +533,7 @@ STUB
   [ ! -e "$(manager_state_dir)/agent-keepawake-amphetamine-owner" ]
 }
 
-@test "dry-run reports cleanup when no Cursor or Claude Code process exists" {
+@test "dry-run reports cleanup when no Claude Code process exists" {
   run bash "$KEEPAWAKE_BIN" --dry-run
   [ "$status" -eq 0 ]
   [[ "$output" == *"would release manager-owned sleep protection"* ]]

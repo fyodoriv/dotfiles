@@ -81,7 +81,7 @@ MORNING="$REPO_ROOT/bin/morning"
   # pin. The sync agent is pinned by 'story 05 sync-interval' above.
 
   declare -A periodic_agents=(
-    [cursor-priority]="60"      # 60 seconds
+    [app-priority]="60"      # 60 seconds
     [network-resilience]="300"  # 5 minutes
     [chrome-profile]="3600"     # 1 hour — Work profile + ChromeWork default browser
   )

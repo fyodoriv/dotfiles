@@ -20,9 +20,6 @@ setup() {
     "$TEST_DOTFILES/lib/agentbrew-memory-readiness.sh"
   cp "$BATS_TEST_DIRNAME/../lib/dotfiles-arch.sh" "$TEST_DOTFILES/lib/dotfiles-arch.sh"
   cp "$BATS_TEST_DIRNAME/../lib/heal-stuck-agents.sh" "$TEST_DOTFILES/lib/heal-stuck-agents.sh"
-  cp "$BATS_TEST_DIRNAME/../bin/cursor-at-login" "$TEST_DOTFILES/bin/cursor-at-login"
-  cp "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.cursor-at-login.plist.tmpl" \
-    "$TEST_DOTFILES/launchagents/com.dotfiles.cursor-at-login.plist.tmpl"
 
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"

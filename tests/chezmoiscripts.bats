@@ -915,12 +915,12 @@ CONFIG
   awk '/agent-browser-chrome\|debug-chrome\|tooling-chrome\|chrome-debug/,/;;/' "$script" | grep -q 'PROFILE.*!=.*full'
 }
 
-@test "launchagents template: cursor-priority supports Ghostty and WebStorm" {
+@test "launchagents template: app-priority supports Ghostty and WebStorm" {
   local script="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
-  local cursor_priority_block
-  cursor_priority_block=$(awk '/cursor-priority\)/,/;;/' "$script")
-  [[ "$cursor_priority_block" == *"Ghostty"* ]]
-  [[ "$cursor_priority_block" == *"WebStorm"* ]]
+  local app_priority_block
+  app_priority_block=$(awk '/app-priority\)/,/;;/' "$script")
+  [[ "$app_priority_block" == *"Ghostty"* ]]
+  [[ "$app_priority_block" == *"WebStorm"* ]]
 }
 
 @test "launchagents template: upgrade agent requires auto_upgrade=true" {
@@ -1046,18 +1046,6 @@ CONFIG
 
   # morning should NOT be skipped on full
   ! should_skip_agent "morning"
-}
-
-@test "launchagents: should_skip_agent skips cursor-at-login on core profile" {
-  PROFILE="core"
-  AUTO_UPGRADE="false"
-  eval "$(sed -n '/^should_skip_agent/,/^}/p' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl")"
-
-  should_skip_agent "cursor-at-login"
-}
-
-@test "launchagents: should_skip_agent gates cursor-at-login on Cursor.app presence" {
-  grep -A3 'cursor-at-login)' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl" | grep -q '/Applications/Cursor.app'
 }
 
 @test "launchagents: should_skip_agent skips dotfiles-upgrade when auto_upgrade=false" {
@@ -1590,4 +1578,24 @@ _render_aws_gcloud_template() {
 
 @test "brew template: awscli and gcloud-cli stay out of the Brewfile" {
   ! grep -qE '^(brew "awscli"|cask "gcloud-cli")' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_brew.sh.tmpl"
+}
+
+@test "launchagents: apply unloads the retired Cursor-era agents (renamed or removed)" {
+  local script="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  local agents="$HOME/Library/LaunchAgents" label
+  mkdir -p "$agents"
+  for label in cursor-priority cursor-at-login heal-stuck-agents app-priority; do
+    : > "$agents/com.dotfiles.$label.plist"
+  done
+  printf '#!/bin/bash\necho "$*" >> "%s/launchctl.log"\n' "$TEST_DIR" > "$MOCK_BIN/launchctl"
+  chmod +x "$MOCK_BIN/launchctl"
+
+  SOURCE_DIR="$TEST_DOTFILES"
+  eval "$(sed -n '/^# ── Orphan unload/,/^# ── Caps Lock opt-out/p' "$script")"
+
+  [ ! -e "$agents/com.dotfiles.cursor-priority.plist" ]
+  [ ! -e "$agents/com.dotfiles.cursor-at-login.plist" ]
+  [ ! -e "$agents/com.dotfiles.heal-stuck-agents.plist" ]
+  [ -e "$agents/com.dotfiles.app-priority.plist" ]
+  grep -q "unload $agents/com.dotfiles.cursor-priority.plist" "$TEST_DIR/launchctl.log"
 }

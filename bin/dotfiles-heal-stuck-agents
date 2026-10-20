@@ -1,23 +1,16 @@
 #!/bin/bash
-# Self-heal stuck Cursor agent symptoms: hung git-upload-pack SSH sessions,
-# stale sandbox shells, runaway high-CPU helpers, and idle SSH mux sockets.
-# Never steals focus or opens GUI apps.
+# Self-heal stuck agent git sessions: hung git-upload-pack SSH sessions and
+# idle SSH mux sockets. Never steals focus or opens GUI apps.
 #
 # Usage:
 #   dotfiles-heal-stuck-agents              Report counts (stdout)
 #   dotfiles-heal-stuck-agents --dry-run  Show actions without killing
 #   dotfiles-heal-stuck-agents --fix      Kill/reset stale resources
-#   dotfiles-heal-stuck-agents --quiet    Log to file only (LaunchAgent mode)
+#   dotfiles-heal-stuck-agents --quiet    Log to file only
+#   dotfiles-heal-stuck-agents --kick-network  Restart network-resilience
 #
-# LaunchAgent gate: Cursor only. com.dotfiles.heal-stuck-agents (every 30 s)
-# loads only when Cursor is installed and use_cursor is on (should_skip_agent
-# in .chezmoiscripts/run_onchange_launchagents.sh.tmpl). Stale shells, runaway
-# rg crawls, and the API DNS check match Cursor only. Hung git-upload-pack and
-# idle GHE SSH mux checks are agent-neutral; on Macs without Cursor they run
-# through `dotfiles doctor --fix` (daily LaunchAgent and on demand).
-#
-# Cursor cloud transport permanent-fail (THROW eoe, willRetry=false after DNS blip)
-# still requires Developer: Reload Window — dotfiles cannot restart Cursor.
+# Runs through `dotfiles doctor --fix` (daily LaunchAgent and on demand) and
+# dotfiles-agent-wake-recover. It has no LaunchAgent of its own.
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
 
@@ -66,8 +59,6 @@ _kill_pid() {
 }
 
 hung_git=0
-stale_shells=0
-runaway_helpers=0
 actions=0
 
 if [ "${HEAL_SKIP_PS:-0}" != "1" ]; then
@@ -79,24 +70,6 @@ while IFS= read -r pid; do
     actions=$((actions + 1))
   fi
 done < <(dotfiles_heal_list_hung_git_session_pids || true)
-
-while IFS= read -r pid; do
-  [ -z "$pid" ] && continue
-  stale_shells=$((stale_shells + 1))
-  if $FIX_MODE || $DRY_RUN; then
-    _kill_pid "$pid" "stale Cursor agent shell"
-    actions=$((actions + 1))
-  fi
-done < <(dotfiles_heal_list_stale_agent_shell_pids || true)
-
-while IFS= read -r pid; do
-  [ -z "$pid" ] && continue
-  runaway_helpers=$((runaway_helpers + 1))
-  if $FIX_MODE || $DRY_RUN; then
-    _kill_pid "$pid" "runaway Cursor helper (>${HEAL_RUNAWAY_AGENT_MAX_CPU_PERCENT}% CPU for >${HEAL_RUNAWAY_AGENT_MIN_AGE_SEC}s)"
-    actions=$((actions + 1))
-  fi
-done < <(dotfiles_heal_list_runaway_agent_helper_pids || true)
 
 sock="$(dotfiles_heal_ssh_mux_socket 2>/dev/null || true)"
 if [ -n "$sock" ] && [ -S "$sock" ]; then
@@ -114,25 +87,7 @@ if [ -n "$sock" ] && [ -S "$sock" ]; then
 fi
 fi
 
-if [ "${HEAL_SKIP_NETWORK:-0}" != "1" ] && ! dotfiles_heal_cursor_agent_dns_ok; then
-  if $FIX_MODE || $DRY_RUN || $KICK_NETWORK; then
-    if $DRY_RUN; then
-      _heal_log "dry-run: would flush DNS (Cursor agent API host unresolved)"
-      actions=$((actions + 1))
-    elif $FIX_MODE || $KICK_NETWORK; then
-      dotfiles_heal_flush_dns_cache
-      sleep 2
-      if dotfiles_heal_cursor_agent_dns_ok; then
-        _heal_log "DNS flush recovered Cursor agent API host"
-      else
-        _heal_log "Cursor agent API DNS still failing after flush (Reload Window may be required)"
-      fi
-      actions=$((actions + 1))
-    fi
-  fi
-fi
-
-if [ "${HEAL_SKIP_NETWORK:-0}" != "1" ] && { $KICK_NETWORK || { $FIX_MODE && ! dotfiles_heal_cursor_agent_dns_ok; }; }; then
+if [ "${HEAL_SKIP_NETWORK:-0}" != "1" ] && $KICK_NETWORK; then
   if $DRY_RUN; then
     _heal_log "dry-run: would kickstart com.dotfiles.network-resilience"
   else
@@ -141,18 +96,17 @@ if [ "${HEAL_SKIP_NETWORK:-0}" != "1" ] && { $KICK_NETWORK || { $FIX_MODE && ! d
   fi
 fi
 
-summary="hung_git=$hung_git stale_shells=$stale_shells runaway_helpers=$runaway_helpers actions=$actions"
+summary="hung_git=$hung_git actions=$actions"
 _heal_log "--- heal-stuck-agents: $summary ---"
 
 if ! $QUIET; then
   echo "$summary"
-  if [ "$hung_git" -gt 0 ] || [ "$stale_shells" -gt 0 ] || [ "$runaway_helpers" -gt 0 ]; then
-    echo "Run with --fix to heal (or wait for com.dotfiles.heal-stuck-agents LaunchAgent)."
-    echo "Cursor agent permanent-fail after DNS blip still needs Developer: Reload Window."
+  if [ "$hung_git" -gt 0 ]; then
+    echo "Run with --fix to heal (dotfiles doctor --fix also runs it)."
   fi
 fi
 
-if [ "$hung_git" -gt 0 ] || [ "$stale_shells" -gt 0 ] || [ "$runaway_helpers" -gt 0 ]; then
+if [ "$hung_git" -gt 0 ]; then
   exit 1
 fi
 exit 0

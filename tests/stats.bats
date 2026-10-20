@@ -44,14 +44,14 @@ setup() {
   log_run doctor
   log_run cleanup
   log_run git-maintain
-  log_run cursor-priority
+  log_run app-priority
   log_run morning
 
   grep '"task":"sync"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":3'
   grep '"task":"doctor"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":2'
   grep '"task":"cleanup"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":10'
   grep '"task":"git-maintain"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":5'
-  grep '"task":"cursor-priority"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":0'
+  grep '"task":"app-priority"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":0'
   grep '"task":"morning"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":15'
 }
 
@@ -172,7 +172,7 @@ setup() {
 
 @test "dotfiles-stats --recalc rewrites historical data with current estimates" {
   # Write old-style inflated entries
-  echo '{"task":"cursor-priority","timestamp":"2026-03-11T12:00:00Z","seconds_saved":15,"units":1}' >> "$DOTFILES_STATS_FILE"
+  echo '{"task":"app-priority","timestamp":"2026-03-11T12:00:00Z","seconds_saved":15,"units":1}' >> "$DOTFILES_STATS_FILE"
   echo '{"task":"sync","timestamp":"2026-03-11T12:01:00Z","seconds_saved":45,"units":1}' >> "$DOTFILES_STATS_FILE"
   echo '{"task":"doctor","timestamp":"2026-03-11T12:02:00Z","pass":100,"fail":2,"seconds_saved":1020,"units":102}' >> "$DOTFILES_STATS_FILE"
 
@@ -180,8 +180,8 @@ setup() {
   [ "$status" -eq 0 ]
   echo "$output" | grep -q "Recalculated 3 records"
 
-  # cursor-priority: 0
-  grep '"task":"cursor-priority"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":0'
+  # app-priority: 0
+  grep '"task":"app-priority"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":0'
   # sync: 3 × 1 = 3
   grep '"task":"sync"' "$DOTFILES_STATS_FILE" | grep -q '"seconds_saved":3'
   # doctor: flat 2, units reset to 1

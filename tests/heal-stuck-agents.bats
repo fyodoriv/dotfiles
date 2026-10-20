@@ -13,9 +13,6 @@ setup() {
   export HEAL_SKIP_NETWORK=1
   export HEAL_SKIP_PS=1
   export HEAL_GIT_UPLOAD_PACK_MAX_AGE_SEC=60
-  export HEAL_STALE_SHELL_MAX_AGE_SEC=60
-  export HEAL_RUNAWAY_AGENT_MAX_CPU_PERCENT=90
-  export HEAL_RUNAWAY_AGENT_MIN_AGE_SEC=60
   # shellcheck source=../lib/heal-stuck-agents.sh
   source "$HEAL_LIB"
 }
@@ -32,10 +29,6 @@ teardown() {
   grep -q '\-\-dry-run' "$HEAL_BIN"
   grep -q '\-\-fix' "$HEAL_BIN"
   grep -q '\-\-quiet' "$HEAL_BIN"
-}
-
-@test "heal-stuck-agents documents Reload Window limit" {
-  grep -q 'Reload Window' "$HEAL_BIN"
 }
 
 @test "lib: mux master is excluded from hung git session detection" {
@@ -89,44 +82,6 @@ teardown() {
   [ "$REPLY_ARGS" = "/sbin/launchd" ]
 }
 
-@test "lib: CPU threshold allows 90 percent and rejects higher usage" {
-  run dotfiles_heal_cpu_exceeds_limit "90.0" 90
-  [ "$status" -eq 1 ]
-
-  run dotfiles_heal_cpu_exceeds_limit "90.1" 90
-  [ "$status" -eq 0 ]
-}
-
-@test "lib: old high-CPU Cursor ignore discovery is runaway" {
-  dotfiles_heal_in_cursor_process_tree() { [ "$1" = "123" ]; }
-  run dotfiles_heal_is_runaway_agent_helper \
-    "/Applications/Cursor.app/ripgrep/bin/rg --files --hidden --follow --no-config" \
-    120 701.2 123
-  [ "$status" -eq 0 ]
-}
-
-@test "lib: young or non-Cursor high-CPU discovery is preserved" {
-  dotfiles_heal_in_cursor_process_tree() { [ "$1" = "123" ]; }
-  local args="/Applications/Cursor.app/ripgrep/bin/rg --files --hidden --follow --no-config"
-
-  run dotfiles_heal_is_runaway_agent_helper "$args" 30 701.2 123
-  [ "$status" -eq 1 ]
-
-  run dotfiles_heal_is_runaway_agent_helper "$args" 120 701.2 999
-  [ "$status" -eq 1 ]
-}
-
-@test "lib: user searches and tests are never treated as runaway helpers" {
-  dotfiles_heal_in_cursor_process_tree() { return 0; }
-
-  run dotfiles_heal_is_runaway_agent_helper \
-    "/Applications/Cursor.app/ripgrep/bin/rg TODO --follow ." 120 701.2 123
-  [ "$status" -eq 1 ]
-
-  run dotfiles_heal_is_runaway_agent_helper "npm test" 120 701.2 123
-  [ "$status" -eq 1 ]
-}
-
 @test "heal-stuck-agents --dry-run exits 0 when healthy" {
   run "$HEAL_BIN" --dry-run
   [ "$status" -eq 0 ]
@@ -139,12 +94,6 @@ teardown() {
   grep -q 'heal-stuck-agents' "$TEST_HOME/.local/share/dotfiles/logs/heal-stuck-agents.log"
 }
 
-@test "network-watchdog checks Cursor agent API DNS" {
-  WATCHDOG="$BATS_TEST_DIRNAME/../bin/network-watchdog"
-  grep -q 'check_cursor_agent_dns' "$WATCHDOG"
-  grep -q 'agentn.us.api5.cursor.sh' "$WATCHDOG"
-}
-
 @test "ssh config template has ConnectTimeout and optional GHE keepalive" {
   TMPL="$BATS_TEST_DIRNAME/../private_dot_ssh/private_config.tmpl"
   grep -q 'ConnectTimeout 15' "$TMPL"
@@ -152,50 +101,12 @@ teardown() {
   grep -q 'ControlPersist 300' "$TMPL"
 }
 
-@test "heal-stuck-agents LaunchAgent exists" {
-  PLIST="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.heal-stuck-agents.plist.tmpl"
-  [ -f "$PLIST" ]
-  grep -q 'dotfiles-heal-stuck-agents' "$PLIST"
-  grep -q '<integer>30</integer>' "$PLIST"
-  grep -q '<key>HEAL_SKIP_NETWORK</key>' "$PLIST"
+@test "heal-stuck-agents has no LaunchAgent of its own" {
+  [ ! -e "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.heal-stuck-agents.plist.tmpl" ]
 }
 
 @test "dotfiles-doctor runs heal before module checks on --fix" {
   DOCTOR="$BATS_TEST_DIRNAME/../bin/dotfiles-doctor"
   grep -q 'dotfiles-heal-stuck-agents' "$DOCTOR"
-  grep -q 'Proactive heal for stuck Cursor agents' "$DOCTOR"
-}
-
-# The LaunchAgent gate lives in should_skip_agent (apply script). Load it
-# with the values a full-profile Mac with use_cursor=true would render.
-_load_launchagent_gate() {
-  local tmpl="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
-  PROFILE=full USE_CURSOR=true
-  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$tmpl")"
-}
-
-@test "LaunchAgent gate: Claude Code without Cursor skips heal-stuck-agents, keeps agent-keepawake" {
-  mkdir -p "$TEST_HOME/.local/bin"
-  printf '#!/bin/bash\n' > "$TEST_HOME/.local/bin/claude"
-  chmod +x "$TEST_HOME/.local/bin/claude"
-  export DOTFILES_CURSOR_APP="$TEST_DIR/Applications/Cursor.app"
-  _load_launchagent_gate
-
-  should_skip_agent heal-stuck-agents
-  ! should_skip_agent agent-keepawake
-}
-
-@test "LaunchAgent gate: an installed Cursor runs heal-stuck-agents" {
-  export DOTFILES_CURSOR_APP="$TEST_DIR/Applications/Cursor.app"
-  mkdir -p "$DOTFILES_CURSOR_APP"
-  _load_launchagent_gate
-
-  ! should_skip_agent heal-stuck-agents
-}
-
-@test "script header and LaunchAgent gate agree: Cursor only" {
-  grep -q '^# LaunchAgent gate: Cursor only' "$HEAL_BIN"
-  sed -n '/^    heal-stuck-agents)/,/;;/p' \
-    "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl" \
-    | grep -q 'Cursor.app'
+  grep -q 'Proactive heal for stuck agent git sessions' "$DOCTOR"
 }

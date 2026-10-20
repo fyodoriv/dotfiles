@@ -1,7 +1,7 @@
 #!/bin/bash
 # Keep core work apps interactive while backgrounding agent/model workers.
 # Runs every 60s via LaunchAgent.
-# Usage: cursor-priority
+# Usage: app-priority
 
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
@@ -129,8 +129,7 @@ if [ -f "$CONFIG_FILE" ]; then
   done < "$CONFIG_FILE"
 else
   # Default process list when no config file exists
-  # IDE apps
-  set_process_priority "Cursor"
+  # Interactive apps
   set_process_priority "Slack"
   set_process_priority "Google Chrome"
   set_process_priority "Microsoft Outlook"
@@ -144,7 +143,6 @@ else
   # workers (launchd jobs, Remote Control, headless runs).
   set_claude_priority
   set_process_background "codex"
-  set_process_background "cursor-agent"
   set_process_background "ollama"
   set_process_background_pattern "mlx_lm.server"
   set_process_background_pattern "node.*minsky"
@@ -162,4 +160,4 @@ else
   set_process_nice_pattern "/biome "
 fi
 
-log_run cursor-priority
+log_run app-priority

@@ -141,6 +141,11 @@ cmd_remove() {
   [ -n "$name" ] || die "usage: dotfiles plugin remove <name>"
   path="$(plugin_lock_get "$name" path)"
   [ -n "$path" ] || die "plugin $name is not installed"
+  # shellcheck source=../lib/plugin-capabilities.sh
+  source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+  # shellcheck source=../lib/plugin-extensions.sh
+  source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+  plugin_launchagents_remove "$name"
   if [ "$(plugin_lock_get "$name" dev)" != true ] && [ "$path" = "$(plugin_home)/$name" ]; then
     rm -rf "$path"
   fi

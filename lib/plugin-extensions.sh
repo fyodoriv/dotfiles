@@ -66,3 +66,83 @@ plugin_brew_pass() {
   done < <(plugin_verified_list)
   return "$failed"
 }
+
+# ── 6b. LaunchAgent templates ──────────────────────────────────────────
+# A plugin ships plist templates in contributes.launchagents (a folder).
+# The core renders them (@HOME@ and @PLUGIN_DIR@ placeholders), checks each
+# Label against capabilities.launchagents, installs, and reloads. Plugins
+# never edit core plists. Installed labels are recorded per plugin, so
+# `plugin remove` can unload and delete them.
+
+plugin_launchagents_dir() {
+  printf '%s' "${DOTFILES_LAUNCHAGENTS_DIR:-$HOME/Library/LaunchAgents}"
+}
+
+_plugin_state_file() {
+  local dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/plugins"
+  mkdir -p "$dir"
+  printf '%s/%s.%s' "$dir" "$1" "$2"
+}
+
+_plugin_plist_label() {
+  plutil -extract Label raw -o - "$1" 2>/dev/null
+}
+
+# plugin_launchagents_render <name> <path>: installs and reloads changed
+# agents. Returns 3 when any Label is not declared (nothing is installed
+# for that template).
+plugin_launchagents_render() {
+  local name="$1" path="$2" src tmpl rendered label dest state status=0
+  src="$(plugin_contribution "$path" launchagents)" || return 0
+  [ -d "$src" ] || { echo "plugin $name: launchagents folder missing: $src" >&2; return 1; }
+  state="$(_plugin_state_file "$name" launchagents)"
+  : > "$state.new"
+  for tmpl in "$src"/*.plist; do
+    [ -f "$tmpl" ] || continue
+    rendered="$(mktemp)"
+    sed -e "s|@HOME@|$HOME|g" -e "s|@PLUGIN_DIR@|$path|g" "$tmpl" > "$rendered"
+    label="$(_plugin_plist_label "$rendered")"
+    if [ -z "$label" ]; then
+      echo "plugin $name: $(basename "$tmpl") has no Label" >&2
+      rm -f "$rendered"; status=1; continue
+    fi
+    if ! plugin_launchagent_check "$name" "$label"; then
+      rm -f "$rendered"; status=3; continue
+    fi
+    dest="$(plugin_launchagents_dir)/$label.plist"
+    echo "$label" >> "$state.new"
+    if [ -f "$dest" ] && cmp -s "$rendered" "$dest"; then
+      rm -f "$rendered"; continue
+    fi
+    mkdir -p "$(plugin_launchagents_dir)"
+    launchctl bootout "gui/$(id -u)/$label" >/dev/null 2>&1 || true
+    mv "$rendered" "$dest"
+    launchctl bootstrap "gui/$(id -u)" "$dest" >/dev/null 2>&1 ||
+      echo "plugin $name: could not load $label" >&2
+    echo "→ loaded $label (plugin $name)"
+  done
+  mv "$state.new" "$state"
+  return "$status"
+}
+
+plugin_launchagents_pass() {
+  local name path failed=0
+  while IFS=$'\t' read -r name path; do
+    [ -n "$name" ] || continue
+    plugin_launchagents_render "$name" "$path" || failed=1
+  done < <(plugin_verified_list)
+  return "$failed"
+}
+
+# plugin_launchagents_remove <name>: unloads and deletes recorded agents.
+plugin_launchagents_remove() {
+  local state label
+  state="$(_plugin_state_file "$1" launchagents)"
+  [ -f "$state" ] || return 0
+  while IFS= read -r label; do
+    [ -n "$label" ] || continue
+    launchctl bootout "gui/$(id -u)/$label" >/dev/null 2>&1 || true
+    rm -f "$(plugin_launchagents_dir)/$label.plist"
+  done < "$state"
+  rm -f "$state"
+}

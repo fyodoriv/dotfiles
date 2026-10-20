@@ -7,6 +7,7 @@
 # capslock_control: {{ dig "capslock_control" (dig "owner_machine" false .) . }}
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 # self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
+# plugins.lock: {{ $lock := joinPath .chezmoi.homeDir ".config/dotfiles/plugins.lock" }}{{ if stat $lock }}{{ include $lock | sha256sum }}{{ end }}
 set -euo pipefail
 
 SOURCE_DIR="{{ .chezmoi.sourceDir }}"
@@ -255,9 +256,22 @@ source "$SOURCE_DIR/lib/launchagent-duplicates.sh"
 launchagent_remove_duplicates "$HOME/Library/LaunchAgents" "$SOURCE_DIR"
 launchagent_remove_renamed_debug_chrome "$HOME/Library/LaunchAgents"
 
+# ── Company plugin LaunchAgents (issue #145, step 6b) ─────────────
+# Render each verified plugin's templates; labels must be declared.
+if [ -f "$SOURCE_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "$SOURCE_DIR/lib/plugin.sh"
+  # shellcheck source=/dev/null
+  source "$SOURCE_DIR/lib/plugin-capabilities.sh"
+  # shellcheck source=/dev/null
+  source "$SOURCE_DIR/lib/plugin-extensions.sh"
+  plugin_launchagents_pass || echo "⚠ Some plugin LaunchAgents did not load (see above)"
+fi
+
 if [ "$failed" -eq 0 ]; then
   echo "✓ All LaunchAgents active"
 else
   echo "⚠ $failed LaunchAgent(s) need manual follow-up"
   exit 1
 fi
+

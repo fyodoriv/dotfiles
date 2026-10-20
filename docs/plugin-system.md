@@ -370,6 +370,11 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     in `capabilities.brew.taps`; casks need `capabilities.brew.casks: true`.
     A failed bundle prints `unreachable (plugin <name>)`. The script re-runs
     when `plugins.lock` changes.
+  - LaunchAgents (`contributes.launchagents`, a folder of `*.plist`
+    templates): the core replaces `@HOME@` and `@PLUGIN_DIR@`, checks each
+    `Label` against `capabilities.launchagents`, installs it to
+    `~/Library/LaunchAgents`, and reloads it only when it changed.
+    `plugin remove` unloads and deletes them. Plugins never edit core plists.
 
 ### Doctor integration
 

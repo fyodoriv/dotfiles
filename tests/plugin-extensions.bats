@@ -17,6 +17,8 @@ setup() {
   mkdir -p "$HOME" "$TEST_DIR/stub"
   printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/stub/chezmoi"
   printf '#!/bin/sh\necho "brew $*" >> "%s"\n[ -z "${BREW_FAIL:-}" ]\n' "$MARKER" > "$TEST_DIR/stub/brew"
+  printf '#!/bin/sh\necho "launchctl $*" >> "%s"\n' "$MARKER" > "$TEST_DIR/stub/launchctl"
+  export DOTFILES_LAUNCHAGENTS_DIR="$TEST_DIR/LaunchAgents" XDG_STATE_HOME="$HOME/.local/state"
   chmod +x "$TEST_DIR/stub/"*
   export PATH="$TEST_DIR/stub:$PATH"
   PLUGIN="$TEST_DIR/dotfiles-acme"
@@ -80,4 +82,61 @@ ext() {
   run ext plugin_brew_pass
   [[ "$output" == *"skipped plugin acme"* ]]
   [ ! -f "$MARKER" ]
+}
+
+plist() {
+  cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>$1</string>
+<key>ProgramArguments</key><array><string>@PLUGIN_DIR@/bin/run</string><string>@HOME@</string></array>
+</dict></plist>
+PLIST
+}
+
+@test "6b: a declared LaunchAgent template is rendered, installed and loaded" {
+  mkdir -p "$PLUGIN/launchagents"
+  plist com.acme.sync > "$PLUGIN/launchagents/sync.plist"
+  install_plugin '  launchagents: [com.acme.*]' '  launchagents: launchagents'
+  run ext plugin_launchagents_pass
+  [ "$status" -eq 0 ]
+  dest="$DOTFILES_LAUNCHAGENTS_DIR/com.acme.sync.plist"
+  [ -f "$dest" ]
+  grep -q "<string>$HOME</string>" "$dest"
+  grep -q "dotfiles-acme/bin/run" "$dest"
+  ! grep -q '@HOME@\|@PLUGIN_DIR@' "$dest"
+  grep -q "launchctl bootstrap gui/" "$MARKER"
+}
+
+@test "6b: an undeclared Label is refused and not installed" {
+  mkdir -p "$PLUGIN/launchagents"
+  plist com.other.agent > "$PLUGIN/launchagents/x.plist"
+  install_plugin '  launchagents: [com.acme.*]' '  launchagents: launchagents'
+  run ext plugin_launchagents_pass
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"capability not declared: launchagents com.other.agent (plugin acme)"* ]]
+  [ ! -e "$DOTFILES_LAUNCHAGENTS_DIR/com.other.agent.plist" ]
+}
+
+@test "6b: an unchanged agent is not reloaded" {
+  mkdir -p "$PLUGIN/launchagents"
+  plist com.acme.sync > "$PLUGIN/launchagents/sync.plist"
+  install_plugin '  launchagents: [com.acme.*]' '  launchagents: launchagents'
+  ext plugin_launchagents_pass
+  rm -f "$MARKER"
+  run ext plugin_launchagents_pass
+  [ "$status" -eq 0 ]
+  [ ! -f "$MARKER" ]
+}
+
+@test "6b: plugin remove unloads and deletes its LaunchAgents" {
+  mkdir -p "$PLUGIN/launchagents"
+  plist com.acme.sync > "$PLUGIN/launchagents/sync.plist"
+  install_plugin '  launchagents: [com.acme.*]' '  launchagents: launchagents'
+  ext plugin_launchagents_pass
+  run bash "$CLI" remove acme
+  [ "$status" -eq 0 ]
+  [ ! -e "$DOTFILES_LAUNCHAGENTS_DIR/com.acme.sync.plist" ]
+  grep -q "launchctl bootout gui/.*/com.acme.sync" "$MARKER"
 }

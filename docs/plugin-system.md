@@ -381,6 +381,12 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     after core setup and before `~/.zshrc.local`. `dotfiles apply`
     (`run_after_plugin-extensions.sh`), `plugin add`, and `plugin remove`
     regenerate it.
+  - Settings (`contributes.settings.vscode`, a JSON file): deep merge with
+    priority default (core) < plugin (lock order) < user
+    (`~/.config/dotfiles/settings/vscode.user.json`) < force (a plugin's
+    `_force` object), the NixOS `mkDefault`/`mkForce` model. The vscode
+    doctor applies it to `settings.generated.json` and prints each conflict
+    (`settings conflict (vscode): <key>: <layers>`) as a warning.
 
 ### Doctor integration
 

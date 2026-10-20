@@ -175,3 +175,57 @@ plugin_shell_pass() {
   mv "$tmp" "$out"
   return "$failed"
 }
+
+# ── 6c. Settings merge with priorities ─────────────────────────────────
+# A plugin contributes a JSON settings file per target
+# (contributes.settings.<target>, today: vscode). Layers merge deep, in
+# this order, later wins (the NixOS mkDefault/mkForce model):
+#
+#   default  the core file
+#   plugin   each verified plugin, in lock order (minus its "_force" key)
+#   user     ~/.config/dotfiles/settings/<target>.user.json (optional)
+#   force    each plugin's "_force" object
+#
+# A leaf that two plugin/user layers set to different values is a conflict.
+# Conflicts print as "settings conflict (<target>): <key path>: <layers>".
+
+plugin_settings_user_file() {
+  printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/settings/$1.user.json"
+}
+
+# plugin_settings_merge <target> <default json> <out json>: writes the merged
+# result and prints conflicts on stderr. Returns 1 on bad JSON.
+plugin_settings_merge() {
+  local target="$1" base="$2" out="$3" name path file layers tmp user
+  layers="$(mktemp)"
+  echo '[]' > "$layers"
+  while IFS=$'\t' read -r name path; do
+    [ -n "$name" ] || continue
+    file="$(T="$target" yq -r '.contributes.settings[strenv(T)] // ""' "$path/dotfiles-plugin.yaml")"
+    [ -n "$file" ] && [ -f "$path/$file" ] || continue
+    tmp="$(mktemp)"
+    jq --arg n "plugin $name" --slurpfile s "$path/$file" '. + [{name: $n, kind: "plugin", data: $s[0]}]' \
+      "$layers" > "$tmp" || { echo "plugin $name: $file is not valid JSON" >&2; rm -f "$tmp" "$layers"; return 1; }
+    mv "$tmp" "$layers"
+  done < <(plugin_verified_list)
+  user="$(plugin_settings_user_file "$target")"
+  if [ -f "$user" ]; then
+    tmp="$(mktemp)"
+    jq --slurpfile s "$user" '. + [{name: "user", kind: "user", data: $s[0]}]' "$layers" > "$tmp" ||
+      { echo "$user is not valid JSON" >&2; rm -f "$tmp" "$layers"; return 1; }
+    mv "$tmp" "$layers"
+  fi
+  tmp="$(mktemp)"
+  jq --slurpfile layers "$layers" '
+    reduce ($layers[0][] | .data | del(._force)) as $l (.; . * $l)
+    | reduce ($layers[0][] | select(.kind == "plugin") | .data._force // {}) as $f (.; . * $f)' \
+    "$base" > "$tmp" || { rm -f "$tmp" "$layers"; return 1; }
+  mv "$tmp" "$out"
+  jq -r --arg t "$target" '
+    [ .[] | .name as $n | .data | del(._force) | paths(type != "object") as $p
+      | {p: ($p | map(tostring) | join(".")), n: $n, v: getpath($p)} ]
+    | group_by(.p)[]
+    | select((map(.v) | unique | length) > 1)
+    | "settings conflict (\($t)): \(.[0].p): \(map(.n) | join(" vs "))"' "$layers" >&2
+  rm -f "$layers"
+}

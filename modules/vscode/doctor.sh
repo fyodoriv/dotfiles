@@ -81,6 +81,17 @@ with open(output_path, "w", encoding="utf-8") as handle:
     json.dump(merged, handle, indent=2)
     handle.write("\n")
 PY
+  # Company plugin settings (issue #145, step 6c): default < plugin < user < force.
+  if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    # shellcheck source=../../lib/plugin-capabilities.sh
+    source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+    # shellcheck source=../../lib/plugin-extensions.sh
+    source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+    while IFS= read -r _vc_conflict; do
+      [ -n "$_vc_conflict" ] && audit_warn "$_vc_conflict"
+    done < <(plugin_settings_merge vscode "$_vc_settings_source" "$_vc_settings_source" 2>&1 >/dev/null)
+    unset _vc_conflict
+  fi
 fi
 [ -f "$_VC_LOCAL/settings.override.json5" ] && _vc_settings_source="$_VC_LOCAL/settings.override.json5"
 check_symlink "vscode.symlink.settings" \

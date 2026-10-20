@@ -176,3 +176,34 @@ PLIST
     "$REPO_ROOT/home/zshrc"
   [ "$status" -eq 0 ]
 }
+
+@test "6c: settings merge default < plugin < user < force, and reports conflicts" {
+  mkdir -p "$PLUGIN/settings" "$XDG_CONFIG_HOME/dotfiles/settings"
+  printf '{"a": 1, "b": {"x": 1, "y": 1}, "c": 1, "d": 1}\n' > "$TEST_DIR/base.json"
+  printf '{"b": {"x": 2}, "c": 2, "d": 2, "_force": {"d": 9}}\n' > "$PLUGIN/settings/vscode.json"
+  printf '{"c": 3, "d": 3}\n' > "$XDG_CONFIG_HOME/dotfiles/settings/vscode.user.json"
+  install_plugin '  sudo: false' '  settings: {vscode: settings/vscode.json}'
+  run ext plugin_settings_merge vscode "$TEST_DIR/base.json" "$TEST_DIR/out.json"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . "$TEST_DIR/out.json")" = '{"a":1,"b":{"x":2,"y":1},"c":3,"d":9}' ]
+  [[ "$output" == *"settings conflict (vscode): c: plugin acme vs user"* ]]
+  [[ "$output" == *"settings conflict (vscode): d: plugin acme vs user"* ]]
+  [[ "$output" != *"conflict (vscode): b.x"* ]]
+}
+
+@test "6c: with no plugins the core settings pass through unchanged" {
+  printf '{"a": 1}\n' > "$TEST_DIR/base.json"
+  run ext plugin_settings_merge vscode "$TEST_DIR/base.json" "$TEST_DIR/out.json"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . "$TEST_DIR/out.json")" = '{"a":1}' ]
+}
+
+@test "6c: invalid plugin settings JSON fails without writing" {
+  mkdir -p "$PLUGIN/settings"
+  printf '{"a": 1}\n' > "$TEST_DIR/base.json"
+  printf '{not json\n' > "$PLUGIN/settings/vscode.json"
+  install_plugin '  sudo: false' '  settings: {vscode: settings/vscode.json}'
+  run ext plugin_settings_merge vscode "$TEST_DIR/base.json" "$TEST_DIR/out.json"
+  [ "$status" -ne 0 ]
+  [ ! -f "$TEST_DIR/out.json" ]
+}

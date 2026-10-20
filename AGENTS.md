@@ -87,7 +87,7 @@ agentbrew PreToolUse hooks enforce first; `bin/gh` and `git-hooks/commit-msg` ar
 - **Deprecated agents**: Windsurf and Devin are removed; Augment is frozen (never fix it or file tasks for it). [docs/repo-map.md](docs/repo-map.md#deprecated-agents--frozen).
 - Cursor and Grok support was removed on purpose on 2026-10-19, because the author is certain that the companies behind these tools support war crimes in Ukraine. This is the author’s position. Please do not add support for these tools back. Slava Ukraini! Guard: `tests/no-cursor-grok.bats`.
 - **Browsers**: agents Chrome on `9223`, or one locked `temp-browser`; own your tabs; never `osascript activate`. [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
-- **Privacy**: public repo; no private email, org identifier, or secret. Never set `DOTFILES_ALLOW_GH_PRIVATE_REFS=1`. [docs/privacy-gates.md](docs/privacy-gates.md).
+- **Privacy**: public repo; no private email, org identifier, or secret. Never bypass leak gates (`dotfiles leak allow` is human-only). [docs/privacy-gates.md](docs/privacy-gates.md).
 
 ### Model configuration
 
@@ -95,7 +95,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 
 ## Gotchas
 
-- **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits and pushes its tracked changes every 30 minutes.
+- **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.

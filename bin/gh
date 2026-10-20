@@ -50,8 +50,8 @@
 #   enterprise hosts, ssh remotes, and token-shaped secrets. The message
 #   names the field and the class, never the matched text. Other hosts
 #   (GitHub Enterprise) and private repos are not scanned. If the lib is
-#   missing, write-shaped calls fail. Deliberate post:
-#   DOTFILES_ALLOW_GH_PRIVATE_REFS=1.
+#   missing, write-shaped calls fail. Deliberate post: a person runs
+#   `dotfiles leak allow --once` in a terminal first.
 #
 # Per-repo agent PR allowlist:
 #   The cross-repo approval gate that fires when `gh pr create --repo X`

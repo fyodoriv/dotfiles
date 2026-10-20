@@ -235,6 +235,11 @@ case "$cmd" in
     exec bash "$DOTFILES_DIR/bin/dotfiles-validate" "$@"
     ;;
 
+  leak)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-leak" "$@"
+    ;;
+
   sync)
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-sync" "$@"

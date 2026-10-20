@@ -228,3 +228,20 @@ s1_commit_blocks_without_patterns() {
     -c user.name=t -c user.email=t@example.com commit -qm "chore: more"
   [ -f "$MARKER" ]
 }
+
+@test "step 9: a person's one-time grant for a commit lets that blocked push through once" {
+  export XDG_STATE_HOME="$TEST_DIR/state"
+  mkdir -p "$TEST_DIR/env"
+  printf "OSS_READINESS_INTERNAL_PATTERN='acme-internal'\n" > "$TEST_DIR/env/oss.env"
+  export OSS_READINESS_ENV_FILE="$TEST_DIR/env/oss.env"
+  make_push_repo "$TEST_DIR/repo" 1
+  run core_push "$TEST_DIR/repo"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"dotfiles leak allow --once"* ]]
+  mkdir -p "$XDG_STATE_HOME/dotfiles"
+  printf '%s %s\n' "$(git -C "$TEST_DIR/repo" rev-parse --short=12 HEAD)" "$(( $(date +%s) + 600 ))" \
+    > "$XDG_STATE_HOME/dotfiles/leak-allow-once"
+  run core_push "$TEST_DIR/repo"
+  [ "$status" -eq 0 ]
+  [ ! -f "$XDG_STATE_HOME/dotfiles/leak-allow-once" ]
+}

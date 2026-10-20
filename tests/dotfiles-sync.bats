@@ -37,6 +37,8 @@ setup_file() {
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$tmpl/dotfiles/lib/push-error-classify.sh"
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$tmpl/dotfiles/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$tmpl/dotfiles/lib/agentbrew-locate.sh"
+  mkdir -p "$tmpl/dotfiles/config"
+  printf '# none\n' > "$tmpl/dotfiles/config/public-push-remotes.txt"
 
   git -C "$tmpl/dotfiles" add -A
   git -C "$tmpl/dotfiles" commit --no-verify -m "chore: initial" --quiet
@@ -668,4 +670,17 @@ push_remote_commit() {
   [[ "$output" == *"Applied checkout: would fast-forward"* ]]
   [ "$(git -C "$APPLIED" rev-parse HEAD)" = "$before" ]
   [ ! -f "$TEST_DIR/chezmoi-apply.log" ]
+}
+
+@test "an unattended sync never pushes to a public remote and leaves a review note (issue #145 step 9)" {
+  echo "data" > "$TEST_DOTFILES/data.conf"
+  git -C "$TEST_DOTFILES" add data.conf
+  before="$(git -C "$REMOTE_REPO" rev-parse HEAD)"
+  printf '%s\n' "${REMOTE_REPO%.git}" | tr '[:upper:]' '[:lower:]' > "$TEST_DIR/public.txt"
+  XDG_STATE_HOME="$TEST_DIR/state" DOTFILES_PUBLIC_PUSH_ALLOWLIST="$TEST_DIR/public.txt" \
+    run "$TEST_DOTFILES/bin/dotfiles-sync" < /dev/null
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Not pushing to public remote origin"* ]]
+  [ "$(git -C "$REMOTE_REPO" rev-parse HEAD)" = "$before" ]
+  grep -q " origin " "$TEST_DIR/state/dotfiles/sync-needs-review"
 }

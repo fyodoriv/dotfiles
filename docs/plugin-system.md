@@ -429,6 +429,12 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
   doctor check `plugins.<name>.lint` flag a shell fragment that exports a
   token from `security …`, and any `@latest` or unpinned `npx -y` in plugin
   files.
+- Unattended pushes and the bypass (step 9). `dotfiles-sync` commits
+  locally but pushes to a public remote (`config/public-push-remotes.txt`)
+  only when a person runs it at a terminal; a LaunchAgent run writes
+  `~/.local/state/dotfiles/sync-needs-review` instead. The leak-gate bypass
+  is `dotfiles leak allow --once [<sha>]`, refused without a terminal; the
+  `DOTFILES_ALLOW_GH_PRIVATE_REFS` variable no longer works.
 
 ### Doctor integration
 

@@ -328,8 +328,20 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
   fi
 done < "$payload"
 
+if [ "$scan_failed" -ne 0 ] && [ -f "$DOTFILES_DIR/lib/leak-allow.sh" ]; then
+  # shellcheck source=../lib/leak-allow.sh
+  source "$DOTFILES_DIR/lib/leak-allow.sh"
+  # A person may grant one push of a named commit: dotfiles leak allow --once <sha>.
+  # shellcheck disable=SC2046  # one argument per pushed sha
+  if leak_allow_consume $(awk '{ print $2 }' "$payload" 2>/dev/null); then
+    printf '%sUsed the one-time bypass a person granted for this push.%s\n' "$YEL" "$RST" >&2
+    scan_failed=0
+  fi
+fi
+
 if [ "$scan_failed" -ne 0 ]; then
   printf '\n%spush blocked by dotfiles pre-push hook%s\n' "$RED" "$RST" >&2
+  printf '%sIf a person checked it: dotfiles leak allow --once <commit sha>, in a terminal.%s\n' "$YEL" "$RST" >&2
   exit 1
 fi
 

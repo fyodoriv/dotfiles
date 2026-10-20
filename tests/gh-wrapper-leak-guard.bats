@@ -361,15 +361,29 @@ YML
   assert_blocked "body: private-pattern match"
 }
 
-@test "DOTFILES_ALLOW_GH_PRIVATE_REFS=1 lets a deliberate post through" {
+@test "DOTFILES_ALLOW_GH_PRIVATE_REFS=1 no longer bypasses the guard (issue #145 step 9)" {
   DOTFILES_ALLOW_GH_PRIVATE_REFS=1 run "$GH_WRAPPER" pr edit 8 -R octo/tool --body "zzwidgetcorp notes"
-  assert_posted
+  assert_blocked "body: private-pattern match"
+  [[ "$output" == *"dotfiles leak allow --once"* ]]
 }
 
-@test "the old DOTFILES_GH_ALLOW_PRIVATE_REFS name no longer bypasses" {
-  DOTFILES_GH_ALLOW_PRIVATE_REFS=1 run "$GH_WRAPPER" pr edit 8 -R octo/tool --body "zzwidgetcorp notes"
+@test "a one-time grant from a person lets exactly one blocked post through" {
+  export XDG_STATE_HOME="$TEST_DIR/state"
+  mkdir -p "$XDG_STATE_HOME/dotfiles"
+  printf 'any %s\n' "$(( $(date +%s) + 600 ))" > "$XDG_STATE_HOME/dotfiles/leak-allow-once"
+  run "$GH_WRAPPER" pr edit 8 -R octo/tool --body "zzwidgetcorp notes"
+  assert_posted
+  rm -f "$GH_POSTED"
+  run "$GH_WRAPPER" pr edit 8 -R octo/tool --body "zzwidgetcorp notes"
   assert_blocked "body: private-pattern match"
-  [[ "$output" == *"DOTFILES_ALLOW_GH_PRIVATE_REFS=1"* ]]
+}
+
+@test "an expired grant does not bypass" {
+  export XDG_STATE_HOME="$TEST_DIR/state"
+  mkdir -p "$XDG_STATE_HOME/dotfiles"
+  printf 'any %s\n' "$(( $(date +%s) - 1 ))" > "$XDG_STATE_HOME/dotfiles/leak-allow-once"
+  run "$GH_WRAPPER" pr edit 8 -R octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
 }
 
 @test "a failed visibility lookup counts as public" {

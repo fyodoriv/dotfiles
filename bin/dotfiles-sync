@@ -81,6 +81,16 @@ if [ ${#REMOTES[@]} -eq 0 ]; then
   exit 0
 fi
 
+# Succeeds when remote "$1" is a public repo listed in
+# config/public-push-remotes.txt (or $DOTFILES_PUBLIC_PUSH_ALLOWLIST).
+_sync_remote_is_public() {
+  local url key list
+  url="$(git remote get-url "$1" 2>/dev/null)" || return 1
+  key="$(printf '%s' "$url" | sed -E 's#^[a-z+]+://##; s#^[^@/]+@##; s#:#/#; s#/$##; s#\.git$##' | tr '[:upper:]' '[:lower:]')"
+  list="${DOTFILES_PUBLIC_PUSH_ALLOWLIST:-$DOTFILES_DIR/config/public-push-remotes.txt}"
+  [ -r "$list" ] && sed 's/#.*//; s/[[:space:]]//g' "$list" | tr '[:upper:]' '[:lower:]' | grep -qxF -- "$key"
+}
+
 # Pick a pull remote — prefer origin, fall back to first available
 PULL_REMOTE="origin"
 if ! git remote get-url "$PULL_REMOTE" &>/dev/null; then
@@ -308,12 +318,23 @@ if [ -n "$(git status --porcelain)" ]; then
   git commit -m "sync: auto-update $(date '+%Y-%m-%d %H:%M')" --quiet
   # Push to every configured remote. The global pre-push hook still
   # blocks private identities before anything reaches GitHub.com.
+  # A public remote (config/public-push-remotes.txt) gets no unattended push
+  # (issue #145, step 9): a run without a terminal commits locally and
+  # leaves a "needs review" note; a person runs `dotfiles sync` to push.
   _direct_push_count=0
+  _review_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/sync-needs-review"
   for remote in "${REMOTES[@]}"; do
+    if ! [ -t 0 ] && _sync_remote_is_public "$remote"; then
+      mkdir -p "$(dirname "$_review_file")"
+      printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$remote" "$(git rev-parse --short HEAD)" >> "$_review_file"
+      warn "[sync] Not pushing to public remote $remote without a person. Review the commit, then run: dotfiles sync"
+      continue
+    fi
     _push_err=$(git push "$remote" --quiet 2>&1) \
       || { warn "[sync] Push to $remote failed: $(_classify_push_error "$_push_err")"; log_error US05 sync push_failed; }
     _direct_push_count=$((_direct_push_count + 1))
   done
+  [ ! -t 0 ] || rm -f "$_review_file"
   ok "[sync] Synced and pushed (${_direct_push_count} remote(s))."
   log_run sync
 else

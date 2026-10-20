@@ -22,8 +22,9 @@
 #   6. Exit 1. The message names the field, the class, and the target
 #      only. It never prints the matched text or a pattern.
 #
-# Deliberate post: DOTFILES_ALLOW_GH_PRIVATE_REFS=1. MINSKY_PIPELINE does
-# not skip the guard.
+# Deliberate post: a person runs `dotfiles leak allow --once` at a terminal
+# (lib/leak-allow.sh); the next blocked write uses that grant. No environment
+# variable skips the guard. MINSKY_PIPELINE does not skip it either.
 #
 # State scope: `_ghpl_*` shell variables in one bin/gh process. The temp
 # dir is removed before the guard returns or exits. Helpers set result
@@ -792,7 +793,6 @@ _ghpl_cleanup() {
 
 gh_public_leak_guard() {
   local hits f class idx line report=""
-  [ "${DOTFILES_ALLOW_GH_PRIVATE_REFS:-}" != 1 ] || return 0
   _ghpl_load_hosts
   _ghpl_parse "$@"
   _ghpl_resolve_targets
@@ -849,8 +849,17 @@ gh_public_leak_guard() {
     printf '%s' "$report"
     [ "$_ghpl_unconfirmed" = 0 ] || echo "  (could not confirm the target's visibility, so it counts as public)"
     echo "Replace each one with a generic placeholder: ~ for the home dir, github.example.com for a host, PROJ-123 for a ticket."
-    echo "If a human checked the text and wants it public, rerun with DOTFILES_ALLOW_GH_PRIVATE_REFS=1."
+    echo "If a person checked the text and wants it public, they run 'dotfiles leak allow --once' in a terminal, then rerun."
   } >&2
+  if [ -f "$_ghpl_dir/leak-allow.sh" ]; then
+    # shellcheck source=lib/leak-allow.sh
+    . "$_ghpl_dir/leak-allow.sh"
+    if leak_allow_consume any; then
+      echo "gh wrapper: used the one-time bypass a person granted." >&2
+      _ghpl_cleanup; trap - EXIT
+      return 0
+    fi
+  fi
   _ghpl_cleanup
   exit 1
 }

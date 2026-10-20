@@ -48,8 +48,10 @@ short version every contributor needs:
    messages with no pattern file. See `SECURITY.md` § "Private pattern
    file". The hook then runs the overlay's `hooks/pre-push`, then the
    repo-local `hooks/pre-push`; both get the per-ref payload on stdin.
-   Never set `DOTFILES_ALLOW_GH_PRIVATE_REFS=1` as an agent; only a human
-   who read the text may.
+   No environment variable bypasses the gates. A person who read the text
+   runs `dotfiles leak allow --once [<commit sha>]` in a terminal; the grant
+   lasts 10 minutes and covers one blocked push (with a sha) or one blocked
+   `gh` write (without). It is refused without a terminal.
 
 4. **`bats tests/no-internal-refs.bats`** + **`bats tests/oss-readiness-lib.bats`**
    lock the private-reference scanner and secret patterns in place.

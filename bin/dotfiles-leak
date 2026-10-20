@@ -1,0 +1,12 @@
+#!/bin/bash
+# dotfiles leak allow --once [<commit sha>]
+# A person grants one leak-gate bypass (lib/leak-allow.sh). Refused without a
+# terminal, so agents and LaunchAgents cannot use it.
+set -euo pipefail
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/leak-allow.sh
+source "$DOTFILES_DIR/lib/leak-allow.sh"
+case "${1:-} ${2:-}" in
+  "allow --once") leak_allow_grant "${3:-any}" ;;
+  *) sed -n '2,4s/^# \{0,1\}//p' "$0"; exit 2 ;;
+esac

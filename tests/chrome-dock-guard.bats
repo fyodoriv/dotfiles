@@ -69,3 +69,23 @@ need_swiftc() {
   bash "$GUARD_CMD" --classify "$CHROME" >/dev/null
   [ "$(cat "$DOTFILES_CHROME_DOCK_GUARD_BIN.sha")" != "stale" ]
 }
+
+@test "decide: a headless agent Chrome with no on-screen window hands focus off" {
+  need_swiftc
+  run bash "$GUARD_CMD" --decide 0 "$CHROME" --remote-debugging-port=9223 --headless=new
+  [ "$status" -eq 0 ]
+  [ "$output" = "hand-off" ]
+}
+
+@test "decide: a headed agent Chrome with a visible window keeps focus (#197)" {
+  need_swiftc
+  run bash "$GUARD_CMD" --decide 1 "$CHROME" --remote-debugging-port=9224
+  [ "$status" -eq 0 ]
+  [ "$output" = "keep" ]
+}
+
+@test "decide: the user's own Chrome always keeps focus" {
+  need_swiftc
+  run bash "$GUARD_CMD" --decide 0 "$CHROME"
+  [ "$output" = "keep" ]
+}

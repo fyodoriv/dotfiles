@@ -1008,7 +1008,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
 | `rancher-desktop` | Start Rancher Desktop and wait until the Docker API answers | At login |
-| `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV` for tests) | Always running (LaunchAgent) |
+| `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV` and `--decide WINDOWS ARGV` for tests; a headed agent Chrome keeps focus) | Always running (LaunchAgent) |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 

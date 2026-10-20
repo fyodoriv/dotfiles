@@ -10,8 +10,13 @@
 // `open -n -a` when it is not running. It never hides, quits, or touches the
 // agent Chromes.
 //
-// Usage: chrome-dock-guard                 run the watcher (LaunchAgent)
-//        chrome-dock-guard --classify ARGV  print "automation" or "user"
+// A headed agent Chrome (for example one left open so the user can finish a
+// sign-in) has a visible window. It keeps focus; only a windowless one hands
+// off.
+//
+// Usage: chrome-dock-guard                          run the watcher (LaunchAgent)
+//        chrome-dock-guard --classify ARGV          print "automation" or "user"
+//        chrome-dock-guard --decide WINDOWS ARGV    print "hand-off" or "keep"
 
 import AppKit
 import Darwin
@@ -23,6 +28,20 @@ let automationMarkers = ["--headless", "--remote-debugging-port", "--remote-debu
 
 func isAutomation(_ argv: [String]) -> Bool {
   argv.dropFirst().contains { arg in automationMarkers.contains { arg.hasPrefix($0) } }
+}
+
+func shouldHandOff(argv: [String], onScreenWindows: Int) -> Bool {
+  isAutomation(argv) && onScreenWindows == 0
+}
+
+// Count the pid's normal (layer 0) windows that are on screen now.
+func onScreenWindowCount(_ pid: pid_t) -> Int {
+  guard let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
+    as? [[String: Any]]
+  else { return 0 }
+  return windows.filter {
+    ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
+  }.count
 }
 
 // Read a process's argv with sysctl KERN_PROCARGS2 (same data as `ps -o command`).
@@ -54,6 +73,16 @@ func log(_ message: String) {
 if CommandLine.arguments.count > 1, CommandLine.arguments[1] == "--classify" {
   print(isAutomation(Array(CommandLine.arguments.dropFirst(2))) ? "automation" : "user")
   exit(0)
+}
+if CommandLine.arguments.count > 2, CommandLine.arguments[1] == "--decide",
+   let windows = Int(CommandLine.arguments[2]) {
+  let argv = Array(CommandLine.arguments.dropFirst(3))
+  print(shouldHandOff(argv: argv, onScreenWindows: windows) ? "hand-off" : "keep")
+  exit(0)
+}
+if CommandLine.arguments.count > 1 {
+  FileHandle.standardError.write("chrome-dock-guard: unknown arguments \(CommandLine.arguments.dropFirst())\n".data(using: .utf8)!)
+  exit(2)
 }
 
 final class Guard {
@@ -92,7 +121,7 @@ final class Guard {
     guard app.bundleIdentifier == chromeBundleID,
           let argv = processArguments(app.processIdentifier)
     else { return false }
-    return isAutomation(argv)
+    return shouldHandOff(argv: argv, onScreenWindows: onScreenWindowCount(app.processIdentifier))
   }
 
   private func raiseUserChrome(replacing app: NSRunningApplication, attempt: Int) {

@@ -79,8 +79,10 @@ Phase 1 compares the machine with it. Use it to keep a repeat run short:
 - Phase 2 has nothing to do when the inventory prints no `ship`, `salvage`,
   or `security` line, and there is no open pull request of yours on a repo
   you do not own.
-- Phase 4 skips the long upgrade when the last upgrade is under 12 hours old
-  and Homebrew has nothing outdated (see the reference file).
+- Phase 4 skips the long upgrade when the last `dotfiles-upgrade` run
+  finished under 12 hours ago and Homebrew has nothing outdated (see the
+  reference file). The 12-hour window counts from that run, not from the
+  last checkup.
 - Phase 7 replays the cached audit when no skill or rule file changed.
 - Phase 6 runs the slow echo test only when `machine_metrics.py` prints
   `latency-check: run`.
@@ -422,6 +424,9 @@ question:
      <the Phase 6, 8, and 9 `record:` metrics> \
      [--metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> when the echo test ran]
    ```
+
+   `--metric` takes `key=value` only, one per flag. A bare value fails with
+   "unrecognized arguments". Example: `--metric shell_echo_p95_ms=42`.
 
 **Done when:** each answer is applied or listed with a reason, and the state
 file holds this run.

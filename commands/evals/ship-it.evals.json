@@ -182,6 +182,17 @@
         "Cherry-picks it onto a new branch from the base and ships that PR",
         "Does not push more commits to the merged PR's branch"
       ]
+    },
+    {
+      "id": 16,
+      "prompt": "/ship-it (three parallel workers each remove different task blocks from the same TASKS.md and ship a PR)",
+      "expected_output": "Each worker fetches and rebases onto the default branch right before push, re-runs the task linter and the affected tests after the rebase, squash-merges, deletes its branch and worktree, and reports the merged state.",
+      "expectations": [
+        "Fetches and rebases onto the default branch before every push",
+        "Re-runs the task linter after the rebase, not only before it",
+        "Checks mergeability right after push",
+        "Deletes the branch and removes the worktree after merge"
+      ]
     }
   ]
 }

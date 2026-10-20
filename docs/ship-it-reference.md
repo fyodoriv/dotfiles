@@ -485,6 +485,8 @@ Respect the guard. Never retry around it with other permissions, shells, encodin
 - Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the `land` command described above.
 - Dry-run first when verifying: `git push --dry-run -u origin <branch>`.
 
+**Parallel workers on one shared file:** when several workers ship small PRs that all edit one file (for example `TASKS.md`), each worker fetches and rebases onto `origin/<base>` right before every push, then re-runs the task linter and the affected tests after the rebase, not only before it. Check mergeability right after the push. After the merge, delete the branch and remove the worktree.
+
 **Stack PR overlap gate (before push/open):** When delivering a multi-PR skill stack against the same base, each child branch must be a **phase delta**, not a cumulative branch that still contains parent commits. Before `git push` / `gh pr create`:
 
 ```bash

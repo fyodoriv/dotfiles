@@ -289,3 +289,20 @@ chrome_has() {
     [[ "$output" == *"$c"* ]]
   done
 }
+
+# #234: a real node CDP reply over 64 KiB used to be cut before jq parsed it.
+@test "shot saves a full PNG when the CDP reply is larger than 64 KiB" {
+  cdp_setup
+  unset AGENT_TAB_CDP
+  node "$BATS_TEST_DIRNAME/fixtures/fake-cdp-ws.mjs" "$TEST_DIR/port" 300000 &
+  srv=$!
+  for _ in $(seq 50); do [ -s "$TEST_DIR/port" ] && break; sleep 0.1; done
+  id="$(open_tab agent-a r)"
+  jq --arg id "$id" --arg ws "ws://127.0.0.1:$(cat "$TEST_DIR/port")/$id" \
+    '. + [{id: $id, type: "page", url: "https://example.com/", webSocketDebuggerUrl: $ws}]' \
+    "$TABS_JSON" > "$TEST_DIR/t.json" && mv "$TEST_DIR/t.json" "$TABS_JSON"
+  run "$SCRIPT" shot --owner agent-a "$id"
+  kill "$srv" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(wc -c < "$output" | tr -d ' ')" -eq 300000 ]
+}

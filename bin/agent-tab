@@ -167,15 +167,22 @@ cmd_renew() {
   echo "agent-tab: renewed $ARG"
 }
 
-# One CDP call over a websocket: cdp <ws-url> <method> [params-json].
-# Prints the result JSON. Exits 1 on error or no answer in 10 s.
+# One CDP call over a websocket: cdp <ws-url> <method> [params-json] [png-file].
+# Prints the result JSON. With png-file, writes the base64 .data of the result
+# to that file as bytes instead (#234: large replies never pass through a shell
+# string or jq). Exits 1 on error or no answer in 10 s.
 cdp() {
   if [ -n "${AGENT_TAB_CDP:-}" ]; then
-    "$AGENT_TAB_CDP" "$1" "$2" "${3:-{\}}"
+    if [ -n "${4:-}" ]; then
+      "$AGENT_TAB_CDP" "$1" "$2" "${3:-{\}}" | jq -r '.data' | base64 -d > "$4"
+    else
+      "$AGENT_TAB_CDP" "$1" "$2" "${3:-{\}}"
+    fi
     return
   fi
   node --input-type=module -e '
-    const [ws, method, params] = process.argv.slice(1);
+    import { writeFileSync } from "node:fs";
+    const [ws, method, params, out] = process.argv.slice(1);
     const sock = new WebSocket(ws);
     const t = setTimeout(() => { console.error("no answer"); process.exit(1); }, 10000);
     sock.onerror = () => { console.error("websocket error"); process.exit(1); };
@@ -185,8 +192,10 @@ cdp() {
       if (r.id !== 1) return;
       clearTimeout(t);
       if (r.error) { console.error(JSON.stringify(r.error)); process.exit(1); }
-      console.log(JSON.stringify(r.result)); process.exit(0);
-    };' "$1" "$2" "${3:-{\}}"
+      if (out) { writeFileSync(out, Buffer.from(r.result.data, "base64")); process.exit(0); }
+      // Exit only after stdout drains; a pipe write is async and was cut at 64 KiB.
+      process.stdout.write(JSON.stringify(r.result) + "\n", () => process.exit(0));
+    };' "$1" "$2" "${3:-{\}}" "${4:-}"
 }
 
 chrome_tabs() {
@@ -241,7 +250,7 @@ cmd_page() {
          echo "agent-tab: navigated $ARG to $ARG2" ;;
     shot) mkdir -p "$SHOT_DIR"
           file="$SHOT_DIR/agent-tab-$ARG-$(date +%Y%m%d-%H%M%S).png"
-          cdp "$ws" Page.captureScreenshot '{"format":"png"}' | jq -r '.data' | base64 -d > "$file" ||
+          cdp "$ws" Page.captureScreenshot '{"format":"png"}' "$file" ||
             die "screenshot failed"
           [ -s "$file" ] || { rm -f "$file"; die "screenshot failed"; }
           echo "$file" ;;

@@ -7,6 +7,7 @@
 # capslock_control: {{ dig "capslock_control" (dig "owner_machine" false .) . }}
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 # self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
+# chrome options: {{ include "lib/chrome-purpose-options.sh" | sha256sum }}
 # plugins.lock: {{ $lock := joinPath .chezmoi.homeDir ".config/dotfiles/plugins.lock" }}{{ if stat $lock }}{{ include $lock | sha256sum }}{{ end }}
 set -euo pipefail
 
@@ -21,6 +22,22 @@ LOCAL_AI_AGENTS="{{ dig "local_ai_agents" (or (dig "use_local_ai" false .) (dig 
 ENDPOINT_HARDENING="{{ dig "endpoint_hardening" true . }}"
 # capslock_control: owner_machine unless set (see .chezmoi.yaml.tmpl).
 CAPSLOCK_CONTROL="{{ dig "capslock_control" (dig "owner_machine" false .) . }}"
+
+# Prints a core option value (config/plugin-options.yaml + plugins), or
+# false when the plugin libs or yq are missing.
+_core_option() {
+  if [ -f "$SOURCE_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+    (
+      for _plib in plugin plugin-capabilities plugin-extensions; do
+        # shellcheck source=/dev/null
+        source "$SOURCE_DIR/lib/$_plib.sh"
+      done
+      plugin_option "$1" 2>/dev/null
+    ) || echo false
+  else
+    echo false
+  fi
+}
 
 # Tool-presence / profile check — skip agents that shouldn't load
 # Core profile only gets essential agents: sync, doctor, git-maintain,
@@ -157,6 +174,15 @@ install_plist() {
     fi
   else
     cp "$src" "$dst.tmp"
+  fi
+
+  # Core options for the purpose Chrome (issue #145, step 7); plugins set
+  # them through contributes.options.
+  if [ "$name" = com.dotfiles.agent-browser-chrome ] && [ -f "$SOURCE_DIR/lib/chrome-purpose-options.sh" ]; then
+    # shellcheck source=/dev/null
+    source "$SOURCE_DIR/lib/chrome-purpose-options.sh"
+    chrome_purpose_apply_options "$dst.tmp" "$(_core_option chrome.purpose_headed)" \
+      "$(_core_option chrome.restore_session)"
   fi
 
   mv "$dst.tmp" "$dst"

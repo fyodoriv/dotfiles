@@ -403,8 +403,12 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
   boolean conflicts.
   - `mas.skip_ids`: `dotfiles-mas-upgrade` skips these App Store ids.
   - `brew.skip`: removed from the core Brewfile before `brew bundle`.
-  - `chrome.purpose_headed`, `chrome.restore_session`,
-    `spotlight.exclude_worktrees`: declared; wiring lands in the next PRs.
+  - `chrome.purpose_headed` (drops `--headless=new`) and
+    `chrome.restore_session` (adds `--restore-last-session`): applied to the
+    rendered `com.dotfiles.agent-browser-chrome` plist by
+    `run_onchange_launchagents.sh` (`lib/chrome-purpose-options.sh`). Plugins
+    no longer patch the core plist.
+  - `spotlight.exclude_worktrees`: declared; wiring lands in the next PR.
 
 ### Doctor integration
 

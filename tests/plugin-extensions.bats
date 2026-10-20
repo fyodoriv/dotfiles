@@ -325,3 +325,31 @@ STUB
   [ "$status" -eq 0 ]
   [ "$(cat "$TEST_DIR/Brewfile")" = 'brew "jq"' ]
 }
+
+render_chrome_plist() {
+  sed "s|{{ .chezmoi.homeDir }}|$HOME|g" "$REPO_ROOT/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl" > "$1"
+}
+
+@test "7b: chrome options default leave the purpose Chrome headless" {
+  render_chrome_plist "$TEST_DIR/c.plist"
+  run bash -c 'source "$1/lib/chrome-purpose-options.sh"; chrome_purpose_apply_options "$2" false false' _ "$REPO_ROOT" "$TEST_DIR/c.plist"
+  [ "$status" -eq 0 ]
+  grep -q -- '--headless=new' "$TEST_DIR/c.plist"
+  ! grep -q -- '--restore-last-session' "$TEST_DIR/c.plist"
+}
+
+@test "7b: chrome.purpose_headed and chrome.restore_session change the plist, idempotently" {
+  render_chrome_plist "$TEST_DIR/c.plist"
+  for _ in 1 2; do
+    bash -c 'source "$1/lib/chrome-purpose-options.sh"; chrome_purpose_apply_options "$2" true true' _ "$REPO_ROOT" "$TEST_DIR/c.plist"
+  done
+  ! grep -q -- '--headless=new' "$TEST_DIR/c.plist"
+  [ "$(grep -c -- '--restore-last-session' "$TEST_DIR/c.plist")" -eq 1 ]
+  plutil -lint "$TEST_DIR/c.plist"
+  [ "$(plutil -extract ProgramArguments.1 raw -o - "$TEST_DIR/c.plist")" = --remote-debugging-port=9223 ]
+}
+
+@test "7b: the launchagents script applies the options to the purpose Chrome" {
+  grep -q 'chrome_purpose_apply_options "\$dst.tmp" "\$(_core_option chrome.purpose_headed)"' \
+    "$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+}

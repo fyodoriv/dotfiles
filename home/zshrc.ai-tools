@@ -4,7 +4,7 @@
 # agent-browser tuning, and related helpers.
 
 # ── Secrets (loaded from macOS Keychain at shell startup) ────────────
-# Exported eagerly so MCP servers launched by GUI apps (Cursor, Claude Desktop)
+# Exported eagerly so MCP servers launched by GUI apps (Claude Desktop, editors)
 # inherit the token. The keychain lookup is fast (~5ms).
 export JIRA_PERSONAL_TOKEN="${JIRA_PERSONAL_TOKEN:-$(security find-generic-password -a "$(whoami)" -s jira-personal-token -w 2>/dev/null)}"
 
@@ -25,7 +25,7 @@ export AGENT_BROWSER_DEFAULT_TIMEOUT=15000
 # an existing CDP endpoint.
 #
 # Problem: every agent-browser caller defaulted to session "default", so
-# Claude Code / Cursor agents running concurrently on
+# Claude Code / Codex agents running concurrently on
 # the same box ended up driving the same Chrome and stealing each other's
 # active tab mid-task. Real collision observed 2026-05-12.
 #
@@ -141,14 +141,13 @@ fi
 # launching an AI agent inside tmux makes the process survive terminal
 # close, ssh disconnect, Ghostty/iTerm quit, and macOS sleep cycles
 # (when Amphetamine/pmset prevents lid-close sleep). The plain `cc`,
-# `curr` aliases still launch the agent in the foreground for
+# aliases still launch the agent in the foreground for
 # quick one-shot work; the `t*` variants persist.
 #
 # Session naming: `<agent>-<cwd-basename>`. Re-running the same alias
 # in the same repo attaches to the live session instead of creating a
 # new one. Detach with `Ctrl-a d` (prefix is `Ctrl-a` per ~/.tmux.conf).
 alias tcc='agent-tmux claude'                             # Claude Code in tmux
-alias tcur='agent-tmux cursor-agent'                      # Cursor Agent in tmux
 alias tcdx='agent-tmux codex'                             # Codex CLI in tmux
 alias agents='agent-tmux --ls'                            # List active agent-tmux sessions
 
@@ -157,14 +156,13 @@ alias agents='agent-tmux --ls'                            # List active agent-tm
 # launching an AI agent inside tmux makes the process survive terminal
 # close, ssh disconnect, Ghostty/iTerm quit, and macOS sleep cycles
 # (when Amphetamine/pmset prevents lid-close sleep). The plain `cc`,
-# `curr` aliases still launch the agent in the foreground for
+# aliases still launch the agent in the foreground for
 # quick one-shot work; the `t*` variants persist.
 #
 # Session naming: `<agent>-<cwd-basename>`. Re-running the same alias
 # in the same repo attaches to the live session instead of creating a
 # new one. Detach with `Ctrl-a d` (prefix is `Ctrl-a` per ~/.tmux.conf).
 alias tcc='agent-tmux claude'                             # Claude Code in tmux
-alias tcur='agent-tmux cursor-agent'                      # Cursor Agent in tmux
 alias tcdx='agent-tmux codex'                             # Codex CLI in tmux
 alias agents='agent-tmux --ls'                            # List active agent-tmux sessions
 

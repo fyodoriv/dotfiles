@@ -17,7 +17,7 @@
 #
 # Examples:
 #   agent-tmux claude                 → session "claude-tooling" in cwd ~/apps/tooling
-#   agent-tmux cursor-agent           → Cursor Agent in tmux
+#   agent-tmux codex                  → Codex CLI in tmux
 #
 # Reattach later: `tmux a -t claude-tooling` (or run agent-tmux again
 # with the same agent name in the same cwd — `tmux new -A` will attach).
@@ -44,7 +44,7 @@ if [ -n "${TMUX:-}" ]; then
 fi
 
 if [ "${1:-}" = "--ls" ]; then
-  tmux ls 2>/dev/null | grep -E "^(claude|cursor|codex|gemini|opencode|amp|cline|aider|goose)" || {
+  tmux ls 2>/dev/null | grep -E "^(claude|codex|gemini|opencode|amp|cline|aider|goose)" || {
     echo "(no active agent-tmux sessions)" >&2
     exit 0
   }
@@ -86,7 +86,7 @@ SESSION="${AGENT_TMUX_SESSION:-${AGENT}-${CWD_BASE}}"
 # creates a new one. The wrapped command is the agent + any passthrough
 # args. The agent runs in $PWD (tmux respects -c "$PWD" or inherits cwd).
 #
-# Why we don't use `caffeinate -s` here: Claude Code / Cursor
+# Why we don't use `caffeinate -s` here: Claude Code / Codex
 # don't need it for their foreground operation. macOS lid-close sleep is handled by Amphetamine
 # (system-level), not per-process caffeinate.
 exec tmux new -A -s "$SESSION" -c "$PWD" "$AGENT" "$@"

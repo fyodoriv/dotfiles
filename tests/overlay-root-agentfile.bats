@@ -168,25 +168,3 @@ STUBEOF
   [[ "$calls" == *"sync --no-recommended --agentfile $TEST_OVERLAY/Agentfile.yaml --no-prune"* ]] || { echo "Expected explicit overlay no-prune sync; got: $calls"; return 1; }
   [[ "$calls" != *"agentfile merge $TEST_DOTFILES/Agentfile.yaml"* ]] || { echo "Expected no merge attempt with legacy agentbrew; got: $calls"; return 1; }
 }
-
-@test "use_cursor=false merges the no-cursor fragment so agentbrew excludes Cursor" {
-  mkdir -p "$TEST_DOTFILES/config"
-  cp "$BATS_TEST_DIRNAME/../config/agentfile-no-cursor.yaml" "$TEST_DOTFILES/config/"
-  grep -q '^excludeAgents:' "$TEST_DOTFILES/config/agentfile-no-cursor.yaml"
-  grep -qx '  - cursor' "$TEST_DOTFILES/config/agentfile-no-cursor.yaml"
-
-  _run_agentbrew_sync DOTFILES_USE_CURSOR=false
-  [ "$status" -eq 0 ]
-  merge_call="$(grep '^agentbrew called with: agentfile merge ' "$TEST_DIR/agentbrew-argv.log" || true)"
-  [[ "$merge_call" == *"$TEST_DOTFILES/config/agentfile-no-cursor.yaml"* ]] || { echo "Expected no-cursor fragment in merge; got: $merge_call"; return 1; }
-}
-
-@test "use_cursor default leaves the no-cursor fragment out of the merge" {
-  mkdir -p "$TEST_DOTFILES/config"
-  cp "$BATS_TEST_DIRNAME/../config/agentfile-no-cursor.yaml" "$TEST_DOTFILES/config/"
-
-  _run_agentbrew_sync
-  [ "$status" -eq 0 ]
-  merge_call="$(grep '^agentbrew called with: agentfile merge ' "$TEST_DIR/agentbrew-argv.log" || true)"
-  [[ "$merge_call" != *"agentfile-no-cursor.yaml"* ]] || { echo "Fragment merged without use_cursor=false: $merge_call"; return 1; }
-}

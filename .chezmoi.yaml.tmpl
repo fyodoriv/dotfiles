@@ -9,7 +9,6 @@
 {{- end -}}
 {{- $useAiTools := promptBoolOnce . "use_ai_tools" "Enable AI agent tooling (ANTHROPIC_MODEL, agent-browser)" false -}}
 {{- $useLocalAi := promptBoolOnce . "use_local_ai" "Enable local-LLM stack (pipx + aider + mlx-lm on Apple Silicon; ~30 GB model weights require explicit opt-in via ~/.config/dotfiles/.local-llm-bootstrap-confirmed sentinel)" false -}}
-{{- $useCursor := promptBoolOnce . "use_cursor" "Manage Cursor (settings, extensions, launch agents, agentbrew Cursor config)" false -}}
 {{- $dotfilesDir := promptStringOnce . "dotfiles_dir" "Dotfiles directory relative to home (e.g. apps/dotfiles, dotfiles)" "apps/dotfiles" -}}
 {{- $reposDir := promptStringOnce . "repos_dir" "Repos directory relative to home (e.g. apps, repos, src)" "apps" -}}
 {{- $brewSkip := list -}}
@@ -163,7 +162,6 @@ data:
   use_ai_tools: {{ $useAiTools }}
   use_local_ai: {{ $useLocalAi }}
   local_ai_agents: {{ $localAiAgents }}
-  use_cursor: {{ $useCursor }}
   use_encryption: {{ $useEncryption }}
   age_recipient: {{ $ageRecipient | quote }}
   morning_hour: {{ $morningHour }}

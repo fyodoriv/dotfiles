@@ -1,13 +1,7 @@
 #!/bin/bash
-# Symlink dotfiles agent-hooks into ~/.config/dotfiles/hooks/ so Agentfile and
-# ~/.cursor/hooks.json can reference stable paths regardless of dotfiles_dir layout.
+# Symlink dotfiles agent-hooks into ~/.config/dotfiles/hooks/ so the Agentfile
+# hooks can reference stable paths regardless of dotfiles_dir layout.
 set -euo pipefail
-
-# use_cursor=false (chezmoi data, or DOTFILES_USE_CURSOR=false) means no Cursor.
-if [ "${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo true)}" = "false" ]; then
-  echo "○ Cursor disabled (use_cursor=false) — skipping $(basename "$0")"
-  exit 0
-fi
 
 _resolve_dotfiles_dir() {
   local candidate
@@ -30,7 +24,7 @@ _resolve_dotfiles_dir() {
 
 DOTFILES_DIR="$(_resolve_dotfiles_dir || true)"
 if [ -z "$DOTFILES_DIR" ]; then
-  echo "○ Could not resolve dotfiles repo — skipping cursor agent-hooks install" >&2
+  echo "○ Could not resolve dotfiles repo — skipping agent-hooks install" >&2
   exit 0
 fi
 
@@ -48,8 +42,5 @@ for hook in block-dangerous-git.sh bootstrap-endpoint-path.sh prepend-endpoint-p
   chmod +x "$src" 2>/dev/null || true
 done
 
-echo "✓ Cursor agent-hooks linked in $HOOKS_DIR"
+echo "✓ agent-hooks linked in $HOOKS_DIR"
 
-if [ -x "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" ]; then
-  bash "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" || true
-fi

@@ -11,8 +11,6 @@ load test_helper
 
 KEYMAP="$BATS_TEST_DIRNAME/../jetbrains/keymap.xml"
 EDITOR_FONT="$BATS_TEST_DIRNAME/../jetbrains/editor-font.xml"
-CURSOR_KEYBINDINGS="$BATS_TEST_DIRNAME/../cursor/keybindings.json"
-CURSOR_TASKS="$BATS_TEST_DIRNAME/../cursor/tasks.json"
 
 @test "keymap: file exists and is non-empty" {
   [ -f "$KEYMAP" ]
@@ -90,46 +88,4 @@ CURSOR_TASKS="$BATS_TEST_DIRNAME/../cursor/tasks.json"
   xmllint --noout "$EDITOR_FONT"
   ! grep -qE 'name="(FONT_SIZE|FONT_SIZE_2D|FONT_FAMILY|LINE_SPACING|USE_LIGATURES)"' "$EDITOR_FONT"
   grep -q 'name="VERSION"' "$EDITOR_FONT"
-}
-
-@test "cursor keybindings: keeps custom WebStorm parity layer" {
-  for key in \
-    '"key": "cmd+p"' \
-    '"key": "cmd+shift+o"' \
-    '"key": "cmd+alt+p"' \
-    '"key": "cmd+alt+r"' \
-    '"key": "cmd+e"' \
-    '"key": "shift+cmd+l"' \
-    '"key": "shift+ctrl+cmd+k"' \
-    '"key": "ctrl+alt+a"'; do
-    grep -q "$key" "$CURSOR_KEYBINDINGS" || { echo "missing Cursor keybinding: $key"; return 1; }
-  done
-  grep -q '"command": "workbench.action.quickOpen"' "$CURSOR_KEYBINDINGS"
-  grep -q '"args": "dotfiles: git pull latest main/master"' "$CURSOR_KEYBINDINGS"
-  grep -q '"args": "dotfiles: git rebase current branch onto main/master"' "$CURSOR_KEYBINDINGS"
-  grep -q '"command": "workbench.action.openRecent"' "$CURSOR_KEYBINDINGS"
-  grep -q '"command": "gitlens.toggleFileBlame"' "$CURSOR_KEYBINDINGS"
-}
-
-@test "cursor tasks: keeps git default-branch workflows" {
-  python3 - "$CURSOR_TASKS" <<'PY'
-import json
-import sys
-
-tasks = {task["label"]: task for task in json.load(open(sys.argv[1], encoding="utf-8"))["tasks"]}
-
-pull = tasks["dotfiles: git pull latest main/master"]
-rebase = tasks["dotfiles: git rebase current branch onto main/master"]
-
-assert pull["command"] == "bash"
-assert rebase["command"] == "bash"
-assert "${workspaceFolder}" == pull["options"]["cwd"]
-assert "${workspaceFolder}" == rebase["options"]["cwd"]
-assert "git pull --ff-only --prune origin" in pull["args"][1]
-assert "git fetch --prune origin" in rebase["args"][1]
-assert "git rebase \"origin/$base\"" in rebase["args"][1]
-for script in (pull["args"][1], rebase["args"][1]):
-    assert "refs/remotes/origin/HEAD" in script
-    assert "main master" in script
-PY
 }

@@ -7,7 +7,7 @@ load test_helper
 # The default doctor run takes ~30s (over 200 checks across all modules).
 # CLI-shape tests (--quiet, --json, --report, --fix-all, --watch) only need
 # *some* doctor output to verify structure — they don't need every module.
-# Pass `--module cursor` to scope each invocation to the smallest module
+# Pass `--module editor` to scope each invocation to the smallest module
 # (~3s, 2 checks). Cuts this file's runtime ~10x.
 #
 # In addition, most CLI-shape tests check different substrings of the
@@ -17,7 +17,7 @@ load test_helper
 #
 # The genuine perf-regression test ("doctor --quiet completes in under 60s")
 # intentionally runs the full doctor and is exempt from both optimizations.
-DOCTOR_TINY_MODULE="cursor"
+DOCTOR_TINY_MODULE="editor"
 
 setup_file() {
   export DOCTOR_CACHE_DIR="$(mktemp -d)"

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Prepend dotfiles/bin before Cursor agent Shell/Bash/Task tool commands.
+# Prepend dotfiles/bin before agent Shell/Bash/Task tool commands.
 #
-# terminal.integrated.env.osx does NOT apply to agent Shell subshells — they run
-# in a sandbox with PATH=/opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin).
-# preToolUse updated_input runs after Cursor's PATH snapshot restore.
+# Agent Shell subshells can run in a sandbox with
+# PATH=/opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin). preToolUse
+# updated_input runs after the agent's PATH snapshot restore.
 
 set -euo pipefail
 

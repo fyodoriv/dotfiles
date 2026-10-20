@@ -1,9 +1,8 @@
 #!/bin/bash
 # Process-scoped single-flight for AgentBrew's complete memory readiness gate.
 #
-# Both the AgentBrew and Cursor doctor modules need the same expensive MCP
-# discovery check. A doctor invocation sources modules into one Bash process,
-# so retain its result only for that process. The next doctor run always
+# The AgentBrew doctor module needs an expensive MCP discovery check. A
+# doctor invocation sources modules into one Bash process, so retain its result only for that process. The next doctor run always
 # performs a fresh readiness check.
 
 dotfiles_agentbrew_memory_doctor_ready() {

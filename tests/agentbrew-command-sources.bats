@@ -427,7 +427,7 @@
   local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
 
   grep -q "## 13. Post-delivery verification loop (tooling repos)" "$reference_file"
-  grep -q "dotfiles doctor --module security --module cursor --module terminal --module agent-browser --module chrome --module resilience --fix" "$reference_file"
+  grep -q "dotfiles doctor --module security --module terminal --module agent-browser --module chrome --module resilience --fix" "$reference_file"
   grep -q "agentbrew status --ci" "$reference_file"
   grep -q "bin/dotfiles-reload-launchagents" "$reference_file"
   grep -q "Apply and reload LaunchAgents (mandatory)" "$reference_file"

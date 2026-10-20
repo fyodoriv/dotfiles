@@ -14,7 +14,7 @@
 #
 # The managed safe baseline never auto-starts a Default Duration or Trigger
 # session. `dotfiles-agent-keepawake` starts an owned session only while
-# Cursor or Claude Code is running and removes it when their process set no
+# Claude Code is running and removes it when its process set no
 # longer qualifies.
 #
 # Storage: dotfiles/data/amphetamine-prefs.json — human-readable JSON

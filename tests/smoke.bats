@@ -94,10 +94,10 @@ DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
   # the chezmoi section runs unconditionally, so one module is enough.
   # Will fail due to real system checks, that's ok.
   # Use a unique lock so this test doesn't compete with doctor.bats's
-  # setup_file (which also runs cursor-only doctors in parallel).
+  # setup_file (which also runs single-module doctors in parallel).
   local lock_dir; lock_dir="$(mktemp -d)"
   run env DOTFILES_LOCK="$lock_dir/dotfiles.lock" \
-    bash "$DOTFILES_DIR/bin/dotfiles-doctor" --module cursor 2>&1
+    bash "$DOTFILES_DIR/bin/dotfiles-doctor" --module editor 2>&1
   rm -rf "$lock_dir"
   # Output should contain the Chezmoi section header
   [[ "$output" == *"Chezmoi"* ]]

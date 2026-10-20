@@ -10,7 +10,7 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
 LA_TMPL="$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
 
 _load_launchagent_gate() {
-  PROFILE=core USE_CURSOR=false LOCAL_AI_AGENTS="$1"
+  PROFILE=core LOCAL_AI_AGENTS="$1"
   eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$LA_TMPL")"
 }
 

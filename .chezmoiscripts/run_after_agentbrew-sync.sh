@@ -87,9 +87,9 @@ if [ "$(uname -s)" = "Darwin" ] \
 fi
 
 # Stable ~/.config/dotfiles/hooks paths must exist before agentbrew sync writes
-# ~/.cursor/hooks.json entries that reference them.
-if [ -x "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-agent-hooks.sh" ]; then
-  bash "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-agent-hooks.sh" || true
+# agent hook entries that reference them.
+if [ -x "$DOTFILES_DIR/.chezmoiscripts/run_after_agent-hooks.sh" ]; then
+  bash "$DOTFILES_DIR/.chezmoiscripts/run_after_agent-hooks.sh" || true
 fi
 
 AGENTFILE="$DOTFILES_DIR/Agentfile.yaml"
@@ -171,7 +171,7 @@ fi
 if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
   AGENTFILE_PATHS+=("$EXTRA_AGENTFILE")
 fi
-# Owner-only rules and the no-Cursor layer (lib/agentfile-layers.sh).
+# Owner-only rules layer (lib/agentfile-layers.sh).
 # shellcheck source=../lib/agentfile-layers.sh
 source "$DOTFILES_DIR/lib/agentfile-layers.sh"
 while IFS= read -r _layer; do
@@ -197,9 +197,6 @@ if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
       echo "✓ canonical Agentfile updated"
       echo "→ Syncing agentbrew from canonical Agentfile..."
       _sync_from_agentfile "$GLOBAL_AGENTFILE"
-      if [ -x "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" ]; then
-        bash "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" || true
-      fi
     else
       echo "⚠ agentbrew Agentfile merge failed (non-fatal)"
     fi
@@ -212,9 +209,6 @@ if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
     if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
       echo "→ Syncing agentbrew from overlay Agentfile at $EXTRA_AGENTFILE..."
       _sync_from_agentfile "$EXTRA_AGENTFILE" --no-prune
-    fi
-    if [ -x "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" ]; then
-      bash "$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh" || true
     fi
   fi
 fi

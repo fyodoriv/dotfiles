@@ -11,10 +11,6 @@ if [ -n "${EDITOR:-}" ] && command -v "$EDITOR" &>/dev/null; then
   exec "$EDITOR" "$@"
 fi
 
-if command -v cursor &>/dev/null; then
-  exec cursor --wait "$@"
-fi
-
 if command -v code &>/dev/null; then
   exec code --wait "$@"
 fi

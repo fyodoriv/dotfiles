@@ -51,13 +51,9 @@ agentbrew_call_count() {
   [ "$(agentbrew_call_count)" -eq 1 ]
 }
 
-@test "AgentBrew and Cursor doctors use the shared readiness helper" {
+@test "AgentBrew doctor uses the shared readiness helper" {
   grep -Fq 'source "$DOTFILES_DIR/lib/agentbrew-memory-readiness.sh"' \
     "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
   grep -Fq 'dotfiles_agentbrew_memory_doctor_ready' \
     "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
-  grep -Fq 'source "$DOTFILES_DIR/lib/agentbrew-memory-readiness.sh"' \
-    "$BATS_TEST_DIRNAME/../modules/cursor/doctor.sh"
-  grep -Fq 'dotfiles_agentbrew_memory_doctor_ready' \
-    "$BATS_TEST_DIRNAME/../modules/cursor/doctor.sh"
 }

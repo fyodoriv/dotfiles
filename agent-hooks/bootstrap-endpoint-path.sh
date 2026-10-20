@@ -1,7 +1,7 @@
 #!/bin/bash
-# Bootstrap dotfiles/bin + ~/.local/bin before any Cursor hook subprocess runs.
+# Bootstrap dotfiles/bin + ~/.local/bin before any agent hook subprocess runs.
 #
-# Cursor afterFileEdit / stop / postToolUse hooks use sandbox PATH
+# Agent hook subprocesses can use sandbox PATH
 # (/opt/homebrew/bin:/usr/bin:/bin) — no dotfiles shims unless we prepend here.
 #
 # Usage:

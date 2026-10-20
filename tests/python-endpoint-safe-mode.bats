@@ -1,33 +1,8 @@
 #!/usr/bin/env bats
 
-@test "apply-time hook wrapper uses Apple plutil, not Python" {
-  script=".chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh"
-  grep -q '/usr/bin/plutil' "$script"
-  ! grep -vE '^[[:space:]]*#' "$script" | grep -qE '(^|[[:space:]])python3([[:space:]]|$)'
-}
-
-@test "Cursor parity does not execute unsigned Python by default" {
-  fake_bin="$BATS_TEST_TMPDIR/bin"
-  marker="$BATS_TEST_TMPDIR/python-executed"
-  mkdir -p "$fake_bin"
-  cat >"$fake_bin/python3" <<EOF
-#!/bin/bash
-touch "$marker"
-exit 99
-EOF
-  chmod +x "$fake_bin/python3"
-
-  run env PATH="$fake_bin:/usr/bin:/bin" \
-    bash .chezmoiscripts/run_after_cursor-agent-parity.sh --check
-
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"endpoint-policy safe mode"* ]]
-  [ ! -e "$marker" ]
-}
-
 @test "doctor gates Python-dependent modules behind explicit exception opt-in" {
   grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' bin/dotfiles-doctor
-  grep -q 'claude-\*|cursor|local-ai|local-llm|mcp-orchestrator|vscode' bin/dotfiles-doctor
+  grep -q 'claude-\*|local-ai|local-llm|mcp-orchestrator|vscode' bin/dotfiles-doctor
   grep -q 'python3 has no publisher authority' bin/dotfiles-doctor
 }
 

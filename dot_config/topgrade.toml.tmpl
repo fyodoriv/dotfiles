@@ -88,6 +88,11 @@ disable = [
   # below (bin/dotfiles-pnpm-global-update) updates only when the global
   # package.json exists.
   "pnpm",
+
+  # Cursor support was removed on purpose (dotfiles #189). Never let topgrade
+  # update Cursor or its extensions again.
+  "cursor",
+  "cursor_agent",
 ]
 
 [brew]

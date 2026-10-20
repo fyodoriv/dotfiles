@@ -31,7 +31,6 @@ bin
 commands
 config
 coverage
-cursor
 data
 docs
 git-hooks

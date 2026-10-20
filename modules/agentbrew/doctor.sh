@@ -207,8 +207,8 @@ _agentbrew_memory_service_http_available() {
   # Keep this check on AgentBrew's canonical readiness contract. The CLI
   # performs initialize → notifications/initialized → tools/list and requires
   # a non-empty tool set, so dotfiles does not maintain a weaker curl-only
-  # duplicate that can report a stale MCP host as healthy. The same doctor
-  # process also checks Cursor, so use its shared single-flight result.
+  # duplicate that can report a stale MCP host as healthy.
+  # Use the shared process-scoped single-flight result.
   # shellcheck source=../../lib/agentbrew-memory-readiness.sh
   source "$DOTFILES_DIR/lib/agentbrew-memory-readiness.sh"
   dotfiles_agentbrew_memory_doctor_ready

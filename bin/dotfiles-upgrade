@@ -113,12 +113,12 @@ echo -e "${BLUE}── dotfiles-upgrade $(date '+%Y-%m-%d %H:%M') ──${NC}" \
   | tee -a "$UPGRADE_LOG"
 
 # ── Corporate CA for Node-based steps ───────────────────────────────
-# topgrade's cursor / windsurf / npm steps shell out to Node, whose bundled
+# topgrade's npm and editor-extension steps shell out to Node, whose bundled
 # Mozilla root store doesn't include a corporate TLS-inspection root CA.
 # Under launchd this script does NOT source
 # ~/.zshenv (where the same export lives for interactive shells — see
-# home/zshenv), so set it here too. Without it, `cursor --update-extensions`
-# and `windsurf --update-extensions` fail with "self signed certificate in
+# home/zshenv), so set it here too. Without it, `code --update-extensions`
+# and npm fail with "self signed certificate in
 # certificate chain". NODE_EXTRA_CA_CERTS only APPENDS to Node's built-in
 # roots. Guarded so a missing bundle doesn't point Node at a missing
 # file, and so an existing value (e.g. from ~/.zshenv.secrets) wins.

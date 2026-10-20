@@ -71,8 +71,6 @@ DOTFILES_PROFILE="$(chezmoi execute-template '{{ .profile }}' 2>/dev/null || ech
 # the key existed have no value, so the fallback keeps their old behaviour.
 OWNER_MACHINE="${DOTFILES_OWNER_MACHINE:-$(chezmoi execute-template '{{ dig "owner_machine" true . }}' 2>/dev/null || echo "true")}"
 # shellcheck disable=SC2034  # used by sourced doctor modules
-USE_CURSOR="${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo "true")}"
-# shellcheck disable=SC2034  # used by sourced doctor modules
 USE_LOCAL_AI="${DOTFILES_USE_LOCAL_AI:-$(chezmoi execute-template '{{ dig "use_local_ai" false . }}' 2>/dev/null || echo "true")}"
 # shellcheck disable=SC2034  # used by sourced doctor modules
 # local_ai_agents: same default as run_onchange_launchagents.sh.tmpl.
@@ -189,7 +187,7 @@ MODULE_FILTER_PATH=""
 failed_check_ids=()
 fixed_check_ids=()
 
-# Parse args (loop so multiple flags work, e.g. `--module cursor --quiet`)
+# Parse args (loop so multiple flags work, e.g. `--module shell --quiet`)
 TRENDS_MODE=false
 
 while [ $# -gt 0 ]; do
@@ -757,7 +755,7 @@ run_module_doctor_inner() {
       && [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" != "1" ] \
       && command -v codesign >/dev/null 2>&1; then
     case "$module_name" in
-      claude-*|cursor|local-ai|local-llm|mcp-orchestrator|vscode)
+      claude-*|local-ai|local-llm|mcp-orchestrator|vscode)
         _doctor_python="$(command -v python3 2>/dev/null || true)"
         _doctor_python_signature=""
         [ -n "$_doctor_python" ] \

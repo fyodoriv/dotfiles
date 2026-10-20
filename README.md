@@ -329,7 +329,7 @@ Only enable this if your work requires AWS, K8s, or JVM tooling — it adds extr
 
 AI agent tooling (tmux agent launchers, agent-browser config) is opt-in. When prompted during `chezmoi init`, set `use_ai_tools: true` — or enable it later by editing `~/.config/chezmoi/chezmoi.yaml` and running `dotfiles apply`.
 
-This deploys `~/.zshrc.ai-tools`, which sets up tmux agent launchers (`tcc`, `tcur`, `tcdx`) and agent-browser tuning. It also installs a `~/bin/claude` wrapper that strips leaked `ANTHROPIC_MODEL` values and starts Claude Code with `--permission-mode bypassPermissions` unless you pass an explicit permission mode. For `claude rc` (Remote Control), it puts that flag after the verb, because Remote Control refuses to start when the flag comes first.
+This deploys `~/.zshrc.ai-tools`, which sets up tmux agent launchers (`tcc`, `tcdx`) and agent-browser tuning. It also installs a `~/bin/claude` wrapper that strips leaked `ANTHROPIC_MODEL` values and starts Claude Code with `--permission-mode bypassPermissions` unless you pass an explicit permission mode. For `claude rc` (Remote Control), it puts that flag after the verb, because Remote Control refuses to start when the flag comes first.
 
 Teammates who want MCP servers, shared skills, and generated agent config should also follow [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for `agentbrew init`, credential setup, sync, status checks, and recovery.
 

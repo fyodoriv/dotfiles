@@ -6,7 +6,7 @@
 #   - tmux (session persistence for agent CLIs)
 #   - sleepwatcher (~/.sleep + ~/.wakeup hooks)
 #   - network-watchdog (auto-heal wifi/VPN/DNS post-wake)
-#   - process-scoped caffeinate and Amphetamine (Cursor/Claude Code only)
+#   - process-scoped caffeinate and Amphetamine (Claude Code only)
 #   - normal macOS idle timers when no tracked agent process is running
 #
 # Run `dotfiles-resilience-setup` for the install/configure wizard.
@@ -77,7 +77,7 @@ _amphetamine_no_stale_single_use_assertion() {
   [ -d "$app_path" ] || return 0
   command -v pmset >/dev/null 2>&1 || return 0
   # The manager records the session it creates. A valid marker with a live
-  # qualifying Cursor/Claude process is an intentional long-running session,
+  # qualifying Claude Code process is an intentional long-running session,
   # not a forgotten manual Single-Use session.
   if declare -F dotfiles_agent_amphetamine_session_is_owned >/dev/null \
       && dotfiles_agent_amphetamine_session_is_owned; then
@@ -100,7 +100,7 @@ check_advisory "resilience.amphetamine_stale_single_use" "No stale Amphetamine S
   "osascript -e 'tell application \"Amphetamine\" to end session'"
 
 # Amphetamine must not own generic automatic sessions. The process manager
-# starts one only for live Cursor/Claude Code work, then ends its own session.
+# starts one only for live Claude Code work, then ends its own session.
 _amphetamine_managed_session_policy() {
   local app_path="${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}"
   local trigger_count triggers_enabled at_launch on_wake on_ac_reconnect
@@ -152,7 +152,7 @@ check "resilience.amphetamine_sync_in_sync" "Amphetamine preferences match dotfi
   "! [ -d /Applications/Amphetamine.app ] || ! [ -s \"\$DOTFILES_DIR/data/amphetamine-prefs.json\" ] || [ \"\$(jq 'keys | length' \"\$DOTFILES_DIR/data/amphetamine-prefs.json\")\" = '0' ] || \"\$DOTFILES_DIR/bin/dotfiles-amphetamine-sync\" diff >/dev/null 2>&1" \
   "echo 'Run dotfiles-amphetamine-sync diff to see the cause: drift, or macOS blocking the app container. To capture local -> dotfiles: dotfiles-amphetamine-sync export. To restore dotfiles -> local: dotfiles-amphetamine-sync apply'"
 
-# ── Process-scoped agent keepawake (Cursor + Claude Code) ─────────────
+# ── Process-scoped agent keepawake (Claude Code) ─────────────
 _agent_keepawake_battery_policy_configured() {
   local plist="$HOME/Library/LaunchAgents/com.dotfiles.agent-keepawake.plist"
   [ -f "$plist" ] || return 1
@@ -192,12 +192,12 @@ check "resilience.agent_wake_recover_script" "dotfiles-agent-wake-recover execut
   "[ -x \"\$DOTFILES_DIR/bin/dotfiles-agent-wake-recover\" ]" \
   "chmod +x \"\$DOTFILES_DIR/bin/dotfiles-agent-wake-recover\""
 
-check "resilience.agent_keepawake_loaded" "agent-keepawake LaunchAgent loaded (full + Cursor or Claude Code)" \
-  "[ \"\${DOTFILES_PROFILE:-full}\" != full ] || { [ ! -d /Applications/Cursor.app ] && [ ! -x \"\$HOME/.local/bin/claude\" ]; } || launchctl print \"gui/\$(id -u)/com.dotfiles.agent-keepawake\" >/dev/null 2>&1" \
+check "resilience.agent_keepawake_loaded" "agent-keepawake LaunchAgent loaded (full + Claude Code)" \
+  "[ \"\${DOTFILES_PROFILE:-full}\" != full ] || [ ! -x \"\$HOME/.local/bin/claude\" ] || launchctl print \"gui/\$(id -u)/com.dotfiles.agent-keepawake\" >/dev/null 2>&1" \
   "launchctl bootstrap gui/\$UID \"\$HOME/Library/LaunchAgents/com.dotfiles.agent-keepawake.plist\" 2>/dev/null || dotfiles apply"
 
 check "resilience.agent_keepawake_battery_policy" "agent keepawake covers AC and battery at or above 20%" \
-  "[ \"\${DOTFILES_PROFILE:-full}\" != full ] || { [ ! -d /Applications/Cursor.app ] && [ ! -x \"\$HOME/.local/bin/claude\" ]; } || _agent_keepawake_battery_policy_configured" \
+  "[ \"\${DOTFILES_PROFILE:-full}\" != full ] || [ ! -x \"\$HOME/.local/bin/claude\" ] || _agent_keepawake_battery_policy_configured" \
   "dotfiles apply && launchctl kickstart -k gui/\$UID/com.dotfiles.agent-keepawake"
 
 check_advisory "resilience.agent_keepawake_lid_closed_automation" "Amphetamine Automation is ready for lid-closed agent work" \

@@ -40,7 +40,7 @@ write_install_script() {
   {
     echo 'set -euo pipefail'
     echo "source '$REPO_ROOT/lib/self-reload.sh'"
-    echo 'PROFILE=full; AUTO_UPGRADE=true; USE_CURSOR=false; AUTO_SYNC=true; CLAUDE_REMOTE_CONTROL=false; IS_ENTERPRISE=false; failed=0'
+    echo 'PROFILE=full; AUTO_UPGRADE=true; AUTO_SYNC=true; CLAUDE_REMOTE_CONTROL=false; IS_ENTERPRISE=false; failed=0'
     sed -n '/^should_skip_agent()/,/^}/p' "$LAUNCHAGENT_TMPL"
     sed -n '/^install_plist()/,/^}/p' "$LAUNCHAGENT_TMPL"
     echo "install_plist '$TEST_DIR/$SYNC_LABEL.plist' '$SYNC_LABEL.plist' '$SYNC_LABEL' dotfiles-sync"

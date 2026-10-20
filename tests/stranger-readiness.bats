@@ -36,12 +36,11 @@ _render_home() {
     | tar -x -C "$TEST_DIR/out"
 }
 
-@test "new user defaults: core profile, no auto-push sync, no Cursor, not the owner" {
+@test "new user defaults: core profile, no auto-push sync, not the owner" {
   _init_config alex@example.com
   grep -q '^  profile: "core"' "$TEST_DIR/cfg.yaml"
   grep -q '^  auto_sync: false' "$TEST_DIR/cfg.yaml"
   grep -q '^  owner_machine: false' "$TEST_DIR/cfg.yaml"
-  grep -q '^  use_cursor: false' "$TEST_DIR/cfg.yaml"
   grep -q '^  global_git_hooks: true' "$TEST_DIR/cfg.yaml"
 }
 

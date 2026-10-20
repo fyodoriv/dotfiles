@@ -2,7 +2,7 @@
 # Bootstrap: agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml
 # Lifecycle: dotfiles apply runs .chezmoiscripts/run_after_agentbrew-sync.sh,
 # which syncs this file through agentbrew. Do not edit generated agent config
-# under ~/.claude, ~/.cursor, ~/.config/devin, or other installed mirrors.
+# under ~/.claude, ~/.config/devin, or other installed mirrors.
 # See: https://www.npmjs.com/package/agentbrew
 
 # Keep this manifest explicit. Hidden recommended sets can add optional MCP servers
@@ -94,7 +94,6 @@ skills:
   - strategic-review
   # ── context budget / token hygiene (agentbrew dev plugins) ───────
   - context-budget           # metrics-driven trim via agentbrew measure context
-  - cursor-token-playbook    # daily Cursor habits — model mix, new chat, @ scoping
   # ── agent time (agentbrew perf log; /tooling-checkup Phase 8, /ship-it Step 15) ──
   - perf-review              # slowest recurring steps → speedup tasks (agentbrew)
   - session-report           # tokens, cache, active hours (official plugin; back after the 2026-10-13 trim)

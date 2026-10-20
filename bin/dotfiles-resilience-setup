@@ -90,7 +90,7 @@ fi
 
 # ── 4b. Amphetamine manager policy ───────────────────────────────────
 # Generic Trigger and automatic Default Duration sessions can outlive agent
-# work. The keepawake manager starts an owned session only while Cursor or
+# work. The keepawake manager starts an owned session only while
 # Claude Code is running on AC or battery at/above 20%, then ends it promptly.
 amphetamine_managed_policy_ready() {
   local trigger_count triggers_enabled at_launch on_wake on_ac_reconnect
@@ -117,7 +117,7 @@ if [ -d "$AMPHETAMINE_PATH" ]; then
   echo "  ${_DIM}  • Apply the managed baseline: dotfiles-amphetamine-sync apply${_RST}"
   echo "  ${_DIM}  • In Amphetamine Preferences → Sessions, keep 'Allow System to Sleep When Display is Closed' off.${_RST}"
   echo "  ${_DIM}  • Leave generic Triggers off. The process manager owns this lifecycle.${_RST}"
-  echo "  ${_DIM}  • Start Cursor or Claude Code. If macOS asks to allow osascript to control Amphetamine, choose Allow.${_RST}"
+  echo "  ${_DIM}  • Start Claude Code. If macOS asks to allow osascript to control Amphetamine, choose Allow.${_RST}"
   echo "  ${_DIM}  • The manager protects AC and battery at or above 20%, then releases after both processes exit.${_RST}"
 fi
 
@@ -125,7 +125,7 @@ fi
 section "agent-tmux (tmux wrapper for agent CLIs)"
 if command -v agent-tmux >/dev/null 2>&1; then
   ok "agent-tmux on PATH ($(command -v agent-tmux))"
-  hint "run agents: \`tcc\` (Claude Code), \`tcur\` (Cursor), \`agents\` (list)"
+  hint "run agents: \`tcc\` (Claude Code), \`tcdx\` (Codex), \`agents\` (list)"
 else
   err "agent-tmux not on PATH — re-run \`dotfiles apply\`"
 fi
@@ -168,8 +168,8 @@ fi
 # ── Summary ──────────────────────────────────────────────────────────
 section "Next steps"
 echo "  After applying the managed Amphetamine policy:"
-echo "    • Test: start Cursor or Claude Code → close lid → wait → open lid → verify the same agent session is still running"
-echo "    • Test cleanup: exit both Cursor and Claude Code → dotfiles-agent-keepawake --dry-run reports release"
+echo "    • Test: start Claude Code → close lid → wait → open lid → verify the same agent session is still running"
+echo "    • Test cleanup: exit Claude Code → dotfiles-agent-keepawake --dry-run reports release"
 echo "    • Test: toggle wifi off→on → tail ~/.local/share/dotfiles/logs/network-watchdog.log → see auto-recovery"
 echo "    • Diagnose: \`dotfiles doctor resilience\` for ongoing health checks"
 echo ""

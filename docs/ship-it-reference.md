@@ -831,7 +831,7 @@ cd ~ && agentbrew sync --pull && agentbrew status --ci || agentbrew status --fix
 # Post-delivery context budget — static + runtime planes (openusage/ccusage/tokscale)
 agentbrew measure context
 
-dotfiles doctor --module security --module cursor --module terminal --module agent-browser --module chrome --module resilience --fix
+dotfiles doctor --module security --module terminal --module agent-browser --module chrome --module resilience --fix
 bin/dotfiles-heal-stuck-agents --fix --quiet
 # When minsky delivered:
 cd ~/apps/tooling/minsky && minsky install-daemon

@@ -103,7 +103,7 @@ if id -Gn 2>/dev/null | grep -qw admin; then
     echo -e "${YELLOW}⚠${NC} MDM profiles detected — power management settings below may be overridden by your IT department"
   fi
   # AC: normal idle timers. The process-scoped keepawake manager temporarily
-  # holds sleep/disk sleep only while Cursor or Claude Code is actually running.
+  # holds sleep/disk sleep only while Claude Code is actually running.
   sudo pmset -c powermode 2 2>/dev/null || true
   sudo pmset -c sleep 1 2>/dev/null || true
   sudo pmset -c disksleep 10 2>/dev/null || true

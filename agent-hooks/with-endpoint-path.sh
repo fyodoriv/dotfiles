@@ -1,14 +1,13 @@
 #!/bin/bash
 # Run a hook command with endpoint-safe PATH (dotfiles shims first).
 #
-# Cursor runs each hooks.json command in an isolated subprocess — PATH set by
-# sessionStart does not propagate. Wrap codeassist / audit hooks so jq, find,
-# curl, perl resolve to adhoc-signed Mach-O shims instead of /usr/bin/* or
+# Agents can run each hook command in an isolated subprocess — PATH set by
+# SessionStart does not propagate. Wrap external hooks so jq, find, curl,
+# perl resolve to adhoc-signed Mach-O shims instead of /usr/bin/* or
 # unsigned Homebrew bottles.
 #
-# hooks.json example:
-#   ~/.config/dotfiles/hooks/with-endpoint-path.sh \
-#     ~/.cursor/codeassist/hooks-scripts/audit-logger.sh afterFileEdit
+# Example:
+#   ~/.config/dotfiles/hooks/with-endpoint-path.sh <hook-command> [args...]
 
 set -euo pipefail
 

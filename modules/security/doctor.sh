@@ -511,7 +511,7 @@ if [ -L "$DOTFILES_DIR/bin/python3" ] && command -v codesign >/dev/null 2>&1; th
 fi
 
 check "security.recurring_automation_no_publisher_na_python" "Recurring apply and doctor avoid unsigned Python execution" \
-  "grep -q 'AGENTBREW_MCPM_BIN=/nonexistent/' '$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh' && grep -q 'endpoint-policy safe mode' '$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-agent-parity.sh' && ! grep -vE '^[[:space:]]*#' '$DOTFILES_DIR/.chezmoiscripts/run_after_cursor-hooks-endpoint-wrap.sh' | grep -qE '(^|[[:space:]])python3([[:space:]]|$)' && grep -q 'endpoint-policy safe mode' '$DOTFILES_DIR/.chezmoiscripts/run_after_install_local_llm.sh.tmpl' && grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' '$DOTFILES_DIR/.chezmoiscripts/run_after_uv-tools.sh' && grep -q 'local-llm' '$DOTFILES_DIR/bin/dotfiles-doctor' && grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' '$DOTFILES_DIR/bin/dotfiles-doctor'" \
+  "grep -q 'AGENTBREW_MCPM_BIN=/nonexistent/' '$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh' && grep -q 'endpoint-policy safe mode' '$DOTFILES_DIR/.chezmoiscripts/run_after_install_local_llm.sh.tmpl' && grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' '$DOTFILES_DIR/.chezmoiscripts/run_after_uv-tools.sh' && grep -q 'local-llm' '$DOTFILES_DIR/bin/dotfiles-doctor' && grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' '$DOTFILES_DIR/bin/dotfiles-doctor'" \
   "upgrade dotfiles; recurring JSON edits must use /usr/bin/plutil and Python-dependent doctors must stay gated"
 
 check "security.agent_hooks_no_publisher_na_python" "High-frequency agent hooks parse JSON with Apple plutil, not unsigned Python" \
@@ -926,7 +926,7 @@ check_advisory "security.deployed_la_locale" \
   "add LANG=C.UTF-8 to EnvironmentVariables in each owning repo's plist template"
 unset _la_no_locale _la_no_locale_list _la_locale_label _la_deployed
 
-# Cursor / CI sandboxes that run `bash -c` with PATH=/usr/bin:/bin bypass ~/.zshenv.
+# Agent / CI sandboxes that run `bash -c` with PATH=/usr/bin:/bin bypass ~/.zshenv.
 # zsh -c still loads ~/.zshenv and picks up dotfiles/bin — prefer zsh for agent shells.
 check_advisory "security.zsh_minimal_path_endpoint" "zsh -c with minimal PATH resolves jq via dotfiles/bin (~/.zshenv)" \
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v jq' 2>/dev/null | grep -q 'dotfiles/bin/jq'" \
@@ -942,7 +942,7 @@ check_advisory "security.zsh_minimal_path_ggrep" "zsh -c with minimal PATH resol
 
 check_advisory "security.bash_minimal_path_ggrep" "bash -c with PATH=/usr/bin:/bin must not resolve ggrep to bare Homebrew" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v ggrep' 2>/dev/null | grep -q '/opt/homebrew/bin/ggrep'" \
-  "Use zsh for non-login agent subshells; chezmoi apply installs cursor preToolUse prepend-endpoint-path hook"
+  "Use zsh for non-login agent subshells; chezmoi apply installs the preToolUse prepend-endpoint-path hook"
 
 check_advisory "security.zsh_minimal_path_perl" "zsh -c with minimal PATH resolves perl via dotfiles/bin (~/.zshenv)" \
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v perl' 2>/dev/null | grep -q 'dotfiles/bin/perl'" \
@@ -950,7 +950,7 @@ check_advisory "security.zsh_minimal_path_perl" "zsh -c with minimal PATH resolv
 
 check_advisory "security.bash_minimal_path_perl" "bash -c with PATH=/usr/bin:/bin must not resolve perl to /usr/bin/perl (endpoint agents may block Apple perl)" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v perl' 2>/dev/null | grep -q '/usr/bin/perl'" \
-  "Use zsh for non-login agent subshells; chezmoi apply installs cursor preToolUse prepend-endpoint-path hook"
+  "Use zsh for non-login agent subshells; chezmoi apply installs the preToolUse prepend-endpoint-path hook"
 
 check_advisory "security.zsh_minimal_path_curl" "zsh -c with minimal PATH resolves curl via dotfiles/bin (~/.zshenv)" \
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v curl' 2>/dev/null | grep -q 'dotfiles/bin/curl'" \
@@ -958,9 +958,9 @@ check_advisory "security.zsh_minimal_path_curl" "zsh -c with minimal PATH resolv
 
 check_advisory "security.bash_minimal_path_curl" "bash -c with PATH=/usr/bin:/bin must not resolve curl to /usr/bin/curl (endpoint agents may block system curl)" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v curl' 2>/dev/null | grep -q '/usr/bin/curl'" \
-  "Use zsh for non-login agent subshells; chezmoi apply installs cursor preToolUse prepend-endpoint-path hook"
+  "Use zsh for non-login agent subshells; chezmoi apply installs the preToolUse prepend-endpoint-path hook"
 
-# Cursor agent tool shells often use PATH=/opt/homebrew/bin:/usr/bin:/bin (Homebrew
+# Agent tool shells often use PATH=/opt/homebrew/bin:/usr/bin:/bin (Homebrew
 # sandbox) which omits dotfiles/bin — ggrep/perl hit bare Homebrew binaries
 # (unsigned when unsigned); curl is keg-only and falls through to /usr/bin/curl
 # on that PATH unless dotfiles/bin is prepended. LaunchAgent PATH was fixed in PR #241;
@@ -970,9 +970,9 @@ if [ -d /opt/homebrew/bin ]; then
   _sandbox_ggrep="$(PATH="$_sandbox_hb_path" command -v ggrep 2>/dev/null || true)"
   if [ -n "$_sandbox_ggrep" ] && [ "$_sandbox_ggrep" != "$DOTFILES_DIR/bin/ggrep" ]; then
     check_advisory "security.sandbox_homebrew_only_ggrep" \
-      "Homebrew-only sandbox PATH resolves ggrep to bare Homebrew (not dotfiles/bin; Cursor agent subshells)" \
+      "Homebrew-only sandbox PATH resolves ggrep to bare Homebrew (not dotfiles/bin; agent subshells)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-adhoc-sign-ggrep; prefer zsh for agent shells"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-adhoc-sign-ggrep; prefer zsh for agent shells"
     if command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_ggrep" ]; then
       check "security.sandbox_ggrep_signed" \
         "bare Homebrew ggrep is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -983,9 +983,9 @@ if [ -d /opt/homebrew/bin ]; then
   _sandbox_perl="$(PATH="$_sandbox_hb_path" command -v perl 2>/dev/null || true)"
   if [ -n "$_sandbox_perl" ] && [ "$_sandbox_perl" != "$DOTFILES_DIR/bin/perl" ]; then
     check_advisory "security.sandbox_homebrew_only_perl" \
-      "Homebrew-only sandbox PATH resolves perl to bare Homebrew (not dotfiles/bin; Cursor agent subshells)" \
+      "Homebrew-only sandbox PATH resolves perl to bare Homebrew (not dotfiles/bin; agent subshells)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-adhoc-sign-bottles; prefer zsh for agent shells"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-adhoc-sign-bottles; prefer zsh for agent shells"
     if command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_perl" ]; then
       check "security.sandbox_perl_signed" \
         "bare Homebrew perl is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -996,14 +996,14 @@ if [ -d /opt/homebrew/bin ]; then
   _sandbox_jq="$(PATH="$_sandbox_hb_path" command -v jq 2>/dev/null || true)"
   if [ -n "$_sandbox_jq" ] && [ "$_sandbox_jq" != "$DOTFILES_DIR/bin/jq" ]; then
     check_advisory "security.sandbox_homebrew_only_jq" \
-      "Homebrew-only sandbox PATH resolves jq to bare Homebrew (not dotfiles/bin; Cursor agent subshells)" \
+      "Homebrew-only sandbox PATH resolves jq to bare Homebrew (not dotfiles/bin; agent subshells)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-adhoc-sign-bottles; prefer zsh for agent shells"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-adhoc-sign-bottles; prefer zsh for agent shells"
     if [ "$_sandbox_jq" = '/usr/bin/jq' ]; then
       check_advisory "security.sandbox_homebrew_only_jq_system" \
         "Homebrew-only sandbox PATH hits /usr/bin/jq (system-signed; prepend dotfiles/bin)" \
         "false" \
-        "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-jq-shim"
+        "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-jq-shim"
     elif command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_jq" ]; then
       check "security.sandbox_jq_signed" \
         "bare Homebrew jq is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -1014,14 +1014,14 @@ if [ -d /opt/homebrew/bin ]; then
   _sandbox_curl="$(PATH="$_sandbox_hb_path" command -v curl 2>/dev/null || true)"
   if [ -n "$_sandbox_curl" ] && [ "$_sandbox_curl" != "$DOTFILES_DIR/bin/curl" ]; then
     check_advisory "security.sandbox_homebrew_only_curl" \
-      "Homebrew-only sandbox PATH resolves curl without dotfiles/bin (often /usr/bin/curl; Cursor agent subshells)" \
+      "Homebrew-only sandbox PATH resolves curl without dotfiles/bin (often /usr/bin/curl; agent subshells)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-curl-shim; prefer zsh for agent shells"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-curl-shim; prefer zsh for agent shells"
     if [ "$_sandbox_curl" = '/usr/bin/curl' ]; then
       check_advisory "security.sandbox_homebrew_only_curl_system" \
         "Homebrew-only sandbox PATH hits /usr/bin/curl (endpoint policy; prepend dotfiles/bin)" \
         "false" \
-        "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook prepends dotfiles/bin"
+        "chezmoi apply  # preToolUse prepend-endpoint-path hook prepends dotfiles/bin"
     elif command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_curl" ]; then
       check "security.sandbox_curl_signed" \
         "bare Homebrew curl keg is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -1036,7 +1036,7 @@ if [ -d /opt/homebrew/bin ]; then
       check_advisory "security.sandbox_keg_curl_without_dotfiles" \
         "Keg curl PATH without dotfiles/bin resolves bare /opt/homebrew/opt/curl/bin/curl" \
         "false" \
-        "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-curl-shim"
+        "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-curl-shim"
       if command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_curl_keg" ]; then
         check "security.sandbox_curl_signed" \
           "bare Homebrew curl keg is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -1051,7 +1051,7 @@ if [ -d /opt/homebrew/bin ]; then
     check "security.sandbox_homebrew_only_find_system" \
       "Homebrew-only sandbox PATH hits /usr/bin/find (system-signed; prepend dotfiles/bin)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-find-shim"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-find-shim"
   elif [ -n "$_sandbox_find" ] && [ "$_sandbox_find" != "$DOTFILES_DIR/bin/find" ] && command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_find" ]; then
     check "security.sandbox_find_signed" \
       "bare Homebrew gfind is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -1063,14 +1063,14 @@ if [ -d /opt/homebrew/bin ]; then
     check "security.sandbox_homebrew_only_grep_system" \
       "Homebrew-only sandbox PATH hits /usr/bin/grep (system-signed; prepend dotfiles/bin)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-grep-shim"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-grep-shim"
   fi
   _sandbox_sed="$(PATH="$_sandbox_hb_path" command -v sed 2>/dev/null || true)"
   if [ "$_sandbox_sed" = '/usr/bin/sed' ]; then
     check "security.sandbox_homebrew_only_sed_system" \
       "Homebrew-only sandbox PATH hits /usr/bin/sed (system-signed; prepend dotfiles/bin)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-sed-shim"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-sed-shim"
   elif [ -n "$_sandbox_sed" ] && [ "$_sandbox_sed" != "$DOTFILES_DIR/bin/sed" ] && command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_sed" ]; then
     check "security.sandbox_sed_signed" \
       "bare Homebrew gsed is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -1082,7 +1082,7 @@ if [ -d /opt/homebrew/bin ]; then
     check "security.sandbox_homebrew_only_awk_system" \
       "Homebrew-only sandbox PATH hits /usr/bin/awk (system-signed; prepend dotfiles/bin)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-awk-shim"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-awk-shim"
   elif [ -n "$_sandbox_awk" ] && [ "$_sandbox_awk" != "$DOTFILES_DIR/bin/awk" ] && command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_awk" ]; then
     check "security.sandbox_awk_signed" \
       "bare Homebrew gawk is adhoc-signed (endpoint-safe when sandbox PATH skips dotfiles/bin)" \
@@ -1094,7 +1094,7 @@ if [ -d /opt/homebrew/bin ]; then
     check "security.sandbox_homebrew_only_python3_system" \
       "Homebrew-only sandbox PATH hits /usr/bin/python3 (system-signed; prepend dotfiles/bin)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-python-shim"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-python-shim"
   elif [ -n "$_sandbox_py" ] && [ "$_sandbox_py" != "$DOTFILES_DIR/bin/python3" ] && echo "$_sandbox_py" | grep -q '.local/share/uv/python' && command -v codesign >/dev/null 2>&1 && [ -f "$_sandbox_py" ]; then
     check "security.sandbox_python3_signed" \
       "bare uv python3 on sandbox PATH is ad-hoc signed (not publisher-authorized)" \
@@ -1115,7 +1115,7 @@ if [ -d /opt/homebrew/bin ]; then
     check_advisory "security.sandbox_homebrew_only_git_system" \
       "Homebrew-only sandbox PATH hits /usr/bin/git (system-signed; prepend dotfiles/bin for push-guard wrapper)" \
       "false" \
-      "chezmoi apply  # cursor preToolUse prepend-endpoint-path hook; dotfiles-link-git-shim adhoc-signs wrapper"
+      "chezmoi apply  # preToolUse prepend-endpoint-path hook; dotfiles-link-git-shim adhoc-signs wrapper"
   fi
   unset _sandbox_hb_path _sandbox_ggrep _sandbox_perl _sandbox_jq _sandbox_curl _sandbox_find \
     _sandbox_grep_sys _sandbox_sed _sandbox_awk _sandbox_py _sandbox_py13 _sandbox_git
@@ -1142,7 +1142,7 @@ if [ -f "${HOME}/.node-version" ] && [ -d /opt/homebrew/bin ]; then
   unset _sandbox_node_path _fnm_bin _sandbox_node _sandbox_npx
 fi
 
-# Deployed Cursor/agent hook scripts must source endpoint PATH bootstrap.
+# Deployed agent hook scripts must source endpoint PATH bootstrap.
 _hooks_bootstrap_bad=0
 for _hooks_scan_dir in \
   "$DOTFILES_DIR/agent-hooks" \
@@ -1373,7 +1373,7 @@ if [ "$_la_env_bad" -eq 0 ]; then
 fi
 unset _la_env_bad _la_env_plist _la_env_rel
 
-# ── Hung git-upload-pack / GHE SSH (stuck Cursor extension-host git) ─
+# ── Hung git-upload-pack / GHE SSH (stuck agent git) ─
 # shellcheck source=../../lib/heal-stuck-agents.sh
 source "$DOTFILES_MODULE_DIR/lib/heal-stuck-agents.sh"
 

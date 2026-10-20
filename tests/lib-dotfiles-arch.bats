@@ -29,19 +29,14 @@ teardown() {
   grep -q 'source "$DOTFILES_DIR/lib/dotfiles-arch.sh"' "$DOTFILES_DIR/macos-apps.sh"
 }
 
-@test "dotfiles-arch: managed app list includes Cursor and Ghostty bundle ids" {
-  grep -q 'Cursor:com.todesktop.230313mzl4w4u92' "$DOTFILES_DIR/lib/dotfiles-arch.sh"
+@test "dotfiles-arch: managed app list includes Ghostty and no Cursor" {
+  ! grep -q 'Cursor:' "$DOTFILES_DIR/lib/dotfiles-arch.sh"
   grep -q 'Ghostty:com.mitchellh.ghostty' "$DOTFILES_DIR/lib/dotfiles-arch.sh"
 }
 
 @test "dotfiles-arch: terminal doctor flags managed apps x86 override on Apple Silicon" {
   grep -q 'apps.no_rosetta_override' "$DOTFILES_DIR/modules/terminal/doctor.sh"
   grep -q 'dotfiles_managed_apps_have_no_x86_override' "$DOTFILES_DIR/modules/terminal/doctor.sh"
-}
-
-@test "dotfiles-arch: cursor doctor checks native arm64 binary" {
-  grep -q 'cursor.native_arch' "$DOTFILES_DIR/modules/cursor/doctor.sh"
-  grep -q 'dotfiles_app_binary_includes_arm64' "$DOTFILES_DIR/modules/cursor/doctor.sh"
 }
 
 @test "dotfiles-arch: terminal doctor flags Ghostty x86_64 on Apple Silicon" {

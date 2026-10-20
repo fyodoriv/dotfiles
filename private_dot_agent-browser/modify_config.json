@@ -1,0 +1,12 @@
+#!/bin/bash
+# chezmoi modify script for ~/.agent-browser/config.json.
+# Sets "cdp": "9223" so agent-browser attaches to the one agents Chrome
+# (com.dotfiles.agent-browser-chrome) by default. When that Chrome is down,
+# agent-browser fails instead of starting its own browser. Other keys stay.
+input="$(cat)"
+[ -n "$input" ] || input='{}'
+if command -v jq >/dev/null 2>&1 && out="$(printf '%s' "$input" | jq '.cdp = "9223"' 2>/dev/null)"; then
+  printf '%s\n' "$out"
+else
+  printf '%s\n' "$input"
+fi

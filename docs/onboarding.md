@@ -155,7 +155,7 @@ The `.overrides` file is tracked in git, so your team fork can pre-configure whi
 | Doctor modules | 7 enabled (14 auto-skipped) | All 21 |
 | Brew packages | essentials set (`make count` with `core`) | full profile set (`make count` with `full`) |
 | macOS defaults | 90 (system) | 149 (+visual, +app prefs) |
-| LaunchAgents | 7 (sync, doctor, cleanup, git-maintain, capslock, gui-path, network) | All 15 (+morning, upgrade, chrome-debug, etc.) |
+| LaunchAgents | 7 (sync, doctor, cleanup, git-maintain, capslock, gui-path, network) | All 15 (+morning, upgrade, agent-browser-chrome, etc.) |
 | Config files | zshrc, zshenv, gitconfig, starship, ssh | +tmux, Ghostty, lazygit, JetBrains, fastfetch |
 | Best for | Team-wide baseline -- minimal opinions | Power users -- opinionated terminal + editor setup |
 

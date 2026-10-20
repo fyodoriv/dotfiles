@@ -30,7 +30,7 @@ should_skip_agent() {
     capslock-control)
       [ "$CAPSLOCK_CONTROL" = "false" ] && return 0 ;;
     # CDP debug ports are a localhost attack vector — require full profile
-    agent-browser-chrome|debug-chrome|tooling-chrome|chrome-debug)
+    agent-browser-chrome)
       [ "$PROFILE" != "full" ] && return 0 ;;
     # Signs and links inside the Homebrew prefix; endpoint_hardening only
     endpoint-bootstrap)

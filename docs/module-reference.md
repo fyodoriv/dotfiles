@@ -235,8 +235,9 @@ On `profile: core`, the module runs only when the `agent-browser` CLI is install
 |----|---------------|----------|
 | `agent-browser.installed` | agent-browser CLI installed | None |
 | `agent-browser.chrome_cdp` | Chrome CDP responsive on port 9223 | `ensure-chrome.sh` |
-| `agent-browser.debug_chrome_cdp` | debug Chrome CDP responsive on port 9224 | Load LaunchAgent |
-| `agent-browser.tooling_cdp` | tooling Chrome CDP responsive on port 9225 | Load LaunchAgent |
+| `agent-browser.no_retired_chromes` | retired agent Chromes (9222/9224/9225) not installed | Unload and delete their plists |
+| `agent-browser.config_cdp` | `~/.agent-browser/config.json` sets `"cdp": "9223"` | `dotfiles apply` |
+| `agent-browser.temp_browser` | `bin/temp-browser` installed (one locked disposable browser) | None |
 | `agent-browser.singleton_preflight` | singleton preflight helper installed | None |
 | `agent-browser.reap_strays_helper` | stray target reap helper installed | None |
 | `agent-browser.no_forwarded_launches` | launchd Chrome logs have no forwarded singleton launches | None |
@@ -246,8 +247,6 @@ On `profile: core`, the module runs only when the `agent-browser` CLI is install
 | `agent-browser.legacy_launchers_safe` | legacy agent-browser launch scripts do not launch managed profiles | None |
 | `agent-browser.profile_dir` | Chrome profile directory exists | `mkdir -p` |
 | `agent-browser.dashboard_theme` | dashboard Chrome themed BLUE (port 9223) | `dotfiles-set-persistent-chrome-themes 9223` |
-| `agent-browser.debug_chrome_theme` | debug Chrome themed ORANGE (port 9224) | `dotfiles-set-persistent-chrome-themes 9224` |
-| `agent-browser.tooling_theme` | tooling Chrome themed PURPLE (port 9225) | `dotfiles-set-persistent-chrome-themes 9225` |
 | `agent-browser.spotlight_excluded` | `~/.agent-browser` has the marker and the index probe finds no indexed child | `touch .metadata_never_index` |
 | `agent-browser.idle_timeout` | Idle timeout env var configured | None |
 | `agent-browser.env_timeout` | Default timeout env var configured | None |

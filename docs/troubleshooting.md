@@ -606,7 +606,7 @@ ssh -T git@github.your-company.com
 
 ## Chrome flashes open then closes / focus switched to main desktop
 
-Persistent CDP Chromes (`9223` / `9224` / `9225`) should stay running in the
+The persistent agents Chrome (`9223`) should stay running in the
 background with **no visible window**. A jump to the main desktop while you are
 fullscreen on another Space usually means headed Chrome briefly became frontmost
 (often during agent-browser CDP tab create on a non-headless path) or dotfiles
@@ -622,7 +622,7 @@ Common causes:
 
 1. **LaunchAgent Chromes missing `--headless=new`** — CDP tab create opens a
    headed window and macOS switches Spaces. Fix: `chezmoi apply`, then reload
-   the three managed Chrome LaunchAgents (below).
+   the managed agents Chrome LaunchAgent (below).
 2. **Global `AGENT_BROWSER_ARGS` leaking into `--cdp` attach** — same symptom
    when agent-browser creates a CDP tab. Fix: `dotfiles apply` so the shell
    wrapper clears `AGENT_BROWSER_ARGS` on the CDP path.
@@ -652,7 +652,7 @@ dotfiles doctor --module agent-browser | grep -E 'focus\.|restore_no'
 **Reload LaunchAgents after plist changes:**
 
 ```bash
-for label in com.dotfiles.agent-browser-chrome com.dotfiles.debug-chrome com.dotfiles.tooling-chrome; do
+for label in com.dotfiles.agent-browser-chrome; do
   launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/${label}.plist"
 done
@@ -662,8 +662,6 @@ Verify CDP stays up:
 
 ```bash
 curl -sf http://127.0.0.1:9223/json/version | jq -r .Browser
-curl -sf http://127.0.0.1:9224/json/version | jq -r .Browser
-curl -sf http://127.0.0.1:9225/json/version | jq -r .Browser
 ```
 
 ---

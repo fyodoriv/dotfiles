@@ -1,10 +1,9 @@
 #!/bin/bash
-# Apply distinct Material You theme colors to each persistent agent Chrome
-# (9223 dashboard / 9224 debug / 9225 tooling) so the user can tell
-# them apart at a glance. Idempotent — re-running on a profile that already has
+# Apply a Material You theme color to the persistent agents Chrome
+# (9223) so the user can tell it apart from their own Chrome at a glance. Idempotent — re-running on a profile that already has
 # the right keys is a no-op. Safe to run multiple times.
 #
-# Why this exists: when three Chromes are tab-strip-identical, agents and
+# Why this exists: when Chromes are tab-strip-identical, agents and
 # humans both pick the wrong one. Theming the new-tab page + accent color via
 # the user-color preference is the lowest-friction visual cue that survives
 # session restore and doesn't touch existing tabs.
@@ -19,9 +18,9 @@
 #   3. launchctl load — Chrome starts back up with the new theme.
 #
 # Usage:
-#   dotfiles-set-persistent-chrome-themes              apply all three
+#   dotfiles-set-persistent-chrome-themes              apply the theme
 #   dotfiles-set-persistent-chrome-themes --check      report current state, no writes
-#   dotfiles-set-persistent-chrome-themes <port>       apply just one (9223|9224|9225)
+#   dotfiles-set-persistent-chrome-themes <port>       apply to one port (9223)
 
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
@@ -30,17 +29,15 @@ CHECK_ONLY=false
 TARGET_PORT=""
 case "${1:-}" in
   --check) CHECK_ONLY=true ;;
-  9223|9224|9225) TARGET_PORT="$1" ;;
+  9223) TARGET_PORT="$1" ;;
   "") ;;
-  *) echo "usage: $(basename "$0") [--check | 9223 | 9224 | 9225]" >&2; exit 2 ;;
+  *) echo "usage: $(basename "$0") [--check | 9223]" >&2; exit 2 ;;
 esac
 
 # Per-port config — colors are signed int32 of ARGB uint32 (alpha 0xFF), the
 # encoding Chrome stores in Preferences. Variant 2 = Vibrant (most saturated,
 # easiest to spot in macOS dark mode).
 #   9223 dashboard      → dashboard blue   #0077C5  → 0xFF0077C5 → -16746043
-#   9224 debug          → debug orange  #FF9800  → 0xFFFF9800 → -355840
-#   9225 tooling        → tooling purple #9C27B0 → 0xFF9C27B0 → -6543440
 config_for_port() {
   case "$1" in
     9223)
@@ -48,18 +45,6 @@ config_for_port() {
       PROFILE_DIR="chrome-profile"
       PROFILE_NAME="🟦 DASHBOARD (SSO)"
       COLOR_INT="-16746043"
-      ;;
-    9224)
-      PLIST_LABEL="com.dotfiles.debug-chrome"
-      PROFILE_DIR="debug-profile"
-      PROFILE_NAME="🟧 DEBUG"
-      COLOR_INT="-355840"
-      ;;
-    9225)
-      PLIST_LABEL="com.dotfiles.tooling-chrome"
-      PROFILE_DIR="tooling-profile"
-      PROFILE_NAME="🟪 TOOLING (dotfiles / agentbrew / minsky / authproxy)"
-      COLOR_INT="-6543440"
       ;;
     *)
       echo "internal: unknown port $1" >&2
@@ -146,7 +131,5 @@ apply_theme() {
 if [ -n "$TARGET_PORT" ]; then
   apply_theme "$TARGET_PORT"
 else
-  for port in 9223 9224 9225; do
-    apply_theme "$port"
-  done
+  apply_theme 9223
 fi

@@ -1,6 +1,6 @@
 // chrome-dock-guard: hand the user's Chrome click to the user's Chrome.
 //
-// The launchd agent Chromes (ports 9223/9224/9225) run the real
+// The launchd agent Chromes (port 9223, plus the temp-browser) run the real
 // Google Chrome.app headless, so macOS registers them as com.google.Chrome.
 // A Dock click, Cmd-Tab, or `open -a "Google Chrome"` can then activate one
 // of them. It has no window, so Chrome looks stuck.

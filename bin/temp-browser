@@ -1,0 +1,190 @@
+#!/bin/bash
+# temp-browser: one disposable, locked browser for agents.
+#
+# Each acquire starts a headless Chrome with a fresh profile. Release stops
+# it and deletes the profile, like an incognito window. Only one agent can
+# hold it. The lock is a directory (mkdir is atomic). It records the owner,
+# the reason, the browser pid, the port, the profile, and the lease expiry.
+# An expired lease or a dead browser is discarded and taken over.
+#
+# Lifecycle scope: the lock lives on disk in $TEMP_BROWSER_STATE_DIR/lock,
+# per user account. Release or takeover deletes it.
+#
+# Usage:
+#   temp-browser acquire --owner <id> --reason <text>   # prints the CDP port
+#   temp-browser status
+#   temp-browser release --owner <id>
+#
+# Env: TEMP_BROWSER_STATE_DIR, TEMP_BROWSER_PORT (9230),
+#      TEMP_BROWSER_LEASE_SECONDS (3600), TEMP_BROWSER_CHROME (Chrome binary),
+#      TEMP_BROWSER_READY_TIMEOUT (seconds to wait for CDP, 15; 0 skips).
+set -euo pipefail
+
+STATE_DIR="${TEMP_BROWSER_STATE_DIR:-$HOME/.local/state/temp-browser}"
+LOCK="$STATE_DIR/lock"
+PORT="${TEMP_BROWSER_PORT:-9230}"
+LEASE="${TEMP_BROWSER_LEASE_SECONDS:-3600}"
+CHROME="${TEMP_BROWSER_CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+READY_TIMEOUT="${TEMP_BROWSER_READY_TIMEOUT:-15}"
+
+usage() {
+  cat <<'EOF'
+Usage: temp-browser acquire --owner <id> --reason <text>
+       temp-browser status
+       temp-browser release --owner <id>
+EOF
+}
+
+field() { cat "$LOCK/$1" 2>/dev/null || true; }
+
+pid_alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+
+lock_stale() {
+  local pid expires
+  pid="$(field pid)"
+  expires="$(field expires)"
+  ! pid_alive "$pid" && return 0
+  [ -n "$expires" ] && [ "$expires" -le "$(date +%s)" ] && return 0
+  return 1
+}
+
+stop_browser() {
+  local pid="$1" profile="$2"
+  if pid_alive "$pid"; then
+    kill "$pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      pid_alive "$pid" || break
+      sleep 0.2
+    done
+    pid_alive "$pid" && kill -9 "$pid" 2>/dev/null || true
+  fi
+  case "$profile" in
+    "$STATE_DIR"/profile.*) rm -rf "$profile" ;;
+  esac
+}
+
+discard_lock() {
+  stop_browser "$(field pid)" "$(field profile)"
+  rm -rf "$LOCK"
+}
+
+holder_line() {
+  printf 'held by %s: %s (pid %s, lease expires %s)' \
+    "$(field owner)" "$(field reason)" "$(field pid)" "$(fmt_time "$(field expires)")"
+}
+
+fmt_time() {
+  [ -n "$1" ] || { echo "?"; return; }
+  date -r "$1" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d "@$1" '+%Y-%m-%d %H:%M:%S'
+}
+
+parse_opts() {
+  OWNER="" REASON=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --owner) OWNER="${2:-}"; shift 2 || shift ;;
+      --reason) REASON="${2:-}"; shift 2 || shift ;;
+      *) echo "temp-browser: unknown option: $1" >&2; usage >&2; exit 2 ;;
+    esac
+  done
+}
+
+wait_ready() {
+  [ "$READY_TIMEOUT" -gt 0 ] || return 0
+  local i=0
+  while [ "$i" -lt "$READY_TIMEOUT" ]; do
+    curl -sf --max-time 1 "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1 && return 0
+    pid_alive "$(field pid)" || return 1
+    sleep 1
+    i=$((i + 1))
+  done
+  return 1
+}
+
+cmd_acquire() {
+  parse_opts "$@"
+  if [ -z "$OWNER" ] || [ -z "$REASON" ]; then
+    echo "temp-browser: acquire needs --owner and --reason" >&2
+    exit 2
+  fi
+  mkdir -p "$STATE_DIR"
+  if ! mkdir "$LOCK" 2>/dev/null; then
+    if [ "$(field owner)" = "$OWNER" ] && ! lock_stale; then
+      echo $(($(date +%s) + LEASE)) > "$LOCK/expires"
+      field port
+      return 0
+    fi
+    if lock_stale; then
+      echo "temp-browser: discarding stale lock ($(holder_line))" >&2
+      discard_lock
+    fi
+    if ! mkdir "$LOCK" 2>/dev/null; then
+      echo "temp-browser: busy, $(holder_line)" >&2
+      exit 3
+    fi
+  fi
+  local profile
+  profile="$(mktemp -d "$STATE_DIR/profile.XXXXXX")"
+  printf '%s\n' "$OWNER" > "$LOCK/owner"
+  printf '%s\n' "$REASON" > "$LOCK/reason"
+  printf '%s\n' "$PORT" > "$LOCK/port"
+  printf '%s\n' "$profile" > "$LOCK/profile"
+  echo $(($(date +%s) + LEASE)) > "$LOCK/expires"
+  if [ ! -x "$CHROME" ]; then
+    echo "temp-browser: browser not found: $CHROME" >&2
+    discard_lock
+    exit 1
+  fi
+  # Headless and backgrounded: it never takes focus or opens a window.
+  nohup "$CHROME" --headless=new --remote-debugging-port="$PORT" \
+    --user-data-dir="$profile" --no-first-run --no-default-browser-check \
+    about:blank >"$STATE_DIR/browser.log" 2>&1 </dev/null &
+  printf '%s\n' "$!" > "$LOCK/pid"
+  if ! wait_ready; then
+    echo "temp-browser: browser did not expose CDP on port $PORT" >&2
+    discard_lock
+    exit 1
+  fi
+  echo "$PORT"
+}
+
+cmd_status() {
+  if [ ! -d "$LOCK" ]; then
+    echo "temp-browser: free"
+    return 0
+  fi
+  local state="held"
+  lock_stale && state="stale (next acquire takes it over)"
+  echo "temp-browser: $state"
+  echo "owner: $(field owner)"
+  echo "reason: $(field reason)"
+  echo "pid: $(field pid)"
+  echo "port: $(field port)"
+  echo "lease expires: $(fmt_time "$(field expires)")"
+}
+
+cmd_release() {
+  parse_opts "$@"
+  if [ -z "$OWNER" ]; then
+    echo "temp-browser: release needs --owner" >&2
+    exit 2
+  fi
+  if [ ! -d "$LOCK" ]; then
+    echo "temp-browser: not held"
+    return 0
+  fi
+  if [ "$(field owner)" != "$OWNER" ]; then
+    echo "temp-browser: not yours, $(holder_line)" >&2
+    exit 3
+  fi
+  discard_lock
+  echo "temp-browser: released"
+}
+
+case "${1:-}" in
+  acquire) shift; cmd_acquire "$@" ;;
+  status) shift; cmd_status ;;
+  release) shift; cmd_release "$@" ;;
+  -h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

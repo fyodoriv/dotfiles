@@ -48,9 +48,7 @@ _deploy_core_plists() {
     com.dotfiles.agent-keepawake \
     com.dotfiles.dotfiles-doctor \
     com.dotfiles.chrome-profile \
-    com.dotfiles.agent-browser-chrome \
-    com.dotfiles.debug-chrome \
-    com.dotfiles.tooling-chrome; do
+    com.dotfiles.agent-browser-chrome; do
     printf '%s\n' '<?xml version="1.0"?><plist/>' > "$TEST_HOME/Library/LaunchAgents/${label}.plist"
   done
 }
@@ -93,13 +91,14 @@ STUB
   [ "$status" -eq 0 ]
 
   [ -f "$TEST_DIR/launchctl.log" ]
-  grep -c 'bootout' "$TEST_DIR/launchctl.log" | grep -q '^8$'
-  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^8$'
+  grep -c 'bootout' "$TEST_DIR/launchctl.log" | grep -q '^6$'
+  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^6$'
   grep -q 'com.dotfiles.network-resilience' "$TEST_DIR/launchctl.log"
   grep -q 'com.dotfiles.gui-path' "$TEST_DIR/launchctl.log"
   grep -q 'com.dotfiles.agent-keepawake' "$TEST_DIR/launchctl.log"
   grep -q 'com.dotfiles.chrome-profile' "$TEST_DIR/launchctl.log"
-  grep -q 'com.dotfiles.tooling-chrome' "$TEST_DIR/launchctl.log"
+  grep -q 'com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
+  ! grep -q 'com.dotfiles.tooling-chrome' "$TEST_DIR/launchctl.log"
 }
 
 @test "dotfiles-reload-launchagents no longer manages dotfiles mcp-memory agents" {
@@ -146,7 +145,7 @@ STUB
   [ "$status" -eq 0 ]
 
   grep -q 'remote-debugging-port=9223' "$TEST_DIR/pkill.log"
-  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^9$'
+  grep -c 'bootstrap' "$TEST_DIR/launchctl.log" | grep -q '^7$'
 }
 
 @test "dry-run prints actions without calling launchctl" {
@@ -165,7 +164,7 @@ STUB
   [ "$status" -eq 0 ]
   [[ "$output" == *"skip"* ]]
   grep -q 'com.dotfiles.gui-path' "$TEST_DIR/launchctl.log"
-  ! grep -q 'com.dotfiles.tooling-chrome' "$TEST_DIR/launchctl.log" || true
+  ! grep -q 'com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log" || true
 }
 
 @test "profile-skipped agents are reported as not applicable, not as not deployed" {

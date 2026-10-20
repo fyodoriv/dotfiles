@@ -38,7 +38,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "${#ports[@]}" -eq 0 ]; then
-  ports=(9223 9224 9225)
+  ports=(9223)
 fi
 
 total=0

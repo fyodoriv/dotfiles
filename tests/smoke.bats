@@ -108,7 +108,7 @@ DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 @test "CDP launchagents are gated behind full profile" {
   local script="$DOTFILES_DIR/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   # The should_skip_agent function must gate all CDP Chrome agents
-  grep -q 'agent-browser-chrome|debug-chrome|tooling-chrome|chrome-debug' "$script"
+  grep -q 'agent-browser-chrome)' "$script"
   # The PROFILE variable must be set from chezmoi template data
   grep -q 'PROFILE="{{ .profile }}"' "$script"
 }

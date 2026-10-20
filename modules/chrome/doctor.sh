@@ -15,8 +15,8 @@
 #                               Chrome's binary with explicit --user-data-dir,
 #                               bypassing LaunchServices' "which Chrome wins"
 #                               ambiguity when agent-browser Chrome daemons
-#                               (com.dotfiles.{agent-browser,debug-chrome,
-#                               tooling}-chrome) run from the same bundle.
+#                               (com.dotfiles.agent-browser-chrome, temp-browser)
+#                               run from the same bundle.
 #                               Fix command: bin/chromework-install --force.
 #
 #   chrome.default_browser      ChromeWork is the system http(s) handler (enterprise).

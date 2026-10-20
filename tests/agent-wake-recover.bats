@@ -30,7 +30,7 @@ WAKE_BIN="$BATS_TEST_DIRNAME/../bin/dotfiles-agent-wake-recover"
 
 @test "dotfiles-agent-wake-recover verifies CDP LaunchAgent labels" {
   grep -q 'com.dotfiles.agent-browser-chrome' "$WAKE_BIN"
-  grep -q 'com.dotfiles.tooling-chrome' "$WAKE_BIN"
+  ! grep -q 'com.dotfiles.tooling-chrome' "$WAKE_BIN"
 }
 
 @test "dotfiles-agent-wake-recover does not run agentbrew status" {

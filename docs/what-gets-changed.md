@@ -156,10 +156,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `morning` | Configurable (default 8:30 AM) | full | Morning briefing |
 | `sleepwatcher` | At load | full | Run scripts on sleep/wake events |
 | `app-priority` | At load | full | Keep interactive apps and terminal-launched agents responsive; background agent and model workers |
-| `agent-browser-chrome` | At load, not kept alive | full | Dashboard / SSO Chrome with remote debugging on port 9223; manual close for logout/shutdown is respected |
-| `debug-chrome` | At load, not kept alive | full | Debug-work Chrome with remote debugging on port 9224; manual close for logout/shutdown is respected |
-| `tooling-chrome` | At load, not kept alive | full | Tooling-repo Chrome with remote debugging on port 9225; manual close for logout/shutdown is respected |
-| `chrome-debug` | On-demand | full | Chrome debugging port 9222 (CDP) (`launchctl start com.dotfiles.chrome-debug`) |
+| `agent-browser-chrome` | At load, not kept alive | full | The one agents Chrome with remote debugging on port 9223; manual close for logout/shutdown is respected |
 | `dotfiles-upgrade` | Sunday 9:00 AM | opt-in | Topgrade upgrade of Homebrew, casks and tools (requires `auto_upgrade: true`) |
 
 Logs are written to `~/.local/share/dotfiles/logs/<agent-name>.log`.

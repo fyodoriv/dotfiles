@@ -80,7 +80,8 @@ CHROME_CMD="$BATS_TEST_DIRNAME/../bin/setup-chrome"
 
 @test "setup-chrome documents remote debugging CDP port" {
   grep -q 'remote-debugging-port' "$CHROME_CMD"
-  grep -q '9222' "$CHROME_CMD"
+  grep -q '9223' "$CHROME_CMD"
+  ! grep -q '9222' "$CHROME_CMD"
 }
 
 @test "setup-chrome enforces default profile via Local State" {
@@ -111,29 +112,6 @@ CHROME_CMD="$BATS_TEST_DIRNAME/../bin/setup-chrome"
   grep -q 'WORK_EMAIL_DOMAIN' "$DOCTOR"
 }
 
-@test "chrome-debug launchagent plist exists" {
-  PLIST="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.chrome-debug.plist.tmpl"
-  [ -f "$PLIST" ]
-}
-
-@test "chrome-debug launchagent uses port 9222" {
-  PLIST="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.chrome-debug.plist.tmpl"
-  grep -q '9222' "$PLIST"
-}
-
-@test "chrome-debug launchagent uses separate user-data-dir" {
-  PLIST="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.chrome-debug.plist.tmpl"
-  grep -q 'chrome-debug' "$PLIST"
-  # Must not use the default Chrome profile
-  ! grep -q 'Google/Chrome"' "$PLIST"
-}
-
-@test "setup-chrome describes enterprise mode in company-neutral language" {
-  # OSS-readiness regression: this script's enterprise-flag comment was
-  # rewritten to drop company-specific framing. The negative case (no
-  # company identifiers) is enforced by the OSS-readiness invariant in
-  # tests/no-org-refs (the global allowlist gate). This test pins the
-  # positive phrasing so a future "fixup" can't silently drop the
-  # comment without failing here.
-  grep -Fq 'enterprise-specific settings' "$CHROME_CMD"
+@test "retired chrome-debug launchagent is gone" {
+  [ ! -e "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.chrome-debug.plist.tmpl" ]
 }

@@ -15,12 +15,20 @@ check "agent-browser.chrome_cdp" "dashboard Chrome launchagent installed; manual
   "[ -f \"\$HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist\" ] || [ -f \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\" ]" \
   ""
 
-check "agent-browser.debug_chrome_cdp" "debug Chrome launchagent installed; manual close respected" \
-  "[ -f \"\$HOME/Library/LaunchAgents/com.dotfiles.debug-chrome.plist\" ] || [ -f \"\$DOTFILES_DIR/launchagents/com.dotfiles.debug-chrome.plist.tmpl\" ]" \
+# One agents Chrome only (9223). The retired chrome-debug (9222),
+# debug-chrome (9224), and tooling-chrome (9225) agents must be gone.
+check "agent-browser.no_retired_chromes" "retired agent Chromes (9222/9224/9225) not installed" \
+  "ok=1; for l in chrome-debug debug-chrome tooling-chrome; do [ ! -e \"\$HOME/Library/LaunchAgents/com.dotfiles.\$l.plist\" ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
+  "for l in chrome-debug debug-chrome tooling-chrome; do launchctl unload \"\$HOME/Library/LaunchAgents/com.dotfiles.\$l.plist\" 2>/dev/null; rm -f \"\$HOME/Library/LaunchAgents/com.dotfiles.\$l.plist\"; done"
+
+# agent-browser attaches to 9223 by default and fails when it is down,
+# instead of starting its own Chrome.
+check "agent-browser.config_cdp" "agent-browser config.json attaches to 9223 by default" \
+  "jq -e '.cdp == \"9223\"' \"\$HOME/.agent-browser/config.json\" >/dev/null 2>&1" \
   ""
 
-check "agent-browser.tooling_cdp" "tooling Chrome launchagent installed; manual close respected" \
-  "[ -f \"\$HOME/Library/LaunchAgents/com.dotfiles.tooling-chrome.plist\" ] || [ -f \"\$DOTFILES_DIR/launchagents/com.dotfiles.tooling-chrome.plist.tmpl\" ]" \
+check "agent-browser.temp_browser" "temp-browser helper installed (one locked disposable browser)" \
+  "[ -x \"\$DOTFILES_DIR/bin/temp-browser\" ]" \
   ""
 
 check "agent-browser.singleton_preflight" "singleton preflight helper installed" \
@@ -32,15 +40,15 @@ check "agent-browser.reap_strays_helper" "stray target reap helper installed" \
   ""
 
 check "agent-browser.no_forwarded_launches" "launchd Chrome logs have no forwarded singleton launches" \
-  "! { for log in \"\$HOME/.local/share/dotfiles/logs/agent-browser-chrome.log\" \"\$HOME/.local/share/dotfiles/logs/debug-chrome.log\" \"\$HOME/.local/share/dotfiles/logs/tooling-chrome.log\"; do [ ! -f \"\$log\" ] || grep -h 'Opening in existing browser session\\.' \"\$log\"; done; } | grep -q ." \
-  "for log in \"\$HOME/.local/share/dotfiles/logs/agent-browser-chrome.log\" \"\$HOME/.local/share/dotfiles/logs/debug-chrome.log\" \"\$HOME/.local/share/dotfiles/logs/tooling-chrome.log\"; do [ ! -f \"\$log\" ] || { tmp=\"\${log}.tmp.\$\$\"; sed '/Opening in existing browser session\\./d' \"\$log\" > \"\$tmp\" && mv \"\$tmp\" \"\$log\"; }; done"
+  "! { for log in \"\$HOME/.local/share/dotfiles/logs/agent-browser-chrome.log\"; do [ ! -f \"\$log\" ] || grep -h 'Opening in existing browser session\\.' \"\$log\"; done; } | grep -q ." \
+  "for log in \"\$HOME/.local/share/dotfiles/logs/agent-browser-chrome.log\"; do [ ! -f \"\$log\" ] || { tmp=\"\${log}.tmp.\$\$\"; sed '/Opening in existing browser session\\./d' \"\$log\" > \"\$tmp\" && mv \"\$tmp\" \"\$log\"; }; done"
 
 check "agent-browser.no_stray_newtab_targets" "managed Chromes expose no stray blank/newtab targets" \
   "[ ! -x \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" ] || \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" --dry-run --quiet" \
   ""
 
 check "agent-browser.remote_debugging_process_count" "Managed Chrome process count stays at one per port" \
-  "ok=1; for port in 9223 9224 9225; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
+  "ok=1; for port in 9223; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
   ""
 
 check "agent-browser.profile_preflight_guard" "zshrc.ai-tools guards launchd-owned AGENT_BROWSER_PROFILE" \
@@ -63,14 +71,6 @@ check "agent-browser.profile_dir" "agent-browser Chrome profile exists" \
 check "agent-browser.dashboard_theme" "dashboard Chrome themed BLUE (port 9223)" \
   "jq -e '.browser.theme.user_color2 == -16746043' \"\$HOME/.agent-browser/chrome-profile/Default/Preferences\" >/dev/null 2>&1" \
   "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9223"
-
-check "agent-browser.debug_chrome_theme" "debug Chrome themed ORANGE (port 9224)" \
-  "jq -e '.browser.theme.user_color2 == -355840' \"\$HOME/.agent-browser/debug-profile/Default/Preferences\" >/dev/null 2>&1" \
-  "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9224"
-
-check "agent-browser.tooling_theme" "tooling Chrome themed PURPLE (port 9225)" \
-  "jq -e '.browser.theme.user_color2 == -6543440' \"\$HOME/.agent-browser/tooling-profile/Default/Preferences\" >/dev/null 2>&1" \
-  "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9225"
 
 # The marker alone proves nothing; also probe the index (lib/spotlight-probe.sh).
 # shellcheck source=../../lib/spotlight-probe.sh
@@ -99,7 +99,7 @@ check "agent-browser.focus_restore_wired" "zshrc.ai-tools restores focus after a
   ""
 
 check "agent-browser.launchagent_no_startup_window" "managed Chromes use --no-startup-window at login" \
-  "grep -q -- '--no-startup-window' \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.debug-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.tooling-chrome.plist.tmpl\"" \
+  "grep -q -- '--no-startup-window' \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\"" \
   ""
 
 check "agent-browser.restore_no_activate" "focus-restore helper never osascript-activates or hides Chrome (no Space switch)" \
@@ -118,15 +118,15 @@ check "focus.no_osascript_activate" "no osascript 'to activate' in bin/lib/launc
   "focus_steal_activate_violations | head -5"
 
 check "agent-browser.launchagent_headless" "managed Chromes use --headless=new (no GUI focus steal)" \
-  "ok=1; for plist in \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.debug-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.tooling-chrome.plist.tmpl\"; do grep -q -- '--headless=new' \"\$plist\" || ok=0; done; [ \"\$ok\" -eq 1 ]" \
+  "ok=1; for plist in \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\"; do grep -q -- '--headless=new' \"\$plist\" || ok=0; done; [ \"\$ok\" -eq 1 ]" \
   ""
 
 check "agent-browser.launchagent_no_offscreen_position" "managed Chromes omit --window-position (prevents flash-quit loop)" \
-  "! grep -q -- '--window-position=' \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.debug-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.tooling-chrome.plist.tmpl\"" \
+  "! grep -q -- '--window-position=' \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\"" \
   ""
 
 check "agent-browser.launchagent_no_keepalive" "managed Chromes do not KeepAlive-reopen during logout/shutdown" \
-  "ok=1; for plist in \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.debug-chrome.plist.tmpl\" \"\$DOTFILES_DIR/launchagents/com.dotfiles.tooling-chrome.plist.tmpl\"; do grep -A1 '<key>KeepAlive</key>' \"\$plist\" | grep -q '<false/>' || ok=0; done; [ \"\$ok\" -eq 1 ]" \
+  "ok=1; for plist in \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\"; do grep -A1 '<key>KeepAlive</key>' \"\$plist\" | grep -q '<false/>' || ok=0; done; [ \"\$ok\" -eq 1 ]" \
   ""
 
 check "agent-browser.cdp_wrapper" "agent-browser shell wrapper auto-uses --cdp 9223" \

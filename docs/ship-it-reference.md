@@ -810,8 +810,6 @@ cd "$DOTFILES_DIR" && bin/dotfiles-reload-launchagents           # NOT --kicksta
 # bin/dotfiles-reload-launchagents --kill-chrome
 # Then verify CDP:
 curl -sf --max-time 2 http://127.0.0.1:9223/json/version && echo CDP9223=ok
-curl -sf --max-time 2 http://127.0.0.1:9224/json/version && echo CDP9224=ok
-curl -sf --max-time 2 http://127.0.0.1:9225/json/version && echo CDP9225=ok
 
 # When agentbrew was delivered this session — build before sync:
 cd ~/apps/tooling/agentbrew && git pull --ff-only origin main 2>/dev/null || true
@@ -858,7 +856,7 @@ When `bin/dotfiles-reload-launchagents` reports bootstrap failure for CDP Chrome
 
 1. **First pass:** `bin/dotfiles-reload-launchagents` — the script auto-retries failed bootstraps (PR #256).
 2. **CDP still down:** `bin/dotfiles-reload-launchagents --kill-chrome`, then reload again.
-3. **Verify CDP:** curl ports 9223, 9224, 9225 (see command block above).
+3. **Verify CDP:** curl port 9223 (see command block above).
 4. **Still down:** capture `launchctl bootstrap` / `launchctl print` stderr for the failing label; if the reload script has a gap, fix in dotfiles and re-ship — do not tell the user to reload manually.
 5. **Wedged but plist unchanged:** only then use `bin/dotfiles-reload-launchagents --kickstart` (lighter restart without full bootout/bootstrap).
 
@@ -876,8 +874,7 @@ The reload helper bootouts then bootstraps these labels (in order):
   Amphetamine protection while Claude Code runs on AC or battery ≥20%
 - `com.dotfiles.dotfiles-doctor`
 - `com.dotfiles.chrome-profile` — hourly Work profile + ChromeWork default-browser heal
-- `com.dotfiles.agent-browser-chrome`, `com.dotfiles.debug-chrome`,
-  `com.dotfiles.tooling-chrome` (CDP ports 9223–9225)
+- `com.dotfiles.agent-browser-chrome` (CDP port 9223)
 
 ### Sync agentbrew from home (not /tmp)
 
@@ -906,8 +903,6 @@ which -a jq python3 python3.13     # first hits must be dotfiles/bin or ~/.local
 codesign -dv "$(readlink -f "$(command -v python3.13)" 2>/dev/null || command -v python3.13)" 2>&1 | grep -E 'Signature=adhoc|TeamIdentifier=not set'
 launchctl getenv UV_PYTHON_PREFERENCE   # expect only-managed when set
 curl -sf --max-time 2 http://127.0.0.1:9223/json/version >/dev/null && echo CDP9223=ok
-curl -sf --max-time 2 http://127.0.0.1:9224/json/version >/dev/null && echo CDP9224=ok
-curl -sf --max-time 2 http://127.0.0.1:9225/json/version >/dev/null && echo CDP9225=ok
 ```
 
 

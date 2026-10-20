@@ -182,7 +182,7 @@ All agents install to `~/Library/LaunchAgents/com.dotfiles.*`. All run as the cu
 
 ### Security considerations
 
-- **CDP ports (9222-9225)**: Chrome DevTools Protocol ports bind to localhost on `full` profile. Port 9222 is the separate on-demand `chrome-debug` profile; 9223/9224/9225 are login-started managed Chromes for agent attach-first workflows. They are deliberately not `KeepAlive`, so quitting Chrome for logout/shutdown stays closed. Any local process can attach and exfiltrate browser state. Disabled on `core` profile.
+- **CDP ports (9223, temp 9230)**: Chrome DevTools Protocol ports bind to localhost on `full` profile. 9223 is the one login-started agents Chrome. 9230 is the locked `temp-browser`, up only while an agent holds it, with a fresh profile deleted on release. The agents Chrome is deliberately not `KeepAlive`, so quitting Chrome for logout/shutdown stays closed. Any local process can attach and exfiltrate browser state. Disabled on `core` profile.
 - **gui-path**: `launchctl setenv PATH` affects all GUI apps. Injects Homebrew and `fnm` Node paths into the system-wide per-user environment.
 - **upgrade agent**: silently upgrades Homebrew packages, Node versions, and CLI tools. Requires explicit opt-in (`auto_upgrade: true` in chezmoi config).
 

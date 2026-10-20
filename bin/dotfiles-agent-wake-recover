@@ -39,7 +39,7 @@ if $DRY_RUN; then
   _recover_log "dry-run: would run dotfiles-heal-stuck-agents --fix --quiet"
   _recover_log "dry-run: would kickstart com.dotfiles.network-resilience"
   _recover_log "dry-run: would kickstart com.dotfiles.agent-keepawake (if loaded)"
-  _recover_log "dry-run: would verify CDP LaunchAgents (9223–9225)"
+  _recover_log "dry-run: would verify CDP LaunchAgents (9223)"
   exit 0
 fi
 
@@ -48,13 +48,12 @@ dotfiles_heal_kickstart_network_resilience
 dotfiles_agent_kickstart_keepawake_agent
 
 domain="gui/$(id -u)"
-for label in com.dotfiles.agent-browser-chrome com.dotfiles.debug-chrome com.dotfiles.tooling-chrome; do
-  if launchctl print "$domain/$label" >/dev/null 2>&1; then
-    _recover_log "ok: $label loaded"
-  else
-    _recover_log "warn: $label not loaded (run dotfiles apply + dotfiles-reload-launchagents)"
-  fi
-done
+label=com.dotfiles.agent-browser-chrome
+if launchctl print "$domain/$label" >/dev/null 2>&1; then
+  _recover_log "ok: $label loaded"
+else
+  _recover_log "warn: $label not loaded (run dotfiles apply + dotfiles-reload-launchagents)"
+fi
 
 _recover_log "wake-recover complete"
 exit 0

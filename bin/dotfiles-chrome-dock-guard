@@ -1,7 +1,7 @@
 #!/bin/bash
 # Keep a Dock click on Chrome from landing in a hidden agent Chrome.
 #
-# The launchd agent Chromes (9223/9224/9225) run the real Google Chrome.app
+# The launchd agent Chromes (9223, plus the temp-browser) run the real Google Chrome.app
 # headless, so macOS can activate one of them when you click Chrome in the
 # Dock. It has no window, so Chrome looks stuck. This wrapper compiles
 # lib/chrome-dock-guard.swift once (cached by source hash) and runs it. The

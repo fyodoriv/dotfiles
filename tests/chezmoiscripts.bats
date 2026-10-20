@@ -909,10 +909,10 @@ CONFIG
 }
 
 @test "launchagents template: CDP agents require full profile" {
-  grep -q 'agent-browser-chrome|debug-chrome|tooling-chrome|chrome-debug' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  grep -q 'agent-browser-chrome)' "$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   # Verify they check for full profile
   local script="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
-  awk '/agent-browser-chrome\|debug-chrome\|tooling-chrome\|chrome-debug/,/;;/' "$script" | grep -q 'PROFILE.*!=.*full'
+  awk '/agent-browser-chrome\)/,/;;/' "$script" | grep -q 'PROFILE.*!=.*full'
 }
 
 @test "launchagents template: app-priority supports Ghostty and WebStorm" {
@@ -1598,4 +1598,24 @@ _render_aws_gcloud_template() {
   [ ! -e "$agents/com.dotfiles.heal-stuck-agents.plist" ]
   [ -e "$agents/com.dotfiles.app-priority.plist" ]
   grep -q "unload $agents/com.dotfiles.cursor-priority.plist" "$TEST_DIR/launchctl.log"
+}
+
+@test "launchagents: apply unloads the retired agent Chromes (9222/9224/9225)" {
+  local script="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  local agents="$HOME/Library/LaunchAgents" label
+  mkdir -p "$agents"
+  for label in chrome-debug debug-chrome tooling-chrome agent-browser-chrome; do
+    : > "$agents/com.dotfiles.$label.plist"
+  done
+  printf '#!/bin/bash\necho "$*" >> "%s/launchctl.log"\n' "$TEST_DIR" > "$MOCK_BIN/launchctl"
+  chmod +x "$MOCK_BIN/launchctl"
+
+  SOURCE_DIR="$TEST_DOTFILES"
+  eval "$(sed -n '/^# ── Orphan unload/,/^# ── Caps Lock opt-out/p' "$script")"
+
+  for label in chrome-debug debug-chrome tooling-chrome; do
+    [ ! -e "$agents/com.dotfiles.$label.plist" ]
+    grep -q "unload $agents/com.dotfiles.$label.plist" "$TEST_DIR/launchctl.log"
+  done
+  [ -e "$agents/com.dotfiles.agent-browser-chrome.plist" ]
 }

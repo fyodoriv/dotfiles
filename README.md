@@ -272,7 +272,7 @@ After uninstalling, macOS defaults (key repeat speed, Dock behavior, etc.) remai
 |--------|-------|---------|
 | **Gatekeeper quarantine disabled** | Full profile | `LSQuarantine` is set to `false` — downloaded apps won't show the "are you sure?" dialog. Review `data/macos-defaults.json` (search for `LSQuarantine`) if this concerns you. |
 | **TCC-protected defaults on macOS 16+** | All profiles | `com.apple.universalaccess reduceTransparency` cannot be set via `defaults write` — the script warns and skips. Toggle manually in System Settings > Accessibility > Display. |
-| **CDP debug ports (9222-9225)** | Full profile | Chrome remote debugging is enabled on localhost for browser automation. Port 9222 is the separate `chrome-debug` profile; ports 9223/9224/9225 are login-started managed Chromes that agents must attach to instead of launching against their profile dirs. They are not `KeepAlive`: closing Chrome for logout/shutdown must stay closed. |
+| **CDP debug port 9223 (+ temp 9230)** | Full profile | Chrome remote debugging is enabled on localhost for browser automation. Port 9223 is the one login-started agents Chrome that agents attach to instead of launching against its profile dir. Port 9230 is the locked, disposable `temp-browser`, up only while an agent holds it. They are not `KeepAlive`: closing Chrome for logout/shutdown must stay closed. |
 | **VPN/proxy interactions** | Enterprise | Some Homebrew downloads and `curl`-based health checks may time out behind corporate proxy. Disconnect VPN for initial setup if needed. |
 | **macOS defaults don't auto-revert** | All profiles | `dotfiles uninstall` removes symlinks and LaunchAgents but does not reset macOS `defaults write` changes. Revert manually in System Settings. |
 
@@ -730,19 +730,11 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 
 | Agent | What it does |
 |-------|-------------|
-| `com.dotfiles.agent-browser-chrome` | Dashboard / SSO Chrome on port 9223 |
-| `com.dotfiles.debug-chrome` | Debug-work Chrome on port 9224 |
-| `com.dotfiles.tooling-chrome` | Tooling-repo Chrome on port 9225 |
+| `com.dotfiles.agent-browser-chrome` | The one agents Chrome on port 9223 |
 
-Agent browser work is attach-first: normal `agent-browser` calls and dotfiles-assigned agent sessions attach to the dashboard Chrome on `9223` when it is reachable. Use the purpose Chrome directly for specialized work (`9224` for debug work, `9225` for tooling) and keep own-tab discipline: open your own tab, work only there, and close extra tabs at task end. Use a stable purpose-named headed session only for true isolation or conflicting credentials; never use timestamp-unique SSO sessions.
+At most three browsers run: your own Chrome, the agents Chrome on `9223`, and one locked temporary browser (`temp-browser acquire|status|release`, fresh profile each time). `~/.agent-browser/config.json` sets `"cdp": "9223"`, so agent-browser attaches by default and fails instead of starting its own browser. Keep own-tab discipline: open your own tab, work only there, and close extra tabs at task end. The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired; `dotfiles apply` removes them. See [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
 
-The three managed Chromes are `RunAtLoad` only, with `KeepAlive=false`. If you quit Chrome while shutting down or logging out, launchd and `dotfiles doctor --fix` must not reopen it. They come back on the next login, or you can restart one explicitly with `launchctl start <agent-label>`.
-
-**On-demand (loaded but not auto-started — start with `launchctl start <label>`)**
-
-| Agent | What it does |
-|-------|-------------|
-| `com.dotfiles.chrome-debug` | Chrome with debug port 9222 (separate profile) |
+The managed agents Chrome is `RunAtLoad` only, with `KeepAlive=false`. If you quit Chrome while shutting down or logging out, launchd and `dotfiles doctor --fix` must not reopen it. They come back on the next login, or you can restart one explicitly with `launchctl start <agent-label>`.
 
 **Disabling an agent:**
 
@@ -1029,6 +1021,7 @@ scratch work.
 |--------|-------------|
 | `new-project` | Scaffold a react/node/lib/python project with best-practice defaults |
 | `setup-chrome` | Apply dev-friendly Chrome settings and performance flags |
+| `temp-browser` | One locked, disposable agent browser: `acquire --owner <id> --reason <text>` prints the CDP port (fresh headless profile); `status`; `release --owner <id>` stops it and deletes the profile |
 | `setup-dock` | Reset Dock to a developer-essential app layout |
 
 **Utilities**

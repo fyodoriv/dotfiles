@@ -72,13 +72,10 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `rancher-desktop` | Start Rancher Desktop; wait until the Docker API answers | At login |
 | `network-resilience` | Network watchdog for marathon sessions | Every 5 min + after wake |
 | `sleepwatcher` | Run hooks on sleep/wake events | At login |
-| `agent-browser-chrome` | Dashboard / SSO Chrome CDP for browser automation; manual close respected | At login, not kept alive |
-| `debug-chrome` | Debug-work Chrome CDP for browser automation; manual close respected | At login, not kept alive |
-| `tooling-chrome` | Tooling-repo Chrome CDP for browser automation; manual close respected | At login, not kept alive |
+| `agent-browser-chrome` | The one agents Chrome CDP for browser automation; manual close respected | At login, not kept alive |
 | `chrome-dock-guard` | Hands a Chrome Dock click from an agent Chrome back to your own Chrome | At login, restarted only after a crash |
 | `chrome-profile` | Heal Chrome Work profile + reassert ChromeWork as default browser (Slack/Outlook links); enterprise Macs only | At login + every 1 hour |
 | `claude-remote-control` | Keep this Mac reachable from Claude mobile and claude.ai/code (opt-in: `claude_remote_control: true`) | At login, kept alive |
-| `chrome-debug` | Chrome with Work profile + debug port | On-demand |
 | `atuin-daemon` | Atuin shell history sync daemon | At login |
 | `ollama` | Start Ollama LLM server (kept alive, restarts on crash) | At login |
 | `opencode-serve` | Run OpenCode IDE server on localhost:4096 | At login |

@@ -218,9 +218,7 @@ _program_resolves() {
 @test "managed Chrome launchagents do not KeepAlive-reopen during shutdown" {
   local src rendered keepalive
   for src in \
-    "$LAUNCHAGENTS/com.dotfiles.agent-browser-chrome.plist.tmpl" \
-    "$LAUNCHAGENTS/com.dotfiles.debug-chrome.plist.tmpl" \
-    "$LAUNCHAGENTS/com.dotfiles.tooling-chrome.plist.tmpl"; do
+    "$LAUNCHAGENTS/com.dotfiles.agent-browser-chrome.plist.tmpl"; do
     rendered=$(_render_plist "$src")
     keepalive=$(_plist_bool_for_key "$rendered" "KeepAlive")
     rm -f "$rendered"

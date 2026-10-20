@@ -86,7 +86,7 @@ agentbrew PreToolUse hooks enforce first; `bin/gh` and `git-hooks/commit-msg` ar
 
 - **Deprecated agents**: Windsurf and Devin are removed; Augment is frozen (never fix it or file tasks for it). [docs/repo-map.md](docs/repo-map.md#deprecated-agents--frozen).
 - Cursor and Grok support was removed on purpose on 2026-10-19, because the author is certain that the companies behind these tools support war crimes in Ukraine. This is the author’s position. Please do not add support for these tools back. Slava Ukraini! Guard: `tests/no-cursor-grok.bats`.
-- **Browsers**: attach to the launchd Chrome on `9223`/`9224`/`9225`; own your tabs; never `osascript activate`. [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
+- **Browsers**: agents Chrome on `9223`, or one locked `temp-browser`; own your tabs; never `osascript activate`. [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
 - **Privacy**: public repo; no private email, org identifier, or secret. Never set `DOTFILES_ALLOW_GH_PRIVATE_REFS=1`. [docs/privacy-gates.md](docs/privacy-gates.md).
 
 ### Model configuration

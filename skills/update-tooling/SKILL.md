@@ -289,8 +289,6 @@ env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" doctor --module agentbrew \
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-heal-stuck-agents" --fix --quiet
 
 curl -sf --max-time 2 http://127.0.0.1:9223/json/version && echo CDP9223=ok
-curl -sf --max-time 2 http://127.0.0.1:9224/json/version && echo CDP9224=ok
-curl -sf --max-time 2 http://127.0.0.1:9225/json/version && echo CDP9225=ok
 ```
 
 When Minsky is installed, verify its opt-in autostart state remains off:

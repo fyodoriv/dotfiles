@@ -89,8 +89,6 @@ HELPER
   mkdir -p "$TEST_DOTFILES/dot_config/dotfiles"
   cp "$BATS_TEST_DIRNAME/../dot_config/dotfiles/env.sh.tmpl" "$TEST_DOTFILES/dot_config/dotfiles/"
   cp "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl" "$TEST_DOTFILES/launchagents/"
-  cp "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.debug-chrome.plist.tmpl" "$TEST_DOTFILES/launchagents/"
-  cp "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.tooling-chrome.plist.tmpl" "$TEST_DOTFILES/launchagents/"
 
   # Mock spotlight exclusion
   touch "$TEST_HOME/.agent-browser/.metadata_never_index"

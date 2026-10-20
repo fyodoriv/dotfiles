@@ -14,9 +14,9 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
-@test "chrome-themes: script references all 3 persistent Chrome ports" {
+@test "chrome-themes: script themes only the agents Chrome port" {
   content=$(cat "$BATS_TEST_DIRNAME/../bin/dotfiles-set-persistent-chrome-themes")
   [[ "$content" == *"9223"* ]]
-  [[ "$content" == *"9224"* ]]
-  [[ "$content" == *"9225"* ]]
+  [[ "$content" != *"9224"* ]]
+  [[ "$content" != *"9225"* ]]
 }

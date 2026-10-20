@@ -56,11 +56,11 @@
     {
       "id": 6,
       "prompt": "/ship-it after dotfiles merge when CDP Chrome bootstrap fails",
-      "expected_output": "The agent runs bin/dotfiles-reload-launchagents via Shell, escalates to --kill-chrome when bootstrap still fails, verifies CDP ports 9223–9225 with curl, and never ends ship-it by telling the user to reload launchagents manually.",
+      "expected_output": "The agent runs bin/dotfiles-reload-launchagents via Shell, escalates to --kill-chrome when bootstrap still fails, verifies CDP port 9223 with curl, and never ends ship-it by telling the user to reload launchagents manually.",
       "expectations": [
         "Runs bin/dotfiles-reload-launchagents after dotfiles apply without delegating to the user",
         "Escalates to --kill-chrome when bootstrap fails after script auto-retry",
-        "Verifies CDP9223/9224/9225 with curl and records output in the delivery report",
+        "Verifies CDP9223 with curl and records output in the delivery report",
         "Does not use --kickstart as default when bootstrap is the correct reload mode",
         "Does not skip reload because plists look unchanged or the PR was docs-only"
       ]

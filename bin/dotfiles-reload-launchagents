@@ -44,8 +44,6 @@ readonly DOTFILES_LAUNCHAGENTS=(
   com.dotfiles.dotfiles-doctor
   com.dotfiles.chrome-profile
   com.dotfiles.agent-browser-chrome
-  com.dotfiles.debug-chrome
-  com.dotfiles.tooling-chrome
 )
 
 # Profile skip rules: reuse should_skip_agent from the apply script, so an
@@ -72,8 +70,6 @@ declare -F should_skip_agent >/dev/null || should_skip_agent() { return 1; }
 cdp_chrome_port() {
   case "$1" in
     com.dotfiles.agent-browser-chrome)     printf '%s' 9223 ;;
-    com.dotfiles.debug-chrome)         printf '%s' 9224 ;;
-    com.dotfiles.tooling-chrome)           printf '%s' 9225 ;;
     *) return 1 ;;
   esac
 }
@@ -118,7 +114,7 @@ run_cmd() {
 }
 
 if [ "$KILL_CHROME" = "1" ]; then
-  info "Stopping stale CDP Chrome processes (ports 9223–9225)…"
+  info "Stopping stale CDP Chrome processes (port 9223)…"
   if [ "$DRY_RUN" = "1" ]; then
     info "[dry-run] pkill -f 'Google Chrome --remote-debugging-port=922'"
   else

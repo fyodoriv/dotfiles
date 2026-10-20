@@ -64,11 +64,20 @@ done
 if [ -f "$DOTFILES_DIR/lib/agent-worktrees-noindex.sh" ]; then
   # shellcheck source=../../lib/agent-worktrees-noindex.sh
   source "$DOTFILES_DIR/lib/agent-worktrees-noindex.sh"
-  if [ -d "$(dirname "$(agent_worktrees_dir)")" ]; then
+  # Core option spotlight.exclude_worktrees (default true; issue #145):
+  # a company plugin may turn it off, for example when MDM owns Spotlight.
+  _wf_exclude_worktrees=true
+  if declare -F plugin_option >/dev/null; then
+    _wf_exclude_worktrees="$(plugin_option spotlight.exclude_worktrees 2>/dev/null || echo true)"
+  fi
+  if [ "$_wf_exclude_worktrees" = false ]; then
+    skipped "agent worktrees left in the Spotlight index (option spotlight.exclude_worktrees: false)"
+  elif [ -d "$(dirname "$(agent_worktrees_dir)")" ]; then
     check "spotlight.agent_worktrees" "$(agent_worktrees_dir) is a symlink to a Spotlight-skipped .noindex folder" \
       "agent_worktrees_noindexed" \
       "agent_worktrees_noindex_fix"
   fi
+  unset _wf_exclude_worktrees
 fi
 
 # Secrets-in-zshrc check removed — covered by security module (dotfiles audit)

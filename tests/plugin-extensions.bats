@@ -353,3 +353,23 @@ render_chrome_plist() {
   grep -q 'chrome_purpose_apply_options "\$dst.tmp" "\$(_core_option chrome.purpose_headed)"' \
     "$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
 }
+
+# Sources only modules/workflow/doctor.sh with stub check/skipped functions.
+workflow_list() {
+  mkdir -p "$HOME/apps/tooling"
+  DOTFILES_REPOS_DIR="$HOME/apps" bash -c '
+    for f in plugin plugin-capabilities plugin-extensions; do source "$1/lib/$f.sh"; done
+    check() { echo "CHECK $1"; }; check_advisory() { echo "CHECK $1"; }
+    skipped() { echo "SKIP $*"; }; pass() { :; }; fail() { :; }; audit_warn() { :; }
+    DOTFILES_DIR="$1"; DOTFILES_MODULE_DIR="$1"
+    source "$1/modules/workflow/doctor.sh"' _ "$REPO_ROOT" < /dev/null 2>/dev/null
+}
+
+@test "7c: spotlight.exclude_worktrees defaults on and a plugin can turn it off" {
+  run workflow_list
+  [[ "$output" == *"CHECK spotlight.agent_worktrees"* ]]
+  install_named acme '    spotlight.exclude_worktrees: false'
+  run workflow_list
+  [[ "$output" != *"CHECK spotlight.agent_worktrees"* ]]
+  [[ "$output" == *"SKIP agent worktrees left in the Spotlight index"* ]]
+}

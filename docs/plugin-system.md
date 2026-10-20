@@ -408,7 +408,8 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     rendered `com.dotfiles.agent-browser-chrome` plist by
     `run_onchange_launchagents.sh` (`lib/chrome-purpose-options.sh`). Plugins
     no longer patch the core plist.
-  - `spotlight.exclude_worktrees`: declared; wiring lands in the next PR.
+  - `spotlight.exclude_worktrees` (default true): when a plugin sets it to
+    false, the workflow doctor skips `spotlight.agent_worktrees`.
 
 ### Doctor integration
 

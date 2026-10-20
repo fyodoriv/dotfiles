@@ -400,3 +400,22 @@ STUB
   [[ "$output" == *"CHECK plugins.acme.blocked_software"* ]]
   [[ "$output" == *"PASS"* ]]
 }
+
+@test "8: plugin_lint flags exported keychain tokens and unpinned packages" {
+  mkdir -p "$PLUGIN/shell" "$PLUGIN/mcp"
+  printf 'export ACME_TOKEN=$(security find-generic-password -s x -w)\nexport OK=1\n' > "$PLUGIN/shell/zshrc.zsh"
+  printf 'npx -y acme-mcp\nnpx -y pinned-mcp@1.2.3\nuvx tool@latest\n' > "$PLUGIN/mcp/run.sh"
+  install_plugin '  shell_fragment: true' '  shell: shell/zshrc.zsh'
+  run ext plugin_lint "$(cd "$PLUGIN" && pwd -P)"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"shell/zshrc.zsh:1:"*"exported secret"* ]]
+  [[ "$output" == *"mcp/run.sh:1:npx -y acme-mcp"* ]]
+  [[ "$output" == *"mcp/run.sh:3:"* ]]
+  [[ "$output" != *"pinned-mcp@1.2.3"* ]]
+}
+
+@test "8: a clean plugin passes plugin_lint" {
+  install_plugin '  sudo: false' '  validate: validate'
+  run ext plugin_lint "$PLUGIN"
+  [ "$status" -eq 0 ]
+}

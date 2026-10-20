@@ -421,6 +421,14 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
   plugin needs new behavior, add a core option or data point and keep the
   plugin to values. Rule of thumb: if a fresh external user could use it
   without company identity, network, or entitlement, it belongs in the core.
+- Secrets by reference (step 8). Manifests name secrets
+  (`capabilities.secrets: [keychain:acme-jira-token]`), never values.
+  `bin/dotfiles-mcp-launch --secret JIRA_TOKEN=keychain:acme-jira-token
+  [--ca-bundle <file>] [--path-minimal] -- <command>` resolves a secret only
+  inside the process that needs it. `dotfiles plugin lint <name>` and the
+  doctor check `plugins.<name>.lint` flag a shell fragment that exports a
+  token from `security …`, and any `@latest` or unpinned `npx -y` in plugin
+  files.
 
 ### Doctor integration
 

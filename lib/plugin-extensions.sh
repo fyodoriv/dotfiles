@@ -388,3 +388,24 @@ plugin_options_report() {
     printf '\n'
   done
 }
+
+# ── 8. Secrets by reference and pinned launchers ───────────────────────
+# plugin_lint <plugin root>: prints one problem per line, fails if any.
+#   - a shell fragment that exports a *TOKEN*/*SECRET*/*KEY*/*PASSWORD*
+#     variable from `security …` (resolve it per launcher with
+#     dotfiles-mcp-launch --secret NAME=keychain:<item> instead)
+#   - any plugin file that uses @latest, or `npx -y <pkg>` without @<version>
+plugin_lint() {
+  local root="$1" fragment problems=""
+  fragment="$(plugin_contribution "$root" shell 2>/dev/null || true)"
+  if [ -n "$fragment" ] && [ -f "$fragment" ]; then
+    problems="$(grep -nE '^[[:space:]]*export[[:space:]]+[A-Za-z_]*(TOKEN|SECRET|KEY|PASSWORD)[A-Za-z_]*=.*security[[:space:]]' "$fragment" |
+      sed "s|^|${fragment#"$root"/}:|; s|$| (exported secret; use dotfiles-mcp-launch --secret)|")"
+  fi
+  problems="$problems"$'\n'"$(cd "$root" && grep -rnIE --exclude-dir=.git '@latest([^A-Za-z0-9_-]|$)|npx[[:space:]]+(-y|--yes)[[:space:]]+(@[a-z0-9._-]+/)?[a-z0-9._-]+([[:space:]]|$)' . 2>/dev/null |
+    sed 's|^\./||; s|$| (unpinned package; pin an exact version)|')"
+  problems="$(printf '%s\n' "$problems" | sed '/^$/d')"
+  [ -z "$problems" ] && return 0
+  printf '%s\n' "$problems"
+  return 1
+}

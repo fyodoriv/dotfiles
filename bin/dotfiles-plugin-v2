@@ -11,6 +11,7 @@
 #   dotfiles plugin list                          name, ref, commit, state
 #   dotfiles plugin verify [<name>]               re-check the lock against disk
 #   dotfiles plugin options                       effective core option values
+#   dotfiles plugin lint <name>                   exported secrets, unpinned packages
 #   dotfiles plugin trust <name> --signer <key> [--revoke] [--yes]
 #                                                 add or remove a trusted signer
 #
@@ -222,6 +223,15 @@ case "${1:-}" in
   list) cmd_list ;;
   verify) shift; cmd_verify "$@" ;;
   trust) shift; cmd_trust "$@" ;;
+  lint)
+    shift
+    # shellcheck source=../lib/plugin-capabilities.sh
+    source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+    # shellcheck source=../lib/plugin-extensions.sh
+    source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+    _lint_path="$(plugin_lock_get "${1:-}" path)"
+    [ -n "$_lint_path" ] || die "usage: dotfiles plugin lint <installed name>"
+    plugin_lint "$_lint_path" ;;
   options)
     # shellcheck source=../lib/plugin-capabilities.sh
     source "$DOTFILES_DIR/lib/plugin-capabilities.sh"

@@ -189,6 +189,7 @@ disabled, and this check prints the difference. Dev links print a warning.
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `plugins.<name>.verified` | Checkout matches its `plugins.lock` entry | None (remove and add again) |
+| `plugins.<name>.lint` | No exported secrets in shell fragments; no `@latest` or unpinned `npx -y` | None (`dotfiles plugin lint <name>` lists lines) |
 | `plugins.<name>.blocked_software` | No software the plugin blocks is installed | None (uninstall the listed items) |
 
 ### sync

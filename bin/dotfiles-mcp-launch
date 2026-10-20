@@ -1,0 +1,75 @@
+#!/bin/bash
+# Start an MCP server (or any launcher) with secrets resolved by reference,
+# only inside this process (issue #145, step 8).
+#
+# Usage:
+#   dotfiles-mcp-launch [--secret NAME=keychain:<item>]... [--ca-bundle <file>]
+#                       [--path-minimal] -- <command> [args...]
+#
+#   --secret NAME=keychain:<item>  read the macOS Keychain generic password
+#                                  <item> and export it as NAME for <command>
+#                                  only. Shell profiles never hold the value.
+#   --ca-bundle <file>             set SSL_CERT_FILE, NODE_EXTRA_CA_CERTS and
+#                                  REQUESTS_CA_BUNDLE to <file>
+#   --path-minimal                 PATH = the command's folder + system dirs
+#
+# Refuses unpinned packages: an argument ending in @latest, or `npx -y <pkg>`
+# without an @<version>.
+
+set -euo pipefail
+
+die() { echo "dotfiles-mcp-launch: $*" >&2; exit 2; }
+
+secrets=() ca="" minimal=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --secret) shift; secrets+=("${1:-}") ;;
+    --ca-bundle) shift; ca="${1:-}" ;;
+    --path-minimal) minimal=1 ;;
+    --) shift; break ;;
+    -h | --help) sed -n '2,20s/^# \{0,1\}//p' "$0"; exit 0 ;;
+    *) die "unknown option: $1 (put the command after --)" ;;
+  esac
+  shift
+done
+[ "$#" -gt 0 ] || die "no command given; usage: dotfiles-mcp-launch [options] -- <command> [args]"
+
+# Supply chain: no floating versions.
+prev=""
+for arg in "$@"; do
+  case "$arg" in *@latest) die "unpinned package: $arg (pin an exact version)" ;; esac
+  if [ "$prev" = -y ] || [ "$prev" = --yes ]; then
+    case "$arg" in
+      @*/*@* | [!@]*@*) ;;
+      -*) ;;
+      *) [ "$(basename "$1")" = npx ] && die "unpinned package: npx -y $arg (use $arg@<version>)" ;;
+    esac
+  fi
+  prev="$arg"
+done
+
+for spec in ${secrets[@]+"${secrets[@]}"}; do
+  name="${spec%%=*}" ref="${spec#*=}"
+  [[ "$name" =~ ^[A-Z_][A-Z0-9_]*$ ]] || die "bad secret name: $name"
+  case "$ref" in
+    keychain:?*) item="${ref#keychain:}" ;;
+    *) die "secret $name: only keychain:<item> references are supported" ;;
+  esac
+  value="$("${DOTFILES_SECURITY_BIN:-security}" find-generic-password -s "$item" -w 2>/dev/null)" ||
+    die "secret $name: keychain item not found: $item"
+  export "$name=$value"
+done
+unset value
+
+if [ -n "$ca" ]; then
+  [ -f "$ca" ] || die "CA bundle not found: $ca"
+  export SSL_CERT_FILE="$ca" NODE_EXTRA_CA_CERTS="$ca" REQUESTS_CA_BUNDLE="$ca"
+fi
+
+if [ "$minimal" = 1 ]; then
+  cmd_path="$(command -v "$1")" || die "command not found: $1"
+  PATH="$(dirname "$cmd_path"):/usr/bin:/bin:/usr/sbin:/sbin"
+  export PATH
+fi
+
+exec "$@"

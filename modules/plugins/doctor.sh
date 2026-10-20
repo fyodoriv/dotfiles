@@ -12,6 +12,17 @@ if command -v yq >/dev/null 2>&1; then
       "plugin $_plugin_name matches plugins.lock (fix: dotfiles plugin remove $_plugin_name, then add it again)" \
       "plugin_verify '$_plugin_name'" \
       ""
+    # Secrets by reference and pinned launchers (step 8).
+    if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ]; then
+      # shellcheck source=../../lib/plugin-capabilities.sh
+      source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+      # shellcheck source=../../lib/plugin-extensions.sh
+      source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+      check "plugins.$_plugin_name.lint" \
+        "plugin $_plugin_name exports no secrets and pins every package (fix: see dotfiles plugin lint $_plugin_name)" \
+        "plugin_lint \"\$(plugin_lock_get '$_plugin_name' path)\" >/dev/null" \
+        ""
+    fi
     # Blocked software listed by the plugin (data only; the core scans).
     _plugin_root="$(plugin_lock_get "$_plugin_name" path)"
     _plugin_blocked="$(N="$_plugin_name" yq -r '.contributes.blocked_software // ""' "$_plugin_root/dotfiles-plugin.yaml" 2>/dev/null)"

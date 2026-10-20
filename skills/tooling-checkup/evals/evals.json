@@ -157,6 +157,19 @@
         "Reports each open PR as green with zero unresolved threads, or with its blocker",
         "Skips repositories the user owns and never rebases or force-pushes a PR branch"
       ]
+    },
+    {
+      "id": 14,
+      "prompt": "/tooling-checkup — agentbrew has a draft PR that /wrap-up parked yesterday: its ## Pending list has one failing test to fix and one item waiting on my consent.",
+      "expected_output": "Phase 2 checks out the draft PR's branch in a worktree, fixes the failing test, ticks that item, keeps the PR a draft, and puts the consent item in the questionnaire instead of only reporting the PR.",
+      "expectations": [
+        "Reads the PR's ## Pending list and its linked task before changing anything",
+        "Works in a new worktree, not in the live checkout",
+        "Reads the failing check's log first, then fixes the test on the PR branch and pushes",
+        "Ticks the finished item and keeps the PR a draft while a human-only item remains",
+        "Asks the consent item in the Phase 11 questionnaire",
+        "Runs gh pr ready and /ship-it only once nothing is pending and the gate is green"
+      ]
     }
   ]
 }

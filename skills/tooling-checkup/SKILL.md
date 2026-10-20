@@ -110,7 +110,7 @@ Act on each inventory line by its verdict:
 | Verdict | Do this |
 |---|---|
 | `ship` | Deliver it with `/ship-it` when it is the user's or an agent's finished work. When it is half done or you cannot tell, report it with its next step. |
-| `ship` on a `PR #N` line | Get it finished (below). |
+| `ship` on a `PR #N` line (or `draft PR #N`) | Get it finished (below). |
 | `salvage` | Look first: `git status`, `git diff`, `git stash show -p`. Commit useful work to a branch and ship it. Report what you kept. |
 | `clean-up` | Delete the merged local branch (`git branch -d`, never `-D`). |
 | `security` | Fix the critical alert: take the dependabot pull request or bump the package yourself. Ship it with `/ship-it`. |
@@ -119,17 +119,19 @@ Act on each inventory line by its verdict:
 
 ### Open pull requests on your repos
 
-Each `ship  PR #N` line is an open pull request. Try to finish it now, in
-this order (the `wrap-up` skill's "Continue open work" section has the same
-steps):
+Each `ship  PR #N` or `ship  draft PR #N` line is an open pull request. Try
+to finish it now, in a new worktree (never the live checkout), in this order
+(the `wrap-up` skill's "Continue open work" section has the same steps):
 
-1. **Draft from `wrap-up`:** read its `## Pending` list and its task. Do the
-   first item that is not blocked; when every item needs the owner, report it.
+1. **Draft from `wrap-up`:** read its `## Pending` list and its task. Do every
+   item that is not blocked and tick it. An item only a person can do (a
+   secret, a consent, a device, an approval) goes to the Phase 11
+   questionnaire, and the PR stays a draft with its list up to date.
 2. **Conflict:** merge the default branch into the PR branch and push.
 3. **Red check:** reproduce it, fix it, push.
 4. **Unresolved review thread:** change the code or answer, then resolve it.
-5. **Green, nothing pending, approved where the repo needs it:** mark it
-   ready and merge with `/ship-it`.
+5. **Green, nothing pending, approved where the repo needs it:** mark a
+   draft ready (`gh pr ready <n>`) and merge with `/ship-it`.
 
 A PR that only waits on a person stays open; report it with who it waits on.
 
@@ -156,8 +158,9 @@ When this Mac runs a local branch that carries unmerged fixes, rebuild it
 after merges: the default branch plus each fix branch still open.
 
 **Done when:** every `ship`, `salvage`, and `security` item is merged, and
-each of your open PRs is green with zero unresolved threads, or each one is
-listed with its reason and next step.
+each of your open PRs is merged, or is green with zero unresolved threads, or
+is a draft whose `## Pending` list holds only items a person must do, each in
+the questionnaire.
 
 ## Phase 3: Refresh tooling
 

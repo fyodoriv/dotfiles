@@ -158,10 +158,10 @@ for repo in "$TOOLING_ROOT"/*; do
   fi
 
   if prs="$(gh pr list -R "$slug" --state open --limit 100 \
-      --json number,title,headRefName,author \
-      --jq '.[] | [.number, .author.login, .headRefName, .title] | @tsv' 2>/dev/null)"; then
+      --json number,title,headRefName,author,isDraft \
+      --jq '.[] | [.number, .author.login, .headRefName, (if .isDraft then "draft" else "open" end), .title] | @tsv' 2>/dev/null)"; then
     deps=0
-    while IFS=$'\t' read -r number author head title; do
+    while IFS=$'\t' read -r number author head state title; do
       [ -n "$number" ] || continue
       case "$author" in
         app/dependabot | dependabot*) deps=$((deps + 1)); continue ;;
@@ -169,7 +169,11 @@ for repo in "$TOOLING_ROOT"/*; do
       if is_bot "$head"; then
         note_bot "$head"
       else
-        say ship "PR #$number $head: $title"
+        if [ "$state" = draft ]; then
+          say ship "draft PR #$number $head: $title (finish its ## Pending list)"
+        else
+          say ship "PR #$number $head: $title"
+        fi
       fi
     done <<< "$prs"
     flush_bots

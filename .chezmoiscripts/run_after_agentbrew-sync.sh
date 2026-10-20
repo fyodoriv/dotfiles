@@ -171,17 +171,12 @@ fi
 if [ -n "$EXTRA_AGENTFILE" ] && [ -f "$EXTRA_AGENTFILE" ]; then
   AGENTFILE_PATHS+=("$EXTRA_AGENTFILE")
 fi
-# owner_machine=true (chezmoi data, or DOTFILES_OWNER_MACHINE): owner-only rules.
-if [ "${DOTFILES_OWNER_MACHINE:-$(chezmoi execute-template '{{ dig "owner_machine" true . }}' 2>/dev/null || echo true)}" = "true" ] \
-    && [ -f "$DOTFILES_DIR/config/agentfile-owner-rules.yaml" ]; then
-  AGENTFILE_PATHS+=("$DOTFILES_DIR/config/agentfile-owner-rules.yaml")
-fi
-# use_cursor=false (chezmoi data, or DOTFILES_USE_CURSOR=false): exclude Cursor.
-NO_CURSOR_AGENTFILE="$DOTFILES_DIR/config/agentfile-no-cursor.yaml"
-if [ "${DOTFILES_USE_CURSOR:-$(chezmoi execute-template '{{ dig "use_cursor" true . }}' 2>/dev/null || echo true)}" = "false" ] \
-    && [ -f "$NO_CURSOR_AGENTFILE" ]; then
-  AGENTFILE_PATHS+=("$NO_CURSOR_AGENTFILE")
-fi
+# Owner-only rules and the no-Cursor layer (lib/agentfile-layers.sh).
+# shellcheck source=../lib/agentfile-layers.sh
+source "$DOTFILES_DIR/lib/agentfile-layers.sh"
+while IFS= read -r _layer; do
+  [ -n "$_layer" ] && AGENTFILE_PATHS+=("$_layer")
+done < <(agentfile_optional_layers "$DOTFILES_DIR")
 
 # This Mac's Claude model/effort, merged last (lib/claude-model-layer.sh).
 # shellcheck source=../lib/claude-model-layer.sh

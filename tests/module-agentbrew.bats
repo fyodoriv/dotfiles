@@ -13,6 +13,8 @@ setup() {
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-memory-readiness.sh" \
     "$TEST_DOTFILES/lib/agentbrew-memory-readiness.sh"
   cp "$BATS_TEST_DIRNAME/../lib/node-pin.sh" "$TEST_DOTFILES/lib/node-pin.sh"
+  [ -f "$BATS_TEST_DIRNAME/../lib/agentfile-layers.sh" ] \
+    && cp "$BATS_TEST_DIRNAME/../lib/agentfile-layers.sh" "$TEST_DOTFILES/lib/agentfile-layers.sh"
 
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
@@ -313,6 +315,48 @@ AGENTBREW_EOF
 
   [ "$fail_count" -eq 0 ]
   [ "$pass_count" -ge 1 ]
+}
+
+@test "agentbrew: global Agentfile drift check includes the owner-rules Agentfile on an owner machine" {
+  grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
+  mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
+
+  echo "mcp: [context7]" > "$TEST_DOTFILES/Agentfile.yaml"
+  mkdir -p "$TEST_DOTFILES/config"
+  echo "rules: [owner]" > "$TEST_DOTFILES/config/agentfile-owner-rules.yaml"
+  echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
+  # The sync script merged both inputs; the mock merge records their names.
+  echo "Agentfile.yaml agentfile-owner-rules.yaml" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+
+  cat > "$TEST_DIR/bin/agentbrew" << 'AGENTBREW_EOF'
+#!/bin/bash
+if [ "$1" = "agentfile" ] && [ "$2" = "merge" ]; then
+  if [ "$3" = "--help" ]; then
+    echo "Usage: agentbrew agentfile merge [options] <agentfiles...>"
+    exit 0
+  fi
+  shift 2
+  inputs=()
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--output" ]; then output="$2"; shift 2; continue; fi
+    inputs+=("$(basename "$1")")
+    shift
+  done
+  echo "${inputs[*]}" > "$output"
+fi
+AGENTBREW_EOF
+  chmod +x "$TEST_DIR/bin/agentbrew"
+
+  DOTFILES_OWNER_MACHINE=true DOTFILES_USE_CURSOR=true \
+    source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+
+  [ "$fail_count" -eq 0 ]
+  [ "$pass_count" -ge 1 ]
+}
+
+@test "agentbrew: sync script and doctor share one Agentfile layer helper" {
+  grep -q 'agentfile_optional_layers' "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_agentbrew-sync.sh"
+  grep -q 'agentfile_optional_layers' "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
 }
 
 @test "agentbrew: global Agentfile drift check skips when CLI lacks agentfile merge" {

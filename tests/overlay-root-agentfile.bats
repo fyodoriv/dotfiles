@@ -80,6 +80,7 @@ LOCEOF
      "$TEST_DOTFILES/.chezmoiscripts/run_after_agentbrew-sync.sh" 2>/dev/null || true
   cp "$BATS_TEST_DIRNAME/fixtures/overlay-locate-stub.sh" \
      "$TEST_DOTFILES/lib/overlay-locate.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/agentfile-layers.sh" "$TEST_DOTFILES/lib/"
 
   cat > "$TEST_OVERLAY/Agentfile.yaml" <<'AFEOF'
 name: Acme Engineering

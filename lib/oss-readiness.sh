@@ -114,6 +114,18 @@ oss_readiness_run_overlay_hook() {
   [ -n "$overlay_root" ] || return 0
   hook="$overlay_root/hooks/$name"
   [ -x "$hook" ] || return 0
+  # A plugin from plugins.lock must declare the hook (issue #145, step 5).
+  local lib_dir plugin
+  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [ -f "$lib_dir/plugin.sh" ] && [ -f "$lib_dir/plugin-capabilities.sh" ]; then
+    # shellcheck source=lib/plugin.sh
+    source "$lib_dir/plugin.sh"
+    # shellcheck source=lib/plugin-capabilities.sh
+    source "$lib_dir/plugin-capabilities.sh"
+    if plugin="$(plugin_name_for_root "$overlay_root")"; then
+      plugin_require "$plugin" hooks "$name" || return
+    fi
+  fi
   "$hook" "$@"
 }
 

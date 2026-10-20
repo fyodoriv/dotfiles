@@ -356,6 +356,13 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
 - `dotfiles plugin trust <name> --signer <key> [--yes]` adds a signer after
   one approval; `--revoke` removes it. A plugin whose locked signer is no
   longer trusted is disabled (`signer revoked`).
+- Capabilities are deny by default (`lib/plugin-capabilities.sh`). The core
+  runs plugin steps through helpers that check the manifest first:
+  `plugin_defaults_write`, `plugin_launchagent_check`, `plugin_brew_tap`,
+  and `plugin_sudo` (also needs a person at a terminal). An undeclared step
+  exits 3 with `capability not declared: <kind> <value> (plugin <name>)`.
+  A locked plugin's `hooks/<name>` runs only when `capabilities.hooks`
+  lists it.
 
 ### Doctor integration
 

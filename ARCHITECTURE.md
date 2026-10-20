@@ -29,7 +29,7 @@
                                         │
                                         ▼
    ┌──────────────────────────────────────────────────────────────┐
-   │ Agentfile.yaml  →  agentbrew sync  →  ~/.claude/, ~/.cursor/  │
+   │ Agentfile.yaml  →  agentbrew sync  →  ~/.claude/  │
    │                                       ~/.codex/, …           │
    │                              (every agent surface in Agentfile) │
    └──────────────────────────────────────────────────────────────┘
@@ -53,7 +53,7 @@ The 5-layer stack: source → chezmoi → host filesystem → agent-config (via 
 | **CLI surface** | dotfiles | `bin/*` (`dotfiles`, `dotfiles-doctor`, `dotfiles-sync`, `dotfiles-stats`, `morning`, `cleanup`, `git-maintain`, `cheat`, etc.) |
 | **Test surface** | dotfiles | `tests/*.bats` |
 | **Agent manifest** | dotfiles | `Agentfile.yaml` (declares MCP servers / skills / sources for agentbrew) |
-| **Generated agent config** | **agentbrew** (NOT dotfiles) | `~/.claude/`, `~/.cursor/`, `~/.codex/`, … |
+| **Generated agent config** | **agentbrew** (NOT dotfiles) | `~/.claude/`, `~/.codex/`, … |
 
 The boundary between dotfiles and agentbrew is in [`AGENTS.md` § "Ownership Boundary"](AGENTS.md#ownership-boundary). Iron rule: **never have both repos write to the same target path.**
 

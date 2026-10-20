@@ -1,12 +1,12 @@
 # AGENTS.md — dotfiles agent guide
 
-This file is always loaded, so it is a router, not a manual. Read it, then open
-only the doc the routing table names. Do not read the README end to end.
+Always loaded: a router, not a manual. Open only the doc the routing table
+names. Do not read the README end to end.
 
 ## Start here
 
 - **What**: macOS developer dotfiles with self-healing doctor checks. chezmoi, shell scripts, bats tests.
-- **Who**: the owner's Macs and team forks. Claude Code, Cursor, and Codex are equal first-class agents ([docs/repo-map.md](docs/repo-map.md#main-use-cases--first-class-ai-coding-agents)).
+- **Who**: the owner's Macs and team forks. Claude Code and Codex are equal first-class agents ([docs/repo-map.md](docs/repo-map.md#main-use-cases--first-class-ai-coding-agents)).
 - **Where**: `github.com/fyodoriv/dotfiles`, branch **`feat/chezmoi`** (canonical and default; `main` is retired). Public repo.
 - **Docs map**: [docs/README.md](docs/README.md). Rule full text: [docs/constitution.md](docs/constitution.md).
 
@@ -26,7 +26,7 @@ only the doc the routing table names. Do not read the README end to end.
 
 ### Verification gates
 
-`make check` covers code, behavior docs, hooks, doctor modules, and tests. Name known pre-existing failures (see Gotchas). No completion claim without fresh command output. Full text: [docs/constitution.md](docs/constitution.md#verification-gates).
+`make check` is the gate. Name known pre-existing failures (see Gotchas). No completion claim without fresh command output. Full text: [docs/constitution.md](docs/constitution.md#verification-gates).
 
 ## Where to change what
 
@@ -49,7 +49,7 @@ only the doc the routing table names. Do not read the README end to end.
 
 ### Ownership boundary
 
-dotfiles owns shell, git, `dot_config/`, macOS defaults, and `com.dotfiles.*` LaunchAgents; agentbrew owns `~/.claude/`, `~/.cursor/mcp.json`, skills, and rules. **Never have both repos write to the same target path.** Table: [docs/repo-map.md](docs/repo-map.md#ownership-boundary).
+dotfiles owns shell, git, `dot_config/`, macOS defaults, and `com.dotfiles.*` LaunchAgents; agentbrew owns `~/.claude/`, skills, and rules. **Never have both repos write to the same target path.** Table: [docs/repo-map.md](docs/repo-map.md#ownership-boundary).
 
 ## Rules
 
@@ -58,7 +58,7 @@ dotfiles owns shell, git, `dot_config/`, macOS defaults, and `com.dotfiles.*` La
 Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](docs/constitution.md#rules-for-editing).
 
 0. **GET, don't IMPLEMENT**: GET, then WRAP, then CONTRIBUTE, ABSORB only when blocked. Pair a new module with a "Replace? Relocate?" task.
-1. **Prefer the modern CLI cohort** (`fd`, `rg`, `sd`, `xh`, …); POSIX only when missing, in strict `/bin/sh`, or in CI.
+1. **Prefer the modern CLI cohort** (`fd`, `rg`, `sd`, `xh`, …); POSIX only as a fallback.
 2. **Quote pip specs** (`pip install 'pkg>=1.2.3'`); keep command output out of the repo root.
 3. **Never hardcode `$HOME` paths**; use `~`, env vars, resolvers, or chezmoi templates.
 4. **Run `make check` before committing.** GitHub Actions are off; local gates are the gate.
@@ -66,7 +66,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 6. **New modules need `modules/<name>/doctor.sh`.**
 7. **The Brewfile is inlined** in `.chezmoiscripts/run_onchange_brew.sh.tmpl`.
 8. **Agent config is managed by agentbrew.** Edit sources and run `agentbrew sync`; never hand-edit generated agent config.
-9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. **Approved-family standing approval**: `/ship-it` means verify, commit, push, PR, and merge when green; verify the author before admin/bypass PR merges; never plain `--force`, someone else's PR, or out-of-scope publishing ([full text](docs/constitution.md#rules-for-editing)).
+9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. **Approved-family standing approval**: `/ship-it` means verify, commit, push, PR, and merge when green; verify the author before admin/bypass PR merges; never plain `--force`, someone else's PR, or out-of-scope publishing.
 10. **Prefer user-dir version managers** (uv, fnm, rustup, mise); no `#!/usr/bin/env` shebangs in dotfiles executables.
 11. **P0/P1 tasks need** single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, `Anchor`.
 12. **Proactive healing**: a recurring error becomes a same-session fix or a task with its blocker.
@@ -76,7 +76,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 
 ### Agentfile lifecycle
 
-`dotfiles apply` merges `Agentfile.yaml` with any overlay Agentfile into `~/.config/agentbrew/Agentfile.yaml` and runs `agentbrew sync`. Org-gated MCPs go in the overlay, never here. Never edit generated agent config under `~/.claude/` or `~/.cursor/`. Full text: [docs/constitution.md](docs/constitution.md#agentfile-lifecycle).
+`dotfiles apply` merges `Agentfile.yaml` with any overlay Agentfile into `~/.config/agentbrew/Agentfile.yaml` and runs `agentbrew sync`. Org-gated MCPs go in the overlay, never here. Never edit generated agent config under `~/.claude/`. Full text: [docs/constitution.md](docs/constitution.md#agentfile-lifecycle).
 
 ### Hook-based enforcement
 
@@ -85,6 +85,7 @@ agentbrew PreToolUse hooks enforce first; `bin/gh` and `git-hooks/commit-msg` ar
 ### Agents, browsers, models, privacy
 
 - **Deprecated agents**: Windsurf and Devin are removed; Augment is frozen (never fix it or file tasks for it). [docs/repo-map.md](docs/repo-map.md#deprecated-agents--frozen).
+- Cursor and Grok support was removed on purpose on 2026-10-19, because the author is certain that the companies behind these tools support war crimes in Ukraine. This is the author’s position. Please do not add support for these tools back. Slava Ukraini! Guard: `tests/no-cursor-grok.bats`.
 - **Browsers**: attach to the launchd Chrome on `9223`/`9224`/`9225`; own your tabs; never `osascript activate`. [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
 - **Privacy**: public repo; no private email, org identifier, or secret. Never set `DOTFILES_ALLOW_GH_PRIVATE_REFS=1`. [docs/privacy-gates.md](docs/privacy-gates.md).
 
@@ -99,12 +100,12 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
-- **Parallel agents**: at most 3 gate-running agents (11 froze a Mac on 2026-10-15); check `dotfiles-load-sampler --report 1`.
+- **Parallel agents**: at most 3 gate-running agents; check `dotfiles-load-sampler --report 1`.
 - **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: set `DOTFILES_DIR` to a temp dir in tests.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.
-- **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name, never by absolute path; writes outside `$HOME` fail it (`tests/install-e2e-guard.bats`).
+- **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name; writes outside `$HOME` fail it.
 - **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
 
 ## Delivery

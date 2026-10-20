@@ -54,7 +54,7 @@ runs Phase 1, that part, and Phases 10 to 12:
 4. **Never lose work.** No `reset --hard`, `clean`, `checkout .`, `stash drop`,
    plain `--force`, or `git pull --rebase` on a checkout you did not create.
    Never delete a worktree with uncommitted files. Never delete a plist; move it.
-5. **Source, not output.** Generated agent config (`~/.claude/`, `~/.cursor/`,
+5. **Source, not output.** Generated agent config (`~/.claude/`,
    installed skills) and installed LaunchAgents of tooling repos change only
    through their source repo, then `agentbrew sync` or `dotfiles apply`.
 6. **Minsky never starts on its own.** Do not start it. Keep

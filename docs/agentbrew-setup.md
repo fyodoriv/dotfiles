@@ -13,9 +13,9 @@ recovering from an `agentbrew sync` failure.
 | Source | Owner | Target |
 |--------|-------|--------|
 | `Agentfile.yaml` | dotfiles | Declarative list of MCP servers, skills, sources, and shared rules |
-| `config/agentfile-owner-rules.yaml` | dotfiles | The owner's personal workflow rules (closing "Needed from you" line, memory-MCP calls, approved-family delivery, deprecated-agent notes). `dotfiles apply` merges it into `~/.config/agentbrew/Agentfile.yaml` only when `owner_machine` is true (or `DOTFILES_OWNER_MACHINE=true`), so a new user's agents get only the general rules in `Agentfile.yaml`. The sync script and the `agentbrew.global_agentfile_in_sync` doctor check both get this layer (and the no-Cursor layer) from `lib/agentfile-layers.sh`, so they cannot drift. |
+| `config/agentfile-owner-rules.yaml` | dotfiles | The owner's personal workflow rules (closing "Needed from you" line, memory-MCP calls, approved-family delivery, deprecated-agent notes). `dotfiles apply` merges it into `~/.config/agentbrew/Agentfile.yaml` only when `owner_machine` is true (or `DOTFILES_OWNER_MACHINE=true`), so a new user's agents get only the general rules in `Agentfile.yaml`. The sync script and the `agentbrew.global_agentfile_in_sync` doctor check both get this layer from `lib/agentfile-layers.sh`, so they cannot drift. |
 | `~/.config/agentbrew/state.yaml` | agentbrew | Local registry of installed items and detected agents |
-| `~/.claude/`, `~/.cursor/mcp.json` | agentbrew or the agent | Generated agent config; do not edit by hand |
+| `~/.claude/` | agentbrew or the agent | Generated agent config; do not edit by hand |
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
 | `~/.config/agentbrew/hooks-overlay/manifest.yaml` | you, plus dotfiles | Per-machine hook overlay. Your `disabled:` list and comments stay. `dotfiles apply` only adds missing opt-in hooks to `enabled:`, through `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl`. It adds the owner-workflow hooks (`gh-pr-body-requires-docs`, `perf-task-review`, `poll-loop-hint`, `usage-tip`, and others) only when `owner_machine` is true, so a new user gets none. List a hook under `disabled:` to opt out on one machine. |
 
@@ -66,7 +66,7 @@ them.
    Dotfiles also ships a real `bin/agentbrew` shim for machines with a local
    checkout at `~/apps/agentbrew` or `~/apps/tooling/agentbrew`; it works in
    non-interactive shells and launch agents, not just interactive zsh.
-   `agentbrew init` detects installed agents such as Claude Code and Cursor
+   `agentbrew init` detects installed agents such as Claude Code and Codex
    config directories.
 
 3. **Configure MCP credentials.**
@@ -166,40 +166,6 @@ dotfiles apply
 
 Use `home/zshenv.secrets.example` as the field list when pairing with a
 teammate. Keep the actual token values local to that user's machine.
-
-### Cursor Reports `ECONNREFUSED` for the Memory MCP
-
-On a full-profile Mac with AI tools enabled, both Cursor and the shared memory
-daemon start at login. The managed `cursor-at-login` wrapper delegates to
-`agentbrew memory fix`, then requires both `127.0.0.1:18765` and `agentbrew
-memory doctor --ready` (the ordered `initialize` → `notifications/initialized`
-→ non-empty `tools/list` discovery contract plus behavioral bootstrap) to pass
-before opening Cursor. A cold `uvx` or model-cache startup therefore cannot
-leave a new IDE session bound to an unavailable, empty, or bootstrap-disabled
-server.
-
-Apply and verify the managed startup path:
-
-```bash
-dotfiles apply
-dotfiles doctor --module cursor
-dotfiles doctor --module agentbrew
-dotfiles doctor --module memory
-agentbrew memory doctor
-agentbrew memory fix
-```
-
-`dotfiles memory ...` remains a compatibility shim to `agentbrew memory ...`;
-it does not own or launch another service. The AgentBrew HTTP client accepts
-JSON and SSE responses and carries a returned `MCP-Session-Id` across the
-discovery requests.
-
-If Cursor was already open when the daemon recovered, reload the IDE window or
-fully restart Cursor. `agentbrew memory fix --json` reports
-`cursorReloadRecommended: true` when it restarted/recovered the daemon. A new
-chat in the same stale MCP host is insufficient; Cursor does not expose a
-supported shell command that reconnects one MCP server inside an existing IDE
-session. Do not edit `~/.cursor/mcp.json` or kill Cursor as a recovery step.
 
 ### Generated Config Keeps Drifting
 

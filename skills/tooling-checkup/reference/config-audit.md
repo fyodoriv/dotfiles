@@ -69,7 +69,7 @@ Read each finding. Then check what a script cannot:
 
 | File | Source to edit |
 |---|---|
-| `~/.claude/CLAUDE.md`, `~/.claude/skills/*`, `~/.cursor/*` | Generated. Edit `~/.config/agentbrew/shared-rules.md`, the dotfiles `Agentfile.yaml`, or the skill's source repo. Then `agentbrew sync`. |
+| `~/.claude/CLAUDE.md`, `~/.claude/skills/*` | Generated. Edit `~/.config/agentbrew/shared-rules.md`, the dotfiles `Agentfile.yaml`, or the skill's source repo. Then `agentbrew sync`. |
 | Skills in a tooling repo | That repo. Deliver with `/ship-it`. |
 | `~/.config/agentbrew/installed-skills/*` from third-party sources | Report only. Fix upstream if the user asks. |
 

@@ -58,7 +58,6 @@ dotfiles-<company>/
 ├── validate/<name>.sh              Auto-discovered by `dotfiles-validate`
 ├── brewfile/Brewfile               Inlined into the brew-install lifecycle script
 ├── home/zshrc.<company>            Sourced from ~/.zshrc if present
-├── cursor/settings.json            Merged into Cursor generated settings by cursor doctor
 ├── vscode/settings.json            Merged into VS Code generated settings by vscode doctor
 ├── Agentfile.yaml                  Merged into the canonical global Agentfile
 └── README.md                       Lists what your overlay contributes
@@ -66,7 +65,7 @@ dotfiles-<company>/
 
 Each subdirectory is independently optional — ship only what you need.
 
-Use `cursor/settings.json` / `vscode/settings.json` for org-only editor keys (for example
+Use `vscode/settings.json` for org-only editor keys (for example
 `github-enterprise.uri` pointing at your GitHub Enterprise host, or an internal MCP command).
 Do not put employer hostnames in the base `dotfiles` repo — keep them in the overlay.
 
@@ -79,7 +78,7 @@ After `dotfiles apply` runs with `extra_overlay_root` set:
 3. **Brewfile** — your overlay's `brewfile/Brewfile` lines are appended to the brew-install lifecycle script (so `dotfiles apply` installs both base packages and your company-specific ones).
 4. **Shell env** — `~/.zshrc` sources `$EXTRA_OVERLAY_ROOT/home/zshrc.<company>` if it exists.
 5. **Agentfile** — your overlay's `Agentfile.yaml` is merged with the base Agentfile into `~/.config/agentbrew/Agentfile.yaml`; agentbrew syncs once from that canonical file. Older agentbrew releases without `agentfile merge` fall back to syncing the base Agentfile first and the overlay with `--no-prune`.
-6. **Editor settings** — when present, `cursor/settings.json` and `vscode/settings.json` are deep-merged into each editor's generated settings by the cursor / vscode doctor modules (so org-only keys survive `doctor --fix`).
+6. **Editor settings** — when present, `vscode/settings.json` is deep-merged into the editor's generated settings by the vscode doctor module (so org-only keys survive `doctor --fix`).
 
 **One overlay at a time.** `extra_overlay_root` is a single path, not a list. If you need to combine multiple overlays, merge them into one repo or fork the whole dotfiles base.
 

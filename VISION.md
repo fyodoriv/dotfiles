@@ -8,7 +8,7 @@ goals:
     description: Every recurring issue becomes a doctor check; docs without an automated check are P2/P3 tasks.
   - id: G2
     name: Agent config is agentbrew's job, not dotfiles'
-    description: dotfiles owns shell, git hooks, doctor, Agentfile.yaml. agentbrew owns ~/.claude/, ~/.cursor/, etc.
+    description: dotfiles owns shell, git hooks, doctor, Agentfile.yaml. agentbrew owns ~/.claude/, etc.
   - id: G3
     name: Zero-leak public repo
     description: No @company.example identifier, no secret, no organization reference outside the configured private-reference gate ever reaches github.com/fyodoriv/dotfiles.
@@ -57,7 +57,7 @@ Three derived rules:
 
 ## Strategy: agent config is agentbrew's job, not dotfiles'
 
-dotfiles owns the **shell environment, git hooks, doctor checks, and the `Agentfile.yaml` manifest** that tells `agentbrew` what MCP servers / skills / rules the machine should have. dotfiles does NOT own the deployed config under `~/.claude/`, `~/.cursor/`, `~/.config/devin/`, etc. — those are agentbrew-managed. The split keeps each repo's blast radius small. Detail in [`AGENTS.md` § "Agentfile Lifecycle"](AGENTS.md#agentfile-lifecycle) and [`docs/agentbrew-setup.md`](docs/agentbrew-setup.md).
+dotfiles owns the **shell environment, git hooks, doctor checks, and the `Agentfile.yaml` manifest** that tells `agentbrew` what MCP servers / skills / rules the machine should have. dotfiles does NOT own the deployed config under `~/.claude/`, `~/.config/devin/`, etc. — those are agentbrew-managed. The split keeps each repo's blast radius small. Detail in [`AGENTS.md` § "Agentfile Lifecycle"](AGENTS.md#agentfile-lifecycle) and [`docs/agentbrew-setup.md`](docs/agentbrew-setup.md).
 
 ## Strategy: zero-leak public repo
 
@@ -88,7 +88,7 @@ New capabilities earn a new user story; new user stories carry a numeric thresho
 
 - **Not a generic dotfiles framework.** dotfiles is macOS + chezmoi + the author's stack. Linux support and other shell ecosystems (fish, nu) are forks' problems.
 - **Not a secrets manager.** Secrets live in `op` (1Password CLI) and `age`-encrypted files. dotfiles fetches; it never stores.
-- **Not an agent config tool.** `agentbrew` owns `~/.claude/`, `~/.cursor/`, etc. dotfiles owns only the `Agentfile.yaml` manifest.
+- **Not an agent config tool.** `agentbrew` owns `~/.claude/`, etc. dotfiles owns only the `Agentfile.yaml` manifest.
 - **Not a system for sharing org-internal tooling.** Org-gated MCPs / skills / scripts live in an overlay repo (e.g. `~/apps/dotfiles-<org>/`) and are loaded via the `EXTRA_AGENTFILE` hook. The litmus test: if a fresh contributor outside the org runs `dotfiles apply`, does the MCP work? If no, it's overlay content.
 
 ## Success

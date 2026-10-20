@@ -180,7 +180,7 @@ Defined in `bin/dotfiles-doctor` as `MODULE_SEVERITY_*` arrays:
 | 🚨 Critical | ssh, workflow |
 | ⚙️ Important | git, shell, editor |
 | ⚡ Performance | macos, tools |
-| 💅 Cosmetic | jetbrains, terminal, prompt, extras, claude, cursor, enterprise |
+| 💅 Cosmetic | jetbrains, terminal, prompt, extras, claude, enterprise |
 
 Modules not in any array default to cosmetic.
 

@@ -161,7 +161,6 @@ All 21 doctor modules and what they check:
 | agentbrew | Agent config sync status |
 | chrome | Chrome profile and extensions |
 | claude | Claude CLI configuration |
-| cursor | Cursor editor settings |
 | editor | Default editor setup |
 | enterprise | AWS, kubectl, gradle, java |
 | extras | Additional CLI tools |

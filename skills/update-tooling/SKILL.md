@@ -283,7 +283,7 @@ else
   env -u DOTFILES_DIR "$APPLIED_AGENTBREW" measure context
 fi
 
-env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" doctor --module agentbrew --module cursor \
+env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" doctor --module agentbrew \
   --module terminal --module agent-browser --module chrome --module resilience \
   --module security --fix
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-heal-stuck-agents" --fix --quiet

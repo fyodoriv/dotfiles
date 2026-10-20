@@ -4,7 +4,7 @@ How to fork this repo and adapt it for your team. Covers what to keep, what to r
 
 ## Quick start
 
-Fastest path: open Claude Code (or Cursor, Codex) and say "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md". For your fork, point it at your fork's `INSTALL.md`. The agent asks your preferences, backs up first, and restores the backup on a critical error. The manual steps:
+Fastest path: open Claude Code (or Codex) and say "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md". For your fork, point it at your fork's `INSTALL.md`. The agent asks your preferences, backs up first, and restores the backup on a critical error. The manual steps:
 
 ```bash
 # 1. Fork the repo on GitHub, then clone your fork
@@ -85,13 +85,13 @@ git commit --no-verify -m "chore: remove <name> module"
 | `tools` | shell (fzf/zoxide cache), git (delta pager) | Yes, but fzf/delta checks will fail |
 | `shell` | git (PATH for bin/), sync (stats) | Yes, but some path checks will fail |
 | `extras` | macos (dockutil for Dock config) | Yes, macos gracefully skips dockutil |
-| `agentbrew` | claude, cursor (MCP server registration) | Yes, unless you use AI coding agents |
+| `agentbrew` | claude (MCP server registration) | Yes, unless you use AI coding agents |
 
 **Common removals for team forks:**
 
 | If your team doesn't use... | Remove these modules |
 |------------------------------|---------------------|
-| AI coding agents | `claude`, `cursor`, `agentbrew`, `agent-browser` |
+| AI coding agents | `claude`, `agentbrew`, `agent-browser` |
 | JetBrains IDEs | `jetbrains` |
 | Enterprise tools (AWS, K8s) | `enterprise` |
 | Ghostty terminal | `terminal` (or just remove Ghostty checks) |
@@ -234,7 +234,7 @@ If your team doesn't use AI coding agents, the simplest approach:
 1. Set `use_ai_tools: false` (the default) during `chezmoi init`
 2. Remove these modules entirely:
    ```bash
-   git rm -r modules/{claude,cursor,agentbrew,agent-browser}
+   git rm -r modules/{claude,agentbrew,agent-browser}
    git commit --no-verify -m "chore: remove AI tooling modules"
    ```
 3. Remove the agentbrew lifecycle script:

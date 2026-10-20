@@ -80,8 +80,7 @@ AgentBrew memory enable/fix
 ```
 
 The daemon stays loopback-only. AgentBrew's memory LaunchAgent and maintenance
-job use the same operator HOME and canonical plist path; AgentBrew also owns
-`~/.cursor/mcp.json`. Dotfiles only declares `memory.enabled`, removes retired
+job use the same operator HOME and canonical plist path. Dotfiles only declares `memory.enabled`, removes retired
 `com.dotfiles.mcp-memory*` jobs during apply, and checks the identity through
 `agentbrew memory status --json`. AgentBrew's readiness contract accepts JSON
 or SSE responses, preserves `MCP-Session-Id`, and requires at least one
@@ -90,8 +89,6 @@ The memory doctor module delegates project-memory freshness and the read-only
 transport compatibility report back to AgentBrew. It does not inspect
 `~/.claude/projects` or issue its own HTTP requests. Global recall is still the
 default; provenance tags only enable explicit project filtering.
-Cursor's existing in-process host remains a separate boundary: after a daemon
-restart, use **Developer: Reload Window** or fully reopen Cursor.
 
 `/learn-repos` stores source-backed dossiers and procedures in this same
 backend. Repository answers require exact repo, revision, and source-fingerprint

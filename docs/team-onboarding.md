@@ -27,7 +27,7 @@ Start small and expand. Don't push `full` profile on day one.
 
 The `core` profile includes the git, macos, ssh, tools, workflow, sync, and security modules plus a curated set of brew packages. It's opinionated about things most developers agree on (fast key repeat, hidden files visible, no Dock animation) but doesn't touch shell config, IDE configs, AI tools, or macOS visual preferences.
 
-The `full` profile adds more modules (cursor, claude, jetbrains, extras, etc.) and additional Homebrew packages beyond `core`. It's great for power users but can surprise people who aren't expecting it — compare profiles in [onboarding.md#profiles](onboarding.md#profiles) or run `make count` for live totals.
+The `full` profile adds more modules (claude, jetbrains, extras, etc.) and additional Homebrew packages beyond `core`. It's great for power users but can surprise people who aren't expecting it — compare profiles in [onboarding.md#profiles](onboarding.md#profiles) or run `make count` for live totals.
 
 
 ---

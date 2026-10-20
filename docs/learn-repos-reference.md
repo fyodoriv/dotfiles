@@ -114,8 +114,8 @@ docs, store correction, rerun eval.
    text/event-stream`) and `get_bootstrap_profile`. On failure: `agentbrew memory
    doctor`, `agentbrew memory fix`, `agentbrew memory enable`, then `agentbrew sync
    --pull` outside a project Agentfile and retry. Streamable HTTP fallback is allowed
-   only against the same configured endpoint when Cursor's live MCP binding remains
-   stale and the endpoint exposes bootstrap, search, write/update, and session-commit.
+   only against the same configured endpoint when the agent's live MCP binding
+   remains stale and the endpoint exposes bootstrap, search, write/update, and session-commit.
    Never create a fallback store.
 3. Run
    `~/apps/tooling/dotfiles/bin/learn-repos-inventory discover --root ~/apps`.

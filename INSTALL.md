@@ -1,6 +1,6 @@
 # Install dotfiles (and agentbrew) with your AI agent
 
-This file is a playbook for an AI coding agent (Claude Code, Cursor, Codex).
+This file is a playbook for an AI coding agent (Claude Code, Codex).
 A person starts it with one sentence:
 
 > Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md

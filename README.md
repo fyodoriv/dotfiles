@@ -6,8 +6,10 @@ macOS developer dotfiles with self-healing health checks. Powered by [chezmoi](h
 One command sets up a Mac; a weekly doctor finds drift and repairs it.
 
 **Who it is for:** a developer who wants a fast, repeatable Mac setup, a team lead
-who rolls one setup out to a team, and AI coding agents (Claude Code, Cursor,
+who rolls one setup out to a team, and AI coding agents (Claude Code,
 Codex) that work in this repo.
+
+**Cursor and Grok:** Cursor and Grok support was removed on purpose on 2026-10-19, because the author is certain that the companies behind these tools support war crimes in Ukraine. This is the author’s position. Please do not add support for these tools back. Slava Ukraini!
 
 **Documentation:** [docs/README.md](docs/README.md) maps every doc to the question it
 answers. Agents start with [AGENTS.md](AGENTS.md).
@@ -27,7 +29,7 @@ last command is the doctor: every failing line names its fix.
 
 Other ways in:
 
-- **With your AI agent**: open Claude Code (or Cursor, Codex) and say
+- **With your AI agent**: open Claude Code (or Codex) and say
   "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md".
   The agent asks your preferences first. Details: [INSTALL.md](INSTALL.md).
 - **Plain chezmoi**: `chezmoi init --source ~/apps/dotfiles --apply`, then
@@ -102,7 +104,6 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Enterprise mode | `is_enterprise` | `false` | Adds generic enterprise tools (AWS CLI, K8s, Gradle, Java 21, enterprise SSH). Organization-specific tools belong in the org overlay repo, not the base repo. |
 | AI tooling | `use_ai_tools` | `false` | Deploys `~/.zshrc.ai-tools` (tmux agent launchers, agent-browser tuning) — see [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration) for the default-model policy |
 | Local AI | `use_local_ai` | `false` | Installs the local-LLM fallback stack (`pipx`, `aider-chat`, `huggingface_hub[cli]`, and `mlx-lm` on native Apple Silicon). Local health checks never spawn models; the Ollama supervisor skips startup when another healthy owner already serves `:11434`. The ~30 GB model download still requires the sentinel in [docs/local-llm.md](docs/local-llm.md). |
-| Cursor | `use_cursor` | `false` | Manages Cursor: the `cursor` doctor module, the `run_after_cursor-*` scripts, the Cursor-only LaunchAgents (`cursor-at-login`, `heal-stuck-agents`), and agentbrew's Cursor target. `false` turns all of them off, removes those LaunchAgents on the next apply, and merges `config/agentfile-no-cursor.yaml` (`excludeAgents: [cursor]`) into the agentbrew Agentfile. Dotfiles does not uninstall the Cursor app itself. |
 | *(not prompted)* | `auto_sync` | `owner_machine` | Scheduled `dotfiles-sync` (30 min, auto-commits and pushes this checkout) and `tooling-sync` (60 min) LaunchAgents. Off on a new user's Mac so a fork never gets unreviewed pushes. Set `true` or `false` in `~/.config/chezmoi/chezmoi.yaml` and run `dotfiles apply`. |
 | *(not prompted)* | `owner_machine` | `true` only for the repo owner's git email | Turns on owner-only parts: the `personal-machine` doctor module, the `minsky` module when no minsky clone exists, the owner-only agent rules (`config/agentfile-owner-rules.yaml`), and the `auto_sync` default. Derived from your git identity, so a new user gets `false`. Override it in `~/.config/chezmoi/chezmoi.yaml`. |
 | *(not prompted)* | `endpoint_hardening` | `owner_machine` | Runs the endpoint-hardening scripts (`run_after_endpoint-security.sh`, `run_at_login_endpoint-bootstrap.sh`) and the `com.dotfiles.endpoint-bootstrap` LaunchAgent. They ad-hoc sign Homebrew bottles and link shims into the Homebrew prefix for an endpoint-security agent. Off on a new user's Mac, so the install writes nothing outside `$HOME`. `DOTFILES_MANAGED_ENDPOINT=1` (endpoint-policy safe mode) turns the scripts on too. Set `true` in `~/.config/chezmoi/chezmoi.yaml` and run `chezmoi init` then `dotfiles apply` on a Mac with such an agent. |
@@ -111,7 +112,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | *(not prompted)* | `global_git_hooks` | `true` | Sets `core.hooksPath` to this repo's `git-hooks/` for every repo (leak gates fire only in repos that ship `lib/oss-readiness.sh`). Set `false` to keep each repo's own hooks. |
 | *(not prompted)* | `claude_remote_control` | `false` | Installs the `com.dotfiles.claude-remote-control` LaunchAgent, which runs `claude remote-control` in `~/apps` so this Mac stays reachable from the Claude mobile app and claude.ai/code. Remote sessions use the `~/bin/claude` default permission mode (`bypassPermissions`). Set `false` and run `dotfiles apply` to remove it. |
 | *(not prompted)* | `claude_permissions` | `manage` | `manage` pins Claude Code to `bypassPermissions` (settings.json, the `~/bin/claude` wrapper, and an `mcp__<server>__*` grant per MCP server). `keep` leaves your own permission settings and prompts alone. agentbrew has the same switch with the same meaning (`claudePermissions: keep` in `~/.config/agentbrew/state.yaml`). Both tools write these settings, so set both: if either one stays `manage`, it turns `bypassPermissions` back on. `keep` does not undo an earlier pin; remove `permissions.defaultMode` and `skipAutoPermissionPrompt` from `~/.claude/settings.json` yourself. The `DOTFILES_CLAUDE_PERMISSIONS` env var wins. |
-| *(not prompted)* | `claude_model` / `claude_effort` | `claude-opus-5-5` / `xhigh` | Override the Claude Code model and effort that `dotfiles apply` pins in `~/.claude/settings.json`; Cursor follows it. Use it for an org overlay or one Mac. The `DOTFILES_CLAUDE_MODEL` / `DOTFILES_CLAUDE_EFFORT` env vars win over these keys. See [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration). |
+| *(not prompted)* | `claude_model` / `claude_effort` | `claude-opus-5-5` / `xhigh` | Override the Claude Code model and effort that `dotfiles apply` pins in `~/.claude/settings.json`. Use it for an org overlay or one Mac. The `DOTFILES_CLAUDE_MODEL` / `DOTFILES_CLAUDE_EFFORT` env vars win over these keys. See [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration). |
 | Auto-upgrade | `auto_upgrade` | `false` | Weekly Topgrade via LaunchAgent (Sunday 9 AM); managed-endpoint safe mode disables it while a required runtime publisher is blocked. |
 | Encryption | `use_encryption` | `false` | age encryption for secrets (requires key at `~/.config/chezmoi/key.txt`) |
 | Dotfiles directory | `dotfiles_dir` | `apps/dotfiles` | Path relative to `$HOME` where this repo lives. Leave as default unless you cloned elsewhere. |
@@ -173,7 +174,6 @@ feature-specific gates.
 | agentbrew | full | Agent config sync health |
 | chrome | full | Chrome default profile, work profile detection, ChromeWork URL router |
 | claude | full | Claude config, MCP servers, GitHub Enterprise integration |
-| cursor | full | Cursor settings, keybindings, extensions |
 | editor | full | editorconfig, global editor settings |
 | enterprise | full | AWS CLI, kubectl, Gradle, Java, enterprise SSH |
 | extras | full | Fastfetch config, misc tools |
@@ -414,13 +414,9 @@ agentbrew memory dashboard       # open the upstream local browser UI
 
 `dotfiles memory ...` remains a compatibility shim to the same AgentBrew
 commands; it never starts a second daemon. Dotfiles apply unloads and removes
-retired `com.dotfiles.mcp-memory*` agents, while Cursor's login LaunchAgent runs
-the AgentBrew repair/doctor gate before opening the IDE. The readiness gate
+retired `com.dotfiles.mcp-memory*` agents. The readiness gate
 accepts JSON or SSE MCP responses and requires a non-empty `tools/list`; URL
-probe failures remain visible to the AgentBrew heal/snapshot path. If daemon recovery reports
-`cursorReloadRecommended`, manually use **Developer: Reload Window** or fully
-restart Cursor — there is no supported single-server reconnect command, and
-dotfiles never quits Cursor or edits generated `~/.cursor/mcp.json`.
+probe failures remain visible to the AgentBrew heal/snapshot path.
 
 `dotfiles-memory-sync-projects` is also a compatibility shim. It forwards the
 daily `com.dotfiles.memory-sync-projects` LaunchAgent and `/ship-it` trigger to
@@ -428,8 +424,8 @@ daily `com.dotfiles.memory-sync-projects` LaunchAgent and `/ship-it` trigger to
 client instead of a second raw HTTP implementation. AgentBrew's Claude Code
 `SessionEnd` hook adds a debounced, non-blocking fast path. The daily job
 remains recovery when a session hook cannot run. Claude project-memory files
-are one source for the same managed store that Cursor and
-Codex use; they are not a separate backend.
+are one source for the same managed store that
+Codex uses; they are not a separate backend.
 Normal project-memory sync is metadata-delta based. Use
 `agentbrew memory sync-projects --force` only for a deliberate recovery
 re-ingest. The fast path writes a bounded receipt and retries after a failed
@@ -575,7 +571,6 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 | **extras** | Lazygit, tig, yazi, hyperfine, duf/dust/procs, and other niche CLI tools | |
 | **upgrade** | Software upgrade LaunchAgent loaded, last upgrade within 14 days | |
 | **claude** | Verifies Google Drive MCP setup (agent config managed by agentbrew) | `enterprise` `ai-tools` |
-| **cursor** | Cursor generated local settings.json, keybindings, tasks, Claude Code model parity, agent settings parity (vim/fonts/glass keybindings), and extension bundle with WebStorm Islands Dark colors, Material icons, JetBrainsMono/Ghostty font parity, quick-open/default-branch git shortcuts, performance parity, and log/lockfile search ignores; HTTP(S) links inherit the ChromeWork system default instead of using Cursor's unexpanded external-browser path (MCP/rules managed by agentbrew) | `ai-tools` |
 | **agentbrew** | Verifies agentbrew CLI/state sync and warns when registered MCP CLIs need local setup | `ai-tools` |
 | **agent-browser** | agent-browser CLI installed, Chrome CDP responsive for browser automation | `ai-tools` |
 | **chrome** | Chrome opens with Work profile by default; ChromeWork is kept as the system HTTP(S) handler so links from Slack, Mail, and Messages route there even when agent-browser Chrome daemons share the bundle | `enterprise` (both work-profile checks) |
@@ -587,7 +582,7 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 
 AI agent configuration (MCP servers, skills, rules, commands) is managed by [agentbrew](https://www.npmjs.com/package/agentbrew), not dotfiles. The `Agentfile.yaml` in this repo is the declarative manifest — see [Agentfile.yaml](Agentfile.yaml) for the full config and [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for teammate setup and recovery. The no-argument `/learn-repos` command repairs its shared-memory connection before scanning and uses the `/ship-it` safety and ownership gates to deliver only source-backed repository healing.
 
-Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Cursor, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
+Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Codex, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
 
 The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
 
@@ -607,11 +602,11 @@ Do not put live authentication material or customer payload snapshots in test da
 logs, screenshots, pull request descriptions, or committed files. Use safe
 placeholders and fixtures.
 
-The `memory` MCP gives those agents one local cross-session store through pinned `mcp-memory-service` 11.7.0. AgentBrew owns the canonical `com.agentbrew.mcp-memory` LaunchAgent, its operator `HOME`, the loopback endpoint, MCP registration, and pack reconciliation; dotfiles contributes only the declarative `memory.enabled` intent and the pre-launch `cursor-at-login` gate. The endpoint is `http://127.0.0.1:18765/mcp`, so concurrent agents share one Python/ONNX process instead of launching a copy per chat. The login gate waits for the complete `initialize` → `notifications/initialized` → non-empty `tools/list` contract before opening Cursor, preventing a startup `ECONNREFUSED` or false-green partial probe from leaving the MCP stale for the whole IDE session. On macOS it persists at `~/Library/Application Support/mcp-memory/sqlite_vec.db` and uses SQLite WAL plus hybrid BM25/vector retrieval with RRF fusion. Behavioral bootstrap is enabled with a 1,536-token cap; the synced rules supply the current task, retrieve relevant context and mistake notes at session start, and automatically search current-revision procedure and repository memory before answering local architecture or operational questions. Agents refresh stale or missing knowledge from source docs, then commit structured decisions, errors, and corrections after substantive work. The service consolidates associations and summaries daily and weekly with forgetting disabled, while its built-in daily backups remain enabled. It never automatically archives raw transcripts or sends content to a cloud service.
+The `memory` MCP gives those agents one local cross-session store through pinned `mcp-memory-service` 11.7.0. AgentBrew owns the canonical `com.agentbrew.mcp-memory` LaunchAgent, its operator `HOME`, the loopback endpoint, MCP registration, and pack reconciliation; dotfiles contributes only the declarative `memory.enabled` intent. The endpoint is `http://127.0.0.1:18765/mcp`, so concurrent agents share one Python/ONNX process instead of launching a copy per chat. On macOS it persists at `~/Library/Application Support/mcp-memory/sqlite_vec.db` and uses SQLite WAL plus hybrid BM25/vector retrieval with RRF fusion. Behavioral bootstrap is enabled with a 1,536-token cap; the synced rules supply the current task, retrieve relevant context and mistake notes at session start, and automatically search current-revision procedure and repository memory before answering local architecture or operational questions. Agents refresh stale or missing knowledge from source docs, then commit structured decisions, errors, and corrections after substantive work. The service consolidates associations and summaries daily and weekly with forgetting disabled, while its built-in daily backups remain enabled. It never automatically archives raw transcripts or sends content to a cloud service.
 
 Agent artifact coverage is enforced source-side: every `commands/*.md` file must have either `commands/evals/<command>.evals.json` or a literal Bats assertion, and `tests/agent-artifact-coverage.bats` also checks Agentfile command/rule/skill invariants plus `AGENTS.md`/`CLAUDE.md` delivery-safety mirroring. Add or update that coverage whenever changing command markdown, `Agentfile.yaml`, or global delivery rules.
 
-Cursor Shell/Bash/Task commands pass through `agent-hooks/prepend-endpoint-path.sh` so endpoint-safe shims remain first in the sandbox PATH. The hook emits a fully materialized PATH rather than a dynamic `$PATH` expression, allowing downstream enterprise egress guards to classify literal `git push` and `gh` commands without weakening either policy layer.
+Agent Shell/Bash/Task commands pass through `agent-hooks/prepend-endpoint-path.sh` so endpoint-safe shims remain first in the sandbox PATH. The hook emits a fully materialized PATH rather than a dynamic `$PATH` expression, allowing downstream enterprise egress guards to classify literal `git push` and `gh` commands without weakening either policy layer.
 
 On managed endpoints, uv Python may remain **Publisher: N/A** because python-build-standalone has no Developer ID authority; ad-hoc signing is not equivalent to publisher approval. Apply-time hook edits and high-frequency pre-tool JSON parsing use Apple-signed `plutil`; the pipx-based mcpm bridge and Python-dependent base/overlay doctors—including local-LLM checks—default to endpoint-policy safe mode. Set `DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=1` only after the machine-scoped exception is approved.
 
@@ -651,7 +646,7 @@ final non-draft PR opens or becomes ready, then done after it merges. It uses
 the configured team's available transition names and skips drafts, stack
 children, and ambiguous or unrelated tickets.
 
-**Adding an MCP server** (e.g. Jira/Atlassian) — deploys to **all agents** (Claude Code, Cursor, etc.) in one command:
+**Adding an MCP server** (e.g. Jira/Atlassian) — deploys to **all agents** (Claude Code, Codex, etc.) in one command:
 
 ```bash
 agentbrew install atlassian          # installs mcp-atlassian across all detected agents
@@ -666,7 +661,7 @@ To share the setup with a colleague (gets Jira MCP in all their agents):
 ```bash
 # On their machine:
 npm install -g agentbrew
-agentbrew init                       # detects Claude Code, Cursor, etc.
+agentbrew init                       # detects Claude Code, Codex, etc.
 agentbrew install atlassian          # deploys to all detected agents globally
 agentbrew setup atlassian            # guided wizard — tells you exactly where to get the tokens
 agentbrew sync
@@ -677,7 +672,7 @@ The wizard walks through each required token (`JIRA_URL`, `JIRA_USERNAME`, `JIRA
 | Target | Owner | Notes |
 |--------|-------|-------|
 | `~/.zshrc`, `~/.gitconfig`, macOS defaults | **dotfiles** | Shell, git, system config |
-| `~/.claude/`, `~/.cursor/mcp.json`, agent skills/rules | **agentbrew** | AI agent config via `Agentfile.yaml` |
+| `~/.claude/`, agent skills/rules | **agentbrew** | AI agent config via `Agentfile.yaml` |
 | **Rule** | Never have both repos write to the same target path | |
 
 See [AGENTS.md](AGENTS.md) for the full boundary table.
@@ -694,7 +689,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.dotfiles-sync` | `dotfiles-sync` | Every 30 min | Auto-commit tracked/staged changes + push/pull dotfiles repo |
 | `com.dotfiles.tooling-sync` | `tooling-sync` | Every hour | Pull agentbrew and minsky; push agentbrew TASKS.md edits |
 | `com.dotfiles.network-resilience` | `network-watchdog` | Every 5 min + after wake | Restore DNS/connectivity after sleep |
-| `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Cursor or Claude Code runs on AC or battery ≥20%; releases when both exit, and quarantines rejected scripting commands |
+| `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code runs on AC or battery ≥20%; releases when both exit, and quarantines rejected scripting commands |
 | `com.dotfiles.git-maintain` | `git-maintain` | Daily 4:00 AM | git gc, prune branches in `~/apps` repos |
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
@@ -1240,14 +1235,14 @@ Then `dotfiles apply` to deploy.
 | Concern | Owner |
 |---------|-------|
 | Shell, git, macOS, SSH, editor config | **dotfiles** |
-| AI model defaults (Claude Code model pin, Cursor model parity) | **dotfiles** (opt-in via `use_ai_tools`) |
+| AI model defaults (Claude Code model pin) | **dotfiles** (opt-in via `use_ai_tools`) |
 | AI agent MCP servers, skills, rules, commands | **agentbrew** |
 
 Rule: never have both repos write to the same target path.
 
 ### `dotfiles doctor` shows failures — is that bad?
 
-Not always. Common benign failures: `enterprise.*` checks (only if enterprise enabled), `claude.*` / `cursor.*` (run `agentbrew sync`), `agent.*` (run `dotfiles doctor --fix`). Use `--skip <id>` to permanently dismiss.
+Not always. Common benign failures: `enterprise.*` checks (only if enterprise enabled), `claude.*` (run `agentbrew sync`), `agent.*` (run `dotfiles doctor --fix`). Use `--skip <id>` to permanently dismiss.
 
 ### How do I check just one module?
 

@@ -30,7 +30,7 @@ These files in the repo's `home/` directory are symlinked into `~/`:
 | `home/zshenv` | `~/.zshenv` | Pre-shell env: fnm (Node), dotfiles env, secrets loading |
 | `home/gitconfig` | `~/.gitconfig` | Git config: delta pager, aliases, performance, LFS, credential helpers |
 | `home/gitignore_global` | `~/.gitignore_global` | Global gitignore: macOS, Node, Python, IDE artifacts |
-| `home/git-editor` | `~/.git-editor` | Smart git editor: detects Cursor/VS Code/nano, skips in non-interactive |
+| `home/git-editor` | `~/.git-editor` | Smart git editor: detects VS Code/nano, skips in non-interactive |
 | `home/gitcommit_template` | `~/.gitcommit_template` | Conventional commit template |
 | `home/tmux.conf` | `~/.tmux.conf` | tmux config: Ctrl-A prefix, vim keys, Dracula theme (full only) |
 | `home/ideavimrc` | `~/.ideavimrc` | IdeaVim config: 275 keybindings for JetBrains IDEs (full only) |

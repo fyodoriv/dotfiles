@@ -14,7 +14,7 @@
         "Admin/bypass merges user-owned or current-session PRs in approved approved repo families when green checks are blocked only by branch/review policy",
         "Runs documented dotfiles apply and agentbrew recommended-update refresh steps after tooling delivery",
         "Executes Steps 12–13 via Shell (dotfiles apply, bin/dotfiles-reload-launchagents, CDP curl verify, optional token-tool install, agentbrew sync/build, agentbrew measure context, doctor) and includes command output as proof — never tells the user to run these manually",
-        "Proactively tells the user to start a new chat in every delivery report after Step 12 sync; mentions cursor-token-playbook when headroom low or rules/MCP changed",
+        "Proactively tells the user to start a new chat in every delivery report after Step 12 sync; mentions context-budget when headroom low or rules/MCP changed",
         "Reports Merged N/M PRs honestly — never Ship-it complete when session PRs remain open for required_pull_request_reviews"
       ]
     },
@@ -54,17 +54,6 @@
       ]
     },
     {
-      "id": 5,
-      "prompt": "/ship-it when Cursor hook blocks git push with 'Pushing source code to this remote has to be done manually'",
-      "expected_output": "The agent retries push with unrestricted Shell permissions and explicit git/gh context, continues PR delivery, and never tells the user to push manually for verified user-owned/current-session work in the current repo, an explicitly named current-task repo, or an approved approved-family repo.",
-      "expectations": [
-        "Does not stop ship-it or delegate push to the user on the first Cursor beforeShellExecution hook rejection",
-        "Retries git push with unrestricted permissions and explicit repo cwd/remote before reporting failure",
-        "Continues through PR create/update, CI watch, and merge after a successful push",
-        "Only reports a hard blocker after exhausting the /ship-it Step 5 retry ladder with evidence"
-      ]
-    },
-    {
       "id": 6,
       "prompt": "/ship-it after dotfiles merge when CDP Chrome bootstrap fails",
       "expected_output": "The agent runs bin/dotfiles-reload-launchagents via Shell, escalates to --kill-chrome when bootstrap still fails, verifies CDP ports 9223–9225 with curl, and never ends ship-it by telling the user to reload launchagents manually.",
@@ -83,7 +72,7 @@
       "expectations": [
         "Treats rebase of verified user-owned/current-session work as pre-approved even outside approved repo families",
         "Preserves the old remote OID before rewriting and uses explicit --force-with-lease",
-        "Retries a Cursor source-push guard from the absolute checkout with explicit remote/ref instead of delegating the push",
+        "Retries a source-push guard from the absolute checkout with explicit remote/ref instead of delegating the push",
         "Polls substantive CI after the rewritten push",
         "Does not use admin/bypass merge or release merely because normal product-repo delivery was approved"
       ]

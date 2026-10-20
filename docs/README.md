@@ -29,7 +29,6 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [agentbrew-setup.md](agentbrew-setup.md) | How do I set up or repair agentbrew on this Mac? | both |
 | [local-llm.md](local-llm.md) | How do I run the local-LLM stack? | both |
 | [obsidian.md](obsidian.md) | How do I use Obsidian with Claude Code? | human |
-| [cursor-token-playbook.md](cursor-token-playbook.md) | How do I spend fewer Cursor tokens? | both |
 | [workspace.md](workspace.md) | How do I see work across several workspaces? | both |
 | [ship-it-reference.md](ship-it-reference.md) | How does an agent verify, commit, open a PR, and merge? | agent |
 | [learn-repos-reference.md](learn-repos-reference.md) | How does the learn-repos workflow run? | agent |

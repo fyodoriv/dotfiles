@@ -160,7 +160,7 @@ Each module declares its severity in `modules/<name>/severity` (one word). This 
 | critical | `ssh` | SSH config managed correctly — wrong config blocks git push/pull |
 | critical | `workflow` | LaunchAgents loaded — auto-sync and auto-doctor depend on this |
 | important | `git` | Gitconfig, hooks path, delta pager, performance settings — daily git workflow |
-| important | `chrome` | Work Chrome link routing — Slack/Mail/Cursor links must reach ChromeWork |
+| important | `chrome` | Work Chrome link routing — Slack/Mail links must reach ChromeWork |
 | important | `shell` | Zsh symlinks, PATH, tool caches — broken shell config blocks everything |
 | important | `editor` | Default editor set — affects git commit, crontab, etc. |
 | performance | `macos` | Key repeat speed, Finder settings, animation removal — faster but not essential |
@@ -266,7 +266,7 @@ Selected at `chezmoi init` time (stored in `~/.config/chezmoi/chezmoi.yaml`):
 | Profile | Modules |
 |---------|---------|
 | `core` | git, macos, ssh, tools, workflow, sync, security |
-| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, cursor, agentbrew, agent-browser, chrome, enterprise |
+| `full` | core + shell, editor, jetbrains, terminal, prompt, extras, upgrade, claude, agentbrew, agent-browser, chrome, enterprise |
 
 Profile controls which files chezmoi deploys (via `.chezmoiignore` conditions) and which Brew packages are installed (via conditions in the Brewfile template).
 
@@ -391,7 +391,7 @@ Some modules depend on others. Verify before removing:
 | `tools` | shell (fzf/zoxide cache), git (delta pager) | Core utilities; most other modules are fine without it |
 | `shell` | git (PATH for bin/), sync (stats) | Sets up `_dotfiles_bin` PATH |
 | `extras` | macos (dockutil for Dock config) | macos gracefully skips if dockutil is missing |
-| `agentbrew` | claude, cursor (MCP server registration) | Only matters if you use AI coding agents |
+| `agentbrew` | claude (MCP server registration) | Only matters if you use AI coding agents |
 
 ### Safe removal steps
 

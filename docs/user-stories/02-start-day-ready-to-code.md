@@ -46,7 +46,7 @@ Also runs automatically via `com.dotfiles.morning` LaunchAgent at 8:30 AM.
 
 → Top resource usage:
   PID  %CPU %MEM COMMAND
-  412  12.3  4.2 /Applications/Cursor.app
+  412  12.3  4.2 /Applications/Ghostty.app
   891   8.1  2.1 node
 
   ⏱  Dotfiles: ~4h 23m saved across 847 runs (12 day streak)
@@ -83,7 +83,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `ollama` | Start Ollama LLM server (kept alive, restarts on crash) | At login |
 | `opencode-serve` | Run OpenCode IDE server on localhost:4096 | At login |
 | `endpoint-bootstrap` | Sign uv Pythons and core tools, link shims, and publish the ready sentinel before other agents start | At login |
-| `agent-keepawake` | Keep the Mac awake while Cursor or Claude Code runs on AC or battery ≥20%; release protection when both exit | At login + every 5s |
+| `agent-keepawake` | Keep the Mac awake while Claude Code runs on AC or battery ≥20%; release protection when it exits | At login + every 5s |
 | `dotfiles-upgrade` | Upgrade all installed software through topgrade (opt-in: `auto_upgrade: true`) | Sundays 9:00 AM |
 | `memory-sync-projects` | Ingest Claude project memory into AgentBrew shared memory | 5:30 AM daily |
 | `adhoc-sign-bottles` | Ad-hoc sign Homebrew bottles and uv Pythons so endpoint security does not flag unsigned binaries | At login + daily |

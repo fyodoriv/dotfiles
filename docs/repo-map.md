@@ -4,16 +4,19 @@ This text moved here from `AGENTS.md` so the always-loaded file stays short. `AG
 
 ## Main use cases — first-class AI coding agents
 
-This dotfiles repo + agentbrew + minsky together support three **primary AI coding agents** as equal first-class citizens: **Claude Code, Cursor, Codex**. Every agent-config surface (skills, MCP, rules, commands, agents, hooks, instructions) syncs to all three automatically every 30 minutes via the auto-repair launchagent. Cursor is **not** an afterthought — it gets the same `~/.cursor/rules/`, `~/.cursor/skills/`, `~/.cursor/commands/`, `~/.cursor/agents/`, `~/.cursor/mcp.json`, `~/.cursor/hooks.json`, and `~/.cursor/CLAUDE.md` treatment as Claude Code does. Long-tail agents (OpenCode, Kiro, Amp, Goose, Cline, Roo Code, Gemini CLI, GitHub Copilot, …) are best-effort: they get every category their underlying API supports, but new first-party features ship for the three primary agents first.
+This dotfiles repo + agentbrew + minsky together support two **primary AI coding agents** as equal first-class citizens: **Claude Code and Codex**. Every agent-config surface (skills, MCP, rules, commands, agents, hooks, instructions) syncs to both automatically every 30 minutes via the auto-repair launchagent. Long-tail agents (OpenCode, Kiro, Amp, Goose, Cline, Roo Code, Gemini CLI, GitHub Copilot, …) are best-effort: they get every category their underlying API supports, but new first-party features ship for the primary agents first.
 
-Concrete invariants enforced by tests:
-- `~/.cursor/rules/*.mdc` ↔ canonical shared rules — see `agentbrew/src/sync/rules-sync.ts` and the per-agent matrix.
-- Cursor's `mcp.json` carries the same MCP servers Claude Code's `~/.claude.json` does.
-- The same skill catalog mounts under both `~/.claude/skills/` and `~/.cursor/skills/`.
 - A new dotfiles feature that touches agent config but only works for Claude Code is a P0 regression. File a follow-up before merge. Deprecated agents (below) are exempt.
+
 ## Deprecated agents — frozen
 
 Owner decision 2026-10-08: **Windsurf and Devin support was removed** from dotfiles. Doctor modules, configs, shell aliases, and tests for them are gone.
+
+**Cursor and Grok (xAI) support was removed** from dotfiles (#189):
+
+> Cursor and Grok support was removed on purpose on 2026-10-19, because the author is certain that the companies behind these tools support war crimes in Ukraine. This is the author’s position. Please do not add support for these tools back. Slava Ukraini!
+
+`tests/no-cursor-grok.bats` fails if a Cursor LaunchAgent, a `~/.cursor` write path, a `use_cursor` switch, a Cursor Topgrade step, or Grok/xAI support comes back. Defensive Cursor detection stays: agent-attribution stripping, the `CURSOR_AGENT` guard in `bin/gh` and `bin/git`, and `.cursor/` in the global gitignore.
 
 **Augment (Auggie) stays deprecated and frozen** in every tooling repo (dotfiles, agentbrew, minsky, tasks.md, and the org overlays).
 
@@ -97,7 +100,7 @@ Agentfile.yaml + overlay     →  run_after_agentbrew-sync.sh   →  canonical g
 | `~/.config/ghostty/`, `~/.config/starship.toml` | **dotfiles** | Copy-mode via `dot_config/` |
 | macOS defaults (Finder, Spotlight, keyboard, etc.) | **dotfiles** | Via `macos*.sh` lifecycle scripts |
 | `~/Library/LaunchAgents/com.dotfiles.*` | **dotfiles** | Via `launchagents/` templates |
-| `~/.claude/`, `~/.cursor/mcp.json`, agent skills/rules | **agentbrew** | Via `Agentfile.yaml` |
+| `~/.claude/`, agent skills/rules | **agentbrew** | Via `Agentfile.yaml` |
 | Orchestrator, personas, pipelines | **minsky** | Separate repo |
 
 **Rule**: Never have both repos write to the same target path.

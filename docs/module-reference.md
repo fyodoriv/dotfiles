@@ -50,7 +50,7 @@ Every module declares one of four severity tiers in `modules/<name>/severity`. T
 | **critical** | Security & safety — failures need immediate attention | `security`, `ssh`, `workflow` |
 | **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `local-bin`, `memory`, `personal-machine`, `resilience`, `shell`, `sync`, `upgrade` |
 | **performance** | System performance — nice to have, not blocking | `macos`, `tools` |
-| **cosmetic** | Personal preference — ok to skip | `claude`, `cursor`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
+| **cosmetic** | Personal preference — ok to skip | `claude`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
 
 Filter usage:
 
@@ -315,7 +315,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `resilience.amphetamine_sync_in_sync` | Amphetamine preferences match `data/amphetamine-prefs.json` | None (hint: `dotfiles-amphetamine-sync`) |
 | `resilience.agent_keepawake_script` | `dotfiles-agent-keepawake` executable | `chmod +x` |
 | `resilience.agent_wake_recover_script` | `dotfiles-agent-wake-recover` executable | `chmod +x` |
-| `resilience.agent_keepawake_loaded` | agent-keepawake LaunchAgent loaded (full profile with Cursor or Claude Code) | `launchctl bootstrap` or `dotfiles apply` |
+| `resilience.agent_keepawake_loaded` | agent-keepawake LaunchAgent loaded (full profile with Claude Code) | `launchctl bootstrap` or `dotfiles apply` |
 | `resilience.agent_keepawake_battery_policy` | Keepawake covers AC and battery at or above 20% | `dotfiles apply` + kickstart |
 | `resilience.agent_keepawake_lid_closed_automation` | advisory — Amphetamine Automation ready for lid-closed agent work | — (hint: approve Automation once) |
 | `resilience.agent_keepawake_owned_amphetamine_state` | advisory — manager-owned Amphetamine session matches live agents | — (hint: `dotfiles-agent-keepawake`) |
@@ -426,21 +426,6 @@ checks apply to any user with Chrome.
 
 Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in the overlay repo's `modules/claude-<org>/doctor.sh` and are auto-discovered via the `EXTRA_DOCTOR_DIR` hook.
 
-### cursor (selected checks)
-
-Gate: skipped entirely when `use_cursor: false` in chezmoi config (default `true`).
-
-| ID | What it checks | Auto-fix |
-|----|---------------|----------|
-| `cursor.installed` | Cursor app installed | None |
-| `cursor.native_arch` | Cursor.app binary includes arm64 on Apple Silicon | `brew reinstall --cask cursor` |
-| `cursor.symlink.settings` | Generated settings.json symlinked into User/ | Symlink from dotfiles source |
-| `cursor.symlink.keybindings` | Keybindings symlinked into User/ | Symlink from dotfiles source |
-| `cursor.model_parity` | Agent/CLI model matches Claude Code | `run_after_cursor-agent-parity.sh --check-model` fix path |
-| `cursor.agent_settings_parity` | CLI vimMode + Glass editor prefs match editor settings.json | `run_after_cursor-agent-parity.sh` |
-| `cursor.vitest_discovery_guard` | Vitest extension excludes mirror/worktree/doc paths from config scan | Regenerate settings via doctor `--fix` |
-| `cursor.no_webstorm_login_item` | WebStorm removed from Login Items | `chezmoi apply` (macos-apps.sh) or osascript delete |
-
 ### local-ai (conditional)
 
 Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`), plus `opencode serve` on `:4096`. Model checks run only for the engine that is installed or up. The module runs only when `local_ai_agents` is on (default: `use_local_ai` or `owner_machine`).
@@ -501,7 +486,7 @@ The minsky orchestrator checkout, its PATH shim, and its CLI. `MINSKY_REPO` over
 
 ### vscode (dynamic)
 
-VS Code settings, keybindings, and extensions from `vscode/`. Mirrors the cursor module. On `profile: core`, the module runs only when the app is installed (`VSCODE_APP` overrides its path). Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
+VS Code settings, keybindings, and extensions from `vscode/`. On `profile: core`, the module runs only when the app is installed (`VSCODE_APP` overrides its path). Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

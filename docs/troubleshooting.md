@@ -355,73 +355,9 @@ list. Never add token values to `Agentfile.yaml` or generated agent config.
 
 ---
 
-## Cursor reports the memory MCP as stale or `serverStatus=error`
+## Edited Claude config keeps reverting
 
-The loopback daemon can be healthy while Cursor's in-process MCP host retains
-an older failed connection. Verify the daemon through AgentBrew's complete
-discovery contract instead of relying on a port check:
-
-```bash
-agentbrew memory doctor --ready
-agentbrew memory fix --json
-dotfiles doctor --module agentbrew
-dotfiles doctor --module cursor
-```
-
-The readiness check performs `initialize`, `notifications/initialized`, and
-`tools/list` in order, preserves `MCP-Session-Id`, accepts JSON/SSE responses,
-and requires at least one advertised tool. If `memory fix --json` reports
-`cursorReloadRecommended: true`, manually run **Developer: Reload Window** or
-fully quit and reopen Cursor. A new chat does not replace a stale in-process
-host. There is no supported single-server reconnect command, so the supported
-policy is prevent/detect, then manually reload; do not kill processes, build an
-extension workaround, or edit generated `~/.cursor/mcp.json`.
-
-On future logins, `bin/cursor-at-login` runs the same bounded readiness gate
-before `open -g -a Cursor`, and launches Cursor degraded with a warning rather
-than looping forever if the daemon cannot become ready.
-
----
-
-## Vitest extension floods Output / spawns hundreds of processes
-
-Symptoms when opening Cursor on a large `~/apps/` multi-root workspace:
-
-- `[API] Vitest not found for ...` for paths under `docs/`, `_inventory/`,
-  `worktrees/`, `scrub-tmp/`, `caliber-research/`, or doc mirrors without
-  `node_modules/vitest`
-- Dozens of `vitest` child processes and WebSocket errors on startup
-- Test Explorer flushing hundreds of test items
-
-**Root cause:** `vitest.explorer` (v1.50+) scans every `vitest.config.*` and
-`vitest.workspace.*` file in open folders. Mirror repos and git worktrees often
-ship config files without a local install.
-
-**Fix (dotfiles-owned):** `cursor/settings.json` sets
-`vitest.configSearchPatternExclude` to skip mirror/worktree/doc paths,
-`vitest.logLevel: info`, and disables workspace-file warning spam. Apply with:
-
-```bash
-dotfiles doctor --module cursor --fix
-# or
-chezmoi apply
-```
-
-Then **Developer: Reload Window** in Cursor.
-
-**Per-project opt-in:** In the Testing view, use **Vitest: Toggle Configs** to
-disable configs for inactive clones. For a one-off override, add paths to
-`~/.local/share/dotfiles-cursor/settings.override.json5` (merged by doctor).
-
-**Verify:** `dotfiles doctor --module cursor` should pass
-`cursor.vitest_discovery_guard`.
-
----
-
-## Edited Claude or Cursor config keeps reverting
-
-Agentbrew owns generated agent config. Files under `~/.claude/`
-and `~/.cursor/mcp.json` are
+Agentbrew owns generated agent config. Files under `~/.claude/` are
 outputs from `Agentfile.yaml` plus agentbrew state.
 
 **Fix:**
@@ -734,7 +670,7 @@ curl -sf http://127.0.0.1:9225/json/version | jq -r .Browser
 
 ## Slack, Mail, or Messages links do nothing
 
-HTTP(S) links from macOS apps use LaunchServices, not Cursor's browser setting.
+HTTP(S) links from macOS apps use LaunchServices, not an editor's browser setting.
 Dotfiles routes them through `~/Applications/ChromeWork.app`, which starts your
 Work Chrome profile explicitly and avoids agent-browser Chrome daemons taking the
 link.
@@ -764,7 +700,7 @@ The `defaultbrowser` output must mark `browser` with `*`. If it does not, run
 
 ---
 
-## Link opens in Chrome but focus stays on Slack/Cursor (or jumps to empty desktop)
+## Link opens in Chrome but focus stays on Slack (or jumps to empty desktop)
 
 ChromeWork used to launch Work Chrome in the background (`> /dev/null 2>&1 &`),
 so the URL opened invisibly. A later fix used `tell application "Google Chrome"
@@ -772,27 +708,20 @@ to activate`, but with headless agent-browser CDP Chromes running that AppleScri
 targeted a 0-window headless instance — macOS switched Spaces to an empty desktop
 instead of the Space where Work Chrome already lives.
 
-Current dotfiles leave `workbench.externalBrowser` unset so Cursor uses the
-macOS default browser. The Chrome module registers and maintains
-`ChromeWork.app` as that default, so links still reach the Work profile without
-an agent-specific path. Do not put `${env:HOME}/Applications/ChromeWork.app` in
-Cursor settings: Cursor passes the value directly to its native opener and
-does not expand `${env:HOME}`, producing an “Unable to find application named”
-error. ChromeWork runs inline `activateWorkChrome()` during the click, then
-spawns `chromework-activate --survive-handoff` to keep Work Chrome frontmost
-after the ChromeWork applet exits and macOS restores Slack/Cursor.
+The Chrome module registers and maintains `ChromeWork.app` as the macOS default
+browser, so links reach the Work profile without an app-specific path.
+ChromeWork runs inline `activateWorkChrome()` during the click, then spawns
+`chromework-activate --survive-handoff` to keep Work Chrome frontmost after the
+ChromeWork applet exits and macOS restores Slack.
 
 **Fix:**
 
 ```bash
 dotfiles doctor --module chrome --fix
-dotfiles doctor --module cursor --fix
 ```
 
 **Verify:** with Work Chrome open on another Space, click an http(s) link in
-Cursor or Slack — macOS should switch to Chrome's Space and open the tab there.
-Reload Cursor once after doctor sync (`Developer: Reload Window`) so
-`workbench.externalBrowser` picks up the regenerated settings.
+Slack — macOS should switch to Chrome's Space and open the tab there.
 
 ---
 
@@ -803,27 +732,17 @@ Common causes from dotfiles history:
 
 1. **Ghostty or other work apps forced to x86_64** — pre-2026 dotfiles set
    `LSArchitecturePriority = x86_64` in `macos-apps.sh` (Ghostty). Finder →
-   Get Info → “Open using Rosetta” on Cursor, Ghostty, Terminal, or Chrome has
+   Get Info → “Open using Rosetta” on Ghostty, Terminal, or Chrome has
    the same effect. Fixed now; apply clears `LSArchitecturePriority` for all
-   managed apps (Cursor, Ghostty, Chrome, Slack, Outlook, Terminal).
+   managed apps (Ghostty, Chrome, Slack, Outlook, Terminal).
    Manual fix:
 
    ```bash
-   defaults delete com.todesktop.230313mzl4w4u92 LSArchitecturePriority  # Cursor
    defaults delete com.mitchellh.ghostty LSArchitecturePriority        # Ghostty
    # Quit each app completely, reopen
    ```
 
-   **Cursor shows arm64 in Activity Monitor but integrated terminal is x86?**
-   That is usually the shell, not the app binary. Check `uname -m` inside the
-   Cursor terminal — it should be `arm64`. If it reports `x86_64`, fix PATH /
-   Homebrew (below) or disable Rosetta on the terminal app.
-
-2. **Intel-only Cursor build** — rare if installed via `brew install --cask cursor`
-   on Apple Silicon. Doctor check `cursor.native_arch` flags an x86_64-only
-   binary. Fix: `brew reinstall --cask cursor`, then quit and reopen Cursor.
-
-3. **Intel Homebrew at `/usr/local`** still on PATH before `/opt/homebrew`.
+2. **Intel Homebrew at `/usr/local`** still on PATH before `/opt/homebrew`.
    Native arm64 shell + Intel brew → every `brew`-installed CLI runs under
    Rosetta.
 
@@ -836,17 +755,15 @@ Common causes from dotfiles history:
    Install native Homebrew if missing (`https://brew.sh`), then migrate or
    remove Intel brew. Reinstall formulae: `brew reinstall $(brew list --formula)`.
 
-4. **Terminal.app “Open using Rosetta”** — disable in Finder → Get Info on
-   Terminal/iTerm/Ghostty/Cursor.
+3. **Terminal.app “Open using Rosetta”** — disable in Finder → Get Info on
+   Terminal/iTerm/Ghostty.
 
 **Verify:**
 
 ```bash
 dotfiles doctor --module terminal    # apps.no_rosetta_override, tool.ghostty.arch
-dotfiles doctor --module cursor      # cursor.native_arch
 dotfiles doctor --module security    # security.homebrew_native_prefix
 dotfiles doctor --module resilience  # resilience.native_arm64_shell
-file /Applications/Cursor.app/Contents/MacOS/Cursor   # expect arm64 or universal
 sysctl sysctl.proc_translated        # 0 = native, 1 = Rosetta
 ```
 
@@ -929,7 +846,7 @@ dotfiles doctor --fix                 # also runs heal proactively before module
 
 ---
 
-## Cursor or Claude Code stops when the laptop sleeps or the lid closes
+## Claude Code stops when the laptop sleeps or the lid closes
 
 **What macOS can guarantee:** Local processes cannot run while the Mac is truly
 asleep. Forced sleep, an empty battery, or battery below the configured policy
@@ -941,7 +858,7 @@ stops local work. Dotfiles cannot override that kernel behavior.
    `disksleep 10`. Dotfiles does not set global `disablesleep` or permanent
    `sleep 0`.
 2. **Track all relevant processes** — `com.dotfiles.agent-keepawake` runs every
-   five seconds and finds every main Cursor process and Claude Code executable.
+   five seconds and finds every Claude Code executable.
    It starts one manager-owned `caffeinate -ims -w <pid>` child per process.
 3. **Power boundary** — protection applies on AC and on battery at or above
    20%. Below 20% on battery, the manager ends only its own protection.
@@ -949,7 +866,7 @@ stops local work. Dotfiles cannot override that kernel behavior.
    Amphetamine session that it owns and verifies Closed-Display Mode.
    Amphetamine provides the supported closed-lid behavior; `caffeinate` alone
    is not a lid-close guarantee.
-5. **Prompt release** — once both Cursor and Claude Code exit, the manager
+5. **Prompt release** — once Claude Code exits, the manager
    removes its recorded `caffeinate` children and owned Amphetamine session.
    A user-owned Amphetamine session that existed before the manager runs is
    left unchanged.

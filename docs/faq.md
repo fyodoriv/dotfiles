@@ -207,7 +207,7 @@ For the full symptom-first troubleshooting guide, see [troubleshooting.md](troub
 | | dotfiles | agentbrew |
 |--|----------|-----------|
 | **Manages** | Shell config, git, SSH, macOS defaults, LaunchAgents | AI agent config (MCP servers, skills, rules) |
-| **Config files** | `~/.zshrc`, `~/.gitconfig`, `~/.ssh/config` | `~/.claude/`, `~/.cursor/mcp.json` |
+| **Config files** | `~/.zshrc`, `~/.gitconfig`, `~/.ssh/config` | `~/.claude/` |
 | **Tool** | chezmoi | agentbrew CLI |
 | **Source** | `~/apps/dotfiles` | `Agentfile.yaml` in each repo |
 

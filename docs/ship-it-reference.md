@@ -4,7 +4,7 @@ Companion to the `/ship-it` slash command. When ship-it mode is active, execute 
 
 ## Session activation
 
-**One `/ship-it` per conversation is enough.** The first invocation in a Cursor chat enables ship-it mode for the rest of that session. Agents must scan conversation history for an earlier `/ship-it` before asking the user to re-invoke the command. **Forked subagents inherit the same mode** — a parent-chat `/ship-it` counts; never require a second invocation.
+**One `/ship-it` per conversation is enough.** The first invocation in a chat enables ship-it mode for the rest of that session. Agents must scan conversation history for an earlier `/ship-it` before asking the user to re-invoke the command. **Forked subagents inherit the same mode** — a parent-chat `/ship-it` counts; never require a second invocation.
 
 Mode remains active until the user says **stop ship-it** or applies a narrow exception (plan only, read only, no commit, no push, scoped file/repo). While mode is on, run Steps 1–13 without re-prompting for commit, push, PR, merge, or Steps 12–13.
 
@@ -785,15 +785,6 @@ After `git pull` and before `agentbrew sync`, ensure optional **token measuremen
 | **ccusage** | no permanent install required | `agentbrew measure context` invokes `bunx ccusage …` then `npx -y ccusage …`; optional sanity check: `npx -y ccusage claude daily --json \| head` |
 | **tokscale** | no permanent install required | Upstream ships on npm only (no Homebrew tap). `agentbrew measure context` runs it via bunx/npx; manual use: `npx -y tokscale@latest` |
 
-**Tokscale Cursor plane** (optional, may need human browser SSO):
-
-```bash
-tokscale cursor login    # browser SSO — if blocked, file avoid-human-blocked-actions doc; do NOT block entire ship-it
-tokscale cursor sync     # refresh local Cursor usage cache after login
-```
-
-When `tokscale cursor login` lands on SSO, **background** per `sso-browser-isolation` and continue Steps 12–13; document skip reason if login cannot complete this session. Runtime tokscale rows in `agentbrew measure context` may show skipped — that is acceptable when login is pending.
-
 **Agentbrew build after pull:** when this session delivered `agentbrew`, reconcile the canonical checkout and run `npm run build` there **before** `agentbrew sync --pull` so the dotfiles shim serves merged CLI code (including `measure context`).
 
 ### Step 12–13 command block (agent runs ALL, in order)
@@ -837,7 +828,7 @@ bin/dotfiles-heal-stuck-agents --fix --quiet
 cd ~/apps/tooling/minsky && minsky install-daemon
 ```
 
-Reading the reload output: `⊘ <label> — not applicable for this profile` means `dotfiles apply` skips that agent on purpose (the same `should_skip_agent` rules, for example no Cursor or not enterprise). It is not a failure. `⚠ skip <label> — plist not deployed` means apply should have deployed the agent; run `dotfiles apply`.
+Reading the reload output: `⊘ <label> — not applicable for this profile` means `dotfiles apply` skips that agent on purpose (the same `should_skip_agent` rules, for example not enterprise). It is not a failure. `⚠ skip <label> — plist not deployed` means apply should have deployed the agent; run `dotfiles apply`.
 
 Skip conditional lines only when the condition is false (no minsky delivery → skip `minsky install-daemon`; agentbrew not delivered → skip `npm run build` in agentbrew checkout). Never skip apply, reload, CDP verify, agentbrew sync, `agentbrew measure context`, or doctor for dotfiles/tooling delivery.
 
@@ -898,11 +889,10 @@ Included in the Step 12 command block **after** sync. Captures static context-bu
 
 - **ccusage** — Claude Code daily JSON via bunx/npx
 - **openusage** — multi-provider daily rollup when `openusage` is on PATH
-- **tokscale** — Cursor IDE today when tokscale is installed and `tokscale cursor login` completed
 
 Record pass/skip lines from command output in the delivery report (`runtime.openusage`, `runtime.ccusage`, `runtime.tokscale` availability). Skipped runtime tools are **non-blocking** when install/login was attempted or brew/SSO unavailable.
 
-**Token playbook reminder (post-measure — mandatory in delivery report):** Read `static.softTokenHeadroom` and `alerts` in `latest.json`. **Agents MUST proactively tell the user to start a new Cursor chat** in every ship-it delivery report after Step 12 sync — stale threads do not load updated rules/MCP/skills. When headroom is low or this delivery changed rules/MCP/skills, cite **`cursor-token-playbook`** / **`context-budget`** and quote headroom numbers. Human mirror: `docs/cursor-token-playbook.md`; shared-rules **## Chat lifecycle**.
+**Token playbook reminder (post-measure — mandatory in delivery report):** Read `static.softTokenHeadroom` and `alerts` in `latest.json`. **Agents MUST proactively tell the user to start a new chat** in every ship-it delivery report after Step 12 sync — stale threads do not load updated rules/MCP/skills. When headroom is low or this delivery changed rules/MCP/skills, cite **`context-budget`** and quote headroom numbers. See shared-rules **## Chat lifecycle**.
 
 ### Doctor and owned-check verification
 
@@ -920,8 +910,6 @@ curl -sf --max-time 2 http://127.0.0.1:9224/json/version >/dev/null && echo CDP9
 curl -sf --max-time 2 http://127.0.0.1:9225/json/version >/dev/null && echo CDP9225=ok
 ```
 
-Also confirm Cursor agent/editor parity (default model, extensions, login item)
-via the `cursor` doctor module — re-run `--fix` when it auto-repairs drift.
 
 ### Minsky daemon refresh (minsky delivery)
 
@@ -949,7 +937,7 @@ Re-run `minsky install-daemon` if PATH or python3 shim drift is detected.
 ### Fix-and-re-ship loop
 
 When doctor reports **fixable** dotfiles-owned failures (stale Chrome logs, unsigned
-uv python, PATH shim drift, cursor model parity, agent-browser session wiring):
+uv python, PATH shim drift, agent-browser session wiring):
 
 1. Fix in the dotfiles repo (or agentbrew when the failure is agentbrew-owned).
 2. Verify locally (`make test` / targeted bats / doctor re-run).

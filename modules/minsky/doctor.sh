@@ -12,7 +12,7 @@
 #   3. Runtime sanity — `minsky --help` exits 0 (catches a broken Node
 #      build or missing tsc dist/ output).
 #
-# Skill sync (~/.claude/skills/*, ~/.cursor/skills/*, etc.) is owned by
+# Skill sync (~/.claude/skills/*, etc.) is owned by
 # **agentbrew**, not dotfiles (see AGENTS.md rule #8). The right place
 # for "is the minsky skill catalog wired up?" checks is
 # `modules/agentbrew/` plus the agentbrew sync output — not here.

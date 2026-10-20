@@ -847,8 +847,25 @@ checks pass or a hard external blocker is documented.
 - **NEVER** use `--kickstart` as the default reload when bootstrap is the correct mode — `--kickstart` only when the agent is already loaded, the plist on disk is unchanged, and the job is wedged (not when bootstrap failed or plists were just deployed)
 - **NEVER** abort on chezmoi lock and delegate apply to the user — wait, clear stale lock, retry
 - **NEVER** treat Step 12–13 as documentation-only — agents execute via Shell and attach output evidence
+- **NEVER** report a merged rules change as delivered without a grep of the deployed instructions for a new phrase (see **Prove a merged rules change reached the deployed instructions**)
 - **NEVER** report "Ship-it complete" or "Delivery complete" when session PRs remain open pending `required_pull_request_reviews` — use **`Merged N/M`** and list pending PR URLs (see **Delivery report honesty**)
 - **NEVER** stop `/ship-it` after the first review-gate failure without trying all merge APIs on every green PR and continuing rebase/CI on review-blocked PRs in the same session
+
+### Prove a merged rules change reached the deployed instructions (Step 13)
+
+A merged rules change is not delivered until agents read it. `agentbrew sync`
+can report success while the deployed instructions still hold the old text,
+for example when a second overlay clone under `~/.cache/agentbrew/sources/`
+is behind.
+
+1. Pick one phrase that only the new rule text contains.
+2. Grep the deployed instruction files for it, for example
+   `grep -F "<phrase>" ~/.claude/CLAUDE.md`.
+3. If it is missing: fast-forward every clone of that overlay (the team
+   checkout and each `~/.cache/agentbrew/sources/<repo>` clone), run
+   `agentbrew sync` from the overlay checkout, and grep again.
+4. Report the grep line (or the miss after step 3) as the deploy proof.
+   Never report a rules delivery as done without it.
 
 ### Bootstrap failure ladder (agent runs automatically)
 

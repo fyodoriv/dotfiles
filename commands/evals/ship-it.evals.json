@@ -182,6 +182,17 @@
         "Checks mergeability right after push",
         "Deletes the branch and removes the worktree after merge"
       ]
+    },
+    {
+      "id": 17,
+      "prompt": "/ship-it (a team-overlay rules change just merged; agentbrew sync reports success)",
+      "expected_output": "After the merge and sync, the agent greps the deployed instructions (for example ~/.claude/CLAUDE.md) for one phrase only the new rule contains. If it is missing, it fast-forwards every clone of the overlay (team checkout and source cache), runs agentbrew sync from the overlay checkout, greps again, and reports the grep line as the deploy proof.",
+      "expectations": [
+        "Greps the deployed instruction files for a phrase unique to the new rule text",
+        "Does not trust a successful agentbrew sync exit as proof the rule deployed",
+        "On a miss, fast-forwards the team checkout and every source-cache clone of the overlay, then syncs from the overlay checkout",
+        "Reports the grep result as the deploy proof, or the remaining miss as a blocker"
+      ]
     }
   ]
 }

@@ -417,6 +417,7 @@ Phase 3 — Devin opt-out:
 | `tests/plugin/heal.bats` | US-3 | partial breakage detected, repaired idempotently |
 | `tests/plugin/manifest-validation.bats` | (cross-cutting) | bad schemaVersion / missing name / bad path errors cleanly |
 | `tests/plugin/conflict-mcp.bats` | (open question) | two plugins with same MCP name → warn + last-wins |
+| `tests/plugin-contract-gaps.bats` | issue #145 | today's overlay lookup and hook chain; security gaps S1–S4 as `known_gap` tests that fail once a gap closes |
 
 ## References
 

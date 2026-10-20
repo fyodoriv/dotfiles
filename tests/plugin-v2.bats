@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # Company plugin contract v2 (issue #145, step 4): manifest schema,
 # plugins.lock with commit + tree hash + capabilities hash, and
-# `dotfiles plugin add/remove/list/verify`.
+# `dotfiles plugin add/remove/list/verify`. Step 5: SSH-signed tags checked
+# against the allowed-signers file shared with agentbrew, and `plugin trust`.
 
 load test_helper
 
@@ -19,6 +20,12 @@ setup() {
   printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/stub/chezmoi"
   chmod +x "$TEST_DIR/stub/chezmoi"
   export PATH="$TEST_DIR/stub:$PATH"
+  ssh-keygen -q -t ed25519 -N '' -C release -f "$TEST_DIR/key"
+  ssh-keygen -q -t ed25519 -N '' -C other -f "$TEST_DIR/other"
+  KEY="$(cat "$TEST_DIR/key.pub")"
+  OTHER="$(cat "$TEST_DIR/other.pub")"
+  SIGNERS="$XDG_CONFIG_HOME/agent-plugins/allowed_signers"
+  unset AGENT_PLUGINS_ALLOWED_SIGNERS
   SRC="$TEST_DIR/dotfiles-acme"
   make_plugin_repo "$SRC"
   LOCK="$XDG_CONFIG_HOME/dotfiles/plugins.lock"
@@ -45,7 +52,17 @@ YAML
   echo 'check "acme.one" "acme" "true" ""' > "$1/modules/acme/doctor.sh"
   git -C "$1" add -A
   git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -qm init
-  git -C "$1" tag v1.0.0
+  sign_tag "$1" v1.0.0 "$TEST_DIR/key"
+}
+
+# sign_tag <repo> <tag> <private key>: an SSH-signed annotated tag.
+sign_tag() {
+  git -C "$1" -c gpg.format=ssh -c user.signingkey="$3.pub" -c user.name=t -c user.email=t@example.com \
+    tag -s "$2" -m "$2"
+}
+
+add_signed() {
+  bash "$CLI" add "$SRC@${1:-v1.0.0}" --signer "$KEY" --yes
 }
 
 lookup() {
@@ -59,12 +76,12 @@ lookup() {
 }
 
 @test "add pins commit, tree hash and capabilities in a 0600 lock" {
-  run bash "$CLI" add "$SRC@v1.0.0" --yes
+  run add_signed
   echo "$output"
   [ "$status" -eq 0 ]
   [ -f "$DEST/dotfiles-plugin.yaml" ]
   [ "$(stat -f %Lp "$LOCK")" = 600 ]
-  [ "$(yq -r '.plugins.acme.commit' "$LOCK")" = "$(git -C "$SRC" rev-parse v1.0.0)" ]
+  [ "$(yq -r '.plugins.acme.commit' "$LOCK")" = "$(git -C "$SRC" rev-parse 'v1.0.0^{commit}')" ]
   [ "$(yq -r '.plugins.acme.tree_hash' "$LOCK")" = "$(git -C "$SRC" rev-parse 'v1.0.0^{tree}')" ]
   [[ "$(yq -r '.plugins.acme.capabilities_sha' "$LOCK")" == sha256-* ]]
   [ "$(yq -r '.plugins.acme.ref' "$LOCK")" = v1.0.0 ]
@@ -72,14 +89,14 @@ lookup() {
 }
 
 @test "a locked, verified plugin is the overlay root" {
-  bash "$CLI" add "$SRC@v1.0.0" --yes
+  add_signed
   run lookup
   [ "$status" -eq 0 ]
   [ "$output" = "$DEST" ]
 }
 
 @test "one changed byte disables the plugin and verify names the file" {
-  bash "$CLI" add "$SRC@v1.0.0" --yes
+  add_signed
   printf ' ' >> "$DEST/modules/acme/doctor.sh"
   run lookup
   [ "$status" -eq 1 ]
@@ -91,7 +108,7 @@ lookup() {
 }
 
 @test "a different commit at the install path disables the plugin" {
-  bash "$CLI" add "$SRC@v1.0.0" --yes
+  add_signed
   git -C "$DEST" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null \
     commit -q --allow-empty -m drift
   run bash "$CLI" verify acme
@@ -100,14 +117,14 @@ lookup() {
 }
 
 @test "add refuses a spec without a ref" {
-  run bash "$CLI" add "$SRC" --yes
+  run bash "$CLI" add "$SRC" --signer "$KEY" --yes
   [ "$status" -ne 0 ]
   [[ "$output" == *"pin a ref"* ]]
   [ ! -f "$LOCK" ]
 }
 
 @test "add refuses without approval when there is no terminal" {
-  run bash "$CLI" add "$SRC@v1.0.0" < /dev/null
+  run bash "$CLI" add "$SRC@v1.0.0" --signer "$KEY" < /dev/null
   [ "$status" -ne 0 ]
   [[ "$output" == *"approval needed"* ]]
   [ ! -e "$DEST" ]
@@ -117,7 +134,7 @@ lookup() {
   printf 'schema: 1\nname: acme\nversion: 1.0.0\nbogus: true\n' > "$SRC/dotfiles-plugin.yaml"
   git -C "$SRC" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -qam bad
   git -C "$SRC" tag v2.0.0
-  run bash "$CLI" add "$SRC@v2.0.0" --yes
+  run bash "$CLI" add "$SRC@v2.0.0" --signer "$KEY" --yes
   [ "$status" -ne 0 ]
   [[ "$output" == *"manifest.bogus: unknown key"* ]]
   [ ! -e "$DEST" ]
@@ -125,14 +142,14 @@ lookup() {
 }
 
 @test "add refuses a second install of the same name" {
-  bash "$CLI" add "$SRC@v1.0.0" --yes
-  run bash "$CLI" add "$SRC@v1.0.0" --yes
+  add_signed
+  run add_signed
   [ "$status" -ne 0 ]
   [[ "$output" == *"already installed"* ]]
 }
 
 @test "remove deletes the checkout and the lock entry" {
-  bash "$CLI" add "$SRC@v1.0.0" --yes
+  add_signed
   run bash "$CLI" remove acme
   [ "$status" -eq 0 ]
   [ ! -e "$DEST" ]
@@ -169,4 +186,77 @@ lookup() {
   [[ "$output" == *"manifest.version: must be string"* ]]
   [[ "$output" == *"manifest.contributes.shell: does not match"* ]]
   [[ "$output" == *"manifest.contributes.settings.other: unknown key"* ]]
+}
+
+@test "add trusts the approved signer in the shared allowed-signers file" {
+  run add_signed
+  [ "$status" -eq 0 ]
+  grep -qxF "acme namespaces=\"git\" $(echo "$KEY" | cut -d' ' -f1-2)" "$SIGNERS"
+  [ "$(yq -r '.plugins.acme.signer' "$LOCK")" = "$(echo "$KEY" | cut -d' ' -f1-2)" ]
+}
+
+@test "a second install needs no --signer once the key is trusted" {
+  add_signed
+  bash "$CLI" remove acme
+  run bash "$CLI" add "$SRC@v1.0.0" --yes
+  [ "$status" -eq 0 ]
+}
+
+@test "AGENT_PLUGINS_ALLOWED_SIGNERS overrides the signers path" {
+  export AGENT_PLUGINS_ALLOWED_SIGNERS="$TEST_DIR/custom_signers"
+  add_signed
+  [ -f "$TEST_DIR/custom_signers" ]
+  [ ! -f "$SIGNERS" ]
+}
+
+@test "a lightweight tag is refused" {
+  git -C "$SRC" tag v1.0.1
+  run bash "$CLI" add "$SRC@v1.0.1" --signer "$KEY" --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not a signed tag"* ]]
+  [ ! -e "$DEST" ]
+}
+
+@test "a tag signed by an untrusted key is refused" {
+  sign_tag "$SRC" v1.0.2 "$TEST_DIR/other"
+  run bash "$CLI" add "$SRC@v1.0.2" --signer "$KEY" --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not signed by a trusted signer"* ]]
+  [ ! -f "$SIGNERS" ]
+}
+
+@test "no trusted signer and no --signer is refused" {
+  run bash "$CLI" add "$SRC@v1.0.0" --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no trusted signer"* ]]
+}
+
+@test "a key trusted for another plugin cannot sign this one" {
+  mkdir -p "$(dirname "$SIGNERS")"
+  printf 'other-plugin namespaces="git" %s\n' "$KEY" > "$SIGNERS"
+  run bash "$CLI" add "$SRC@v1.0.0" --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no trusted signer"* ]]
+}
+
+@test "revoking the signer disables the installed plugin" {
+  add_signed
+  run bash "$CLI" trust acme --signer "$KEY" --revoke
+  [ "$status" -eq 0 ]
+  run bash "$CLI" verify acme
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"signer revoked"* ]]
+  run lookup
+  [ "$status" -eq 1 ]
+  run bash "$CLI" trust acme --signer "$KEY" --yes
+  [ "$status" -eq 0 ]
+  run bash "$CLI" verify acme
+  [ "$status" -eq 0 ]
+}
+
+@test "trust needs a terminal or --yes" {
+  run bash "$CLI" trust acme --signer "$OTHER" < /dev/null
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"approval needed"* ]]
+  [ ! -f "$SIGNERS" ]
 }

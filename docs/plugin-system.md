@@ -344,9 +344,18 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
 - `dotfiles plugin remove <name>`, `list`, and `verify [<name>]`.
 - A plugin whose commit, tree, files, or capabilities differ from the lock
   is disabled: the lookup skips it and `plugins.<name>.verified` fails.
-- Next (step 5): signed tags checked against the allowed-signers file shared
-  with agentbrew, `~/.config/agent-plugins/allowed_signers`
-  (`$AGENT_PLUGINS_ALLOWED_SIGNERS`).
+- Signed tags (step 5). A release ref must be an annotated tag signed with
+  an SSH key. The trusted keys live in one file shared with agentbrew:
+  `~/.config/agent-plugins/allowed_signers` (or
+  `$AGENT_PLUGINS_ALLOWED_SIGNERS`), git `gpg.ssh.allowedSignersFile`
+  format, principal = plugin name. `git verify-tag` runs against a scratch
+  file with only this plugin's keys, so a key trusted for another plugin, or
+  the user's own git config, cannot widen trust.
+- `add --signer <key>` shows a new signer with the capabilities. Approval
+  writes it to the shared file. The lock records the `signer`.
+- `dotfiles plugin trust <name> --signer <key> [--yes]` adds a signer after
+  one approval; `--revoke` removes it. A plugin whose locked signer is no
+  longer trusted is disabled (`signer revoked`).
 
 ### Doctor integration
 

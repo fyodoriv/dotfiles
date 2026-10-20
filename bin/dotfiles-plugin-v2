@@ -3,15 +3,20 @@
 # DOTFILES_PLUGINS_V2=1. `dotfiles plugin` dispatches here when it is set.
 #
 # Usage:
-#   dotfiles plugin add <git-url>@<ref> [--yes]   clone, validate, approve, lock
+#   dotfiles plugin add <git-url>@<tag> [--signer <key>] [--yes]
+#                                                 clone, check the signed tag,
+#                                                 validate, approve, lock
 #   dotfiles plugin add --dev <path> [--yes]      link a local checkout (no pin)
 #   dotfiles plugin remove <name>                 delete checkout and lock entry
 #   dotfiles plugin list                          name, ref, commit, state
 #   dotfiles plugin verify [<name>]               re-check the lock against disk
+#   dotfiles plugin trust <name> --signer <key> [--revoke] [--yes]
+#                                                 add or remove a trusted signer
 #
 # `add` runs no plugin code. It pins the commit, the HEAD tree hash, and a
 # hash of the approved capabilities in plugins.lock (see lib/plugin.sh).
-# Signed tags and capability enforcement come in step 5.
+# A release tag must be an annotated tag signed with an SSH key that the
+# shared allowed-signers file trusts for the plugin name (lib/plugin-signers.sh).
 
 set -euo pipefail
 
@@ -41,7 +46,7 @@ approve() {
   local yes="$1" answer
   [ "$yes" = 1 ] && return 0
   [ -t 0 ] || die "approval needed: rerun in a terminal, or pass --yes after reading the capabilities"
-  printf 'Install this plugin? [y/N] ' >&2
+  printf 'Approve? [y/N] ' >&2
   read -r answer
   [ "$answer" = y ] || [ "$answer" = Y ] || die "not approved"
 }
@@ -54,17 +59,18 @@ lock_write_entry() {
   N="$name" yq -i '.plugins[strenv(N)] = {
       "source": strenv(SRC), "ref": strenv(REF), "version": strenv(VER),
       "commit": strenv(COMMIT), "tree_hash": strenv(TREE),
-      "capabilities_sha": strenv(CAPS), "path": strenv(DEST),
+      "capabilities_sha": strenv(CAPS), "signer": strenv(SIGNER), "path": strenv(DEST),
       "dev": (strenv(DEV) == "true"), "locked_at": strenv(AT)}' "$lock"
   chmod 600 "$lock"
 }
 
 cmd_add() {
-  local yes=0 dev=0 spec="" url ref manifest name dest errors
+  local yes=0 dev=0 spec="" url ref manifest name dest errors signer="" new_signer="" key
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --yes) yes=1 ;;
       --dev) dev=1 ;;
+      --signer) shift; new_signer="${1:-}" ;;
       -*) die "unknown flag: $1" ;;
       *) spec="$1" ;;
     esac
@@ -94,11 +100,25 @@ cmd_add() {
   [ -z "$(plugin_lock_get "$name" path 2>/dev/null)" ] ||
     die "plugin $name is already installed; remove it first"
 
+  if [ "$dev" = 0 ]; then
+    if [ -n "$new_signer" ]; then
+      key="$(plugin_normalize_key "$new_signer")" || die "--signer is not an SSH public key"
+      signer="$(plugin_verify_signed_tag "$STAGING/src" "$ref" "$name" "$key")" || die "$signer"
+    else
+      signer="$(plugin_verify_signed_tag "$STAGING/src" "$ref" "$name")" || die "$signer"
+    fi
+  fi
+
   echo "Source: $url"
   [ "$dev" = 1 ] || echo "Ref:    $ref ($(git -C "$STAGING/src" rev-parse HEAD))"
   [ "$dev" = 0 ] || echo "Dev:    yes (not pinned; doctor warns on every run)"
+  [ -z "$signer" ] || echo "Signer: $signer"
+  if [ -n "$signer" ] && ! plugin_signers_for "$name" | grep -qxF -- "$signer"; then
+    echo "        (new signer: approving also trusts it for plugin $name)"
+  fi
   show_capabilities "$name" "$manifest"
   approve "$yes"
+  [ -z "$signer" ] || plugin_trust_signer "$name" "$signer"
 
   if [ "$dev" = 0 ]; then
     dest="$(plugin_home)/$name"
@@ -110,7 +130,7 @@ cmd_add() {
   COMMIT="$(git -C "$dest" rev-parse HEAD 2>/dev/null || true)" \
   TREE="$(git -C "$dest" rev-parse 'HEAD^{tree}' 2>/dev/null || true)" \
   CAPS="$(plugin_capabilities_sha "$dest/dotfiles-plugin.yaml")" \
-  DEST="$dest" DEV="$([ "$dev" = 1 ] && echo true || echo false)" \
+  SIGNER="$signer" DEST="$dest" DEV="$([ "$dev" = 1 ] && echo true || echo false)" \
   AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     lock_write_entry "$name"
   echo "✓ Installed plugin $name at $dest"
@@ -127,6 +147,33 @@ cmd_remove() {
   lock="$(plugin_lock_file)"
   N="$name" yq -i 'del(.plugins[strenv(N)])' "$lock"
   echo "✓ Removed plugin $name"
+}
+
+cmd_trust() {
+  local name="" key="" revoke=0 yes=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --signer) shift; key="${1:-}" ;;
+      --revoke) revoke=1 ;;
+      --yes) yes=1 ;;
+      -*) die "unknown flag: $1" ;;
+      *) name="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$name" ] && [ -n "$key" ] || die "usage: dotfiles plugin trust <name> --signer <key> [--revoke]"
+  key="$(plugin_normalize_key "$key")" || die "--signer is not an SSH public key"
+  if [ "$revoke" = 1 ]; then
+    plugin_revoke_signer "$name" "$key" || exit 1
+    echo "✓ Revoked signer for $name. A plugin signed by it is now disabled."
+    return 0
+  fi
+  echo "Trust this key to sign releases of plugin $name?"
+  echo "  $key"
+  echo "  fingerprint $(_plugin_key_fingerprint "$key")"
+  approve "$yes"
+  plugin_trust_signer "$name" "$key"
+  echo "✓ Trusted signer for $name in $(plugin_signers_file)"
 }
 
 cmd_list() {
@@ -152,6 +199,7 @@ case "${1:-}" in
   remove) shift; cmd_remove "$@" ;;
   list) cmd_list ;;
   verify) shift; cmd_verify "$@" ;;
+  trust) shift; cmd_trust "$@" ;;
   -h | --help | help | "") usage ;;
   *) die "unknown command: $1" ;;
 esac

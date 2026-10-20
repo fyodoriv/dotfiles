@@ -196,6 +196,16 @@ loaded, the pre-commit, pre-push, and `gh` guards block instead.
 After the gates pass, the hooks run the overlay's own `hooks/pre-commit` or
 `hooks/pre-push`, then the repo-local hook. A failing overlay hook blocks.
 
+### Company plugin trust (preview)
+
+With `DOTFILES_PLUGINS_V2=1`, a company plugin runs only when it is listed in
+`~/.config/dotfiles/plugins.lock` and still matches it: commit, tree hash, no
+changed files, approved capabilities, and a signer that is still trusted.
+Release tags must be SSH-signed by a key in
+`~/.config/agent-plugins/allowed_signers` for that plugin name. This file is
+shared with agentbrew. Folder names never make code trusted. Details:
+[docs/plugin-system.md](docs/plugin-system.md).
+
 ### Approved private repos
 
 A private repo has no public history to protect. List it in the local file

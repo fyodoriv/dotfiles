@@ -33,9 +33,16 @@
 #       commit: <full sha>
 #       tree_hash: <HEAD tree sha>
 #       capabilities_sha: sha256-<hex of the canonical capabilities JSON>
+#       signer: <ssh public key that signed the tag; must stay trusted>
 #       path: <checkout>
 #       dev: false
 #       locked_at: <UTC time>
+
+# Without the signers lib, plugin_verify fails closed for pinned plugins.
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/plugin-signers.sh" ]; then
+  # shellcheck source=lib/plugin-signers.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/plugin-signers.sh"
+fi
 
 plugin_lock_file() {
   printf '%s' "${DOTFILES_PLUGINS_LOCK:-${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/plugins.lock}"
@@ -107,7 +114,7 @@ plugin_capabilities_sha() {
 # entry. Otherwise prints what differs and fails. A dev entry skips the
 # commit and tree checks.
 plugin_verify() {
-  local name="$1" path commit tree caps dev
+  local name="$1" path commit tree caps dev signer
   path="$(plugin_lock_get "$name" path)"
   [ -n "$path" ] || { echo "$name: not in $(plugin_lock_file)"; return 1; }
   [ -d "$path" ] || { echo "$name: checkout missing: $path"; return 1; }
@@ -120,6 +127,11 @@ plugin_verify() {
     tree="$(git -C "$path" rev-parse 'HEAD^{tree}' 2>/dev/null || true)"
     [ "$tree" = "$(plugin_lock_get "$name" tree_hash)" ] ||
       { echo "$name: tree changed"; return 1; }
+    signer="$(plugin_lock_get "$name" signer)"
+    if [ -z "$signer" ] || ! plugin_signers_for "$name" | grep -qxF -- "$signer"; then
+      echo "$name: signer revoked or missing (trust it again with: dotfiles plugin trust $name --signer <key>)"
+      return 1
+    fi
     if [ -n "$(git -C "$path" status --porcelain --untracked-files=all 2>/dev/null)" ]; then
       echo "$name: files changed after install:"
       git -C "$path" status --porcelain --untracked-files=all | sed 's/^/  /'

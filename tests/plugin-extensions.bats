@@ -373,3 +373,30 @@ workflow_list() {
   [[ "$output" != *"CHECK spotlight.agent_worktrees"* ]]
   [[ "$output" == *"SKIP agent worktrees left in the Spotlight index"* ]]
 }
+
+@test "7d: blocked_software lists installed apps, casks and formulae" {
+  mkdir -p "$TEST_DIR/Apps/Bad.app"
+  printf 'apps: [Bad.app, Fine.app]\ncasks: [bad-cask, ok-cask]\nformulae: [bad-f]\n' > "$TEST_DIR/blocked.yaml"
+  cat > "$TEST_DIR/stub/brew" <<'STUB'
+#!/bin/sh
+case "$*" in
+  "list --cask -1") echo bad-cask ;;
+  "list --formula -1") printf 'jq\nbad-f\n' ;;
+esac
+STUB
+  chmod +x "$TEST_DIR/stub/brew"
+  BLOCKED_SOFTWARE_APPS_DIR="$TEST_DIR/Apps" run bash -c 'source "$1/lib/blocked-software.sh"; blocked_software_found "$2"' \
+    _ "$REPO_ROOT" "$TEST_DIR/blocked.yaml"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'app Bad.app\ncask bad-cask\nformula bad-f' ]
+}
+
+@test "7d: the plugins doctor adds a blocked_software check for a verified plugin" {
+  printf 'apps: [Nothing.app]\n' > "$PLUGIN/blocked.yaml"
+  install_plugin '  sudo: false' '  blocked_software: blocked.yaml'
+  run bash -c '
+    check() { echo "CHECK $1"; eval "$3" && echo PASS || echo FAIL; }; audit_warn() { :; }
+    DOTFILES_DIR="$1"; source "$1/modules/plugins/doctor.sh"' _ "$REPO_ROOT"
+  [[ "$output" == *"CHECK plugins.acme.blocked_software"* ]]
+  [[ "$output" == *"PASS"* ]]
+}

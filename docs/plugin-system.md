@@ -410,6 +410,17 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     no longer patch the core plist.
   - `spotlight.exclude_worktrees` (default true): when a plugin sets it to
     false, the workflow doctor skips `spotlight.agent_worktrees`.
+- Blocked software (`contributes.blocked_software`, a YAML file with
+  `apps`, `casks`, `formulae` lists): the core scan (`lib/blocked-software.sh`)
+  adds the doctor check `plugins.<name>.blocked_software`, which fails while
+  any listed item is installed.
+- Data-only contributions are the pattern. The core owns the logic; a plugin
+  passes data (options, lists, settings, leak patterns). For example, an
+  endpoint-agent dialog healer reads its known dialog titles from a
+  plugin-supplied `heal.env` file instead of shipping its own healer. When a
+  plugin needs new behavior, add a core option or data point and keep the
+  plugin to values. Rule of thumb: if a fresh external user could use it
+  without company identity, network, or entitlement, it belongs in the core.
 
 ### Doctor integration
 

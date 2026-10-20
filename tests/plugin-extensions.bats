@@ -140,3 +140,39 @@ PLIST
   [ ! -e "$DOTFILES_LAUNCHAGENTS_DIR/com.acme.sync.plist" ]
   grep -q "launchctl bootout gui/.*/com.acme.sync" "$MARKER"
 }
+
+@test "6d: a declared shell fragment is sourced by the generated loader" {
+  mkdir -p "$PLUGIN/shell"
+  printf 'export ACME_FRAGMENT=loaded\n' > "$PLUGIN/shell/zshrc.zsh"
+  install_plugin '  shell_fragment: true' '  shell: shell/zshrc.zsh'
+  run ext plugin_shell_pass
+  [ "$status" -eq 0 ]
+  loader="$XDG_STATE_HOME/dotfiles/plugin-shell.zsh"
+  run zsh -fc "source '$loader'; print -r -- \$ACME_FRAGMENT"
+  [ "$output" = loaded ]
+}
+
+@test "6d: an undeclared shell fragment is left out" {
+  mkdir -p "$PLUGIN/shell"
+  printf 'touch "%s"\n' "$MARKER" > "$PLUGIN/shell/zshrc.zsh"
+  install_plugin '  sudo: false' '  shell: shell/zshrc.zsh'
+  run ext plugin_shell_pass
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"capability not declared: shell_fragment (plugin acme)"* ]]
+  ! grep -q zshrc.zsh "$XDG_STATE_HOME/dotfiles/plugin-shell.zsh"
+}
+
+@test "6d: plugin add and remove refresh the loader" {
+  mkdir -p "$PLUGIN/shell"
+  printf ':\n' > "$PLUGIN/shell/zshrc.zsh"
+  install_plugin '  shell_fragment: true' '  shell: shell/zshrc.zsh'
+  grep -q 'shell/zshrc.zsh' "$XDG_STATE_HOME/dotfiles/plugin-shell.zsh"
+  bash "$CLI" remove acme
+  ! grep -q 'shell/zshrc.zsh' "$XDG_STATE_HOME/dotfiles/plugin-shell.zsh"
+}
+
+@test "6d: home/zshrc loads plugin fragments before ~/.zshrc.local" {
+  run awk '/plugin-shell.zsh/ && !p { p = NR } /source ~\/.zshrc.local/ && !l && p { l = NR } END { exit !(p && l && p < l) }' \
+    "$REPO_ROOT/home/zshrc"
+  [ "$status" -eq 0 ]
+}

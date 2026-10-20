@@ -375,6 +375,12 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     `Label` against `capabilities.launchagents`, installs it to
     `~/Library/LaunchAgents`, and reloads it only when it changed.
     `plugin remove` unloads and deletes them. Plugins never edit core plists.
+  - Shell (`contributes.shell`, needs `capabilities.shell_fragment: true`):
+    the core writes `~/.local/state/dotfiles/plugin-shell.zsh`, which
+    sources each verified fragment in lock order. `home/zshrc` loads it
+    after core setup and before `~/.zshrc.local`. `dotfiles apply`
+    (`run_after_plugin-extensions.sh`), `plugin add`, and `plugin remove`
+    regenerate it.
 
 ### Doctor integration
 

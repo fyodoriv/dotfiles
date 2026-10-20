@@ -57,7 +57,7 @@ dotfiles-<company>/
 ├── modules/<name>/doctor.sh        Auto-discovered by `dotfiles-doctor`
 ├── validate/<name>.sh              Auto-discovered by `dotfiles-validate`
 ├── brewfile/Brewfile               Inlined into the brew-install lifecycle script
-├── home/zshrc.<company>            Sourced from ~/.zshrc if present
+├── home/zshrc.<company>            Not loaded by v1 overlays; use a v2 plugin `contributes.shell`
 ├── vscode/settings.json            Merged into VS Code generated settings by vscode doctor
 ├── Agentfile.yaml                  Merged into the canonical global Agentfile
 └── README.md                       Lists what your overlay contributes
@@ -76,7 +76,7 @@ After `dotfiles apply` runs with `extra_overlay_root` set:
 1. **`dotfiles doctor`** — runs every `modules/<name>/doctor.sh` from the overlay alongside the base modules. Output is interleaved.
 2. **`dotfiles validate`** — runs every `validate/<name>.sh` from the overlay alongside base validates.
 3. **Brewfile** — your overlay's `brewfile/Brewfile` lines are appended to the brew-install lifecycle script (so `dotfiles apply` installs both base packages and your company-specific ones).
-4. **Shell env** — `~/.zshrc` sources `$EXTRA_OVERLAY_ROOT/home/zshrc.<company>` if it exists.
+4. **Shell env** — an `EXTRA_OVERLAY_ROOT` overlay has no shell hook. A v2 plugin (`DOTFILES_PLUGINS_V2=1`) with `capabilities.shell_fragment: true` sets `contributes.shell`, and `~/.zshrc` loads it before `~/.zshrc.local` ([plugin-system.md](../plugin-system.md)).
 5. **Agentfile** — your overlay's `Agentfile.yaml` is merged with the base Agentfile into `~/.config/agentbrew/Agentfile.yaml`; agentbrew syncs once from that canonical file. Older agentbrew releases without `agentfile merge` fall back to syncing the base Agentfile first and the overlay with `--no-prune`.
 6. **Editor settings** — when present, `vscode/settings.json` is deep-merged into the editor's generated settings by the vscode doctor module (so org-only keys survive `doctor --fix`).
 

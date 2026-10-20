@@ -64,6 +64,15 @@ lock_write_entry() {
   chmod 600 "$lock"
 }
 
+# Regenerates outputs that follow the lock (shell fragment loader).
+refresh_outputs() {
+  # shellcheck source=../lib/plugin-capabilities.sh
+  source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+  # shellcheck source=../lib/plugin-extensions.sh
+  source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+  plugin_shell_pass || true
+}
+
 cmd_add() {
   local yes=0 dev=0 spec="" url ref manifest name dest errors signer="" new_signer="" key
   while [ "$#" -gt 0 ]; do
@@ -133,6 +142,7 @@ cmd_add() {
   SIGNER="$signer" DEST="$dest" DEV="$([ "$dev" = 1 ] && echo true || echo false)" \
   AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     lock_write_entry "$name"
+  refresh_outputs
   echo "✓ Installed plugin $name at $dest"
 }
 
@@ -151,6 +161,7 @@ cmd_remove() {
   fi
   lock="$(plugin_lock_file)"
   N="$name" yq -i 'del(.plugins[strenv(N)])' "$lock"
+  refresh_outputs
   echo "✓ Removed plugin $name"
 }
 

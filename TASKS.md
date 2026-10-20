@@ -14,6 +14,34 @@ them. -->
 
 ## P2
 
+- [ ] Checkup skips the full `dotfiles apply` when nothing changed
+  - **ID**: checkup-skip-apply-when-unchanged
+  - **Tags**: perf, agents
+  - **Details**: The 2026-10-20 `/tooling-checkup` ran `dotfiles apply` for 191 s (last run: 214 s) right after `dotfiles-sync` printed "No changes". The apply converges drift too, so a skip must still detect drift cheaply (for example `chezmoi status` plus the doctor modules the checkup already runs).
+  - **Files**: `skills/update-tooling/SKILL.md`, `skills/tooling-checkup/SKILL.md`
+  - **Output**: code
+  - **Acceptance**: a checkup on an unchanged machine finishes the apply step in under 30 s, and a hand edit is still reported.
+  - **Hypothesis**: skipping the full apply when the source head and live drift are unchanged cuts the checkup apply step from ~200 s to under 30 s.
+  - **Measurement**: the `dotfiles_apply_secs` metric in `python3 ~/.claude/skills/tooling-checkup/scripts/checkup_state.py diff`, on the next two checkups.
+  - **Success**: under 30 s on a no-change run.
+  - **Pivot**: over 90 s, or a missed drift item -> keep the full apply and speed up its slowest step instead.
+  - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
+  - **Competitive-goal**: `noop_reapply_ms` (docs/competition/scorecard.md).
+
+- [ ] Make `make check` fast in the inner loop
+  - **ID**: speed-up-make-check
+  - **Tags**: perf, agents
+  - **Details**: The 2026-10-20 checkup time review: `make check` costs 2m38s/day (17x in 7 sessions, p95 5m12s). Agents run the full gate while iterating instead of `bin/bats-affected`.
+  - **Files**: `Makefile`, `AGENTS.md`, `bin/cached-run`
+  - **Output**: code
+  - **Acceptance**: the `make check` line in the 7-day agent time review is under 1 min/day.
+  - **Hypothesis**: steering the inner loop to `bin/bats-affected` and caching unchanged steps cuts `make check` from 2m38s/day to under 1 min/day.
+  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (the dotfiles `make check` line), 7 days after the change lands.
+  - **Success**: under 1 min/day.
+  - **Pivot**: still over 2 min/day after 7 days -> profile per step from `~/.local/state/dotfiles/gate-timings.jsonl` and drop this approach.
+  - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
+  - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
+
 ## P3
 
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack

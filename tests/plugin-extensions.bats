@@ -207,3 +207,64 @@ PLIST
   [ "$status" -ne 0 ]
   [ ! -f "$TEST_DIR/out.json" ]
 }
+
+# Collects results the way bin/dotfiles-doctor's check() would.
+doctor_run() {
+  bash -c '
+    for f in plugin plugin-capabilities plugin-extensions; do source "$1/lib/$f.sh"; done
+    check() { printf "%s|%s|%s\n" "$1" "$3" "$2"; }
+    while IFS=$'"'"'\t'"'"' read -r n r m; do plugin_doctor_run "$n" "$r" "$m" "$2"; done < <(plugin_doctor_modules all)
+    echo "IN_PROCESS=${ACME_SET_ME:-unset}"
+  ' _ "$REPO_ROOT" "$1"
+}
+
+@test "6e: plugin doctor modules run in a child with a cleaned env, ids namespaced" {
+  mkdir -p "$PLUGIN/doctor/acme"
+  cat > "$PLUGIN/doctor/acme/doctor.sh" <<'MOD'
+ACME_SET_ME=leaked
+check "acme.clean_env" "no inherited token" '[ -z "${SECRET_TOKEN:-}" ] && [ -z "${DOTFILES_DIR:-}" ]' ""
+check "acme.cwd" "runs in plugin root" '[ -f dotfiles-plugin.yaml ]' ""
+check "acme.bad" "a failing check" 'false' ""
+echo "noise that is not a result"
+MOD
+  install_plugin '  sudo: false' '  doctor_modules: doctor'
+  SECRET_TOKEN=s3cr3t DOTFILES_DIR=/x run doctor_run run
+  echo "$output"
+  [[ "$output" == *"acme/acme.clean_env|true|"* ]]
+  [[ "$output" == *"acme/acme.cwd|true|"* ]]
+  [[ "$output" == *"acme/acme.bad|false|a failing check"* ]]
+  [[ "$output" == *"IN_PROCESS=unset"* ]]
+  [[ "$output" != *"noise"* ]]
+}
+
+@test "6e: a module that hangs is stopped and reported" {
+  mkdir -p "$PLUGIN/doctor/slow"
+  printf 'sleep 30\n' > "$PLUGIN/doctor/slow/doctor.sh"
+  install_plugin '  sudo: false' '  doctor_modules: doctor'
+  DOTFILES_PLUGIN_TIMEOUT=1 run doctor_run run
+  [[ "$output" == *"acme/slow.ran|false|"*"142 = timeout"* ]]
+}
+
+@test "6e: list mode names checks without running them" {
+  mkdir -p "$PLUGIN/doctor/acme"
+  printf 'check "acme.one" "one" "touch %s" ""\n' "$MARKER" > "$PLUGIN/doctor/acme/doctor.sh"
+  install_plugin '  sudo: false' '  doctor_modules: doctor'
+  run doctor_run list
+  [[ "$output" == *"acme/acme.one|true|one"* ]]
+  [ ! -f "$MARKER" ]
+}
+
+@test "6e: plugin validate scripts report through pass/fail/warn" {
+  mkdir -p "$PLUGIN/validate"
+  printf 'pass "ok one"\nfail "bad one"\naudit_warn "careful"\n' > "$PLUGIN/validate/a.sh"
+  printf 'exit 4\n' > "$PLUGIN/validate/b.sh"
+  install_plugin '  sudo: false' '  validate: validate'
+  run bash -c '
+    for f in plugin plugin-capabilities plugin-extensions; do source "$1/lib/$f.sh"; done
+    pass() { echo "P:$*"; }; fail() { echo "F:$*"; }; audit_warn() { echo "W:$*"; }
+    plugin_validate_run' _ "$REPO_ROOT"
+  [[ "$output" == *"P:acme: ok one"* ]]
+  [[ "$output" == *"F:acme: bad one"* ]]
+  [[ "$output" == *"W:acme: careful"* ]]
+  [[ "$output" == *"F:plugin acme validate script b.sh failed (exit 4"* ]]
+}

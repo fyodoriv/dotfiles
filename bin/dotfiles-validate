@@ -229,6 +229,17 @@ if [ -n "$EXTRA_VALIDATE_DIR" ] && [ -d "$EXTRA_VALIDATE_DIR" ]; then
   fi
 fi
 
+# ── Company plugin validate scripts (issue #145, step 6e) ───────
+# Each runs in a child process with a cleaned environment and a timeout.
+if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+  for _plib in plugin plugin-capabilities plugin-extensions; do
+    # shellcheck source=/dev/null
+    source "$DOTFILES_DIR/lib/$_plib.sh"
+  done
+  unset _plib
+  plugin_validate_run
+fi
+
 # ── Summary ──────────────────────────────────────────────────────
 
 local_total=$((pass_count + fail_count + warn_count))

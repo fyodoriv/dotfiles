@@ -91,7 +91,7 @@ _resolve_extra_doctor_dir() {
   local rc=0
   # shellcheck source=../lib/plugin.sh
   source "$DOTFILES_DIR/lib/plugin.sh"
-  plugin_overlay_path modules || rc=$?
+  plugin_overlay_path --no-discover modules || rc=$?
   [ "$rc" -ne 2 ]
 }
 
@@ -102,6 +102,27 @@ if [ -z "$EXTRA_DOCTOR_DIR" ]; then
 fi
 
 MODULE_DIRS=("$DOTFILES_DIR/modules")
+
+# Company plugins from plugins.lock run in a child process, never in this
+# shell (issue #145, step 6e). See lib/plugin-extensions.sh.
+_plugins_v2=false
+if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
+  for _plib in plugin plugin-capabilities plugin-extensions; do
+    # shellcheck source=/dev/null
+    source "$DOTFILES_DIR/lib/$_plib.sh"
+  done
+  unset _plib
+  _plugins_v2=true
+fi
+run_plugin_modules() {
+  $_plugins_v2 || return 0
+  local _pn _pr _pm
+  while IFS=$'\t' read -r _pn _pr _pm; do
+    [ -n "$_pn" ] || continue
+    _json_current_module="$_pn/$(basename "$_pm")"
+    plugin_doctor_run "$_pn" "$_pr" "$_pm" "$2"
+  done < <(plugin_doctor_modules "$1")
+}
 if [ -n "$EXTRA_DOCTOR_DIR" ] && [ -d "$EXTRA_DOCTOR_DIR" ]; then
   MODULE_DIRS+=("$EXTRA_DOCTOR_DIR")
 fi
@@ -810,6 +831,7 @@ elif $LIST_MODE; then
       source "$doctor_file"
     done
   done
+  run_plugin_modules all list
 else
   # Run checks grouped by severity
   for severity in critical important performance cosmetic; do
@@ -841,6 +863,7 @@ else
         fi
       done
     done
+    run_plugin_modules "$severity" run
   done
 fi
 

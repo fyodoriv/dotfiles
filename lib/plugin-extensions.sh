@@ -229,3 +229,91 @@ plugin_settings_merge() {
     | "settings conflict (\($t)): \(.[0].p): \(map(.n) | join(" vs "))"' "$layers" >&2
   rm -f "$layers"
 }
+
+# ── 6e. Doctor modules and validate scripts in a child process ─────────
+# Plugin code never runs inside the core shell. Each doctor module
+# (contributes.doctor_modules/<module>/doctor.sh) and validate script
+# (contributes.validate/*.sh) runs through lib/plugin-sandbox-runner.sh:
+#   - a cleaned environment: only HOME, USER, LOGNAME, TMPDIR, LANG, and a
+#     fixed PATH; no DOTFILES_* overrides and no inherited tokens
+#   - the plugin root as the working folder
+#   - a timeout (DOTFILES_PLUGIN_TIMEOUT seconds, default 60)
+# Check ids are namespaced as <plugin>/<id>.
+
+plugin_sandbox_run() {
+  local root="$1" mode="$2" file="$3" runner
+  runner="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/plugin-sandbox-runner.sh"
+  (
+    cd "$root" || exit 1
+    exec env -i HOME="$HOME" USER="${USER:-}" LOGNAME="${LOGNAME:-}" TMPDIR="${TMPDIR:-/tmp}" \
+      LANG="${LANG:-en_US.UTF-8}" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+      perl -e '
+        # Run the command in its own process group; on timeout kill the
+        # whole group (so no child keeps running) and exit 142.
+        my $t = shift; my $pid = fork() // exit 1;
+        if (!$pid) { setpgrp(0, 0); exec @ARGV or exit 127; }
+        local $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 142; };
+        alarm $t; waitpid($pid, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+      ' "${DOTFILES_PLUGIN_TIMEOUT:-60}" \
+      /bin/bash "$runner" "$mode" "$file"
+  )
+}
+
+# plugin_doctor_modules <severity|all>: prints "<plugin>\t<root>\t<module dir>"
+# for each verified plugin module at that severity.
+plugin_doctor_modules() {
+  local want="$1" name path dir module sev
+  while IFS=$'\t' read -r name path; do
+    [ -n "$name" ] || continue
+    dir="$(plugin_contribution "$path" doctor_modules)" || continue
+    for module in "$dir"/*/; do
+      [ -f "$module/doctor.sh" ] || continue
+      sev="$(cat "$module/severity" 2>/dev/null || echo cosmetic)"
+      [ "$want" = all ] || [ "$sev" = "$want" ] || continue
+      printf '%s\t%s\t%s\n' "$name" "$path" "${module%/}"
+    done
+  done < <(plugin_verified_list 2>/dev/null)
+}
+
+# plugin_doctor_run <plugin> <root> <module dir> <list|run>: records each
+# result through the caller's check() (so overrides, JSON and counts work).
+# A timeout or crash is a failed check "<plugin>/<module>.ran".
+plugin_doctor_run() {
+  local name="$1" root="$2" module="$3" mode="$4" out status=0 kind id result desc
+  out="$(plugin_sandbox_run "$root" "$mode" "$module/doctor.sh" 2>/dev/null)" || status=$?
+  while IFS=$'\t' read -r kind id result desc; do
+    [ "$kind" = CHECK ] || continue
+    if [ "$result" = pass ] || [ "$result" = list ]; then
+      check "$name/$id" "$desc" "true" ""
+    else
+      check "$name/$id" "$desc" "false" ""
+    fi
+  done <<< "$out"
+  if [ "$status" -ne 0 ] && [ "$mode" = run ]; then
+    check "$name/$(basename "$module").ran" \
+      "plugin $name module $(basename "$module") finished (exit $status; 142 = timeout)" "false" ""
+  fi
+}
+
+# plugin_validate_run: runs every verified plugin's validate scripts and
+# records results through the caller's pass/fail/audit_warn.
+plugin_validate_run() {
+  local name path dir script out status kind msg
+  while IFS=$'\t' read -r name path; do
+    [ -n "$name" ] || continue
+    dir="$(plugin_contribution "$path" validate)" || continue
+    for script in "$dir"/*.sh; do
+      [ -f "$script" ] || continue
+      status=0
+      out="$(plugin_sandbox_run "$path" validate "$script" 2>/dev/null)" || status=$?
+      while IFS=$'\t' read -r kind msg; do
+        case "$kind" in
+          PASS) pass "$name: $msg" ;;
+          FAIL) fail "$name: $msg" ;;
+          WARN) audit_warn "$name: $msg" ;;
+        esac
+      done <<< "$out"
+      [ "$status" -eq 0 ] || fail "plugin $name validate script $(basename "$script") failed (exit $status; 142 = timeout)"
+    done
+  done < <(plugin_verified_list 2>/dev/null)
+}

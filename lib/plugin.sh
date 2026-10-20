@@ -15,9 +15,11 @@
 #   if root="$(plugin_overlay_root)"; then ...; fi
 #   file="$(plugin_overlay_path Agentfile.yaml)"
 #
-# --no-discover (first argument of either function) skips step 3. Callers
-# that never used auto-discovery (vscode, brew, validate) pass it until the
-# typed extension points land (step 6).
+# --no-discover (first argument of either function) skips step 3: only a
+# v1 overlay (env or chezmoi key) counts. Callers that read the v1 overlay
+# layout (doctor modules/, validate/, brewfile/, vscode/) pass it. v2 plugins
+# reach those features through lib/plugin-extensions.sh instead, where their
+# code runs in a child process and their data is capability-checked.
 #
 # plugin_overlay_root prints the path and returns 0, returns 1 when there is
 # no overlay, and returns 2 (with a message on stderr) for a colon-separated

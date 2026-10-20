@@ -320,8 +320,9 @@ which is idempotent on existing symlinks and re-creates anything missing.
 `EXTRA_OVERLAY_ROOT`. Order: `EXTRA_OVERLAY_ROOT`, the chezmoi key
 `extra_overlay_root`, then the first plugin in `plugins.lock` that still
 matches its lock. Folders named `dotfiles-*` are never auto-discovered
-(step 4 closed gap S3). `--no-discover` skips the lock step; vscode, brew,
-and validate pass it until step 6. `tests/overlay-locate.bats` fails when a
+(step 4 closed gap S3). `--no-discover` skips the lock step: the v1 overlay
+layout (doctor `modules/`, `validate/`, `brewfile/`, `vscode/`) is read only
+from a v1 overlay. v2 plugins use the typed extension points below. `tests/overlay-locate.bats` fails when a
 core file copies the lookup inline.
 
 ### Contract v2 preview: manifest and plugins.lock
@@ -387,6 +388,14 @@ Set `DOTFILES_PLUGINS_V2=1` to use it (issue #145, step 4).
     `_force` object), the NixOS `mkDefault`/`mkForce` model. The vscode
     doctor applies it to `settings.generated.json` and prints each conflict
     (`settings conflict (vscode): <key>: <layers>`) as a warning.
+  - Doctor modules (`contributes.doctor_modules/<module>/doctor.sh`, with
+    an optional `severity` file) and validate scripts (`contributes.validate/*.sh`)
+    run in a child process (`lib/plugin-sandbox-runner.sh`), never in the
+    core shell. The child gets a cleaned environment (HOME, USER, LOGNAME,
+    TMPDIR, LANG, a fixed PATH; no `DOTFILES_*`, no tokens), the plugin root
+    as its folder, and a timeout (`DOTFILES_PLUGIN_TIMEOUT`, default 60 s).
+    Check ids show as `<plugin>/<id>`. A hang or crash fails
+    `<plugin>/<module>.ran`. Plugin checks report only; fix commands do not run.
 
 ### Doctor integration
 

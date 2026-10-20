@@ -15,9 +15,19 @@
 #   agent-tab list
 #   agent-tab close --owner <id> <tab>
 #   agent-tab renew --owner <id> [--lease <s>] <tab>
+#   agent-tab text|shot --owner <id> <tab>
+#   agent-tab eval --owner <id> <tab> <js>
+#   agent-tab nav --owner <id> <tab> <url>
+#   agent-tab health [--fix]
+#   agent-tab clear-cookies <domain>
 #
-# Env: AGENT_TAB_STATE_DIR, AGENT_TAB_PORT (9223),
-#      AGENT_TAB_LEASE_SECONDS (3600).
+# Page commands (text, eval, nav, shot) need the caller to own the tab with a
+# live lease. They talk CDP over the tab's websocket (Node built-in WebSocket).
+#
+# Env: AGENT_TAB_STATE_DIR, AGENT_TAB_PORT (9223), AGENT_TAB_LEASE_SECONDS
+#      (3600), AGENT_TAB_OWNER (default --owner), AGENT_TAB_SHOT_DIR
+#      (~/apps/agent-scratch/screenshots), AGENT_TAB_CDP (CDP client override,
+#      used by tests).
 #
 # Exit codes: 0 ok, 1 error, 2 usage, 3 busy (live tab held by another owner).
 # shellcheck disable=SC2016  # jq filters use $vars on purpose.
@@ -29,6 +39,7 @@ LOCK="$STATE_DIR/lock"
 PORT="${AGENT_TAB_PORT:-9223}"
 LEASE="${AGENT_TAB_LEASE_SECONDS:-3600}"
 CDP="http://127.0.0.1:$PORT"
+SHOT_DIR="${AGENT_TAB_SHOT_DIR:-$HOME/apps/agent-scratch/screenshots}"
 
 usage() {
   cat <<'EOF'
@@ -36,6 +47,15 @@ Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
        agent-tab list
        agent-tab close --owner <id> <tab>
        agent-tab renew --owner <id> [--lease <seconds>] <tab>
+       agent-tab text --owner <id> <tab>          # page text
+       agent-tab eval --owner <id> <tab> <js>     # evaluate, print the value
+       agent-tab nav --owner <id> <tab> <url>     # navigate
+       agent-tab shot --owner <id> <tab>          # PNG path, under AGENT_TAB_SHOT_DIR
+       agent-tab health [--fix]                   # list tabs that do not answer;
+                                                  # --fix reloads, closes unowned
+       agent-tab clear-cookies <domain>           # only if no live-lease tab uses it
+--owner defaults to $AGENT_TAB_OWNER. text, eval, nav, and shot need your own
+live lease.
 Exit 0 ok, 1 error, 2 usage, Exit 3 busy: the tab has a live lease held by
 another owner. The holder and reason go to stderr.
 EOF
@@ -70,14 +90,15 @@ write_state() {
 rec() { jq -r --arg id "$1" --arg k "$2" '.[$id][$k] // empty' "$STATE"; }
 
 parse_opts() {
-  OWNER="" REASON="" LEASE_OPT="" ARG=""
+  OWNER="${AGENT_TAB_OWNER:-}" REASON="" LEASE_OPT="" ARG="" ARG2="" FIX=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --owner) OWNER="${2:-}"; shift 2 || shift ;;
       --reason) REASON="${2:-}"; shift 2 || shift ;;
       --lease) LEASE_OPT="${2:-}"; shift 2 || shift ;;
+      --fix) FIX=1; shift ;;
       -*) usage >&2; die "unknown option: $1" 2 ;;
-      *) ARG="$1"; shift ;;
+      *) if [ -z "$ARG" ]; then ARG="$1"; else ARG2="$1"; fi; shift ;;
     esac
   done
   [ -z "$LEASE_OPT" ] || LEASE="$LEASE_OPT"
@@ -146,7 +167,162 @@ cmd_renew() {
   echo "agent-tab: renewed $ARG"
 }
 
+# One CDP call over a websocket: cdp <ws-url> <method> [params-json].
+# Prints the result JSON. Exits 1 on error or no answer in 10 s.
+cdp() {
+  if [ -n "${AGENT_TAB_CDP:-}" ]; then
+    "$AGENT_TAB_CDP" "$1" "$2" "${3:-{\}}"
+    return
+  fi
+  node --input-type=module -e '
+    const [ws, method, params] = process.argv.slice(1);
+    const sock = new WebSocket(ws);
+    const t = setTimeout(() => { console.error("no answer"); process.exit(1); }, 10000);
+    sock.onerror = () => { console.error("websocket error"); process.exit(1); };
+    sock.onopen = () => sock.send(JSON.stringify({ id: 1, method, params: JSON.parse(params) }));
+    sock.onmessage = (m) => {
+      const r = JSON.parse(m.data);
+      if (r.id !== 1) return;
+      clearTimeout(t);
+      if (r.error) { console.error(JSON.stringify(r.error)); process.exit(1); }
+      console.log(JSON.stringify(r.result)); process.exit(0);
+    };' "$1" "$2" "${3:-{\}}"
+}
+
+chrome_tabs() {
+  curl -sf --max-time 5 "$CDP/json/list" || die "agents Chrome not reachable on port $PORT"
+}
+
+tab_ws() {
+  local ws
+  ws="$(chrome_tabs | jq -r --arg id "$1" '.[] | select(.id == $id) | .webSocketDebuggerUrl // empty')"
+  [ -n "$ws" ] || die "tab $1 is not open in Chrome"
+  echo "$ws"
+}
+
+# Exits unless OWNER holds a live lease on the tab.
+require_own_live() {
+  local id="$1" holder expires
+  [ -n "$OWNER" ] || die "needs --owner or AGENT_TAB_OWNER" 2
+  [ -f "$STATE" ] || die "tab $id is not tracked"
+  holder="$(rec "$id" owner)"
+  expires="$(rec "$id" expires)"
+  [ -n "$holder" ] || die "tab $id is not tracked"
+  if [ "$holder" != "$OWNER" ]; then
+    die "busy, tab $id held by $holder: $(rec "$id" reason) (lease expires $(fmt_time "$expires"))" 3
+  fi
+  [ "${expires:-0}" -gt "$(date +%s)" ] ||
+    die "busy, your lease on tab $id expired; renew it first" 3
+}
+
+# Runs JS in the tab and prints the value (strings raw, others as JSON).
+page_eval() {
+  local out
+  out="$(cdp "$1" Runtime.evaluate "$(jq -cn --arg e "$2" '{expression: $e, returnByValue: true, awaitPromise: true}')")" ||
+    die "eval failed in tab"
+  printf '%s' "$out" | jq -e '.exceptionDetails | not' >/dev/null ||
+    die "page threw: $(printf '%s' "$out" | jq -c '.exceptionDetails.exception.description // .exceptionDetails.text')"
+  printf '%s' "$out" | jq -r '.result.value | if type == "string" then . else tojson end'
+}
+
+cmd_page() {
+  local sub="$1"; shift
+  parse_opts "$@"
+  [ -n "$ARG" ] || die "$sub needs a tab id" 2
+  case "$sub" in eval|nav) [ -n "$ARG2" ] || die "$sub needs a tab id and an argument" 2 ;; esac
+  require_own_live "$ARG"
+  local ws file
+  ws="$(tab_ws "$ARG")"
+  case "$sub" in
+    text) page_eval "$ws" 'document.body ? document.body.innerText : ""' ;;
+    eval) page_eval "$ws" "$ARG2" ;;
+    nav) cdp "$ws" Page.navigate "$(jq -cn --arg u "$ARG2" '{url: $u}')" >/dev/null ||
+           die "navigate failed"
+         echo "agent-tab: navigated $ARG to $ARG2" ;;
+    shot) mkdir -p "$SHOT_DIR"
+          file="$SHOT_DIR/agent-tab-$ARG-$(date +%Y%m%d-%H%M%S).png"
+          cdp "$ws" Page.captureScreenshot '{"format":"png"}' | jq -r '.data' | base64 -d > "$file" ||
+            die "screenshot failed"
+          [ -s "$file" ] || { rm -f "$file"; die "screenshot failed"; }
+          echo "$file" ;;
+  esac
+}
+
+# Live-lease holder of a tab, or empty.
+live_holder() {
+  [ -f "$STATE" ] || return 0
+  jq -r --arg id "$1" --argjson now "$(date +%s)" \
+    '.[$id] | select(. != null and .expires > $now) | .owner' "$STATE"
+}
+
+cmd_health() {
+  parse_opts "$@"
+  local tabs bad=0 id ws holder
+  tabs="$(chrome_tabs | jq -r '.[] | select(.type == "page") | [.id, .webSocketDebuggerUrl // ""] | @tsv')"
+  while IFS=$'\t' read -r id ws; do
+    [ -n "$id" ] || continue
+    if [ -n "$ws" ] && cdp "$ws" Runtime.evaluate '{"expression":"1","returnByValue":true}' >/dev/null 2>&1; then
+      continue
+    fi
+    bad=1
+    echo "not answering: $id"
+    [ -n "$FIX" ] || continue
+    if [ -n "$ws" ] && cdp "$ws" Page.reload '{}' >/dev/null 2>&1 &&
+       cdp "$ws" Runtime.evaluate '{"expression":"1","returnByValue":true}' >/dev/null 2>&1; then
+      echo "  reloaded $id"
+      continue
+    fi
+    holder="$(live_holder "$id")"
+    if [ -n "$holder" ]; then
+      echo "  kept $id: live lease held by $holder ($(rec "$id" reason))"
+    else
+      curl -sf --max-time 5 "$CDP/json/close/$id" >/dev/null || true
+      if [ -f "$STATE" ]; then lock; write_state --arg id "$id" 'del(.[$id])'; rmdir "$LOCK" 2>/dev/null || true; trap - EXIT; fi
+      echo "  closed $id"
+    fi
+  done <<< "$tabs"
+  [ "$bad" -eq 0 ] && echo "agent-tab: all tabs answer"
+  [ "$bad" -eq 0 ] || [ -n "$FIX" ]
+}
+
+cmd_clear_cookies() {
+  parse_opts "$@"
+  local domain="${ARG#.}" tabs blocking="" id url holder host bws cookies pws
+  [ -n "$domain" ] || die "clear-cookies needs a domain" 2
+  tabs="$(chrome_tabs)"
+  while IFS=$'\t' read -r id url; do
+    [ -n "$id" ] || continue
+    host="${url#*://}"; host="${host%%/*}"; host="${host%%:*}"
+    case "$host" in "$domain"|*".$domain") ;; *) continue ;; esac
+    holder="$(live_holder "$id")"
+    [ -n "$holder" ] || continue
+    blocking="$blocking  $id held by $holder: $(rec "$id" reason) ($url)"$'\n'
+  done < <(printf '%s' "$tabs" | jq -r '.[] | select(.type == "page") | [.id, .url] | @tsv')
+  if [ -n "$blocking" ]; then
+    printf 'agent-tab: busy, live-lease tabs use %s:\n%s' "$domain" "$blocking" >&2
+    exit 3
+  fi
+  bws="$(curl -sf --max-time 5 "$CDP/json/version" | jq -r '.webSocketDebuggerUrl // empty')"
+  [ -n "$bws" ] || die "agents Chrome not reachable on port $PORT"
+  cookies="$(cdp "$bws" Storage.getCookies '{}' | jq -c --arg d "$domain" \
+    '.cookies[] | select((.domain | ltrimstr(".")) as $c | $c == $d or ($c | endswith("." + $d)))
+     | {name, domain, path}')" || die "could not read cookies"
+  [ -n "$cookies" ] || { echo "agent-tab: no cookies for $domain"; return 0; }
+  # Network.deleteCookies is a page-target method; any page tab works.
+  pws="$(printf '%s' "$tabs" | jq -r '[.[] | select(.type == "page") | .webSocketDebuggerUrl // empty][0] // empty')"
+  [ -n "$pws" ] || die "no page tab to clear cookies through"
+  local n=0 c
+  while IFS= read -r c; do
+    cdp "$pws" Network.deleteCookies "$c" >/dev/null || die "delete failed: $c"
+    n=$((n + 1))
+  done <<< "$cookies"
+  echo "agent-tab: cleared $n cookies for $domain"
+}
+
 case "${1:-}" in
+  text|eval|nav|shot) sub="$1"; shift; cmd_page "$sub" "$@" ;;
+  health) shift; cmd_health "$@" ;;
+  clear-cookies) shift; cmd_clear_cookies "$@" ;;
   open) shift; cmd_open "$@" ;;
   list) shift; cmd_list ;;
   close) shift; cmd_close "$@" ;;

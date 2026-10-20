@@ -46,9 +46,9 @@ Wrappers can rely on these codes for `temp-browser`, `agent-browser-temp-route`,
 | Code | Meaning |
 |------|---------|
 | 0 | OK |
-| 1 | Error (browser did not start, Chrome not reachable, tab not tracked) |
+| 1 | Error (browser did not start, Chrome not reachable, tab not tracked, page command failed, `health` found tabs that do not answer) |
 | 2 | Usage error |
-| 3 | Busy: another owner holds the lock or the tab. The holder and the reason go to stderr. Wait, or pick another resource. |
+| 3 | Busy: another owner holds the lock or the tab. The holder and the reason go to stderr. Wait, or pick another resource. For `agent-tab`: a page command (`text`, `eval`, `nav`, `shot`) on a tab you do not own or whose lease expired, or `clear-cookies` while a live-lease tab uses that site (stderr lists the blocking tabs). |
 
 `tests/temp-browser.bats` and `tests/agent-tab.bats` pin `exit 3`.
 
@@ -61,12 +61,24 @@ tab="$(agent-tab open --owner "$AGENT_ID" --reason "check dashboard" https://exa
 agent-tab list                                   # id, owner, live/expired, expiry, reason, url
 agent-tab renew --owner "$AGENT_ID" --lease 1800 "$tab"
 agent-tab close --owner "$AGENT_ID" "$tab"
+
+export AGENT_TAB_OWNER="$AGENT_ID"              # default for --owner
+agent-tab text "$tab"                            # page text
+agent-tab eval "$tab" 'document.title'           # value of a JS expression
+agent-tab nav "$tab" https://example.com/next
+agent-tab shot "$tab"                            # prints the PNG path
+agent-tab health [--fix]                         # tabs that do not answer
+agent-tab clear-cookies example.com              # one site's cookies
 ```
 
 - Records live in `~/.local/state/agent-tab/tabs.json`. Writes take a `mkdir` lock and replace the file with `mv` (atomic).
 - `open` uses CDP `PUT /json/new`; `close` uses `/json/close/<id>`. Neither raises a window.
 - Default lease is 1 hour (`--lease`, `AGENT_TAB_LEASE_SECONDS`).
 - Closing or renewing another owner's tab with a live lease exits 3 and prints the holder and the reason. After the lease expires, anyone can close it.
+- `text`, `eval`, `nav`, and `shot` work only for the owner with a live lease. Others get exit 3. An owner with an expired lease gets exit 3 too: run `renew` first. They send one CDP call over the tab's websocket (Node built-in `WebSocket`) and never raise a window.
+- `shot` writes PNGs to `~/apps/agent-scratch/screenshots/` (`AGENT_TAB_SHOT_DIR`).
+- `health` evaluates `1` in every page tab and lists the ones that do not answer (exit 1). `--fix` reloads them. If a reload does not help, it closes the tab only when no live lease owns it; a leased tab is kept and its holder printed.
+- `clear-cookies <domain>` deletes the cookies of that domain and its subdomains. If any live-lease tab is on that site, it exits 3 and lists the blocking tabs. Tabs with an expired lease do not block.
 
 The `home/zshrc.ai-tools` wrapper routes normal operator calls and dotfiles-assigned agent sessions to `agent-browser --cdp 9223` when the dashboard Chrome is reachable. Launchd Chromes run `--headless=new` so CDP tab create never opens a GUI window. After agent-browser, the wrapper logs suspected focus steals to `~/.local/share/dotfiles/logs/focus-steal.log` only — it never hides Chrome or `osascript activate`s another app (both can switch Spaces). Use `--headed` or `AGENT_BROWSER_ALLOW_FOCUS=1` when you want Chrome to stay frontmost for SSO. Preserve tab safety with per-agent daemons plus own-tab discipline: open your own tab, act only on tabs you opened, and close extra tabs at task end.
 

@@ -112,3 +112,180 @@ open_tab() { "$SCRIPT" open --owner "$1" --reason "$2" https://example.com; }
 @test "agent-tab never raises windows" {
   ! grep -qE 'osascript|activate|/json/activate|open -a' "$SCRIPT"
 }
+
+# --- page commands, health, clear-cookies (#221) ---
+# The CDP client is stubbed through AGENT_TAB_CDP. It logs "<ws> <method> <params>"
+# and answers from canned JSON. /json/list comes from $TABS_JSON.
+
+cdp_setup() {
+  export TABS_JSON="$TEST_DIR/tabs-list.json"
+  echo '[]' > "$TABS_JSON"
+  cat > "$TEST_DIR/bin/curl" <<'STUB'
+#!/bin/bash
+url="${*: -1}"
+echo "$*" >> "$CDP_LOG"
+case "$url" in
+  */json/new*) n=$(( $(wc -l < "$CDP_LOG") )); printf '{"id":"T%s","url":"x","type":"page"}\n' "$n" ;;
+  */json/close/*) echo "Target is closing" ;;
+  */json/list*) cat "$TABS_JSON" ;;
+  */json/version*) echo '{"webSocketDebuggerUrl":"ws://b/browser"}' ;;
+  *) exit 7 ;;
+esac
+STUB
+  chmod +x "$TEST_DIR/bin/curl"
+  export CDP_CALLS="$TEST_DIR/cdp-calls.log"
+  cat > "$TEST_DIR/cdp" <<'STUB'
+#!/bin/bash
+echo "$1 $2 $3" >> "$CDP_CALLS"
+case "$1" in *dead*) exit 1 ;; esac
+case "$2" in
+  Runtime.evaluate) echo '{"result":{"type":"string","value":"hello page"}}' ;;
+  Page.captureScreenshot) echo '{"data":"aGk="}' ;;
+  Storage.getCookies) echo '{"cookies":[{"name":"sid","domain":".example.com","path":"/"},{"name":"o","domain":"other.org","path":"/"}]}' ;;
+  *) echo '{}' ;;
+esac
+STUB
+  chmod +x "$TEST_DIR/cdp"
+  export AGENT_TAB_CDP="$TEST_DIR/cdp"
+  export AGENT_TAB_SHOT_DIR="$TEST_DIR/shots"
+}
+
+# Adds a tab to the stubbed /json/list.
+chrome_has() {
+  local tmp; tmp="$(mktemp)"
+  jq --arg id "$1" --arg u "$2" '. + [{id: $id, type: "page", url: $u, webSocketDebuggerUrl: ("ws://x/" + $id)}]' "$TABS_JSON" > "$tmp"
+  mv "$tmp" "$TABS_JSON"
+}
+
+@test "text returns page text for the owner" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  run "$SCRIPT" text --owner agent-a "$id"
+  [ "$status" -eq 0 ]
+  [ "$output" = "hello page" ]
+  grep -q "ws://x/$id Runtime.evaluate" "$CDP_CALLS"
+}
+
+@test "eval runs an expression for the owner" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  run "$SCRIPT" eval --owner agent-a "$id" 'document.title'
+  [ "$status" -eq 0 ]
+  grep -q 'document.title' "$CDP_CALLS"
+}
+
+@test "nav sends Page.navigate for the owner" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  run "$SCRIPT" nav --owner agent-a "$id" https://example.com/next
+  [ "$status" -eq 0 ]
+  grep -q 'Page.navigate.*example.com/next' "$CDP_CALLS"
+}
+
+@test "shot writes a PNG under the screenshot dir" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  run "$SCRIPT" shot --owner agent-a "$id"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "$AGENT_TAB_SHOT_DIR/"*.png ]]
+  [ "$(cat "$output")" = "hi" ]
+}
+
+@test "page commands from another owner exit 3 with holder and reason" {
+  cdp_setup
+  id="$(open_tab agent-a "bot login")"; chrome_has "$id" https://example.com/
+  for cmd in text eval nav shot; do
+    run "$SCRIPT" "$cmd" --owner agent-b "$id" x
+    [ "$status" -eq 3 ]
+    [[ "$output" == *"agent-a"*"bot login"* ]]
+  done
+  [ ! -e "$CDP_CALLS" ]
+}
+
+@test "page commands need a live lease, even for the owner" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  tmp="$(mktemp)"; jq --arg id "$id" '.[$id].expires = 1' "$AGENT_TAB_STATE_DIR/tabs.json" > "$tmp"
+  mv "$tmp" "$AGENT_TAB_STATE_DIR/tabs.json"
+  run "$SCRIPT" text --owner agent-a "$id"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"renew"* ]]
+}
+
+@test "AGENT_TAB_OWNER is the default owner" {
+  cdp_setup
+  id="$(AGENT_TAB_OWNER=agent-a "$SCRIPT" open --reason r https://example.com)"
+  jq -e --arg id "$id" '.[$id].owner == "agent-a"' "$AGENT_TAB_STATE_DIR/tabs.json"
+  chrome_has "$id" https://example.com/
+  AGENT_TAB_OWNER=agent-a run "$SCRIPT" text "$id"
+  [ "$status" -eq 0 ]
+  AGENT_TAB_OWNER=agent-b run "$SCRIPT" close "$id"
+  [ "$status" -eq 3 ]
+}
+
+@test "health lists tabs that do not answer" {
+  cdp_setup
+  chrome_has OK1 https://example.com/
+  chrome_has dead1 https://example.com/
+  run "$SCRIPT" health
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"dead1"* ]]
+  [[ "$output" != *"OK1"* ]]
+  ! grep -q '/json/close/' "$CDP_LOG"
+}
+
+@test "health --fix reloads, and closes only tabs no live lease owns" {
+  cdp_setup
+  chrome_has dead1 https://example.com/
+  chrome_has dead2 https://example.com/
+  # dead2 has a live lease from agent-a.
+  mkdir -p "$AGENT_TAB_STATE_DIR"
+  jq -n --argjson e "$(( $(date +%s) + 600 ))" '{dead2: {owner: "agent-a", reason: "r", url: "u", expires: $e}}' > "$AGENT_TAB_STATE_DIR/tabs.json"
+  run "$SCRIPT" health --fix
+  grep -q 'dead1 Page.reload' "$CDP_CALLS"
+  grep -q '/json/close/dead1' "$CDP_LOG"
+  ! grep -q '/json/close/dead2' "$CDP_LOG"
+  [[ "$output" == *"dead2"*"agent-a"* ]]
+}
+
+@test "health is ok when every tab answers" {
+  cdp_setup
+  chrome_has OK1 https://example.com/
+  run "$SCRIPT" health
+  [ "$status" -eq 0 ]
+}
+
+@test "clear-cookies clears only that site's cookies when no live tab uses it" {
+  cdp_setup
+  chrome_has P1 https://other.org/
+  run "$SCRIPT" clear-cookies example.com
+  [ "$status" -eq 0 ]
+  grep -q 'Network.deleteCookies.*"name":"sid"' "$CDP_CALLS"
+  ! grep -q '"name":"o"' "$CDP_CALLS"
+}
+
+@test "clear-cookies exits 3 and lists blocking live-lease tabs" {
+  cdp_setup
+  id="$(open_tab agent-a "bot login")"; chrome_has "$id" https://app.example.com/x
+  run "$SCRIPT" clear-cookies example.com
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"$id"*"agent-a"*"bot login"* ]]
+  ! grep -q 'deleteCookies' "$CDP_CALLS" 2>/dev/null
+}
+
+@test "clear-cookies ignores expired-lease tabs on the site" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  chrome_has P1 https://other.org/
+  tmp="$(mktemp)"; jq --arg id "$id" '.[$id].expires = 1' "$AGENT_TAB_STATE_DIR/tabs.json" > "$tmp"
+  mv "$tmp" "$AGENT_TAB_STATE_DIR/tabs.json"
+  run "$SCRIPT" clear-cookies example.com
+  [ "$status" -eq 0 ]
+}
+
+@test "usage lists the new commands" {
+  run "$SCRIPT" --help
+  for c in text eval nav shot health clear-cookies AGENT_TAB_OWNER; do
+    [[ "$output" == *"$c"* ]]
+  done
+}

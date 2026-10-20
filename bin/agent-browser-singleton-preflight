@@ -41,8 +41,15 @@ managed_port_for_profile() {
   profile="$(normalize_profile "$1")"
   case "$profile" in
     "$HOME/.agent-browser/chrome-profile") echo "9223" ;;
-    "$HOME/.agent-browser/debug-profile") echo "9224" ;;
-    "$HOME/.agent-browser/tooling-profile") echo "9225" ;;
+    *) return 1 ;;
+  esac
+}
+
+# debug-profile (9224) and tooling-profile (9225) belonged to retired Chromes.
+# Nothing attaches to them; isolated work goes to temp-browser instead.
+retired_profile() {
+  case "$(normalize_profile "$1")" in
+    "$HOME/.agent-browser/debug-profile"|"$HOME/.agent-browser/tooling-profile") return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -133,6 +140,14 @@ fi
 [ -n "$profile" ] || { usage >&2; exit 2; }
 
 normalized_profile="$(normalize_profile "$profile")"
+if retired_profile "$normalized_profile"; then
+  {
+    printf 'Refusing retired agent profile: %s\n' "$normalized_profile"
+    printf 'Its Chrome is retired. For isolation use temp-browser:\n'
+    printf '  agent-browser --session-name <name> ...  (routes through temp-browser)\n'
+  } >&2
+  exit 2
+fi
 if port="$(managed_port_for_profile "$normalized_profile")"; then
   if cdp_responsive "$port"; then
     unset AGENT_BROWSER_PROFILE

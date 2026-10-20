@@ -1022,6 +1022,7 @@ scratch work.
 | `new-project` | Scaffold a react/node/lib/python project with best-practice defaults |
 | `setup-chrome` | Apply dev-friendly Chrome settings and performance flags |
 | `temp-browser` | One locked, disposable agent browser: `acquire --owner <id> --reason <text>` prints the CDP port (fresh headless profile); `status`; `release --owner <id>` stops it and deletes the profile |
+| `agent-browser-temp-route` | Routes agent-browser calls with `--session-name`, `--profile`, or `--extension` to `temp-browser` through its lock; fails with the holder and reason when held |
 | `setup-dock` | Reset Dock to a developer-essential app layout |
 
 **Utilities**

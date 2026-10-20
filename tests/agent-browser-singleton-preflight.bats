@@ -52,7 +52,7 @@ teardown() {
   [[ "$output" == *"profile=__unset__"* ]]
 }
 
-@test "preflight maps every launchd-owned profile to its managed CDP port" {
+@test "preflight maps only the agents Chrome profile to a CDP port" {
   printf '9223\n9224\n9225\n' > "$TEST_DIR/responsive-ports"
 
   run "$SCRIPT" --print-cdp "$HOME/.agent-browser/chrome-profile/"
@@ -60,23 +60,36 @@ teardown() {
   [ "$output" = "9223" ]
 
   run "$SCRIPT" --print-cdp "$HOME/.agent-browser/debug-profile"
-  [ "$status" -eq 0 ]
-  [ "$output" = "9224" ]
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"9224"* ]]
 
   run "$SCRIPT" --print-cdp "~/.agent-browser/tooling-profile"
-  [ "$status" -eq 0 ]
-  [ "$output" = "9225" ]
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"9225"* ]]
 }
 
 @test "preflight refuses managed profile launch when singleton lock exists but CDP is down" {
-  touch "$HOME/.agent-browser/debug-profile/SingletonLock"
+  touch "$HOME/.agent-browser/chrome-profile/SingletonLock"
 
-  run "$SCRIPT" --profile "$HOME/.agent-browser/debug-profile" -- open https://example.com
+  run "$SCRIPT" --profile "$HOME/.agent-browser/chrome-profile" -- open https://example.com
 
   [ "$status" -eq 2 ]
   [[ "$output" == *"Refusing to launch Chrome against launchd-owned profile"* ]]
-  [[ "$output" == *"9224"* ]]
+  [[ "$output" == *"9223"* ]]
   [[ "$output" != *"agent-browser <"* ]]
+}
+
+@test "preflight refuses retired profiles and points at temp-browser, never 9224/9225" {
+  printf '9224\n9225\n' > "$TEST_DIR/responsive-ports"
+  for name in debug-profile tooling-profile; do
+    run "$SCRIPT" --profile "$HOME/.agent-browser/$name" -- open https://example.com
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"retired"* ]]
+    [[ "$output" == *"temp-browser"* ]]
+    [[ "$output" != *"9224"* ]]
+    [[ "$output" != *"9225"* ]]
+    [[ "$output" != *"agent-browser <"* ]]
+  done
 }
 
 @test "preflight passes non-managed profiles through without CDP rewriting" {

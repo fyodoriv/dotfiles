@@ -1,0 +1,68 @@
+#!/bin/bash
+# agent-browser-temp-route: send isolated agent-browser calls to temp-browser.
+#
+# A call needs isolation when it passes --session-name, --profile, or
+# --extension. Such a call must not use the shared agents Chrome (9223).
+# This script takes the temp-browser lock, then runs agent-browser with
+# --cdp <temp port>. When another agent holds the lock, it fails with the
+# holder and the reason. It never raises or focuses a window.
+#
+# Owner: the --session-name value, else $AGENT_ID, else $AGENT_BROWSER_SESSION.
+# Reason: $AGENT_BROWSER_TEMP_REASON, default "isolated agent-browser session".
+# `close` releases the lock after agent-browser exits. Else the lease expires.
+# --profile <dir> is dropped: temp-browser always uses a fresh profile.
+#
+# Usage:
+#   agent-browser-temp-route --needs-isolation [args...]  # exit 0 if yes
+#   agent-browser-temp-route -- [agent-browser args...]
+set -uo pipefail
+
+TEMP_BROWSER="${TEMP_BROWSER_BIN:-$(dirname "$0")/temp-browser}"
+
+needs_isolation() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --session-name|--session-name=*|--profile|--profile=*|--extension|--extension=*) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+case "${1:-}" in
+  --needs-isolation) shift; needs_isolation "$@"; exit $? ;;
+  --) shift ;;
+  *) echo "usage: agent-browser-temp-route --needs-isolation|-- [args...]" >&2; exit 2 ;;
+esac
+
+session="" is_close=0 args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --session-name) session="${2:-}"; args+=("$1" "${2:-}"); shift 2 || shift ;;
+    --session-name=*) session="${1#*=}"; args+=("$1"); shift ;;
+    --profile) shift 2 || shift ;;
+    --profile=*) shift ;;
+    *) [ "$1" = close ] && is_close=1; args+=("$1"); shift ;;
+  esac
+done
+
+owner="${session:-${AGENT_ID:-${AGENT_BROWSER_SESSION:-}}}"
+if [ -z "$owner" ]; then
+  echo "agent-browser: isolated call needs an owner: pass --session-name or set AGENT_ID" >&2
+  exit 2
+fi
+reason="${AGENT_BROWSER_TEMP_REASON:-isolated agent-browser session}"
+
+port="$("$TEMP_BROWSER" acquire --owner "$owner" --reason "$reason")"
+rc=$?
+if [ "$rc" -ne 0 ]; then
+  echo "agent-browser: temp-browser not available (exit $rc); see the holder above" >&2
+  exit "$rc"
+fi
+
+env -u AGENT_BROWSER_ARGS -u AGENT_BROWSER_PROFILE command agent-browser --cdp "$port" "${args[@]}"
+rc=$?
+if [ "$is_close" = 1 ]; then
+  "$TEMP_BROWSER" release --owner "$owner" >/dev/null || true
+fi
+exit "$rc"

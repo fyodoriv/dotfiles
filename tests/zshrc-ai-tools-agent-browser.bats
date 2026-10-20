@@ -212,3 +212,19 @@ MOCK
   [ "$status" -eq 0 ]
   [ "$output" = "args=open https://example.com env=--headless=new" ]
 }
+
+@test "agent-browser wrapper routes isolation flags through the temp-browser router" {
+  cp "$BATS_TEST_DIRNAME/../bin/agent-browser-temp-route" "$DOTFILES_DIR/bin/"
+  cat > "$DOTFILES_DIR/bin/temp-browser" <<'MOCK'
+#!/bin/bash
+[ "$1" = acquire ] && echo 9399
+exit 0
+MOCK
+  chmod +x "$DOTFILES_DIR/bin/temp-browser"
+  source_agent_browser_function
+
+  run agent-browser --session-name sso-bot open https://example.com
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "real agent-browser: --cdp 9399 --session-name sso-bot open https://example.com" ]
+}

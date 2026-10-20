@@ -83,6 +83,13 @@ agent-browser() {
     _ab_dotfiles_dir="$HOME/apps/dotfiles"
   fi
   local _ab_focus_log="$_ab_dotfiles_dir/bin/dotfiles-restore-focus-after-chrome"
+  # Isolation flags (--session-name, --profile, --extension) go to the
+  # locked temp-browser, never the shared agents Chrome on 9223.
+  local _ab_temp_route="$_ab_dotfiles_dir/bin/agent-browser-temp-route"
+  if [ -x "$_ab_temp_route" ] && "$_ab_temp_route" --needs-isolation "$@"; then
+    "$_ab_temp_route" -- "$@"
+    return $?
+  fi
   if [ "${_DOTFILES_AGENT_BROWSER_TEST_CDP_READY:-}" = "1" ] || (exec 3<>/dev/tcp/127.0.0.1/9223) 2>/dev/null; then
     _ab_cdp_ready=1
   fi

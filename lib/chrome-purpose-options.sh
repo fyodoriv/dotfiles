@@ -3,6 +3,7 @@
 # These replace overlay post-patches of the rendered plist:
 #   chrome.purpose_headed   true  → drop --headless=new (a visible window)
 #   chrome.restore_session  true  → add --restore-last-session
+#   chrome.dock_guard       false → no com.dotfiles.chrome-dock-guard (#237)
 # Values come from config/plugin-options.yaml (default false) and plugins.
 
 # _chrome_args_index <plist> <arg>: prints the ProgramArguments index of
@@ -26,4 +27,12 @@ chrome_purpose_apply_options() {
     count="$(plutil -extract ProgramArguments raw -o - "$plist")"
     plutil -insert "ProgramArguments.$count" -string --restore-last-session "$plist"
   fi
+}
+
+# chrome_dock_guard_enabled <dock_guard:true|false> <headed:true|false>
+# Succeeds when the Dock guard should run. A headless purpose Chrome has no
+# window, so a Dock click can get stuck in it: the guard stays on there.
+chrome_dock_guard_enabled() {
+  [ "$1" = false ] && [ "$2" = true ] && return 1
+  return 0
 }

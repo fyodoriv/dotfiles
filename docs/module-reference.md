@@ -264,7 +264,7 @@ On `profile: core`, the module runs only when the `agent-browser` CLI is install
 | `agent-browser.env_timeout` | Default timeout env var configured | None |
 | `agent-browser.cdp_wrapper` | shell wrapper auto-uses `--cdp 9223` for default and dotfiles-assigned agent sessions | None |
 | `agent-browser.focus_restore_helper` | `dotfiles-restore-focus-after-chrome` helper installed | None |
-| `agent-browser.chrome_dock_guard` | `com.dotfiles.chrome-dock-guard` LaunchAgent installed | None |
+| `agent-browser.chrome_dock_guard` | `com.dotfiles.chrome-dock-guard` LaunchAgent installed (skipped when `chrome.dock_guard` is off) | None |
 | `agent-browser.focus_restore_wired` | zshrc.ai-tools logs focus steals after agent-browser (never hides Chrome) | None |
 | `agent-browser.restore_no_activate` | focus-restore helper never osascript-activates or hides Chrome | None |
 | `focus.no_steal_open_flags` | `open -a` in bin/lib/launchagents uses `-g`, `--gj`, or `--background` | Fix offending script |

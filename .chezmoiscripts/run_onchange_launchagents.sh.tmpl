@@ -39,6 +39,16 @@ _core_option() {
   fi
 }
 
+# chrome.dock_guard core option (#237): false keeps the guard off, only with
+# a headed purpose Chrome. Override: DOTFILES_CHROME_DOCK_GUARD.
+CHROME_DOCK_GUARD="${DOTFILES_CHROME_DOCK_GUARD:-true}"
+if [ -z "${DOTFILES_CHROME_DOCK_GUARD:-}" ] && [ -f "$SOURCE_DIR/lib/chrome-purpose-options.sh" ]; then
+  # shellcheck source=/dev/null
+  source "$SOURCE_DIR/lib/chrome-purpose-options.sh"
+  chrome_dock_guard_enabled "$(_core_option chrome.dock_guard)" "$(_core_option chrome.purpose_headed)" ||
+    CHROME_DOCK_GUARD=false
+fi
+
 # Tool-presence / profile check — skip agents that shouldn't load
 # Core profile only gets essential agents: sync, doctor, git-maintain,
 # capslock-control (capslock_control only), gui-path, network-resilience. Everything else requires full.
@@ -47,6 +57,8 @@ should_skip_agent() {
   case "$short" in
     capslock-control)
       [ "$CAPSLOCK_CONTROL" = "false" ] && return 0 ;;
+    chrome-dock-guard)
+      [ "${CHROME_DOCK_GUARD:-true}" = "false" ] && return 0 ;;
     # CDP debug ports are a localhost attack vector — require full profile
     agent-browser-chrome)
       [ "$PROFILE" != "full" ] && return 0 ;;

@@ -157,6 +157,20 @@ check "agent-browser.agent_session_wired" "agent-browser session env wired for a
 
 # The launchd agent Chromes share Google Chrome.app's identity, so a Dock click
 # can land in a hidden one. The guard hands that click to the user's Chrome.
-check "agent-browser.chrome_dock_guard" "Chrome Dock guard launchagent installed (Dock click never lands in a hidden agent Chrome)" \
-  "[ -f \"\$HOME/Library/LaunchAgents/com.dotfiles.chrome-dock-guard.plist\" ] || [ -f \"\$DOTFILES_DIR/launchagents/com.dotfiles.chrome-dock-guard.plist.tmpl\" ]" \
-  ""
+# Core option chrome.dock_guard: false (with a headed purpose Chrome) turns the
+# guard off, so the check is skipped and has no fix (#237).
+_dg_option() {
+  if declare -F plugin_option >/dev/null; then plugin_option "$1" 2>/dev/null || echo "$2"; else echo "$2"; fi
+}
+_dg_on=true
+if [ -f "$DOTFILES_DIR/lib/chrome-purpose-options.sh" ]; then
+  # shellcheck source=/dev/null
+  source "$DOTFILES_DIR/lib/chrome-purpose-options.sh"
+  chrome_dock_guard_enabled "${DOTFILES_CHROME_DOCK_GUARD:-$(_dg_option chrome.dock_guard true)}" \
+    "${DOTFILES_CHROME_PURPOSE_HEADED:-$(_dg_option chrome.purpose_headed false)}" || _dg_on=false
+fi
+if $_dg_on; then
+  check "agent-browser.chrome_dock_guard" "Chrome Dock guard launchagent installed (Dock click never lands in a hidden agent Chrome)" \
+    "[ -f \"\$HOME/Library/LaunchAgents/com.dotfiles.chrome-dock-guard.plist\" ] || [ -f \"\$DOTFILES_DIR/launchagents/com.dotfiles.chrome-dock-guard.plist.tmpl\" ]" \
+    ""
+fi

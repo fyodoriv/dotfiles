@@ -16,6 +16,10 @@ options:
     type: boolean
     default: false
     description: Start the purpose Chrome LaunchAgents with --restore-last-session.
+  chrome.dock_guard:
+    type: boolean
+    default: true
+    description: Run com.dotfiles.chrome-dock-guard. false is honored only with chrome.purpose_headed true; a headless purpose Chrome always keeps the guard.
   spotlight.exclude_worktrees:
     type: boolean
     default: true

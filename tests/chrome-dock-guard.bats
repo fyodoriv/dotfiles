@@ -89,3 +89,39 @@ need_swiftc() {
   run bash "$GUARD_CMD" --decide 0 "$CHROME"
   [ "$output" = "keep" ]
 }
+
+# --- #237: core option chrome.dock_guard ---
+
+@test "chrome.dock_guard is a core boolean option that defaults to true" {
+  run yq -r '.options["chrome.dock_guard"] | .type + " " + (.default | tostring)' \
+    "$BATS_TEST_DIRNAME/../config/plugin-options.yaml"
+  [ "$output" = "boolean true" ]
+}
+
+@test "chrome.dock_guard=false turns the guard off only with a headed purpose Chrome" {
+  lib="$BATS_TEST_DIRNAME/../lib/chrome-purpose-options.sh"
+  run bash -c "source '$lib'; chrome_dock_guard_enabled false true"
+  [ "$status" -eq 1 ]
+  run bash -c "source '$lib'; chrome_dock_guard_enabled false false"
+  [ "$status" -eq 0 ]
+  run bash -c "source '$lib'; chrome_dock_guard_enabled true true"
+  [ "$status" -eq 0 ]
+}
+
+@test "apply skips (and removes) the guard LaunchAgent when the guard is off" {
+  src="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  run bash -c "eval \"\$(sed -n '/^should_skip_agent() {/,/^}/p' '$src')\"; CHROME_DOCK_GUARD=false should_skip_agent chrome-dock-guard"
+  [ "$status" -eq 0 ]
+  run bash -c "eval \"\$(sed -n '/^should_skip_agent() {/,/^}/p' '$src')\"; CHROME_DOCK_GUARD=true should_skip_agent chrome-dock-guard"
+  [ "$status" -eq 1 ]
+  grep -q 'CHROME_DOCK_GUARD=' "$src"
+}
+
+@test "doctor skips the guard check when the guard is off" {
+  run env DOTFILES_CHROME_DOCK_GUARD=false DOTFILES_CHROME_PURPOSE_HEADED=true \
+    "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module agent-browser --list
+  [[ "$output" != *agent-browser.chrome_dock_guard* ]]
+  run env DOTFILES_CHROME_DOCK_GUARD=false DOTFILES_CHROME_PURPOSE_HEADED=false \
+    "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module agent-browser --list
+  [[ "$output" == *agent-browser.chrome_dock_guard* ]]
+}

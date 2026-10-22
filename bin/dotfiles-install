@@ -5,7 +5,7 @@
 # Usage:
 #   dotfiles-install plan [--profile core|full]   Explain what will change; change nothing
 #   dotfiles-install run --yes [flags]            Back up, apply, heal, verify (+ agentbrew)
-#   dotfiles-install restore [BACKUP_ID]          Put the backed-up files and macOS settings back
+#   dotfiles-install restore [BACKUP_ID] [--yes]  Put the backed-up files and macOS settings back
 #   dotfiles-install backups                      List backups
 #
 # Flags for `run` (the answers to the INSTALL.md questions):
@@ -35,6 +35,8 @@ AGENTBREW_URL="${DOTFILES_INSTALL_AGENTBREW_URL:-https://github.com/fyodoriv/age
 
 # shellcheck source=../lib/mac-baseline.sh
 source "$REPO_DIR/lib/mac-baseline.sh"
+# shellcheck source=../lib/confirm.sh
+source "$REPO_DIR/lib/confirm.sh"
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
@@ -279,7 +281,7 @@ cmd_run() {
     esac
     shift
   done
-  [ "$yes" -eq 1 ] || { say "Show the plan first (dotfiles-install plan), then rerun with --yes."; exit 2; }
+  confirm_require_yes "$yes" "Show the plan first (dotfiles-install plan), then rerun with --yes."
   case "$profile" in core|full) ;; *) say "--profile must be core or full"; exit 2 ;; esac
   # Before anything changes: the "before" half of the install receipt.
   receipt_begin "$profile"
@@ -350,7 +352,19 @@ cmd_run() {
 case "${1:-}" in
   plan) shift; cmd_plan "$@" ;;
   run) shift; cmd_run "$@" ;;
-  restore) shift; do_restore "${1:-}" ;;
+  restore)
+    shift
+    _yes=0 _id=""
+    for _a in "$@"; do
+      case "$_a" in
+        --yes) _yes=1 ;;
+        -h | --help) usage; exit 0 ;;
+        -*) say "Unknown flag: $_a"; usage; exit 2 ;;
+        *) _id="$_a" ;;
+      esac
+    done
+    confirm_yes "$_yes" "replaces your managed files, LaunchAgents, chezmoi config, and macOS settings with backup ${_id:-(the latest)}"
+    do_restore "$_id" ;;
   backups) ls -1 "$BACKUP_ROOT" 2>/dev/null || say "No backups yet." ;;
   -h|--help|help|"") usage ;;
   *) say "Unknown command: $1"; usage; exit 2 ;;

@@ -22,8 +22,11 @@ re-signs new bottles.
 
 ```bash
 DOTFILES_APPLIED="$(chezmoi source-path)"
-env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-upgrade"
+env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-upgrade" --yes
 ```
+
+`--yes` is needed: without a terminal the upgrade refuses without it. Running
+`/tooling-checkup` is the owner's yes for this upgrade.
 
 It can take 5 to 20 minutes. Run it in the background and keep working on
 Phases 5 to 8. Its log is `~/.local/share/dotfiles/logs/dotfiles-upgrade.log`.

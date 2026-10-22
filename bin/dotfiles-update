@@ -9,16 +9,19 @@ else
 fi
 DRY_RUN=0
 VERBOSE=0
+YES=0
 
 usage() {
   cat <<USAGE
-Usage: dotfiles-update [--dry-run] [--verbose]
+Usage: dotfiles-update [--dry-run] [--verbose] [--yes]
 
 Update the whole machine: pull/apply/agentbrew/packages/doctor.
+It asks first: y/N at a terminal; without a terminal it needs --yes.
 
 Options:
-  --dry-run   Print phases without running them
+  --dry-run   Print phases without running them (needs no yes)
   --verbose   Print command detail while running
+  --yes       The person agreed: update without asking
   --help      Show this help
 USAGE
 }
@@ -27,6 +30,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --verbose) VERBOSE=1; shift ;;
+    --yes) YES=1; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -74,8 +78,15 @@ agentbrew_phase() {
   printf '○ agentbrew not available — skipping agent config refresh\n'
 }
 
+if [ "$DRY_RUN" -eq 0 ]; then
+  # shellcheck source=../lib/confirm.sh
+  source "$DOTFILES_DIR/lib/confirm.sh"
+  confirm_yes "$YES" "pulls, applies, and updates agents and every package on this Mac"
+fi
+
 phase pull git -C "$DOTFILES_DIR" pull --rebase
 phase apply dotfiles apply
 agentbrew_phase
-phase packages dotfiles-upgrade
+# The person said yes to the whole update, the package upgrade included.
+phase packages dotfiles-upgrade --yes
 phase doctor dotfiles-doctor --fix

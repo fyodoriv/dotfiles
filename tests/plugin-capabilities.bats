@@ -75,7 +75,7 @@ caps() {
   run caps plugin_sudo acme true
   [ "$status" -eq 3 ]
   [[ "$output" == *"capability not declared: sudo (plugin acme)"* ]]
-  bash "$CLI" remove acme >/dev/null
+  bash "$CLI" remove acme --yes >/dev/null
   install_plugin '  sudo: true'
   run caps plugin_sudo acme true < /dev/null
   [ "$status" -eq 3 ]

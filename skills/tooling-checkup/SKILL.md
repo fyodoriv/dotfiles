@@ -195,7 +195,7 @@ apply skip.
 
 Follow [reference/machine-updates.md](reference/machine-updates.md). In short:
 
-1. Run `dotfiles-upgrade` (Topgrade: Homebrew and casks, npm and pnpm globals,
+1. Run `dotfiles-upgrade --yes` (Topgrade: Homebrew and casks, npm and pnpm globals,
    uv, pipx, mise, gh extensions) unless the fast path applies. Start it only
    after Phase 3 is done. Run it in the background and go on with Phases 5
    to 8. When it ends, run `dotfiles-lock-checked --log <upgrade log>`. Exit

@@ -735,6 +735,10 @@ broken file://$feeds/missing.xml"
   grep -q 'dotfiles-lock-checked' "$SKILL_DIR/reference/machine-updates.md"
 }
 
+@test "tooling-checkup passes --yes to dotfiles-upgrade (the checkup is the owner's yes)" {
+  grep -qF 'bin/dotfiles-upgrade" --yes' "$SKILL_DIR/reference/machine-updates.md"
+}
+
 @test "tooling-checkup resolves new-project from its source when not installed" {
   grep -q "\[ -d \"\$NP\" \] || NP=" "$SKILL"
 }

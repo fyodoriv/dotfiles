@@ -2,8 +2,10 @@
 # Hard-to-undo dotfiles commands ask first (lib/confirm.sh): a y/N prompt at
 # a terminal, or --yes. Without a terminal and without --yes they refuse and
 # change nothing, so an agent has to ask the user first. --dry-run and --help
-# need no yes. Covers `dotfiles contribute` (a public PR), `dotfiles init`, and
-# `dotfiles update`.
+# need no yes. Covers `dotfiles contribute` (a public PR) and `dotfiles init`
+# here, the prompt itself (on /dev/tty, through a pty), and
+# tests/bin-dotfiles-update.bats, tests/dotfiles-upgrade.bats, and
+# tests/plugin-v2.bats cover the gates inside those scripts.
 
 load test_helper
 
@@ -65,13 +67,46 @@ teardown() {
   [ "$(cat "$LOG")" = "chezmoi init --source $TEST_DIR/repo --apply" ]
 }
 
-@test "update without a terminal and without --yes refuses; --dry-run and --yes run it" {
-  run bash "$TEST_DIR/repo/bin/dotfiles" update --verbose < /dev/null
-  [ "$status" -eq 2 ]
-  [ ! -e "$LOG" ] || { cat "$LOG"; return 1; }
-  run bash "$TEST_DIR/repo/bin/dotfiles" update --dry-run < /dev/null
-  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  run bash "$TEST_DIR/repo/bin/dotfiles" update --yes --verbose < /dev/null
-  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  [ "$(cat "$LOG")" = "$(printf 'dotfiles-update --dry-run\ndotfiles-update --verbose')" ]
+# on_tty <answer> <cmd>...: run cmd with a pty as its terminal; answer the
+# first "[y/N]" the pty shows. Exit 99 when no prompt reached the terminal.
+on_tty() {
+  ANSWER="$1" python3 - "${@:2}" <<'PY'
+import os, pty, select, signal, sys, time
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(sys.argv[1], sys.argv[1:])
+buf, sent, end = b"", False, time.time() + 15
+while time.time() < end:
+    if select.select([fd], [], [], 0.2)[0]:
+        try:
+            data = os.read(fd, 1024)
+        except OSError:
+            break
+        if not data:
+            break
+        buf += data
+        if not sent and b"[y/N]" in buf:
+            os.write(fd, os.environ["ANSWER"].encode() + b"\n")
+            sent = True
+    elif os.waitpid(pid, os.WNOHANG)[0]:
+        break
+else:
+    os.kill(pid, signal.SIGKILL)
+_, status = os.waitpid(pid, 0)
+sys.stdout.write(buf.decode(errors="replace"))
+sys.exit(os.waitstatus_to_exitcode(status) if sent else 99)
+PY
+}
+
+@test "at a terminal with its output sent to a file, the prompt shows on the terminal and y goes through" {
+  run on_tty y bash -c 'exec >"$1" 2>&1; source "$2"; confirm_yes 0 "changes a test thing"; echo AGREED' _ "$TEST_DIR/out" "$REPO_ROOT/lib/confirm.sh"
+  [ "$status" -eq 0 ] || { echo "status $status: $output"; cat "$TEST_DIR/out"; return 1; }
+  [[ "$output" == *"changes a test thing"*"[y/N]"* ]]
+  grep -qx AGREED "$TEST_DIR/out"
+}
+
+@test "at a terminal, n stops the command and nothing after the gate runs" {
+  run on_tty n bash -c 'exec >"$1" 2>&1; source "$2"; confirm_yes 0 "changes a test thing"; echo AGREED' _ "$TEST_DIR/out" "$REPO_ROOT/lib/confirm.sh"
+  [ "$status" -eq 1 ] || { echo "status $status: $output"; cat "$TEST_DIR/out"; return 1; }
+  ! grep -q AGREED "$TEST_DIR/out"
 }

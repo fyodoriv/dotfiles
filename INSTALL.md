@@ -55,7 +55,7 @@ Show the person, in your own short words:
 - that a critical error restores the backup by itself and removes the files
   and folders the install created, but Homebrew packages stay installed, and
   caches and tools the install scripts made stay too (restore lists them),
-- how to undo later: `bash <DIR>/bin/dotfiles-install restore`.
+- how to undo later: `bash <DIR>/bin/dotfiles-install restore` (it asks first; an agent passes `--yes` after the user says yes).
 
 If a prerequisite is missing, help install it first. Homebrew and the Xcode
 tools ask for the person's password or show a dialog: tell them, and let

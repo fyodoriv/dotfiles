@@ -185,7 +185,7 @@ exit 1
 STUB
   chmod +x "$TEST_BIN/pgrep"
 
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
   [ "$status" -eq 0 ]
   [[ "$output" != *"Skipping upgrade"* ]]
   # Sanity: the wrapper ran topgrade rather than aborting
@@ -206,7 +206,7 @@ exit 1
 STUB
   chmod +x "$TEST_BIN/pgrep"
 
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
   [ "$status" -eq 0 ]
   [[ "$output" != *"Skipping upgrade"* ]]
 }
@@ -225,25 +225,25 @@ STUB
 # ── Full run ─────────────────────────────────────────────────────────
 
 @test "full run creates last-upgrade timestamp file" {
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
   [ "$status" -eq 0 ]
   [ -f "$TEST_HOME/.local/share/dotfiles/last-upgrade" ]
 }
 
 @test "full run creates log file" {
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
   [ "$status" -eq 0 ]
   [ -f "$TEST_HOME/.local/share/dotfiles/logs/dotfiles-upgrade.log" ]
 }
 
 @test "full run invokes topgrade" {
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
   [ "$status" -eq 0 ]
   [[ "$output" == *"[topgrade-stub] would run upgrades"* ]]
 }
 
 @test "full run shows upgrade complete summary" {
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
   [ "$status" -eq 0 ]
   [[ "$output" == *"Upgrade complete"* ]]
 }
@@ -317,7 +317,7 @@ STUB
   _opencode_installer_stub
   mkdir -p "$TEST_HOME/.opencode/bin"
 
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
 
   [ "$status" -eq 0 ]
   [ "$(cat "$TEST_DIR/repo/home/zshrc")" = "# managed zshrc" ]
@@ -326,9 +326,37 @@ STUB
 @test "wrapper adds ~/.opencode/bin to PATH only when it exists" {
   _opencode_installer_stub
 
-  run "$SCRIPT"
+  run "$SCRIPT" --yes
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"[topgrade-stub] PATH="* ]]
   [[ "$output" != *".opencode/bin"* ]]
+}
+
+@test "without a terminal and without --yes it refuses before topgrade runs" {
+  run "$SCRIPT" < /dev/null
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--yes"* ]]
+  [[ "$output" != *"[topgrade-stub]"* ]]
+  [ ! -f "$TEST_HOME/.local/share/dotfiles/last-upgrade" ]
+}
+
+@test "--node asks too, and --dry-run needs no yes" {
+  run "$SCRIPT" --node 24 < /dev/null
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --dry-run < /dev/null
+  [ "$status" -eq 0 ]
+}
+
+@test "the weekly LaunchAgent passes --yes: auto_upgrade is the owner's yes" {
+  local plist="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.dotfiles-upgrade.plist.tmpl"
+  grep -A1 'bin/dotfiles-upgrade</string>' "$plist" | grep -q '<string>--yes</string>'
+}
+
+@test "--yes --help prints the help and upgrades nothing" {
+  run "$SCRIPT" --yes --help < /dev/null
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage:"* ]]
+  [[ "$output" != *"[topgrade-stub]"* ]]
+  [ ! -f "$TEST_HOME/.local/share/dotfiles/last-upgrade" ]
 }

@@ -22,6 +22,8 @@ copy_script_to_test_repo() {
   mkdir -p "$TEST_DOTFILES/bin"
   cp "$SCRIPT" "$TEST_DOTFILES/bin/dotfiles-update"
   chmod +x "$TEST_DOTFILES/bin/dotfiles-update"
+  mkdir -p "$TEST_DOTFILES/lib"
+  cp "$REPO/lib/confirm.sh" "$TEST_DOTFILES/lib/confirm.sh"
   touch "$TEST_DOTFILES/Agentfile.yaml"
 }
 
@@ -61,12 +63,12 @@ STUB
   done
   copy_script_to_test_repo
 
-  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update"
+  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update" --yes
 
   expected="git -C $TEST_DOTFILES pull --rebase
 ""dotfiles apply
 ""agentbrew sync --pull --agentfile $TEST_DOTFILES/Agentfile.yaml
-""dotfiles-upgrade
+""dotfiles-upgrade --yes
 ""dotfiles-doctor --fix"
   [ "$status" -eq 0 ]
   [ "$(cat "$invocations")" = "$expected" ]
@@ -82,11 +84,11 @@ STUB
   done
   copy_script_to_test_repo
 
-  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update"
+  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update" --yes
 
   expected="git -C $TEST_DOTFILES pull --rebase
 ""dotfiles apply
-""dotfiles-upgrade
+""dotfiles-upgrade --yes
 ""dotfiles-doctor --fix"
   [ "$status" -eq 0 ]
   [[ "$output" == *"○ agentbrew not available — skipping agent config refresh"* ]]
@@ -105,11 +107,33 @@ STUB
   make_recording_stub "$stub_bin/dotfiles-doctor" dotfiles-doctor "$invocations"
   copy_script_to_test_repo
 
-  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update"
+  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update" --yes
 
   expected="git -C $TEST_DOTFILES pull --rebase
 ""dotfiles apply"
   [ "$status" -eq 42 ]
   [[ "$output" == *"✗ Phase failed: apply (exit 42)"* ]]
   [ "$(cat "$invocations")" = "$expected" ]
+}
+
+@test "without a terminal and without --yes it refuses and runs no phase" {
+  local stub_bin invocations command_name
+  stub_bin="$TEST_DIR/bin"
+  invocations="$TEST_DIR/invocations"
+  mkdir -p "$stub_bin"
+  for command_name in git dotfiles agentbrew dotfiles-upgrade dotfiles-doctor; do
+    make_recording_stub "$stub_bin/$command_name" "$command_name" "$invocations"
+  done
+  copy_script_to_test_repo
+
+  run env PATH="$stub_bin:/usr/bin:/bin" "$TEST_DOTFILES/bin/dotfiles-update" --verbose < /dev/null
+
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--yes"* ]]
+  [ ! -e "$invocations" ]
+}
+
+@test "the gate is in the script, so dotfiles update and dotfiles-update ask the same way" {
+  grep -q 'confirm_yes' "$SCRIPT"
+  ! awk '/^  update\)$/ { on = 1 } on && /;;/ { exit } on' "$REPO/bin/dotfiles" | grep -q 'confirm_'
 }

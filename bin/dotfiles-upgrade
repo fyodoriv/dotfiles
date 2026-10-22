@@ -20,27 +20,47 @@
 # Run `topgrade --edit-config` to open + edit that file.
 #
 # Usage:
-#   dotfiles-upgrade              Run full upgrade
+#   dotfiles-upgrade [--yes]      Run full upgrade
 #   dotfiles-upgrade --dry-run    Show what would be upgraded (no changes)
-#   dotfiles-upgrade --node [VER]  Switch Node (latest LTS or VER) in one step:
+#   dotfiles-upgrade --node [VER] [--yes]
+#                                 Switch Node (latest LTS or VER) in one step:
 #                                 fnm, ~/.node-version, ~/.local/bin links,
 #                                 agentbrew plists (bin/dotfiles-node-upgrade)
 #
+# It asks first (lib/confirm.sh): y/N at a terminal; without a terminal it
+# needs --yes. --dry-run needs no yes.
 # Schedule: com.dotfiles.dotfiles-upgrade LaunchAgent (weekly, Sunday 09:00).
+# It passes --yes: turning on auto_upgrade is the owner's yes.
 
 # shellcheck disable=SC2154  # counters defined in lib/output.sh
 
 set -euo pipefail
+
+# --yes is the person's yes (or the weekly LaunchAgent's, see above). It is
+# read first, so `--yes --help` still only prints the help.
+YES=0 _args=()
+for _a in "$@"; do
+  case "$_a" in --yes) YES=1 ;; *) _args+=("$_a") ;; esac
+done
+set -- ${_args[@]+"${_args[@]}"}
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/confirm.sh
+source "$DOTFILES_DIR/lib/confirm.sh"
 
 # A Node switch is deliberate (macOS may prompt once for the new binary), so
 # it runs only on request, never in the weekly topgrade pass.
-if [ "${1:-}" = "--node" ]; then
-  shift
-  exec bash "$DOTFILES_DIR/bin/dotfiles-node-upgrade" "$@"
-fi
+case "${1:-}" in
+  --node)
+    shift
+    case " $* " in
+      *" --dry-run "*) ;;
+      *) confirm_yes "$YES" "switches Node for your shell, ~/.local/bin, and the agentbrew LaunchAgents" ;;
+    esac
+    exec bash "$DOTFILES_DIR/bin/dotfiles-node-upgrade" "$@"
+    ;;
+esac
 
 # Topgrade discovers and executes Node/npm/fnm, Ollama, uv/Python, and editor
 # update CLIs. Do not run that unattended publisher fan-out while this managed
@@ -106,6 +126,7 @@ fi
 
 # ── Acquire lock so the weekly launchagent + manual invocation can't race
 if ! $DRY_RUN; then
+  confirm_yes "$YES" "upgrades the software of every package manager on this Mac (topgrade); that is hard to roll back"
   acquire_lock "upgrade" || exit 0
 fi
 

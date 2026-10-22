@@ -230,7 +230,7 @@ assert_kept_v1() {
   run bash "$CLI" update acme feature/x
   [ "$status" -ne 0 ]
   [[ "$output" == *"not a tag"* ]]
-  bash "$CLI" remove acme >/dev/null
+  bash "$CLI" remove acme --yes >/dev/null
   bash "$CLI" add --dev "$SRC" --yes >/dev/null
   run bash "$CLI" update acme
   [ "$status" -ne 0 ]

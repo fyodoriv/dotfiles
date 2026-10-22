@@ -46,8 +46,8 @@ odd_arms() {
 # A copy of the repo parts the generator reads, to change without touching the repo.
 copy_cli() {
   mkdir -p "$TEST_DIR/repo/bin" "$TEST_DIR/repo/lib"
-  cp "$REPO_ROOT/bin/dotfiles" "$REPO_ROOT/bin/dotfiles-actions" "$TEST_DIR/repo/bin/"
-  cp "$REPO_ROOT/lib/colors.sh" "$TEST_DIR/repo/lib/"
+  cp "$REPO_ROOT"/bin/dotfiles* "$TEST_DIR/repo/bin/"
+  cp "$REPO_ROOT"/lib/*.sh "$TEST_DIR/repo/lib/"
 }
 
 @test "every dispatched command is an action in dotfiles actions --json, nothing missing, nothing extra" {
@@ -115,31 +115,81 @@ copy_cli() {
 
 @test "a help line with one space before its description fails the check, even with a continuation line" {
   copy_cli
-  awk '/^  cheat  / { print "  cheat Shows every command"; print "                               and alias"; next } { print }' \
-    "$REPO_ROOT/bin/dotfiles" > "$TEST_DIR/repo/bin/dotfiles"
-  run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"cheat: "*"two or more spaces"* ]] || { echo "$output"; return 1; }
+  local desc
+  # A capital first word, and a plain lowercase one.
+  for desc in "Shows every command" "show every command" "shows 3 commands" "shows"; do
+    D="$desc" awk '/^  cheat  / { print "  cheat " ENVIRON["D"]; print "                               and alias"; next } { print }' \
+      "$REPO_ROOT/bin/dotfiles" > "$TEST_DIR/repo/bin/dotfiles"
+    run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
+    [ "$status" -eq 1 ] || { echo "passed with: $desc"; echo "$output"; return 1; }
+    [[ "$output" == *"cheat: "*"two or more spaces"* ]] || { echo "$output"; return 1; }
+  done
 }
 
-@test "each confirm action takes --yes or says why it runs unattended" {
+@test "quoted case words and a heredoc holding ;; do not change the arms" {
+  copy_cli
+  awk '/^  apply\)$/ { print; print "    echo \"in case you need it, esac\" >/dev/null"; next }
+       /^  diff\)$/ { print; print "    cat <<'"'"'TXT'"'"' >/dev/null"; print ";;"; print "  bogus)"; print "TXT"; next }
+       /^  status\)$/ { print; print "    _probe=\"$(printf '"'"'%s'"'"' \"case x in y) ;; esac\")\""; print "    _probe=$(echo case esac)"; next }
+       { print }' "$REPO_ROOT/bin/dotfiles" > "$TEST_DIR/repo/bin/dotfiles"
+  grep -q 'in case you need it' "$TEST_DIR/repo/bin/dotfiles"
+  grep -qx '  bogus)' "$TEST_DIR/repo/bin/dotfiles"
+  run --separate-stderr bash "$TEST_DIR/repo/bin/dotfiles" actions --json
+  [ "$status" -eq 0 ]
+  local want got
+  want="$(bash "$CLI" actions --json | jq -r '.[].name')"
+  got="$(printf '%s' "$output" | jq -r '.[].name')"
+  [ "$want" = "$got" ] || { diff <(echo "$want") <(echo "$got"); return 1; }
+  run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
+@test "each form that needs a yes takes --yes and reaches a yes gate in code" {
   run bash "$CLI" actions --json
   [ "$status" -eq 0 ]
-  printf '%s' "$output" | jq -e 'all(.[] | select(.confirm); any(.forms[], .subforms[]; any(.args[]; .flag == "--yes")) or ((.unattended // "") | length) > 0)' ||
-    { printf '%s' "$output" | jq -r '.[] | select(.confirm) | select((any(.forms[], .subforms[]; any(.args[]; .flag == "--yes")) or ((.unattended // "") | length) > 0) | not) | .name'; return 1; }
-  # A real yes gate: these take --yes.
+  # Per form, not per action: every form that needs a yes has --yes in its
+  # usage and a confirm_* call (lib/confirm.sh) on its code path.
+  printf '%s' "$output" | jq -e 'all(.[] | select(.confirm and .unattended == null); all(.forms[], .subforms[]; (.needs_yes | not) or (.gated and any(.args[]; .flag == "--yes"))))' ||
+    { printf '%s' "$output" | jq -r '.[] | .name as $n | (.forms[], .subforms[]) | select(.needs_yes and ((.gated and any(.args[]; .flag == "--yes")) | not)) | "\($n): \(.usage)"'; return 1; }
   local name
-  for name in contribute init update uninstall install plugin; do
-    printf '%s' "$output" | jq -e --arg n "$name" '.[] | select(.name == $n) | any(.forms[], .subforms[]; any(.args[]; .flag == "--yes"))' ||
-      { echo "$name should take --yes"; return 1; }
+  for name in contribute init update upgrade uninstall install plugin; do
+    printf '%s' "$output" | jq -e --arg n "$name" '.[] | select(.name == $n) | .unattended == null and any(.forms[], .subforms[]; .needs_yes and .gated)' ||
+      { echo "$name should have a real yes gate"; return 1; }
   done
-  # Run unattended by a LaunchAgent or a skill: a written reason instead.
-  for name in apply sync upgrade; do
-    printf '%s' "$output" | jq -e --arg n "$name" '.[] | select(.name == $n) | (.unattended | length) > 0' ||
-      { echo "$name should say why it runs unattended"; return 1; }
+  # plugin: remove, add, update, and trust need a yes; list does not.
+  local sub
+  for sub in remove add trust; do
+    printf '%s' "$output" | jq -e --arg s "dotfiles plugin $sub " '.[] | select(.name == "plugin") | any(.subforms[]; (.usage | startswith($s)) and .needs_yes and .gated)' ||
+      { echo "plugin $sub should need a yes and reach a gate"; return 1; }
   done
-  # plugin refuses without a terminal unless --yes; its note says so.
+  # plugin update asks only when the capabilities changed, so it is not a
+  # form that always needs a yes; list changes nothing.
+  printf '%s' "$output" | jq -e '.[] | select(.name == "plugin") | all(.subforms[] | select(.usage == "dotfiles plugin list" or (.usage | startswith("dotfiles plugin update "))); .needs_yes == false)'
+  printf '%s' "$output" | jq -e '.[] | select(.name == "plugin") | .confirm | test("update. asks only when")'
+  # Only these run without a yes, and each says why.
+  printf '%s' "$output" | jq -e '[.[] | select(.unattended) | .name] == ["apply", "sync"]'
+  printf '%s' "$output" | jq -e '.[] | select(.name == "sync") | .unattended | test("same script")'
   printf '%s' "$output" | jq -e '.[] | select(.name == "plugin") | .confirm | test("--yes")'
+}
+
+@test "a form with --yes in its usage but no yes gate in code fails the check" {
+  copy_cli
+  grep -q 'confirm_yes "\$yes" "deletes plugin' "$TEST_DIR/repo/bin/dotfiles-plugin"
+  awk '!/confirm_yes "\$yes" "deletes plugin/' "$REPO_ROOT/bin/dotfiles-plugin" > "$TEST_DIR/repo/bin/dotfiles-plugin"
+  run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"plugin: dotfiles plugin remove"*"no yes gate"* ]] || { echo "$output"; return 1; }
+  [[ "$output" != *"plugin: dotfiles plugin add"* ]] || { echo "$output"; return 1; }
+}
+
+@test "a form that needs a yes but has no --yes in its usage fails the check" {
+  copy_cli
+  sed 's/^#   dotfiles plugin remove <name> \[--yes\]/#   dotfiles plugin remove <name>        /' \
+    "$REPO_ROOT/bin/dotfiles-plugin" > "$TEST_DIR/repo/bin/dotfiles-plugin"
+  ! cmp -s "$REPO_ROOT/bin/dotfiles-plugin" "$TEST_DIR/repo/bin/dotfiles-plugin"
+  run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"plugin: dotfiles plugin remove <name>"*"takes no --yes"* ]] || { echo "$output"; return 1; }
 }
 
 @test "a confirm action with no --yes and no unattended reason fails the check" {
@@ -149,7 +199,7 @@ copy_cli() {
   ! cmp -s "$REPO_ROOT/bin/dotfiles" "$TEST_DIR/repo/bin/dotfiles"
   run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"sync: "*"--yes"*"unattended"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"sync: dotfiles sync"*"takes no --yes"*"unattended"* ]] || { echo "$output"; return 1; }
 }
 
 @test "sub-forms come from each command's own usage header" {
@@ -197,6 +247,7 @@ copy_cli() {
   run bash "$CLI" actions --json
   [ "$status" -eq 0 ]
   printf '%s' "$output" | jq -e 'all(.[]; has("name") and has("aliases") and has("command") and has("help") and has("forms") and has("subforms") and has("agent") and has("terminal_only") and has("confirm") and has("unattended") and has("agent_note"))'
+  printf '%s' "$output" | jq -e 'all(.[]; all(.forms[], .subforms[]; has("usage") and has("help") and has("args") and has("needs_yes") and has("gated")))'
   # Arguments come from the usage text.
   printf '%s' "$output" | jq -e '.[] | select(.name == "apply") | .forms[0] | .usage == "dotfiles apply [--pull] [--no-fix] [--if-changed]" and ([.args[].flag] == ["--pull", "--no-fix", "--if-changed"]) and all(.args[]; .required == false and .kind == "flag")'
   printf '%s' "$output" | jq -e '.[] | select(.name == "add") | .forms[0].args[0] == {"kind": "positional", "name": "file", "flag": null, "value": null, "choices": null, "required": true}'
@@ -266,4 +317,27 @@ copy_cli() {
   grep -q 'subforms' "$f"
   grep -q 'unattended' "$f"
   grep -q 'dotfiles update --yes' "$f"
+}
+
+@test "a script with two gates: removing either one fails the check for its own form" {
+  copy_cli
+  local pat form
+  for pat in "switches Node for your shell" "upgrades the software of every package"; do
+    P="$pat" awk 'index($0, ENVIRON["P"]) == 0' "$REPO_ROOT/bin/dotfiles-upgrade" > "$TEST_DIR/repo/bin/dotfiles-upgrade"
+    ! cmp -s "$REPO_ROOT/bin/dotfiles-upgrade" "$TEST_DIR/repo/bin/dotfiles-upgrade"
+    run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
+    [ "$status" -eq 1 ] || { echo "passed without: $pat"; return 1; }
+    case "$pat" in switches*) form="upgrade: dotfiles upgrade --node" ;; *) form="upgrade: dotfiles upgrade [--yes]" ;; esac
+    [[ "$output" == *"$form"*"no yes gate"* ]] || { echo "$output"; return 1; }
+  done
+}
+
+@test "a gate call with a fixed yes does not count as a gate" {
+  copy_cli
+  sed 's/confirm_yes "\$yes" "deletes plugin/confirm_yes 1 "deletes plugin/' \
+    "$REPO_ROOT/bin/dotfiles-plugin" > "$TEST_DIR/repo/bin/dotfiles-plugin"
+  ! cmp -s "$REPO_ROOT/bin/dotfiles-plugin" "$TEST_DIR/repo/bin/dotfiles-plugin"
+  run bash "$TEST_DIR/repo/bin/dotfiles" actions --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"plugin: dotfiles plugin remove"*"no yes gate"* ]] || { echo "$output"; return 1; }
 }

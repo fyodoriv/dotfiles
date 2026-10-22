@@ -134,7 +134,7 @@ PLIST
   plist com.acme.sync > "$PLUGIN/launchagents/sync.plist"
   install_plugin '  launchagents: [com.acme.*]' '  launchagents: launchagents'
   ext plugin_launchagents_pass
-  run bash "$CLI" remove acme
+  run bash "$CLI" remove acme --yes
   [ "$status" -eq 0 ]
   [ ! -e "$DOTFILES_LAUNCHAGENTS_DIR/com.acme.sync.plist" ]
   grep -q "launchctl bootout gui/.*/com.acme.sync" "$MARKER"
@@ -166,7 +166,7 @@ PLIST
   printf ':\n' > "$PLUGIN/shell/zshrc.zsh"
   install_plugin '  shell_fragment: true' '  shell: shell/zshrc.zsh'
   grep -q 'shell/zshrc.zsh' "$XDG_STATE_HOME/dotfiles/plugin-shell.zsh"
-  bash "$CLI" remove acme
+  bash "$CLI" remove acme --yes
   ! grep -q 'shell/zshrc.zsh' "$XDG_STATE_HOME/dotfiles/plugin-shell.zsh"
 }
 

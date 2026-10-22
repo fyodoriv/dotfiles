@@ -13,8 +13,14 @@
 # notes from comments in a dispatch arm:
 #   # terminal-only: <why an agent cannot run it>  (needs a person at a terminal)
 #   # confirm: <what it changes that is hard to undo>  (agents ask first)
-#   # unattended: <why a confirm action has no --yes>  (a LaunchAgent or skill runs it)
+#   # yes-for: <subcommands>  (only these sub-forms of a confirm action need a yes)
+#   # unattended: <why a confirm action has no --yes>
 #   # agent: <what an agent must do differently>
+# Each form of a confirm action that needs a yes must take --yes, and a
+# confirm_* call from lib/confirm.sh must be on its code path (the arm, the
+# script it runs, or a function either one calls); --check fails otherwise.
+# `gated` means a gate is on that path; a script may still skip the question
+# on some branches (plugin update when the capabilities did not change).
 # dotfiles has no UI; a UI would read this same list. It reads files only:
 # no git, no network, no update check.
 
@@ -40,14 +46,15 @@ done
 command -v jq >/dev/null 2>&1 || die "jq is not installed. Fix: brew install jq"
 [ -r "$CLI" ] || die "cannot read $CLI"
 
-# Shared by both awk programs. prose() returns the first token of a usage
-# that reads like description text, or "": a capitalized word, or a bare
-# lowercase word after the first [..], <..>, or --flag (literal subcommand
-# words come right after the command name). It catches a usage and its
-# description joined by one space instead of two or more.
+# Shared by the awk programs below. Their globals live for one awk run.
 # shellcheck disable=SC2016 # awk program, not shell
 AWK_LIB='
-function prose(s,   i, c, d, tok, seen, n, toks) {
+# prose(s): the first token of a usage that reads like description text, or
+# "": a capitalized word, a number, two bare lowercase words in a row, or a bare word
+# after the first [..], <..>, or --flag (a literal subcommand word comes
+# right after the command name). It catches a usage and its description
+# joined by one space instead of two or more.
+function prose(s,   i, c, d, tok, seen, bare, n, toks) {
   n = 0; d = 0; tok = ""
   for (i = 1; i <= length(s); i++) {
     c = substr(s, i, 1)
@@ -56,25 +63,142 @@ function prose(s,   i, c, d, tok, seen, n, toks) {
     if (c == " " && d == 0) { if (tok != "") toks[++n] = tok; tok = "" } else tok = tok c
   }
   if (tok != "") toks[++n] = tok
-  seen = 0
+  seen = 0; bare = 0
   for (i = 1; i <= n; i++) {
-    if (toks[i] ~ /^[A-Z][a-z]/) return toks[i]
-    if (seen && toks[i] ~ /^[a-z][a-z0-9-]*$/) return toks[i]
+    if (toks[i] ~ /^([A-Z][a-z]|[0-9])/) return toks[i]
+    if (toks[i] ~ /^[a-z][a-z0-9-]*$/) { if (seen || ++bare > 1) return toks[i] } else bare = 0
     if (toks[i] ~ /^(\[|<|-)/) seen = 1
   }
   return ""
+}
+
+# lastbare(s): the last top-level token of a usage when it is a bare word.
+# A usage whose description is only on the next lines must not end in one
+# (`cheat shows` + a continuation line is a description, not a usage).
+function lastbare(s,   t) {
+  t = s; gsub(/\[[^]]*\]|<[^>]*>/, " @ ", t); sub(/[ \t]+$/, "", t); sub(/.*[ \t]/, "", t)
+  return (t ~ /^[a-z][a-z0-9-]*$/) ? t : ""
+}
+
+# A small shell lexer. LST: the open contexts, carried across lines, as a
+# stack string: S single quote, D double quote, C inside $( ) (PC[level]
+# counts its parentheses). LHD: the heredoc delimiter while inside a heredoc
+# body (LHT: <<- also strips tabs).
+function lex_reset() { LST = ""; LHD = ""; LHT = 0 }
+# lex(line): the top-level code of a line, with quoted text replaced by Q
+# (V for a double-quoted string that expands a $), $( ) replaced by x, and
+# the comment removed; "" inside a heredoc body.
+# LEXP is 1 when the line starts at top level (so a leading # there is a
+# real comment and a case label can start there).
+function lex(line,   i, n, c, nx, out, prev, top, L, j, d, q, k) {
+  if (LHD != "") {
+    d = line; if (LHT) sub(/^\t+/, "", d)
+    if (d == LHD) LHD = ""
+    LEXP = 0; return ""
+  }
+  LEXP = (LST == ""); out = ""; prev = " "; n = length(line)
+  for (i = 1; i <= n; i++) {
+    c = substr(line, i, 1); nx = substr(line, i + 1, 1); L = length(LST); top = substr(LST, L, 1)
+    if (top == "S") { if (c == "\047") LST = substr(LST, 1, L - 1); continue }
+    if (top == "D") {
+      if (c == "\\") i++
+      else if (c == "\"") { LST = substr(LST, 1, L - 1); if (L == 1) { out = out (LDV ? "V" : "Q"); prev = "Q" } }
+      else if (c == "$") { if (L == 1) LDV = 1; if (nx == "(") { LST = LST "C"; PC[L + 1] = 1; i++ } }
+      continue
+    }
+    if (c == "\\") { i++; if (top == "") { out = out "x"; prev = "x" } continue }
+    if (c == "\"") { LST = LST "D"; LDV = 0; continue }
+    if (c == "\047") { LST = LST "S"; if (top == "") { out = out "Q"; prev = "Q" } continue }
+    if (c == "$" && nx == "(") { LST = LST "C"; PC[L + 1] = 1; i++; if (top == "") { out = out "x"; prev = "x" } continue }
+    if (top == "C") {
+      if (c == "(") PC[L]++
+      else if (c == ")") { if (--PC[L] == 0) LST = substr(LST, 1, L - 1) }
+      else if (c == "#" && (prev == " " || prev == "\t")) break
+      prev = c; continue
+    }
+    if (c == "#" && (prev == " " || prev == "\t" || prev == ";")) break
+    if (c == "<" && nx == "<" && substr(line, i + 2, 1) != "<" && prev != "<") {
+      j = i + 2; LHT = 0
+      if (substr(line, j, 1) == "-") { LHT = 1; j++ }
+      while (substr(line, j, 1) == " " || substr(line, j, 1) == "\t") j++
+      q = substr(line, j, 1)
+      if (q == "\047" || q == "\"") {
+        k = index(substr(line, j + 1), q)
+        if (k > 0) { LHD = substr(line, j + 1, k - 1); i = j + k } else i = n
+      } else {
+        if (q == "\\") j++
+        d = substr(line, j)
+        if (match(d, /^[A-Za-z_][A-Za-z0-9_]*/)) { LHD = substr(d, 1, RLENGTH); i = j + RLENGTH - 1 }
+      }
+      out = out " << "; prev = " "; continue
+    }
+    out = out c; prev = c
+  }
+  return out
+}
+
+# parse_arms(st): read the case block that starts at line st of LN[1..LNN].
+# An arm is the first code after `in` or after a `;;` at depth 1, at any
+# indent and with any spaces around `|`; nested case blocks raise the depth,
+# and quoted text and heredocs do not count. Fills ARMN and, per arm k,
+# ARM_LAB[k] (labels joined by |, without quotes; "*" left out),
+# ARM_CODE[k], ARM_RAW[k] (its raw code lines), ARM_NOTE[k] (its comments).
+function parse_arms(st,   i, line, code, depth, expect, tmp, p, lab, n, parts, j, q, clean, cur, w, nw) {
+  ARMN = 0; lex_reset(); depth = 1; expect = 1; cur = 0
+  for (i = st + 1; i <= LNN; i++) {
+    line = LN[i]; code = lex(line)
+    if (!LEXP && code == "") continue
+    if (LEXP && line ~ /^[ \t]*#/) { if (cur && !expect && depth == 1) ARM_NOTE[cur] = ARM_NOTE[cur] line "\n"; continue }
+    if (depth == 1 && expect && LEXP) {
+      tmp = line; sub(/^[ \t]+/, "", tmp)
+      if (tmp == "") continue
+      if (tmp ~ /^esac([ \t;]|$)/) return i
+      sub(/^\(/, "", tmp); p = index(tmp, ")")
+      if (p > 0) {
+        lab = substr(tmp, 1, p - 1); expect = 0
+        p = index(code, ")"); code = substr(code, p + 1)
+        n = split(lab, parts, "|"); clean = ""; cur = 0
+        for (j = 1; j <= n; j++) {
+          q = parts[j]; gsub(/^[ \t]+|[ \t]+$/, "", q); gsub(/["\047]/, "", q)
+          if (q == "*") continue
+          clean = clean (j == 1 ? "" : "|") q
+          if (q != "") cur = -1
+        }
+        if (cur == -1) { ARMN++; cur = ARMN; ARM_LAB[cur] = clean; ARM_CODE[cur] = ""; ARM_RAW[cur] = ""; ARM_NOTE[cur] = "" }
+      }
+    }
+    if (cur) { ARM_CODE[cur] = ARM_CODE[cur] " " code; ARM_RAW[cur] = ARM_RAW[cur] line "\n" }
+    # case, esac, and ;; in the order they come, so a one-line nested case
+    # (`case $a in x) ;; esac`) does not end the arm.
+    tmp = code; gsub(/;;&?|;&/, " \001 ", tmp); gsub(/;/, " ", tmp)
+    nw = split(tmp, w, /[ \t&|()]+/)
+    for (j = 1; j <= nw; j++) {
+      if (w[j] == "case") depth++
+      else if (w[j] == "esac") { if (--depth <= 0) return i }
+      else if (w[j] == "\001" && depth == 1) expect = 1
+    }
+  }
+  return LNN
+}
+
+# has_gate(code): a confirm_* call whose yes comes from a variable (so
+# `confirm_yes 1 ...`, which never asks, does not count).
+function has_gate(text) {
+  return text ~ /(^|[^A-Za-z0-9_])confirm_(yes|require_yes)[ \t]+(V|\$)/ ||
+    text ~ /(^|[^A-Za-z0-9_])confirm_gate[ \t]+[QV][ \t]+(V|\$)/
 }
 '
 
 # Rows from bin/dotfiles, tab-separated (help text holds no tabs):
 #   A <name> <arm labels>          one per dispatch arm, in order
 #   S <name> <script>              the bin/ script an arm runs, if any
+#   K <name>                       the arm itself calls lib/confirm.sh
 #   F <name> <usage> <args> <help> one per show_help line (a usage form)
 #   N <name> <key> <text>          one per note comment in an arm
 #   E <problem>                    one per parity problem
 # shellcheck disable=SC2016 # awk program, not shell
 rows="$(awk "$AWK_LIB"'
-  { L[NR] = $0 }
+  { LN[NR] = $0; LNN = NR }
 
   # show_help: one line per form, two-space indent, the usage, two or more
   # spaces, what it does; deeper-indented lines continue the description.
@@ -90,7 +214,7 @@ rows="$(awk "$AWK_LIB"'
     if (line ~ /^  [^ ]/) {
       body = substr(line, 3)
       nh++
-      if (match(body, /  +/)) { hu[nh] = substr(body, 1, RSTART - 1); hd[nh] = substr(body, RSTART + RLENGTH) }
+      if (match(body, /  +/)) { hu[nh] = substr(body, 1, RSTART - 1); hd[nh] = substr(body, RSTART + RLENGTH); hsame[nh] = 1 }
       else { hu[nh] = body; hd[nh] = "" }
       cont = 1
       next
@@ -110,54 +234,25 @@ rows="$(awk "$AWK_LIB"'
 
   END {
     # The dispatch is the last `case "$cmd" in` (an earlier one skips the
-    # update check). Arms are read by case depth, not by indent: an arm is
-    # the first code after `in` or after a `;;` at depth 1, at any indent,
-    # with any spaces around `|`. Nested case blocks raise the depth.
-    for (i = 1; i <= NR; i++) if (L[i] ~ /^[ \t]*case[ \t]+"?\$\{?cmd\}?"?[ \t]+in[ \t]*$/) start = i
-    depth = 1; expect = 1; in_note = 0
-    for (i = start + 1; start && i <= NR; i++) {
-      line = L[i]
-      if (line ~ /^[ \t]*#/) {
-        if (depth != 1 || expect || cur == 0) continue
-        if (match(line, /^[ \t]*#[ \t]*(terminal-only|confirm|unattended|agent):[ \t]/)) {
-          t = substr(line, RLENGTH + 1); k = line; sub(/^[ \t]*#[ \t]*/, "", k); sub(/:.*/, "", k)
-          nn++; note_key[nn] = k; note_text[nn] = t; note_arm[nn] = cur; in_note = 1
-        } else if (in_note && line ~ /^[ \t]*#[ \t][ \t][ \t]+[^ \t]/) {
-          t = line; sub(/^[ \t]*#[ \t]+/, "", t); note_text[nn] = note_text[nn] " " t
+    # update check).
+    for (i = 1; i <= LNN; i++) if (LN[i] ~ /^[ \t]*case[ \t]+"?\$\{?cmd\}?"?[ \t]+in[ \t]*$/) start = i
+    if (start) parse_arms(start)
+    na = ARMN
+    for (a = 1; a <= na; a++) {
+      n = split(ARM_LAB[a], parts, "|"); name[a] = ""
+      for (j = 1; j <= n; j++) { if (name[a] == "" && parts[j] != "") name[a] = parts[j]; arm_of[parts[j]] = a }
+      labels[a] = ARM_LAB[a]
+      if (match(ARM_RAW[a], /\$DOTFILES_DIR\/bin\/[A-Za-z0-9_.-]+/)) script[a] = substr(ARM_RAW[a], RSTART + 18, RLENGTH - 18)
+      if (has_gate(ARM_CODE[a])) armgate[a] = 1
+      m = split(ARM_NOTE[a], nl, "\n"); in_note = 0
+      for (j = 1; j <= m; j++) {
+        if (match(nl[j], /^[ \t]*#[ \t]*(terminal-only|confirm|yes-for|unattended|agent):[ \t]/)) {
+          t = substr(nl[j], RLENGTH + 1); k = nl[j]; sub(/^[ \t]*#[ \t]*/, "", k); sub(/:.*/, "", k)
+          nn++; note_key[nn] = k; note_text[nn] = t; note_arm[nn] = a; in_note = 1
+        } else if (in_note && nl[j] ~ /^[ \t]*#[ \t][ \t][ \t]+[^ \t]/) {
+          t = nl[j]; sub(/^[ \t]*#[ \t]+/, "", t); note_text[nn] = note_text[nn] " " t
         } else in_note = 0
-        continue
       }
-      in_note = 0
-      code = line; sub(/(^|[ \t])#.*$/, "", code)
-      if (depth == 1 && expect) {
-        tmp = code; sub(/^[ \t]+/, "", tmp)
-        if (tmp == "") continue
-        if (tmp ~ /^esac([ \t;]|$)/) break
-        sub(/^\(/, "", tmp)
-        p = index(tmp, ")")
-        if (p > 0) {
-          lab = substr(tmp, 1, p - 1); code = substr(tmp, p + 1); expect = 0
-          n = split(lab, parts, "|"); prim = ""; clean = ""
-          for (j = 1; j <= n; j++) {
-            q = parts[j]; gsub(/^[ \t]+|[ \t]+$/, "", q); gsub(/"/, "", q)
-            if (q == "*") continue
-            if (prim == "" && q != "") prim = q
-            clean = clean (clean == "" && j == 1 ? "" : "|") q
-          }
-          if (prim != "") {
-            na++; name[na] = prim; labels[na] = clean
-            for (j = 1; j <= n; j++) { q = parts[j]; gsub(/^[ \t]+|[ \t]+$/, "", q); gsub(/"/, "", q); if (q != "*") arm_of[q] = na }
-            cur = na
-          } else cur = 0
-        }
-      }
-      if (cur && !(cur in script) && match(code, /\$DOTFILES_DIR\/bin\/[A-Za-z0-9_.-]+/)) {
-        script[cur] = substr(code, RSTART + 18, RLENGTH - 18)
-      }
-      n = split(code, w, /[ \t;&|()]+/)
-      for (j = 1; j <= n; j++) { if (w[j] == "case") depth++; else if (w[j] == "esac") depth-- }
-      if (depth <= 0) break
-      if (depth == 1 && code ~ /;;|;&/) expect = 1
     }
 
     for (i = 1; i <= nh; i++) {
@@ -177,23 +272,28 @@ rows="$(awk "$AWK_LIB"'
         continue
       }
       a = arm_of[k]; listed[a] = 1
-      if ((bad = prose(rest)) != "") print "E\t" name[a] ": its show_help line \"" u "\" runs the usage into the description at \"" bad "\"; put two or more spaces between them"
+      if ((bad = prose(rest)) != "" || (!hsame[i] && hd[i] != "" && (bad = lastbare(rest)) != "")) print "E\t" name[a] ": its show_help line \"" u "\" runs the usage into the description at \"" bad "\"; put two or more spaces between them"
       else if (hd[i] == "") print "E\t" name[a] ": its show_help line has no description; put two or more spaces between the usage and what it does"
       print "F\t" name[a] "\t" shown "\t" rest "\t" hd[i]
     }
     for (a = 1; a <= na; a++) {
       print "A\t" name[a] "\t" labels[a]
       if (a in script) print "S\t" name[a] "\t" script[a]
+      if (a in armgate) print "K\t" name[a]
       if (!(a in listed)) print "E\t" name[a] ": dispatched in bin/dotfiles but has no line in show_help; add one: two-space indent, the usage, two spaces, what it does"
     }
     for (i = 1; i <= nn; i++) print "N\t" name[note_arm[i]] "\t" note_key[i] "\t" note_text[i]
   }
 ' "$CLI")"
 
-# Sub-form rows from the "Usage:" header comment of each script an arm runs:
-#   G <name> <usage> <args> <help>
-# A form line starts with `dotfiles <name>` (or `dotfiles-<name>`); a more
-# indented line continues its description; a blank `#` line ends the block.
+# Rows from each script an arm runs:
+#   G <name> <usage> <args> <help>  a sub-form from its "Usage:" header: a line
+#       that starts with `dotfiles <name>` (or `dotfiles-<name>`); a more
+#       indented line continues its description; a blank `#` line ends it
+#   T <script> <0|1>                its top-level code reaches lib/confirm.sh
+#   W <script> <subcommand> <0|1>   that arm of its own dispatch `case` does
+# "Reaches" means a confirm_* call in that code or in a function it calls,
+# followed through the script's own functions.
 scripts=() names=()
 while IFS=$'\t' read -r kind nm sc; do
   [ "$kind" = S ] && [ -r "$DOTFILES_DIR/bin/$sc" ] || continue
@@ -202,8 +302,49 @@ done <<<"$rows"
 if [ "${#scripts[@]}" -gt 0 ]; then
   # shellcheck disable=SC2016 # awk program, not shell
   rows="$rows"$'\n'"$(printf '%s\n' "${names[@]}" | awk "$AWK_LIB"'
+    function fgates(f) {
+      if (f in FG) return FG[f]
+      FG[f] = 0
+      FG[f] = gates(FB[f])
+      return FG[f]
+    }
+    function gates(text,   n, w, j) {
+      if (has_gate(text)) return 1
+      n = split(text, w, /[^A-Za-z0-9_]+/)
+      for (j = 1; j <= n; j++) if ((w[j] in FB) && fgates(w[j])) return 1
+      return 0
+    }
+    function finish(   i, line, code, fn, top, st, en, k, n, parts, j) {
+      if (LNN == 0) return
+      lex_reset(); fn = ""; st = 0
+      for (i = 1; i <= LNN; i++) {
+        line = LN[i]; code = lex(line); TC[i] = ""
+        if (fn == "" && LEXP && match(line, /^[A-Za-z_][A-Za-z0-9_]*\(\)[ \t]*\{/)) {
+          fn = substr(line, 1, index(line, "(") - 1); FB[fn] = code
+          if (code ~ /\}[ \t;]*$/) fn = ""
+          continue
+        }
+        if (fn != "") { if (LEXP && line ~ /^\}[ \t]*$/) fn = ""; else FB[fn] = FB[fn] " " code; continue }
+        TC[i] = code
+        if (LEXP && line ~ /^case[ \t]+"?\$\{?(1(:-)?|cmd|sub|subcmd|action)\}?"?[ \t]+in[ \t]*$/) st = i
+      }
+      # Top-level code outside the own dispatch case of the script: the gate for
+      # forms that do not start with one of its sub-commands.
+      en = st ? parse_arms(st) : 0
+      top = ""
+      for (i = 1; i <= LNN; i++) if (!st || i < st || i > en) top = top " " TC[i]
+      print "T\t" FILE "\t" gates(top)
+      if (st) {
+        for (k = 1; k <= ARMN; k++) {
+          n = split(ARM_LAB[k], parts, "|")
+          for (j = 1; j <= n; j++) if (parts[j] != "") print "W\t" FILE "\t" parts[j] "\t" gates(ARM_CODE[k])
+        }
+      }
+      delete FB; delete FG; delete TC; LNN = 0
+    }
     NR == FNR { nm_of[++nf] = $0; next }
-    FNR == 1 { fi++; nm = nm_of[fi]; hdr = 1; usage = 0; cur = 0; f = FILENAME; sub(/.*\//, "", f) }
+    FNR == 1 { finish(); fi++; nm = nm_of[fi]; hdr = 1; usage = 0; cur = 0; FILE = FILENAME; sub(/.*\//, "", FILE) }
+    { LN[FNR] = $0; LNN = FNR }
     !hdr || /^#!/ { next }
     /^$/ { usage = 0; cur = 0; next }
     !/^#/ { hdr = 0; next }
@@ -219,20 +360,27 @@ if [ "${#scripts[@]}" -gt 0 ]; then
       if (s == cmd || index(s, cmd " ") == 1) {
         if (match(s, /  +/)) { u = substr(s, 1, RSTART - 1); d = substr(s, RSTART + RLENGTH) } else { u = s; d = "" }
         rest = substr(u, length(cmd) + 2)
-        if ((bad = prose(rest)) != "") print "E\t" nm ": bin/" f " has the usage line \"" u "\" with description text at \"" bad "\"; put two or more spaces between them"
-        ng++; gname[ng] = nm; gu[ng] = u; gr[ng] = rest; gd[ng] = d; cur = 1
+        if ((bad = prose(rest)) != "") print "E\t" nm ": bin/" FILE " has the usage line \"" u "\" with description text at \"" bad "\"; put two or more spaces between them"
+        ng++; gname[ng] = nm; gu[ng] = u; gr[ng] = rest; gd[ng] = d; gsame[ng] = (d != ""); gfile[ng] = FILE; cur = 1
       } else if (cur && t ~ /^[ \t][ \t]/) {
         gd[ng] = (gd[ng] == "" ? s : gd[ng] " " s)
       } else { usage = 0; cur = 0 }
     }
-    END { for (i = 1; i <= ng; i++) print "G\t" gname[i] "\t" gu[i] "\t" gr[i] "\t" gd[i] }
+    END {
+      finish()
+      for (i = 1; i <= ng; i++) {
+        if (!gsame[i] && gd[i] != "" && (bad = lastbare(gr[i])) != "") print "E\t" gname[i] ": bin/" gfile[i] " has the usage line \"" gu[i] "\" with description text at \"" bad "\"; put two or more spaces between them"
+        print "G\t" gname[i] "\t" gu[i] "\t" gr[i] "\t" gd[i]
+      }
+    }
   ' - "${scripts[@]}")"
 fi
 
 # The catalog, as one JSON array. Arguments come from the usage tokens:
 # [x] is optional, <x> and UPPER are values, a|b is a choice, --x is a flag,
 # --x VALUE or --x <v> an option, ... passes more arguments through, and a
-# bare word is literal.
+# bare word is literal. A form of a confirm action needs a yes unless it is
+# a --dry-run, --help, or --check form, or `# yes-for:` leaves it out.
 # shellcheck disable=SC2016 # jq program, not shell
 catalog="$(printf '%s\n' "$rows" | jq -nR '
   def arg:
@@ -256,11 +404,27 @@ catalog="$(printf '%s\n' "$rows" | jq -nR '
     then (length - 1) as $k | .[$k].kind = "option" | .[$k].value = $a.raw
     else . + [$a] end);
   def args: [scan("\\[[^\\]]*\\]|[^ <\\[]*<[^>]*>[^ ]*|[^ ]+") | arg] | fold | map(del(.raw));
+  def free: any(.args[]; .required and (.flag == "--dry-run" or .flag == "--help" or .flag == "-h" or .flag == "--check"));
   [inputs | select(length > 0) | split("\t")] as $rows
+  | ([$rows[] | select(.[0] == "T") | {(.[1]): (.[2] == "1")}] | add // {}) as $top
+  | ([$rows[] | select(.[0] == "W") | {(.[1] + " " + .[2]): (.[3] == "1")}] | add // {}) as $sub
   | [ $rows[] | select(.[0] == "A") | .[1] as $n
       | ([$rows[] | select(.[0] == "N" and .[1] == $n) | {(.[2]): .[3]}] | add // {}) as $notes
-      | [$rows[] | select(.[0] == "F" and .[1] == $n) | {usage: .[2], help: .[4], args: (.[3] | args)}] as $forms
-      | [$rows[] | select(.[0] == "G" and .[1] == $n) | {usage: .[2], help: .[4], args: (.[3] | args)}] as $subforms
+      | ([$rows[] | select(.[0] == "S" and .[1] == $n) | .[2]][0]) as $script
+      | (any($rows[]; .[0] == "K" and .[1] == $n)) as $armgate
+      | ($notes["yes-for"] // null | if . then split(" ") | map(select(. != "")) else null end) as $yesfor
+      | def form($from_header):
+          {usage: .[2], help: .[4], args: (.[3] | args)}
+          | (.args[0] // {}) as $first
+          | ($first | if .kind == "word" then .name elif (.kind == "flag" or .kind == "option") and .required then .flag else null end) as $key
+          | .needs_yes = ($notes.confirm != null and (free | not)
+              and (if $yesfor == null then true
+                   else $from_header and $first.kind == "word" and any($yesfor[]; . == $first.name) end))
+          | .gated = (if $key != null and $script != null and ($sub | has($script + " " + $key))
+                      then $sub[$script + " " + $key]
+                      else ($armgate or ($script != null and ($top[$script] // false))) end);
+        [$rows[] | select(.[0] == "F" and .[1] == $n) | form(false)] as $forms
+      | [$rows[] | select(.[0] == "G" and .[1] == $n) | form(true)] as $subforms
       | { name: $n,
           aliases: (.[2] | split("|") | map(select(. != $n))),
           command: ("dotfiles " + $n),
@@ -270,17 +434,28 @@ catalog="$(printf '%s\n' "$rows" | jq -nR '
           agent: ($notes["terminal-only"] == null),
           terminal_only: $notes["terminal-only"],
           confirm: $notes.confirm,
+          yes_for: $yesfor,
           unattended: $notes.unattended,
           agent_note: $notes.agent } ]
 ')"
 
-# A confirm action needs a yes gate (--yes in a form) or a written reason
-# why it runs without one (# unattended:).
+# Per form: a form that needs a yes takes --yes, and a yes gate in code
+# reaches it, unless an # unattended: note says why the action runs without
+# one. Every # yes-for: word names a sub-form.
 # shellcheck disable=SC2016 # jq program, not shell
 problems="$(
   printf '%s\n' "$rows" | awk -F '\t' '$1 == "E" { print $2 }'
-  printf '%s' "$catalog" | jq -r '.[] | select(.confirm and ((.unattended // "") == "") and (any(.forms[], .subforms[]; any(.args[]; .flag == "--yes")) | not))
-    | "\(.name): marked confirm, but no form takes --yes and it has no # unattended: reason; add a yes gate (lib/confirm.sh) or say why it runs unattended"'
+  printf '%s' "$catalog" | jq -r '
+    .[] | select(.confirm and .unattended == null) | .name as $n
+    | ((.forms[], .subforms[]) | select(.needs_yes)
+        | if any(.args[]; .flag == "--yes") | not then
+            "\($n): \(.usage) changes something hard to undo, but takes no --yes; add [--yes] and a yes gate (lib/confirm.sh), or an # unattended: reason"
+          elif .gated | not then
+            "\($n): \(.usage) takes --yes, but no yes gate in code reaches it; call confirm_yes, confirm_gate, or confirm_require_yes (lib/confirm.sh) on its path"
+          else empty end),
+      (. as $a | (.yes_for // [])[] | select(. as $w | any($a.subforms[]; .args[0].name == $w) | not)
+        | "\($n): # yes-for: names \(.), but no sub-form in its script header starts with it"),
+      (select(any(.forms[], .subforms[]; .needs_yes) | not) | "\($n): marked confirm, but no form needs a yes; add a form that takes --yes, or an # unattended: reason")'
 )"
 
 total="$(printf '%s' "$catalog" | jq 'length')"
@@ -318,6 +493,6 @@ printf '%s' "$catalog" | jq -r --arg one "$want" '
           + (if .confirm then "  [confirm: \(.confirm)]" else "" end)
           + (if .unattended then "  [no --yes: \(.unattended)]" else "" end)
           + (if .agent_note then "  [agents: \(.agent_note)]" else "" end)) end)),
-    (if $one != "" then ($a.subforms[] | "  \(.usage)" + (if .help != "" then "  - \(.help)" else "" end)) else empty end)
+    (if $one != "" then ($a.subforms[] | "  \(.usage)" + (if .help != "" then "  - \(.help)" else "" end) + (if .needs_yes then "  [needs a yes]" else "" end)) else empty end)
 '
 echo "$(printf '%s' "$catalog" | jq 'length') action(s) from bin/dotfiles; agents: dotfiles actions --json"

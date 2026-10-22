@@ -63,7 +63,7 @@ contributes:
 | `dotfiles plugin add <url>@<tag> [--signer <key>] [--yes]` | Clones the tag, checks the signature, validates the manifest and options, shows the capabilities, and asks once. It runs no plugin code. |
 | `dotfiles plugin add --dev <path>` | Links a local checkout for authors. Not pinned; doctor warns on every run. |
 | `dotfiles plugin update <name> [<tag>] [--yes]` | Moves an installed plugin to another signed tag in place. Without a tag, it takes the newest tag that is newer than the installed one and signed by a trusted signer. See [Update](#update). |
-| `dotfiles plugin remove <name>` | Unloads its LaunchAgents and deletes the checkout and the lock entry. |
+| `dotfiles plugin remove <name> [--yes]` | Unloads its LaunchAgents and deletes the checkout and the lock entry. It asks first; without a terminal it needs `--yes`. |
 | `dotfiles plugin list` / `verify [<name>]` | Shows each plugin and re-checks it against the lock. |
 | `dotfiles plugin trust <name> --signer <key> [--revoke]` | Adds or removes a trusted signer (needs a terminal or `--yes`). |
 | `dotfiles plugin options` | Each core option, its value, who set it, and conflicts. |

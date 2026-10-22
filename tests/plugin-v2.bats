@@ -144,7 +144,7 @@ lookup() {
 
 @test "remove deletes the checkout and the lock entry" {
   add_signed
-  run bash "$CLI" remove acme
+  run bash "$CLI" remove acme --yes
   [ "$status" -eq 0 ]
   [ ! -e "$DEST" ]
   [ "$(yq -r '.plugins | length' "$LOCK")" = 0 ]
@@ -191,7 +191,7 @@ lookup() {
 
 @test "a second install needs no --signer once the key is trusted" {
   add_signed
-  bash "$CLI" remove acme
+  bash "$CLI" remove acme --yes
   run bash "$CLI" add "$SRC@v1.0.0" --yes
   [ "$status" -eq 0 ]
 }
@@ -319,4 +319,13 @@ lookup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"looks like an object ID"* ]]
   [ ! -e "$DEST" ]
+}
+
+@test "remove refuses without a terminal and without --yes, and keeps the plugin" {
+  add_signed
+  run bash "$CLI" remove acme < /dev/null
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--yes"* ]]
+  [ -e "$DEST" ]
+  [ "$(yq -r '.plugins | length' "$LOCK")" = 1 ]
 }

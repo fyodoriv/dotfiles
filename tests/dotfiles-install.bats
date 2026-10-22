@@ -227,7 +227,17 @@ teardown() { rm -rf "$TEST_DIR"; }
   run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew --no-macos-defaults
   [ "$status" -eq 0 ]
   [ "$(cat "$STORE/com.apple.dock")" = "original-dock" ]
-  run bash "$REPO/bin/dotfiles-install" restore
+  run bash "$REPO/bin/dotfiles-install" restore < /dev/null
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--yes"* ]]
+  # --help prints the usage, and an unknown flag is no backup ID.
+  run bash "$REPO/bin/dotfiles-install" restore --help < /dev/null
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"dotfiles-install restore"* ]]
+  run bash "$REPO/bin/dotfiles-install" restore --bogus --yes < /dev/null
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Unknown flag: --bogus"* ]]
+  run bash "$REPO/bin/dotfiles-install" restore --yes
   [ "$status" -eq 0 ]
   [ "$(cat "$HOME/.zshrc")" = "# my zshrc" ]
 }

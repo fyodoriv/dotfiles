@@ -266,16 +266,17 @@ teardown() {
 
 # ── Functional: confirmation prompt ──
 
-@test "confirmation prompt aborts on n" {
-  run bash -c "echo n | bash '$UNINSTALL_CMD'"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Aborted"* ]]
-}
-
-@test "confirmation prompt proceeds on y" {
-  run bash -c "echo y | bash '$UNINSTALL_CMD'"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Done"* ]]
+@test "a piped answer is not a terminal: it refuses, needs --yes, and removes nothing" {
+  # lib/confirm.sh asks only at a terminal, so an agent cannot pipe a yes.
+  touch "$TEST_HOME/Library/LaunchAgents/com.dotfiles.example.plist"
+  local answer
+  for answer in y n; do
+    run bash -c "echo $answer | bash '$UNINSTALL_CMD'"
+    [ "$status" -eq 2 ] || { echo "$answer: $output"; return 1; }
+    [[ "$output" == *"--yes"* ]]
+    [[ "$output" != *"Done"* ]]
+    [ -f "$TEST_HOME/Library/LaunchAgents/com.dotfiles.example.plist" ]
+  done
 }
 
 @test "--yes skips confirmation prompt" {

@@ -24,7 +24,7 @@ It backs up your files and macOS settings, applies dotfiles, heals, verifies,
 and installs agentbrew. It is safe to run again. A critical error restores the
 backup by itself; optional steps (agentbrew, a failing doctor check) only warn.
 macOS may ask for permission prompts on the way. Preview first with
-`bin/dotfiles-install plan`; undo with `bin/dotfiles-install restore`. The
+`bin/dotfiles-install plan`; undo with `bin/dotfiles-install restore` (it asks first). The
 last command is the doctor: every failing line names its fix.
 
 After that, run `dotfiles` (or `/dotfiles` in an agent) any time. One screen
@@ -898,16 +898,24 @@ the "Usage:" header of the script an arm runs gives the sub-forms
 (`subforms`, for example `dotfiles config get <key>`), and comments in a
 dispatch arm add the notes. `terminal_only` says why an agent cannot run it
 (an editor, a wizard, a person-only step). `confirm` says what it changes that
-is hard to undo, so agents ask first. Such a command asks y/N at a terminal
-and refuses without one unless you pass `--yes`
-([`lib/confirm.sh`](lib/confirm.sh): `contribute`, `init`, `update`), or an
-`unattended` note says why it runs without a yes (a LaunchAgent or a skill
-runs `apply`, `sync`, and `upgrade`). dotfiles has no UI, so parity covers the
-CLI and agents. `dotfiles actions --check`
+is hard to undo, so agents ask first. Each form that needs a yes
+(`needs_yes`; `# yes-for:` narrows it to some sub-commands, such as `plugin
+remove`) asks y/N on the terminal and refuses without one unless you pass
+`--yes` ([`lib/confirm.sh`](lib/confirm.sh): `contribute`, `init`, `update`,
+`upgrade`, `uninstall`, `install run` and `restore`, and `plugin add`,
+`remove`, and `trust`; `plugin update` asks only when the capabilities
+changed). The gate lives in each script, so `dotfiles-update` and `dotfiles
+update` ask the same way. Only `apply` and `sync` run without a yes, and
+their `unattended` note says why (skills run `apply`; the
+`com.dotfiles.dotfiles-sync` LaunchAgent runs the same sync script every 30
+minutes). `gated` means a `confirm_*` call is on the form's code path; a
+script may still skip the question on some branches. dotfiles
+has no UI, so parity covers the CLI and agents. `dotfiles actions --check`
 ([`tests/dotfiles-actions.bats`](tests/dotfiles-actions.bats)) fails when a
 command has no `--help` line, a `--help` line names no command, a usage runs
-into its description, or a confirm command has neither `--yes` nor an
-`unattended` reason. `cheat` builds its dotfiles lines from the same list
+into its description, or a form that needs a yes takes no `--yes` or has no
+`confirm_*` call on its code path (`gated`). It reads the code with a small
+shell lexer, so quoted text and heredocs do not count. `cheat` builds its dotfiles lines from the same list
 (without jq it reads the `--help` text in `bin/dotfiles`), and
 [`tests/cheat.bats`](tests/cheat.bats) fails when an action is missing from
 it. The start screen footer points at `dotfiles actions`.
@@ -1023,7 +1031,7 @@ dotfiles apply                                    Apply dotfiles (chezmoi apply)
 dotfiles init [--yes]                             Initialize on new machine (chezmoi init --apply); asks first
 dotfiles diff                                     Show pending changes (chezmoi diff)
 dotfiles update [--dry-run] [--verbose] [--yes]   Whole-machine update (pull/apply/agentbrew/packages/doctor); asks first
-dotfiles upgrade [--dry-run]                      Upgrade all software (brew, casks, macOS, tools)
+dotfiles upgrade [--dry-run] [--yes]              Upgrade all software (brew, casks, macOS, tools); asks first
 dotfiles doctor [--fix] [--fix-all] [--skip ID] [--list] [--quiet] [--report]
                 [--module X] [--severity LEVEL] [--json] [--watch] [--validate-overrides] [--trends]
                                                               Audit configs, optionally auto-fix drift
@@ -1056,7 +1064,7 @@ dotfiles defaults-add <domain> <key> <val> <type> Add a macOS default
 dotfiles profile [core|full]                      Show or switch profile
 dotfiles enterprise [on|off]                      Toggle enterprise mode
 dotfiles quickstart [--check]                     Interactive first-run wizard (guided setup)
-dotfiles uninstall [--dry-run]                    Remove dotfiles from this machine
+dotfiles uninstall [--dry-run] [--yes]            Remove dotfiles from this machine; asks first
 dotfiles cd                                       Print dotfiles directory (use: cd $(dotfiles cd))
 ```
 

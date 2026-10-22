@@ -96,3 +96,34 @@ changes): the count of dispatched commands missing from
 - Cost: `cheat` with no topic went from about 0.03 s to about 0.25 s at load
   220 on 10 cores (the `dotfiles actions --json` run). `cheat git` and the
   other topics except `shell` do not run it.
+
+## Follow-up: review of PR #279
+
+- The check is per form now. Each form of a confirm action gets `needs_yes`
+  (all forms, or only the sub-commands that `# yes-for:` names; `--dry-run`,
+  `--help`, and `--check` forms need none) and `gated`: a `confirm_yes`,
+  `confirm_gate`, or `confirm_require_yes` call (lib/confirm.sh) is on its
+  code path. The path is the arm, the script it runs (or that script's own
+  dispatch arm for the sub-command), and the functions they call, followed
+  through the script. `--check` fails on a form that needs a yes and takes no
+  `--yes`, or that no gate reaches.
+- `plugin remove` got a gate; plugin `approve()`, `uninstall`, and
+  `install run`/`restore` now use lib/confirm.sh too.
+- `upgrade` has a real gate in `bin/dotfiles-upgrade`; the weekly LaunchAgent
+  and the tooling-checkup skill pass `--yes`, and `dotfiles update` passes it
+  on after its own yes. The `update` gate moved into `bin/dotfiles-update`.
+  `sync` keeps no gate: without a terminal it never pushes to a public remote.
+- The prompt reads and writes `/dev/tty`, so it shows even when the output
+  goes to a log; a piped `y` is not a terminal answer.
+- The arm reader uses a small shell lexer: quoted text, `$( )`, and heredocs
+  do not count as `case`, `esac`, or `;;`, and a one-line nested case does not
+  end an arm. Two bare words in a row in a usage also fail the check.
+- A fresh-context review before merge found more: the script-level gate
+  counted the dispatch arms too (now only code outside the script's own
+  dispatch `case`; `upgrade --node` is an arm), `plugin update` asks only when
+  the capabilities changed (not a `yes-for` form now), the sync reason named
+  pushes it does make (now: the LaunchAgent runs the same script), a gate call
+  with a fixed yes (`confirm_yes 1`) counted, `upgrade --yes --help` ran the
+  upgrade, `install restore --help` took `--help` as a backup ID, and a
+  one-word or numbered description slipped past the prose check. Each has a
+  test.

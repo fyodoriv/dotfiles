@@ -87,8 +87,9 @@ Common:
   doctor [--fix] [...]        Audit configs; --fix auto-repairs
                               See \`doctor --help\` for all flags
   sync                        Commit local changes and pull remote updates
-  upgrade [--dry-run]         Upgrade all software (brew, casks, macOS, tools)
-  upgrade --node [VERSION]    Switch Node in one step (links, .node-version, agentbrew plists)
+  upgrade [--dry-run] [--yes]  Upgrade all software (brew, casks, macOS, tools); asks first
+  upgrade --node [VERSION] [--yes]
+                              Switch Node in one step (links, .node-version, agentbrew plists)
 
 Scaffolding:
   add <file> [--copy] [--module M]          Add a config file (symlink or copy mode)
@@ -168,9 +169,10 @@ esac
 
 # Each case arm is an action (`dotfiles actions`). Notes for agents go in the
 # arm as four-space comments: `# terminal-only: <why>` (needs a person at a
-# terminal), `# confirm: <what it changes>` (agents ask first; the command
-# takes --yes through lib/confirm.sh, or an `# unattended: <why>` note says
-# why it runs without one), and `# agent: <what to do differently>`.
+# terminal), `# confirm: <what it changes>` (agents ask first; each form takes
+# --yes and its code calls lib/confirm.sh, or an `# unattended: <why>` note says
+# why it runs without one), `# yes-for: <subcommands>` (only those sub-forms
+# need a yes), and `# agent: <what to do differently>`.
 case "$cmd" in
   help|h)
     show_help
@@ -315,7 +317,8 @@ case "$cmd" in
     ;;
 
   plugin)
-    # confirm: `add`, `update`, `remove`, and `trust` install, change, delete, or trust code that runs here; `list` and `verify` change nothing. Without a terminal, `add`, `update`, and `trust` refuse unless --yes.
+    # confirm: `add`, `remove`, and `trust` install, delete, or trust code that runs here; without a terminal they refuse unless --yes. `update` asks only when the plugin's capabilities changed; `trust --revoke` asks nothing; `list` and `verify` change nothing.
+    # yes-for: add remove trust
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-plugin" "$@"
     ;;
@@ -338,7 +341,7 @@ case "$cmd" in
 
   sync)
     # confirm: commits every local change in the dotfiles repo and pushes it (never to a public remote without a terminal).
-    # unattended: the com.dotfiles.dotfiles-sync LaunchAgent runs it every 30 minutes; each change is a git commit you can revert.
+    # unattended: the com.dotfiles.dotfiles-sync LaunchAgent runs this same script (bin/dotfiles-sync) every 30 minutes without asking, so a yes here would guard nothing. Without a terminal it does not push to a remote listed in config/public-push-remotes.txt; it does push to other remotes (for example a private mirror).
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-sync" "$@"
     ;;
@@ -356,10 +359,7 @@ case "$cmd" in
   update)
     # confirm: pulls, applies, and updates agents and every package; it takes minutes. Try --dry-run first. It asks first; agents pass --yes after the user agrees.
     shift
-    # shellcheck source=../lib/confirm.sh
-    source "$DOTFILES_DIR/lib/confirm.sh"
-    confirm_gate "pulls, applies, and updates agents and every package on this Mac" "$@"
-    exec bash "$DOTFILES_DIR/bin/dotfiles-update" ${CONFIRM_ARGS[@]+"${CONFIRM_ARGS[@]}"}
+    exec bash "$DOTFILES_DIR/bin/dotfiles-update" "$@"
     ;;
 
   managed)
@@ -381,7 +381,8 @@ case "$cmd" in
     ;;
 
   install)
-    # confirm: `install run --yes` changes the machine (after a backup); `install restore` puts a backup back. `plan` changes nothing.
+    # confirm: `install run --yes` changes the machine (after a backup); `install restore` puts a backup back over your files and asks first. `plan` and `backups` change nothing.
+    # yes-for: run restore
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-install" "$@"
     ;;
@@ -457,8 +458,7 @@ case "$cmd" in
     ;;
 
   upgrade)
-    # confirm: upgrades the software of every package manager (topgrade), or switches Node; hard to roll back. Try --dry-run.
-    # unattended: the com.dotfiles.dotfiles-upgrade LaunchAgent runs the same upgrade every Sunday when auto_upgrade is on.
+    # confirm: upgrades the software of every package manager (topgrade), or switches Node; hard to roll back. Try --dry-run. It asks first; agents pass --yes after the user agrees. The weekly com.dotfiles.dotfiles-upgrade LaunchAgent passes --yes (auto_upgrade is the owner's yes).
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-upgrade" "$@"
     ;;

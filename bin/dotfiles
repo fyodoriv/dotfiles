@@ -116,7 +116,7 @@ Advanced:
   defaults-preview [--changed]  Preview macOS defaults changes (no writes)
   enterprise [on|off]          Show or toggle enterprise mode
   quickstart [--check]         Interactive first-run wizard
-  plugin <subcommand>          Company plugins: add, remove, list, verify, trust
+  plugin <subcommand>          Company plugins: add, update, remove, list, trust
                                (see \`dotfiles plugin --help\`)
   leak allow --once [<sha>]    A person allows one leak-gate bypass (needs a terminal)
   memory <subcommand>          Deprecated: forwards to \`agentbrew memory\`
@@ -307,7 +307,7 @@ case "$cmd" in
     ;;
 
   plugin)
-    # confirm: `add`, `remove`, and `trust` install, delete, or trust code that runs here; `list`, `verify`, and `lint` change nothing.
+    # confirm: `add`, `update`, `remove`, and `trust` install, change, delete, or trust code that runs here; `list` and `verify` change nothing.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-plugin" "$@"
     ;;

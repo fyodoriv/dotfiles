@@ -159,12 +159,13 @@ else
   echo "○ No Agentfile.yaml in dotfiles — skipping base agent sync"
 fi
 AGENTFILE_PATHS+=(${PLUGIN_AGENTFILES[@]+"${PLUGIN_AGENTFILES[@]}"})
-# Owner-only rules layer (lib/agentfile-layers.sh).
+# Owner-only rules and the local layer (lib/agentfile-layers.sh). The local
+# layer is checked with the same agentbrew that merges it.
 # shellcheck source=../lib/agentfile-layers.sh
 source "$DOTFILES_DIR/lib/agentfile-layers.sh"
 while IFS= read -r _layer; do
   [ -n "$_layer" ] && AGENTFILE_PATHS+=("$_layer")
-done < <(agentfile_optional_layers "$DOTFILES_DIR")
+done < <(AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_optional_layers "$DOTFILES_DIR")
 
 # This Mac's Claude model/effort, merged last (lib/claude-model-layer.sh).
 # shellcheck source=../lib/claude-model-layer.sh

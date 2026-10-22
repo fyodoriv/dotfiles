@@ -220,7 +220,7 @@ Conditional MCP checks only run when the MCP server is present in `~/.config/age
 | `agentbrew.agentfile_exists` | `Agentfile.yaml` in dotfiles | None |
 | `agentbrew.initialized` | agentbrew state initialized | `agentbrew init` |
 | `agentbrew.global_agentfile` | Global Agentfile exists | `agentbrew sync` |
-| `agentbrew.local_agentfile_valid` | `~/.config/dotfiles/Agentfile.local.yaml`, when present, is valid YAML, has no `hooks:`, and uses lists for list keys; the description names the first problem ([agentbrew-setup.md](agentbrew-setup.md#add-an-mcp-server-on-one-mac)) | None (edit the file) |
+| `agentbrew.local_agentfile_valid` | `~/.config/dotfiles/Agentfile.local.yaml`, when present, is one document agentbrew can read, has no `hooks:` (also none through a YAML merge key), and uses lists for list keys; the description names the first problem ([agentbrew-setup.md](agentbrew-setup.md#add-an-mcp-server-on-one-mac)) | None (edit the file) |
 | `agentbrew.env_*` | Required env vars for registered MCP servers | `agentbrew setup` |
 | `agentbrew.memory_service_http` | Shared loopback memory MCP passes AgentBrew's stateful `initialize` → `notifications/initialized` → non-empty `tools/list` readiness contract when `use_ai_tools` is on and the memory MCP is registered | `agentbrew memory fix` |
 | `agentbrew.memory_launchagent_identity` | Loaded memory LaunchAgent uses the canonical `com.agentbrew.mcp-memory` plist path and operator `HOME` | `agentbrew memory fix` |

@@ -67,16 +67,25 @@ Mac may still want it.
    list keys (`mcp:`, `skills:`, `sources:`, and so on), each layer adds
    its entries, and an MCP entry with the same name replaces the earlier
    one.
-   - The local file may not hold `hooks:`. In agentbrew's merge, a hook
-     replaces every earlier hook with the same event and matcher, so one
-     local `Bash` hook would drop the shared `block-dangerous-git.sh`.
-   - A local file with `hooks:`, or one that is not valid YAML, is skipped
+   - The local file may not hold `hooks:`, also not through a YAML anchor
+     or merge key (`<<: *base`). In agentbrew's merge, a hook replaces
+     every earlier hook with the same event and matcher, so one local
+     `Bash` hook would drop the shared `block-dangerous-git.sh`.
+   - Before the merge, agentbrew reads the file alone with its own parser.
+     A file it cannot read (bad YAML, a duplicate key, an unknown `!tag`,
+     a second `---` document) or one whose result has hooks is skipped
      with a warning that names the problem. The other layers still sync.
-   - A list key written as a single value (for example `mcp: figma`) gets
-     a warning; agentbrew ignores that key. Write `mcp:` then `- figma`.
+     If the check itself cannot run (no temp file), the file is skipped
+     too: it is never trusted unchecked.
+   - With mikefarah `yq` installed (the Brewfile has it), apply also warns
+     about a list key written as a single value (for example
+     `mcp: figma`; write `mcp:` then `- figma`), a `rules:` that is not
+     text, and a key agentbrew's merge does not use. agentbrew ignores
+     those keys.
 3. Check: `dotfiles doctor --module agentbrew`.
    `agentbrew.local_agentfile_valid` names the first problem in the local
-   file. The `agentbrew.global_agentfile_in_sync` check builds the same list from
+   file, and says "checked with yq only" when the doctor finds no agentbrew
+   that can merge. The `agentbrew.global_agentfile_in_sync` check builds the same list from
    `lib/agentfile-layers.sh`, so it passes. An entry added by hand to
    `~/.config/agentbrew/Agentfile.yaml` still fails it: that file is
    generated, and the next apply overwrites it.

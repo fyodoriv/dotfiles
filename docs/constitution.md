@@ -122,6 +122,10 @@ directly.
 
 - Edit `Agentfile.yaml` when dotfiles should request MCP servers, skills,
   sources, or shared rules for all agents on this machine.
+- For one Mac only, list the addition in the untracked
+  `~/.config/dotfiles/Agentfile.local.yaml`. The sync and the doctor drift
+  check merge it through `lib/agentfile-layers.sh`
+  ([agentbrew-setup.md](agentbrew-setup.md#add-an-mcp-server-on-one-mac)).
 - **Org-gated MCPs DO NOT belong here.** Any MCP whose runtime depends on
   org-internal infrastructure (corporate identity provider, internal API
   gateway, behind-VPN endpoint, marketplace entitlement) goes into the

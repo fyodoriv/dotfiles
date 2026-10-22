@@ -315,6 +315,66 @@ AGENTBREW_EOF
   [ "$pass_count" -ge 1 ]
 }
 
+# Mock merge that records the basenames of its inputs, in order.
+_mock_merge_records_inputs() {
+  cat > "$TEST_DIR/bin/agentbrew" << 'AGENTBREW_EOF'
+#!/bin/bash
+if [ "$1" = "agentfile" ] && [ "$2" = "merge" ]; then
+  if [ "$3" = "--help" ]; then
+    echo "Usage: agentbrew agentfile merge [options] <agentfiles...>"
+    exit 0
+  fi
+  shift 2
+  inputs=()
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--output" ]; then output="$2"; shift 2; continue; fi
+    inputs+=("$(basename "$1")")
+    shift
+  done
+  echo "${inputs[*]}" > "$output"
+fi
+AGENTBREW_EOF
+  chmod +x "$TEST_DIR/bin/agentbrew"
+}
+
+@test "agentbrew: global Agentfile drift check includes this Mac's local Agentfile (#259)" {
+  grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
+  mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
+  unset XDG_CONFIG_HOME
+
+  echo "mcp: [playwright]" > "$TEST_DOTFILES/Agentfile.yaml"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "mcp: [figma]" > "$TEST_HOME/.config/dotfiles/Agentfile.local.yaml"
+  echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
+  # The sync script merged both inputs; the mock merge records their names.
+  echo "Agentfile.yaml Agentfile.local.yaml" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+  _mock_merge_records_inputs
+
+  DOTFILES_OWNER_MACHINE=false \
+    source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+
+  [ "$fail_count" -eq 0 ]
+  [ "$pass_count" -ge 1 ]
+}
+
+@test "agentbrew: drift check fails when the local Agentfile is new and apply has not run" {
+  grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
+  mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
+  unset XDG_CONFIG_HOME
+
+  echo "mcp: [playwright]" > "$TEST_DOTFILES/Agentfile.yaml"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "mcp: [figma]" > "$TEST_HOME/.config/dotfiles/Agentfile.local.yaml"
+  echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
+  echo "Agentfile.yaml" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+  _mock_merge_records_inputs
+
+  DOTFILES_OWNER_MACHINE=false \
+    source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+
+  [ "$fail_count" -eq 1 ]
+}
+
 @test "agentbrew: sync script and doctor share one Agentfile layer helper" {
   grep -q 'agentfile_optional_layers' "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_agentbrew-sync.sh"
   grep -q 'agentfile_optional_layers' "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"

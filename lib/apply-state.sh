@@ -31,8 +31,10 @@ _apply_state_hash() {
 }
 
 # What a full apply reads besides the target files: the source path and
-# commit, the chezmoi config (template data), and the pinned plugins
-# (same default path as plugin_lock_file in lib/plugin.sh).
+# commit, the chezmoi config (template data), the pinned plugins (same
+# default path as plugin_lock_file in lib/plugin.sh), and this Mac's local
+# Agentfile layer (same path as agentfile_local_layer_path in
+# lib/agentfile-layers.sh).
 apply_state_fingerprint() {
   local source head
   source="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
@@ -41,6 +43,7 @@ apply_state_fingerprint() {
   printf 'head %s\n' "$head"
   printf 'config %s\n' "$(_apply_state_hash "${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.yaml")"
   printf 'plugins %s\n' "$(_apply_state_hash "${DOTFILES_PLUGINS_LOCK:-${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/plugins.lock}")"
+  printf 'local_agentfile %s\n' "$(_apply_state_hash "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/Agentfile.local.yaml")"
 }
 
 # 0 when the source checkout has no tracked or untracked change.

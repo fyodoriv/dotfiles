@@ -14,6 +14,7 @@ recovering from an `agentbrew sync` failure.
 |--------|-------|--------|
 | `Agentfile.yaml` | dotfiles | Declarative list of MCP servers, skills, sources, and shared rules |
 | `config/agentfile-owner-rules.yaml` | dotfiles | The owner's personal workflow rules (closing "Needed from you" line, memory-MCP calls, approved-family delivery, deprecated-agent notes). `dotfiles apply` merges it into `~/.config/agentbrew/Agentfile.yaml` only when `owner_machine` is true (or `DOTFILES_OWNER_MACHINE=true`), so a new user's agents get only the general rules in `Agentfile.yaml`. The sync script and the `agentbrew.global_agentfile_in_sync` doctor check both get this layer from `lib/agentfile-layers.sh`, so they cannot drift. |
+| `~/.config/dotfiles/Agentfile.local.yaml` | you | Optional, untracked Agentfile layer for this Mac only, for example an extra MCP server. See [Add an MCP server on one Mac](#add-an-mcp-server-on-one-mac). |
 | `~/.config/agentbrew/state.yaml` | agentbrew | Local registry of installed items and detected agents |
 | `~/.claude/` | agentbrew or the agent | Generated agent config; do not edit by hand |
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
@@ -43,6 +44,50 @@ After an `Agentfile.yaml` edit, `make check` parses the file as YAML
 (`tests/agentfile.bats`, with `yq` or the system Ruby) and runs only the tests
 that read it. It skips the install e2e: the e2e never runs agentbrew, so it
 never reads the Agentfile.
+
+## Add an MCP server on one Mac
+
+Use the local layer when one Mac needs an MCP server (or a skill or rule)
+that the shared `Agentfile.yaml` does not list. For example, `figma` was
+removed from `Agentfile.yaml` on 2026-10-13 because it was unused, but one
+Mac may still want it.
+
+1. Create `~/.config/dotfiles/Agentfile.local.yaml` (or
+   `$XDG_CONFIG_HOME/dotfiles/Agentfile.local.yaml`). It is a normal
+   Agentfile, outside the repo, and never committed:
+
+   ```yaml
+   mcp:
+     - figma
+   ```
+
+2. Run `dotfiles apply`. The sync merges the layers in this order: the
+   shared `Agentfile.yaml`, plugin Agentfiles, the owner rules (owner
+   machines only), this local file, and this Mac's model override. A later
+   layer adds entries; an MCP entry with the same name replaces the earlier
+   one.
+3. Check: `dotfiles doctor --module agentbrew`. The
+   `agentbrew.global_agentfile_in_sync` check builds the same list from
+   `lib/agentfile-layers.sh`, so it passes. An entry added by hand to
+   `~/.config/agentbrew/Agentfile.yaml` still fails it: that file is
+   generated, and the next apply overwrites it.
+
+`dotfiles apply --if-changed` (and plain `dotfiles`) also run the full apply
+after you edit the local file, because the last-apply record includes its
+hash (`lib/apply-state.sh`). To remove the server, delete its line (or the
+file) and run `dotfiles apply` again.
+
+Rules for what goes where:
+
+- Every machine needs it, and it works for a fresh user without company
+  login or network: add it to `Agentfile.yaml`.
+- A company or team needs it (company login, internal network, paid
+  entitlement): add it to the company plugin's Agentfile
+  (`contributes.agentbrew`, [plugins.md](plugins.md)), never to
+  `Agentfile.yaml`.
+- Only this Mac needs it: use the local file. It can name servers that need
+  a login, because it never leaves the Mac. Keep tokens in
+  `~/.zshenv.secrets`, not in the file.
 
 ## First-Time Setup
 

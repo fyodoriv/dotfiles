@@ -42,8 +42,10 @@ mcp:
   # Code or Codex on this Mac: context7, tasks-mcp, github (gh CLI is used),
   # figma (OAuth, unused), chrome-devtools (agent-browser is the browser
   # tool), shadcn-mcp (the shadcn skill stays). Each one started at session
-  # start and was probed every 30 minutes. Re-add with `agentbrew install <name>`
-  # and a line here. atlassian and jenkins stay out (see git history).
+  # start and was probed every 30 minutes. Re-add for every machine with
+  # `agentbrew install <name>` and a line here. For one Mac only, list it in
+  # the untracked ~/.config/dotfiles/Agentfile.local.yaml instead
+  # (docs/agentbrew-setup.md). atlassian and jenkins stay out (see git history).
 # Semantic memory runtime — AgentBrew owns daemon, MCP URL, and pack reconciliation.
 memory:
   enabled: true

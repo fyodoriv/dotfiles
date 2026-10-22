@@ -39,6 +39,11 @@ If generated config looks wrong, update `Agentfile.yaml` or agentbrew state and
 sync again. Do not patch generated files directly; the next sync will overwrite
 them.
 
+After an `Agentfile.yaml` edit, `make check` parses the file as YAML
+(`tests/agentfile.bats`, with `yq` or the system Ruby) and runs only the tests
+that read it. It skips the install e2e: the e2e never runs agentbrew, so it
+never reads the Agentfile.
+
 ## First-Time Setup
 
 1. **Install dotfiles with AI tooling enabled.**

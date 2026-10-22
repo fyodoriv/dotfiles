@@ -907,7 +907,10 @@ CLI and agents. `dotfiles actions --check`
 ([`tests/dotfiles-actions.bats`](tests/dotfiles-actions.bats)) fails when a
 command has no `--help` line, a `--help` line names no command, a usage runs
 into its description, or a confirm command has neither `--yes` nor an
-`unattended` reason.
+`unattended` reason. `cheat` builds its dotfiles lines from the same list
+(without jq it reads the `--help` text in `bin/dotfiles`), and
+[`tests/cheat.bats`](tests/cheat.bats) fails when an action is missing from
+it. The start screen footer points at `dotfiles actions`.
 
 ### File modes
 
@@ -1106,7 +1109,7 @@ scratch work.
 | Script | Description |
 |--------|-------------|
 | `dotfiles-lock-checked` | Run a dotfiles command; treat a `[lock] Skipping`/`Timed out` run as not applied, wait, re-run, exit 75 if still locked. `--log FILE` checks a `dotfiles-upgrade` log (lock skip or no Summary = did not run) |
-| `cheat` | Quick cheatsheet for all custom commands and shortcuts |
+| `cheat` | Quick cheatsheet for all custom commands and shortcuts; the `dotfiles` commands come from `dotfiles actions` |
 | `note` | Append timestamped notes to a daily markdown file |
 | `status` | System dashboard: fastfetch, dotfiles version, agent status |
 | `timer` | Pomodoro-style countdown timer with macOS notification |

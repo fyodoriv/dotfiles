@@ -88,6 +88,8 @@ agent() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"Next: "* ]]
   [[ "$output" != *"Usage:"* ]]
+  # The footer points at the generated command list (bin/dotfiles-actions).
+  [[ "$output" == *"All commands: dotfiles actions"* ]]
   run "$REPO/bin/dotfiles" start --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"--yes"* ]] && [[ "$output" == *"--health"* ]]

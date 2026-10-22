@@ -57,19 +57,6 @@ them. -->
   - **Pivot**: if an unattended update cannot stay safe, print the pending updates in the upgrade summary instead.
   - **Anchor**: issue #265; PR #276 review (2026-10-22).
 
-- [ ] `cheat` and the start screen point at the generated `dotfiles actions` list
-  - **ID**: cheat-reads-dotfiles-actions
-  - **Tags**: cli, docs
-  - **Details**: PR #277 and #279 made `dotfiles actions` the one generated command list, enforced by `dotfiles actions --check`. Two places still keep their own copy: the "Dotfiles Management" section of `bin/cheat` (a hand-kept list of 12 commands, already missing `actions`, `plugin`, `leak`, `memory`) and the start screen footer in `bin/dotfiles-start:211` ("All commands: dotfiles --help"). Build the `cheat` dotfiles section from `dotfiles actions --json`, and point the footer at `dotfiles actions`.
-  - **Files**: `bin/cheat`, `bin/dotfiles-start`, `tests/cheat.bats` (or the closest existing test)
-  - **Output**: code
-  - **Acceptance**: `cheat` lists every `dotfiles actions` name, and a test fails when a new action is missing from it.
-  - **Hypothesis**: generating the section removes the drift: commands missing from `cheat` go from 4 (or more) to 0 and stay there.
-  - **Measurement**: a bats test that diffs `cheat`'s dotfiles names against `dotfiles actions --json | jq -r '.[].name'`.
-  - **Success**: 0 missing, enforced in `make check`.
-  - **Pivot**: if `cheat` must stay hand-written for its layout, add only the parity test.
-  - **Anchor**: Hunt & Thomas 1999, "DRY"; PR #277 review (2026-10-22).
-
 ## P3
 
 - [ ] Make `make lint` fast in the inner loop

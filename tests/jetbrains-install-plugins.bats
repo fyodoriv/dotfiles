@@ -35,7 +35,8 @@ teardown() {
 
 # make_ide <App name> <binary> <build>: a fake JetBrains app bundle.
 # `installPlugins <id>` logs and succeeds, or fails when <id> is in
-# FAKE_FAIL_PLUGIN. `serve` loops so the IDE looks open to pgrep.
+# FAKE_FAIL_PLUGIN. FAKE_READ_STDIN=1 makes it read all of stdin, as an IDE
+# that reads stdin would. `serve` loops so the IDE looks open to pgrep.
 make_ide() {
   local app="$JETBRAINS_APP_DIRS/$1.app"
   mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -46,6 +47,7 @@ if [ "${1:-}" = "serve" ]; then
   while :; do sleep 1; done
 fi
 echo "$(basename "$0") $*" >> "$LAUNCH_LOG"
+[ -z "${FAKE_READ_STDIN:-}" ] || cat > /dev/null
 if [ "${1:-}" = "installPlugins" ] && [ "${2:-}" = "${FAKE_FAIL_PLUGIN:-}" ]; then
   echo "error: plugin not found: $2"
   exit 1
@@ -74,6 +76,14 @@ launches() { grep -c 'installPlugins' "$LAUNCH_LOG" || true; }
   run bash "$RUN_AFTER"
   [ "$status" -eq 0 ]
   grep -qx 'webstorm installPlugins Key Promoter X' "$LAUNCH_LOG"
+}
+
+@test "an IDE that reads stdin does not swallow the rest of the plugin list" {
+  FAKE_READ_STDIN=1 run bash "$INSTALLER"
+  [ "$status" -eq 0 ]
+  [ "$(launches)" -eq 2 ]
+  grep -qx 'webstorm installPlugins Key Promoter X' "$LAUNCH_LOG"
+  grep -qx 'webstorm installPlugins zielu.gittoolbox' "$LAUNCH_LOG"
 }
 
 @test "a change to the plugin list re-runs the install" {

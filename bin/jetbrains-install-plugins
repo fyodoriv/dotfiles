@@ -208,7 +208,9 @@ for i in "${!RUNNABLE_BINARIES[@]}"; do
   while IFS= read -r plugin; do
     [ -z "$plugin" ] && continue
     echo "  installPlugins $plugin"
-    if "$b" installPlugins "$plugin" 2>&1 | tail -3; then
+    # </dev/null: the loop reads the plugin list on stdin, and an IDE that
+    # reads stdin would swallow the rest of it.
+    if "$b" installPlugins "$plugin" </dev/null 2>&1 | tail -3; then
       :
     else
       echo "    (failed — wrong ID? check jetbrains/recommended_plugins.txt)"

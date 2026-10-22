@@ -58,9 +58,12 @@ show_help() {
 Usage: dotfiles <command> [options]
 
 Common:
-  apply [--pull] [--no-fix]   Apply dotfiles and self-heal (chezmoi + doctor --fix)
+  apply [--pull] [--no-fix] [--if-changed]
+                              Apply dotfiles and self-heal (chezmoi + doctor --fix)
                               --pull also git-pulls latest first
                               --no-fix opts out of the auto-doctor pass
+                              --if-changed skips both when nothing changed since
+                              the last full apply and chezmoi status shows no drift
   update [--dry-run] [--verbose]
                               Update the whole machine (pull/apply/agents/packages/doctor)
   doctor [--fix] [...]        Audit configs; --fix auto-repairs
@@ -153,14 +156,20 @@ case "$cmd" in
     #      installs, login items, etc.). --no-fix opts out for the rare
     #      case where the operator wants raw chezmoi behavior. Doctor's
     #      --quiet means it only prints when something actually changed.
+    #   --if-changed skips steps 2 and 3 when lib/apply-state.sh shows that
+    #   the source, chezmoi config, and plugins are unchanged since the last
+    #   full apply and `chezmoi status` shows no drift. Drift is printed, then
+    #   the full apply runs.
     shift
     _do_pull=0
     _do_fix=1
+    _if_changed=0
     _chezmoi_args=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --pull) _do_pull=1; shift ;;
         --no-fix) _do_fix=0; shift ;;
+        --if-changed) _if_changed=1; shift ;;
         *) _chezmoi_args+=("$1"); shift ;;
       esac
     done
@@ -183,10 +192,36 @@ case "$cmd" in
       fi
     }
     trap _release_apply_lock EXIT
+    # shellcheck source=../lib/apply-state.sh
+    source "$DOTFILES_DIR/lib/apply-state.sh"
+    if [ "$_if_changed" -eq 1 ]; then
+      if apply_state_current "$DOTFILES_DIR"; then
+        _drift_rc=0
+        _drift="$(apply_state_drift "$DOTFILES_DIR")" || _drift_rc=$?
+        case "$_drift_rc" in
+          1)
+            echo "✓ Nothing changed since the last apply ($(git -C "$DOTFILES_DIR" rev-parse --short HEAD)) and chezmoi status shows no drift: skipped chezmoi apply and doctor. Run \`dotfiles apply\` for a full apply."
+            exit 0
+            ;;
+          0)
+            echo "→ Drift since the last apply (chezmoi status):"
+            printf '%s\n' "$_drift" | sed 's/^/    /'
+            echo "→ Running the full apply."
+            ;;
+          *) echo "→ chezmoi status failed; running the full apply." ;;
+        esac
+      else
+        echo "→ Source, chezmoi config, or plugins changed since the last apply (or no record yet); running the full apply."
+      fi
+    fi
     if [ "${#_chezmoi_args[@]}" -gt 0 ]; then
       chezmoi apply --source "$DOTFILES_DIR" "${_chezmoi_args[@]}"
     else
+      # Only a full apply (no target or flag passthrough) updates the record;
+      # a failed one leaves none, so the next --if-changed run applies again.
+      apply_state_clear
       chezmoi apply --source "$DOTFILES_DIR"
+      apply_state_record "$DOTFILES_DIR"
     fi
     _apply_rc=$?
     _release_apply_lock

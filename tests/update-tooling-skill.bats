@@ -128,3 +128,11 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -q "^## 16. Run report (two or more PRs)" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
   grep -q "self-contained HTML" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
 }
+
+@test "update-tooling skips the full dotfiles apply only when nothing changed" {
+  grep -F -q '"$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply --if-changed' "$SKILL"
+  grep -F -q 'chezmoi status --exclude=always' "$SKILL"
+  grep -F -q 'Report each drift line.' "$SKILL"
+  run jq -e '[.evals[] | select(.expectations | any(contains("--if-changed")))] | length >= 1' "$EVALS"
+  [ "$status" -eq 0 ]
+}

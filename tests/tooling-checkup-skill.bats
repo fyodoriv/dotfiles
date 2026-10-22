@@ -608,3 +608,11 @@ broken file://$feeds/missing.xml"
   grep -q "publish it as a private Artifact" "$skill"
   grep -q "Ask from the page" "$skill"
 }
+
+@test "tooling-checkup times the skip-when-unchanged apply and reports drift" {
+  grep -q 'dotfiles apply --if-changed' "$SKILL"
+  grep -q 'dotfiles_apply_secs=<n>' "$SKILL"
+  grep -q 'each drift line named' "$SKILL"
+  run jq -e '[.evals[] | select(.prompt | contains("dotfiles_apply_secs"))] | length >= 1' "$EVALS"
+  [ "$status" -eq 0 ]
+}

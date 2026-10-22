@@ -172,8 +172,13 @@ clean checkouts, rebuilds the applied agentbrew, runs
 applies dotfiles, reloads LaunchAgents, and runs the health checks. Keep its
 safety rules. Its step 5 (next work) feeds this skill's report.
 
+Time the `dotfiles apply --if-changed` step and record it in Phase 12 as
+`--metric dotfiles_apply_secs=<n>`. On an unchanged machine it prints
+`skipped chezmoi apply and doctor` and takes seconds. When it reports drift
+(a hand-edited or missing file), name each drift line in the report.
+
 **Done when:** `update-tooling` steps 1 to 4 are done, with each skipped
-checkout and each failed check named.
+checkout, each failed check, and each drift line named.
 
 Finish Phase 3 before you start Phase 4. The dotfiles apply and
 `dotfiles-upgrade` take the same dotfiles lock; a background upgrade makes the
@@ -450,7 +455,7 @@ question:
 
    ```bash
    python3 <skill-dir>/scripts/checkup_state.py record --verdict "<verdict line>" \
-     <the Phase 6, 8, and 9 `record:` metrics> \
+     <the Phase 6, 8, and 9 `record:` metrics> --metric dotfiles_apply_secs=<n> \
      [--metric claude_echo_p95_ms=<n> --metric shell_echo_p95_ms=<n> when the echo test ran]
    ```
 

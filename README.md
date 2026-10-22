@@ -370,6 +370,7 @@ See [docs/onboarding.md](docs/onboarding.md) for the complete onboarding guide i
 dotfiles update             # whole-machine update: pull/apply/agentbrew/packages/doctor
 dotfiles apply              # deploy all config (chezmoi apply)
 dotfiles apply --pull       # narrow path: pull dotfiles source + apply only
+dotfiles apply --if-changed # skip the apply when nothing changed and chezmoi status shows no drift
 dotfiles diff               # preview pending changes without writing
 ```
 

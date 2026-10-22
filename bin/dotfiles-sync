@@ -37,6 +37,8 @@ source "$DOTFILES_DIR/lib/self-reload.sh"
 source "$DOTFILES_DIR/lib/push-error-classify.sh"
 # shellcheck source=../lib/zshrc-appends.sh
 source "$DOTFILES_DIR/lib/zshrc-appends.sh"
+# shellcheck source=../lib/apply-state.sh
+source "$DOTFILES_DIR/lib/apply-state.sh"
 
 cd "$DOTFILES_DIR" || { warn "[sync] Cannot cd to dotfiles dir"; exit 1; }
 
@@ -128,9 +130,13 @@ _move_zshrc_appends() {
 }
 
 # Re-apply chezmoi from this checkout. On failure, show chezmoi's last error line.
+# A success updates the last-apply record (lib/apply-state.sh), so a later
+# `dotfiles apply --if-changed` can skip the same work.
 _chezmoi_apply() {
   local out
+  apply_state_clear
   if out=$(chezmoi apply --source "$DOTFILES_DIR" 2>&1); then
+    apply_state_record "$DOTFILES_DIR"
     return 0
   fi
   warn "[sync] chezmoi apply failed: $(printf '%s\n' "$out" | tail -n 1)"

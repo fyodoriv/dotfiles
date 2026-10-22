@@ -26,7 +26,7 @@ setup() {
   git init --quiet "$REPO"
   mkdir -p "$REPO/bin" "$REPO/lib" "$REPO/home"
   cp "$REPO_ROOT/bin/dotfiles-sync" "$REPO/bin/"
-  for f in colors stats errors-log lock self-reload push-error-classify agentbrew-locate zshrc-appends; do
+  for f in colors stats errors-log lock self-reload push-error-classify agentbrew-locate zshrc-appends apply-state; do
     cp "$REPO_ROOT/lib/$f.sh" "$REPO/lib/"
   done
   printf '# zshrc\n[ -f ~/.zshrc.local ] && source ~/.zshrc.local\n' > "$REPO/home/zshrc"

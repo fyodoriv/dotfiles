@@ -145,7 +145,8 @@ printf '%s\n' "$@" > "$CHEZMOI_ARGS_OUT"
 EOF
   chmod +x "$fake_bin/chezmoi"
 
-  run env PATH="$fake_bin:$PATH" CHEZMOI_ARGS_OUT="$args_file" bash "$CLI" apply --no-fix
+  # XDG_STATE_HOME keeps the last-apply record out of the real state dir.
+  run env PATH="$fake_bin:$PATH" CHEZMOI_ARGS_OUT="$args_file" XDG_STATE_HOME="$tmp/state" bash "$CLI" apply --no-fix
 
   rm -rf "$tmp"
   [ "$status" -eq 0 ]

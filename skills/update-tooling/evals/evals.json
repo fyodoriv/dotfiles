@@ -113,6 +113,17 @@
         "Asks which next work to start, with options taken from the page"
       ],
       "id": 10
+    },
+    {
+      "prompt": "update latest tooling (dotfiles-sync printed \"No changes\" and nothing landed since the last apply, but ~/.gitconfig was edited by hand)",
+      "expected_output": "The agent runs `dotfiles apply --if-changed` through dotfiles-lock-checked. chezmoi status shows the hand-edited ~/.gitconfig, so the command prints that drift line and runs the full apply. The agent reports the drift line, does not use --force, and still runs the step 4 doctor modules.",
+      "expectations": [
+        "Runs `dotfiles apply --if-changed` after dotfiles-sync, not a bare `dotfiles apply`",
+        "Reports the hand-edited ~/.gitconfig drift line from the apply output",
+        "Does not pass --force to chezmoi or dotfiles apply",
+        "Still runs the step 4 doctor modules and health checks"
+      ],
+      "id": 11
     }
   ]
 }

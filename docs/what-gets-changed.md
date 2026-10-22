@@ -226,6 +226,16 @@ These chezmoi scripts run automatically during `chezmoi apply`:
 | `run_after_agentbrew-sync.sh` | Every apply | Sync agent config from `Agentfile.yaml` (non-fatal) |
 | `run_after_jetbrains-plugins.sh` | Every apply where a JetBrains IDE is in `/Applications` | Install the plugins in `jetbrains/recommended_plugins.txt` with `bin/jetbrains-install-plugins --if-changed` (non-fatal). Each install starts a headless IDE JVM, so a stamp per IDE in `~/.local/state/dotfiles/jetbrains-plugins/` records the IDE build and plugin list. A no-change apply starts no JVM. A list change, an IDE upgrade, or a new IDE re-runs it. Open IDEs are skipped and get no stamp. |
 
+`dotfiles apply --if-changed` skips the whole apply, scripts and doctor pass
+included, when nothing changed. A successful full apply (by `dotfiles apply`
+or `dotfiles-sync`) from a clean source writes
+`~/.local/state/dotfiles/last-apply`: the source path and commit, plus hashes
+of `~/.config/chezmoi/chezmoi.yaml` and `~/.config/dotfiles/plugins.lock`.
+The flag skips only when that record still matches, the source has no
+uncommitted change, and `chezmoi status --exclude=always` prints nothing.
+Otherwise it prints the reason or the drift lines and runs the full apply.
+Delete the file to force a full apply.
+
 ---
 
 ## 9. What is NEVER Touched

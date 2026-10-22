@@ -193,6 +193,17 @@
         "Phase 11 questions are asked after the page and refer to its sections"
       ],
       "id": 16
+    },
+    {
+      "prompt": "/tooling-checkup (nothing landed in dotfiles since the last checkup; dotfiles-sync printed \"No changes\"; the last run recorded dotfiles_apply_secs=191)",
+      "expected_output": "In Phase 3 the apply step runs `dotfiles apply --if-changed`, which prints `skipped chezmoi apply and doctor` within seconds. The agent times the step, records `--metric dotfiles_apply_secs=<n>` in Phase 12, compares it with the last 191 s, and still runs the update-tooling step 4 doctor modules.",
+      "expectations": [
+        "Runs the apply step as `dotfiles apply --if-changed`",
+        "Times the apply step and records `--metric dotfiles_apply_secs=<n>` in Phase 12",
+        "Counts the skip line as applied, not as a lock skip",
+        "Still runs the update-tooling step 4 doctor modules"
+      ],
+      "id": 17
     }
   ]
 }

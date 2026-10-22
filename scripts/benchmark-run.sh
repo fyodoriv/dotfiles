@@ -200,7 +200,7 @@ detect_chezmoi() {
 prepare_dotfiles() {
   mkdir -p "$1/bin" "$1/lib"
   cp "$DOTFILES_DIR/bin/dotfiles" "$1/bin/dotfiles"
-  cp "$DOTFILES_DIR/lib/colors.sh" "$DOTFILES_DIR/lib/lock.sh" "$1/lib/"
+  cp "$DOTFILES_DIR/lib/colors.sh" "$DOTFILES_DIR/lib/lock.sh" "$DOTFILES_DIR/lib/apply-state.sh" "$1/lib/"
   printf 'bin\nlib\n' > "$1/.chezmoiignore"
   cp -R "$WORK/fixture" "$1/dot_bench"
 }

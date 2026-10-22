@@ -36,6 +36,7 @@ setup_file() {
   cp "$BATS_TEST_DIRNAME/../lib/self-reload.sh" "$tmpl/dotfiles/lib/self-reload.sh"
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$tmpl/dotfiles/lib/push-error-classify.sh"
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$tmpl/dotfiles/lib/zshrc-appends.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/apply-state.sh" "$tmpl/dotfiles/lib/apply-state.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$tmpl/dotfiles/lib/agentbrew-locate.sh"
   mkdir -p "$tmpl/dotfiles/config"
   printf '# none\n' > "$tmpl/dotfiles/config/public-push-remotes.txt"
@@ -184,6 +185,7 @@ teardown() {
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$NOT_GIT/lib/push-error-classify.sh"
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$NOT_GIT/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$NOT_GIT/lib/agentbrew-locate.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/apply-state.sh" "$NOT_GIT/lib/apply-state.sh"
 
   run "$NOT_GIT/bin/dotfiles-sync"
   [ "$status" -eq 0 ]
@@ -203,6 +205,7 @@ teardown() {
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$NO_REMOTE/lib/push-error-classify.sh"
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$NO_REMOTE/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$NO_REMOTE/lib/agentbrew-locate.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/apply-state.sh" "$NO_REMOTE/lib/apply-state.sh"
   git -C "$NO_REMOTE" init --quiet
   git -C "$NO_REMOTE" add -A
   git -C "$NO_REMOTE" commit --no-verify --allow-empty -m "chore: init" --quiet
@@ -609,6 +612,24 @@ push_remote_commit() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"chezmoi apply failed: chezmoi: could not open a new TTY"* ]]
   [[ "$output" != *"chezmoi re-applied"* ]]
+}
+
+@test "a successful sync re-apply records the source for dotfiles apply --if-changed" {
+  setup_applied_worktree
+  push_remote_commit >/dev/null
+  run "$APPLIED/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  grep -q "^head $(git -C "$APPLIED" rev-parse HEAD)$" "$HOME/.local/state/dotfiles/last-apply"
+}
+
+@test "a failed sync re-apply removes the apply record" {
+  setup_applied_worktree
+  push_remote_commit >/dev/null
+  mkdir -p "$HOME/.local/state/dotfiles"
+  echo "head stale" > "$HOME/.local/state/dotfiles/last-apply"
+  FAKE_CHEZMOI_APPLY_ERROR="could not open a new TTY" run "$APPLIED/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.local/state/dotfiles/last-apply" ]
 }
 
 @test "sync output still reaches the log after the log is trimmed" {

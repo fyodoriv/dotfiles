@@ -240,7 +240,7 @@ DOTFILES_APPLIED="$(chezmoi source-path)"
 [ -n "$DOTFILES_APPLIED" ] || { echo "chezmoi source-path failed; is chezmoi still locked?"; exit 1; }
 CHECKED="$DOTFILES_APPLIED/bin/dotfiles-lock-checked"
 env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles-sync"
-cd "$HOME" && env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply
+cd "$HOME" && env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply --if-changed
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-reload-launchagents"
 ```
 
@@ -257,10 +257,24 @@ run an applied-checkout update against a dirty or diverged worktree.
 
 Run the explicit apply after the helper intentionally. The helper reapplies
 only after a successful fast-forward; the explicit apply converges the current
-manifest even when the checkout was already current. If apply asks for a
-noninteractive drift confirmation, such as a missing TTY, do not use
-`--force`. Preserve the live file and report the drift for source
-reconciliation.
+manifest even when the checkout was already current.
+
+`--if-changed` makes the explicit apply cheap when nothing changed. It skips
+`chezmoi apply` and the doctor pass (about 200 s) when both are true:
+
+- the source commit, chezmoi config, and plugin lock match the last
+  successful full apply (by `dotfiles apply` or `dotfiles-sync`), and the
+  source checkout has no uncommitted change; and
+- `chezmoi status --exclude=always` prints nothing (no hand-edited, missing,
+  or pending file, and no changed `run_onchange_` script).
+
+Then it prints `skipped chezmoi apply and doctor`, and the step 4 doctor
+modules check the rest of the machine. Otherwise it prints why, including
+each drift line, and runs the full apply. Report each drift line. Use plain
+`dotfiles apply` when the user asks for a full apply or a step 4 check
+fails. If apply asks for a noninteractive drift confirmation, such as a
+missing TTY, do not use `--force`. Preserve the live file and report the
+drift for source reconciliation.
 
 ### LaunchAgents
 

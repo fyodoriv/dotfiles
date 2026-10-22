@@ -62,6 +62,7 @@ contributes:
 |---|---|
 | `dotfiles plugin add <url>@<tag> [--signer <key>] [--yes]` | Clones the tag, checks the signature, validates the manifest and options, shows the capabilities, and asks once. It runs no plugin code. |
 | `dotfiles plugin add --dev <path>` | Links a local checkout for authors. Not pinned; doctor warns on every run. |
+| `dotfiles plugin update <name> [<tag>] [--yes]` | Moves an installed plugin to another signed tag in place. Without a tag, it takes the newest tag that is newer than the installed one and signed by a trusted signer. See [Update](#update). |
 | `dotfiles plugin remove <name>` | Unloads its LaunchAgents and deletes the checkout and the lock entry. |
 | `dotfiles plugin list` / `verify [<name>]` | Shows each plugin and re-checks it against the lock. |
 | `dotfiles plugin trust <name> --signer <key> [--revoke]` | Adds or removes a trusted signer (needs a terminal or `--yes`). |
@@ -79,6 +80,34 @@ contributes:
   trusted. Otherwise it is disabled, and the doctor check
   `plugins.<name>.verified` prints the difference. Folder names never make
   code trusted.
+
+### Update
+
+`dotfiles plugin update <name> [<tag>]` keeps the plugin working while it
+moves to a new release. It never removes the plugin first.
+
+1. It clones the lock's `source` into a staging folder beside the checkout.
+2. It picks the tag: the one you name, or else the newest tag that sorts
+   after the locked `ref` (version order) and that a trusted signer signed.
+   It skips and names each newer tag that is unsigned or signed by another
+   key. No newer signed tag: it prints "up to date" and changes nothing.
+3. It checks the new tag as `add` does: SSH signature from a key trusted for
+   this plugin, valid manifest and options, and the same plugin `name`.
+4. Same capabilities as the approved version: no prompt. Changed
+   capabilities: it shows them and asks once (a terminal or `--yes`).
+5. It moves the old checkout aside, moves the new one in, rewrites the lock
+   entry (commit, `tree_hash`, `capabilities_sha`, signer, ref, version),
+   and runs the same check as `verify`. If that fails, the old checkout and
+   lock come back and the command exits non-zero.
+
+Any failed step leaves the installed version and its lock untouched. A
+named tag older than the installed one installs with a "downgrade" note;
+without a tag, update never goes back. Naming the locked tag on a checkout
+that no longer matches its lock reinstalls it, so the doctor fix for
+`plugins.<name>.verified` is `dotfiles plugin update <name> <ref>`. A
+`--dev` plugin is not pinned; update it with git in its folder. Then run
+`dotfiles apply` to load new LaunchAgents, Brewfile entries, and Agentfile
+layers. A new signer must be trusted first (`plugin trust`, see below).
 
 ## Trust and signing
 

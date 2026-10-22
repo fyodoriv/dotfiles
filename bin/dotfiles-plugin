@@ -7,6 +7,9 @@
 #                                                 clone, check the signed tag,
 #                                                 validate, approve, lock
 #   dotfiles plugin add --dev <path> [--yes]      link a local checkout (no pin)
+#   dotfiles plugin update <name> [<tag>] [--yes] move to another signed tag (the
+#                                                 newest newer one when omitted);
+#                                                 swap and re-lock only after checks
 #   dotfiles plugin remove <name>                 delete checkout and lock entry
 #   dotfiles plugin list                          name, ref, commit, state
 #   dotfiles plugin verify [<name>]               re-check the lock against disk
@@ -153,6 +156,121 @@ cmd_add() {
   echo "✓ Installed plugin $name at $dest"
 }
 
+# _ref_newer <a> <b>: succeeds when tag <a> sorts after tag <b> by version.
+_ref_newer() {
+  [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]
+}
+
+# Moves an installed plugin to another signed tag (issue #265). The new tag
+# is cloned and checked beside the current checkout: signed by a trusted
+# signer, valid manifest and options, same plugin name. Changed capabilities
+# need approval again. Only then the checkouts swap and the lock is
+# rewritten; if the new checkout then fails plugin_verify, the old checkout
+# and lock come back. No plugin code runs.
+cmd_update() {
+  local yes=0 name="" ref="" path url cur_ref cur_commit manifest errors="" signer="" tag lock new_commit
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes) yes=1 ;;
+      -*) die "unknown flag: $1" ;;
+      *)
+        if [ -z "$name" ]; then name="$1"
+        elif [ -z "$ref" ]; then ref="$1"
+        else die "usage: dotfiles plugin update <name> [<tag>] [--yes]"; fi ;;
+    esac
+    shift
+  done
+  [ -n "$name" ] || die "usage: dotfiles plugin update <name> [<tag>] [--yes]"
+  path="$(plugin_lock_get "$name" path)"
+  [ -n "$path" ] || die "plugin $name is not installed"
+  [ "$(plugin_lock_get "$name" dev)" != true ] ||
+    die "plugin $name is a dev checkout; update it with git in $path"
+  case "$ref" in */* | *:*) die "not a tag: $ref" ;; esac
+  url="$(plugin_lock_get "$name" source)"
+  cur_ref="$(plugin_lock_get "$name" ref)"
+  cur_commit="$(plugin_lock_get "$name" commit)"
+
+  mkdir -p "$(dirname "$path")"
+  STAGING="$(mktemp -d "$(dirname "$path")/.staging.XXXXXX")"
+  trap 'rm -rf "${STAGING:-}"' EXIT
+  git clone --quiet --no-checkout -- "$url" "$STAGING/src" || die "clone failed: $url"
+
+  if [ -z "$ref" ]; then
+    # Newest tag first; take the first newer one a trusted signer signed.
+    while IFS= read -r tag; do
+      [ -n "$tag" ] && _ref_newer "$tag" "$cur_ref" || continue
+      if signer="$(plugin_verify_signed_tag "$STAGING/src" "$tag" "$name")"; then
+        ref="$tag"
+        break
+      fi
+      echo "skipped $tag: $signer"
+      signer=""
+    done < <(git -C "$STAGING/src" tag -l --sort=-version:refname)
+    if [ -z "$ref" ]; then
+      echo "✓ Plugin $name is up to date at $cur_ref (no newer signed tag)"
+      return 0
+    fi
+  else
+    signer="$(plugin_verify_signed_tag "$STAGING/src" "$ref" "$name")" || die "$signer"
+  fi
+  git -C "$STAGING/src" -c advice.detachedHead=false checkout --quiet "refs/tags/$ref" 2>/dev/null ||
+    die "ref not found: $ref"
+  new_commit="$(git -C "$STAGING/src" rev-parse HEAD)"
+  if [ "$ref" = "$cur_ref" ] && [ "$new_commit" = "$cur_commit" ] && plugin_verify "$name" >/dev/null 2>&1; then
+    echo "✓ Plugin $name is already at $ref"
+    return 0
+  fi
+
+  manifest="$STAGING/src/dotfiles-plugin.yaml"
+  errors="$(plugin_validate_manifest "$manifest")" || die "invalid manifest:"$'\n'"$errors"
+  # shellcheck source=../lib/plugin-capabilities.sh
+  source "$DOTFILES_DIR/lib/plugin-capabilities.sh"
+  # shellcheck source=../lib/plugin-extensions.sh
+  source "$DOTFILES_DIR/lib/plugin-extensions.sh"
+  errors="$(plugin_validate_options "$manifest")" || die "invalid manifest:"$'\n'"$errors"
+  [ "$(yq -r '.name' "$manifest")" = "$name" ] ||
+    die "the manifest at $ref names plugin $(yq -r '.name' "$manifest"), not $name"
+
+  echo "Source: $url"
+  echo "Update: $cur_ref → $ref ($new_commit)"
+  if [ "$ref" != "$cur_ref" ] && ! _ref_newer "$ref" "$cur_ref"; then
+    echo "        (downgrade: $ref is older than $cur_ref)"
+  fi
+  echo "Signer: $signer"
+  if [ "$(plugin_capabilities_sha "$manifest")" = "$(plugin_lock_get "$name" capabilities_sha)" ]; then
+    echo "Capabilities: unchanged since you approved $cur_ref"
+  else
+    echo "Capabilities changed since you approved $cur_ref."
+    show_capabilities "$name" "$manifest"
+    approve "$yes"
+  fi
+
+  # Swap. The old checkout and lock wait in staging until the new one verifies.
+  lock="$(plugin_lock_file)"
+  cp -p "$lock" "$STAGING/plugins.lock.before"
+  if [ -e "$path" ]; then
+    mv "$path" "$STAGING/old" || die "could not move $path aside; $name stays at $cur_ref"
+  fi
+  if ! mv "$STAGING/src" "$path"; then
+    [ ! -e "$STAGING/old" ] || mv "$STAGING/old" "$path"
+    die "could not move the new checkout into place; $name stays at $cur_ref"
+  fi
+  if ! SRC="$url" REF="$ref" VER="$(yq -r '.version' "$path/dotfiles-plugin.yaml")" \
+      COMMIT="$new_commit" TREE="$(git -C "$path" rev-parse 'HEAD^{tree}')" \
+      CAPS="$(plugin_capabilities_sha "$path/dotfiles-plugin.yaml")" \
+      SIGNER="$signer" DEST="$path" DEV=false AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      lock_write_entry "$name" 2>/dev/null ||
+    ! errors="$(plugin_verify "$name" 2>&1)"; then
+    rm -rf "$path"
+    [ ! -e "$STAGING/old" ] || mv "$STAGING/old" "$path"
+    cmp -s "$STAGING/plugins.lock.before" "$lock" || cp -p "$STAGING/plugins.lock.before" "$lock"
+    die "the new checkout failed its check, so $name stays at $cur_ref${errors:+:$'\n'$errors}"
+  fi
+  refresh_outputs
+  echo "✓ Updated plugin $name: $cur_ref → $ref"
+  echo "  Run dotfiles apply to load its LaunchAgents, Brewfile, and Agentfile."
+}
+
 cmd_remove() {
   local name="${1:-}" path lock
   [ -n "$name" ] || die "usage: dotfiles plugin remove <name>"
@@ -269,6 +387,7 @@ cmd_verify() {
 
 case "${1:-}" in
   add) shift; cmd_add "$@" ;;
+  update) shift; cmd_update "$@" ;;
   remove) shift; cmd_remove "$@" ;;
   list) cmd_list ;;
   verify) shift; cmd_verify "$@" ;;

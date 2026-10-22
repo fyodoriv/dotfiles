@@ -12,6 +12,19 @@ them. -->
 
 ## P1
 
+- [ ] Stop the 30-minute sync from launching WebStorm 5 times when nothing changed
+  - **ID**: skip-unchanged-jetbrains-plugin-installs
+  - **Tags**: perf, stability, launchagents, jetbrains
+  - **Details**: Found by the 2026-10-21 `/tooling-checkup`. `bin/dotfiles-sync` runs `chezmoi apply` after every successful pull, even when the pull brought no commits (`bin/dotfiles-sync` around line 215). `chezmoi apply` always runs `.chezmoiscripts/run_after_jetbrains-plugins.sh`, which starts one headless WebStorm JVM per plugin (`webstorm installPlugins <id>`, 5 plugins in `jetbrains/recommended_plugins.txt`). The `com.dotfiles.dotfiles-sync` LaunchAgent runs every 1800 s, so that is up to 48 x 5 = 240 JVM launches a day. Measured on 2026-10-21 at load1 ~175: one no-op `installPlugins` ran 40 s+ at about 400 MB RSS, one sync held the dotfiles lock for over 8 minutes, and a manual `dotfiles apply` timed out on that lock after 120 s. The script header assumes ~2 s per plugin; that is not true on a busy host.
+  - **Files**: `.chezmoiscripts/run_after_jetbrains-plugins.sh`, `bin/jetbrains-install-plugins`, `bin/dotfiles-sync`, `tests/jetbrains-install-plugins.bats`, `docs/what-gets-changed.md`
+  - **Output**: code
+  - **Acceptance**: a second `chezmoi apply` with no change to the plugin list or the IDE build starts no `installPlugins` process, and a bats test proves the skip and the re-run after a list change.
+  - **Hypothesis**: a stamp of (plugin list hash, IDE build number) in `~/.local/state/dotfiles/` makes no-change runs skip the JVM launches, so a no-change `chezmoi apply` drops from minutes to under 30 s.
+  - **Measurement**: `/usr/bin/time -p chezmoi apply --source ~/apps/tooling/dotfiles` run twice in a row on this Mac (the second run's `real`), before and after.
+  - **Success**: the second run is under 30 s and starts zero `webstorm installPlugins` processes (`pgrep -f 'installPlugins'` during the run).
+  - **Pivot**: the stamp misses real plugin changes (a test or a user report) -> drop the stamp and move plugin installs out of `run_after` into an explicit `dotfiles jetbrains` command.
+  - **Anchor**: tooling-checkup 2026-10-21 Phase 3 lock timeout; Forsgren, Humble, Kim 2018 (MTTR, change fail rate).
+
 ## P2
 
 - [ ] Every dotfiles action runs through the CLI, agents, and the UI, with tests
@@ -61,6 +74,20 @@ them. -->
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
 ## P3
+
+- [ ] Make `make lint` fast in the inner loop
+  - **ID**: speed-up-make-lint
+  - **Tags**: perf, agents
+  - **Details**: The 2026-10-21 checkup time review (7 days): `make lint` (shellcheck on every script in `SCRIPTS`) costs 3m51s/day across sessions started in dotfiles and agentbrew (14x in 4 sessions, p95 8m20s to 11m30s). agentbrew has no Makefile, so both lines are this target. Agents run the full shellcheck while they iterate.
+  - **Files**: `Makefile`, `bin/cached-run`, `AGENTS.md`
+  - **Output**: code
+  - **Acceptance**: the `make lint` lines in the 7-day agent time review add up to less than the Success threshold.
+  - **Hypothesis**: shellcheck on changed scripts only (or `bin/cached-run` per file) cuts `make lint` from 3m51s/day to under 1 min/day.
+  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), 7 days after the change lands.
+  - **Success**: under 1 min/day.
+  - **Pivot**: still over 3 min/day after 7 days -> profile with `bin/dotfiles-metrics --table` gate rows and drop this approach.
+  - **Anchor**: tooling-checkup agent time review 2026-10-21; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
+  - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
 - [ ] Evaluate Gemma 4 26B (and E4B) as a replacement for qwen3-coder:30b in the local-AI stack
   - **ID**: bench-gemma4-vs-qwen3-coder-local-ai

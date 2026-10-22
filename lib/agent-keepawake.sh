@@ -183,6 +183,40 @@ dotfiles_agent_tracked_paths() {
   dotfiles_agent_claude_paths
 }
 
+# The Claude desktop app runs its Claude Code sessions from a bundled copy:
+# <root>/<version>/<hash>/claude.app/Contents/MacOS/claude. The version and
+# hash change with every app release, so match the shape, not one path.
+dotfiles_agent_desktop_claude_root() {
+  printf '%s\n' "${DOTFILES_AGENT_DESKTOP_CLAUDE_ROOT:-$HOME/Library/Application Support/Claude/claude-code}"
+}
+
+dotfiles_agent_desktop_claude_installed() {
+  [ -d "$(dotfiles_agent_desktop_claude_root)" ]
+}
+
+# Sets REPLY_AGENT_PATH and returns 0 when a ps command line starts with a
+# desktop-app Claude Code executable. The root contains a space, so this
+# compares strings and does not split the command into words.
+dotfiles_agent_desktop_claude_executable() {
+  local command="$1" root executable relative_path
+  local suffix="/claude.app/Contents/MacOS/claude"
+  REPLY_AGENT_PATH=""
+  root="$(dotfiles_agent_desktop_claude_root)"
+
+  case "$command" in
+    "$root"/*"$suffix"|"$root"/*"$suffix "*) ;;
+    *) return 1 ;;
+  esac
+  executable="${command%%"$suffix"*}$suffix"
+  case "${command#"$executable"}" in
+    ""|" "*) ;;
+    *) return 1 ;;
+  esac
+  relative_path="${executable#"$root"/}"
+  [[ "$relative_path" =~ ^[^/]+/[^/]+/claude\.app/Contents/MacOS/claude$ ]] || return 1
+  REPLY_AGENT_PATH="$executable"
+}
+
 dotfiles_agent_list_tracked_processes() {
   local process_snapshot agent_path pid command seen_pids=""
 
@@ -204,6 +238,16 @@ dotfiles_agent_list_tracked_processes() {
       esac
     done <<< "$process_snapshot"
   done < <(dotfiles_agent_tracked_paths)
+
+  while read -r pid command; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    dotfiles_agent_desktop_claude_executable "$command" || continue
+    case " $seen_pids " in
+      *" $pid "*) continue ;;
+    esac
+    seen_pids="$seen_pids $pid"
+    printf '%s\t%s\n' "$pid" "$REPLY_AGENT_PATH"
+  done <<< "$process_snapshot"
 }
 
 # Compatibility API for existing callers. It now returns the first tracked
@@ -291,6 +335,31 @@ dotfiles_agent_power_qualifies() {
 dotfiles_agent_should_keepawake() {
   dotfiles_agent_has_tracked_processes || return 1
   dotfiles_agent_power_qualifies
+}
+
+# Lid close sleeps the Mac even with `pmset sleep 0` or a caffeinate
+# assertion. `pmset -a disablesleep 1` shows as "SleepDisabled 1" in
+# `pmset -g`; it keeps a closed Mac awake, also on battery.
+dotfiles_agent_sleep_disabled() {
+  "$(dotfiles_agent_pmset_bin)" -g 2>/dev/null \
+    | awk '$1 == "SleepDisabled" && $2 == "1" { found = 1 } END { exit !found }'
+}
+
+# Prints the label of each enabled user LaunchAgent that runs on a calendar
+# (StartCalendarInterval). launchd runs a job that was due during sleep at
+# the next wake, so these jobs run late while the lid is closed.
+dotfiles_agent_calendar_launchagents() {
+  local directory plist label
+  directory="${DOTFILES_AGENT_LAUNCHAGENTS_DIR:-$HOME/Library/LaunchAgents}"
+  [ -d "$directory" ] || return 0
+  for plist in "$directory"/*.plist; do
+    [ -f "$plist" ] || continue
+    plutil -extract StartCalendarInterval xml1 -o /dev/null "$plist" >/dev/null 2>&1 || continue
+    [ "$(plutil -extract Disabled raw -o - "$plist" 2>/dev/null)" = "true" ] && continue
+    label="$(plutil -extract Label raw -o - "$plist" 2>/dev/null || true)"
+    [ -n "$label" ] || label="$(basename "$plist" .plist)"
+    printf '%s\n' "$label"
+  done
 }
 
 dotfiles_agent_process_command() {

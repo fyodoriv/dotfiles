@@ -10,13 +10,22 @@
 #   5. agent-tmux         — tmux wrapper for agent CLIs
 #   6. network-resilience LaunchAgent — auto-heal wifi/VPN/DNS post-wake
 #   7. sleepwatcher LaunchAgent — fires ~/.wakeup → network-watchdog
+#   8. lid close          — reports whether closing the lid sleeps the Mac
 #
 # Idempotent — re-running is free. Prints a status table at the end.
+#
+# Usage:
+#   dotfiles-resilience-setup              # run every step
+#   dotfiles-resilience-setup --lid-close  # only report the lid-close state (read-only)
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && {
   sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"
   exit 0
 }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/agent-keepawake.sh
+source "$DOTFILES_DIR/lib/agent-keepawake.sh"
 
 # Color helpers (works with or without dotfiles colors.sh sourced).
 _RED=$'\033[0;31m'; _GRN=$'\033[0;32m'; _YEL=$'\033[0;33m'; _DIM=$'\033[2m'; _RST=$'\033[0m'
@@ -28,6 +37,48 @@ section() { printf "\n${_DIM}── %s${_RST}\n" "$1"; }
 
 AMPHETAMINE_APP_ID=937984704
 AMPHETAMINE_PATH=/Applications/Amphetamine.app
+
+# Read-only: never runs sudo, never changes pmset, never sends AppleScript.
+report_lid_close() {
+  local calendar_jobs calendar_count
+
+  section "Lid close (does closing the lid sleep this Mac?)"
+  if dotfiles_agent_sleep_disabled; then
+    ok "Lid close will not sleep this Mac: pmset disablesleep is on"
+    warn "The Mac also never sleeps on battery: this drains the battery and heats a closed bag"
+    hint "undo: sudo pmset -a disablesleep 0"
+    return 0
+  fi
+
+  if dotfiles_agent_amphetamine_owner_marker_has_closed_display; then
+    ok "Lid close will not sleep this Mac now: the keepawake manager holds an Amphetamine session for a running Claude Code"
+  else
+    warn "Lid close will sleep this Mac. pmset sleep 0 does not stop lid-close sleep."
+  fi
+  if [ -d "$(dotfiles_agent_amphetamine_app_path)" ]; then
+    hint "Running Claude Code sessions (CLI and desktop app) are covered: the keepawake manager starts an Amphetamine session for them"
+  else
+    hint "Install Amphetamine (step 4) so the keepawake manager can cover running Claude Code sessions"
+  fi
+
+  calendar_jobs="$(dotfiles_agent_calendar_launchagents)"
+  if [ -n "$calendar_jobs" ]; then
+    calendar_count="$(printf '%s\n' "$calendar_jobs" | wc -l | tr -d ' ')"
+    warn "$calendar_count scheduled LaunchAgent(s) run late, at the next wake, if the Mac sleeps at their time (lid closed, no Claude Code running):"
+    printf '%s\n' "$calendar_jobs" | while IFS= read -r label; do
+      printf "      %s\n" "$label"
+    done
+  fi
+
+  echo "  To keep the Mac awake with the lid closed (for example for scheduled jobs), pick one:"
+  hint "Fix 1, on the charger: start an Amphetamine session before you close the lid (Amphetamine menu → Start New Session → Indefinitely). End it when you are back."
+  hint "Fix 2, no app: sudo pmset -a disablesleep 1. The Mac then never sleeps, also on battery: it drains the battery and heats a closed bag. Undo: sudo pmset -a disablesleep 0"
+}
+
+if [ "${1:-}" = "--lid-close" ]; then
+  report_lid_close
+  exit 0
+fi
 
 # ── 1. tmux ───────────────────────────────────────────────────────────
 section "tmux (session persistence)"
@@ -154,6 +205,9 @@ else
   warn "AC idle timers are sleep=${ac_sleep:-?}, disksleep=${ac_disksleep:-?} (expected 1 and 10)"
   hint "set: sudo pmset -c sleep 1 disksleep 10"
 fi
+
+# ── 7b. Lid close ────────────────────────────────────────────────────
+report_lid_close
 
 # ── 8. ulimit ────────────────────────────────────────────────────────
 section "File descriptor limit (Chrome/Playwright/multi-agent)"

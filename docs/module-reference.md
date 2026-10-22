@@ -306,7 +306,7 @@ Guards the one-time setup of a personal Mac.
 
 ### resilience
 
-Keeps agents alive through lid close, network drops, and terminal close: tmux, sleepwatcher, network-watchdog, Amphetamine, and the agent keepawake manager. Setup wizard: `dotfiles-resilience-setup`.
+Keeps agents alive through lid close, network drops, and terminal close: tmux, sleepwatcher, network-watchdog, Amphetamine, and the agent keepawake manager. Setup wizard: `dotfiles-resilience-setup` (`--lid-close` only reports whether closing the lid sleeps the Mac).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
@@ -326,7 +326,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `resilience.amphetamine_sync_in_sync` | Amphetamine preferences match `data/amphetamine-prefs.json` | None (hint: `dotfiles-amphetamine-sync`) |
 | `resilience.agent_keepawake_script` | `dotfiles-agent-keepawake` executable | `chmod +x` |
 | `resilience.agent_wake_recover_script` | `dotfiles-agent-wake-recover` executable | `chmod +x` |
-| `resilience.agent_keepawake_loaded` | agent-keepawake LaunchAgent loaded (full profile with Claude Code) | `launchctl bootstrap` or `dotfiles apply` |
+| `resilience.agent_keepawake_loaded` | agent-keepawake LaunchAgent loaded (full profile with the Claude Code CLI or desktop app) | `launchctl bootstrap` or `dotfiles apply` |
 | `resilience.agent_keepawake_battery_policy` | Keepawake covers AC and battery at or above 20% | `dotfiles apply` + kickstart |
 | `resilience.agent_keepawake_lid_closed_automation` | advisory — Amphetamine Automation ready for lid-closed agent work | — (hint: approve Automation once) |
 | `resilience.agent_keepawake_owned_amphetamine_state` | advisory — manager-owned Amphetamine session matches live agents | — (hint: `dotfiles-agent-keepawake`) |

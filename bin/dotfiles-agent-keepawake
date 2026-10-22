@@ -1,5 +1,6 @@
 #!/bin/bash
-# Keep macOS awake only while Claude Code is running.
+# Keep macOS awake only while Claude Code is running: the CLI or a Claude
+# desktop app session (matched by path shape, so app updates need no change).
 #
 # The manager creates one caffeinate -ims child per tracked process. It also
 # owns a short-lived Amphetamine session for reliable lid-closed work. Both are

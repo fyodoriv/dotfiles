@@ -78,6 +78,7 @@ should_skip_agent() {
       [ "$PROFILE" != "full" ] && return 0
       [ ! -x "$HOME/.local/bin/claude" ] \
         && ! command -v claude >/dev/null 2>&1 \
+        && [ ! -d "$HOME/Library/Application Support/Claude/claude-code" ] \
         && return 0 ;;
     cascade-caffeinate)
       return 0 ;;

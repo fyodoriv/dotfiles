@@ -856,7 +856,12 @@ stops local work. Dotfiles cannot override that kernel behavior.
    `disksleep 10`. Dotfiles does not set global `disablesleep` or permanent
    `sleep 0`.
 2. **Track all relevant processes** — `com.dotfiles.agent-keepawake` runs every
-   five seconds and finds every Claude Code executable.
+   five seconds and finds every Claude Code executable: the CLI
+   (`~/.local/bin/claude` or `claude` on `PATH`) and each Claude desktop app
+   session. The desktop app runs Claude Code from
+   `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`.
+   The manager matches that path shape, not one version, so app updates need
+   no change. The LaunchAgent is deployed when either install exists.
    It starts one manager-owned `caffeinate -ims -w <pid>` child per process.
 3. **Power boundary** — protection applies on AC and on battery at or above
    20%. Below 20% on battery, the manager ends only its own protection.
@@ -874,6 +879,33 @@ stops local work. Dotfiles cannot override that kernel behavior.
 
 Display sleep and screen lock still work. The manager does not block an
 explicit Restart or Shut Down.
+
+**`pmset sleep 0` does not stop lid-close sleep.** It only turns off the idle
+timer. A closed lid sleeps the Mac unless one of these holds: an Amphetamine
+session with Closed-Display Mode, `pmset disablesleep 1`, or clamshell mode
+(external display and power connected). `caffeinate` alone does not stop it.
+To see the state of this Mac, run `dotfiles-resilience-setup --lid-close`. It
+is read-only: it never runs `sudo`, changes `pmset`, or sends AppleScript.
+
+**Scheduled jobs while the lid is closed (out of scope for the manager).** A
+user LaunchAgent with `StartCalendarInterval` (for example a 06:00 morning job)
+needs the Mac awake at its time. With the lid closed, launchd runs it late, at
+the next wake. The keepawake manager does not cover these jobs: nothing runs
+at lid-close time to hold protection, and covering "a job is due in N hours"
+would hold a closed-lid session all night, every night. Pick one fix by hand:
+
+- **On the charger, with Amphetamine:** start a session before you close the
+  lid (Amphetamine menu → Start New Session → Indefinitely), and end it when
+  you are back. With the managed baseline, its sessions keep a closed Mac
+  awake. Do not add an Amphetamine Trigger for this: the managed baseline
+  turns Triggers off. `resilience.amphetamine_stale_single_use` warns when a
+  manual session runs 12 hours or more.
+- **No app:** `sudo pmset -a disablesleep 1`. The Mac then never sleeps, also
+  on battery. It drains the battery and heats a closed bag. Undo it with
+  `sudo pmset -a disablesleep 0`.
+
+`dotfiles-resilience-setup --lid-close` lists the enabled scheduled
+LaunchAgents in `~/Library/LaunchAgents` that a closed lid would delay.
 
 **One-time lid-close setup:** Install Amphetamine. Apply the managed baseline
 with `dotfiles-amphetamine-sync apply`. If it reports `cannot read Amphetamine
@@ -903,6 +935,7 @@ dotfiles doctor --module resilience --quiet
 pmset -g batt                    # AC Power or Battery + percentage
 launchctl print "gui/$(id -u)/com.dotfiles.agent-keepawake"
 dotfiles-agent-keepawake --dry-run
+dotfiles-resilience-setup --lid-close   # does closing the lid sleep this Mac?
 pmset -g assertions
 cat ~/.local/state/dotfiles/agent-keepawake-amphetamine-error
 cat ~/.local/state/dotfiles/agent-keepawake-amphetamine-quarantine

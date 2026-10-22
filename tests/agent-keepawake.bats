@@ -247,6 +247,54 @@ STUB
   [[ "$output" == *"$claude_pid"$'\t'"$STUB_BIN/claude"* ]]
 }
 
+desktop_claude_path() {
+  printf '%s/Library/Application Support/Claude/claude-code/%s/%s/claude.app/Contents/MacOS/claude\n' \
+    "$HOME" "$1" "$2"
+}
+
+@test "manager discovers Claude desktop app sessions for any app version" {
+  local old_build new_build root
+  old_build="$(desktop_claude_path 2.1.304 6bbba6adc37f)"
+  new_build="$(desktop_claude_path 9.9.9 0123abcd)"
+  root="$HOME/Library/Application Support/Claude/claude-code"
+  # Fake PIDs only: list detection reads the ps snapshot, not live processes.
+  cat > "$PS_SNAPSHOT_FILE" <<EOF
+41045 /Applications/Claude.app/Contents/Helpers/disclaimer --pgroup -- $old_build --output-format stream-json
+41046 $old_build --output-format stream-json --verbose
+45665 $new_build
+45700 $root/2.1.304/6bbba6adc37f/claude.app/Contents/MacOS/claude-helper --type=gpu
+45701 $root/2.1.304/extra/6bbba6adc37f/claude.app/Contents/MacOS/claude --resume
+45702 /tmp/elsewhere/claude-code/2.1.304/6bbba6adc37f/claude.app/Contents/MacOS/claude
+EOF
+
+  run dotfiles_agent_list_tracked_processes
+  [ "$status" -eq 0 ]
+  [ "$output" = "41046"$'\t'"$old_build"$'\n'"45665"$'\t'"$new_build" ]
+}
+
+@test "dry-run lists a Claude desktop app session when it is the only Claude Code" {
+  local desktop_build
+  desktop_build="$(desktop_claude_path 2.1.308 a93ded4b1b47)"
+  printf '70964 %s --output-format stream-json --effort=high\n' "$desktop_build" > "$PS_SNAPSHOT_FILE"
+
+  run bash "$KEEPAWAKE_BIN" --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"would protect 1 tracked process"* ]]
+  [[ "$output" == *"70964 ($desktop_build)"* ]]
+  [ ! -e "$(manager_state_dir)/agent-keepawake-caffeinate.tsv" ]
+}
+
+@test "manager does not count the same PID twice when a CLI path is also a desktop path" {
+  local desktop_build
+  desktop_build="$(desktop_claude_path 2.1.304 6bbba6adc37f)"
+  export DOTFILES_AGENT_CLAUDE_PATHS="$desktop_build"
+  printf '41046 %s --verbose\n' "$desktop_build" > "$PS_SNAPSHOT_FILE"
+
+  run dotfiles_agent_list_tracked_processes
+  [ "$status" -eq 0 ]
+  [ "$output" = "41046"$'\t'"$desktop_build" ]
+}
+
 @test "battery policy qualifies at 20 percent and stops below it" {
   set_battery_percent 20
   run dotfiles_agent_power_qualifies
@@ -564,6 +612,20 @@ STUB
   local launchagent_setup="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   awk '/agent-keepawake\)/,/;;/' "$launchagent_setup" | grep -q '\.local/bin/claude'
   awk '/agent-keepawake\)/,/;;/' "$launchagent_setup" | grep -q 'command -v claude'
+}
+
+@test "LaunchAgent deployment gate accepts a Claude desktop app install alone" {
+  local launchagent_setup="$BATS_TEST_DIRNAME/../.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$launchagent_setup")"
+  PROFILE=full
+  PATH="/usr/bin:/bin"
+
+  run should_skip_agent agent-keepawake
+  [ "$status" -eq 0 ]
+
+  mkdir -p "$HOME/Library/Application Support/Claude/claude-code"
+  run should_skip_agent agent-keepawake
+  [ "$status" -ne 0 ]
 }
 
 @test "managed Amphetamine preferences disable generic triggers" {

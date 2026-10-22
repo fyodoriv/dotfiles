@@ -638,12 +638,13 @@ To keep agentbrew running while that publisher is blocked, set `DOTFILES_AGENT_N
 
 Dotfiles exposes `agentbrew` as a real executable shim in `bin/agentbrew`, so it works from interactive zsh, non-interactive shells, launch agents, and agent tool calls. The shim reuses a local checkout at `~/apps/agentbrew` or `~/apps/tooling/agentbrew` and falls back to any later `agentbrew` binary on `PATH`. With an approved `DOTFILES_AGENT_NODE_BIN`, it runs the checkout's `dist/cli.js` on that Node.
 
-**On `dotfiles apply`**, a chezmoi `run_after` script merges this file plus any overlay `Agentfile.yaml` and this Mac's untracked `~/.config/dotfiles/Agentfile.local.yaml` (an extra MCP server on one Mac, [docs/agentbrew-setup.md](docs/agentbrew-setup.md#add-an-mcp-server-on-one-mac)) into `~/.config/agentbrew/Agentfile.yaml`, then syncs agentbrew from that canonical global file when the installed `agentbrew` supports `agentfile merge`. On endpoint-policy-blocked Node publishers, that run exits in safe mode before executing Node. Older agentbrew releases fall back to the legacy safe path: sync the base Agentfile first, then sync the overlay with `--no-prune`. To sync manually on a merge-capable agentbrew:
+**On `dotfiles apply`**, a chezmoi `run_after` script merges this file plus any overlay `Agentfile.yaml` and this Mac's untracked `~/.config/dotfiles/Agentfile.local.yaml` (an extra MCP server on one Mac, [docs/agentbrew-setup.md](docs/agentbrew-setup.md#add-an-mcp-server-on-one-mac)) into `~/.config/agentbrew/Agentfile.yaml`, then syncs agentbrew from that canonical global file when the installed `agentbrew` supports `agentfile merge`. On endpoint-policy-blocked Node publishers, that run exits in safe mode before executing Node. Older agentbrew releases fall back to the legacy safe path: sync the base Agentfile first, then sync the overlay with `--no-prune`. To sync by hand, run the same step that `dotfiles apply` runs. It builds the full layer list (base, plugins, owner rules, the local file, the model override), merges it, and syncs:
 
 ```bash
-agentbrew agentfile merge ~/apps/dotfiles/Agentfile.yaml --output ~/.config/agentbrew/Agentfile.yaml
-agentbrew sync --agentfile ~/.config/agentbrew/Agentfile.yaml
+bash ~/apps/dotfiles/.chezmoiscripts/run_after_agentbrew-sync.sh
 ```
+
+A hand-typed `agentbrew agentfile merge` of only `Agentfile.yaml` leaves out the other layers, and the doctor check `agentbrew.global_agentfile_in_sync` then fails.
 
 If `agentbrew agentfile merge --help` does not show that subcommand yet, use:
 

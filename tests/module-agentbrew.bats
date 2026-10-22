@@ -83,6 +83,7 @@ agentbrew.env_jenkins_api_token
 agentbrew.claude_no_npm_leftover
 agentbrew.mcp_servers_ready
 agentbrew.global_agentfile_in_sync
+agentbrew.local_agentfile_valid
 agentbrew.hooks_enforcing
 agentbrew.memory_service_singleton
 agentbrew.memory_launchagent_identity

@@ -79,6 +79,28 @@ check "agentbrew.global_agentfile_in_sync" "global Agentfile matches dotfiles/ov
   "_agentbrew_global_agentfile_in_sync" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh'"
 
+# This Mac's local Agentfile layer (lib/agentfile-layers.sh). A file with an
+# error is skipped by apply, so the drift check above still passes; this
+# check says why the layer is not in use.
+# The problems are computed once here and reused by the check, and not at
+# all in --list mode or when the check is overridden (each check starts
+# agentbrew).
+_agentbrew_local_problems="" _agentbrew_local_note=""
+if [ -f "$DOTFILES_DIR/lib/agentfile-layers.sh" ]; then
+  # shellcheck source=../../lib/agentfile-layers.sh
+  source "$DOTFILES_DIR/lib/agentfile-layers.sh"
+  if [ "${LIST_MODE:-false}" != true ] &&
+    ! { declare -F is_overridden >/dev/null && is_overridden "agentbrew.local_agentfile_valid"; }; then
+    _agentbrew_local_problems="$(agentfile_local_layer_problems 2>/dev/null)"
+    _agentbrew_local_note="$(printf '%s\n' "$_agentbrew_local_problems" | grep -m1 '^note: ' | sed 's/^note: //')"
+    _agentbrew_local_problems="$(printf '%s\n' "$_agentbrew_local_problems" | grep -v '^note: ' || true)"
+  fi
+fi
+check "agentbrew.local_agentfile_valid" \
+  "local Agentfile layer is usable${_agentbrew_local_note:+ ($_agentbrew_local_note)}${_agentbrew_local_problems:+ ($(agentfile_local_layer_path): $(printf '%s\n' "$_agentbrew_local_problems" | head -1))}" \
+  "[ -z \"\$_agentbrew_local_problems\" ]" \
+  ""
+
 # ── MCP env vars — tokens needed by agentbrew-managed MCP servers ──
 # These vars must be in ~/.zshenv.secrets so MCP servers can start cleanly.
 # See home/zshenv.secrets.example for how to obtain each token.

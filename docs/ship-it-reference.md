@@ -1043,3 +1043,16 @@ turn, reuse that review in the delivery report. Do not run a second one.
 **Non-blocking.** With no perf rows, write `Time review: no perf data` and
 check `agentbrew status` for the `perf-record` hook. Never hold a delivery for
 this step. The `perf-review` skill explains how to read the report.
+
+## 16. Run report (two or more PRs)
+
+A `/ship-it` run that ships two or more PRs ends with one self-contained HTML
+page, not a long chat message (shared-rules **## Long-run reports**):
+
+1. The page shows what merged (PR links, gate results), what is blocked and
+   why (each blocker in plain words: what it is, why, the options, and what
+   each changes), and what to do next.
+2. Publish it as a private Artifact (the Artifact tool). Without it, send the
+   file or give its full path. Paths show as `~/…`; no secrets.
+3. In chat, give the link and **Merged N/M PRs**, then ask the next actions,
+   with the options from the page.

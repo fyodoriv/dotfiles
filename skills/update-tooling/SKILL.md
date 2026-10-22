@@ -339,7 +339,12 @@ the queue is the source of truth.
 
 ## 6. Report
 
-Use this shape:
+End with one self-contained HTML page, not chat text (shared-rules
+**## Long-run reports**): write it under `~/.local/state/update-tooling/`,
+publish it as a private Artifact when the Artifact tool exists (else send the
+file or give its path), then ask in chat which next work to start, with the
+options from the page. Paths show as `~/…`; no secrets. Build the page from
+this outline:
 
 ```markdown
 ## Repository refresh

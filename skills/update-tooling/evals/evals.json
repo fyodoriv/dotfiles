@@ -103,6 +103,16 @@
         "Reports \"not applied\" with the lock owner when the helper exits 75"
       ],
       "id": 9
+    },
+    {
+      "prompt": "update latest tooling",
+      "expected_output": "After the refresh, apply, and health checks, the agent ends with one HTML page (repository refresh, machine delivery, stability, recommended next work) published as a private Artifact, then asks in chat which next work to start.",
+      "expectations": [
+        "Ends with an HTML page, not the markdown report pasted in chat",
+        "Shows paths as ~/ and no secrets on the page",
+        "Asks which next work to start, with options taken from the page"
+      ],
+      "id": 10
     }
   ]
 }

@@ -601,3 +601,10 @@ broken file://$feeds/missing.xml"
 @test "tooling-checkup resolves new-project from its source when not installed" {
   grep -q "\[ -d \"\$NP\" \] || NP=" "$SKILL"
 }
+
+@test "tooling-checkup ends with a published HTML report, then asks from it" {
+  local skill="$BATS_TEST_DIRNAME/../skills/tooling-checkup/SKILL.md"
+  grep -q "The report is one self-contained HTML page, not chat text" "$skill"
+  grep -q "publish it as a private Artifact" "$skill"
+  grep -q "Ask from the page" "$skill"
+}

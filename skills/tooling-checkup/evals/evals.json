@@ -181,6 +181,18 @@
         "Resolves NP from the agentbrew source when ~/.claude/skills/new-project is missing"
       ],
       "id": 15
+    },
+    {
+      "prompt": "/tooling-checkup (2026-10-21 run: 3 PRs merged, 2 outside PRs waiting, a dotfiles-sync lock held 20 minutes by JetBrains plugin checks, 101 merged local branches the hook blocks deleting)",
+      "expected_output": "The agent writes the report as one HTML page under ~/.local/state/tooling-checkup/reports/, publishes it as a private Artifact, puts only the link and the verdict in chat, then asks Phase 11 questions that each name the page section they come from.",
+      "expectations": [
+        "Writes the report as an HTML page, not a long chat message",
+        "Publishes the page as a private Artifact or gives its full path",
+        "Explains each blocker on the page: what it is, why it is blocked, the options, what each changes",
+        "Chat holds only the page link and a one-line verdict before the questions",
+        "Phase 11 questions are asked after the page and refer to its sections"
+      ],
+      "id": 16
     }
   ]
 }

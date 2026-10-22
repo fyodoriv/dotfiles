@@ -353,7 +353,20 @@ a verdict line, and each `adopt` or `try` has a task, a change, or a question.
 
 ## Phase 10: Report
 
-Put the verdict first. Use this template.
+The report is one self-contained HTML page, not chat text (shared-rules
+**## Long-run reports**). Build it from the outline below, verdict first:
+
+1. Write it to `~/.local/state/tooling-checkup/reports/<YYYY-MM-DD>.html`.
+   Load the `artifact-design` skill first when the Artifact tool exists.
+2. Show paths as `~/…` and keep secrets, tokens, and private names out.
+   Then publish it as a private Artifact (the Artifact tool). Without the
+   Artifact tool, send the file (SendUserFile) or give its full path.
+3. Each "Needs you" item and each blocker says, in plain words, what it is,
+   why it is blocked, the options, and what each option changes.
+4. In chat, write only the page link, the one-line verdict, and then go to
+   Phase 11. Do not paste the whole report.
+
+Outline of the page:
 
 ```markdown
 ## Tooling checkup <YYYY-MM-DD>
@@ -406,10 +419,12 @@ feature work in separate lists, up to three each. Recommend from the refreshed
 `TASKS.md` queues of the tooling repositories. A gap with no task gets
 `new: <kebab-case-id>` and one line on why.
 
-**Done when:** the report is written and each claim has evidence.
+**Done when:** the HTML page is published (or its path given), each claim on
+it has evidence, and the chat holds only the link and the verdict.
 
 ## Phase 11: Ask the owner
 
+Ask from the page: each question names the page section it comes from.
 Collect the questions: each "Needs you" item, each third-party job to remove,
 each big config change, and which next tasks to start. Skip a question an
 earlier answer settles.

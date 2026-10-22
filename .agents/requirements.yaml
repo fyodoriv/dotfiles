@@ -88,3 +88,8 @@ map.self-improving: Makefile scripts/gate-timed.sh skills/tooling-checkup/SKILL.
 # dotfiles has no release tags), and tests/changelog.bats regenerates it from
 # its recorded commit to prove it was never edited by hand. LICENSE is MIT.
 map.tool: CHANGELOG.md scripts/changelog.sh cliff.toml tests/changelog.bats LICENSE
+
+# HTML report: /tooling-checkup (the one checkup command) ends with a published
+# HTML page (verdict, blockers explained, next steps), then asks from it
+# (tests/tooling-checkup-skill.bats pins it).
+map.html-report: skills/tooling-checkup/SKILL.md tests/tooling-checkup-skill.bats

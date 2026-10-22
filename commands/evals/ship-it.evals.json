@@ -193,6 +193,16 @@
         "On a miss, fast-forwards the team checkout and every source-cache clone of the overlay, then syncs from the overlay checkout",
         "Reports the grep result as the deploy proof, or the remaining miss as a blocker"
       ]
+    },
+    {
+      "id": 18,
+      "prompt": "/ship-it (this session changed agentbrew, dotfiles, and careerbrew; three PRs)",
+      "expected_output": "After the PRs merge and the machine refresh, the agent ends with one HTML page (merged PRs with evidence, blockers with reasons, next steps) published as a private Artifact, reports Merged 3/3 PRs, and asks the next actions in chat.",
+      "expectations": [
+        "Reports Merged N/M PRs",
+        "Ends a multi-PR run with an HTML page published as a private Artifact or a file path",
+        "Asks the next actions in chat with options from the page"
+      ]
     }
   ]
 }

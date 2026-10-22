@@ -472,7 +472,7 @@
   local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
   local eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
 
-  grep -q "Steps 1–15" "$command_file"
+  grep -q "Steps 1–16" "$command_file"
   grep -q "agent-perf.mjs report --session latest" "$command_file"
   grep -q "perf-task-review" "$command_file"
   grep -q "## 15. Time review (every delivery, all repo families)" "$reference_file"

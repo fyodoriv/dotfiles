@@ -118,3 +118,13 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -F -q '"$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply' "$SKILL"
   grep -q 'not applied' "$SKILL"
 }
+
+@test "update-tooling ends with an HTML page and asks next work from it" {
+  grep -q "End with one self-contained HTML page" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+}
+
+@test "ship-it ends a multi-PR run with an HTML page" {
+  grep -q "Steps 1–16" "$BATS_TEST_DIRNAME/../commands/ship-it.md"
+  grep -q "^## 16. Run report (two or more PRs)" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  grep -q "self-contained HTML" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+}

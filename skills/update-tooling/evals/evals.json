@@ -124,6 +124,17 @@
         "Still runs the step 4 doctor modules and health checks"
       ],
       "id": 11
+    },
+    {
+      "id": 12,
+      "prompt": "update latest tooling (the dotfiles pull brings two new commits)",
+      "expected_output": "The agent runs dotfiles-sync and then `dotfiles apply --if-changed`, both through dotfiles-lock-checked. dotfiles-sync fast-forwards and prints `chezmoi re-applied`; the apply finds the record that run wrote and prints `skipped chezmoi apply and doctor`. The agent reports one chezmoi apply for the refresh, does not add a second plain `dotfiles apply`, and still runs the step 4 doctor modules.",
+      "expectations": [
+        "Runs dotfiles-sync and then `dotfiles apply --if-changed`, each through dotfiles-lock-checked",
+        "Reports one chezmoi apply for the refresh: dotfiles-sync re-applied and the --if-changed apply skipped",
+        "Does not run a second plain `dotfiles apply` after the skip",
+        "Still runs the step 4 doctor modules and health checks"
+      ]
     }
   ]
 }

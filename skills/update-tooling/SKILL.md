@@ -255,10 +255,22 @@ ran.
 The applied-checkout helper only fast-forwards and reapplies chezmoi. Never
 run an applied-checkout update against a dirty or diverged worktree.
 
-Run the explicit apply after the helper intentionally. The helper reapplies
-only when the fast-forward brought commits, its last apply failed, or
-`chezmoi status` shows drift; the explicit apply converges the current
-manifest even when the checkout was already current.
+Run the explicit apply after the helper intentionally. One refresh runs
+`chezmoi apply` at most once (`tests/update-tooling-apply-count.bats` counts
+the runs):
+
+- The helper re-applies only when the fast-forward brought commits, its last
+  apply failed, or `chezmoi status` shows drift. A successful re-apply writes
+  the last-apply record. Its output says `chezmoi re-applied` or
+  `skipped chezmoi apply`.
+- `dotfiles apply --if-changed` then finds that record and skips. When the
+  helper did not apply (its apply failed, or it left a dirty checkout
+  untouched), the explicit apply converges the current manifest.
+
+Do not add a second plain `dotfiles apply` to this step. If both commands
+apply in one refresh, a drift line survived the helper's apply: chezmoi
+cannot converge that file (for example, another program rewrites it). Report
+that line as drift to fix in the source.
 
 `--if-changed` makes the explicit apply cheap when nothing changed. It skips
 `chezmoi apply` and the doctor pass (about 200 s) when both are true:

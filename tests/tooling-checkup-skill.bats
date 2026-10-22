@@ -159,7 +159,8 @@ make_tooling_root() {
   cat > "$TEST_DIR/bin/gh" <<'EOF2'
 #!/bin/sh
 case "$1" in
-  pr) printf '5\tfyodor\tfeat/ready\topen\tReady work\n6\tfyodor\twip/parked\tdraft\tParked work\n' ;;
+  pr) printf '5\tfyodor\tfeat/ready\topen\tsame\tReady work\n6\tfyodor\twip/parked\tdraft\tsame\tParked work\n' ;;
+  api) case "$*" in *" user "*) echo fyodor ;; *) exit 1 ;; esac ;;
   *) exit 1 ;;
 esac
 EOF2
@@ -183,8 +184,8 @@ case "\$1 \$2" in
   "auth status")
     case " \${FAKE_GH_AUTH_HOSTS:-} " in *" \$4 "*) exit 0 ;; esac
     exit 1 ;;
-  "pr list") printf '7\tfyodor\tfeat/ghe\topen\tEnterprise work\n' ;;
-  "api "*) exit 0 ;;
+  "pr list") printf '7\tfyodor\tfeat/ghe\topen\tsame\tEnterprise work\n' ;;
+  "api "*) case "\$*" in *" user "*) echo fyodor ;; esac ;;
   *) exit 1 ;;
 esac
 EOF2
@@ -243,6 +244,69 @@ run_inventory_with_origin() {
   grep -q "^GH_HOST=github.com pr list -R acme/alpha " "$TEST_DIR/gh.log"
   grep -q "^GH_HOST= api --hostname github.com --paginate repos/acme/alpha/" "$TEST_DIR/gh.log"
   ! grep -q "auth status" "$TEST_DIR/gh.log"
+}
+
+# Two checkouts on an enterprise host, each with its own PR and PRs by other
+# people. Mirrors the 2026-10-21 checkup, which listed outside fork PRs
+# agentbrew #352 and dotfiles #242 as `ship` (issue #267). FAKE_GH_LOGIN is
+# what `gh api user` prints; empty makes that call fail.
+run_inventory_with_outside_prs() {
+  TOOLING="$TEST_DIR/tooling"
+  mkdir -p "$TOOLING" "$TEST_DIR/bin"
+  local name
+  for name in agentbrew dotfiles; do
+    git_q init --bare "$TEST_DIR/$name.git"
+    git_q clone "$TEST_DIR/$name.git" "$TOOLING/$name"
+    git_q -C "$TOOLING/$name" commit --allow-empty -m "chore: init"
+    git_q -C "$TOOLING/$name" push origin HEAD:main
+    git_q -C "$TOOLING/$name" remote set-head origin main
+    git_q -C "$TOOLING/$name" remote set-url origin "git@github.example.com:owner-me/$name.git"
+  done
+  cat > "$TEST_DIR/bin/gh" <<'EOF2'
+#!/bin/sh
+echo "$*" >> "${0%/bin/gh}/gh.log"
+case "$*" in
+  "api --hostname github.example.com user --jq .login")
+    [ -n "$FAKE_GH_LOGIN" ] || exit 1
+    echo "$FAKE_GH_LOGIN" ;;
+  "pr list -R owner-me/agentbrew "*)
+    printf '352\tfork-dev\teval/goal-dashboard\topen\tfork\ttest(run-goal): eval for a dashboard goal\n'
+    printf '353\towner-me\tfeat/own-work\topen\tsame\tfeat: own work\n' ;;
+  "pr list -R owner-me/dotfiles "*)
+    printf '242\tfork-dev\tdocs/keep-awake\tdraft\tfork\tdocs(tasks): keep awake\n'
+    printf '243\tteam-mate\tfix/shared-branch\topen\tsame\tfix: a teammate branch\n'
+    printf '244\towner-me\tfeat/from-my-fork\topen\tfork\tfeat: pushed from a fork\n' ;;
+  "api "*) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF2
+  chmod +x "$TEST_DIR/bin/gh"
+  run env -u BASH_ENV -u ENV PATH="$TEST_DIR/bin:$PATH" TOOLING_ROOT="$TOOLING" TOOLING_CHECKUP_NO_FETCH=1 \
+    TOOLING_CHECKUP_GH_HOSTS=github.example.com FAKE_GH_LOGIN="${FAKE_GH_LOGIN-owner-me}" \
+    bash "$SCRIPTS/inventory.sh"
+}
+
+@test "inventory gives other authors' and fork PRs a review verdict, never ship (issue #267)" {
+  run_inventory_with_outside_prs
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ship      PR #353 feat/own-work: feat: own work"* ]]
+  [[ "$output" == *"review    PR #352 eval/goal-dashboard by fork-dev from a fork: test(run-goal): eval for a dashboard goal (owner decides; never merge it)"* ]]
+  [[ "$output" == *"review    draft PR #242 docs/keep-awake by fork-dev from a fork: docs(tasks): keep awake (owner decides; never merge it)"* ]]
+  [[ "$output" == *"review    PR #243 fix/shared-branch by team-mate: fix: a teammate branch (owner decides; never merge it)"* ]]
+  [[ "$output" == *"review    PR #244 feat/from-my-fork by owner-me from a fork: feat: pushed from a fork (owner decides; never merge it)"* ]]
+  # Only the own same-repo PR is outstanding work.
+  [ "$(grep -c '^  ship ' <<< "$output")" -eq 1 ]
+  # gh api user runs once per host, not once per checkout or PR.
+  [ "$(grep -c '^api --hostname github.example.com user' "$TEST_DIR/gh.log")" -eq 1 ]
+  # Phase 2 tells the agent what to do with a review line.
+  grep -F -q '| `review` |' "$SKILL"
+}
+
+@test "inventory never says ship for a PR when it cannot read the gh login" {
+  FAKE_GH_LOGIN="" run_inventory_with_outside_prs
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"unknown   PR #353 feat/own-work by owner-me: feat: own work (could not read your gh login on github.example.com; check the author by hand)"* ]]
+  ! grep -q '^  ship ' <<< "$output"
 }
 
 @test "inventory fails clearly when the tooling root has no checkouts" {

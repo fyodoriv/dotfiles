@@ -15,7 +15,9 @@
 #                                    passes for it
 #
 # Verdicts:
-#   ship       work that is not on the canonical branch yet
+#   ship       work that is not on the canonical branch yet (a PR line only for
+#              your own PR from a branch of the same repo)
+#   review     open PR by another author or from a fork; the owner decides
 #   salvage    uncommitted files or stashes; look before anything else
 #   clean-up   local branch already merged into the canonical branch
 #   pipeline   linked worktree under <repo>/.worktrees (an orchestrator owns it)
@@ -100,6 +102,20 @@ gh_host_known() {
   fi
   gh_hosts_bad="$gh_hosts_bad$1 "
   return 1
+}
+
+# Set `me` to the gh login on host $1, or to "" when gh cannot tell. The
+# answer for each host is kept for this run (shell-process scope), so
+# `gh api user` runs at most once per host.
+gh_logins=" "
+me=""
+gh_me() {
+  local entry
+  for entry in $gh_logins; do
+    case "$entry" in "$1="*) me="${entry#*=}"; return 0 ;; esac
+  done
+  me="$(gh api --hostname "$1" user --jq .login 2>/dev/null | head -n 1)" || me=""
+  gh_logins="$gh_logins$1=$me "
 }
 
 if [ ! -d "$TOOLING_ROOT" ]; then
@@ -211,22 +227,33 @@ for repo in "$TOOLING_ROOT"/*; do
   fi
 
   if prs="$(GH_HOST="$host" gh pr list -R "$slug" --state open --limit 100 \
-      --json number,title,headRefName,author,isDraft \
-      --jq '.[] | [.number, .author.login, .headRefName, (if .isDraft then "draft" else "open" end), .title] | @tsv' 2>/dev/null)"; then
+      --json number,title,headRefName,author,isDraft,isCrossRepository \
+      --jq '.[] | [.number, .author.login, .headRefName, (if .isDraft then "draft" else "open" end), (if .isCrossRepository then "fork" else "same" end), .title] | @tsv' 2>/dev/null)"; then
     deps=0
-    while IFS=$'\t' read -r number author head state title; do
+    [ -n "$prs" ] && gh_me "$host"
+    while IFS=$'\t' read -r number author head state head_repo title; do
       [ -n "$number" ] || continue
       case "$author" in
         app/dependabot | dependabot*) deps=$((deps + 1)); continue ;;
       esac
       if is_bot "$head"; then
         note_bot "$head"
+        continue
+      fi
+      pr="PR #$number"
+      [ "$state" = draft ] && pr="draft $pr"
+      # Only your own PR from a branch of this repo is outstanding work. Never
+      # fix, push to, or merge someone else's PR or a fork's PR (hard rule).
+      if [ -z "$me" ]; then
+        say unknown "$pr $head by $author: $title (could not read your gh login on $host; check the author by hand)"
+      elif [ "$author" != "$me" ] || [ "$head_repo" = fork ]; then
+        from=""
+        [ "$head_repo" = fork ] && from=" from a fork"
+        say review "$pr $head by $author$from: $title (owner decides; never merge it)"
+      elif [ "$state" = draft ]; then
+        say ship "$pr $head: $title (finish its ## Pending list)"
       else
-        if [ "$state" = draft ]; then
-          say ship "draft PR #$number $head: $title (finish its ## Pending list)"
-        else
-          say ship "PR #$number $head: $title"
-        fi
+        say ship "$pr $head: $title"
       fi
     done <<< "$prs"
     flush_bots

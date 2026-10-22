@@ -215,6 +215,17 @@
         "Runs any follow-up gh command for that repo against github.example.com (GH_HOST or --hostname), not github.com"
       ],
       "id": 18
+    },
+    {
+      "prompt": "/tooling-checkup (agentbrew has open PR #352 by another contributor from their fork, and dotfiles has open PR #242 from the same contributor's fork; the owner has one open PR of their own on agentbrew)",
+      "expected_output": "In Phase 1, inventory.sh prints `review` lines for agentbrew #352 and dotfiles #242 with the author and `from a fork`, and a `ship` line only for the owner's own PR. In Phase 2 the agent finishes the owner's PR, and reports #352 and #242 with their author without fixing, pushing to, or merging them: the owner decides.",
+      "expectations": [
+        "Gets `review` lines, not `ship` lines, for #352 and #242 from inventory.sh, each naming its author and `from a fork`",
+        "Does not push to, rebase, fix, approve, or merge #352 or #242",
+        "Reports #352 and #242 with their author as waiting on the owner",
+        "Still finishes the owner's own `ship  PR #N` line in Phase 2"
+      ],
+      "id": 19
     }
   ]
 }

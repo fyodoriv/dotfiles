@@ -80,7 +80,7 @@ them. -->
   - **Pivot**: over 90 s, or a missed drift item -> keep the full apply and speed up its slowest step instead.
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: `noop_reapply_ms` (docs/competition/scorecard.md).
-  - **Blocked**: needs-time — 2026-10-22: shipped `dotfiles apply --if-changed` and switched update-tooling and tooling-checkup to it (PR #PRNUM). Baseline `dotfiles_apply_secs`: 191 s and 214 s on the last two checkups. The skip check took 0.74 to 1.09 s on this Mac at load1 114. Measure on the next two checkups, on or after 2026-10-29, with `python3 ~/.claude/skills/tooling-checkup/scripts/checkup_state.py diff` (`dotfiles_apply_secs`), then close or pivot.
+  - **Blocked**: needs-time — 2026-10-22: shipped `dotfiles apply --if-changed` and switched update-tooling and tooling-checkup to it (PR #253). Baseline `dotfiles_apply_secs`: 191 s and 214 s on the last two checkups. The skip check took 0.74 to 1.09 s on this Mac at load1 114. Measure on the next two checkups, on or after 2026-10-29, with `python3 ~/.claude/skills/tooling-checkup/scripts/checkup_state.py diff` (`dotfiles_apply_secs`), then close or pivot.
 
 - [ ] Make `make check` fast in the inner loop
   - **ID**: speed-up-make-check

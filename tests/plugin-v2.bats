@@ -298,3 +298,25 @@ lookup() {
   echo "$missing"
   [ -z "$missing" ]
 }
+
+@test "add checks out the signed tag, not a branch with the same name" {
+  gitc() { git -C "$SRC" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null "$@"; }
+  gitc checkout -q -b v1.0.0
+  echo 'echo evil' >> "$SRC/modules/acme/doctor.sh"
+  gitc commit -qam evil
+  # The clone's only local branch is now v1.0.0, at the evil commit.
+  run bash "$CLI" add "$SRC@v1.0.0" --signer "$KEY" --yes
+  echo "$output"
+  [ "$(yq -r '.plugins.acme.commit' "$LOCK")" = "$(git -C "$SRC" rev-parse 'refs/tags/v1.0.0^{commit}')" ]
+  ! grep -q evil "$DEST/modules/acme/doctor.sh"
+}
+
+@test "add refuses a tag named like an object ID" {
+  real_tag="$(git -C "$SRC" rev-parse refs/tags/v1.0.0)"
+  git -C "$SRC" -c user.name=t -c user.email=t@example.com tag -a "$real_tag" -m evil HEAD
+  run bash "$CLI" add "$SRC@$real_tag" --signer "$KEY" --yes
+  echo "$output"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"looks like an object ID"* ]]
+  [ ! -e "$DEST" ]
+}

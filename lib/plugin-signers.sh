@@ -68,19 +68,40 @@ _plugin_key_fingerprint() {
   printf '%s' "$fp"
 }
 
+# plugin_tag_object <dir> <ref>: prints the object ID of the annotated tag
+# at exactly refs/tags/<ref>. Fails, and prints why, when <ref> looks like
+# an object ID (git would read it as one, not as a tag name), when there is
+# no annotated tag there, or when the tag object names another tag (an old
+# signed tag object under a new name).
+plugin_tag_object() {
+  local dir="$1" ref="$2" oid tagged
+  if [[ "$ref" =~ ^[0-9a-fA-F]+$ ]] && { [ "${#ref}" -eq 40 ] || [ "${#ref}" -eq 64 ]; }; then
+    echo "$ref looks like an object ID; plugins install only from tag names"
+    return 1
+  fi
+  git check-ref-format "refs/tags/$ref" 2>/dev/null || { echo "$ref is not a valid tag name"; return 1; }
+  oid="$(git -C "$dir" rev-parse --verify --quiet "refs/tags/$ref" 2>/dev/null)" &&
+    [ "$(git -C "$dir" cat-file -t "$oid" 2>/dev/null)" = tag ] ||
+    { echo "$ref is not a signed tag; plugins install only from signed tags"; return 1; }
+  tagged="$(git -C "$dir" cat-file tag "$oid" 2>/dev/null | sed -n 's/^tag //p' | head -1)"
+  [ "$tagged" = "$ref" ] || { echo "the tag object at $ref names tag $tagged, not $ref"; return 1; }
+  printf '%s' "$oid"
+}
+
 # plugin_verify_signed_tag <dir> <ref> <name> [<extra key>...]: succeeds and
 # prints the signing key when <ref> is an annotated tag signed by a key
 # trusted for <name> (or one of the extra keys). Otherwise prints why.
+# It checks the exact tag object that plugin_tag_object resolves, so a
+# caller that checks out "$(plugin_tag_object ...)" gets the verified code.
 plugin_verify_signed_tag() {
-  local dir="$1" ref="$2" name="$3" keys scratch out fp key
+  local dir="$1" ref="$2" name="$3" keys scratch out fp key oid
   shift 3
   keys="$( { plugin_signers_for "$name"; for key in "$@"; do plugin_normalize_key "$key" && echo; done; } | sed '/^$/d' | sort -u)"
   [ -n "$keys" ] || { echo "no trusted signer for plugin $name; pass --signer <ssh-public-key>"; return 1; }
-  [ "$(git -C "$dir" cat-file -t "refs/tags/$ref" 2>/dev/null)" = tag ] ||
-    { echo "$ref is not a signed tag; plugins install only from signed tags"; return 1; }
+  oid="$(plugin_tag_object "$dir" "$ref")" || { echo "$oid"; return 1; }
   scratch="$(mktemp)"
   printf '%s\n' "$keys" | sed "s/^/$name namespaces=\"git\" /" > "$scratch"
-  out="$(git -C "$dir" -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$scratch" verify-tag "$ref" 2>&1)" || {
+  out="$(git -C "$dir" -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$scratch" verify-tag "$oid" 2>&1)" || {
     rm -f "$scratch"
     echo "tag $ref is not signed by a trusted signer for $name"
     return 1

@@ -87,10 +87,14 @@ contributes:
 moves to a new release. It never removes the plugin first.
 
 1. It clones the lock's `source` into a staging folder beside the checkout.
-2. It picks the tag: the one you name, or else the newest tag that sorts
-   after the locked `ref` (version order) and that a trusted signer signed.
-   It skips and names each newer tag that is unsigned or signed by another
-   key. No newer signed tag: it prints "up to date" and changes nothing.
+2. It picks the tag: the one you name, or else the newest stable release
+   (`vX.Y.Z` or `X.Y.Z`, nothing after it) that is newer than the locked
+   `ref` by [semver](https://semver.org) order and that a trusted signer
+   signed. Pre-releases (`v1.1.0-rc.1`) and other names (`wip`, `latest`)
+   install only when you name them. It skips and names each newer release
+   that is unsigned or signed by another key. No newer signed release: it
+   prints "up to date" and changes nothing. If the locked `ref` is not a
+   version, name the tag.
 3. It checks the new tag as `add` does: SSH signature from a key trusted for
    this plugin, valid manifest and options, and the same plugin `name`.
 4. Same capabilities as the approved version: no prompt. Changed
@@ -100,7 +104,12 @@ moves to a new release. It never removes the plugin first.
    and runs the same check as `verify`. If that fails, the old checkout and
    lock come back and the command exits non-zero.
 
-Any failed step leaves the installed version and its lock untouched. A
+Any failed step, Ctrl-C, or `TERM` before the new checkout verifies leaves
+the installed version and its lock as they were: an exit handler moves the
+old checkout back and restores the lock. If it cannot, it keeps the staging
+folder (with the old checkout) and prints its path. Every lock write goes to
+a 0600 temp file in the same folder and then one rename, so the lock is
+always the old one or the new one. A
 named tag older than the installed one installs with a "downgrade" note;
 without a tag, update never goes back. Naming the locked tag on a checkout
 that no longer matches its lock reinstalls it, so the doctor fix for
@@ -119,6 +128,12 @@ layers. A new signer must be trusted first (`plugin trust`, see below).
   cannot sign another.
 - `git verify-tag` runs against a scratch file with only this plugin's keys,
   so the user's git config cannot widen trust.
+- The check reads the tag object at exactly `refs/tags/<ref>`, and the
+  checkout is that object's commit (`add` and `update` prove it). A name
+  that looks like an object ID (40 or 64 hex digits) is refused, because
+  git would read it as an ID and check some other, real signature. A tag
+  object whose own name differs from `<ref>` (an old signed tag pushed
+  under a new name) is refused too.
 - Key rotation: `plugin trust <name> --signer <new key>`, release a new tag,
   then `--revoke` the old key. A revoked signer disables the plugin.
 

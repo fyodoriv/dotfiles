@@ -255,3 +255,160 @@ assert_kept_v1() {
   run bash "$CLI" --help
   [[ "$output" == *"dotfiles plugin update <name> [<tag>]"* ]]
 }
+
+# ── Hardening (review of #276) ─────────────────────────────────────────
+
+# commit_evil: a commit with changed plugin code, on no branch tip.
+commit_evil() {
+  echo 'echo evil' >> "$SRC/modules/acme/doctor.sh"
+  gitc commit -qam evil
+  git -C "$SRC" rev-parse HEAD
+}
+
+@test "a tag named like a signed tag's object ID cannot borrow its signature" {
+  real_tag="$(git -C "$SRC" rev-parse refs/tags/v1.0.0)"
+  evil="$(commit_evil)"
+  # Unsigned annotated tag, named after the real signed tag object.
+  gitc tag -a "$real_tag" -m evil "$evil"
+  run bash "$CLI" update acme "$real_tag" --yes
+  echo "$output"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"looks like an object ID"* ]]
+  [ "$(lock_commit)" != "$evil" ]
+  assert_kept_v1
+}
+
+@test "a signed tag object under another tag name is refused" {
+  release v1.1.0
+  # refs/tags/v2.0.0 points at the real, signed v1.1.0 tag object.
+  git -C "$SRC" update-ref refs/tags/v2.0.0 "$(git -C "$SRC" rev-parse refs/tags/v1.1.0)"
+  run bash "$CLI" update acme v2.0.0 --yes
+  echo "$output"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"names tag v1.1.0, not v2.0.0"* ]]
+  assert_kept_v1
+  # With no tag, update skips the renamed tag and takes the real one.
+  run bash "$CLI" update acme < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped v2.0.0"* ]]
+  [ "$(lock_ref)" = v1.1.0 ]
+}
+
+@test "update with no tag ignores pre-release tags" {
+  release v1.1.0
+  release v1.1.0-rc.1
+  release v1.2.0-beta
+  run bash "$CLI" update acme < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(lock_ref)" = v1.1.0 ]
+}
+
+@test "update with no tag ignores tags that are not versions" {
+  echo '# wip' >> "$SRC/modules/acme/doctor.sh"
+  gitc commit -qam wip
+  sign_tag "$SRC" wip "$TEST_DIR/key"
+  sign_tag "$SRC" latest "$TEST_DIR/key"
+  run bash "$CLI" update acme < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"up to date at v1.0.0"* ]]
+  assert_kept_v1
+}
+
+@test "update with no tag compares versions by number, with or without a v" {
+  release v1.9.0
+  release 1.10.0
+  run bash "$CLI" update acme < /dev/null
+  [ "$status" -eq 0 ]
+  [ "$(lock_ref)" = 1.10.0 ]
+}
+
+@test "a named pre-release installs, and the stable release counts as newer" {
+  release v1.1.0-rc.1
+  run bash "$CLI" update acme v1.1.0-rc.1 < /dev/null
+  [ "$status" -eq 0 ]
+  [ "$(lock_ref)" = v1.1.0-rc.1 ]
+  run bash "$CLI" update acme < /dev/null
+  [[ "$output" == *"up to date at v1.1.0-rc.1"* ]]
+  release v1.1.0
+  run bash "$CLI" update acme < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(lock_ref)" = v1.1.0 ]
+}
+
+@test "update with no tag needs a named tag when the installed ref is not a version" {
+  sign_tag "$SRC" stable "$TEST_DIR/key"
+  bash "$CLI" update acme stable < /dev/null >/dev/null
+  [ "$(lock_ref)" = stable ]
+  release v9.0.0
+  run bash "$CLI" update acme < /dev/null
+  echo "$output"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not a version"* ]]
+  [ "$(lock_ref)" = stable ]
+}
+
+# interrupt_at <step> <signal>: the next update gets <signal> at <step>.
+# Stub mv and yq send it to the CLI ($PPID); INT also kills the stub
+# itself, as Ctrl-C does to the whole foreground group.
+interrupt_at() {
+  mkdir -p "$TEST_DIR/sig"
+  cat > "$TEST_DIR/sig/mv" <<'STUB'
+#!/bin/bash
+/bin/mv "$@"; rc=$?
+[ "$1" != -f ] || shift
+case "$KILL_AT:$1:$2" in
+  old-aside:*:*/.staging.*/old | new-in:*/.staging.*/src:* | lock-replaced:*plugins.lock.tmp.*:*)
+    kill "-$KILL_SIG" "$PPID"; [ "$KILL_SIG" != INT ] || kill -INT $$ ;;
+esac
+exit "$rc"
+STUB
+  cat > "$TEST_DIR/sig/yq" <<STUB
+#!/bin/bash
+if [ "\$KILL_AT" = lock-write ] && [[ "\$*" == *locked_at* ]]; then
+  kill "-\$KILL_SIG" "\$PPID"; [ "\$KILL_SIG" != INT ] || kill -INT \$\$
+  exit 1
+fi
+exec $(command -v yq) "\$@"
+STUB
+  chmod +x "$TEST_DIR/sig/mv" "$TEST_DIR/sig/yq"
+  export KILL_AT="$1" KILL_SIG="$2"
+}
+
+run_interrupted_update() {
+  release v1.1.0
+  interrupt_at "$1" "$2"
+  PATH="$TEST_DIR/sig:$PATH" run bash "$CLI" update acme < /dev/null
+  unset KILL_AT KILL_SIG
+  echo "$output"
+  [ "$status" -ne 0 ]
+  assert_kept_v1
+}
+
+@test "TERM after the old checkout moves aside puts it back" {
+  run_interrupted_update old-aside TERM
+}
+
+@test "Ctrl-C after the new checkout moves in puts the old one back" {
+  run_interrupted_update new-in INT
+}
+
+@test "TERM during the lock write keeps the old checkout and lock" {
+  run_interrupted_update lock-write TERM
+}
+
+@test "TERM after the lock is replaced, before the check, rolls both back" {
+  run_interrupted_update lock-replaced TERM
+}
+
+@test "the lock is written through a temp file and a rename" {
+  release v1.1.0
+  bash "$CLI" update acme < /dev/null >/dev/null
+  [ "$(stat -f %Lp "$LOCK")" = 600 ]
+  [ -z "$(find "$(dirname "$LOCK")" -name 'plugins.lock.tmp.*')" ]
+  run grep -n 'yq -i' "$REPO_ROOT/bin/dotfiles-plugin"
+  [ "$status" -ne 0 ]
+}

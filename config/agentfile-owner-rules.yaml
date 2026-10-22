@@ -16,3 +16,8 @@ rules: |
   Broad sibling delivery remains limited to approved repo families.
   Within those families, never bypass-merge someone else's PR.
   Windsurf and Devin support was removed on 2026-10-08. Augment (Auggie) is deprecated and frozen in all tooling repos: keep its existing support, but never implement fixes or features for it, never file tasks for it, and ignore its failing checks.
+  Every app or tool I build to share ships an upstream feedback loop: a
+  CONTRIBUTING.md "Report problems and ideas" section (my welcome, the
+  `agentbrew report` safety steps, the opt-out), a one-line pointer to it in
+  AGENTS.md, and the `report-upstream` skill in its Agentfile. The
+  new-project scorer checks this; scaffold it from new-project.

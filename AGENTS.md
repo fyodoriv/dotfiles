@@ -1,14 +1,15 @@
 # AGENTS.md — dotfiles agent guide
 
 Always loaded: a router, not a manual. Open only the doc the routing table
-names. Do not read the README end to end.
+names.
 
 ## Start here
 
 - **What**: macOS developer dotfiles with self-healing doctor checks. chezmoi, shell scripts, bats tests.
 - **Who**: the owner's Macs and team forks. Claude Code and Codex are equal first-class agents ([docs/repo-map.md](docs/repo-map.md#main-use-cases--first-class-ai-coding-agents)).
-- **Where**: `github.com/fyodoriv/dotfiles`, branch **`feat/chezmoi`** (canonical and default; `main` is retired). Public repo.
+- **Where**: `github.com/fyodoriv/dotfiles`, branch **`feat/chezmoi`** (canonical and default; `main` retired). Public repo.
 - **Docs map**: [docs/README.md](docs/README.md). Rule full text: [docs/constitution.md](docs/constitution.md).
+- **Bug or idea?** Offer a [safe report](CONTRIBUTING.md#report-problems-and-ideas).
 
 ## Commands
 
@@ -106,7 +107,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.
 - **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name; writes outside `$HOME` fail it.
-- **Human-only steps**: `sudo` (for example `dotfiles-launchd-maxfiles`) and `bin/land` need a human terminal.
+- **Human-only steps**: `sudo` and `bin/land` need a human terminal.
 
 ## Delivery
 

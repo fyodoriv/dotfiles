@@ -65,6 +65,7 @@ skills:
   - receiving-code-review
   - iterate
   - run-goal                 # loads on every /goal (agentbrew hook goal-set-loads-run-goal)
+  - report-upstream          # offers safe upstream issue reports (CONTRIBUTING.md)
   - semgrep
   - codeql
   - playwright-best-practices

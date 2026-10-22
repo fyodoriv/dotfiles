@@ -9,6 +9,10 @@
 #   TOOLING_CHECKUP_BOT_BRANCH_RE    ERE for automation branches that are never outstanding work
 #   TOOLING_CHECKUP_NO_FETCH=1       skip `git fetch`
 #   TOOLING_CHECKUP_NO_GH=1          skip pull request and security-alert lookups
+#   TOOLING_CHECKUP_GH_HOSTS         GitHub Enterprise hosts to check (space or comma
+#                                    separated); any other host that is not github.com
+#                                    is checked only when `gh auth status --hostname`
+#                                    passes for it
 #
 # Verdicts:
 #   ship       work that is not on the canonical branch yet
@@ -27,6 +31,8 @@ TOOLING_ROOT="${TOOLING_ROOT:-$HOME/apps/tooling}"
 BOT_BRANCH_RE="${TOOLING_CHECKUP_BOT_BRANCH_RE:-^(dependabot/|mape-k-ingestion/|observer-dogfood/|tasks-claims$|tasksmd/generated-snapshot$)}"
 NO_FETCH="${TOOLING_CHECKUP_NO_FETCH:-0}"
 NO_GH="${TOOLING_CHECKUP_NO_GH:-0}"
+GH_HOSTS="${TOOLING_CHECKUP_GH_HOSTS:-}"
+GH_HOSTS=" ${GH_HOSTS//,/ } "
 
 say() { printf '  %-9s %s\n' "$1" "$2"; }
 
@@ -47,13 +53,53 @@ flush_bots() {
   bots=""
 }
 
+# Print "<host> <owner/repo>" for a remote URL:
+#   git@<host>:owner/repo(.git), ssh://git@<host>[:port]/owner/repo(.git),
+#   or https://<host>/owner/repo(.git). A local path is not a remote.
 github_slug() {
-  # git@github.com:owner/repo.git or https://github.com/owner/repo(.git)
-  local url="${1%.git}"
+  local url="${1%/}" host path
+  url="${url%.git}"
   case "$url" in
-    *github.com[:/]*/*) printf '%s\n' "${url#*github.com[:/]}" ;;
+    *://*)
+      path="${url#*://}"
+      host="${path%%/*}"
+      path="${path#*/}"
+      [ "$path" != "${url#*://}" ] || return 1
+      host="${host##*@}"
+      host="${host%%:*}"
+      ;;
+    *:*)
+      host="${url%%:*}"
+      case "$host" in */*) return 1 ;; esac
+      host="${host##*@}"
+      path="${url#*:}"
+      ;;
     *) return 1 ;;
   esac
+  case "$path" in
+    /* | */*/* | */) return 1 ;;
+    ?*/?*) ;;
+    *) return 1 ;;
+  esac
+  [ -n "$host" ] || return 1
+  printf '%s %s\n' "$host" "$path"
+}
+
+# Succeeds when gh can talk to $1: github.com, a host in
+# TOOLING_CHECKUP_GH_HOSTS, or a host gh is logged in to. The answer for each
+# host is kept for this run (shell-process scope), so gh auth status runs at
+# most once per host.
+gh_hosts_ok=" github.com "
+gh_hosts_bad=" "
+gh_host_known() {
+  case "$gh_hosts_ok$GH_HOSTS" in *" $1 "*) return 0 ;; esac
+  case "$gh_hosts_bad" in *" $1 "*) return 1 ;; esac
+  if gh auth status --hostname "$1" >/dev/null 2>&1; then
+    gh_hosts_ok="$gh_hosts_ok$1 "
+    return 0
+  fi
+  gh_hosts_bad="$gh_hosts_bad$1 "
+  return 1
 }
 
 if [ ! -d "$TOOLING_ROOT" ]; then
@@ -151,13 +197,20 @@ for repo in "$TOOLING_ROOT"/*; do
     say unknown "gh is not installed; pull requests and alerts not checked"
     continue
   fi
-  if ! slug="$(github_slug "$(git -C "$repo" remote get-url origin)")"; then
+  if ! remote="$(github_slug "$(git -C "$repo" remote get-url origin)")"; then
     flush_bots
     say unknown "origin is not a GitHub remote; pull requests not checked"
     continue
   fi
+  host="${remote%% *}"
+  slug="${remote#* }"
+  if ! gh_host_known "$host"; then
+    flush_bots
+    say unknown "origin host $host is not github.com and gh is not logged in to it; pull requests not checked (run: gh auth login --hostname $host, or add it to TOOLING_CHECKUP_GH_HOSTS)"
+    continue
+  fi
 
-  if prs="$(gh pr list -R "$slug" --state open --limit 100 \
+  if prs="$(GH_HOST="$host" gh pr list -R "$slug" --state open --limit 100 \
       --json number,title,headRefName,author,isDraft \
       --jq '.[] | [.number, .author.login, .headRefName, (if .isDraft then "draft" else "open" end), .title] | @tsv' 2>/dev/null)"; then
     deps=0
@@ -183,7 +236,7 @@ for repo in "$TOOLING_ROOT"/*; do
     say unknown "gh pr list failed for $slug"
   fi
 
-  if alerts="$(gh api --paginate "repos/$slug/dependabot/alerts?state=open&severity=critical,high&per_page=100" \
+  if alerts="$(gh api --hostname "$host" --paginate "repos/$slug/dependabot/alerts?state=open&severity=critical,high&per_page=100" \
       --jq '.[] | [.security_advisory.severity, .dependency.package.name, .security_advisory.ghsa_id, (.dependency.scope // "unknown")] | @tsv' 2>/dev/null)"; then
     # Critical alerts are outstanding work: one line each. High alerts get a
     # one-line summary for the report.

@@ -204,6 +204,17 @@
         "Still runs the update-tooling step 4 doctor modules"
       ],
       "id": 17
+    },
+    {
+      "prompt": "/tooling-checkup (one checkout's origin is git@github.example.com:acme/app.git, a GitHub Enterprise host that gh is logged in to; that repo has one open draft PR)",
+      "expected_output": "In Phase 1, inventory.sh parses the origin into host github.example.com and slug acme/app, asks gh for its pull requests on that host, and prints a `ship  draft PR #N` line for it. In Phase 2 the agent continues that draft from its ## Pending list, like a github.com PR.",
+      "expectations": [
+        "Gets a `ship  draft PR #N` line for the repo on the enterprise origin from inventory.sh",
+        "Does not report that checkout as `origin is not a GitHub remote`",
+        "Continues the draft PR in Phase 2 from its ## Pending list",
+        "Runs any follow-up gh command for that repo against github.example.com (GH_HOST or --hostname), not github.com"
+      ],
+      "id": 18
     }
   ]
 }

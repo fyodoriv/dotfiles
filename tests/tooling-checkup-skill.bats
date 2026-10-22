@@ -172,6 +172,79 @@ EOF2
   [[ "$output" == *"ship      draft PR #6 wip/parked: Parked work (finish its ## Pending list)"* ]]
 }
 
+# A gh stub that logs "GH_HOST=<value> <args>" for each call. `gh auth status
+# --hostname H` passes only for a host listed in FAKE_GH_AUTH_HOSTS.
+write_fake_gh() {
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/gh" <<EOF2
+#!/bin/sh
+echo "GH_HOST=\${GH_HOST:-} \$*" >> "$TEST_DIR/gh.log"
+case "\$1 \$2" in
+  "auth status")
+    case " \${FAKE_GH_AUTH_HOSTS:-} " in *" \$4 "*) exit 0 ;; esac
+    exit 1 ;;
+  "pr list") printf '7\tfyodor\tfeat/ghe\topen\tEnterprise work\n' ;;
+  "api "*) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF2
+  chmod +x "$TEST_DIR/bin/gh"
+}
+
+# Run the inventory for one checkout whose origin is $1, with the gh stub.
+run_inventory_with_origin() {
+  make_tooling_root
+  git_q -C "$TOOLING/alpha" remote set-url origin "$1"
+  write_fake_gh
+  run env -u BASH_ENV -u ENV PATH="$TEST_DIR/bin:$PATH" TOOLING_ROOT="$TOOLING" TOOLING_CHECKUP_NO_FETCH=1 \
+    bash "$SCRIPTS/inventory.sh"
+}
+
+@test "inventory checks pull requests on a GitHub Enterprise ssh origin (issue #256)" {
+  FAKE_GH_AUTH_HOSTS="github.example.com" run_inventory_with_origin "git@github.example.com:acme/alpha.git"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ship      PR #7 feat/ghe: Enterprise work"* ]]
+  [[ "$output" != *"not a GitHub remote"* ]]
+  grep -qxF "GH_HOST= auth status --hostname github.example.com" "$TEST_DIR/gh.log"
+  grep -q "^GH_HOST=github.example.com pr list -R acme/alpha " "$TEST_DIR/gh.log"
+  grep -q "^GH_HOST= api --hostname github.example.com --paginate repos/acme/alpha/dependabot/alerts" "$TEST_DIR/gh.log"
+}
+
+@test "inventory parses https and ssh:// enterprise origins into host and slug" {
+  TOOLING_CHECKUP_GH_HOSTS="other.example.com,github.example.com" \
+    run_inventory_with_origin "https://github.example.com/acme/alpha.git"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ship      PR #7 feat/ghe: Enterprise work"* ]]
+  grep -q "^GH_HOST=github.example.com pr list -R acme/alpha " "$TEST_DIR/gh.log"
+  # A host listed in TOOLING_CHECKUP_GH_HOSTS needs no gh auth status call.
+  ! grep -q "auth status" "$TEST_DIR/gh.log"
+
+  rm -rf "$TEST_DIR/tooling" "$TEST_DIR/origin.git" "$TEST_DIR/gh.log"
+  FAKE_GH_AUTH_HOSTS="github.example.com" \
+    run_inventory_with_origin "ssh://git@github.example.com:2222/acme/alpha.git"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ship      PR #7 feat/ghe: Enterprise work"* ]]
+  grep -q "^GH_HOST=github.example.com pr list -R acme/alpha " "$TEST_DIR/gh.log"
+}
+
+@test "inventory skips a host gh is not logged in to and says how to add it" {
+  run_inventory_with_origin "git@git.example.com:acme/alpha.git"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"unknown   origin host git.example.com is not github.com and gh is not logged in to it"* ]]
+  [[ "$output" == *"TOOLING_CHECKUP_GH_HOSTS"* ]]
+  grep -qxF "GH_HOST= auth status --hostname git.example.com" "$TEST_DIR/gh.log"
+  ! grep -q "pr list" "$TEST_DIR/gh.log"
+}
+
+@test "inventory sends github.com origins to github.com without an auth check" {
+  run_inventory_with_origin "https://github.com/acme/alpha.git"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ship      PR #7 feat/ghe: Enterprise work"* ]]
+  grep -q "^GH_HOST=github.com pr list -R acme/alpha " "$TEST_DIR/gh.log"
+  grep -q "^GH_HOST= api --hostname github.com --paginate repos/acme/alpha/" "$TEST_DIR/gh.log"
+  ! grep -q "auth status" "$TEST_DIR/gh.log"
+}
+
 @test "inventory fails clearly when the tooling root has no checkouts" {
   mkdir -p "$TEST_DIR/empty"
   run env TOOLING_ROOT="$TEST_DIR/empty" bash "$SCRIPTS/inventory.sh"

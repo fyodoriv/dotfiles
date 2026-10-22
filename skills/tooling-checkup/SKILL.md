@@ -99,8 +99,11 @@ python3 <skill-dir>/scripts/pty_capture.py --timeout 60 -- claude doctor
 
 - `diff` prints the last run time, its verdict and numbers, and every tool
   version or repository head that changed since.
-- `inventory.sh` prints one verdict per item: `ship`, `salvage`, `clean-up`,
-  `pipeline`, `bot`, `skip`, `security`, `advisory`, or `unknown`.
+- `inventory.sh` prints one verdict per item: `ship`, `review`, `salvage`,
+  `clean-up`, `pipeline`, `bot`, `skip`, `security`, `advisory`, or `unknown`.
+- A PR is `ship` only when it is yours (its author is your `gh` login) and
+  its branch is in the same repo. A PR by anyone else, or from a fork, is
+  `review`.
 - It checks pull requests and alerts on github.com and on each GitHub
   Enterprise host that `gh` is logged in to or `TOOLING_CHECKUP_GH_HOSTS`
   lists. An `unknown` line names a host it skipped and how to add it.
@@ -116,6 +119,7 @@ Act on each inventory line by its verdict:
 |---|---|
 | `ship` | Deliver it with `/ship-it` when it is the user's or an agent's finished work. When it is half done or you cannot tell, report it with its next step. |
 | `ship` on a `PR #N` line (or `draft PR #N`) | Get it finished (below). |
+| `review` | Someone else's PR, or a PR from a fork. Report it with its author. Never fix, push to, or merge it: the owner decides. |
 | `salvage` | Look first: `git status`, `git diff`, `git stash show -p`. Commit useful work to a branch and ship it. Report what you kept. |
 | `clean-up` | Delete the merged local branch (`git branch -d`, never `-D`). |
 | `security` | Fix the critical alert: take the dependabot pull request or bump the package yourself. Ship it with `/ship-it`. |
@@ -124,8 +128,8 @@ Act on each inventory line by its verdict:
 
 ### Open pull requests on your repos
 
-Each `ship  PR #N` or `ship  draft PR #N` line is an open pull request. Try
-to finish it now, in a new worktree (never the live checkout), in this order
+Each `ship  PR #N` or `ship  draft PR #N` line is an open pull request of
+yours. Try to finish it now, in a new worktree (never the live checkout), in this order
 (the `wrap-up` skill's "Continue open work" section has the same steps):
 
 1. **Draft from `wrap-up`:** read its `## Pending` list and its task. Do every

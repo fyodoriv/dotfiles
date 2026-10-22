@@ -67,6 +67,7 @@ agent-tab close --owner "$AGENT_ID" "$tab"
 export AGENT_TAB_OWNER="$AGENT_ID"              # default for --owner
 agent-tab text "$tab"                            # page text
 agent-tab eval "$tab" 'document.title'           # value of a JS expression
+agent-tab eval "$tab" - < script.js              # a large script, from stdin
 agent-tab nav "$tab" https://example.com/next
 agent-tab shot "$tab"                            # prints the PNG path
 agent-tab health [--fix]                         # tabs that do not answer
@@ -78,6 +79,7 @@ agent-tab clear-cookies example.com              # one site's cookies
 - Default lease is 1 hour (`--lease`, `AGENT_TAB_LEASE_SECONDS`).
 - Closing or renewing another owner's tab with a live lease exits 3 and prints the holder and the reason. After the lease expires, anyone can close it.
 - `text`, `eval`, `nav`, and `shot` work only for the owner with a live lease. Others get exit 3. An owner with an expired lease gets exit 3 too: run `renew` first. They send one CDP call over the tab's websocket (Node built-in `WebSocket`) and never raise a window.
+- `eval` has no size limit of its own: the script reaches node on stdin, never in argv (#270). A script of `-` is read from stdin, so a file of megabytes goes in one call. A failed CDP call prints one `agent-tab: cdp <method>: <cause>` line (for example `websocket closed before the answer (code 1006)`) before `eval failed in tab`.
 - `shot` writes PNGs to `~/apps/agent-scratch/screenshots/` (`AGENT_TAB_SHOT_DIR`).
 - `health` evaluates `1` in every page tab and lists the ones that do not answer (exit 1). `--fix` reloads them. If a reload does not help, it closes the tab only when no live lease owns it; a leased tab is kept and its holder printed.
 - `clear-cookies <domain>` deletes the cookies of that domain and its subdomains. If any live-lease tab is on that site, it exits 3 and lists the blocking tabs. Tabs with an expired lease do not block.

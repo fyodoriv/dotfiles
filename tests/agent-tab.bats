@@ -306,3 +306,64 @@ chrome_has() {
   [ "$status" -eq 0 ]
   [ "$(wc -c < "$output" | tr -d ' ')" -eq 300000 ]
 }
+
+# --- eval size (#270): the script must never ride in node's argv ---
+# The real node CDP client talks to fake-cdp-eval-ws.mjs, which answers with
+# the length and sha256 of the expression it got. A node shim on PATH logs
+# the total size of node's argv, then runs the real node.
+
+eval_ws_setup() {
+  cdp_setup
+  unset AGENT_TAB_CDP
+  REAL_NODE="$(command -v node)"
+  cat > "$TEST_DIR/bin/node" <<STUB
+#!/bin/bash
+n=0; for a in "\$@"; do n=\$((n + \${#a})); done
+echo "\$n" >> "$TEST_DIR/node-argv.log"
+exec "$REAL_NODE" "\$@"
+STUB
+  chmod +x "$TEST_DIR/bin/node"
+  "$REAL_NODE" "$BATS_TEST_DIRNAME/fixtures/fake-cdp-eval-ws.mjs" "$TEST_DIR/port" ${1:-} &
+  srv=$!
+  for _ in $(seq 50); do [ -s "$TEST_DIR/port" ] && break; sleep 0.1; done
+  id="$(open_tab agent-a r)"
+  jq --arg id "$id" --arg ws "ws://127.0.0.1:$(cat "$TEST_DIR/port")/$id" \
+    '. + [{id: $id, type: "page", url: "https://example.com/", webSocketDebuggerUrl: $ws}]' \
+    "$TABS_JSON" > "$TEST_DIR/t.json" && mv "$TEST_DIR/t.json" "$TABS_JSON"
+}
+
+# "chars=<n> sha256=<16 hex>" for the file $1, as the fake server prints it.
+expected_eval() {
+  printf 'chars=%s sha256=%s' "$(wc -c < "$1" | tr -d ' ')" "$(shasum -a 256 < "$1" | cut -c1-16)"
+}
+
+@test "eval sends a 300 KB script whole, with node argv under 4 KB (#270)" {
+  eval_ws_setup
+  { printf "'"; head -c 300000 /dev/zero | tr '\0' a; printf "'.length"; } > "$TEST_DIR/big.js"
+  run "$SCRIPT" eval --owner agent-a "$id" "$(cat "$TEST_DIR/big.js")"
+  kill "$srv" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(expected_eval "$TEST_DIR/big.js")" ]
+  [ "$(sort -n "$TEST_DIR/node-argv.log" | tail -n 1)" -lt 4096 ]
+}
+
+@test "eval - reads a 2 MB script from stdin, past the argv limit (#270)" {
+  eval_ws_setup
+  { printf 'window.data = "'; head -c 2000000 /dev/zero | tr '\0' b; printf '"; window.data.length'; } > "$TEST_DIR/huge.js"
+  run "$SCRIPT" eval --owner agent-a "$id" - < "$TEST_DIR/huge.js"
+  kill "$srv" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(expected_eval "$TEST_DIR/huge.js")" ]
+}
+
+@test "eval failure names the cause from the CDP client (#270)" {
+  eval_ws_setup close
+  SECONDS=0
+  run "$SCRIPT" eval --owner agent-a "$id" '1 + 1'
+  kill "$srv" 2>/dev/null || true
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"agent-tab: cdp Runtime.evaluate: websocket closed before the answer (code 1006)"* ]]
+  [[ "$output" == *"agent-tab: eval failed in tab"* ]]
+  # The close is reported at once, not after the 10 s no-answer timeout.
+  [ "$SECONDS" -lt 8 ]
+}

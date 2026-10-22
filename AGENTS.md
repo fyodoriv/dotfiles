@@ -22,7 +22,7 @@ names.
 | Install e2e: real chezmoi, scripts, doctor, zsh in a sandboxed scratch HOME | `make e2e` (`make check` runs it when an installer path changes) |
 | TASKS.md only | `make lint-tasks` |
 | Review the task queue (truth, usefulness, priority) | `/review-tasks` (tasks.md command, installed by the Agentfile) |
-| Apply to this Mac | `dotfiles apply` (needed after `Agentfile.yaml` edits) |
+| Apply to this Mac | `dotfiles apply` (after `Agentfile.yaml` edits) |
 | Check one module | `dotfiles doctor --module <name>` |
 
 ### Verification gates
@@ -39,7 +39,7 @@ names.
 | Add a LaunchAgent | `launchagents/com.dotfiles.<name>.plist.tmpl` | README "LaunchAgents" |
 | Add a Homebrew package | `.chezmoiscripts/run_onchange_brew.sh.tmpl` | [what-gets-changed.md](docs/what-gets-changed.md) |
 | Change macOS defaults | `macos.sh`, `macos-visual.sh`, `macos-apps.sh` | [what-gets-changed.md](docs/what-gets-changed.md) |
-| Add a chezmoi prompt | `.chezmoi.yaml.tmpl` | README "Configuration" |
+| Add a setting | `config/settings.yaml`, `.chezmoi.yaml.tmpl` | README "Configuration" |
 | Change git config or hooks | `dot_gitconfig.tmpl`, `git-hooks/` | [privacy-gates.md](docs/privacy-gates.md) |
 | Change agent MCPs, skills, rules | `Agentfile.yaml` | [agentbrew-setup.md](docs/agentbrew-setup.md) |
 | Turn an opt-in agentbrew hook on for every machine | `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl` (`HOOKS=`, owner-only) | [agentbrew-setup.md](docs/agentbrew-setup.md) |

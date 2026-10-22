@@ -27,6 +27,9 @@ macOS may ask for permission prompts on the way. Preview first with
 `bin/dotfiles-install plan`; undo with `bin/dotfiles-install restore`. The
 last command is the doctor: every failing line names its fix.
 
+After that, run `dotfiles` (or `/dotfiles` in an agent) any time. One screen
+shows what changed and what needs you, and ends with a `Next:` command.
+
 Other ways in:
 
 - **With your AI agent**: open Claude Code (or Codex) and say
@@ -96,7 +99,7 @@ Plain chezmoi works too (`chezmoi init --source ~/apps/dotfiles --apply`), witho
 
 ### Configuration
 
-During `chezmoi init`, you'll be prompted for these values. They're stored in `~/.config/chezmoi/chezmoi.yaml` — edit and run `dotfiles apply` to change later.
+During `chezmoi init`, you'll be prompted for these values. They're stored in `~/.config/chezmoi/chezmoi.yaml`. To change one later, run `dotfiles config set <key> <value>` (it checks the value first), then `dotfiles apply`. `dotfiles config` lists every setting with its value and source (`default` or `chezmoi.yaml`). Every default is in one table, [`config/settings.yaml`](config/settings.yaml); a test keeps it equal to `.chezmoi.yaml.tmpl`.
 
 | Prompt | Variable | Default | What it does |
 |--------|----------|---------|-------------|
@@ -116,6 +119,8 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | *(not prompted)* | `claude_model` / `claude_effort` | `claude-opus-5-5` / `xhigh` | Override the Claude Code model and effort that `dotfiles apply` pins in `~/.claude/settings.json`. Use it for an org overlay or one Mac. The `DOTFILES_CLAUDE_MODEL` / `DOTFILES_CLAUDE_EFFORT` env vars win over these keys. See [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration). |
 | Auto-upgrade | `auto_upgrade` | `false` | Weekly Topgrade via LaunchAgent (Sunday 9 AM); managed-endpoint safe mode disables it while a required runtime publisher is blocked. |
 | Encryption | `use_encryption` | `false` | age encryption for secrets (requires key at `~/.config/chezmoi/key.txt`) |
+| age recipient | `age_recipient` | `unused-no-encryption-configured` | Your age public key. Prompted only when `use_encryption` is `true`. |
+| Morning briefing time | `morning_hour` / `morning_minute` | `8` / `30` | When the `morning` LaunchAgent runs. Prompted only on the full profile. |
 | Dotfiles directory | `dotfiles_dir` | `apps/dotfiles` | Path relative to `$HOME` where this repo lives. Leave as default unless you cloned elsewhere. |
 | Repos directory | `repos_dir` | `apps` | Path relative to `$HOME` where your code repos live. Used by `git-maintain` and doctor. |
 | Git work name | `git_work_name` | _(empty)_ | Commit author name for your work/default identity |
@@ -123,7 +128,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Split git identity | `git_personal_enabled` | `false` | Enable a separate personal identity for any `github.com` remote. Work identity stays default for enterprise remotes. |
 | Git personal name | `git_personal_name` | _(empty, only if split enabled)_ | Commit author name used for `github.com` remotes |
 | Git personal email | `git_personal_email` | _(empty, only if split enabled)_ | Commit email for `github.com` remotes — consider `<username>@users.noreply.github.com` for privacy |
-| *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install. Edit `~/.config/chezmoi/chezmoi.yaml` directly — see example below. |
+| *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install: `dotfiles config set brew_skip watchman,rancher`, or edit the file (example below). |
 | *(not prompted)* | `obsidian` | `false` | Install Obsidian (full profile) and run the `obsidian` doctor checks. Opt-in. |
 
 Enterprise-only prompts (when `is_enterprise: true`):
@@ -367,6 +372,7 @@ See [docs/onboarding.md](docs/onboarding.md) for the complete onboarding guide i
 ### Apply and update
 
 ```bash
+dotfiles                    # start screen: what changed, what needs you, the Next command
 dotfiles update             # whole-machine update: pull/apply/agentbrew/packages/doctor
 dotfiles apply              # deploy all config (chezmoi apply)
 dotfiles apply --pull       # narrow path: pull dotfiles source + apply only
@@ -598,7 +604,7 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 
 AI agent configuration (MCP servers, skills, rules, commands) is managed by [agentbrew](https://www.npmjs.com/package/agentbrew), not dotfiles. The `Agentfile.yaml` in this repo is the declarative manifest — see [Agentfile.yaml](Agentfile.yaml) for the full config and [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for teammate setup and recovery. The no-argument `/learn-repos` command repairs its shared-memory connection before scanning and uses the `/ship-it` safety and ownership gates to deliver only source-backed repository healing.
 
-Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Codex, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
+Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `dotfiles` (the start screen), `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Codex, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
 
 The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
 
@@ -860,6 +866,30 @@ See [docs/onboarding.md](docs/onboarding.md) for the full onboarding guide.
 
 ## How it works
 
+### One command to start
+
+`dotfiles` with no arguments (or `/dotfiles` in Claude Code or Codex, from
+[`commands/dotfiles.md`](commands/dotfiles.md)) is the start screen. It runs in
+about 2 seconds and prints one line each:
+
+- **Set up**: is dotfiles installed here (chezmoi and its config), and which profile.
+- **Applied**: the same test as `dotfiles apply --if-changed`: files that wait to be applied, or a source that moved since the last full apply.
+- **Background jobs**: how many `com.dotfiles.*` LaunchAgents are loaded.
+- **Health**: the last doctor run (`--health` runs a fresh `dotfiles-doctor --quiet`).
+- **Update**: commits behind the remote (a background fetch at most once an hour).
+
+Then a numbered "Needs you" list and a `Next:` line with the exact command.
+It never uses sudo and never starts LaunchAgents (some start Chrome or a local
+model). It applies or installs only with a yes: `y` at the prompt in a
+terminal, or `dotfiles --yes`. Run it from a worktree and it reports the
+checkout that this Mac applies, and never applies from the worktree.
+
+Settings: `dotfiles config` shows every setting with its value and source,
+`dotfiles config <key>` explains one, and `dotfiles config set <key> <value>`
+checks the value against [`config/settings.yaml`](config/settings.yaml) and
+saves it under `data:` in `~/.config/chezmoi/chezmoi.yaml`. Agents change
+settings the same way. Then run `dotfiles apply`.
+
 ### File modes
 
 | Source naming | Mode | Deployed as |
@@ -961,6 +991,10 @@ default app list; include `ghostty` and `WebStorm` to keep this policy.
 ## CLI reference
 
 ```
+dotfiles [--yes] [--health]                       Start screen: set up, applied, jobs, health, updates, Next
+dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
+dotfiles config get <key>                         Print one value
+dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it
 dotfiles apply                                    Apply dotfiles (chezmoi apply)
 dotfiles init                                     Initialize on new machine (chezmoi init --apply)
 dotfiles diff                                     Show pending changes (chezmoi diff)

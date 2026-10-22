@@ -4,7 +4,7 @@
 
 **Metric:** `.overrides` entries that name no known check — see [docs/metrics.md](../metrics.md#metrics).
 
-**Tests:** tests/e2e/stories-e2e.bats, tests/doctor-validate-overrides.bats.
+**Tests:** tests/e2e/stories-e2e.bats, tests/doctor-validate-overrides.bats, tests/dotfiles-config.bats.
 
 ## Switch Profile
 
@@ -35,6 +35,18 @@ Independent of profile — you can be `core` + `enterprise` or `full` + `enterpr
 dotfiles enterprise on    # adds AWS, K8s, Gradle, Java, company tools
 dotfiles enterprise off
 ```
+
+## Change Any Setting
+
+Every setting has a default in one table, `config/settings.yaml`. People and agents change settings with the same command:
+
+```bash
+dotfiles config                            # every setting: value, source, allowed values
+dotfiles config weekly_metrics             # what one setting does, and its default
+dotfiles config set weekly_metrics true    # check the value and save it, then: dotfiles apply
+```
+
+A bad value is refused with the allowed values, and the file stays unchanged.
 
 ## Per-Machine Overrides
 

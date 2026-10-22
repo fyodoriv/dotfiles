@@ -64,10 +64,12 @@ readme_doctor_reference_block() {
   [[ "$output" == *"--fix"* ]]
 }
 
-@test "dotfiles with no args shows help" {
-  run bash "$CLI"
+@test "dotfiles with no args shows the start screen, not help" {
+  # A scratch HOME: no chezmoi config, so this reads no real machine state.
+  HOME="$BATS_TEST_TMPDIR" run bash "$CLI"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Usage: dotfiles"* ]]
+  [[ "$output" == *"Next: "* ]]
+  [[ "$output" != *"Usage: dotfiles"* ]]
 }
 
 @test "dotfiles --version shows git hash and date" {

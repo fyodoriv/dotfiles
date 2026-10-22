@@ -1,0 +1,330 @@
+#!/bin/bash
+# Show or change a dotfiles setting (chezmoi data), checked against one table.
+#
+# Usage:
+#   dotfiles config                    List every setting: value, source, allowed values
+#   dotfiles config <key>              One setting: value, source, default, what it does
+#   dotfiles config get <key>          Print only the value (for scripts and agents)
+#   dotfiles config set <key> <value>  Check the value and save it; then run `dotfiles apply`
+#
+# The table is config/settings.yaml (type, default, description per key).
+# Values live under `data:` in ~/.config/chezmoi/chezmoi.yaml. Source "default"
+# means the value is the table default; "chezmoi.yaml" means you changed it.
+# `set` never applies anything and never asks for sudo.
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+
+TABLE="$DOTFILES_DIR/config/settings.yaml"
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.yaml"
+TILDE='~'
+case "$CONFIG" in
+  "$HOME"/*) CONFIG_SHOWN="$TILDE/${CONFIG#"$HOME"/}" ;;
+  *) CONFIG_SHOWN="$CONFIG" ;;
+esac
+
+die() { echo -e "${RED}✗${NC} $1" >&2; exit "${2:-1}"; }
+
+command -v yq >/dev/null 2>&1 || die "yq is not installed. Fix: brew install yq"
+[ -r "$TABLE" ] || die "settings table missing: $TABLE"
+
+# The table and the saved values, read once per run. Plain indexed arrays,
+# because macOS /bin/bash 3.2 has no associative arrays. State owner: this
+# process; nothing outlives it.
+KEYS=() TYPES=() DEFAULTS=() OPTIONALS=() DESCS=()
+VKEYS=() VVALS=()
+
+_load_table() {
+  local k t o desc d
+  # The default goes last: it may be empty, and read merges empty tab fields.
+  while IFS=$'\t' read -r k t o desc d; do
+    [ -n "$k" ] || continue
+    if [ "$d" = "null" ]; then d=""; fi
+    KEYS+=("$k") TYPES+=("$t") DEFAULTS+=("$d") OPTIONALS+=("$o") DESCS+=("$desc")
+  done < <(yq -r '.settings | to_entries | .[] | .key + "\t" + .value.type + "\t" + ((.value.optional // false) | tostring) + "\t" + .value.description + "\t" + (.value.default | tostring)' "$TABLE")
+}
+
+# Lists are joined with commas. Not @tsv: it quotes values that hold a '"'.
+_load_values() {
+  local k v
+  [ -f "$CONFIG" ] || return 0
+  while IFS=$'\t' read -r k v; do
+    [ -n "$k" ] || continue
+    if [ "$v" = "null" ]; then v=""; fi
+    VKEYS+=("$k") VVALS+=("$v")
+  done < <(yq -r '(.data // {}) | to_entries | .[] | .key + "\t" + (.value as $v | (if ($v | tag) == "!!seq" then ($v | join(",")) else ($v | tostring) end) | sub("[\t\n]"; " "))' "$CONFIG")
+}
+
+# _row <key>: set I to the table row, or return 1 for an unknown key.
+_row() {
+  local i
+  for i in "${!KEYS[@]}"; do
+    if [ "${KEYS[$i]}" = "$1" ]; then I="$i"; return 0; fi
+  done
+  return 1
+}
+
+# _saved <key>: set SAVED to the value in chezmoi.yaml, or return 1 when absent.
+_saved() {
+  local i
+  [ "${#VKEYS[@]}" -gt 0 ] || return 1
+  for i in "${!VKEYS[@]}"; do
+    if [ "${VKEYS[$i]}" = "$1" ]; then SAVED="${VVALS[$i]}"; return 0; fi
+  done
+  return 1
+}
+
+# _value <key>: set VAL to the saved value, else the resolved default.
+_value() {
+  if _saved "$1"; then VAL="$SAVED"; return 0; fi
+  _default "$1"
+  VAL="$DEF"
+  if [ "$VAL" = "derived" ]; then VAL=""; fi
+  return 0
+}
+
+# _default <key>: set DEF to the default; "@key" and "@a|b" read other settings.
+_default() {
+  local I d ref refs out=false
+  _row "$1"
+  d="${DEFAULTS[$I]}"
+  case "$d" in
+    @*)
+      IFS='|' read -r -a refs <<< "${d#@}"
+      for ref in "${refs[@]}"; do
+        _value "$ref"
+        if [ "$VAL" = "true" ]; then out=true; fi
+      done
+      DEF="$out"
+      ;;
+    *) DEF="$d" ;;
+  esac
+}
+
+# _source <key>: set SRC to "default" or "chezmoi.yaml".
+_source() {
+  local I saved
+  _row "$1"
+  SRC="default"
+  if _saved "$1"; then
+    saved="$SAVED"
+    _default "$1"
+    if [ "${DEFAULTS[$I]}" = "derived" ] || [ "$saved" != "$DEF" ]; then SRC="chezmoi.yaml"; fi
+  fi
+}
+
+# _allowed <key>: set ALLOWED to a short description of the allowed values.
+_allowed() {
+  local I t
+  _row "$1"
+  t="${TYPES[$I]}"
+  case "$t" in
+    bool) ALLOWED="true|false" ;;
+    int:*) ALLOWED="${t#int:}" ;;
+    enum:*) ALLOWED="${t#enum:}"; ALLOWED="${ALLOWED//,/|}" ;;
+    text) ALLOWED="one line" ;;
+    email) ALLOWED="email or empty" ;;
+    host) ALLOWED="host name" ;;
+    relpath) ALLOWED="path under ~" ;;
+    token) ALLOWED="one word" ;;
+    list) ALLOWED="a,b,c or empty" ;;
+    *) ALLOWED="$t" ;;
+  esac
+  if [ "${OPTIONALS[$I]}" = "true" ] && [[ "$ALLOWED" != *empty* ]]; then ALLOWED="$ALLOWED or empty"; fi
+}
+
+# _validate <key> <value>: set NEW to the normalized value, or set WHY and return 1.
+_validate() {
+  local I t v="$2" lo hi item items choice choices ok=0 out="" re
+  _row "$1"
+  t="${TYPES[$I]}"
+  WHY=""
+  if [ -z "$v" ] && [ "${OPTIONALS[$I]}" = "true" ]; then NEW=""; return 0; fi
+  case "$v" in *$'\n'* | *$'\t'*) WHY="use one line"; return 1 ;; esac
+  case "$t" in
+    bool)
+      case "$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')" in
+        true | yes | on | 1) v=true ;;
+        false | no | off | 0) v=false ;;
+        *) WHY="use true or false" ;;
+      esac
+      ;;
+    int:*)
+      lo="${t#int:}"; hi="${lo#*-}"; lo="${lo%-*}"
+      if [[ "$v" =~ ^[0-9]{1,6}$ ]] && [ "$((10#$v))" -ge "$lo" ] && [ "$((10#$v))" -le "$hi" ]; then
+        v="$((10#$v))"
+      else
+        WHY="use a whole number from $lo to $hi"
+      fi
+      ;;
+    enum:*)
+      IFS=',' read -r -a choices <<< "${t#enum:}"
+      for choice in "${choices[@]}"; do
+        if [ "$v" = "$choice" ]; then ok=1; fi
+      done
+      if [ "$ok" -ne 1 ]; then _allowed "$1"; WHY="use one of: $ALLOWED"; fi
+      ;;
+    text)
+      re='[[:cntrl:]]'
+      if [ "${#v}" -gt 120 ] || [[ "$v" =~ $re ]]; then WHY="use one line of at most 120 characters"; fi
+      ;;
+    email)
+      re='^[^@[:space:]"]+@[^@[:space:]"]+\.[^@[:space:]"]+$'
+      if [ -n "$v" ] && ! [[ "$v" =~ $re ]]; then WHY="use an email address, or empty"; fi
+      ;;
+    host)
+      re='^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$'
+      [[ "$v" =~ $re ]] || WHY="use a host name such as github.example.com"
+      ;;
+    relpath)
+      re='^[A-Za-z0-9._-][A-Za-z0-9._/-]{0,199}$'
+      if ! [[ "$v" =~ $re ]] || [[ "/$v/" == */../* ]] || [[ "/$v/" == */./* ]]; then
+        WHY="use a path relative to your home folder, such as apps/dotfiles (no leading /, no ..)"
+      fi
+      ;;
+    token)
+      re='^[][A-Za-z0-9._:@/+-]{1,100}$'
+      [[ "$v" =~ $re ]] || WHY="use one word: letters, digits, and . _ : @ / [ ] + - (at most 100)"
+      ;;
+    list)
+      re='^[A-Za-z0-9@._+/-]{1,100}$'
+      IFS=',' read -r -a items <<< "$v"
+      for item in "${items[@]+"${items[@]}"}"; do
+        item="$(printf '%s' "$item" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+        [ -n "$item" ] || continue
+        if ! [[ "$item" =~ $re ]]; then WHY="'$item' is not a package name"; break; fi
+        out="${out:+$out,}$item"
+      done
+      v="$out"
+      ;;
+    *) WHY="the table has an unknown type '$t' for $1" ;;
+  esac
+  [ -z "$WHY" ] || return 1
+  NEW="$v"
+}
+
+_need_key() {
+  local I
+  [ -n "${1:-}" ] || die "name a setting. Run \`dotfiles config\` to list them." 2
+  _row "$1" || die "unknown setting: $1. Run \`dotfiles config\` to list them." 2
+}
+
+cmd_list() {
+  local i k w=4 vw=5 shown=() srcs=() allowed=()
+  for k in "${KEYS[@]}"; do
+    _value "$k"; _source "$k"; _allowed "$k"
+    shown+=("${VAL:-(empty)}") srcs+=("$SRC") allowed+=("$ALLOWED")
+    if [ "${#k}" -gt "$w" ]; then w="${#k}"; fi
+    if [ "${#VAL}" -gt "$vw" ]; then vw="${#VAL}"; fi
+  done
+  echo "Settings · defaults: config/settings.yaml · yours: $CONFIG_SHOWN"
+  [ -f "$CONFIG" ] || echo -e "${YELLOW}!${NC} $CONFIG_SHOWN does not exist yet, so these are the defaults. Install first: dotfiles install plan"
+  echo ""
+  printf "%-${w}s  %-${vw}s  %-12s  %s\n" "KEY" "VALUE" "SOURCE" "ALLOWED"
+  for i in "${!KEYS[@]}"; do
+    printf "%-${w}s  %-${vw}s  %-12s  %s\n" "${KEYS[$i]}" "${shown[$i]}" "${srcs[$i]}" "${allowed[$i]}"
+  done
+  echo ""
+  echo "One setting:  dotfiles config <key>"
+  echo "Change one:   dotfiles config set <key> <value>, then dotfiles apply"
+}
+
+cmd_show() {
+  local I d
+  _need_key "$1"
+  _row "$1"
+  _value "$1"; _source "$1"; _allowed "$1"
+  d="${DEFAULTS[$I]}"
+  case "$d" in
+    derived) d="derived (see What)" ;;
+    @*) d="same as ${d#@}"; d="${d//|/ or }" ;;
+    "") d="(empty)" ;;
+  esac
+  echo "$1"
+  echo "  Value:     ${VAL:-(empty)}"
+  echo "  Source:    $SRC"
+  echo "  Default:   $d"
+  echo "  Allowed:   $ALLOWED"
+  echo "  What:      ${DESCS[$I]}"
+  echo "  Change it: dotfiles config set $1 <value>, then dotfiles apply"
+}
+
+cmd_get() {
+  _need_key "${1:-}"
+  _value "$1"
+  printf '%s\n' "$VAL"
+}
+
+cmd_set() {
+  local I key="${1:-}" raw="${2-}" old expr tmp
+  _need_key "$key"
+  _row "$key"
+  _allowed "$key"
+  [ "$#" -ge 2 ] || die "give a value: dotfiles config set $key <value> ($ALLOWED)" 2
+  [ "$#" -le 2 ] || die "give one value; quote it if it has spaces: dotfiles config set $key \"<value>\"" 2
+  _validate "$key" "$raw" || die "$key: '$raw' is not allowed: $WHY. What it does: ${DESCS[$I]}" 2
+  [ -f "$CONFIG" ] || die "$CONFIG_SHOWN does not exist yet, so there is nothing to change. Install first: dotfiles install plan"
+
+  _value "$key"
+  old="$VAL"
+  if _saved "$key" && [ "$old" = "$NEW" ]; then
+    echo -e "${GREEN}✓${NC} $key is already ${NEW:-(empty)}. Nothing changed."
+    return 0
+  fi
+  if [ -z "$NEW" ] && [ "${OPTIONALS[$I]}" = "true" ] && ! _saved "$key"; then
+    echo -e "${GREEN}✓${NC} $key is not set, so the default applies. Nothing changed."
+    return 0
+  fi
+
+  if [ -z "$NEW" ] && [ "${OPTIONALS[$I]}" = "true" ]; then
+    expr='del(.data[strenv(DOTFILES_CONFIG_KEY)])'
+  else
+    case "${TYPES[$I]}" in
+      bool) expr='.data[strenv(DOTFILES_CONFIG_KEY)] = (strenv(DOTFILES_CONFIG_VALUE) == "true")' ;;
+      int:*) expr='.data[strenv(DOTFILES_CONFIG_KEY)] = (strenv(DOTFILES_CONFIG_VALUE) | to_number)' ;;
+      list)
+        if [ -z "$NEW" ]; then
+          expr='.data[strenv(DOTFILES_CONFIG_KEY)] = []'
+        else
+          expr='(.data[strenv(DOTFILES_CONFIG_KEY)] = (strenv(DOTFILES_CONFIG_VALUE) | split(","))) | .data[strenv(DOTFILES_CONFIG_KEY)][] style="double"'
+        fi
+        ;;
+      *) expr='(.data[strenv(DOTFILES_CONFIG_KEY)] = strenv(DOTFILES_CONFIG_VALUE)) | .data[strenv(DOTFILES_CONFIG_KEY)] style="double"' ;;
+    esac
+  fi
+
+  # Do not race a running apply, sync, or doctor (shared ~/.dotfiles.lock).
+  # shellcheck source=../lib/lock.sh
+  source "$DOTFILES_DIR/lib/lock.sh"
+  wait_for_lock "config" 30 || exit 1
+  trap release_lock EXIT
+  # Write a copy with the same mode, then swap it in: a failed write keeps the file.
+  tmp="$CONFIG.dotfiles-config.$$"
+  cp -p "$CONFIG" "$tmp"
+  if ! DOTFILES_CONFIG_KEY="$key" DOTFILES_CONFIG_VALUE="$NEW" yq "$expr" "$CONFIG" > "$tmp" ||
+    ! yq -e '.data' "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    die "could not write $CONFIG_SHOWN; it is unchanged."
+  fi
+  mv -f "$tmp" "$CONFIG"
+  release_lock
+  trap - EXIT
+
+  echo -e "${GREEN}✓${NC} $key: ${old:-(empty)} → ${NEW:-(empty)} (saved in $CONFIG_SHOWN)"
+  echo "  What it does: ${DESCS[$I]}"
+  echo "Next: dotfiles apply (it uses the new value)"
+}
+
+_load_table
+_load_values
+
+case "${1:-}" in
+  "" | list) cmd_list ;;
+  get) shift; cmd_get "${1:-}" ;;
+  set) shift; cmd_set "$@" ;;
+  *) cmd_show "$1" ;;
+esac

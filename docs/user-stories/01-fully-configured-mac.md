@@ -4,7 +4,7 @@
 
 **Metric:** Commands a person types on a fresh Mac — see [docs/metrics.md](../metrics.md#metrics). Guard: the install e2e passes.
 
-**Tests:** tests/e2e/dotfiles-install-e2e.bats, tests/dotfiles-install.bats, tests/stranger-readiness.bats.
+**Tests:** tests/e2e/dotfiles-install-e2e.bats, tests/dotfiles-install.bats, tests/stranger-readiness.bats, tests/dotfiles-start.bats.
 
 ## Steps
 
@@ -16,6 +16,8 @@ chezmoi init --source ~/apps/dotfiles --apply
 Prompts cover profile, enterprise mode, AI tooling, paths, auto-upgrade, encryption, and your git identity, plus a few conditional follow-ups — see the [README configuration table](../../README.md#configuration) for the full list and defaults.
 
 The bootstrap script auto-creates `~/.gitconfig.local` and prompts for your name and email.
+
+From then on, `dotfiles` alone shows what changed and what needs you, and ends with a `Next:` command. On a fresh clone that is not installed yet, it names the install command (tests/dotfiles-start.bats).
 
 ## What Happens
 

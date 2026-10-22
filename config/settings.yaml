@@ -1,0 +1,144 @@
+# Every dotfiles setting: its type, its default, and what it does. This is the
+# one settings table. `dotfiles config` lists each setting with its value and
+# source; `dotfiles config set <key> <value>` checks the value against `type`
+# and saves it under `data:` in ~/.config/chezmoi/chezmoi.yaml. Run
+# `dotfiles apply` after a change.
+#
+# .chezmoi.yaml.tmpl gives a new Mac the same defaults. tests/dotfiles-config.bats
+# fails when a key or a default here differs from a new-user render of it.
+#
+# type:     bool | int:<min>-<max> | enum:<a>,<b>,... | text | email | host |
+#           relpath | token | list
+# default:  a value; "@key" (the value of another setting); "@a|b" (true when
+#           either one is true); or "derived" (the template works it out; the
+#           description says how).
+# optional: true means an empty value removes the key, so the built-in
+#           default applies.
+settings:
+  profile:
+    type: enum:core,full
+    default: core
+    description: core = 7 baseline modules (team-friendly); full = every module.
+  is_enterprise:
+    type: bool
+    default: false
+    description: Adds generic enterprise tools (AWS CLI, K8s, Gradle, Java 21, enterprise SSH).
+  work_email_domain:
+    type: host
+    default: example.com
+    description: Work email domain for Chrome work-profile detection. Used only when is_enterprise is true.
+  github_enterprise_host:
+    type: host
+    default: github.example.com
+    description: GitHub Enterprise host for enterprise SSH and repo checks. Used only when is_enterprise is true.
+  dotfiles_dir:
+    type: relpath
+    default: apps/dotfiles
+    description: Where this repo lives, relative to your home folder.
+  repos_dir:
+    type: relpath
+    default: apps
+    description: Where your code repos live, relative to your home folder (git-maintain, doctor).
+  brew_skip:
+    type: list
+    default: ""
+    description: Homebrew packages to leave out of the install, comma-separated.
+  obsidian:
+    type: bool
+    default: false
+    description: Install Obsidian (full profile) and run the obsidian doctor checks.
+  auto_upgrade:
+    type: bool
+    default: false
+    description: Weekly software upgrade (Topgrade) through a LaunchAgent.
+  auto_sync:
+    type: bool
+    default: "@owner_machine"
+    description: Commit this checkout every 30 min (dotfiles-sync) and run tooling-sync hourly.
+  owner_machine:
+    type: bool
+    default: derived
+    description: Turns on owner-only checks and jobs. Derived from your git email; a new user gets false.
+  endpoint_hardening:
+    type: bool
+    default: "@owner_machine"
+    description: Ad-hoc sign Homebrew bottles and link shims for an endpoint-security agent (writes outside your home folder). Run chezmoi init before dotfiles apply.
+  capslock_control:
+    type: bool
+    default: "@owner_machine"
+    description: Map Caps Lock to Control (com.dotfiles.capslock-control LaunchAgent).
+  global_git_hooks:
+    type: bool
+    default: true
+    description: Use this repo's git-hooks/ (leak gates, commit-msg cleanup) for every repo.
+  claude_remote_control:
+    type: bool
+    default: false
+    description: Keep this Mac reachable from the Claude mobile app (claude remote-control LaunchAgent).
+  weekly_metrics:
+    type: bool
+    default: false
+    description: Each full doctor run writes a weekly numbers-only metrics file. It stays local.
+  use_ai_tools:
+    type: bool
+    default: false
+    description: Deploy ~/.zshrc.ai-tools (agent launchers, agent-browser tuning).
+  use_local_ai:
+    type: bool
+    default: false
+    description: Install the local-LLM stack (pipx, aider, mlx-lm). The model download needs a separate opt-in.
+  local_ai_agents:
+    type: bool
+    default: "@use_local_ai|owner_machine"
+    description: Load the local-AI LaunchAgents (opencode serve, Ollama, model warmup).
+  use_encryption:
+    type: bool
+    default: false
+    description: age encryption for secrets (needs the key at ~/.config/chezmoi/key.txt).
+  age_recipient:
+    type: token
+    default: unused-no-encryption-configured
+    description: Your age public key. Used only when use_encryption is true.
+  morning_hour:
+    type: int:0-23
+    default: 8
+    description: Hour of the morning briefing LaunchAgent (full profile).
+  morning_minute:
+    type: int:0-59
+    default: 30
+    description: Minute of the morning briefing LaunchAgent (full profile).
+  git_work_name:
+    type: text
+    default: ""
+    description: Commit author name for your work/default identity.
+  git_work_email:
+    type: email
+    default: ""
+    description: Commit email for your work/default identity.
+  git_personal_enabled:
+    type: bool
+    default: false
+    description: Use a separate personal identity for github.com remotes.
+  git_personal_name:
+    type: text
+    default: ""
+    description: Commit author name for github.com remotes. Used only when git_personal_enabled is true.
+  git_personal_email:
+    type: email
+    default: ""
+    description: Commit email for github.com remotes. Used only when git_personal_enabled is true.
+  claude_model:
+    type: token
+    default: ""
+    optional: true
+    description: Claude Code model that dotfiles apply pins. Empty = the repo default (claude-opus-5-5).
+  claude_effort:
+    type: enum:low,medium,high,xhigh
+    default: ""
+    optional: true
+    description: Claude Code effort that dotfiles apply pins. Empty = the repo default (xhigh).
+  claude_permissions:
+    type: enum:manage,keep
+    default: manage
+    optional: true
+    description: manage pins Claude Code to bypassPermissions; keep leaves your own permission prompts alone.

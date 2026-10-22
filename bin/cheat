@@ -45,6 +45,8 @@ show_shell() {
   cmd "chezmoi edit <file>"    "Edit source of a managed file"
   cmd "chezmoi managed"        "List all managed files"
   cmd "chezmoi verify"         "Check all files match source"
+  cmd "dotfiles"               "Start screen: what needs you now"
+  cmd "dotfiles config [set]"  "Show or change settings"
   cmd "dotfiles doctor"        "Auto-discovered health audit"
   cmd "dotfiles doctor --fix"  "Auto-repair config drift"
   cmd "dotfiles audit"         "Security audit (SSH, secrets, git creds)"

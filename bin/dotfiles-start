@@ -1,0 +1,234 @@
+#!/bin/bash
+# Start dotfiles: see what is missing, refresh, and print what needs you now.
+#
+# Usage:
+#   dotfiles                  The start screen (same as `dotfiles start`)
+#   dotfiles --yes            Also do the pending step without asking: the
+#                             installer on a new Mac, else `dotfiles apply --if-changed`
+#   dotfiles --health         Also run a fresh health check (dotfiles-doctor --quiet, 1-2 min)
+#
+# Safe and fast by default: no sudo, and nothing is applied or installed
+# unless you say yes (a y/N prompt in a terminal, or --yes). Background jobs
+# (LaunchAgents) are reported, never started here: some of them start Chrome
+# or a local model. Each line that needs you names the exact command.
+
+set -uo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
+# shellcheck source=../lib/colors.sh
+source "$DOTFILES_DIR/lib/colors.sh"
+# shellcheck source=../lib/apply-state.sh
+source "$DOTFILES_DIR/lib/apply-state.sh"
+# shellcheck source=../lib/dotfiles-source-dir.sh
+source "$DOTFILES_DIR/lib/dotfiles-source-dir.sh"
+
+yes=0 health=0
+for arg in "$@"; do
+  case "$arg" in
+    --yes | -y) yes=1 ;;
+    --health) health=1 ;;
+    *) echo "Unknown option: $arg (see dotfiles start --help)" >&2; exit 2 ;;
+  esac
+done
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.yaml"
+STATS="${DOTFILES_STATS_FILE:-$HOME/.dotfiles-stats.jsonl}"
+DOCTOR_STALE_DAYS=7
+
+# A path with $HOME shown as ~ (the literal character, for display only).
+TILDE='~'
+short() { case "$1" in "$HOME"/*) printf '%s/%s' "$TILDE" "${1#"$HOME"/}" ;; *) printf '%s' "$1" ;; esac; }
+
+# What needs the user, most important first: "label|command".
+NEEDS=()
+need() { NEEDS+=("$1|$2"); }
+
+# ── Which checkout ──────────────────────────────────────────────────────
+STATE_DIR="$DOTFILES_DIR"
+other_checkout=""
+if [ -f "$CONFIG" ] && applied="$(dotfiles_applied_root)" && [ "$applied" != "$DOTFILES_DIR" ]; then
+  other_checkout="$applied"
+  STATE_DIR="$applied"
+fi
+
+if sha="$(git -C "$STATE_DIR" rev-parse --short HEAD 2>/dev/null)"; then
+  branch="$(git -C "$STATE_DIR" branch --show-current 2>/dev/null)"
+  head_line="$sha on ${branch:-a detached HEAD} ($(git -C "$STATE_DIR" log -1 --format=%cs 2>/dev/null))"
+fi
+echo "dotfiles ${head_line:-(not a git checkout)} · $(short "$STATE_DIR")"
+echo ""
+if [ -n "$other_checkout" ]; then
+  echo -e "${DIM}○ You ran this from $(short "$DOTFILES_DIR"); this Mac applies $(short "$other_checkout"). The lines below are about that checkout.${NC}"
+fi
+
+# ── Set up ──────────────────────────────────────────────────────────────
+installed=1
+if ! command -v chezmoi >/dev/null 2>&1; then
+  installed=0
+  echo -e "${RED}✗${NC} Set up: chezmoi is not installed, so dotfiles is not set up on this Mac."
+elif [ ! -f "$CONFIG" ]; then
+  installed=0
+  echo -e "${RED}✗${NC} Set up: not installed on this Mac yet (no $(short "$CONFIG"))."
+else
+  profile="$(sed -n -E 's/^  profile: "?([a-z]+)"?$/\1/p' "$CONFIG" | head -1)"
+  echo -e "${GREEN}✓${NC} Set up: profile ${profile:-unknown}, settings in $(short "$CONFIG") (dotfiles config)"
+fi
+
+if [ "$installed" -eq 0 ]; then
+  need "Install (backs up first; preview with dotfiles install plan)" "dotfiles install run --yes"
+else
+  # ── Applied? Same test as `dotfiles apply --if-changed` ───────────────
+  drift_rc=0
+  drift="$(apply_state_drift "$STATE_DIR")" || drift_rc=$?
+  record_current=1
+  apply_state_current "$STATE_DIR" || record_current=0
+  case "$drift_rc" in
+    0)
+      n="$(printf '%s\n' "$drift" | grep -c .)"
+      echo -e "${YELLOW}!${NC} Applied: $n change(s) wait to be applied (chezmoi status):"
+      printf '%s\n' "$drift" | head -5 | sed 's/^/    /'
+      [ "$n" -gt 5 ] && echo "    … and $((n - 5)) more (dotfiles diff)"
+      need "Apply the waiting changes" "dotfiles apply --if-changed"
+      ;;
+    2)
+      echo -e "${RED}✗${NC} Applied: chezmoi status failed, so the apply state is unknown."
+      need "See why chezmoi status fails" "chezmoi status --source $(short "$STATE_DIR")"
+      ;;
+    *)
+      if [ "$record_current" -eq 1 ]; then
+        echo -e "${GREEN}✓${NC} Applied: nothing changed since the last apply; no drift."
+      elif [ -r "$(apply_state_file)" ]; then
+        echo -e "${YELLOW}!${NC} Applied: the files match, but the source, settings, or plugins changed since the last full apply."
+        need "Run the full apply (scripts, agent config, doctor)" "dotfiles apply --if-changed"
+      else
+        echo -e "${GREEN}✓${NC} Applied: files match the source (no full apply recorded yet)."
+      fi
+      ;;
+  esac
+
+  # ── Background jobs (LaunchAgents) ────────────────────────────────────
+  plists=()
+  for f in "$HOME"/Library/LaunchAgents/com.dotfiles.*.plist; do
+    [ -e "$f" ] && plists+=("$f")
+  done
+  if [ "${#plists[@]}" -eq 0 ]; then
+    echo -e "${DIM}○ Background jobs: no dotfiles LaunchAgents installed.${NC}"
+  elif loaded="$(launchctl list 2>/dev/null | awk 'NR > 1 { print $3 }')"; then
+    missing=()
+    for f in "${plists[@]}"; do
+      label="$(basename "$f" .plist)"
+      printf '%s\n' "$loaded" | grep -qxF "$label" || missing+=("${label#com.dotfiles.}")
+    done
+    if [ "${#missing[@]}" -eq 0 ]; then
+      echo -e "${GREEN}✓${NC} Background jobs: ${#plists[@]} of ${#plists[@]} dotfiles LaunchAgents loaded."
+    else
+      echo -e "${YELLOW}!${NC} Background jobs: $(( ${#plists[@]} - ${#missing[@]} )) of ${#plists[@]} loaded; not loaded: ${missing[*]:0:5}"
+      need "Load the background jobs (some start Chrome or a local model)" "dotfiles-reload-launchagents"
+    fi
+  else
+    echo -e "${DIM}○ Background jobs: ${#plists[@]} installed; launchctl is not available here.${NC}"
+  fi
+
+  # ── Health ────────────────────────────────────────────────────────────
+  if [ "$health" -eq 1 ]; then
+    echo -e "${DIM}→ Running a fresh health check (dotfiles-doctor --quiet)…${NC}"
+    doctor_rc=0
+    doctor_out="$(bash "$DOTFILES_DIR/bin/dotfiles-doctor" --quiet 2>&1)" || doctor_rc=$?
+    doctor_line="$(printf '%s\n' "$doctor_out" | tail -1)"
+    if [ "$doctor_rc" -eq 0 ]; then
+      echo -e "${GREEN}✓${NC} Health: $doctor_line"
+    else
+      echo -e "${RED}✗${NC} Health: $doctor_line"
+      need "Fix the failing checks" "dotfiles doctor --fix"
+    fi
+  else
+    last="$(grep '"task":"doctor"' "$STATS" 2>/dev/null | tail -1)"
+    ts="$(printf '%s' "$last" | sed -n -E 's/.*"timestamp":"([^"]+)".*/\1/p')"
+    pass="$(printf '%s' "$last" | sed -n -E 's/.*"pass":([0-9]+).*/\1/p')"
+    failn="$(printf '%s' "$last" | sed -n -E 's/.*"fail":([0-9]+).*/\1/p')"
+    then_s="$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s 2>/dev/null || date -u -d "$ts" +%s 2>/dev/null || echo "")"
+    if [ -z "$ts" ] || [ -z "$then_s" ]; then
+      echo -e "${YELLOW}?${NC} Health: no doctor run recorded yet."
+      need "Check health" "dotfiles doctor"
+    else
+      age_s=$(( $(date +%s) - then_s ))
+      if [ "$age_s" -lt 3600 ]; then age="$((age_s / 60)) min ago"
+      elif [ "$age_s" -lt 172800 ]; then age="$((age_s / 3600)) h ago"
+      else age="$((age_s / 86400)) days ago"; fi
+      if [ "${failn:-0}" -gt 0 ]; then
+        echo -e "${RED}✗${NC} Health: ${failn} failing check(s) in the last doctor run ($age)."
+        need "Fix the failing checks" "dotfiles doctor --fix"
+      elif [ "$age_s" -gt $((DOCTOR_STALE_DAYS * 86400)) ]; then
+        echo -e "${YELLOW}?${NC} Health: the last doctor run was $age."
+        need "Check health" "dotfiles doctor"
+      else
+        echo -e "${GREEN}✓${NC} Health: ${pass:-all} checks passed in the last doctor run ($age)."
+      fi
+    fi
+  fi
+fi
+
+# ── Updates and the checkout ────────────────────────────────────────────
+if git -C "$STATE_DIR" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+  # At most one background fetch an hour, like the update check of the other
+  # commands; this run reads what the last fetch saw.
+  fetch_head="$(git -C "$STATE_DIR" rev-parse --git-path FETCH_HEAD 2>/dev/null)"
+  case "$fetch_head" in /*) ;; *) fetch_head="$STATE_DIR/$fetch_head" ;; esac
+  fetched="$(stat -f %m "$fetch_head" 2>/dev/null || stat -c %Y "$fetch_head" 2>/dev/null || echo 0)"
+  if [ $(( $(date +%s) - fetched )) -gt 3600 ]; then
+    (git -C "$STATE_DIR" fetch --quiet origin >/dev/null 2>&1 &)
+  fi
+  upstream="$(git -C "$STATE_DIR" rev-parse --abbrev-ref '@{u}' 2>/dev/null)"
+  behind="$(git -C "$STATE_DIR" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
+  if [ "${behind:-0}" -gt 0 ]; then
+    echo -e "${YELLOW}⬆${NC} Update: $behind commit(s) behind $upstream."
+    need "Update the whole machine (pull, apply, agents, packages, doctor)" "dotfiles update"
+  else
+    echo -e "${GREEN}✓${NC} Update: up to date with $upstream (as of the last fetch)."
+  fi
+fi
+dirty="$(git -C "$STATE_DIR" status --porcelain 2>/dev/null | grep -c .)"
+if [ "${dirty:-0}" -gt 0 ]; then
+  echo -e "${DIM}○ Checkout: $dirty uncommitted file(s) in $(short "$STATE_DIR").${NC}"
+fi
+
+# ── What needs you ──────────────────────────────────────────────────────
+echo ""
+if [ "${#NEEDS[@]}" -eq 0 ]; then
+  echo -e "${GREEN}✓${NC} Nothing needs you."
+  echo "Next: nothing. dotfiles is up to date on this Mac."
+else
+  echo "Needs you:"
+  i=1
+  for item in "${NEEDS[@]}"; do
+    echo "  $i. ${item%%|*}: ${item#*|}"
+    i=$((i + 1))
+  done
+  echo ""
+  echo "Next: ${NEEDS[0]#*|}"
+fi
+echo -e "${DIM}Settings: dotfiles config · All commands: dotfiles --help${NC}"
+
+# ── Do the pending step, only with a yes ────────────────────────────────
+[ "${#NEEDS[@]}" -gt 0 ] || exit 0
+next="${NEEDS[0]#*|}"
+case "$next" in
+  "dotfiles install run --yes") run=(bash "$DOTFILES_DIR/bin/dotfiles-install" run --yes) ;;
+  "dotfiles apply --if-changed")
+    if [ -n "$other_checkout" ]; then
+      [ "$yes" -eq 1 ] && echo "Not applying from this checkout. Run it from the applied one: $(short "$other_checkout")/bin/dotfiles --yes"
+      exit 0
+    fi
+    run=(bash "$DOTFILES_DIR/bin/dotfiles" apply --if-changed)
+    ;;
+  *) exit 0 ;;
+esac
+if [ "$yes" -eq 0 ]; then
+  [ -t 0 ] && [ -t 1 ] || exit 0
+  printf '\nRun "%s" now? [y/N] ' "$next"
+  read -r answer || exit 0
+  case "$answer" in y | Y | yes | YES) ;; *) exit 0 ;; esac
+fi
+echo "→ $next"
+exec "${run[@]}"

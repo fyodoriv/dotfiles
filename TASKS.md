@@ -23,15 +23,6 @@ them. -->
   - **Pivot**: if generating from the parser is not possible in this stack, keep one registry file that both the CLI and the UI read, never two lists.
   - **Anchor**: Hunt & Thomas 1999, The Pragmatic Programmer, "DRY: every piece of knowledge must have a single representation".
 
-- [ ] One command starts dotfiles: `dotfiles` in the shell, `/dotfiles` in an agent
-  - **ID**: one-command-start
-  - **Details**: Follow the shared rule "One command to start any app" (reference: careerbrew `careerbrew` / `/careerbrew` / `careerbrew config`). Running `dotfiles` with no arguments sets up what is missing, starts any long-running parts with sane defaults (reusing ones already running), refreshes, and prints what matters now and what it needs from the user. Ship `commands/dotfiles.md` and declare `commands: [./commands]` in `Agentfile.yaml`. Keep every default in one table; `dotfiles config` shows each value and its source, and `dotfiles config set <key> <value>` validates and saves it, so agents change settings the way people do.
-  - **Hypothesis**: starting dotfiles takes one command instead of a remembered sequence, so a fresh agent or the owner reaches a working state with no lookup.
-  - **Measurement**: from a fresh clone, count the commands typed until the app shows its first useful screen (a scripted e2e that runs only `dotfiles` and checks its output).
-  - **Success**: 1 command, and `dotfiles config set` round-trips one setting in the e2e.
-  - **Pivot**: if a part cannot start safely by default (a paid service, a secret), the start command prints the exact next step instead of starting it.
-  - **Anchor**: Nielsen 1994, "Recognition rather than recall" (usability heuristic 6).
-
 - [ ] Checkup skips the full `dotfiles apply` when nothing changed
   - **ID**: checkup-skip-apply-when-unchanged
   - **Tags**: perf, agents

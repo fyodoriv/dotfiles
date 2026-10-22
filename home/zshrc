@@ -226,6 +226,8 @@ autoload -Uz compinit
   # dotfiles CLI completion
   _dotfiles() {
     local -a subcmds=(
+      'start:Start screen: what needs you now (same as no command)'
+      'config:Show or change settings (config set <key> <value>)'
       'apply:Apply dotfiles (chezmoi apply)'
       'init:Initialize on new machine'
       'diff:Show pending changes'
@@ -254,6 +256,8 @@ autoload -Uz compinit
       _describe 'command' subcmds
     else
       case "${words[2]}" in
+        start)      compadd --yes --health ;;
+        config)     (( CURRENT == 3 )) && compadd get set ;;
         doctor)     compadd --fix --quiet --skip --list --module ;;
         audit)      compadd --report ;;
         add)        compadd --copy --module ;;

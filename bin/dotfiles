@@ -2,6 +2,7 @@
 # Unified dotfiles CLI — delegates to chezmoi.
 #
 # Usage:
+#   dotfiles                 Start screen: what is missing, what changed, what needs you
 #   dotfiles <command> [args]
 #   dotfiles --help
 
@@ -55,7 +56,17 @@ _check_for_updates() {
 
 show_help() {
   cat <<EOF
-Usage: dotfiles <command> [options]
+Usage: dotfiles [<command>] [options]
+
+Start:
+  (no command) [--yes] [--health]
+                              Start screen: set up, applied, background jobs,
+                              health, updates, then what needs you and Next.
+                              Safe and fast: no sudo, applies only with a yes
+                              (--yes, or y at the prompt). --health also runs
+                              a fresh doctor check. Same as \`dotfiles start\`.
+  config [<key>]              Show every setting (value, source, allowed) or one
+  config set <key> <value>    Check a value against config/settings.yaml and save it
 
 Common:
   apply [--pull] [--no-fix] [--if-changed]
@@ -106,6 +117,8 @@ Options:
   --version, -v      Show current dotfiles version
 
 Examples:
+  dotfiles                        What needs you now, and the next command
+  dotfiles config set weekly_metrics true   Change a setting (then: dotfiles apply)
   dotfiles update                 Whole-machine update (pull/apply/agents/packages/doctor)
   dotfiles apply                  Apply + self-heal
   dotfiles apply --pull           Pull latest from git, then apply + self-heal
@@ -126,20 +139,34 @@ show_version() {
   fi
 }
 
+# Start-screen flags without a command mean `start` (dotfiles --yes).
+case "${1:-}" in --yes | -y | --health) set -- start "$@" ;; esac
+
 # Normalize: strip leading dashes from subcommands (e.g. --doctor → doctor, -h → h)
 cmd="${1:-}"
 cmd="${cmd#--}"
 cmd="${cmd#-}"
 
-# Check for updates (skip for commands that already update or need clean stdout)
+# Check for updates (skip for commands that already update or need clean stdout;
+# the start screen prints its own Update line)
 case "$cmd" in
-  update|upgrade|sync|cd|version|v) ;;
+  update|upgrade|sync|cd|version|v|start|""|config) ;;
   *) _check_for_updates ;;
 esac
 
 case "$cmd" in
-  help|h|"")
+  help|h)
     show_help
+    ;;
+
+  ""|start)
+    [ "$cmd" = "start" ] && shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-start" "$@"
+    ;;
+
+  config)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-config" "$@"
     ;;
 
   version|v)

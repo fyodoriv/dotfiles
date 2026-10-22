@@ -112,6 +112,9 @@ Tell the person:
 
 - open a new terminal to load the new shell,
 - where the backup is and how to undo (`dotfiles-install restore`),
+- `dotfiles` (or `/dotfiles` in an agent) shows what needs them any time and
+  ends with the next command; `dotfiles config set <key> <value>` changes a
+  setting,
 - `dotfiles doctor` checks health; `dotfiles metrics` shows how the tools
   behave on their Mac,
 - what the install changed: run `dotfiles metrics --gains` now (time to

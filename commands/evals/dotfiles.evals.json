@@ -1,0 +1,38 @@
+{
+  "command_name": "dotfiles",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/dotfiles",
+      "expected_output": "The agent runs `dotfiles` with no arguments, answers first with one line on whether dotfiles is up to date on this Mac, explains each Needs you item in plain words, and runs none of them until the user says yes.",
+      "expectations": [
+        "Runs `dotfiles` (or bin/dotfiles from the chezmoi source checkout) with no arguments as its first command",
+        "Opens with one line that says whether dotfiles is up to date, based on the start screen lines",
+        "Explains what each Needs you command does and what changes for the user before asking",
+        "Runs `dotfiles apply --if-changed`, `dotfiles update`, `dotfiles doctor --fix`, or `dotfiles-reload-launchagents` only after an explicit yes",
+        "Never runs sudo; gives the user the command for their own terminal instead"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/dotfiles on a Mac where dotfiles is not installed yet",
+      "expected_output": "The agent reports that dotfiles is not installed, shows `dotfiles install plan` output, and asks before it runs `dotfiles install run --yes`.",
+      "expectations": [
+        "Reads the not-installed line and the Next: dotfiles install run --yes line from the start screen",
+        "Runs `dotfiles install plan` and summarizes what will change before asking",
+        "Runs the installer only after the user says yes"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/dotfiles then: turn on the weekly metrics file",
+      "expected_output": "The agent changes the setting with `dotfiles config set weekly_metrics true`, shows the old and new value, and offers `dotfiles apply --if-changed` instead of editing chezmoi.yaml by hand.",
+      "expectations": [
+        "Finds the setting with `dotfiles config` or `dotfiles config weekly_metrics`",
+        "Uses `dotfiles config set weekly_metrics true`, never a hand edit of ~/.config/chezmoi/chezmoi.yaml",
+        "Reports a refused value with the allowed values from the error",
+        "Asks before it runs the apply that uses the new value"
+      ]
+    }
+  ]
+}

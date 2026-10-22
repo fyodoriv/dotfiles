@@ -81,8 +81,9 @@ Common:
                               --no-fix opts out of the auto-doctor pass
                               --if-changed skips both when nothing changed since
                               the last full apply and chezmoi status shows no drift
-  update [--dry-run] [--verbose]
-                              Update the whole machine (pull/apply/agents/packages/doctor)
+  update [--dry-run] [--verbose] [--yes]
+                              Update the whole machine (pull/apply/agents/packages/doctor);
+                              asks first (--yes skips the question)
   doctor [--fix] [...]        Audit configs; --fix auto-repairs
                               See \`doctor --help\` for all flags
   sync                        Commit local changes and pull remote updates
@@ -98,14 +99,15 @@ Scaffolding:
   profile [core|full]                       Show or switch chezmoi profile
 
 Advanced:
-  init                         Alias of \`apply\` (chezmoi init then apply)
+  init [--yes]                 chezmoi init, then apply; asks first (--yes skips it)
   diff                         Show pending changes (chezmoi diff)
   managed                      List all managed files
   status                       Show git status of dotfiles repo
   stats                        Show automation stats (runs, time saved, streak)
   install plan|run|restore     One-step install with backup and auto-restore
   metrics [--share FILE]       Agent time, hook blocks, MCP health, machine load
-  contribute [--repo agentbrew]  Open a PR upstream from your branch (forks for you)
+  contribute [--repo agentbrew] [--yes]  Open a PR upstream from your branch (forks
+                               for you); asks first (--yes skips the question)
   cheat                        Show all available commands and aliases
   edit                         Open the dotfiles repo in your editor
   cd                           Print the dotfiles directory (use: cd \$(dotfiles cd))
@@ -166,8 +168,9 @@ esac
 
 # Each case arm is an action (`dotfiles actions`). Notes for agents go in the
 # arm as four-space comments: `# terminal-only: <why>` (needs a person at a
-# terminal), `# confirm: <what it changes>` (agents ask first), and
-# `# agent: <what to do differently>`.
+# terminal), `# confirm: <what it changes>` (agents ask first; the command
+# takes --yes through lib/confirm.sh, or an `# unattended: <why>` note says
+# why it runs without one), and `# agent: <what to do differently>`.
 case "$cmd" in
   help|h)
     show_help
@@ -196,6 +199,7 @@ case "$cmd" in
 
   apply)
     # confirm: overwrites the managed files in your home folder and runs doctor --fix; it can take minutes and show macOS prompts.
+    # unattended: the update-tooling and tooling-checkup skills run `dotfiles apply --if-changed`, and `dotfiles --yes` runs it after its own yes; it writes only what the repo holds, so git and another apply undo it.
     # `dotfiles apply` is now the single command operators run. It:
     #   1. Optionally git-pulls latest if --pull was passed (subsumes
     #      `dotfiles update`'s primary purpose).
@@ -285,12 +289,16 @@ case "$cmd" in
     ;;
 
   init)
-    # confirm: runs chezmoi init, then applies every managed file, like `dotfiles apply`.
+    # confirm: runs chezmoi init, then applies every managed file, like `dotfiles apply`. It asks first; agents pass --yes after the user agrees.
     # Backward-compat alias for first-time-on-a-machine. Equivalent to
     # `dotfiles apply` once the repo is already cloned; chezmoi init clones
     # the source and then applies, which we replicate by ensuring the repo
     # is present then forwarding to apply.
     shift
+    # shellcheck source=../lib/confirm.sh
+    source "$DOTFILES_DIR/lib/confirm.sh"
+    confirm_gate "runs chezmoi init and applies every managed file in your home folder" "$@"
+    set -- ${CONFIRM_ARGS[@]+"${CONFIRM_ARGS[@]}"}
     echo "→ \`dotfiles init\` is now an alias for \`dotfiles apply\`."
     exec chezmoi init --source "$DOTFILES_DIR" --apply "$@"
     ;;
@@ -307,7 +315,7 @@ case "$cmd" in
     ;;
 
   plugin)
-    # confirm: `add`, `update`, `remove`, and `trust` install, change, delete, or trust code that runs here; `list` and `verify` change nothing.
+    # confirm: `add`, `update`, `remove`, and `trust` install, change, delete, or trust code that runs here; `list` and `verify` change nothing. Without a terminal, `add`, `update`, and `trust` refuse unless --yes.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-plugin" "$@"
     ;;
@@ -330,6 +338,7 @@ case "$cmd" in
 
   sync)
     # confirm: commits every local change in the dotfiles repo and pushes it (never to a public remote without a terminal).
+    # unattended: the com.dotfiles.dotfiles-sync LaunchAgent runs it every 30 minutes; each change is a git commit you can revert.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-sync" "$@"
     ;;
@@ -345,9 +354,12 @@ case "$cmd" in
     ;;
 
   update)
-    # confirm: pulls, applies, and updates agents and every package; it takes minutes. Try --dry-run first.
+    # confirm: pulls, applies, and updates agents and every package; it takes minutes. Try --dry-run first. It asks first; agents pass --yes after the user agrees.
     shift
-    exec bash "$DOTFILES_DIR/bin/dotfiles-update" "$@"
+    # shellcheck source=../lib/confirm.sh
+    source "$DOTFILES_DIR/lib/confirm.sh"
+    confirm_gate "pulls, applies, and updates agents and every package on this Mac" "$@"
+    exec bash "$DOTFILES_DIR/bin/dotfiles-update" ${CONFIRM_ARGS[@]+"${CONFIRM_ARGS[@]}"}
     ;;
 
   managed)
@@ -380,7 +392,7 @@ case "$cmd" in
     ;;
 
   contribute)
-    # confirm: pushes your branch and opens a public pull request upstream (it forks the repo if needed). Try --dry-run first.
+    # confirm: pushes your branch and opens a public pull request upstream (it forks the repo if needed). Try --dry-run first. It asks first; agents pass --yes after the user agrees.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-contribute" "$@"
     ;;
@@ -395,11 +407,13 @@ case "$cmd" in
     ;;
 
   profile)
+    # agent: switching changes which modules the next apply installs or removes; switch only when the user asks (switching back undoes it).
     shift
     exec "$DOTFILES_DIR/bin/dotfiles-profile" "$@"
     ;;
 
   enterprise)
+    # agent: `on` or `off` changes the enterprise tools the next apply installs; change it only when the user asks (the other value undoes it).
     shift
     exec "$DOTFILES_DIR/bin/dotfiles-enterprise" "$@"
     ;;
@@ -415,6 +429,7 @@ case "$cmd" in
     ;;
 
   unmanage)
+    # agent: removes the file's source and doctor checks from the repo (the file in your home folder stays); run it only when the user asks; git brings the source back.
     shift
     exec "$DOTFILES_DIR/bin/dotfiles-unmanage" "$@"
     ;;
@@ -436,13 +451,14 @@ case "$cmd" in
     ;;
 
   quickstart)
-    # terminal-only: an interactive wizard that asks y/N questions; agents use `dotfiles install plan`, then `install run --yes`.
+    # terminal-only: an interactive wizard that asks y/N questions; agents use `dotfiles install plan`, then `install run --yes`. `quickstart --check` asks nothing and only checks prerequisites, so agents may run it.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-quickstart" "$@"
     ;;
 
   upgrade)
     # confirm: upgrades the software of every package manager (topgrade), or switches Node; hard to roll back. Try --dry-run.
+    # unattended: the com.dotfiles.dotfiles-upgrade LaunchAgent runs the same upgrade every Sunday when auto_upgrade is on.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-upgrade" "$@"
     ;;

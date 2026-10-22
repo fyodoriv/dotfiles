@@ -22,7 +22,7 @@
 # Usage:
 #   dotfiles-upgrade              Run full upgrade
 #   dotfiles-upgrade --dry-run    Show what would be upgraded (no changes)
-#   dotfiles-upgrade --node [VER] Switch Node (latest LTS or VER) in one step:
+#   dotfiles-upgrade --node [VER]  Switch Node (latest LTS or VER) in one step:
 #                                 fnm, ~/.node-version, ~/.local/bin links,
 #                                 agentbrew plists (bin/dotfiles-node-upgrade)
 #

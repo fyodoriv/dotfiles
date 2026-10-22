@@ -9,7 +9,7 @@
         "Runs `dotfiles` (or bin/dotfiles from the chezmoi source checkout) with no arguments as its first command",
         "Opens with one line that says whether dotfiles is up to date, based on the start screen lines",
         "Explains what each Needs you command does and what changes for the user before asking",
-        "Runs `dotfiles apply --if-changed`, `dotfiles update`, `dotfiles doctor --fix`, or `dotfiles-reload-launchagents` only after an explicit yes",
+        "Runs `dotfiles apply --if-changed`, `dotfiles update --yes`, `dotfiles doctor --fix`, or `dotfiles-reload-launchagents` only after an explicit yes",
         "Never runs sudo; gives the user the command for their own terminal instead"
       ]
     },
@@ -32,6 +32,17 @@
         "Uses `dotfiles config set weekly_metrics true`, never a hand edit of ~/.config/chezmoi/chezmoi.yaml",
         "Reports a refused value with the allowed values from the error",
         "Asks before it runs the apply that uses the new value"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/dotfiles then: open a PR upstream with my fix",
+      "expected_output": "The agent finds the command with `dotfiles actions contribute --json`, reads its `confirm` note, shows `dotfiles contribute --dry-run`, and runs `dotfiles contribute --yes` only after the user says yes.",
+      "expectations": [
+        "Looks the command up with `dotfiles actions --json` or `dotfiles actions contribute`, not by guessing",
+        "Says in plain words that it opens a public pull request, from the `confirm` note",
+        "Shows the `dotfiles contribute --dry-run` steps before it asks",
+        "Runs `dotfiles contribute --yes` only after an explicit yes; never adds --yes on its own"
       ]
     }
   ]

@@ -124,6 +124,8 @@ Tell the person:
 - if anything in the install was wrong or confusing, they can fix it and
   send it upstream from their own fork. Offer to do it with them: create a
   branch, make the fix, add or update a test (`tests/*.bats`) and the docs,
-  run `make check`, then `dotfiles contribute` (it forks the repo and opens
-  the PR; `--repo agentbrew` does the same for agentbrew).
+  run `make check`, then show them `dotfiles contribute --dry-run`. After
+  they say yes, run `dotfiles contribute --yes` (it forks the repo and opens
+  a public PR; `--repo agentbrew` does the same for agentbrew; without
+  `--yes` and without a terminal it refuses).
   `dotfiles metrics --share metrics.md` is a privacy-safe snapshot to attach.

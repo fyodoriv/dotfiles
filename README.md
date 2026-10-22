@@ -74,7 +74,7 @@ A new Mac ships with conservative defaults — slow key repeat, Spotlight crawli
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
-- **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac; `--share FILE` writes a privacy-safe snapshot; `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot; `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you.
+- **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac; `--share FILE` writes a privacy-safe snapshot; `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot; `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you; it asks first (`--yes` skips the question).
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
 
 ## Installation
@@ -890,16 +890,24 @@ checks the value against [`config/settings.yaml`](config/settings.yaml) and
 saves it under `data:` in `~/.config/chezmoi/chezmoi.yaml`. Agents change
 settings the same way. Then run `dotfiles apply`.
 
-Actions: `dotfiles actions` lists every command, and agents read the same
-list with `dotfiles actions --json` (`/dotfiles` points them at it). It is
-generated from `bin/dotfiles` itself: the dispatch `case` gives the names,
-the `--help` text gives the usage, arguments, and what each one does, and
-comments in a dispatch arm add the notes. `terminal_only` says why an agent
-cannot run it (an editor, a wizard, a person-only step), and `confirm` says
-what it changes that is hard to undo, so agents ask first. dotfiles has no UI,
-so parity covers the CLI and agents. `dotfiles actions --check`
+Actions: `dotfiles actions` lists every top-level command, and agents read
+the same list with `dotfiles actions --json` (`/dotfiles` points them at it).
+It is generated from `bin/dotfiles` itself: the dispatch `case` gives the
+names, the `--help` text gives the usage, arguments, and what each one does,
+the "Usage:" header of the script an arm runs gives the sub-forms
+(`subforms`, for example `dotfiles config get <key>`), and comments in a
+dispatch arm add the notes. `terminal_only` says why an agent cannot run it
+(an editor, a wizard, a person-only step). `confirm` says what it changes that
+is hard to undo, so agents ask first. Such a command asks y/N at a terminal
+and refuses without one unless you pass `--yes`
+([`lib/confirm.sh`](lib/confirm.sh): `contribute`, `init`, `update`), or an
+`unattended` note says why it runs without a yes (a LaunchAgent or a skill
+runs `apply`, `sync`, and `upgrade`). dotfiles has no UI, so parity covers the
+CLI and agents. `dotfiles actions --check`
 ([`tests/dotfiles-actions.bats`](tests/dotfiles-actions.bats)) fails when a
-command has no `--help` line, or a `--help` line names no command.
+command has no `--help` line, a `--help` line names no command, a usage runs
+into its description, or a confirm command has neither `--yes` nor an
+`unattended` reason.
 
 ### File modes
 
@@ -1009,9 +1017,9 @@ dotfiles config set <key> <value>                 Check a value against config/s
 dotfiles actions [<name>] [--json]                Every command: usage, arguments, terminal-only and confirm notes
 dotfiles actions --check                          Fail when a command has no --help line (the parity test)
 dotfiles apply                                    Apply dotfiles (chezmoi apply)
-dotfiles init                                     Initialize on new machine (chezmoi init --apply)
+dotfiles init [--yes]                             Initialize on new machine (chezmoi init --apply); asks first
 dotfiles diff                                     Show pending changes (chezmoi diff)
-dotfiles update [--dry-run] [--verbose]           Whole-machine update (pull/apply/agentbrew/packages/doctor)
+dotfiles update [--dry-run] [--verbose] [--yes]   Whole-machine update (pull/apply/agentbrew/packages/doctor); asks first
 dotfiles upgrade [--dry-run]                      Upgrade all software (brew, casks, macOS, tools)
 dotfiles doctor [--fix] [--fix-all] [--skip ID] [--list] [--quiet] [--report]
                 [--module X] [--severity LEVEL] [--json] [--watch] [--validate-overrides] [--trends]
@@ -1028,9 +1036,14 @@ dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP h
 dotfiles metrics --table                         Every docs/metrics.md metric: value, goal, pivot ((stub) if no data)
 dotfiles metrics --baseline                      zsh start median, free disk, LaunchAgent count (same lines as install plan)
 dotfiles metrics --gains                         Before vs now from the install receipt, time to configured, minutes saved (estimate)
-dotfiles contribute [--repo agentbrew|PATH]       Open a PR upstream from your branch; forks the repo for you
+dotfiles contribute [--repo agentbrew|PATH] [--yes] Open a PR upstream from your branch; forks the repo for you; asks first
 dotfiles edit                                     Open dotfiles repo in $EDITOR
 dotfiles cheat                                    Command reference card
+dotfiles plugin <subcommand>                      Company plugins: add, update, remove, list, verify, trust (docs/plugins.md)
+dotfiles leak allow --once [<sha>]                A person allows one leak-gate bypass (needs a terminal; never an agent)
+dotfiles memory <subcommand>                      Deprecated: forwards to `agentbrew memory`
+dotfiles --help                                   Show the command list
+dotfiles --version                                Show the dotfiles commit and date
 
 dotfiles add <file> [--copy] [--module M]         Add a config file
 dotfiles unmanage <file>                          Remove a managed file

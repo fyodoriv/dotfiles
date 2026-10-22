@@ -105,6 +105,10 @@ skills:
   # (rule-based dashboard UI). It replaces `effective-ui-design`, which
   # covered the same ground.
   - frontend-design
+  # ui-ux-rankings (agentbrew): the comfort budget every UI is built to
+  # (references/comfort-patterns.md) and the rankings that measure it.
+  # docs/shared-rules.md loads it for all frontend/UI work.
+  - ui-ux-rankings
   # ── Anthropic plugin marketplace skills (claude-plugins-official) ─
   # Removed 2026-10-13 (0 uses in 180 days; each cost listing tokens in every
   # session): the mcp-server-dev and plugin-dev sets, claude-md-improver,

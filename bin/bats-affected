@@ -386,7 +386,9 @@ for bats_file in "${all_bats[@]}"; do
 done
 # A test that reads "$REPO_ROOT/<file>" (or $DOTFILES_DIR, $root, or
 # $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
-# runs too. A test that only names a fixture file of the same name does not.
+# runs too. A test that only names a fixture file of the same name does not,
+# and neither does a fixture path whose variable only ends in a root name
+# ("$TEST_REPO/Agentfile.yaml"): the match starts at the `$`.
 pairs_note
 for file in "${changed_files[@]}"; do
   pairs_note "$file"
@@ -414,7 +416,7 @@ ${dir#tests/}"
   # needs the "./" (a bare TASKS.md is usually a fixture name).
   if [[ "$file" == */* ]]; then rel="(\./)?$escaped"; else rel="\./$escaped"; fi
   for i in "${!all_bats[@]}"; do
-    if grep -qE -- "(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)|(^|[[:space:]\"'(=])$rel([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
+    if grep -qE -- "\\\$\{?(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)|(^|[[:space:]\"'(=])$rel([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
       affected+=("${all_bats[$i]}")
       continue
     fi

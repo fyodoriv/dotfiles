@@ -668,3 +668,19 @@ pairs_now() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+@test "a fixture path that only ends in a root name (\$TEST_REPO/x) does not select the test" {
+  printf 'notes\n' > "$TEST_REPO/notes.md"
+  cat > "$TEST_REPO/tests/reads-fixture-repo.bats" <<'BATS'
+@test "f" { printf 'x' > "$TEST_REPO/notes.md"; cat "${MY_root}/notes.md"; }
+BATS
+  cat > "$TEST_REPO/tests/reads-real-root.bats" <<'BATS'
+REPO_ROOT="$BATS_TEST_DIRNAME/.."
+@test "g" { cat "$REPO_ROOT/notes.md"; }
+BATS
+  git -C "$TEST_REPO" add notes.md tests/reads-fixture-repo.bats tests/reads-real-root.bats
+  git -C "$TEST_REPO" commit -q --no-verify -m "chore: fixture repo var"
+  result="$(affected_for notes.md | basenames)"
+  printf '%s\n' "$result" | grep -qx reads-real-root
+  ! printf '%s\n' "$result" | grep -qx reads-fixture-repo
+}

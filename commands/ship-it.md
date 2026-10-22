@@ -19,12 +19,12 @@ state, also read `task-command-center` →
 Follow those skills for the plan shape, including the versioned
 `HostBootstrapPayload` contract for a host integration.
 
-This applies only to a planning request. It does not add a planning stop before
-an explicitly requested implementation or delivery.
+It applies only to planning and adds no stop before an explicitly requested
+implementation or delivery.
 
 ## Session auto-ship (default)
 
-**verify → commit → push/PR → CI → review (6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?”, “should I push?”, or tell the user to run delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
+**review lessons (2a) → verify → commit → push/PR → CI → review (6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?”, “should I push?”, or tell the user to run delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
 
 ### Push early, let CI verify (IRON LAW)
 

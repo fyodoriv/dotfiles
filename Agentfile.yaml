@@ -66,6 +66,7 @@ skills:
   - iterate
   - run-goal                 # loads on every /goal (agentbrew hook goal-set-loads-run-goal)
   - report-upstream          # offers safe upstream issue reports (CONTRIBUTING.md)
+  - watch-issues             # /watch-issues: keep fixing new issues and tasks (pairs with /loop)
   - semgrep
   - codeql
   - playwright-best-practices

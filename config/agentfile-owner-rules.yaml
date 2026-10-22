@@ -21,3 +21,5 @@ rules: |
   `agentbrew report` safety steps, the opt-out), a one-line pointer to it in
   AGENTS.md, and the `report-upstream` skill in its Agentfile. The
   new-project scorer checks this; scaffold it from new-project.
+  When the queue is empty or I ask to keep going, run `/loop /watch-issues ~/apps/tooling/agentbrew ~/apps/tooling/dotfiles`
+  (add ~/apps/careerbrew only when I ask): each pass fixes new issues, unblocked tasks, and red PRs right away.

@@ -37,3 +37,8 @@ section() {
 @test "owner rules make the feedback loop a rule for every shareable app" {
   grep -q "Every app or tool I build to share ships an upstream feedback loop" "$DOTFILES_DIR/config/agentfile-owner-rules.yaml"
 }
+
+@test "Agentfile installs watch-issues and owner rules name the watched repos" {
+  grep -qE '^  - watch-issues\b' "$DOTFILES_DIR/Agentfile.yaml"
+  grep -q '/loop /watch-issues ~/apps/tooling/agentbrew ~/apps/tooling/dotfiles' "$DOTFILES_DIR/config/agentfile-owner-rules.yaml"
+}

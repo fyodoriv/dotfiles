@@ -8,8 +8,12 @@ source "$DOTFILES_DIR/lib/plugin.sh"
 
 if command -v yq >/dev/null 2>&1; then
   for _plugin_name in $(plugin_lock_names); do
+    # A pinned plugin is reinstalled in place from its locked tag.
+    _plugin_fix="dotfiles plugin update $_plugin_name $(plugin_lock_get "$_plugin_name" ref)"
+    [ "$(plugin_lock_get "$_plugin_name" dev)" != true ] ||
+      _plugin_fix="dotfiles plugin remove $_plugin_name, then add it again"
     check "plugins.$_plugin_name.verified" \
-      "plugin $_plugin_name matches plugins.lock (fix: dotfiles plugin remove $_plugin_name, then add it again)" \
+      "plugin $_plugin_name matches plugins.lock (fix: $_plugin_fix)" \
       "plugin_verify '$_plugin_name'" \
       ""
     # Secrets by reference and pinned launchers (step 8).

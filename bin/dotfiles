@@ -210,7 +210,7 @@ case "$cmd" in
     #      case where the operator wants raw chezmoi behavior. Doctor's
     #      --quiet means it only prints when something actually changed.
     #   --if-changed skips steps 2 and 3 when lib/apply-state.sh shows that
-    #   the source, chezmoi config, and plugins are unchanged since the last
+    #   the source, chezmoi config, plugins, and local Agentfile are unchanged since the last
     #   full apply and `chezmoi status` shows no drift. Drift is printed, then
     #   the full apply runs.
     shift
@@ -264,7 +264,7 @@ case "$cmd" in
           *) echo "→ chezmoi status failed; running the full apply." ;;
         esac
       else
-        echo "→ Source, chezmoi config, or plugins changed since the last apply (or no record yet); running the full apply."
+        echo "→ Source, chezmoi config, plugins, or the local Agentfile changed since the last apply (or no record yet); running the full apply."
       fi
     fi
     if [ "${#_chezmoi_args[@]}" -gt 0 ]; then

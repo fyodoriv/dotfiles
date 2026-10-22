@@ -63,11 +63,20 @@ Mac may still want it.
 
 2. Run `dotfiles apply`. The sync merges the layers in this order: the
    shared `Agentfile.yaml`, plugin Agentfiles, the owner rules (owner
-   machines only), this local file, and this Mac's model override. A later
-   layer adds entries; an MCP entry with the same name replaces the earlier
+   machines only), this local file, and this Mac's model override. For
+   list keys (`mcp:`, `skills:`, `sources:`, and so on), each layer adds
+   its entries, and an MCP entry with the same name replaces the earlier
    one.
-3. Check: `dotfiles doctor --module agentbrew`. The
-   `agentbrew.global_agentfile_in_sync` check builds the same list from
+   - The local file may not hold `hooks:`. In agentbrew's merge, a hook
+     replaces every earlier hook with the same event and matcher, so one
+     local `Bash` hook would drop the shared `block-dangerous-git.sh`.
+   - A local file with `hooks:`, or one that is not valid YAML, is skipped
+     with a warning that names the problem. The other layers still sync.
+   - A list key written as a single value (for example `mcp: figma`) gets
+     a warning; agentbrew ignores that key. Write `mcp:` then `- figma`.
+3. Check: `dotfiles doctor --module agentbrew`.
+   `agentbrew.local_agentfile_valid` names the first problem in the local
+   file. The `agentbrew.global_agentfile_in_sync` check builds the same list from
    `lib/agentfile-layers.sh`, so it passes. An entry added by hand to
    `~/.config/agentbrew/Agentfile.yaml` still fails it: that file is
    generated, and the next apply overwrites it.

@@ -99,7 +99,7 @@ else
       if [ "$record_current" -eq 1 ]; then
         echo -e "${GREEN}✓${NC} Applied: nothing changed since the last apply; no drift."
       elif [ -r "$(apply_state_file)" ]; then
-        echo -e "${YELLOW}!${NC} Applied: the files match, but the source, settings, or plugins changed since the last full apply."
+        echo -e "${YELLOW}!${NC} Applied: the files match, but the source, settings, plugins, or the local Agentfile changed since the last full apply."
         need "Run the full apply (scripts, agent config, doctor)" "dotfiles apply --if-changed"
       else
         echo -e "${GREEN}✓${NC} Applied: files match the source (no full apply recorded yet)."

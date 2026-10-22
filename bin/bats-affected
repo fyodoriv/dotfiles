@@ -10,9 +10,12 @@
 #   bats-affected --cached     # staged only
 #   bats-affected HEAD~3       # changed in last 3 commits
 #   bats-affected main          # changed vs main branch
+#   bats-affected --pairs [ref] # "test<TAB>changed file" for each match
 #
 # Output: newline-separated list of test file paths (deduped, sorted).
-# Exits 0 with no output when nothing is affected.
+# With --pairs, one "test<TAB>changed file" line per reason a test runs
+# (make test uses them to skip a test none of whose changed files changed
+# since it last passed). Exits 0 with no output when nothing is affected.
 
 set -euo pipefail
 
@@ -22,6 +25,11 @@ TESTS_DIR="$DOTFILES_DIR/tests"
 source "$DOTFILES_DIR/tests/verify-counts-doc-paths.sh"
 
 # ── Parse args ───────────────────────────────────────────────────────
+pairs=0
+if [ "${1:-}" = "--pairs" ]; then
+  pairs=1
+  shift
+fi
 diff_args=()
 case "${1:-}" in
   --help|-h)
@@ -101,16 +109,36 @@ smoke_patterns=(
 )
 
 affected=()
+# --pairs: pair_owner[i] is the changed file that put affected[i] in the list.
+# pairs_note runs at the top of each loop pass (and after each loop), so the
+# entries added since the last note belong to the file before.
+pair_owner=()
+pairs_cur=""
+run_all_files=()
+pairs_note() {
+  while [ "${#pair_owner[@]}" -lt "${#affected[@]}" ]; do pair_owner+=("$pairs_cur"); done
+  pairs_cur="${1:-}"
+}
 
 for file in "${changed_files[@]}"; do
+  pairs_note "$file"
   # ── Run-all triggers ─────────────────────────────────────────────
+  run_all=0
   for pattern in "${run_all_patterns[@]}"; do
     if [[ "$file" == "$pattern" || "$file" == "$pattern"* ]]; then
+      run_all=1
+    fi
+  done
+  if [ "$run_all" -eq 1 ]; then
+    if [ "$pairs" -eq 0 ]; then
       # Output all test files and exit
       find "$TESTS_DIR" -name '*.bats' -not -path "$TESTS_DIR/e2e/*" | sort
       exit 0
     fi
-  done
+    # Every test depends on this file; pair it with each one at the end.
+    run_all_files+=("$file")
+    continue
+  fi
 
   # ── Test files themselves ────────────────────────────────────────
   if [[ "$file" == tests/*.bats ]]; then
@@ -359,7 +387,9 @@ done
 # A test that reads "$REPO_ROOT/<file>" (or $DOTFILES_DIR, $root, or
 # $BATS_TEST_DIRNAME/..) depends on that file even with no rule above, so it
 # runs too. A test that only names a fixture file of the same name does not.
+pairs_note
 for file in "${changed_files[@]}"; do
+  pairs_note "$file"
   [[ "$file" == tests/*.bats ]] && continue
   # A helper or fixture under tests/ is read by its path relative to tests/
   # ("$BATS_TEST_DIRNAME/fixtures/x" or "fixtures/x").
@@ -399,7 +429,23 @@ ${dir#tests/}"
   done
 done
 
+pairs_note
+
 # ── Deduplicate and sort ─────────────────────────────────────────────
+if [ "$pairs" -eq 1 ]; then
+  {
+    if [ "${#affected[@]}" -gt 0 ]; then
+      for i in "${!affected[@]}"; do printf '%s\t%s\n' "${affected[$i]}" "${pair_owner[$i]}"; done
+    fi
+    if [ "${#run_all_files[@]}" -gt 0 ]; then
+      for f in "${run_all_files[@]}"; do
+        for t in "${all_bats[@]}"; do printf '%s\t%s\n' "$t" "$f"; done
+      done
+    fi
+  } | LC_ALL=C sort -u
+  exit 0
+fi
+
 if [ "${#affected[@]}" -eq 0 ]; then
   exit 0
 fi

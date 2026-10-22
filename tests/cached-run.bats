@@ -579,6 +579,44 @@ calls() {
   [[ "$output" == *"--"* ]]
 }
 
+@test "--per-file --deps re-checks a file when one of its listed inputs changes" {
+  per_file_setup
+  mkdir -p data
+  printf 'v1\n' > data/x.txt
+  printf 'bin/a\tdata/x.txt\n' > "$TEST_DIR/deps"
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/deps" "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  calls >/dev/null
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/deps" "$CHECK" -- bin/a bin/b
+  [ -z "$(calls)" ]
+  printf 'v2\n' > data/x.txt
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/deps" "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a " ]
+}
+
+@test "--per-file --deps counts a deleted input as a change, then caches it" {
+  per_file_setup
+  mkdir -p data
+  printf 'v1\n' > data/gone.txt
+  printf 'bin/a\tdata/gone.txt\n' > "$TEST_DIR/deps"
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/deps" "$CHECK" -- bin/a
+  calls >/dev/null
+  rm data/gone.txt
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/deps" "$CHECK" -- bin/a
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a " ]
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/deps" "$CHECK" -- bin/a
+  [ -z "$(calls)" ]
+}
+
+@test "--per-file fails with status 2 when --deps cannot be read" {
+  per_file_setup
+  run "$SCRIPT" --per-file --deps "$TEST_DIR/no-such-deps" "$CHECK" -- bin/a
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"cannot read --deps"* ]]
+}
+
 @test "--per-file re-runs real shellcheck when a sourced lib drops a variable" {
   command -v shellcheck >/dev/null || skip "shellcheck not installed"
   per_file_setup
@@ -613,4 +651,31 @@ calls() {
   local bad
   bad="$(printf '%s\n' "$output" | grep -vE '^[[:space:]]*source-path=SCRIPTDIR[[:space:]]*$' || true)"
   [ -z "$bad" ] || { echo "$bad"; return 1; }
+}
+
+@test "make test skips a test whose selecting files did not change since it passed on HEAD" {
+  local mk="$BATS_TEST_DIRNAME/../Makefile"
+  grep -qF './bin/bats-affected --pairs > "$$pairs"' "$mk"
+  grep -qF './bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs"' "$mk"
+  grep -qF -- '--key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$affected' "$mk"
+}
+
+@test "make e2e-if-needed reruns the e2e only when an input needs-e2e counts changed" {
+  local mk="$BATS_TEST_DIRNAME/../Makefile"
+  grep -qF 'git ls-files -co --exclude-standard | ./tests/e2e/needs-e2e.sh --stdin' "$mk"
+  grep -qF './bin/cached-run --per-file --deps "$$inputs"' "$mk"
+  grep -qF 'chezmoi --version' "$mk"
+  # make e2e stays the uncached full run.
+  grep -qE '^	@bats tests/e2e/$' "$mk"
+}
+
+@test "make check points agents at the inner loop" {
+  grep -qF 'Iterating? Use make lint and bats tests/<name>.bats; run make check once before you commit.' \
+    "$BATS_TEST_DIRNAME/../Makefile"
+}
+
+@test "Makefile builds the lint list only when lint runs, with one file call" {
+  local mk="$BATS_TEST_DIRNAME/../Makefile"
+  grep -qE '^BIN_SCRIPTS = \$\(shell file bin/\* ' "$mk"
+  grep -qE '^SCRIPTS = ' "$mk"
 }

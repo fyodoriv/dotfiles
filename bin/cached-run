@@ -13,11 +13,11 @@
 #   cached-run --clear-all      # clear entire cache
 #
 # Per-file mode (make lint):
-#   cached-run --per-file [--jobs N] [--key TEXT] <command...> -- <file...>
+#   cached-run --per-file [--jobs N] [--key TEXT] [--deps FILE] <command...> -- <file...>
 # Runs `<command...> <file>` for each file, in parallel, and skips a file
-# whose content, sourced files, command, and --key already passed. These
-# passes are shared by every worktree and clone (the repo path is not part
-# of the key).
+# whose content, sourced files, extra --deps inputs, command, and --key
+# already passed. These passes are shared by every worktree and clone (the
+# repo path is not part of the key).
 
 set -euo pipefail
 
@@ -36,12 +36,13 @@ usage() {
   echo "  --help, -h    Show this help"
   echo ""
   echo "Per-file mode:"
-  echo "  cached-run --per-file [--jobs N] [--key TEXT] <command...> -- <file...>"
-  echo "  Run '<command...> <file>' for each file (N at a time) and skip a file"
+  echo "  cached-run --per-file [--jobs N] [--key TEXT] [--deps FILE] <command...> -- <file...>"
+  echo "  Run '<command...> <file>' for each file (N at a time, default 1) and skip a file"
   echo "  that already passed with the same content, the same files it sources"
   echo "  (source/. with a constant path, '# shellcheck source=' directives), the"
   echo "  same command, and the same --key. Put tool versions and config in --key."
-  echo "  Passes are shared across worktrees and clones."
+  echo "  --deps FILE adds inputs: lines of 'file<TAB>input' (bin/bats-affected"
+  echo "  --pairs writes them). Passes are shared across worktrees and clones."
   echo ""
   echo "Examples:"
   echo "  cached-run make check"
@@ -215,8 +216,9 @@ function add(src, p,   q) {
 # ("file<TAB>dep"), files (one per line, in order). Writes <tmp>/<n>.file
 # and <tmp>/<n>.key for each file that needs a run and prints its number n.
 # A file's key is its path and blob plus the path and blob of every file it
-# sources, directly or through another sourced file. A file with no key (an
-# unknown source, or a file that cannot be read) always runs.
+# sources or names in --deps, directly or through another input. An input
+# that does not exist (a deleted file) counts as "-". A file with no key (an
+# unknown source, or a listed file that cannot be read) always runs.
 # shellcheck disable=SC2016 # awk program, not shell
 KEYS_AWK='
 FILENAME == ARGV[1] { passed[$0] = 1; next }
@@ -230,7 +232,8 @@ FILENAME == ARGV[3] { split($0, f, "\t"); deps[f[1]] = deps[f[1]] "\t" f[2]; nex
     cur = todo[nt--]
     nd = split(deps[cur], d, "\t")
     for (i = 2; i <= nd; i++) {
-      if (d[i] == "*" || !(d[i] in blob)) { bad = 1; continue }
+      if (d[i] == "*") { bad = 1; continue }
+      if (!(d[i] in blob)) blob[d[i]] = "-"
       if (d[i] in seen) continue
       seen[d[i]] = 1; todo[++nt] = d[i]; list[++nl] = d[i]
     }
@@ -275,13 +278,15 @@ per_file_usage() {
 }
 
 cmd_per_file() {
-  local jobs="" extra_key=""
+  local jobs="" extra_key="" deps_file=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --jobs) [ $# -ge 2 ] || per_file_usage; jobs="$2"; shift 2 ;;
       --jobs=*) jobs="${1#--jobs=}"; shift ;;
       --key) [ $# -ge 2 ] || per_file_usage; extra_key="$2"; shift 2 ;;
       --key=*) extra_key="${1#--key=}"; shift ;;
+      --deps) [ $# -ge 2 ] || per_file_usage; deps_file="$2"; shift 2 ;;
+      --deps=*) deps_file="${1#--deps=}"; shift ;;
       *) break ;;
     esac
   done
@@ -294,7 +299,7 @@ cmd_per_file() {
   shift
   [ $# -gt 0 ] || { echo "cached-run: no files to check"; return 0; }
   case "$jobs" in
-    ''|*[!0-9]*|0) jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" ;;
+    ''|*[!0-9]*|0) jobs=1 ;;
   esac
 
   repo_root >/dev/null || { echo "Error: not in a git repository" >&2; exit 1; }
@@ -310,19 +315,25 @@ cmd_per_file() {
   trap "rm -rf '$tmp'" EXIT
 
   printf '%s\n' "$@" > "$tmp/files"
-  # Sources, two or more levels deep: scan each newly found file once.
+  # Extra inputs from --deps, then sources, two or more levels deep: scan
+  # each newly found file that exists once.
   : > "$tmp/edges"
-  cp "$tmp/files" "$tmp/scan"
-  cp "$tmp/files" "$tmp/scanned"
+  if [ -n "$deps_file" ]; then
+    [ -r "$deps_file" ] || { echo "cached-run --per-file: cannot read --deps $deps_file" >&2; exit 2; }
+    grep "$(printf '\t')" "$deps_file" > "$tmp/edges" || true
+  fi
+  { cat "$tmp/files"; cut -f2 "$tmp/edges"; } | LC_ALL=C sort -u > "$tmp/scan"
+  cp "$tmp/scan" "$tmp/scanned"
   local round=0
   while [ -s "$tmp/scan" ] && [ "$round" -lt 20 ]; do
     round=$((round + 1))
-    tr '\n' '\0' < "$tmp/scan" | xargs -0 awk "$SOURCES_AWK" 2>/dev/null > "$tmp/new-edges" || true
+    while IFS= read -r f; do if [ -f "$f" ]; then printf '%s\0' "$f"; fi; done < "$tmp/scan" |
+      xargs -0 awk "$SOURCES_AWK" 2>/dev/null > "$tmp/new-edges" || true
     cat "$tmp/new-edges" >> "$tmp/edges"
     cut -f2 "$tmp/new-edges" | grep -vxF '*' | LC_ALL=C sort -u | grep -vxF -f "$tmp/scanned" > "$tmp/scan" || true
     cat "$tmp/scan" >> "$tmp/scanned"
   done
-  # Blob hashes of every file that exists (a missing one gets no key).
+  # Blob hashes of every file that exists (a missing input counts as "-").
   LC_ALL=C sort -u "$tmp/scanned" | while IFS= read -r f; do if [ -f "$f" ]; then printf '%s\n' "$f"; fi; done > "$tmp/hashable"
   if [ -s "$tmp/hashable" ] && git hash-object --stdin-paths < "$tmp/hashable" > "$tmp/blobs" 2>/dev/null; then
     paste "$tmp/hashable" "$tmp/blobs" > "$tmp/hashes"

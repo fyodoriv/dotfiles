@@ -619,3 +619,52 @@ BATS
   git -C "$TEST_REPO" commit -q --no-verify -m "chore: folder var"
   assert_affected_includes launchagents/com.x.plist.tmpl reads-folder-var
 }
+
+# ── --pairs (make test skips tests whose changed inputs did not change) ──
+
+# Print the pairs as "test-basename<TAB>changed-file".
+pairs_now() {
+  (cd "$TEST_REPO" && bash bin/bats-affected --pairs) | while IFS=$'\t' read -r t f; do
+    printf '%s\t%s\n' "$(basename "$t" .bats)" "$f"
+  done
+}
+
+@test "--pairs names the changed file behind each affected test" {
+  echo "# change" >> "$TEST_REPO/bin/cleanup"
+  echo "# change" >> "$TEST_REPO/lib/colors.sh"
+  run pairs_now
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | grep -qxF "$(printf 'cleanup\tbin/cleanup')"
+  printf '%s\n' "$output" | grep -qxF "$(printf 'cleanup\tlib/colors.sh')"
+  printf '%s\n' "$output" | grep -qxF "$(printf 'smoke\tbin/cleanup')"
+  # smoke runs for the bin change only, not for the lib change.
+  ! printf '%s\n' "$output" | grep -qxF "$(printf 'smoke\tlib/colors.sh')"
+}
+
+@test "--pairs lists the same tests as the plain output" {
+  echo "# change" >> "$TEST_REPO/bin/morning"
+  echo "# change" >> "$TEST_REPO/tests/cli.bats"
+  echo "# change" >> "$TEST_REPO/modules/git/doctor.sh"
+  local plain paired
+  plain="$(cd "$TEST_REPO" && bash bin/bats-affected)"
+  paired="$(cd "$TEST_REPO" && bash bin/bats-affected --pairs | cut -f1 | LC_ALL=C sort -u)"
+  [ -n "$plain" ]
+  [ "$(printf '%s\n' "$plain" | LC_ALL=C sort -u)" = "$paired" ]
+}
+
+@test "--pairs pairs a run-all file with every test and keeps the other pairs" {
+  echo "# change" >> "$TEST_REPO/tests/test_helper.bash"
+  echo "# change" >> "$TEST_REPO/bin/cleanup"
+  run pairs_now
+  [ "$status" -eq 0 ]
+  local all
+  all="$(find "$TEST_REPO/tests" -name '*.bats' -not -path '*/e2e/*' | wc -l | tr -d ' ')"
+  [ "$(printf '%s\n' "$output" | grep -c "$(printf '\ttests/test_helper.bash$')")" -eq "$all" ]
+  printf '%s\n' "$output" | grep -qxF "$(printf 'cleanup\tbin/cleanup')"
+}
+
+@test "--pairs with no changes prints nothing" {
+  run bash -c "cd '$TEST_REPO' && bash bin/bats-affected --pairs"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}

@@ -5,11 +5,12 @@
 # All scripts to lint
 # Endpoint-security shims (curl/jq/grep/...) are Mach-O binaries/symlinks.
 # Shellcheck only the real scripts under bin/.
-BIN_SCRIPTS := $(shell for f in bin/*; do \
-  file -b "$$f" 2>/dev/null | grep -qE 'shell script|POSIX shell script' && echo "$$f"; \
-done)
+# Both lists use `=`, so make builds them only when lint needs them, not in
+# each of the sub-makes that make check starts. One `file` call reads every
+# bin/ entry.
+BIN_SCRIPTS = $(shell file bin/* 2>/dev/null | awk -F': ' '/shell script/ { print $$1 }')
 
-SCRIPTS := macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-run.sh scripts/gate-timed.sh scripts/changelog.sh \
+SCRIPTS = macos.sh macos-visual.sh macos-apps.sh snapshot.sh scripts/benchmark-run.sh scripts/gate-timed.sh scripts/changelog.sh \
            $(wildcard private_dot_agent-browser/executable_*.sh) \
            $(wildcard lib/*.sh) \
            $(BIN_SCRIPTS) $(wildcard modules/*/doctor.sh) \
@@ -99,18 +100,28 @@ HAS_PARALLEL := $(shell command -v parallel >/dev/null 2>&1 && echo yes)
 ifeq ($(HAS_PARALLEL),yes)
 BATS_JOBS := --jobs $(JOBS) --no-parallelize-within-files
 JOBS_LABEL := $(JOBS) jobs
+TEST_FILE_JOBS := --jobs $(JOBS)
 else
 BATS_JOBS :=
 JOBS_LABEL := serial: GNU parallel not found
+TEST_FILE_JOBS :=
 endif
-test: ## Run affected tests only (cached, git-aware)
-	@affected=$$(./bin/bats-affected); \
+# make test skips an affected test file that already passed on this HEAD
+# with the same content of the changed files that select it
+# (bin/bats-affected --pairs feeds them to bin/cached-run --per-file --deps).
+# A fix to one file re-runs only the tests that file selects.
+test: ## Run affected tests only (skips tests that passed with the same inputs)
+	@pairs=$$(mktemp "$${TMPDIR:-/tmp}/bats-pairs.XXXXXX") || exit 1; \
+	trap 'rm -f "$$pairs"' EXIT; \
+	./bin/bats-affected --pairs > "$$pairs" || exit 1; \
+	affected=$$(cut -f1 "$$pairs" | LC_ALL=C sort -u); \
 	if [ -z "$$affected" ]; then \
 	  echo "✓ No affected test files (nothing changed)"; \
 	else \
 	  count=$$(echo "$$affected" | wc -l | tr -d ' '); \
 	  echo "═══ Tests: $$count affected file(s) ($(JOBS_LABEL)) ═══"; \
-	  echo "$$affected" | xargs $(FULLPOWER) ./bin/cached-run bats $(BATS_JOBS); \
+	  $(FULLPOWER) ./bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs" \
+	    --key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$affected; \
 	fi
 
 test-all: ## Run full test suite (cached)
@@ -121,13 +132,22 @@ test-force: ## Run full test suite (no cache)
 	@$(FULLPOWER) bats $(BATS_JOBS) tests/ tests/plugin/
 
 # ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
+E2E_FILES = $(wildcard tests/e2e/*.bats)
 e2e: ## Run the hermetic install and story e2e (about 100 s; E2E_FULL=1 for the whole doctor)
 	@bats tests/e2e/
 
+# The e2e reruns only when an installer input, chezmoi, or zsh changed since
+# it last passed: its inputs are every file needs-e2e.sh counts (the passes
+# are shared by all worktrees).
 e2e-if-needed: ## Run the install e2e only when an installer path changed
 	@if paths=$$(./tests/e2e/needs-e2e.sh); then \
 	  echo "═══ Install e2e: triggered by ═══"; echo "$$paths" | sed 's/^/  /'; \
-	  bats tests/e2e/; \
+	  inputs=$$(mktemp "$${TMPDIR:-/tmp}/e2e-inputs.XXXXXX") || exit 1; \
+	  trap 'rm -f "$$inputs"' EXIT; \
+	  git ls-files -co --exclude-standard | ./tests/e2e/needs-e2e.sh --stdin | \
+	    awk -v files="$(E2E_FILES)" 'BEGIN { n = split(files, f, " ") } { for (i = 1; i <= n; i++) print f[i] "\t" $$0 }' > "$$inputs"; \
+	  ./bin/cached-run --per-file --deps "$$inputs" \
+	    --key "$$(chezmoi --version 2>/dev/null | head -1); $$(zsh --version 2>/dev/null)" bats -- $(E2E_FILES); \
 	else \
 	  echo "✓ Install e2e skipped (no installer path changed)"; \
 	fi
@@ -139,6 +159,7 @@ check: ## Lint + task queue lint + test + install e2e when needed (timed)
 	@scripts/gate-timed.sh total $(MAKE) --no-print-directory check-steps
 	@echo ""
 	@echo "✓ All checks passed"
+	@echo "  Iterating? Use make lint and bats tests/<name>.bats; run make check once before you commit."
 
 check-steps:
 	@scripts/gate-timed.sh lint $(MAKE) --no-print-directory lint

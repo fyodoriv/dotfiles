@@ -49,6 +49,7 @@ them. -->
 
 - [ ] Make `make check` fast in the inner loop
   - **ID**: speed-up-make-check
+  - **Blocked**: needs-time — 2026-10-22: shipped per-test caching in `make test` (`bin/bats-affected --pairs` + `bin/cached-run --per-file --deps`, keyed on HEAD), an input-keyed cache for the install e2e, lazy lint lists (one `file` call), and inner-loop steering in AGENTS.md and the `make check` output (branch `perf/speed-up-make-check`). Baseline 2026-10-22: dotfiles `make check` line 5m04s/day (27x in 9 sessions, p95 5m12s); tooling line 17m57s/day (42x in 3 sessions). Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (the dotfiles `make check` line), then close or pivot.
   - **Tags**: perf, agents
   - **Details**: The 2026-10-20 checkup time review: `make check` costs 2m38s/day (17x in 7 sessions, p95 5m12s). Agents run the full gate while iterating instead of `bin/bats-affected`.
   - **Files**: `Makefile`, `AGENTS.md`, `bin/cached-run`

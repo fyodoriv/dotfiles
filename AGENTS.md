@@ -15,12 +15,12 @@ names.
 
 | Task | Command (from the repo root) |
 |---|---|
-| Default gate before a commit | `make check` (shellcheck + TASKS.md lint + affected bats) |
-| One test file / one test | `bats tests/<name>.bats` / `bats -f '<test name>' tests/<name>.bats` |
+| Gate, once before a commit | `make check` (lint, TASKS.md lint, affected bats; skips unchanged) |
+| Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
 | Tests affected by a committed branch | `bin/bats-affected origin/feat/chezmoi \| xargs bats` |
 | Full suite (slow; run in the background) | `make test-all` |
 | Install e2e: real chezmoi, scripts, doctor, zsh in a sandboxed scratch HOME | `make e2e` (`make check` runs it when an installer path changes) |
-| Lint only / TASKS.md only | `make lint` / `make lint-tasks` |
+| TASKS.md only | `make lint-tasks` |
 | Review the task queue (truth, usefulness, priority) | `/review-tasks` (tasks.md command, installed by the Agentfile) |
 | Apply to this Mac | `dotfiles apply` (needed after `Agentfile.yaml` edits) |
 | Check one module | `dotfiles doctor --module <name>` |

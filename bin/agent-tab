@@ -16,7 +16,7 @@
 #   agent-tab close --owner <id> <tab>
 #   agent-tab renew --owner <id> [--lease <s>] <tab>
 #   agent-tab text|shot --owner <id> <tab>
-#   agent-tab eval --owner <id> <tab> <js>
+#   agent-tab eval --owner <id> <tab> <js>     # or - to read the js from stdin
 #   agent-tab nav --owner <id> <tab> <url>
 #   agent-tab health [--fix]
 #   agent-tab clear-cookies <domain>
@@ -48,7 +48,8 @@ Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
        agent-tab close --owner <id> <tab>
        agent-tab renew --owner <id> [--lease <seconds>] <tab>
        agent-tab text --owner <id> <tab>          # page text
-       agent-tab eval --owner <id> <tab> <js>     # evaluate, print the value
+       agent-tab eval --owner <id> <tab> <js>     # evaluate, print the value;
+                                                  # <js> of - reads it from stdin
        agent-tab nav --owner <id> <tab> <url>     # navigate
        agent-tab shot --owner <id> <tab>          # PNG path, under AGENT_TAB_SHOT_DIR
        agent-tab health [--fix]                   # list tabs that do not answer;
@@ -97,7 +98,7 @@ parse_opts() {
       --reason) REASON="${2:-}"; shift 2 || shift ;;
       --lease) LEASE_OPT="${2:-}"; shift 2 || shift ;;
       --fix) FIX=1; shift ;;
-      -*) usage >&2; die "unknown option: $1" 2 ;;
+      -?*) usage >&2; die "unknown option: $1" 2 ;;
       *) if [ -z "$ARG" ]; then ARG="$1"; else ARG2="$1"; fi; shift ;;
     esac
   done
@@ -170,7 +171,10 @@ cmd_renew() {
 # One CDP call over a websocket: cdp <ws-url> <method> [params-json] [png-file].
 # Prints the result JSON. With png-file, writes the base64 .data of the result
 # to that file as bytes instead (#234: large replies never pass through a shell
-# string or jq). Exits 1 on error or no answer in 10 s.
+# string or jq). Exits 1 on error or no answer in 10 s, after one stderr line
+# "agent-tab: cdp <method>: <cause>".
+# The params go to node on stdin, never in argv (#270): node's startup runs
+# out of stack on a large argv, and argv is capped by ARG_MAX.
 cdp() {
   if [ -n "${AGENT_TAB_CDP:-}" ]; then
     if [ -n "${4:-}" ]; then
@@ -180,22 +184,38 @@ cdp() {
     fi
     return
   fi
-  node --input-type=module -e '
-    import { writeFileSync } from "node:fs";
-    const [ws, method, params, out] = process.argv.slice(1);
+  local rc=0
+  printf '%s' "${3:-{\}}" | node --input-type=module -e '
+    import { readFileSync, writeFileSync } from "node:fs";
+    const [ws, method, out] = process.argv.slice(1);
+    let done = false;
+    const fail = (why) => {
+      if (done) return;
+      done = true;
+      console.error(`agent-tab: cdp ${method}: ${why}`);
+      process.exit(1);
+    };
+    if (typeof WebSocket !== "function") fail(`node ${process.version} has no WebSocket; use Node 22 or newer`);
+    let params;
+    try { params = JSON.parse(readFileSync(0, "utf8")); } catch (e) { fail(`bad params: ${e.message}`); }
     const sock = new WebSocket(ws);
-    const t = setTimeout(() => { console.error("no answer"); process.exit(1); }, 10000);
-    sock.onerror = () => { console.error("websocket error"); process.exit(1); };
-    sock.onopen = () => sock.send(JSON.stringify({ id: 1, method, params: JSON.parse(params) }));
+    const t = setTimeout(() => fail("no answer in 10 s"), 10000);
+    // An error event has no detail; the close event after it has the code.
+    sock.onerror = () => {};
+    sock.onclose = (e) => fail(`websocket closed before the answer (code ${e.code}${e.reason ? ", " + e.reason : ""})`);
+    sock.onopen = () => sock.send(JSON.stringify({ id: 1, method, params }));
     sock.onmessage = (m) => {
       const r = JSON.parse(m.data);
-      if (r.id !== 1) return;
+      if (r.id !== 1 || done) return;
       clearTimeout(t);
-      if (r.error) { console.error(JSON.stringify(r.error)); process.exit(1); }
+      if (r.error) fail(JSON.stringify(r.error));
+      done = true;
       if (out) { writeFileSync(out, Buffer.from(r.result.data, "base64")); process.exit(0); }
       // Exit only after stdout drains; a pipe write is async and was cut at 64 KiB.
       process.stdout.write(JSON.stringify(r.result) + "\n", () => process.exit(0));
-    };' "$1" "$2" "${3:-{\}}" "${4:-}"
+    };' "$1" "$2" "${4:-}" || rc=$?
+  [ "$rc" -le 128 ] || echo "agent-tab: cdp $2: node was killed by signal $((rc - 128))" >&2
+  return "$rc"
 }
 
 chrome_tabs() {
@@ -227,7 +247,8 @@ require_own_live() {
 # Runs JS in the tab and prints the value (strings raw, others as JSON).
 page_eval() {
   local out
-  out="$(cdp "$1" Runtime.evaluate "$(jq -cn --arg e "$2" '{expression: $e, returnByValue: true, awaitPromise: true}')")" ||
+  # The script goes to jq on stdin too, so its size never meets ARG_MAX.
+  out="$(cdp "$1" Runtime.evaluate "$(printf '%s' "$2" | jq -Rsc '{expression: ., returnByValue: true, awaitPromise: true}')")" ||
     die "eval failed in tab"
   printf '%s' "$out" | jq -e '.exceptionDetails | not' >/dev/null ||
     die "page threw: $(printf '%s' "$out" | jq -c '.exceptionDetails.exception.description // .exceptionDetails.text')"
@@ -244,7 +265,7 @@ cmd_page() {
   ws="$(tab_ws "$ARG")"
   case "$sub" in
     text) page_eval "$ws" 'document.body ? document.body.innerText : ""' ;;
-    eval) page_eval "$ws" "$ARG2" ;;
+    eval) if [ "$ARG2" = - ]; then page_eval "$ws" "$(cat)"; else page_eval "$ws" "$ARG2"; fi ;;
     nav) cdp "$ws" Page.navigate "$(jq -cn --arg u "$ARG2" '{url: $u}')" >/dev/null ||
            die "navigate failed"
          echo "agent-tab: navigated $ARG to $ARG2" ;;

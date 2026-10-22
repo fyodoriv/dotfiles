@@ -1037,7 +1037,7 @@ scratch work.
 | `new-project` | Scaffold a react/node/lib/python project with best-practice defaults |
 | `setup-chrome` | Apply dev-friendly Chrome settings and performance flags |
 | `temp-browser` | One locked, disposable agent browser: `acquire --owner <id> --reason <text>` prints the CDP port (fresh headless profile); `status`; `release --owner <id>` stops it and deletes the profile. `TEMP_BROWSER_HEADED=1` opens a headed window in the background (no focus); `TEMP_BROWSER_LAUNCH=<cmd>` launches it your way. Exit 3 = busy |
-| `agent-tab` | Owner, reason, and lease per tab of the agents Chrome (9223): `open --owner --reason [--lease] <url>`, `list`, `close --owner <id> <tab>`, `renew`; owner-only page commands `text`, `eval`, `nav`, `shot`; `health [--fix]`; `clear-cookies <domain>`. `AGENT_TAB_OWNER` sets the default owner. Acting on another owner's live tab exits 3 |
+| `agent-tab` | Owner, reason, and lease per tab of the agents Chrome (9223): `open --owner --reason [--lease] <url>`, `list`, `close --owner <id> <tab>`, `renew`; owner-only page commands `text`, `eval` (`-` reads the script from stdin), `nav`, `shot`; `health [--fix]`; `clear-cookies <domain>`. `AGENT_TAB_OWNER` sets the default owner. Acting on another owner's live tab exits 3 |
 | `agent-browser-temp-route` | Routes agent-browser calls with `--session-name`, `--profile`, or `--extension` to `temp-browser` through its lock; fails with the holder and reason when held |
 | `setup-dock` | Reset Dock to a developer-essential app layout |
 

@@ -445,3 +445,172 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"cached"* ]]
 }
+
+# ── Per-file mode (make lint) ────────────────────────────────────────
+
+# A fake checker: logs each file it gets and fails on a file that says BAD.
+per_file_setup() {
+  CHECK="$TEST_DIR/check"
+  CALLS="$TEST_DIR/calls.log"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$1" >> "%s"\nif grep -q BAD "$1"; then echo "BAD in $1"; exit 3; fi\n' "$CALLS" > "$CHECK"
+  chmod +x "$CHECK"
+  mkdir -p "$TEST_REPO/bin" "$TEST_REPO/lib"
+  printf 'echo a\n' > "$TEST_REPO/bin/a"
+  printf 'echo b\n' > "$TEST_REPO/bin/b"
+  cd "$TEST_REPO"
+}
+
+# Print the files the checker got since the last call (sorted), then reset.
+calls() {
+  [ -f "$CALLS" ] && LC_ALL=C sort "$CALLS" | tr '\n' ' '
+  : > "$CALLS"
+}
+
+@test "--per-file checks each file once, then reuses each pass" {
+  per_file_setup
+  run "$SCRIPT" --per-file --jobs 2 "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a bin/b " ]
+  [[ "$output" == *"2 checked"* ]]
+
+  run "$SCRIPT" --per-file --jobs 2 "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ -z "$(calls)" ]
+  [[ "$output" == *"2 unchanged"* ]]
+}
+
+@test "--per-file re-checks only the edited file" {
+  per_file_setup
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  calls >/dev/null
+  echo "echo a2" >> bin/a
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a " ]
+}
+
+@test "--per-file shows a failing file's output, fails, and keeps the other passes" {
+  per_file_setup
+  echo "BAD" >> bin/b
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"BAD in bin/b"* ]]
+  [[ "$output" == *"1 failed"* ]]
+  calls >/dev/null
+
+  # The failure is not cached; the pass is.
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 3 ]
+  [ "$(calls)" = "bin/b " ]
+}
+
+@test "--per-file re-checks a file when a file it sources changes" {
+  per_file_setup
+  printf '# shellcheck source=lib/x.sh\nsource "$DIR/lib/x.sh"\n' > bin/a
+  printf 'X=1\n' > lib/x.sh
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  calls >/dev/null
+  printf 'X=2\n' > lib/x.sh
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a " ]
+}
+
+@test "--per-file follows sources two levels deep and from the file's folder" {
+  per_file_setup
+  # bin/a names its lib relative to its own folder; the lib sources a
+  # second lib with a constant path.
+  printf '# shellcheck source=../lib/x.sh\n. "$DIR/../lib/x.sh"\n' > bin/a
+  printf 'source lib/y.sh\n' > lib/x.sh
+  printf 'Y=1\n' > lib/y.sh
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  calls >/dev/null
+  printf 'Y=2\n' > lib/y.sh
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a " ]
+}
+
+@test "--per-file shares passes across worktrees and clones of the repo" {
+  per_file_setup
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  calls >/dev/null
+  cp -R "$TEST_REPO" "$TEST_DIR/clone"
+  cd "$TEST_DIR/clone"
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ -z "$(calls)" ]
+}
+
+@test "--per-file re-checks every file when --key changes" {
+  per_file_setup
+  run "$SCRIPT" --per-file --key "tool 1.0" "$CHECK" -- bin/a bin/b
+  calls >/dev/null
+  run "$SCRIPT" --per-file --key "tool 1.0" "$CHECK" -- bin/a bin/b
+  [ -z "$(calls)" ]
+  run "$SCRIPT" --per-file --key "tool 2.0" "$CHECK" -- bin/a bin/b
+  [ "$(calls)" = "bin/a bin/b " ]
+}
+
+@test "--per-file never caches a file with a source-path directive" {
+  per_file_setup
+  printf '# shellcheck source-path=lib\necho a\n' > bin/a
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  calls >/dev/null
+  run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a " ]
+}
+
+@test "--per-file still checks and passes when the cache folder cannot be written" {
+  per_file_setup
+  # A plain file where the cache folder should be: mkdir fails, as in the
+  # agent sandbox.
+  : > "$TEST_DIR/not-a-dir"
+  CACHED_RUN_DIR="$TEST_DIR/not-a-dir/cache" run "$SCRIPT" --per-file "$CHECK" -- bin/a bin/b
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "bin/a bin/b " ]
+}
+
+@test "--per-file without -- before the files fails with usage" {
+  per_file_setup
+  run "$SCRIPT" --per-file "$CHECK" bin/a
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--"* ]]
+}
+
+@test "--per-file re-runs real shellcheck when a sourced lib drops a variable" {
+  command -v shellcheck >/dev/null || skip "shellcheck not installed"
+  per_file_setup
+  printf 'external-sources=true\n' > .shellcheckrc
+  # (SC2154 skips ALL_CAPS names, so the variable is lowercase.)
+  printf '#!/bin/bash\n# shellcheck source=lib/x.sh\nsource "$DIR/lib/x.sh"\necho "$my_var"\n' > bin/a
+  printf '#!/bin/bash\n# shellcheck disable=SC2034\nmy_var=1\n' > lib/x.sh
+  run "$SCRIPT" --per-file shellcheck -S warning -- bin/a
+  [ "$status" -eq 0 ]
+  # Without my_var in the lib, bin/a references an unassigned variable.
+  printf '#!/bin/bash\nother=1\nexport other\n' > lib/x.sh
+  run "$SCRIPT" --per-file shellcheck -S warning -- bin/a
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"SC2154"* ]]
+}
+
+@test "make lint uses the per-file cache and make lint-full skips it" {
+  local mk="$BATS_TEST_DIRNAME/../Makefile"
+  grep -qE 'cached-run --per-file .*shellcheck \$\(LINT_FLAGS\) -- \$\(SCRIPTS\)' "$mk"
+  grep -qE '^lint-full:' "$mk"
+  grep -qE '^	@\$\(FULLPOWER\) shellcheck \$\(LINT_FLAGS\) \$\(SCRIPTS\)' "$mk"
+  # The cache key covers the shellcheck version and the repo .shellcheckrc.
+  grep -qE 'shellcheck --version' "$mk"
+  grep -qE 'hash-object \.shellcheckrc' "$mk"
+}
+
+@test "repo .shellcheckrc sets no source-path that the per-file cache cannot follow" {
+  # bin/cached-run --per-file looks up a sourced path from the repo root and
+  # from the script's folder (SCRIPTDIR). Another source-path folder would
+  # hide a dependency from the cache key: teach cached-run first.
+  run grep -E '^[[:space:]]*source-path=' "$BATS_TEST_DIRNAME/../.shellcheckrc"
+  local bad
+  bad="$(printf '%s\n' "$output" | grep -vE '^[[:space:]]*source-path=SCRIPTDIR[[:space:]]*$' || true)"
+  [ -z "$bad" ] || { echo "$bad"; return 1; }
+}

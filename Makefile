@@ -1,4 +1,4 @@
-.PHONY: changelog check-steps e2e e2e-if-needed help lint lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
+.PHONY: changelog check-steps e2e e2e-if-needed help lint lint-full lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
 
 .DEFAULT_GOAL := help
 
@@ -47,9 +47,20 @@ help: ## Show this help message
 		awk -F ':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 # ── Lint: shellcheck all scripts ─────────────────────────────────────
-lint: ## Shellcheck all scripts
+# make lint checks every script in SCRIPTS, but skips a script that already
+# passed with the same content, the same files it sources, the same
+# shellcheck version, and the same .shellcheckrc (bin/cached-run --per-file;
+# every worktree shares these passes). The rest run $(JOBS) at a time.
+# make lint-full is the old single uncached shellcheck call: same verdict.
+LINT_FLAGS := -S warning
+lint-key = $(shell shellcheck --version 2>/dev/null | sed -n 2p) rc=$(shell git hash-object .shellcheckrc 2>/dev/null) opts=$(SHELLCHECK_OPTS)
+lint: ## Shellcheck all scripts (skips scripts that passed unchanged)
 	@echo "═══ Shellcheck ═══"
-	@$(FULLPOWER) shellcheck -S warning $(SCRIPTS) && echo "✓ All scripts pass shellcheck" || exit 1
+	@$(FULLPOWER) ./bin/cached-run --per-file --jobs $(JOBS) --key "$(lint-key)" shellcheck $(LINT_FLAGS) -- $(SCRIPTS) && echo "✓ All scripts pass shellcheck" || exit 1
+
+lint-full: ## Shellcheck all scripts, no cache (slow)
+	@echo "═══ Shellcheck (full, no cache) ═══"
+	@$(FULLPOWER) shellcheck $(LINT_FLAGS) $(SCRIPTS) && echo "✓ All scripts pass shellcheck" || exit 1
 
 # ── Lint: task queue format ──────────────────────────────────────────
 lint-tasks: ## Validate TASKS.md queue format

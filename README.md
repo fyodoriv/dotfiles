@@ -1060,7 +1060,7 @@ scratch work.
 | Script | Description |
 |--------|-------------|
 | `bats-affected` | Print bats test files affected by current git changes |
-| `cached-run` | Skip commands when the git working tree hasn't changed |
+| `cached-run` | Skip commands when the git working tree hasn't changed; `--per-file` skips each file that already passed unchanged (`make lint`) |
 | `check-all` | Run cached lint and test across all `~/apps` repos |
 
 ## Environment variables
@@ -1129,7 +1129,8 @@ See [AGENTS.md](AGENTS.md) for the detailed repo layout with ownership boundarie
 ## Development
 
 ```bash
-make lint           # shellcheck all scripts
+make lint           # shellcheck all scripts (skips scripts that passed unchanged)
+make lint-full      # shellcheck all scripts, no cache
 make lint-tasks     # validate TASKS.md queue format + P0/P1 rule-9 fields
 make test           # affected tests only (cached, git-aware)
 make test-all       # full suite (cached)

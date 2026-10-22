@@ -164,6 +164,7 @@ EOF
   mkdir -p "$fake_repo/bin" "$fake_repo/lib" "$stub_bin"
   cp "$CLI" "$fake_repo/bin/dotfiles"
   cp "$DOTFILES_DIR/lib/colors.sh" "$fake_repo/lib/colors.sh"
+  cp "$DOTFILES_DIR/lib/confirm.sh" "$fake_repo/lib/confirm.sh"
   cat > "$fake_repo/bin/dotfiles-update" <<STUB
 #!/usr/bin/env bash
 printf 'dotfiles-update' > "$invocations"

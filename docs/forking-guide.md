@@ -370,9 +370,11 @@ git switch -c fix/short-name
 # edit, then: make check
 git commit -m "fix: what changed"
 dotfiles contribute --dry-run         # prints each git and gh step
-dotfiles contribute                   # forks, pushes to your fork, opens the PR
+dotfiles contribute                   # asks y/N, then forks, pushes to your fork, opens the PR
 dotfiles contribute --repo agentbrew  # same, from your agentbrew clone
 ```
+
+`dotfiles contribute` posts a public PR, so it asks first. Without a terminal (an agent's shell) it refuses unless you pass `--yes`: an agent shows you the `--dry-run` output, and runs `dotfiles contribute --yes` only after you say yes.
 
 To show the maintainer how the tooling behaves on your machine, attach the output of `dotfiles metrics --share metrics.md`. It holds only aggregates: no project names, paths, prompts, or process names. Nothing is uploaded unless you attach it.
 

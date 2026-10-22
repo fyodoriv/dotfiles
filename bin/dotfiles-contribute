@@ -4,12 +4,14 @@
 # push access. A thin wrapper: `agentbrew contribute` does the work.
 #
 # Usage:
-#   dotfiles contribute [--repo dotfiles|agentbrew|<path>] [agentbrew contribute flags]
+#   dotfiles contribute [--repo dotfiles|agentbrew|<path>] [--yes] [agentbrew contribute flags]
 #
 # Flags:
 #   --repo NAME   Which checkout to open the PR from (default: dotfiles).
 #                 `agentbrew` uses the agentbrew clone dotfiles found.
 #   --dry-run     Print the git and gh steps without running them.
+#   --yes         The person agreed: open the PR without asking. Without it,
+#                 a terminal asks y/N, and no terminal refuses (lib/confirm.sh).
 #   --help, -h    Print this message.
 # Every other flag (--title, --body-file, --base, --draft) passes through.
 set -euo pipefail
@@ -22,7 +24,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo) repo="${2:-}"; shift 2 ;;
     --repo=*) repo="${1#--repo=}"; shift ;;
-    --help|-h) sed -n '2,15p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    --help|-h) sed -n '2,17p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
     *) args+=("$1"); shift ;;
   esac
 done
@@ -37,6 +39,11 @@ case "$repo" in
   *) dir="$repo" ;;
 esac
 [ -d "$dir" ] || { echo "dotfiles contribute: $dir is not a folder" >&2; exit 1; }
+
+# shellcheck source=../lib/confirm.sh
+source "$DOTFILES_DIR/lib/confirm.sh"
+confirm_gate "opens a public pull request upstream from $dir (it pushes your branch, and forks the repo when needed)" ${args[@]+"${args[@]}"}
+args=(${CONFIRM_ARGS[@]+"${CONFIRM_ARGS[@]}"})
 
 cd "$dir"
 exec "${DOTFILES_AGENTBREW_BIN:-$DOTFILES_DIR/bin/agentbrew}" contribute ${args[@]+"${args[@]}"}

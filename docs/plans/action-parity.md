@@ -45,3 +45,24 @@ changes): the count of dispatched commands missing from
 - Success: 0 missing, enforced by the test in the gate.
 - Pivot: if the dispatch could not be parsed, keep one registry file that
   both the dispatch and `actions` read, never two lists.
+
+## Follow-up: review of PR #277
+
+- Arms are read by case depth, not by indent: an arm is the first code after
+  `in` or after `;;` at depth 1, at any indent, with any spaces around `|`.
+  The test reads the arms with bash's own parser (`declare -f` of the
+  dispatch block), so the generator and the test cannot miss the same arm.
+- `subforms` come from the "Usage:" header of the script an arm runs (for
+  example `dotfiles config get <key>`, `dotfiles plugin update`).
+- A usage that runs into its description (one space, then a capital or a
+  bare word after the first `[`, `<`, or `--`) fails `--check`, in the help
+  text and in script headers.
+- Each `confirm` action takes `--yes` or has an `# unattended:` reason, and
+  `--check` fails otherwise. `contribute` (a public PR), `init`, and `update`
+  now ask y/N at a terminal and refuse without one unless `--yes`
+  (`lib/confirm.sh`; `--dry-run` and `--help` need no yes). Nothing runs
+  `dotfiles update` unattended, so it got a real gate. `apply`, `sync`, and
+  `upgrade` keep running unattended: the update-tooling and tooling-checkup
+  skills, `com.dotfiles.dotfiles-sync`, and `com.dotfiles.dotfiles-upgrade`
+  run them, and their notes say so.
+- The README CLI reference must name every action (a test).

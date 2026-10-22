@@ -7,7 +7,8 @@
 #                                                 clone, check the signed tag,
 #                                                 validate, approve, lock
 #   dotfiles plugin add --dev <path> [--yes]      link a local checkout (no pin)
-#   dotfiles plugin update <name> [<tag>] [--yes] move to another signed tag (the
+#   dotfiles plugin update <name> [<tag>] [--yes]
+#                                                 move to another signed tag (the
 #                                                 newest newer one when omitted);
 #                                                 swap and re-lock only after checks
 #   dotfiles plugin remove <name>                 delete checkout and lock entry

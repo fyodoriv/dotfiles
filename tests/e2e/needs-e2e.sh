@@ -28,8 +28,13 @@ libs_of() { (cd "$root" && grep -ohE 'lib/[A-Za-z0-9_.-]+\.(sh|awk|py)' "$@" 2>/
 # Repo files the lifecycle scripts run ({{ .chezmoi.sourceDir }}/macos.sh,
 # $DOTFILES_DIR/bin/x, ...) are part of the install too: they trigger the e2e
 # and their libs are scanned.
+# Not an input: run_after_agentbrew-sync.sh reads Agentfile.yaml only after
+# it finds agentbrew, and the hermetic HOME has none (the e2e also passes
+# --no-agentbrew; tests/chezmoiscripts.bats covers the skip). So an
+# Agentfile-only change does not need the e2e (tests/install-e2e-guard.bats).
+NOT_INPUTS='^Agentfile\.yaml$'
 targets="$(cd "$root" && grep -ohE '(\.chezmoi\.sourceDir \}\}|\$\{?(DOTFILES_DIR|CHEZMOI_SOURCE_DIR)\}?)/[A-Za-z0-9_./-]+' .chezmoiscripts/* 2>/dev/null |
-  sed -E 's#^(\.chezmoi\.sourceDir \}\}|\$\{?(DOTFILES_DIR|CHEZMOI_SOURCE_DIR)\}?)/##; s#/$##' | sort -u |
+  sed -E 's#^(\.chezmoi\.sourceDir \}\}|\$\{?(DOTFILES_DIR|CHEZMOI_SOURCE_DIR)\}?)/##; s#/$##' | sort -u | grep -vE "$NOT_INPUTS" |
   while IFS= read -r t; do [ -f "$t" ] && printf '%s\n' "$t"; done)"
 E2E_SOURCES="$E2E_CMDS modules/git/doctor.sh modules/shell/doctor.sh modules/sync/doctor.sh $(cd "$root" && ls .chezmoiscripts/* 2>/dev/null | tr '\n' ' ') $(printf '%s ' $targets)"
 # shellcheck disable=SC2086 # word-split the command and lib lists on purpose

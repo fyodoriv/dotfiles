@@ -16,3 +16,29 @@ agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
     [ "$status" -eq 0 ]
   done
 }
+
+# Parse a YAML file the way a broken Agentfile would fail agentbrew: yq when
+# it is on PATH (the Brewfile installs it), else the macOS system Ruby.
+parse_yaml() {
+  if command -v yq >/dev/null 2>&1; then
+    yq e '.' "$1" >/dev/null
+  elif [ -x /usr/bin/ruby ]; then
+    /usr/bin/ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$1"
+  else
+    echo "no YAML parser (install yq)" >&2
+    return 2
+  fi
+}
+
+@test "Agentfile.yaml parses as YAML" {
+  run parse_yaml "$agentfile"
+  [ "$status" -ne 2 ] || skip "needs yq or ruby"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
+@test "the Agentfile YAML check fails on a broken file" {
+  printf 'skills:\n  - a\n bad: [\n' > "$BATS_TEST_TMPDIR/broken.yaml"
+  run parse_yaml "$BATS_TEST_TMPDIR/broken.yaml"
+  [ "$status" -ne 2 ] || skip "needs yq or ruby"
+  [ "$status" -ne 0 ]
+}

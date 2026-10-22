@@ -51,3 +51,15 @@ REPO_ROOT="$BATS_TEST_DIRNAME/.."
   grep -qE 'gate-timed.sh e2e .*e2e-if-needed' "$REPO_ROOT/Makefile"
   grep -q 'needs-e2e.sh' "$REPO_ROOT/Makefile"
 }
+
+@test "an Agentfile-only change skips the install e2e, because the e2e never runs agentbrew" {
+  run bash -c "printf 'Agentfile.yaml\n' | '$REPO_ROOT/tests/e2e/needs-e2e.sh' --stdin"
+  [ "$status" -eq 1 ]
+  # The reason it is safe: the install e2e passes --no-agentbrew, and
+  # run_after_agentbrew-sync.sh reads the Agentfile only after it finds
+  # agentbrew (tests/chezmoiscripts.bats: "skips when no CLI is available").
+  grep -q -- '--no-agentbrew' "$REPO_ROOT/tests/e2e/dotfiles-install-e2e.bats"
+  run awk '/AGENTFILE=/ { a = NR } /agentbrew not available/ { n = NR } /_sync_from_agentfile "\$AGENTFILE"/ { s = NR } END { exit !(a && n && s && n < s) }' \
+    "$REPO_ROOT/.chezmoiscripts/run_after_agentbrew-sync.sh"
+  [ "$status" -eq 0 ]
+}

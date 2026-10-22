@@ -216,6 +216,10 @@ from another publisher (for example `/opt/homebrew/bin/node`), then run
 `dotfiles apply`. Agentbrew sync, its LaunchAgents, and its doctors then run on
 that Node. The default `node` and Topgrade stay in safe mode. If the variable
 names a missing file or a binary from the blocked publisher, nothing changes.
+If `security.agent_node_jobs_enabled` reports `com.agentbrew.check disabled
+while an approved agent Node exists`, run `dotfiles-disable-blocked-node-automation`
+(or `dotfiles apply`). It enables each `com.agentbrew.*` job that runs only that
+Node, also when safe mode is off.
 
 **Python:** `uv` Pythons have no publisher identity, so a strict policy can still
 flag them after ad-hoc signing. Python-dependent doctor modules stay off unless

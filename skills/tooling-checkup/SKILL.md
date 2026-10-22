@@ -101,6 +101,9 @@ python3 <skill-dir>/scripts/pty_capture.py --timeout 60 -- claude doctor
   version or repository head that changed since.
 - `inventory.sh` prints one verdict per item: `ship`, `salvage`, `clean-up`,
   `pipeline`, `bot`, `skip`, `security`, `advisory`, or `unknown`.
+- It checks pull requests and alerts on github.com and on each GitHub
+  Enterprise host that `gh` is logged in to or `TOOLING_CHECKUP_GH_HOSTS`
+  lists. An `unknown` line names a host it skipped and how to add it.
 - `claude doctor` needs a terminal; `pty_capture.py` gives it one.
 
 **Done when:** you have all three outputs, or you know why one failed.

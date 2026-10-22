@@ -469,6 +469,26 @@ if grep -q 'TeamIdentifier=HX7739G8FX' <<<"$_node_signature" \
 fi
 unset _node_path _node_signature
 
+# Safe mode can disable a job and then turn off. With an approved agent Node,
+# a disabled job that runs only that Node is a failure in either case.
+if [ -f "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" ]; then
+  # shellcheck source=../../lib/dotfiles-agent-node.sh
+  source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
+  if dotfiles_agent_node_bin >/dev/null; then
+    _agent_node_jobs_off="$(dotfiles_agent_node_disabled_jobs | tr '\n' ' ')"
+    _agent_node_jobs_off="${_agent_node_jobs_off% }"
+    if [ -n "$_agent_node_jobs_off" ]; then
+      _agent_node_jobs_desc="$_agent_node_jobs_off disabled while an approved agent Node exists"
+    else
+      _agent_node_jobs_desc="agentbrew jobs on the approved agent Node are enabled"
+    fi
+    check "security.agent_node_jobs_enabled" "$_agent_node_jobs_desc" \
+      "[ -z \"\$(dotfiles_agent_node_disabled_jobs)\" ]" \
+      "'$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation'"
+    unset _agent_node_jobs_off _agent_node_jobs_desc
+  fi
+fi
+
 check "security.ollama_publisher_safe_mode" "Ollama supervisor never starts the blocked publisher without exception opt-in" \
   "grep -q 'DOTFILES_ALLOW_BLOCKED_OLLAMA_PUBLISHER' '$DOTFILES_DIR/bin/ollama-launchagent' && grep -q 'TeamIdentifier=.*BLOCKED_TEAM_ID' '$DOTFILES_DIR/bin/ollama-launchagent'" \
   "upgrade dotfiles; keep Ollama startup publisher-gated until its machine-scoped exception is approved"

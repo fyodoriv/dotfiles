@@ -201,7 +201,10 @@ if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
   fi
 fi
 
-# Jobs that sync just rewrote onto the approved agent Node can now be enabled.
-if $_agent_node_active; then
+# Jobs that sync just rewrote onto the approved agent Node can now be enabled,
+# also when safe mode is off (the shim runs agentbrew on that Node anyway).
+if $_agent_node_active || { [ -f "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" ] \
+    && source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" \
+    && dotfiles_agent_node_bin >/dev/null; }; then
   PATH="$_default_node_path" "$DOTFILES_DIR/bin/dotfiles-disable-blocked-node-automation" || true
 fi

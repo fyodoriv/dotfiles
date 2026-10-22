@@ -44,9 +44,27 @@ touch "$BATS_TEST_TMPDIR/agent-node-executed"
 exit 0
 EOF
   chmod +x "$AGENT_NODE_DIR/node"
+  # Fake launchctl: logs every call and keeps the disabled labels in a file,
+  # one per line, so print-disabled answers like launchd does.
+  export LAUNCHD_DISABLED="$BATS_TEST_TMPDIR/launchd-disabled"
+  : >"$LAUNCHD_DISABLED"
   cat >"$FAKE_BIN/launchctl" <<EOF
 #!/bin/bash
 printf '%s\n' "\$*" >>"$LAUNCHCTL_LOG"
+case "\$1" in
+  print-disabled)
+    printf '\tdisabled services = {\n'
+    while IFS= read -r label; do
+      printf '\t\t"%s" => disabled\n' "\$label"
+    done <"$LAUNCHD_DISABLED"
+    printf '\t}\n'
+    ;;
+  disable) printf '%s\n' "\${2##*/}" >>"$LAUNCHD_DISABLED" ;;
+  enable)
+    grep -vxF "\${2##*/}" "$LAUNCHD_DISABLED" >"$LAUNCHD_DISABLED.tmp"
+    mv "$LAUNCHD_DISABLED.tmp" "$LAUNCHD_DISABLED"
+    ;;
+esac
 exit 0
 EOF
   chmod +x "$FAKE_BIN/uname" "$FAKE_BIN/node" "$FAKE_BIN/codesign" "$FAKE_BIN/launchctl"
@@ -146,6 +164,7 @@ EOF
 
 @test "agent Node opt-in keeps agentbrew jobs on that Node and still stops Topgrade" {
   write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
   touch "$TEST_HOME/Library/LaunchAgents/com.dotfiles.dotfiles-upgrade.plist"
 
   run env HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
@@ -160,6 +179,72 @@ EOF
   grep -q 'enable gui/.*/com.agentbrew.check' "$LAUNCHCTL_LOG"
   grep -q 'disable gui/.*/com.dotfiles.dotfiles-upgrade' "$LAUNCHCTL_LOG"
   [ ! -e "$BATS_TEST_TMPDIR/node-executed" ]
+}
+
+@test "safe mode off: a disabled job on the approved agent Node is enabled again" {
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
+
+  run env HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node" \
+    bin/dotfiles-disable-blocked-node-automation
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Re-enabled com.agentbrew.check"*"approved agent Node $AGENT_NODE_DIR/node"* ]]
+  grep -q 'enable gui/.*/com.agentbrew.check' "$LAUNCHCTL_LOG"
+  ! grep -q 'disable gui/' "$LAUNCHCTL_LOG"
+  [ ! -s "$LAUNCHD_DISABLED" ]
+  [ ! -e "$TEST_HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ]
+}
+
+@test "safe mode off: a disabled job that runs the blocked Node stays off" {
+  write_job com.agentbrew.check "$FAKE_BIN/node" "$FAKE_BIN:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
+
+  run env HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node" \
+    bin/dotfiles-disable-blocked-node-automation
+
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Re-enabled"* ]]
+  ! grep -q 'enable gui/' "$LAUNCHCTL_LOG"
+  grep -qx com.agentbrew.check "$LAUNCHD_DISABLED"
+}
+
+@test "safe mode off without an agent Node leaves launchd alone" {
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
+
+  run env HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    bin/dotfiles-disable-blocked-node-automation
+
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -e "$LAUNCHCTL_LOG" ]
+}
+
+@test "apply-time sync enables a job that sync moved onto the agent Node" {
+  # Before sync the job runs the blocked Node; the fake sync rewrites it onto
+  # the approved agent Node, as agentbrew does through the shim.
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:/usr/bin:/bin"
+  mv "$TEST_HOME/Library/LaunchAgents/com.agentbrew.check.plist" "$BATS_TEST_TMPDIR/rewritten.plist"
+  write_job com.agentbrew.check "$FAKE_BIN/node" "$FAKE_BIN:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
+  cat >"$FAKE_BIN/agentbrew" <<EOF
+#!/bin/bash
+[ "\$1" = sync ] && cp "$BATS_TEST_TMPDIR/rewritten.plist" "$TEST_HOME/Library/LaunchAgents/com.agentbrew.check.plist"
+exit 0
+EOF
+  chmod +x "$FAKE_BIN/agentbrew"
+
+  run env HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    CHEZMOI_SOURCE_DIR="$PWD" DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node" \
+    bash .chezmoiscripts/run_after_agentbrew-sync.sh
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Re-enabled com.agentbrew.check"* ]]
+  grep -q 'enable gui/.*/com.agentbrew.check' "$LAUNCHCTL_LOG"
+  [ ! -s "$LAUNCHD_DISABLED" ]
 }
 
 @test "agent Node opt-in still disables a job whose program is the blocked Node" {
@@ -312,4 +397,51 @@ security_check_ids() {
 @test "managed endpoint with official Node requires Node jobs unloaded" {
   run security_check_ids DOTFILES_MANAGED_ENDPOINT=1
   [[ "$output" == *"security.blocked_node_jobs_unloaded"* ]]
+}
+
+# Source the security module; print the agent Node job check as
+# "result|description|fix", running only that check's test command.
+security_agent_node_check() {
+  env -i HOME="$TEST_HOME" PATH="$FAKE_BIN:/usr/bin:/bin" \
+    DOTFILES_DIR="$PWD" DOTFILES_MODULE_DIR="$PWD" "$@" \
+    /bin/bash -c '
+      check() {
+        [ "$1" = security.agent_node_jobs_enabled ] || return 0
+        if eval "$3" >/dev/null 2>&1; then r=pass; else r=fail; fi
+        printf "%s|%s|%s\n" "$r" "$2" "$4"
+      }
+      check_advisory() { :; }; check_symlink() { :; }; check_managed() { :; }
+      pass() { :; }; fail() { :; }; fixed() { :; }; skipped() { :; }; audit_warn() { :; }
+      is_overridden() { return 1; }
+      FIX_MODE=false; LIST_MODE=false; QUIET_MODE=true
+      source modules/security/doctor.sh
+    ' 2>/dev/null
+}
+
+@test "security doctor fails when a job is disabled while an approved agent Node exists" {
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
+
+  run security_agent_node_check DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node"
+
+  [[ "$output" == "fail|com.agentbrew.check disabled while an approved agent Node exists|"*"bin/dotfiles-disable-blocked-node-automation"* ]]
+}
+
+@test "security doctor passes when agent Node jobs are enabled" {
+  write_job com.agentbrew.check "$AGENT_NODE_DIR/node" "$AGENT_NODE_DIR:/usr/bin:/bin"
+
+  run security_agent_node_check DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node"
+
+  [[ "$output" == "pass|agentbrew jobs on the approved agent Node are enabled|"* ]]
+}
+
+@test "security doctor ignores a disabled blocked-Node job and a missing agent Node" {
+  write_job com.agentbrew.check "$FAKE_BIN/node" "$FAKE_BIN:/usr/bin:/bin"
+  echo com.agentbrew.check >"$LAUNCHD_DISABLED"
+
+  run security_agent_node_check DOTFILES_AGENT_NODE_BIN="$AGENT_NODE_DIR/node"
+  [[ "$output" == "pass|"* ]]
+
+  run security_agent_node_check
+  [ -z "$output" ]
 }

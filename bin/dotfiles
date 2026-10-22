@@ -54,6 +54,10 @@ _check_for_updates() {
   fi
 }
 
+# bin/dotfiles-actions reads this text: one line per usage form, at a
+# two-space indent: the usage, two or more spaces, what it does (deeper lines
+# continue it). Every dispatch arm below needs a line here; `dotfiles actions
+# --check` (tests/dotfiles-actions.bats) fails otherwise.
 show_help() {
   cat <<EOF
 Usage: dotfiles [<command>] [options]
@@ -67,6 +71,8 @@ Start:
                               a fresh doctor check. Same as \`dotfiles start\`.
   config [<key>]              Show every setting (value, source, allowed) or one
   config set <key> <value>    Check a value against config/settings.yaml and save it
+  actions [<name>] [--json]   Every command for agents: usage, arguments, notes
+  actions --check             Fail when a command has no line in this help
 
 Common:
   apply [--pull] [--no-fix] [--if-changed]
@@ -99,7 +105,7 @@ Advanced:
   stats                        Show automation stats (runs, time saved, streak)
   install plan|run|restore     One-step install with backup and auto-restore
   metrics [--share FILE]       Agent time, hook blocks, MCP health, machine load
-  contribute [--repo agentbrew] Open a PR upstream from your branch (forks for you)
+  contribute [--repo agentbrew]  Open a PR upstream from your branch (forks for you)
   cheat                        Show all available commands and aliases
   edit                         Open the dotfiles repo in your editor
   cd                           Print the dotfiles directory (use: cd \$(dotfiles cd))
@@ -107,10 +113,14 @@ Advanced:
                                (also runs as part of \`doctor\`)
   validate [--quick]           Verify repo is safe to share (paths, secrets, lint, test)
                                (also runs as part of \`doctor\`)
-  defaults-preview [--changed] Preview macOS defaults changes (no writes)
+  defaults-preview [--changed]  Preview macOS defaults changes (no writes)
   enterprise [on|off]          Show or toggle enterprise mode
   quickstart [--check]         Interactive first-run wizard
-  uninstall [--dry-run] [--yes] Remove dotfiles from this machine
+  plugin <subcommand>          Company plugins: add, remove, list, verify, trust
+                               (see \`dotfiles plugin --help\`)
+  leak allow --once [<sha>]    A person allows one leak-gate bypass (needs a terminal)
+  memory <subcommand>          Deprecated: forwards to \`agentbrew memory\`
+  uninstall [--dry-run] [--yes]  Remove dotfiles from this machine
 
 Options:
   --help, -h         Show this help
@@ -150,23 +160,34 @@ cmd="${cmd#-}"
 # Check for updates (skip for commands that already update or need clean stdout;
 # the start screen prints its own Update line)
 case "$cmd" in
-  update|upgrade|sync|cd|version|v|start|""|config) ;;
+  update|upgrade|sync|cd|version|v|start|""|config|actions) ;;
   *) _check_for_updates ;;
 esac
 
+# Each case arm is an action (`dotfiles actions`). Notes for agents go in the
+# arm as four-space comments: `# terminal-only: <why>` (needs a person at a
+# terminal), `# confirm: <what it changes>` (agents ask first), and
+# `# agent: <what to do differently>`.
 case "$cmd" in
   help|h)
     show_help
     ;;
 
   ""|start)
+    # agent: run it bare first; it changes nothing. Add --yes only after the user says yes: it applies, or installs on a new Mac.
     [ "$cmd" = "start" ] && shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-start" "$@"
     ;;
 
   config)
+    # agent: run `config set` only for a change the user asked for, then `dotfiles apply --if-changed` after a yes.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-config" "$@"
+    ;;
+
+  actions)
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-actions" "$@"
     ;;
 
   version|v)
@@ -174,6 +195,7 @@ case "$cmd" in
     ;;
 
   apply)
+    # confirm: overwrites the managed files in your home folder and runs doctor --fix; it can take minutes and show macOS prompts.
     # `dotfiles apply` is now the single command operators run. It:
     #   1. Optionally git-pulls latest if --pull was passed (subsumes
     #      `dotfiles update`'s primary purpose).
@@ -263,6 +285,7 @@ case "$cmd" in
     ;;
 
   init)
+    # confirm: runs chezmoi init, then applies every managed file, like `dotfiles apply`.
     # Backward-compat alias for first-time-on-a-machine. Equivalent to
     # `dotfiles apply` once the repo is already cloned; chezmoi init clones
     # the source and then applies, which we replicate by ensuring the repo
@@ -278,11 +301,13 @@ case "$cmd" in
     ;;
 
   doctor)
+    # agent: --fix changes the machine; add it only after the user says yes.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-doctor" "$@"
     ;;
 
   plugin)
+    # confirm: `add`, `remove`, and `trust` install, delete, or trust code that runs here; `list`, `verify`, and `lint` change nothing.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-plugin" "$@"
     ;;
@@ -298,16 +323,19 @@ case "$cmd" in
     ;;
 
   leak)
+    # terminal-only: a person grants a leak-gate bypass at a terminal; it refuses without one, and agents never ask for it.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-leak" "$@"
     ;;
 
   sync)
+    # confirm: commits every local change in the dotfiles repo and pushes it (never to a public remote without a terminal).
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-sync" "$@"
     ;;
 
   edit)
+    # terminal-only: it opens the repo in your editor ($EDITOR); agents edit the files directly.
     local_editor="${EDITOR:-code}"
     exec "$local_editor" "$DOTFILES_DIR"
     ;;
@@ -317,6 +345,7 @@ case "$cmd" in
     ;;
 
   update)
+    # confirm: pulls, applies, and updates agents and every package; it takes minutes. Try --dry-run first.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-update" "$@"
     ;;
@@ -340,6 +369,7 @@ case "$cmd" in
     ;;
 
   install)
+    # confirm: `install run --yes` changes the machine (after a backup); `install restore` puts a backup back. `plan` changes nothing.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-install" "$@"
     ;;
@@ -350,6 +380,7 @@ case "$cmd" in
     ;;
 
   contribute)
+    # confirm: pushes your branch and opens a public pull request upstream (it forks the repo if needed). Try --dry-run first.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-contribute" "$@"
     ;;
@@ -399,21 +430,25 @@ case "$cmd" in
     ;;
 
   uninstall)
+    # confirm: removes the dotfiles symlinks and LaunchAgents from this machine. Try --dry-run first; --yes skips its prompt.
     shift
     exec "$DOTFILES_DIR/bin/dotfiles-uninstall" "$@"
     ;;
 
   quickstart)
+    # terminal-only: an interactive wizard that asks y/N questions; agents use `dotfiles install plan`, then `install run --yes`.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-quickstart" "$@"
     ;;
 
   upgrade)
+    # confirm: upgrades the software of every package manager (topgrade), or switches Node; hard to roll back. Try --dry-run.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-upgrade" "$@"
     ;;
 
   memory)
+    # agent: deprecated; run `agentbrew memory` instead.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-memory" "$@"
     ;;

@@ -1,0 +1,202 @@
+#!/bin/bash
+# Every dotfiles command as an action, for agents and people, read from bin/dotfiles.
+#
+# Usage:
+#   dotfiles actions [<name>]          One line per usage form, with the notes
+#   dotfiles actions [<name>] --json   The same list as JSON, for agents
+#   dotfiles actions --check           Fail when a dispatched command has no help
+#                                      line, or a help line names no command
+#
+# One source, nothing listed twice: the names come from the dispatch `case`
+# in bin/dotfiles, the usage and what each one does from its show_help text,
+# and the notes from comments in a dispatch arm, at four-space indent:
+#   # terminal-only: <why an agent cannot run it>  (needs a person at a terminal)
+#   # confirm: <what it changes that is hard to undo>  (agents ask first)
+#   # agent: <what an agent must do differently>
+# dotfiles has no UI; a UI would read this same list. It reads files only:
+# no git, no network, no update check.
+
+set -euo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CLI="$DOTFILES_DIR/bin/dotfiles"
+
+die() { echo "✗ $1" >&2; exit "${2:-1}"; }
+
+mode=list json=0 want=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json) json=1 ;;
+    --check) mode=check ;;
+    -*) die "unknown flag: $1. Run: dotfiles actions --help" 2 ;;
+    *) [ -z "$want" ] || die "one action name at a time" 2; want="$1" ;;
+  esac
+  shift
+done
+
+command -v jq >/dev/null 2>&1 || die "jq is not installed. Fix: brew install jq"
+[ -r "$CLI" ] || die "cannot read $CLI"
+
+# Rows, tab-separated (help text holds no tabs):
+#   A <name> <arm labels>          one per dispatch arm, in order
+#   F <name> <usage> <args> <help> one per show_help line (a usage form)
+#   N <name> <key> <text>          one per note comment in an arm
+#   E <problem>                    one per parity problem
+# shellcheck disable=SC2016 # awk program, not shell
+rows="$(awk '
+  # show_help: one line per form, two-space indent, the usage, two or more
+  # spaces, what it does; deeper-indented lines continue the description.
+  /^show_help\(\) \{$/ { in_fn = 1; next }
+  in_fn && /^  cat <<EOF$/ { in_help = 1; in_fn = 0; next }
+  in_help && /^EOF$/ { in_help = 0; next }
+  in_help {
+    line = $0
+    gsub(/\\`/, "`", line)
+    gsub(/\\\$/, "$", line)
+    if (line ~ /^[A-Z][A-Za-z ]*:$/) { skip = (line == "Examples:"); cont = 0; next }
+    if (skip) next
+    if (line ~ /^  [^ ]/) {
+      body = substr(line, 3)
+      nh++
+      if (match(body, /  +/)) { hu[nh] = substr(body, 1, RSTART - 1); hd[nh] = substr(body, RSTART + RLENGTH) }
+      else { hu[nh] = body; hd[nh] = "" }
+      cont = 1
+      next
+    }
+    if (cont && line ~ /^   +[^ ]/) {
+      t = line; sub(/^ +/, "", t)
+      # A line that starts a new point (a flag or a capital) after unfinished
+      # text joins with "; "; a wrapped sentence joins with a space.
+      if (hd[nh] == "") hd[nh] = t
+      else if (t ~ /^(-|[A-Z])/ && hd[nh] !~ /[.,:;]$/) hd[nh] = hd[nh] "; " t
+      else hd[nh] = hd[nh] " " t
+      next
+    }
+    cont = 0
+    next
+  }
+
+  # The dispatch: the second `case "$cmd" in` (the first skips the update check).
+  /^case "\$cmd" in$/ { ncase++; next }
+  ncase == 2 && /^esac$/ { ncase = 3; next }
+  ncase == 2 && /^  [^ *#][^ ]*\)/ {
+    lab = substr($0, 3); sub(/\).*/, "", lab)
+    na++; labels[na] = lab; prim = ""
+    n = split(lab, parts, "|")
+    for (i = 1; i <= n; i++) {
+      p = parts[i]; gsub(/"/, "", p)
+      if (prim == "" && p != "") prim = p
+      arm_of[p] = na
+    }
+    name[na] = prim; in_note = 0
+    next
+  }
+  ncase == 2 && /^    # (terminal-only|confirm|agent): / {
+    t = substr($0, 7); k = t; sub(/:.*/, "", k); v = t; sub(/^[^:]*: /, "", v)
+    nn++; note_key[nn] = k; note_text[nn] = v; note_arm[nn] = na; in_note = 1
+    next
+  }
+  ncase == 2 && in_note && /^    #   +[^ ]/ { t = $0; sub(/^    # +/, "", t); note_text[nn] = note_text[nn] " " t; next }
+  ncase == 2 { in_note = 0 }
+
+  END {
+    for (i = 1; i <= nh; i++) {
+      u = hu[i]
+      if (u ~ /^\(no command\)/) {
+        k = ""; rest = u; sub(/^\(no command\) */, "", rest)
+        shown = "dotfiles" (rest == "" ? "" : " " rest)
+      } else if (u ~ /^-/) {
+        k = u; sub(/[ ,].*/, "", k); shown = "dotfiles " k; sub(/^-+/, "", k); rest = ""
+      } else {
+        k = u; sub(/ .*/, "", k); rest = ""
+        if (index(u, " ")) { rest = u; sub(/^[^ ]+ /, "", rest) }
+        shown = "dotfiles " u
+      }
+      if (!(k in arm_of)) {
+        print "E\t" (k == "" ? "(no command)" : k) ": its show_help line names a command that is not dispatched in bin/dotfiles; remove the line or add the case arm"
+        continue
+      }
+      a = arm_of[k]; listed[a] = 1
+      if (hd[i] == "") print "E\t" name[a] ": its show_help line has no description; put two or more spaces between the usage and what it does"
+      print "F\t" name[a] "\t" shown "\t" rest "\t" hd[i]
+    }
+    for (a = 1; a <= na; a++) {
+      print "A\t" name[a] "\t" labels[a]
+      if (!(a in listed)) print "E\t" name[a] ": dispatched in bin/dotfiles but has no line in show_help; add one: two-space indent, the usage, two spaces, what it does"
+    }
+    for (i = 1; i <= nn; i++) print "N\t" name[note_arm[i]] "\t" note_key[i] "\t" note_text[i]
+  }
+' "$CLI")"
+
+problems="$(printf '%s\n' "$rows" | awk -F '\t' '$1 == "E" { print $2 }')"
+
+# The catalog, as one JSON array. Arguments come from the usage tokens:
+# [x] is optional, <x> and UPPER are values, a|b is a choice, --x is a flag,
+# --x VALUE an option, ... passes more arguments through, a bare word is literal.
+# shellcheck disable=SC2016 # jq program, not shell
+catalog="$(printf '%s\n' "$rows" | jq -nR '
+  def arg:
+    (startswith("[") and endswith("]")) as $opt
+    | (if $opt then .[1:-1] else . end) as $in
+    | ($in | split(" ") | map(select(. != ""))) as $w
+    | {kind: null, name: null, flag: null, value: null, choices: null, required: ($opt | not)}
+    | if $in == "..." then .kind = "more" | .required = false
+      elif ($w[0] | startswith("-")) then
+        .flag = ($w[0] | rtrimstr(",")) | .value = $w[1] | .kind = (if $w[1] then "option" else "flag" end)
+      elif ($in | test("^<[^>]+>$")) then .kind = "positional" | .name = ($in | .[1:-1])
+      elif ($in | test("\\|")) then .kind = "choice" | .choices = ($in | split("|"))
+      elif ($in | test("^[A-Z][A-Z0-9_]*$")) then .kind = "positional" | .name = ($in | ascii_downcase)
+      else .kind = "word" | .name = $in
+      end;
+  [inputs | select(length > 0) | split("\t")] as $rows
+  | [ $rows[] | select(.[0] == "A") | .[1] as $n
+      | ([$rows[] | select(.[0] == "N" and .[1] == $n) | {(.[2]): .[3]}] | add // {}) as $notes
+      | [$rows[] | select(.[0] == "F" and .[1] == $n)
+          | {usage: .[2], help: .[4], args: [.[3] | scan("\\[[^\\]]*\\]|[^ ]+") | arg]}] as $forms
+      | { name: $n,
+          aliases: (.[2] | split("|") | map(gsub("\""; "")) | map(select(. != $n))),
+          command: ("dotfiles " + $n),
+          help: ($forms[0].help // ""),
+          forms: $forms,
+          agent: ($notes["terminal-only"] == null),
+          terminal_only: $notes["terminal-only"],
+          confirm: $notes.confirm,
+          agent_note: $notes.agent } ]
+')"
+
+total="$(printf '%s' "$catalog" | jq 'length')"
+
+if [ "$mode" = check ]; then
+  if [ -n "$problems" ]; then
+    printf '✗ %s\n' "$problems"
+    echo "Fix bin/dotfiles so every case arm has a show_help line (see the comment above show_help)."
+    exit 1
+  fi
+  echo "✓ $total actions: every dispatched command has a help line, and every help line a command (bin/dotfiles)"
+  exit 0
+fi
+
+[ -z "$problems" ] || printf '! %s (run: dotfiles actions --check)\n' "$problems" >&2
+
+if [ -n "$want" ]; then
+  catalog="$(printf '%s' "$catalog" | jq --arg q "$want" 'map(select(.name == $q or any(.aliases[]; . == $q)))')"
+  [ "$(printf '%s' "$catalog" | jq 'length')" -gt 0 ] || die "no action named $want. Run: dotfiles actions"
+fi
+
+if [ "$json" -eq 1 ]; then
+  printf '%s\n' "$catalog"
+  exit 0
+fi
+
+# shellcheck disable=SC2016 # jq program, not shell
+printf '%s' "$catalog" | jq -r '
+  .[] | . as $a
+  | (if (.forms | length) == 0 then [{usage: .command, help: "(no help line in bin/dotfiles)"}] else .forms end)
+  | to_entries[]
+  | "\(.value.usage)  - \(.value.help)" + (if .key > 0 then "" else
+      ($a | (if .terminal_only then "  [terminal only: \(.terminal_only)]" else "" end)
+        + (if .confirm then "  [confirm: \(.confirm)]" else "" end)
+        + (if .agent_note then "  [agents: \(.agent_note)]" else "" end)) end)
+'
+echo "$(printf '%s' "$catalog" | jq 'length') action(s) from bin/dotfiles; agents: dotfiles actions --json"

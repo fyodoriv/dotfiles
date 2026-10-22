@@ -890,6 +890,17 @@ checks the value against [`config/settings.yaml`](config/settings.yaml) and
 saves it under `data:` in `~/.config/chezmoi/chezmoi.yaml`. Agents change
 settings the same way. Then run `dotfiles apply`.
 
+Actions: `dotfiles actions` lists every command, and agents read the same
+list with `dotfiles actions --json` (`/dotfiles` points them at it). It is
+generated from `bin/dotfiles` itself: the dispatch `case` gives the names,
+the `--help` text gives the usage, arguments, and what each one does, and
+comments in a dispatch arm add the notes. `terminal_only` says why an agent
+cannot run it (an editor, a wizard, a person-only step), and `confirm` says
+what it changes that is hard to undo, so agents ask first. dotfiles has no UI,
+so parity covers the CLI and agents. `dotfiles actions --check`
+([`tests/dotfiles-actions.bats`](tests/dotfiles-actions.bats)) fails when a
+command has no `--help` line, or a `--help` line names no command.
+
 ### File modes
 
 | Source naming | Mode | Deployed as |
@@ -995,6 +1006,8 @@ dotfiles [--yes] [--health]                       Start screen: set up, applied,
 dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
 dotfiles config get <key>                         Print one value
 dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it
+dotfiles actions [<name>] [--json]                Every command: usage, arguments, terminal-only and confirm notes
+dotfiles actions --check                          Fail when a command has no --help line (the parity test)
 dotfiles apply                                    Apply dotfiles (chezmoi apply)
 dotfiles init                                     Initialize on new machine (chezmoi init --apply)
 dotfiles diff                                     Show pending changes (chezmoi diff)

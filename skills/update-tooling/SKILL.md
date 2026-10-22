@@ -256,7 +256,8 @@ The applied-checkout helper only fast-forwards and reapplies chezmoi. Never
 run an applied-checkout update against a dirty or diverged worktree.
 
 Run the explicit apply after the helper intentionally. The helper reapplies
-only after a successful fast-forward; the explicit apply converges the current
+only when the fast-forward brought commits, its last apply failed, or
+`chezmoi status` shows drift; the explicit apply converges the current
 manifest even when the checkout was already current.
 
 `--if-changed` makes the explicit apply cheap when nothing changed. It skips

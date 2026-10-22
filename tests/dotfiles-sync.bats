@@ -533,21 +533,29 @@ _load_classifier() {
 # ── Linked worktrees and the applied checkout ───────────────────────
 
 # Add a linked worktree on its own branch that tracks the canonical branch,
-# plus a fake chezmoi whose source-path is $1 (default: the worktree) and
-# that records apply calls. Like chezmoi v2, the fake rejects apply flags it
-# does not know. Set FAKE_CHEZMOI_APPLY_ERROR to make apply fail.
+# plus a fake chezmoi (write_fake_chezmoi) whose source-path is $1 (default:
+# the worktree).
 setup_applied_worktree() {
   local canon
   canon="$(git -C "$TEST_DOTFILES" branch --show-current)"
   APPLIED="$TEST_DIR/applied"
   git -C "$TEST_DOTFILES" worktree add --quiet -b "applied/$canon" "$APPLIED" "origin/$canon"
   git -C "$APPLIED" branch --quiet --set-upstream-to="origin/$canon"
-  local source_dir="${1:-$APPLIED}"
+  write_fake_chezmoi "${1:-$APPLIED}"
+}
+
+# A fake chezmoi whose source-path is $1 and that records apply calls. Like
+# chezmoi v2, the fake rejects apply flags it does not know. Set
+# FAKE_CHEZMOI_APPLY_ERROR to make apply fail, and FAKE_CHEZMOI_STATUS to the
+# lines `chezmoi status` prints (default: none, no drift).
+write_fake_chezmoi() {
+  local source_dir="$1"
   mkdir -p "$TEST_DIR/fakebin"
   cat > "$TEST_DIR/fakebin/chezmoi" <<FAKE
 #!/bin/bash
 case "\$1" in
   source-path) printf '%s\n' "$source_dir" ;;
+  status) [ -z "\${FAKE_CHEZMOI_STATUS:-}" ] || printf '%s\n' "\$FAKE_CHEZMOI_STATUS" ;;
   apply)
     args="\$*"
     shift
@@ -630,6 +638,62 @@ push_remote_commit() {
   FAKE_CHEZMOI_APPLY_ERROR="could not open a new TTY" run "$APPLIED/bin/dotfiles-sync"
   [ "$status" -eq 0 ]
   [ ! -e "$HOME/.local/state/dotfiles/last-apply" ]
+}
+
+@test "sync with no new commits skips chezmoi apply after a recorded apply" {
+  write_fake_chezmoi "$TEST_DIR/elsewhere"
+  run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 1 ]
+  run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped chezmoi apply"* ]]
+  [[ "$output" == *"No changes"* ]]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 1 ]
+}
+
+@test "sync applies when the pull brings new commits" {
+  write_fake_chezmoi "$TEST_DIR/elsewhere"
+  "$TEST_DOTFILES/bin/dotfiles-sync"
+  push_remote_commit >/dev/null
+  run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"skipped chezmoi apply"* ]]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 2 ]
+}
+
+@test "sync applies when chezmoi status shows drift, and names it" {
+  write_fake_chezmoi "$TEST_DIR/elsewhere"
+  "$TEST_DOTFILES/bin/dotfiles-sync"
+  FAKE_CHEZMOI_STATUS="MM .gitconfig" run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Drift since the last apply"*".gitconfig"* ]]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 2 ]
+}
+
+@test "sync applies again after a failed apply with no new commits" {
+  write_fake_chezmoi "$TEST_DIR/elsewhere"
+  FAKE_CHEZMOI_APPLY_ERROR="could not open a new TTY" run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [[ "$output" == *"chezmoi apply failed"* ]]
+  run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 1 ]
+}
+
+@test "applied checkout with no new commits skips chezmoi apply after a recorded apply" {
+  setup_applied_worktree
+  run "$APPLIED/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"chezmoi re-applied"* ]]
+  run "$APPLIED/bin/dotfiles-sync"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Applied checkout at"*"skipped chezmoi apply"* ]]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 1 ]
+  # A fast-forward still re-applies.
+  push_remote_commit >/dev/null
+  run "$APPLIED/bin/dotfiles-sync"
+  [[ "$output" == *"chezmoi re-applied"* ]]
+  [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 2 ]
 }
 
 @test "sync output still reaches the log after the log is trimmed" {

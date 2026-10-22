@@ -1,6 +1,8 @@
 #!/bin/bash
 # Dotfiles auto-sync — commits and pushes any local changes, then pulls remote.
 # In chezmoi's applied checkout it only fast-forwards and re-applies chezmoi.
+# Either way it re-applies only when the pull brought commits, the last apply
+# did not succeed, or `chezmoi status` shows drift.
 # Designed to run periodically via LaunchAgent.
 # Usage: dotfiles-sync [--dry-run]
 
@@ -144,6 +146,22 @@ _chezmoi_apply() {
   return 1
 }
 
+# Re-apply only when something changed since the last successful apply: the
+# pull or fast-forward moved HEAD from $1, there is no matching record
+# (lib/apply-state.sh: a failed apply, a dirty source, a new chezmoi config or
+# plugin lock), or `chezmoi status` shows drift. A no-change run then costs one
+# `chezmoi status` (about 1 s) instead of a full apply that re-runs every
+# run_after_ script. Returns 0 applied, 1 apply failed, 2 skipped.
+_chezmoi_apply_if_needed() {
+  local drift drift_rc=0
+  if [ "$(git rev-parse HEAD)" = "$1" ] && apply_state_current "$DOTFILES_DIR"; then
+    drift="$(apply_state_drift "$DOTFILES_DIR")" || drift_rc=$?
+    [ "$drift_rc" -ne 1 ] || return 2
+    [ "$drift_rc" -ne 0 ] || info "[sync] Drift since the last apply: $(printf '%s\n' "$drift" | paste -sd ',' -)"
+  fi
+  _chezmoi_apply
+}
+
 # ── Applied checkout: fast-forward only ──────────────────────────────
 # chezmoi's source checkout sits on its own local branch that tracks the
 # canonical branch (e.g. applied/feat-chezmoi -> origin/feat/chezmoi). It
@@ -183,16 +201,19 @@ if _is_applied_checkout; then
     log_error US05 sync fetch_failed
     exit 0
   fi
+  _head_before="$(git rev-parse HEAD)"
   if ! git merge --ff-only --quiet "$APPLIED_UPSTREAM" 2>/dev/null; then
     warn "[sync] Applied checkout '$CURRENT_BRANCH' has diverged from $APPLIED_UPSTREAM — not a fast-forward; leaving it untouched."
     exit 0
   fi
   _head="$(git rev-parse --short HEAD)"
-  if _chezmoi_apply; then
-    ok "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi re-applied."
-  else
-    warn "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi was not re-applied."
-  fi
+  _apply_rc=0
+  _chezmoi_apply_if_needed "$_head_before" || _apply_rc=$?
+  case "$_apply_rc" in
+    0) ok "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi re-applied." ;;
+    2) ok "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); no new commits or drift, skipped chezmoi apply." ;;
+    *) warn "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi was not re-applied." ;;
+  esac
   log_run sync
   exit 0
 fi
@@ -218,11 +239,14 @@ else
   info "[sync] Pulling remote changes from $PULL_REMOTE..."
   _pull_err=""
   _pull_rc=0
+  _head_before="$(git rev-parse HEAD)"
   _pull_err=$(git pull "$PULL_REMOTE" "$(git branch --show-current)" --rebase --autostash --quiet 2>&1) || _pull_rc=$?
   if [ "$_pull_rc" -eq 0 ]; then
-    # Apply any config changes from remote
+    # Apply config changes from remote, or drift since the last apply.
     if command -v chezmoi &>/dev/null; then
-      _chezmoi_apply || true
+      _apply_rc=0
+      _chezmoi_apply_if_needed "$_head_before" || _apply_rc=$?
+      [ "$_apply_rc" -ne 2 ] || info "[sync] No new commits and no drift since the last apply; skipped chezmoi apply."
     fi
   else
     warn "[sync] Pull failed: $(_classify_push_error "$_pull_err")"

@@ -702,7 +702,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | Agent | Script | Schedule | What it does |
 |-------|--------|----------|-------------|
 | `com.dotfiles.app-priority` | `app-priority` | Every 60s | Prioritize interactive apps; background agent/model and verification workers so they yield under contention |
-| `com.dotfiles.dotfiles-sync` | `dotfiles-sync` | Every 30 min | Auto-commit tracked/staged changes + push/pull dotfiles repo |
+| `com.dotfiles.dotfiles-sync` | `dotfiles-sync` | Every 30 min | Auto-commit tracked/staged changes + push/pull dotfiles repo; re-applies chezmoi only on new commits, a failed last apply, or drift |
 | `com.dotfiles.tooling-sync` | `tooling-sync` | Every hour | Pull agentbrew and minsky; push agentbrew TASKS.md edits |
 | `com.dotfiles.network-resilience` | `network-watchdog` | Every 5 min + after wake | Restore DNS/connectivity after sleep |
 | `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code (CLI or desktop app) runs on AC or battery ≥20%; releases when both exit, and quarantines rejected scripting commands |

@@ -359,7 +359,7 @@ run `git push origin <branch>`, open a PR on github.com, and merge it. Run
 A machine can hold two checkouts of this repo:
 
 - **Development checkout** (for example `~/apps/tooling/dotfiles`): on the canonical branch. You edit, commit, and push feature branches here.
-- **Applied checkout** (for example `~/apps/tooling/dotfiles-applied`): a linked worktree on `applied/<canonical branch>` that tracks `origin/<canonical branch>`. It is chezmoi's `sourceDir`, `~/.config/dotfiles/env.sh` sets `DOTFILES_DIR` to it, and its `bin/` is on `PATH`. Every home link, git `core.hooksPath`, and LaunchAgent points into it. `dotfiles-sync` only fast-forwards it and re-applies chezmoi; it never commits there.
+- **Applied checkout** (for example `~/apps/tooling/dotfiles-applied`): a linked worktree on `applied/<canonical branch>` that tracks `origin/<canonical branch>`. It is chezmoi's `sourceDir`, `~/.config/dotfiles/env.sh` sets `DOTFILES_DIR` to it, and its `bin/` is on `PATH`. Every home link, git `core.hooksPath`, and LaunchAgent points into it. `dotfiles-sync` only fast-forwards it and re-applies chezmoi (when the fast-forward brought commits, the last apply failed, or `chezmoi status` shows drift); it never commits there.
 
 Keep `$HOME` pointed at the applied checkout only:
 

@@ -7,13 +7,13 @@ Guide for using these dotfiles across multiple machines — common for engineers
 The `dotfiles-sync` LaunchAgent runs every 30 minutes on each machine:
 
 1. **Pull** remote changes with `git pull --rebase --autostash`
-2. **Apply** config via `chezmoi apply` (deploys any remote changes)
+2. **Apply** config via `chezmoi apply` (deploys any remote changes). The apply runs only when the pull brought new commits, the record of the last successful apply does not match (a failed apply, uncommitted source changes, or a new chezmoi config or plugin lock), or `chezmoi status` shows drift (a hand-edited or missing file). Otherwise the run costs one `chezmoi status`, about 1 s, and logs `skipped chezmoi apply`. `dotfiles apply` always runs the full apply.
 3. **Commit** local changes (additions and modifications — never deletions)
 4. **Push** to all configured remotes
 
 This means changes made on Machine A appear on Machine B within ~30 minutes, without manual intervention. Deletions are excluded from auto-sync as a safety measure and require manual commits.
 
-When chezmoi's source is a separate applied checkout (a linked worktree on its own branch that tracks the canonical branch), sync only fast-forwards that checkout and re-runs `chezmoi apply`. It never commits or pushes from it, and it leaves the checkout untouched when it has local changes or has diverged.
+When chezmoi's source is a separate applied checkout (a linked worktree on its own branch that tracks the canonical branch), sync only fast-forwards that checkout and re-runs `chezmoi apply` under the same rule. It never commits or pushes from it, and it leaves the checkout untouched when it has local changes or has diverged.
 
 An apply never unloads the `dotfiles-sync` LaunchAgent while a sync runs, because unloading kills the run. This covers the sync's own `chezmoi apply` and a manual `chezmoi apply` that starts while launchd runs a sync (the sync holds `~/.dotfiles.lock`). The apply writes a marker in `~/.local/state/dotfiles/pending-reload/`, and the sync reloads the agent once after it ends.
 

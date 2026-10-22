@@ -7,10 +7,85 @@
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
 
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=../lib/colors.sh
-source "$(cd "$(dirname "$0")/.." && pwd)/lib/colors.sh"
+source "$DOTFILES_DIR/lib/colors.sh"
 
 cmd() { printf "  ${GREEN}%-28s${NC} %s\n" "$1" "$2"; }
+
+# The dotfiles commands, one "usage<TAB>what it does" line per usage form.
+# They come from `dotfiles actions --json`, which bin/dotfiles generates, so a
+# new command shows up here with no edit. Without jq (or when that fails),
+# the same show_help text in bin/dotfiles is read directly, the first line of
+# each form, after a "!<TAB>why" note line.
+dotfiles_forms() {
+  local json forms
+  # The jq program keeps the first sentence of what a form does; while that is
+  # over 60 characters, it drops the last "; " point, then a trailing "(...)",
+  # then cuts at a word. A jq failure falls through to the plain list.
+  # shellcheck disable=SC2016 # jq program, not shell
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '!\t%s\n' "jq not found: a plain list from bin/dotfiles. Fix: brew install jq"
+  elif json="$(bash "$DOTFILES_DIR/bin/dotfiles-actions" --json 2>/dev/null)" &&
+    forms="$(jq -r '
+      def fit:
+        if length <= 60 then .
+        elif test("; ") then sub("; [^;]*$"; "") | fit
+        elif test(" \\([^()]*\\)$") then sub(" \\([^()]*\\)$"; "") | fit
+        else .[0:60] | sub(" [^ ]*$"; "") | sub("[,;:]$"; "") + "…"
+        end;
+      .[]
+      | (if (.forms | length) == 0 then [{usage: .command, help: "(no help line in bin/dotfiles)"}] else .forms end)[]
+      | "\(.usage)\t\((.help // "") | (split(". ")[0] // "") | fit)"' <<<"$json" 2>/dev/null)" &&
+    [ -n "$forms" ]; then
+    printf '%s\n' "$forms"
+    return
+  else
+    printf '!\t%s\n' "dotfiles actions failed: a plain list from bin/dotfiles. Check: dotfiles actions --check"
+  fi
+  # A form whose usage line has no description takes its next help line.
+  # shellcheck disable=SC2016 # awk program, not shell
+  awk '
+    function plain(s) { gsub(/\\`/, "`", s); gsub(/\\\$/, "$", s); return s }
+    function flush() {
+      if (!pend) return
+      sub(/ \([^)]*$/, "", pd); sub(/[;,]$/, "", pd)
+      print pu "\t" pd; pend = 0
+    }
+    /^show_help\(\) \{$/ { fn = 1; next }
+    fn && /^  cat <<EOF$/ { on = 1; fn = 0; next }
+    !on { next }
+    /^EOF$/ { flush(); exit }
+    /^[A-Z][A-Za-z ]*:$/ { flush(); skip = ($0 == "Examples:"); next }
+    skip { next }
+    /^  [^ ]/ {
+      flush()
+      line = plain(substr($0, 3))
+      u = line; pd = ""
+      if (match(line, /  +/)) { u = substr(line, 1, RSTART - 1); pd = substr(line, RSTART + RLENGTH) }
+      sub(/^\(no command\) */, "", u)
+      pu = "dotfiles" (u == "" ? "" : " " u); pend = 1
+      next
+    }
+    pend && pd == "" && /^   +[^ ]/ { pd = plain($0); sub(/^ +/, "", pd); flush() }
+  ' "$DOTFILES_DIR/bin/dotfiles"
+}
+
+show_dotfiles_actions() {
+  local usage help
+  section "dotfiles (from dotfiles actions)"
+  while IFS=$'\t' read -r usage help; do
+    if [ "$usage" = "!" ]; then
+      echo -e "  ${DIM}${help}${NC}"
+    elif [ "${#usage}" -le 28 ]; then
+      cmd "$usage" "$help"
+    else
+      # A long usage gets its own line; what it does goes under the column.
+      printf "  ${GREEN}%s${NC}\n  %-28s %s\n" "$usage" "" "$help"
+    fi
+  done < <(dotfiles_forms)
+  echo -e "  ${DIM}Details and agent notes: dotfiles actions <name>${NC}"
+}
 
 show_shell() {
   section "Shell Commands"
@@ -45,20 +120,7 @@ show_shell() {
   cmd "chezmoi edit <file>"    "Edit source of a managed file"
   cmd "chezmoi managed"        "List all managed files"
   cmd "chezmoi verify"         "Check all files match source"
-  cmd "dotfiles"               "Start screen: what needs you now"
-  cmd "dotfiles config [set]"  "Show or change settings"
-  cmd "dotfiles doctor"        "Auto-discovered health audit"
-  cmd "dotfiles doctor --fix"  "Auto-repair config drift"
-  cmd "dotfiles audit"         "Security audit (SSH, secrets, git creds)"
-  cmd "dotfiles add <file>"    "Track a new config file"
-  cmd "dotfiles unmanage <f>"  "Stop tracking a managed file"
-  cmd "dotfiles new-module <n>" "Create a new doctor module"
-  cmd "dotfiles brew-add <pkg>" "Add a Homebrew package to Brewfile"
-  cmd "dotfiles profile [c|f]" "Show or switch profile (core/full)"
-  cmd "dotfiles enterprise"    "Toggle enterprise mode (on/off)"
-  cmd "dotfiles uninstall"     "Remove dotfiles from this machine"
-  cmd "dotfiles-stats"         "Time saved: runs, streak, per-task breakdown"
-  cmd "dotfiles-sync"          "Auto commit + push dotfiles changes"
+  show_dotfiles_actions
 }
 
 show_git() {

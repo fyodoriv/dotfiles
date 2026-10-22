@@ -66,3 +66,33 @@ changes): the count of dispatched commands missing from
   skills, `com.dotfiles.dotfiles-sync`, and `com.dotfiles.dotfiles-upgrade`
   run them, and their notes say so.
 - The README CLI reference must name every action (a test).
+
+## Follow-up: cheat and the start screen (task cheat-reads-dotfiles-actions)
+
+- `cheat` kept its own hand-written list of `dotfiles` commands, and the start
+  screen footer pointed at `dotfiles --help`. Both now point at the generated
+  list: the "dotfiles (from dotfiles actions)" section of `cheat` comes from
+  `dotfiles actions --json`, one line per usage form, and the footer says
+  `All commands: dotfiles actions`. What a form does is cut to its first
+  sentence; while that is over 60 characters, the last `; ` point goes, then a
+  trailing `(...)`, then it is cut at a word.
+- Without jq, or when `dotfiles actions` fails, `cheat` reads the `show_help`
+  text in `bin/dotfiles` directly and says why the list is plain. It stays
+  offline: `dotfiles actions` reads files only.
+- The `chezmoi` lines stay hand-written: they are chezmoi's own commands, not
+  dotfiles actions. `dotfiles-stats` and `dotfiles-sync` are gone from the
+  list; `dotfiles stats` and `dotfiles sync` run them.
+- Measurement: actions in `dotfiles actions --json` whose name has no
+  `dotfiles <name>` (or `dotfiles --<name>`) line in `cheat`.
+  Baseline 2026-10-22: 25 of 36 (help, actions, version, apply, init, diff,
+  plugin, validate, leak, sync, edit, cd, update, managed, status, stats,
+  install, metrics, contribute, cheat, defaults-add, defaults-preview,
+  quickstart, upgrade, memory). After: 0 of 36. `tests/cheat.bats` checks the
+  stricter form: a row for the first usage of each action. On the old `cheat`
+  it reports 36 of 36 missing. It runs in `make check` (bin/bats-affected
+  selects it when `bin/cheat`, `bin/dotfiles`, or `bin/dotfiles-actions`
+  changes), also without jq (with macOS awk), for a new command added to
+  `bin/dotfiles`, and for a help line with no description.
+- Cost: `cheat` with no topic went from about 0.03 s to about 0.25 s at load
+  220 on 10 cores (the `dotfiles actions --json` run). `cheat git` and the
+  other topics except `shell` do not run it.

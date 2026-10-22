@@ -208,7 +208,7 @@ else
   echo ""
   echo "Next: ${NEEDS[0]#*|}"
 fi
-echo -e "${DIM}Settings: dotfiles config · All commands: dotfiles --help${NC}"
+echo -e "${DIM}Settings: dotfiles config · All commands: dotfiles actions${NC}"
 
 # ── Do the pending step, only with a yes ────────────────────────────────
 [ "${#NEEDS[@]}" -gt 0 ] || exit 0

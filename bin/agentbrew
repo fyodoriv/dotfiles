@@ -20,9 +20,17 @@ DOTFILES_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd -P)"
 
 # shellcheck source=../lib/agentbrew-locate.sh
 source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+# shellcheck source=../lib/dotfiles-agent-node.sh
+source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
 
 if agentbrew_dir="$(agentbrew_locate)"; then
   if [ -x "$agentbrew_dir/dist/cli.js" ] && ! grep -Fq "exec $agentbrew_dir/dist/cli.js" "$agentbrew_dir/dist/cli.js"; then
+    # The CLI's shebang runs the first `node` on PATH. With an approved agent
+    # Node (DOTFILES_AGENT_NODE_BIN), run that Node, so the LaunchAgents that
+    # `auto-sync install` writes run it too.
+    if agent_node="$(dotfiles_agent_node_bin)"; then
+      exec "$agent_node" "$agentbrew_dir/dist/cli.js" "$@"
+    fi
     exec "$agentbrew_dir/dist/cli.js" "$@"
   fi
   if [ -x "$agentbrew_dir/node_modules/.bin/tsx" ]; then

@@ -11,6 +11,7 @@
 # Usage (sourced):
 #   source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
 #   if agent_node="$(dotfiles_agent_node_bin)"; then ...; fi
+#   dotfiles_enable_agent_node_jobs   # enable agent-Node jobs left disabled
 
 DOTFILES_BLOCKED_NODE_TEAM_ID="HX7739G8FX"
 
@@ -54,4 +55,41 @@ dotfiles_launchagent_runs_blocked_node() {
     return
   done
   return 1
+}
+
+# True when launchd marks the gui-domain job disabled. Newer macOS prints
+# `=> disabled`; older macOS prints `=> true`.
+dotfiles_launchagent_disabled() {
+  local label="$1" disabled
+  disabled="$(launchctl print-disabled "gui/$(id -u)" 2>/dev/null)" || return 1
+  grep -Fq -e "\"$label\" => disabled" -e "\"$label\" => true" <<<"$disabled"
+}
+
+# Print each com.agentbrew.* job that runs only the approved agent Node but is
+# disabled in launchd, one label per line. Prints nothing without an agent
+# Node. The uvx memory daemon is not Node-owned, so it is skipped.
+dotfiles_agent_node_disabled_jobs() {
+  local plist label
+  dotfiles_agent_node_bin >/dev/null || return 0
+  for plist in "$HOME"/Library/LaunchAgents/com.agentbrew.*.plist; do
+    [ -f "$plist" ] || continue
+    label="$(basename "$plist" .plist)"
+    [ "$label" = "com.agentbrew.mcp-memory" ] && continue
+    dotfiles_launchagent_runs_blocked_node "$plist" && continue
+    dotfiles_launchagent_disabled "$label" && printf '%s\n' "$label"
+  done
+  return 0
+}
+
+# Enable each job that dotfiles_agent_node_disabled_jobs prints and report it.
+# Safe mode can disable a job and then turn off; this runs either way, so the
+# job does not stay off for good.
+dotfiles_enable_agent_node_jobs() {
+  local agent_node label
+  agent_node="$(dotfiles_agent_node_bin)" || return 0
+  while IFS= read -r label; do
+    [ -n "$label" ] || continue
+    launchctl enable "gui/$(id -u)/$label" 2>/dev/null || true
+    echo "✓ Re-enabled $label: it runs only the approved agent Node $agent_node"
+  done < <(dotfiles_agent_node_disabled_jobs)
 }

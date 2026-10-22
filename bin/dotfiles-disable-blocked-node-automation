@@ -1,7 +1,9 @@
 #!/bin/bash
 # Disable unattended Node.js jobs when enterprise endpoint policy blocks the
 # Node.js Foundation publisher. Explicit/interactive Node remains available
-# after the machine-scoped exception is approved.
+# after the machine-scoped exception is approved. With an approved agent Node
+# (DOTFILES_AGENT_NODE_BIN), it also enables the agentbrew jobs that run only
+# that Node, whether or not safe mode is on.
 
 set -uo pipefail
 
@@ -17,6 +19,11 @@ SENTINEL="$STATE_DIR/endpoint-node-publisher-blocked"
 if [ "$(uname -s)" != "Darwin" ]; then
   exit 0
 fi
+# DOTFILES_AGENT_NODE_BIN opts agentbrew into a Node from another publisher.
+# A job that runs only that Node and that safe mode disabled earlier is enabled
+# again here, before the safe-mode exits below, so it comes back after safe
+# mode is turned off too.
+dotfiles_enable_agent_node_jobs
 if ! dotfiles_managed_endpoint; then
   exit 0
 fi
@@ -39,9 +46,8 @@ mkdir -p "$STATE_DIR"
 printf 'path=%s\nteam_id=%s\ndetected_at=%s\n' \
   "$node_path" "$BLOCKED_TEAM_ID" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >"$SENTINEL"
 
-# DOTFILES_AGENT_NODE_BIN opts agentbrew into a Node from another publisher.
-# Jobs that already run only that Node stay on; the rest stay off until
-# agentbrew sync rewrites them.
+# Jobs that already run only the approved agent Node stay on (enabled above);
+# the rest stay off until agentbrew sync rewrites them.
 agent_node="$(dotfiles_agent_node_bin || true)"
 if [ -n "$agent_node" ]; then
   echo "○ Keeping agentbrew jobs on approved agent Node $agent_node"
@@ -55,7 +61,6 @@ for plist in "$HOME"/Library/LaunchAgents/com.agentbrew.*.plist; do
   # reconciles this required cold-start dependency independently.
   [ "$label" = "com.agentbrew.mcp-memory" ] && continue
   if [ -n "$agent_node" ] && ! dotfiles_launchagent_runs_blocked_node "$plist"; then
-    launchctl enable "gui/$(id -u)/$label" 2>/dev/null || true
     continue
   fi
   launchctl disable "gui/$(id -u)/$label" 2>/dev/null || true

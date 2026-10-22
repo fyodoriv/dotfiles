@@ -86,6 +86,7 @@ Runs as `dotfiles audit`. Uses direct pass/fail/warn calls (no `check()` wrapper
 | Git credential helper is not `store` (plaintext) | Warn if set |
 | Git commit GPG signing enabled | Warn if not |
 | Homebrew Mach-O bottles have an ad-hoc signature | Warn if unsigned or unverifiable |
+| `security.agent_node_jobs_enabled`: with an approved agent Node (`DOTFILES_AGENT_NODE_BIN`), no `com.agentbrew.*` job that runs only that Node is disabled in launchd. A failure reads `com.agentbrew.check disabled while an approved agent Node exists`. Fix: `dotfiles-disable-blocked-node-automation`. | Fail if disabled |
 | `security.deployed_la_locale`: deployed LaunchAgents of other owners (not `com.dotfiles.*`) that set `PATH` also set `LANG` or `LC_ALL`. One warning names them all. Fix each in its owning repo; dotfiles never edits them. | Warn if missing |
 
 The Homebrew signature scan caches only successful results for 24 hours.

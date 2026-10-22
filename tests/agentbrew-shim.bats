@@ -30,6 +30,69 @@ EOF
   [ "$output" = "dist:status --json" ]
 }
 
+# Write a dist CLI, a fake agent Node, and a fake codesign that reports the
+# given Team ID for every binary. Prints the checkout base.
+agent_node_fixture() {
+  local team_id="$1" base="$TEST_DIR/repos"
+  mkdir -p "$base/tooling/agentbrew/dist" "$TEST_DIR/agent-node/bin" "$TEST_DIR/fake-bin"
+  cat > "$base/tooling/agentbrew/dist/cli.js" <<'EOF'
+#!/bin/sh
+printf 'dist:%s\n' "$*"
+EOF
+  cat > "$TEST_DIR/agent-node/bin/node" <<'EOF'
+#!/bin/sh
+printf 'agent-node:%s\n' "$*"
+EOF
+  cat > "$TEST_DIR/fake-bin/codesign" <<EOF
+#!/bin/sh
+echo "TeamIdentifier=$team_id" >&2
+EOF
+  chmod +x "$base/tooling/agentbrew/dist/cli.js" "$TEST_DIR/agent-node/bin/node" "$TEST_DIR/fake-bin/codesign"
+  printf '%s' "$base"
+}
+
+@test "agentbrew shim: runs dist CLI on DOTFILES_AGENT_NODE_BIN" {
+  local base
+  base="$(agent_node_fixture EXAMPLE123)"
+
+  run env DOTFILES_REPOS_DIR="$base" PATH="$TEST_DIR/fake-bin:/usr/bin:/bin" \
+    DOTFILES_AGENT_NODE_BIN="$TEST_DIR/agent-node/bin/node" \
+    "$BATS_TEST_DIRNAME/../bin/agentbrew" auto-sync install
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "agent-node:$base/tooling/agentbrew/dist/cli.js auto-sync install" ]
+}
+
+@test "agentbrew shim: ignores a missing or non-executable DOTFILES_AGENT_NODE_BIN" {
+  local base
+  base="$(agent_node_fixture EXAMPLE123)"
+  chmod -x "$TEST_DIR/agent-node/bin/node"
+
+  run env DOTFILES_REPOS_DIR="$base" PATH="$TEST_DIR/fake-bin:/usr/bin:/bin" \
+    DOTFILES_AGENT_NODE_BIN="$TEST_DIR/agent-node/bin/node" \
+    "$BATS_TEST_DIRNAME/../bin/agentbrew" status
+  [ "$status" -eq 0 ]
+  [ "$output" = "dist:status" ]
+
+  run env DOTFILES_REPOS_DIR="$base" PATH="$TEST_DIR/fake-bin:/usr/bin:/bin" \
+    DOTFILES_AGENT_NODE_BIN="$TEST_DIR/missing/node" \
+    "$BATS_TEST_DIRNAME/../bin/agentbrew" status
+  [ "$status" -eq 0 ]
+  [ "$output" = "dist:status" ]
+}
+
+@test "agentbrew shim: ignores an agent Node from the blocked publisher" {
+  local base
+  base="$(agent_node_fixture HX7739G8FX)"
+
+  run env DOTFILES_REPOS_DIR="$base" PATH="$TEST_DIR/fake-bin:/usr/bin:/bin" \
+    DOTFILES_AGENT_NODE_BIN="$TEST_DIR/agent-node/bin/node" \
+    "$BATS_TEST_DIRNAME/../bin/agentbrew" status
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "dist:status" ]
+}
+
 @test "agentbrew shim: falls back to tsx dev CLI when dist is absent" {
   local base="$TEST_DIR/repos"
   mkdir -p "$base/agentbrew/node_modules/.bin" "$base/agentbrew/src"

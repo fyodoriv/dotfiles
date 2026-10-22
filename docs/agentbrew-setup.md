@@ -70,7 +70,10 @@ Mac may still want it.
    - The local file may not hold `hooks:`, also not through a YAML anchor
      or merge key (`<<: *base`). In agentbrew's merge, a hook replaces
      every earlier hook with the same event and matcher, so one local
-     `Bash` hook would drop the shared `block-dangerous-git.sh`.
+     `Bash` hook would drop the shared `block-dangerous-git.sh`. A company
+     plugin's Agentfile may add hooks but never drop or replace a shared
+     one; apply skips a plugin Agentfile that would
+     ([plugins.md](plugins.md#extension-points)).
    - Before the merge, agentbrew reads the file alone with its own parser.
      A file it cannot read (bad YAML, a duplicate key, an unknown `!tag`,
      a second `---` document) or one whose result has hooks is skipped

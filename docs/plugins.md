@@ -109,7 +109,22 @@ the installed version and its lock as they were: an exit handler moves the
 old checkout back and restores the lock. If it cannot, it keeps the staging
 folder (with the old checkout) and prints its path. Every lock write goes to
 a 0600 temp file in the same folder and then one rename, so the lock is
-always the old one or the new one. A
+always the old one or the new one.
+
+A crash with no exit handler (SIGKILL, a power cut) leaves a `.staging.*`
+folder. Each one holds `owner.pid` (the run's PID and boot ID), and an
+update's also holds `plugin.name`. The next `add`, `update`, `remove`,
+`list`, or `verify` looks in the plugin home and beside each pinned checkout
+for a folder whose run is gone (another boot, or the PID no longer runs):
+- the checkout still matches the lock: the update had finished, so the old
+  copy is deleted;
+- otherwise the old checkout and its lock entry come back.
+
+Until then the doctor check `plugins.staging_clean` names the folder.
+Recovery messages go to stderr and never fail the command. When it cannot
+tell whether a run is gone (an unknown boot ID, a sandbox that blocks the
+check), it counts the run as live. It never touches a folder without
+`owner.pid`, or anything beside a `--dev` link. A
 named tag older than the installed one installs with a "downgrade" note;
 without a tag, update never goes back. Naming the locked tag on a checkout
 that no longer matches its lock reinstalls it, so the doctor fix for
@@ -160,7 +175,7 @@ Only verified plugins contribute (`lib/plugin-extensions.sh`).
 | Settings (VS Code) | Deep merge, later wins: core default < plugin < user (`~/.config/dotfiles/settings/vscode.user.json`) < a plugin's `_force`. Conflicts show as doctor warnings. |
 | Shell | One generated loader (`~/.local/state/dotfiles/plugin-shell.zsh`), sourced by `home/zshrc` before `~/.zshrc.local`. Needs `shell_fragment: true`. |
 | Git hooks | The core pre-commit and pre-push run the plugin's `hooks/<name>` (declared in `capabilities.hooks`) after the leak gates, then the repo-local hook. |
-| Agentfile | `contributes.agentbrew/Agentfile.yaml` is merged into `~/.config/agentbrew/Agentfile.yaml` on apply, before `agentbrew sync`. |
+| Agentfile | `contributes.agentbrew/Agentfile.yaml` is merged into `~/.config/agentbrew/Agentfile.yaml` on apply, before `agentbrew sync`. Its hooks may add to the shared agent hooks but never drop, replace, or weaken one: agentbrew's merge replaces every earlier hook with the same event, matcher, and agents, so apply merges the earlier layers with and without the plugin (with the real agentbrew) and skips a plugin Agentfile if any earlier hook entry, compared whole (`if`, `async`, `timeout`, and the rest), is gone. Without `agentfile merge` (older agentbrew), a plugin Agentfile with `hooks:` is skipped, because a separate sync would set the hooks to that file's list. The doctor check `agentbrew.plugin_agentfile_hooks` finds agentbrew the way apply does (PATH, then the checkout's `dist/cli.js`, then its `tsx`) and names the plugin and the hook. Give a plugin hook its own matcher. |
 | Blocked software | `apps`, `casks`, `formulae` lists; the doctor check `plugins.<name>.blocked_software` fails while any is installed. |
 
 ## Core options

@@ -57,6 +57,48 @@ them. -->
   - **Pivot**: if an unattended update cannot stay safe, print the pending updates in the upgrade summary instead.
   - **Anchor**: issue #265; PR #276 review (2026-10-22).
 
+- [ ] Run the plugin bats files under macOS `/bin/bash` 3.2
+  - **ID**: plugin-tests-bash32
+  - **Tags**: plugins, tests
+  - **Details**: The #281 re-review (2026-10-22) found that no test runs the plugin code on `/bin/bash` 3.2. The bats files call `bash "$CLI"`, and `bin/dotfiles` runs `exec bash`, so both use the first `bash` on PATH (Homebrew bash 5 on the owner's Mac). Scripts start with `#!/bin/bash`, so a user who runs `bin/dotfiles-plugin` directly gets 3.2. The re-review checked 3.2 by hand once (TERM, INT, and HUP at 5 swap steps restored cleanly).
+  - **Files**: `tests/plugin-update.bats`, `tests/plugin-v2.bats`, `Makefile`
+  - **Output**: code
+  - **Acceptance**: `make check` (or a named target it calls) runs `tests/plugin-update.bats` and `tests/plugin-v2.bats` once with `/bin/bash` 3.2 as the CLI shell, and a construct that bash 3.2 rejects in `bin/dotfiles-plugin` fails it.
+  - **Hypothesis**: running the plugin suites with `/bin/bash` catches 3.2-only breakage before merge: the number of plugin bats files run under 3.2 goes from 0 to 2.
+  - **Measurement**: a bats case that plants a bash-4-only construct in a copy of `bin/dotfiles-plugin` and expects the 3.2 run to fail.
+  - **Success**: both plugin bats files pass under `/bin/bash` 3.2, and the planted construct fails the run.
+  - **Pivot**: if the 3.2 run adds more than 60 s to `make check`, run it only when a plugin file changed.
+  - **Anchor**: #281 re-review, 2026-10-22; Apple ships bash 3.2.57 as `/bin/bash`.
+  - **Competitive-goal**: none — test coverage for the plugin path, not a scorecard metric.
+
+- [ ] Decide whether a plugin Agentfile's `excludeAgents:` may turn off the shared hooks
+  - **ID**: plugin-exclude-agents-hooks
+  - **Tags**: plugins, agents, security
+  - **Details**: The fresh review of the #281-lows PR (2026-10-22) found that a company plugin Agentfile can list `excludeAgents: [claude]`. The merged Agentfile then turns off all agentbrew sync for that agent, the shared hooks (`block-dangerous-git.sh`) included. `agentfile_plugin_layers` stops a plugin hook from replacing a shared hook, but not this. Decide: refuse `excludeAgents:` in plugin Agentfiles (like hooks), or allow it and name it in the doctor check `agentbrew.plugin_agentfile_hooks`.
+  - **Files**: `lib/agentfile-layers.sh`, `modules/agentbrew/doctor.sh`, `tests/plugin-agentfile-hooks.bats`, `docs/plugins.md`
+  - **Output**: code
+  - **Acceptance**: a plugin Agentfile with `excludeAgents:` either is skipped by apply or shows in the doctor, with a real-merge bats test.
+  - **Hypothesis**: closing this path drops the number of ways a plugin Agentfile can turn off a shared hook from 1 to 0.
+  - **Measurement**: a real-merge bats case: a plugin Agentfile with `excludeAgents: [claude]`, then check that the shared hooks still reach Claude Code or that the doctor check fails naming the plugin.
+  - **Success**: the case passes.
+  - **Pivot**: if company plugins need `excludeAgents:` for real, keep it and only report it.
+  - **Anchor**: review of the #281-lows PR, 2026-10-22; Saltzer and Schroeder 1975 (fail-safe defaults).
+  - **Competitive-goal**: none — plugin trust boundary, not a scorecard metric.
+
+- [ ] Fix the US01 install e2e flake: `before.zsh_ms` can be 0 on a quiet Mac
+  - **ID**: e2e-zsh-ms-zero-flake
+  - **Tags**: tests, flaky
+  - **Details**: On 2026-10-22 `make check` failed once in `tests/e2e/dotfiles-install-e2e.bats:46` (`jq -e '.before.zsh_ms > 0 and …'` printed false) and passed on the rerun. `baseline_zsh_ms` (`lib/mac-baseline.sh`) times `zsh -i -c exit` with `/usr/bin/time -p`, which has 10 ms steps. In the e2e scratch HOME, zsh starts in under 10 ms when the Mac is quiet (`real 0.00` in 1 of 3 runs at load 5), so the median can be 0.
+  - **Files**: `lib/mac-baseline.sh`, `tests/e2e/dotfiles-install-e2e.bats`
+  - **Output**: code
+  - **Acceptance**: the US01 e2e passes 20 times in a row on a quiet Mac.
+  - **Hypothesis**: a finer timer (or a floor of 1 ms for a run that finished) drops the US01 e2e failure rate on a quiet Mac from about 1 in 3 runs to 0 in 20.
+  - **Measurement**: `for i in $(seq 20); do bats -f 'US01 e2e: a fresh install' tests/e2e/dotfiles-install-e2e.bats || echo FAIL; done | grep -c FAIL` on a quiet Mac.
+  - **Success**: 0 failures in 20 runs.
+  - **Pivot**: if a finer timer is not portable, assert that `zsh_ms` is a number (`>= 0`) instead of `> 0`.
+  - **Anchor**: the 2026-10-22 gate run of the #281-lows PR; Luo et al. 2014, "An Empirical Analysis of Flaky Tests" (timing-dependent flakes).
+  - **Competitive-goal**: none — gate stability, not a scorecard metric.
+
 ## P3
 
 - [ ] Make `make lint` fast in the inner loop

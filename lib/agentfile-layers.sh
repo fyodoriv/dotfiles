@@ -157,3 +157,92 @@ _agentfile_local_yq_check() {
 _agentfile_flat_q() {
   printf '%s\n' "$flat" | yq -p=json "$1" 2>/dev/null
 }
+
+# agentfile_plugin_layers <base Agentfile>: reads "name<TAB>Agentfile" lines
+# for company plugins (plugin_agentfile_pairs, lock order) on stdin and
+# prints the Agentfiles to merge, one per line.
+#
+# A plugin may add agent hooks, but never drop, replace, or weaken a shared
+# one. agentbrew's merge lets a later hook replace every earlier hook with
+# the same event, matcher, and agents, so this asks agentbrew itself: it
+# merges the earlier layers (the base, then each plugin kept so far) with
+# and without the plugin. If a hook entry of the earlier merge (compared
+# whole: command, if, async, timeout, and every other field) is missing
+# from the later one, that plugin's Agentfile is skipped, and stderr names
+# the plugin and each hook it would remove. A plugin Agentfile agentbrew
+# cannot read, or a check that cannot run, skips it too.
+#
+# Without an agentbrew that can merge (AGENTFILE_AGENTBREW_CMD, default
+# agentbrew), the sync syncs each Agentfile on its own, and agentbrew then
+# sets the hooks to that file's list, so a plugin Agentfile with hooks: is
+# skipped. Without mikefarah yq nothing can be checked: every Agentfile is
+# skipped.
+agentfile_plugin_layers() {
+  local base="$1" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" name file before after err dropped
+  local -a earlier=()
+  [ -f "$base" ] && earlier=("$base")
+  if ! yq --version 2>&1 | grep -q mikefarah; then
+    while IFS=$'\t' read -r name file; do
+      [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check its hooks without mikefarah yq\n' "$name" >&2
+    done
+    return 0
+  fi
+  # shellcheck disable=SC2086 # the command may be "node <path>/cli.js"
+  if ! $ab agentfile merge --help 2>&1 | grep -q 'agentfile merge'; then
+    while IFS=$'\t' read -r name file; do
+      [ -n "$file" ] || continue
+      if [ "$(yq 'explode(.) | has("hooks")' "$file" 2>/dev/null)" != false ]; then
+        printf '⚠ Skipping the Agentfile of plugin %s (%s): it has hooks:, and without agentfile merge they would replace every shared hook\n' "$name" "$file" >&2
+        continue
+      fi
+      printf '%s\n' "$file"
+    done
+    return 0
+  fi
+  if ! before="$(_agentfile_local_tmp)" || ! after="$(_agentfile_local_tmp)"; then
+    rm -f "${before:-}"
+    while IFS=$'\t' read -r name file; do
+      [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check it (no temp file)\n' "$name" >&2
+    done
+    return 0
+  fi
+  # The merge of the earlier layers; after each kept plugin, its merge.
+  : > "$before"
+  if [ "${#earlier[@]}" -gt 0 ]; then
+    # shellcheck disable=SC2086
+    if ! err="$($ab agentfile merge "${earlier[@]}" --output "$before" 2>&1)"; then
+      while IFS=$'\t' read -r name file; do
+        [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check it: %s\n' "$name" "$(_agentfile_error_line "$err")" >&2
+      done
+      rm -f "$before" "$after"
+      return 0
+    fi
+  fi
+  while IFS=$'\t' read -r name file; do
+    [ -n "$file" ] || continue
+    # shellcheck disable=SC2086
+    if ! err="$($ab agentfile merge ${earlier[@]+"${earlier[@]}"} "$file" --output "$after" 2>&1)"; then
+      printf '⚠ Skipping the Agentfile of plugin %s (%s): agentbrew cannot read it: %s\n' \
+        "$name" "$file" "$(_agentfile_error_line "$err")" >&2
+      continue
+    fi
+    dropped="$(LC_ALL=C comm -23 <(_agentfile_hook_entries "$before") <(_agentfile_hook_entries "$after"))"
+    if [ -n "$dropped" ]; then
+      printf '⚠ Skipping the Agentfile of plugin %s (%s): its hooks would replace these shared hooks (same event, matcher, and agents):\n' "$name" "$file" >&2
+      printf '%s\n' "$dropped" | yq -p=json -r '.event + " " + .matcher + " " + (.command // .prompt // "")' 2>/dev/null |
+        grep -v '^---$' | sed 's/^/    /' >&2
+      continue
+    fi
+    printf '%s\n' "$file"
+    earlier+=("$file")
+    cp "$after" "$before"
+  done
+  rm -f "$before" "$after"
+}
+
+# _agentfile_hook_entries <merged Agentfile>: each hook entry as one line of
+# sorted-key JSON (matcher "*" when unset), sorted, for a whole-entry compare.
+_agentfile_hook_entries() {
+  [ -s "$1" ] || return 0
+  yq -o=json -I=0 '(.hooks // [])[] | .matcher = (.matcher // "*") | sort_keys(..)' "$1" 2>/dev/null | LC_ALL=C sort -u
+}

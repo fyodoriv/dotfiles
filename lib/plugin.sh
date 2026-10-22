@@ -133,6 +133,61 @@ plugin_verify() {
   return 0
 }
 
+# plugin_boot_id: an ID for this boot (macOS kern.bootsessionuuid, Linux
+# boot_id), so a PID saved before a reboot never counts as live after it.
+plugin_boot_id() {
+  sysctl -n kern.bootsessionuuid 2>/dev/null ||
+    cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown
+}
+
+# plugin_staging_owner_write <staging folder>: records this run as the owner
+# ("<pid> <boot id>" in owner.pid) right after the folder is made.
+plugin_staging_owner_write() {
+  printf '%s %s\n' "$$" "$(plugin_boot_id)" > "$1/owner.pid"
+}
+
+# _plugin_run_gone <pid> <boot id>: succeeds only when that run is surely
+# gone: another boot (both boot IDs known and different), or `kill -0` says
+# "No such process". When it cannot tell (an unknown boot ID, a sandbox that
+# blocks the check, another user's process), the run counts as live, so
+# recovery leaves its folder alone.
+_plugin_run_gone() {
+  local here out
+  here="$(plugin_boot_id)"
+  if [ "$2" != unknown ] && [ "$here" != unknown ] && [ "$2" != "$here" ]; then
+    return 0
+  fi
+  out="$(LC_ALL=C kill -0 "$1" 2>&1)" && return 1
+  printf '%s\n' "$out" | grep -qi 'no such process'
+}
+
+# plugin_staging_leftovers: prints each .staging.* folder whose owner is
+# gone: an add or update that died without its exit handler, for example on
+# SIGKILL or a power cut. It looks in the plugin home and beside each pinned
+# (not --dev) checkout, the only places add and update make staging. Only a
+# folder with an owner.pid counts, and only when _plugin_run_gone is sure
+# its run is gone. A folder with an empty or unreadable owner.pid, or none
+# (made before owner.pid existed), is never listed, so recovery never
+# touches it.
+plugin_staging_leftovers() {
+  local dirs dir s pid boot name
+  dirs="$(plugin_home)"
+  for name in $(plugin_lock_names); do
+    [ "$(plugin_lock_get "$name" dev)" != true ] || continue
+    dir="$(plugin_lock_get "$name" path)"
+    [ -z "$dir" ] || dirs="$dirs"$'\n'"$(dirname "$dir")"
+  done
+  printf '%s\n' "$dirs" | awk 'NF && !seen[$0]++' | while IFS= read -r dir; do
+    for s in "$dir"/.staging.*; do
+      [ -d "$s" ] && [ -f "$s/owner.pid" ] || continue
+      { read -r pid boot < "$s/owner.pid"; } 2>/dev/null || continue
+      [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "${boot:-}" ] || continue
+      _plugin_run_gone "$pid" "$boot" || continue
+      printf '%s\n' "$s"
+    done
+  done
+}
+
 # Settings from the removed v1 overlay.
 _PLUGIN_V1_VARS="EXTRA_OVERLAY_ROOT EXTRA_DOCTOR_DIR EXTRA_BREWFILE EXTRA_VALIDATE_DIR EXTRA_AGENTFILE"
 

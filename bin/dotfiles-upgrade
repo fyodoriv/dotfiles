@@ -137,6 +137,20 @@ if [ -z "${NODE_EXTRA_CA_CERTS:-}" ]; then
   unset _corp_ca _extra_ca
 fi
 
+# ── OpenCode on PATH (#260) ─────────────────────────────────────────
+# topgrade's OpenCode step runs `opencode upgrade`, which re-runs the OpenCode
+# install script. That script appends an `export PATH=...` line to ~/.zshrc
+# (a link to the tracked home/zshrc) unless ~/.opencode/bin is already on
+# PATH. launchd and agent shells often lack it, so add it here.
+_opencode_bin="$HOME/.opencode/bin"
+if [ -d "$_opencode_bin" ]; then
+  case ":$PATH:" in
+    *":$_opencode_bin:"*) ;;
+    *) export PATH="$_opencode_bin:$PATH" ;;
+  esac
+fi
+unset _opencode_bin
+
 # ── Run topgrade ────────────────────────────────────────────────────
 # topgrade flags:
 #   --no-tmux      Don't auto-launch inside tmux — we want headless

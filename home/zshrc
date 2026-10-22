@@ -56,6 +56,9 @@ fi
 
 # ── PATH ─────────────────────────────────────────────────────────────
 [ -d "$HOME/.rd/bin" ] && export PATH="$HOME/.rd/bin:$PATH"
+# The OpenCode installer (run by `opencode upgrade`) appends its own PATH line
+# to ~/.zshrc, which is this tracked file, unless this dir is already on PATH.
+[ -d "$HOME/.opencode/bin" ] && export PATH="$HOME/.opencode/bin:$PATH"
 # XDG user-binary dir — always on PATH so shims (minsky, etc.) resolve
 # first-try even before the dir is populated. dotfiles apply mkdir's it.
 export PATH="$HOME/.local/bin:$PATH"

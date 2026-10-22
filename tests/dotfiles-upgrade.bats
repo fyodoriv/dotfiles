@@ -290,3 +290,45 @@ STUB
   # via [post_commands] (see test above).
   grep -q -- '--cleanup' "$SCRIPT"
 }
+
+# ── OpenCode step leaves the managed zshrc alone (#260) ──────────────
+# topgrade's OpenCode step runs `opencode upgrade`, which re-runs the
+# OpenCode install script. That script appends `# opencode` and an
+# `export PATH=<home>/.opencode/bin:$PATH` line to ${ZDOTDIR:-$HOME}/.zshrc
+# unless ~/.opencode/bin is already on PATH. ~/.zshrc links to the tracked
+# home/zshrc, so the append dirties the repo. This topgrade stub copies the
+# install script's rule (its add_to_path block), so no real upgrade runs.
+_opencode_installer_stub() {
+  cat > "$TEST_BIN/topgrade" <<'STUB'
+#!/bin/bash
+install_dir="$HOME/.opencode/bin"
+if [[ ":$PATH:" != *":$install_dir:"* ]]; then
+  printf '\n# opencode\nexport PATH=%s:$PATH\n' "$install_dir" >> "${ZDOTDIR:-$HOME}/.zshrc"
+fi
+echo "[topgrade-stub] PATH=$PATH"
+STUB
+  chmod +x "$TEST_BIN/topgrade"
+  mkdir -p "$TEST_DIR/repo/home"
+  printf '# managed zshrc\n' > "$TEST_DIR/repo/home/zshrc"
+  ln -s "$TEST_DIR/repo/home/zshrc" "$TEST_HOME/.zshrc"
+}
+
+@test "OpenCode upgrade step does not edit the managed zshrc" {
+  _opencode_installer_stub
+  mkdir -p "$TEST_HOME/.opencode/bin"
+
+  run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/repo/home/zshrc")" = "# managed zshrc" ]
+}
+
+@test "wrapper adds ~/.opencode/bin to PATH only when it exists" {
+  _opencode_installer_stub
+
+  run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[topgrade-stub] PATH="* ]]
+  [[ "$output" != *".opencode/bin"* ]]
+}

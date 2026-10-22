@@ -1258,7 +1258,7 @@ In `~/.zshenv.secrets` — this file is gitignored and sourced automatically by 
 
 ### Where do I put personal aliases?
 
-`~/.zshrc.local` — sourced at the end of `.zshrc`, gitignored, never overwritten. When an installer appends lines to `~/.zshrc` (a link to the tracked `home/zshrc`), `dotfiles-sync` and `dotfiles doctor --fix` move them to `~/.zshrc.local`.
+`~/.zshrc.local` — sourced at the end of `.zshrc`, gitignored, never overwritten. When an installer appends lines to `~/.zshrc` (a link to the tracked `home/zshrc`), `dotfiles-sync` and `dotfiles doctor --fix` move them to `~/.zshrc.local`. The OpenCode upgrade step does not append at all: `home/zshrc` and `dotfiles-upgrade` put `~/.opencode/bin` on `PATH` when it exists, so its installer skips the edit.
 
 ### How do I add a new tool?
 

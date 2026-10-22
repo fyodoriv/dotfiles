@@ -248,3 +248,21 @@ FNM
   [ "$status" -eq 0 ]
   [ "$output" = "$tmp/second.pem" ]
 }
+
+@test "home/zshrc PATH block adds ~/.opencode/bin when it exists (#260)" {
+  # The OpenCode install script (run by `opencode upgrade`) appends its own
+  # PATH line to ~/.zshrc, which is this tracked file, unless
+  # ~/.opencode/bin is already on PATH.
+  local tmp
+  tmp=$(mktemp -d)
+  mkdir -p "$tmp/home/.opencode/bin"
+  sed -n "/^# ── PATH/,/^unset _dotfiles_bin/p" "$ZSHRC" > "$tmp/path-block.sh"
+
+  run env HOME="$tmp/home" PATH="/usr/bin:/bin" bash -c '. "$1"; echo "PATH=$PATH"' _ "$tmp/path-block.sh"
+  [[ "$output" == *"$tmp/home/.opencode/bin:"* ]]
+
+  rmdir "$tmp/home/.opencode/bin"
+  run env HOME="$tmp/home" PATH="/usr/bin:/bin" bash -c '. "$1"; echo "PATH=$PATH"' _ "$tmp/path-block.sh"
+  [[ "$output" != *".opencode/bin"* ]]
+  rm -rf "$tmp"
+}

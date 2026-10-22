@@ -128,6 +128,19 @@ teardown() {
   [ "$pass_count" -ge 4 ]
 }
 
+@test "agent-browser: theme check wants the orange agents Chrome" {
+  prefs="$TEST_HOME/.agent-browser/chrome-profile/Default/Preferences"
+  mkdir -p "$(dirname "$prefs")"
+  echo '{"browser":{"theme":{"user_color2":-16746043}}}' >"$prefs"
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -qx "agents Chrome themed ORANGE (port 9223)" "$FAIL_MESSAGES"
+
+  : >"$FAIL_MESSAGES"
+  echo '{"browser":{"theme":{"user_color2":-37632}}}' >"$prefs"
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  ! grep -q "themed" "$FAIL_MESSAGES"
+}
+
 @test "agent-browser: fails when env patterns missing from zshrc" {
   echo "# empty" > "$TEST_DOTFILES/home/zshrc"
   rm -rf "$TEST_HOME/.agent-browser"

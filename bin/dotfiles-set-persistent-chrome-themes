@@ -1,6 +1,6 @@
 #!/bin/bash
-# Apply a Material You theme color to the persistent agents Chrome
-# (9223) so the user can tell it apart from their own Chrome at a glance. Idempotent — re-running on a profile that already has
+# Apply a Material You theme color and a profile name to the persistent agents
+# Chrome (9223) so the user can tell it apart from their own Chrome at a glance. Idempotent — re-running on a profile that already has
 # the right keys is a no-op. Safe to run multiple times.
 #
 # Why this exists: when Chromes are tab-strip-identical, agents and
@@ -37,14 +37,15 @@ esac
 # Per-port config — colors are signed int32 of ARGB uint32 (alpha 0xFF), the
 # encoding Chrome stores in Preferences. Variant 2 = Vibrant (most saturated,
 # easiest to spot in macOS dark mode).
-#   9223 dashboard      → dashboard blue   #0077C5  → 0xFF0077C5 → -16746043
+#   9223 agents         → agents orange    #FF6D00  → 0xFFFF6D00 → -37632
+# temp-browser (9230) seeds its own magenta theme in bin/temp-browser.
 config_for_port() {
   case "$1" in
     9223)
       PLIST_LABEL="com.dotfiles.agent-browser-chrome"
       PROFILE_DIR="chrome-profile"
-      PROFILE_NAME="🟦 DASHBOARD (SSO)"
-      COLOR_INT="-16746043"
+      PROFILE_NAME="🟧 AGENTS (SSO)"
+      COLOR_INT="-37632"
       ;;
     *)
       echo "internal: unknown port $1" >&2
@@ -65,10 +66,11 @@ apply_theme() {
   fi
 
   # Already correct? Skip if user_color / user_color2 / color_variant match.
-  # We deliberately do NOT include `follows_system_colors` in the drift check:
-  # Chrome 148 writes it back to `true` on exit regardless of what we set,
-  # but the theme renders correctly anyway — the `*2` key path is the source
-  # of truth for the Material You renderer.
+  # We deliberately do NOT include `follows_system_colors` or `profile.name`
+  # in the drift check: a mismatch here restarts the agents Chrome. Chrome 148
+  # writes `follows_system_colors` back to `true` on exit regardless of what
+  # we set, but the theme renders correctly anyway — the `*2` key path is the
+  # source of truth for the Material You renderer.
   local current want
   current="$(jq -r '
     [
@@ -99,7 +101,7 @@ apply_theme() {
   done
 
   local tmp="$prefs.tmp.$$"
-  jq --argjson color "$COLOR_INT" '
+  jq --argjson color "$COLOR_INT" --arg name "$PROFILE_NAME" '
     .browser.theme.user_color = $color |
     .browser.theme.user_color2 = $color |
     .browser.theme.color_variant = 2 |
@@ -110,7 +112,8 @@ apply_theme() {
     .browser.theme.is_grayscale = false |
     .browser.theme.is_grayscale2 = false |
     .extensions.theme.id = "" |
-    .extensions.theme.use_system = false
+    .extensions.theme.use_system = false |
+    .profile.name = $name
   ' "$prefs" > "$tmp" && mv "$tmp" "$prefs"
 
   launchctl load "$plist"

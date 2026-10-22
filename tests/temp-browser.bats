@@ -46,6 +46,15 @@ teardown() {
   grep -qx -- "--user-data-dir=$profile" "$TEMP_BROWSER_STATE_DIR/launch-args"
 }
 
+@test "acquire seeds a magenta theme so the temp browser stands out" {
+  "$SCRIPT" acquire --owner a --reason r >/dev/null
+  profile="$(cat "$TEMP_BROWSER_STATE_DIR/lock/profile")"
+  prefs="$profile/Default/Preferences"
+  [ "$(jq -r '.browser.theme.user_color2' "$prefs")" = "-2817799" ]
+  [ "$(jq -r '.browser.theme.follows_system_colors' "$prefs")" = "false" ]
+  [ "$(jq -r '.profile.name' "$prefs")" = "🟪 TEMP BOT" ]
+}
+
 @test "second acquirer is refused with holder name and reason" {
   "$SCRIPT" acquire --owner agent-a --reason "bot sign-in" >/dev/null
   run "$SCRIPT" acquire --owner agent-b --reason other

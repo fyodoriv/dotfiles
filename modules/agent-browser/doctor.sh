@@ -63,13 +63,14 @@ check "agent-browser.profile_dir" "agent-browser Chrome profile exists" \
   "[ -d \"\$HOME/.agent-browser/chrome-profile\" ]" \
   "mkdir -p \"\$HOME/.agent-browser/chrome-profile\""
 
-# Each persistent Chrome should have a distinct Material You theme color
-# applied to its profile, so the human can tell them apart at a glance.
+# The agents Chrome gets a bright orange Material You theme (#FF6D00) and the
+# temp-browser a magenta one, so the human can tell them from their own
+# Chrome at a glance.
 # Color encoding is signed-int32 of ARGB uint32 (alpha 0xFF). The fix path
 # (`bin/dotfiles-set-persistent-chrome-themes`) is idempotent and a no-op
 # when the profile is already themed correctly.
-check "agent-browser.dashboard_theme" "dashboard Chrome themed BLUE (port 9223)" \
-  "jq -e '.browser.theme.user_color2 == -16746043' \"\$HOME/.agent-browser/chrome-profile/Default/Preferences\" >/dev/null 2>&1" \
+check "agent-browser.dashboard_theme" "agents Chrome themed ORANGE (port 9223)" \
+  "jq -e '.browser.theme.user_color2 == -37632' \"\$HOME/.agent-browser/chrome-profile/Default/Preferences\" >/dev/null 2>&1" \
   "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9223"
 
 # The marker alone proves nothing; also probe the index (lib/spotlight-probe.sh).

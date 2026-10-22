@@ -121,6 +121,17 @@ chrome_app() {
   esac
 }
 
+# Seed the fresh profile with a magenta theme (#D500F9) and the profile name
+# "🟪 TEMP BOT", so it never looks like the user's Chrome or the orange agents
+# Chrome. Colors are signed int32 of ARGB: 0xFFD500F9 → -2817799.
+seed_theme() {
+  local profile="$1"
+  mkdir -p "$profile/Default"
+  cat >"$profile/Default/Preferences" <<'JSON'
+{"browser":{"theme":{"user_color":-2817799,"user_color2":-2817799,"color_variant":2,"color_variant2":2,"color_scheme":0,"color_scheme2":0,"follows_system_colors":false,"is_grayscale":false,"is_grayscale2":false}},"extensions":{"theme":{"id":"","use_system":false}},"profile":{"name":"🟪 TEMP BOT"}}
+JSON
+}
+
 # Prints the browser pid. Never raises or focuses a window.
 launch_browser() {
   local profile="$1" out pid
@@ -176,6 +187,8 @@ cmd_acquire() {
   fi
   local profile
   profile="$(mktemp -d "$STATE_DIR/profile.XXXXXX")"
+  # The theme only helps tell browsers apart; a failed write never blocks.
+  seed_theme "$profile" || true
   printf '%s\n' "$OWNER" > "$LOCK/owner"
   printf '%s\n' "$REASON" > "$LOCK/reason"
   printf '%s\n' "$PORT" > "$LOCK/port"

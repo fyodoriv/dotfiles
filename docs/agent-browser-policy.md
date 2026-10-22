@@ -12,6 +12,8 @@ At most three browsers run on this Mac. Zero is fine.
 | One agents Chrome: `com.dotfiles.agent-browser-chrome`, CDP port `9223` | The user signs in once. Agents share it in their own tabs and share its cookies. This is the default. |
 | One temporary browser: `temp-browser`, CDP port `9230` | For disposable or bot sign-ins. Each use starts with a fresh profile, deleted after use, like incognito. One agent at a time holds it. |
 
+Colors tell them apart: the agents Chrome is bright orange (`#FF6D00`, profile `🟧 AGENTS (SSO)`), the temp browser is magenta (`#D500F9`, profile `🟪 TEMP BOT`), and the user's own Chrome keeps its own theme.
+
 The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired. `dotfiles apply` unloads and deletes them (orphan unload), and the doctor check `agent-browser.no_retired_chromes` removes any copy left behind.
 
 `~/.agent-browser/config.json` sets `"cdp": "9223"` (chezmoi `private_dot_agent-browser/modify_config.json`, other keys kept). So agent-browser attaches to the agents Chrome by default. When that Chrome is down, agent-browser fails. It does not start its own browser. Start it with `~/.agent-browser/ensure-chrome.sh`.

@@ -110,6 +110,17 @@ them. -->
 
 ## P3
 
+- [ ] Make make check fast for Agentfile-only diffs
+  - **ID**: fast-check-agentfile-only
+  - **Details**: On 2026-10-22 a one-line `Agentfile.yaml` change (adding a skill) took 5m56s in `make check`, longer than the work itself. Skills-list edits recur on most goal retros. When a diff touches only `Agentfile.yaml` or `TASKS.md`, run the YAML parse, the TASKS.md lint and the tests that read the Agentfile, and skip the rest.
+  - **Files**: `Makefile`, `bin/bats-affected`
+  - **Acceptance**: `time make check` on a branch that only edits `Agentfile.yaml` finishes in under 60 s and still fails on invalid YAML.
+  - **Hypothesis**: Agentfile-only gate time drops from about 6 min to under 1 min, with no missed YAML or skill-list failure.
+  - **Measurement**: `time make check` on a one-line `Agentfile.yaml` change.
+  - **Success**: under 60 s, and broken YAML still fails.
+  - **Pivot**: if the tests that read the Agentfile cannot be mapped, keep the full run and close this task.
+  - **Anchor**: perf-task-review, session 5a0bcbe8 (2026-10-22); Forsgren, Humble, Kim 2018 (fast feedback).
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Tags**: perf, agents

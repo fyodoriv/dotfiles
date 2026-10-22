@@ -8,18 +8,42 @@
 # To install ALL recommended plugins for ALL detected JetBrains IDEs:
 #     bin/jetbrains-install-plugins
 #
+# To skip each IDE that already got the current plugin list at its current build
+# (the chezmoi step .chezmoiscripts/run_after_jetbrains-plugins.sh does this):
+#     bin/jetbrains-install-plugins --if-changed
+#
 # To install a single plugin (any IDE):
 #     /Applications/<IDE>.app/Contents/MacOS/<binary> installPlugins <plugin-id>
 #
-# Idempotent: re-running on an already-installed plugin is a no-op.
-# Safe to add to a launchd cron — running daily at idle won't churn anything.
+# Idempotent: re-running on an already-installed plugin is a no-op, but each
+# `installPlugins` call still starts one headless IDE JVM (40 s+ and ~400 MB on
+# a busy Mac). So after every plugin installs in an IDE, the script writes a
+# stamp with the IDE build number and the plugin list:
+#     ${XDG_STATE_HOME:-~/.local/state}/dotfiles/jetbrains-plugins/<App>.stamp
+# With --if-changed, an IDE whose stamp matches starts no JVM. A plugin list
+# change (comments do not count), an IDE upgrade, or a new IDE re-runs it. A
+# failed install removes the stamp, so the next run retries. An IDE with no
+# build number is never skipped. Without --if-changed (doctor --fix, manual
+# runs) every plugin installs again.
+#
+# JETBRAINS_APP_DIRS: colon-separated folders to search for IDE app bundles
+# (default /Applications). Tests point it at fake IDEs.
 
 set -euo pipefail
+
+IF_CHANGED=0
+for arg in "$@"; do
+  case "$arg" in
+    --if-changed) IF_CHANGED=1 ;;
+    *) echo "Unknown argument: $arg (usage: jetbrains-install-plugins [--if-changed])" >&2; exit 2 ;;
+  esac
+done
 
 # Resolve dotfiles dir from this script's location.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_LIST="$DOTFILES_DIR/jetbrains/recommended_plugins.txt"
+STAMP_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/jetbrains-plugins"
 
 if [ ! -f "$PLUGIN_LIST" ]; then
   echo "ERROR: $PLUGIN_LIST not found" >&2
@@ -37,39 +61,85 @@ if [ -z "$plugins" ]; then
   exit 0
 fi
 
+# The IDE build number (for example WS-251.25410.117), or nothing when unknown.
+ide_build() {
+  local app="$1" f
+  for f in "$app/Contents/Resources/build.txt" "$app/Contents/build.txt"; do
+    if [ -s "$f" ]; then
+      head -n 1 "$f"
+      return 0
+    fi
+  done
+  if [ -f "$app/Contents/Info.plist" ] && command -v plutil >/dev/null 2>&1; then
+    plutil -extract CFBundleVersion raw "$app/Contents/Info.plist" 2>/dev/null || true
+  fi
+}
+
+stamp_path() {
+  printf '%s/%s.stamp' "$STAMP_DIR" "$(basename "$1" .app | tr ' /' '__')"
+}
+
+# The stamp body: binary path, build, then the plugin ids, one per line.
+stamp_body() {
+  printf 'binary=%s\nbuild=%s\n%s\n' "$2" "$(ide_build "$1")" "$plugins"
+}
+
+stamp_matches() {
+  local app="$1" b="$2" stamp
+  stamp="$(stamp_path "$app")"
+  [ -n "$(ide_build "$app")" ] && [ -f "$stamp" ] &&
+    [ "$(cat "$stamp")" = "$(stamp_body "$app" "$b")" ]
+}
+
+write_stamp() {
+  local app="$1" b="$2" stamp
+  [ -n "$(ide_build "$app")" ] || return 0
+  stamp="$(stamp_path "$app")"
+  mkdir -p "$STAMP_DIR"
+  stamp_body "$app" "$b" > "$stamp.tmp.$$"
+  mv -f "$stamp.tmp.$$" "$stamp"
+}
+
 # Detect installed JetBrains IDEs by their app bundle.
 declare -a IDE_BINARIES=()
-for app in /Applications/WebStorm.app \
-           /Applications/IntelliJ\ IDEA.app \
-           /Applications/IntelliJ\ IDEA\ Ultimate.app \
-           /Applications/IntelliJ\ IDEA\ Community\ Edition.app \
-           /Applications/PyCharm.app \
-           /Applications/PyCharm\ Professional\ Edition.app \
-           /Applications/PyCharm\ Community\ Edition.app \
-           /Applications/GoLand.app \
-           /Applications/Rider.app \
-           /Applications/CLion.app \
-           /Applications/RubyMine.app \
-           /Applications/PhpStorm.app \
-           /Applications/DataGrip.app \
-           /Applications/Aqua.app; do
-  [ -d "$app" ] || continue
-  binary="$app/Contents/MacOS"
-  # Each IDE's binary inside MacOS/ is the lowercased product name.
-  for b in "$binary"/*; do
-    if [ -x "$b" ] && [ ! -d "$b" ]; then
-      IDE_BINARIES+=("$b")
-      break
-    fi
+declare -a IDE_APPS=()
+IFS=: read -r -a APP_DIRS <<< "${JETBRAINS_APP_DIRS:-/Applications}"
+for dir in "${APP_DIRS[@]}"; do
+  for name in WebStorm \
+              "IntelliJ IDEA" \
+              "IntelliJ IDEA Ultimate" \
+              "IntelliJ IDEA Community Edition" \
+              PyCharm \
+              "PyCharm Professional Edition" \
+              "PyCharm Community Edition" \
+              GoLand \
+              Rider \
+              CLion \
+              RubyMine \
+              PhpStorm \
+              DataGrip \
+              Aqua; do
+    app="$dir/$name.app"
+    [ -d "$app" ] || continue
+    binary="$app/Contents/MacOS"
+    # Each IDE's binary inside MacOS/ is the lowercased product name.
+    for b in "$binary"/*; do
+      if [ -x "$b" ] && [ ! -d "$b" ]; then
+        IDE_BINARIES+=("$b")
+        IDE_APPS+=("$app")
+        break
+      fi
+    done
   done
 done
 
 if [ "${#IDE_BINARIES[@]}" -eq 0 ]; then
-  echo "No JetBrains IDEs detected in /Applications"
+  echo "No JetBrains IDEs detected in ${JETBRAINS_APP_DIRS:-/Applications}"
   exit 0
 fi
 
-# Partition IDEs into runnable (closed) vs running. `installPlugins` fails fast
+# Partition IDEs into unchanged (stamp matches, --if-changed only), running,
+# and runnable (closed). `installPlugins` fails fast
 # with "Only one instance of <IDE> can be run at a time." when the IDE is open,
 # so we skip running IDEs upfront and produce a clean summary instead of a
 # noisy per-plugin failure dump. Doctor --fix relies on exit 0 to count as
@@ -77,24 +147,35 @@ fi
 # advisory) so a busy operator's running IDE doesn't keep the doctor permanently
 # red.
 declare -a RUNNABLE_BINARIES=()
+declare -a RUNNABLE_APPS=()
 declare -a SKIPPED_RUNNING=()
-for b in "${IDE_BINARIES[@]}"; do
-  ide_name="$(basename "$b")"
-  if pgrep -fl "$b" >/dev/null 2>&1; then
-    SKIPPED_RUNNING+=("$ide_name")
+declare -a IDE_NOTES=()
+unchanged=0
+for i in "${!IDE_BINARIES[@]}"; do
+  b="${IDE_BINARIES[$i]}"
+  app="${IDE_APPS[$i]}"
+  if [ "$IF_CHANGED" -eq 1 ] && stamp_matches "$app" "$b"; then
+    unchanged=$((unchanged + 1))
+    IDE_NOTES+=("  (unchanged since the last install — will skip)")
+  elif pgrep -fl "$b" >/dev/null 2>&1; then
+    SKIPPED_RUNNING+=("$(basename "$b")")
+    IDE_NOTES+=("  (running — will skip)")
   else
     RUNNABLE_BINARIES+=("$b")
+    RUNNABLE_APPS+=("$app")
+    IDE_NOTES+=("")
   fi
 done
 
+if [ "$unchanged" -eq "${#IDE_BINARIES[@]}" ]; then
+  echo "✓ JetBrains plugins unchanged since the last install ($unchanged IDE(s)); nothing to do."
+  echo "  Stamps: $STAMP_DIR"
+  exit 0
+fi
+
 echo "Detected JetBrains IDEs:"
-for b in "${IDE_BINARIES[@]}"; do
-  ide_name="$(basename "$b")"
-  if pgrep -fl "$b" >/dev/null 2>&1; then
-    echo "  $b  (running — will skip)"
-  else
-    echo "  $b"
-  fi
+for i in "${!IDE_BINARIES[@]}"; do
+  echo "  ${IDE_BINARIES[$i]}${IDE_NOTES[$i]}"
 done
 echo ""
 
@@ -107,7 +188,7 @@ if [ "${#SKIPPED_RUNNING[@]}" -gt 0 ]; then
 fi
 
 if [ "${#RUNNABLE_BINARIES[@]}" -eq 0 ]; then
-  echo "All detected IDEs are running; nothing to install right now."
+  echo "All detected IDEs that need plugins are running; nothing to install right now."
   echo "Re-run this script after closing the IDEs."
   # Exit 0 — doctor --fix should not stay red just because the user has
   # WebStorm open. The advisory check will re-flag missing plugins on the
@@ -117,9 +198,12 @@ fi
 
 # Install each plugin in each runnable IDE. installPlugins on a closed IDE
 # is reliable; we still track per-plugin failures (wrong ID, network, etc.).
+# An IDE gets a stamp only when every plugin installed in it.
 fail=0
-for b in "${RUNNABLE_BINARIES[@]}"; do
+for i in "${!RUNNABLE_BINARIES[@]}"; do
+  b="${RUNNABLE_BINARIES[$i]}"
   ide_name="$(basename "$b")"
+  ide_fail=0
   echo "─── $ide_name ──────────────────────────────────────────"
   while IFS= read -r plugin; do
     [ -z "$plugin" ] && continue
@@ -128,9 +212,15 @@ for b in "${RUNNABLE_BINARIES[@]}"; do
       :
     else
       echo "    (failed — wrong ID? check jetbrains/recommended_plugins.txt)"
-      fail=$((fail + 1))
+      ide_fail=$((ide_fail + 1))
     fi
   done <<< "$plugins"
+  if [ "$ide_fail" -eq 0 ]; then
+    write_stamp "${RUNNABLE_APPS[$i]}" "$b"
+  else
+    rm -f "$(stamp_path "${RUNNABLE_APPS[$i]}")"
+  fi
+  fail=$((fail + ide_fail))
   echo ""
 done
 

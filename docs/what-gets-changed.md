@@ -224,6 +224,7 @@ These chezmoi scripts run automatically during `chezmoi apply`:
 | `run_after_endpoint-security.sh` | Every apply where `endpoint_hardening` is true (default: `owner_machine`) or `DOTFILES_MANAGED_ENDPOINT=1` | Re-sign Homebrew bottles, uv pythons, and dotfiles endpoint shims (managed-endpoint drift) |
 | `run_after_aws-gcloud.sh.tmpl` | Every apply (enterprise only) | Install AWS CLI v2 and the Google Cloud SDK into user dirs with `bin/dotfiles-install-aws-gcloud`; skips tools already installed |
 | `run_after_agentbrew-sync.sh` | Every apply | Sync agent config from `Agentfile.yaml` (non-fatal) |
+| `run_after_jetbrains-plugins.sh` | Every apply where a JetBrains IDE is in `/Applications` | Install the plugins in `jetbrains/recommended_plugins.txt` with `bin/jetbrains-install-plugins --if-changed` (non-fatal). Each install starts a headless IDE JVM, so a stamp per IDE in `~/.local/state/dotfiles/jetbrains-plugins/` records the IDE build and plugin list. A no-change apply starts no JVM. A list change, an IDE upgrade, or a new IDE re-runs it. Open IDEs are skipped and get no stamp. |
 
 ---
 

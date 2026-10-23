@@ -44,20 +44,6 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
-- [ ] Make `dotfiles plugin` commands take the shared dotfiles lock
-  - **ID**: plugin-commands-take-lock
-  - **Tags**: plugins, upgrade, locking
-  - **Details**: `bin/dotfiles-plugin` never sources `lib/lock.sh`, so `add`, `update`, `remove`, and `trust` run without `~/.dotfiles.lock`. `dotfiles upgrade` holds that lock while it runs `dotfiles plugin update --unattended` for each plugin (the Sunday job), and `dotfiles apply` holds it while it reads `plugins.lock` and the plugin folders. A manual plugin command at the same time can race them: two writers of `plugins.lock` (each `_lock_yq` write is atomic, but each read-modify-write is not), or a plugin folder swapped while apply reads it. The child that `dotfiles upgrade` starts must not wait on its parent's lock: `acquire_lock` sees a live owner and returns 1, so a plain `acquire_lock || exit 0` would skip every plugin update. Pass the held lock down (for example an env var with the holder's PID that `lib/lock.sh` accepts) or let `dotfiles upgrade` call the update code in-process. Found while closing plugin-name-shadowing (2026-10-22).
-  - **Files**: `bin/dotfiles-plugin`, `lib/lock.sh`, `bin/dotfiles-upgrade`, `tests/plugin-update.bats`, `tests/dotfiles-upgrade-plugins.bats`
-  - **Output**: code
-  - **Acceptance**: with `~/.dotfiles.lock` held by a live dotfiles process, `dotfiles plugin update <name>` waits or exits with a message naming the holder and leaves `plugins.lock` unchanged, while `dotfiles upgrade` still updates its plugins.
-  - **Hypothesis**: plugin commands that can run during a held dotfiles lock drop from 4 (`add`, `update`, `remove`, `trust`) to 0, with the upgrade's own plugin step still working.
-  - **Measurement**: bats cases that hold the lock with a live scratch process and run each writing plugin command, plus the existing `tests/dotfiles-upgrade-plugins.bats` cases.
-  - **Success**: every writing plugin command refuses or waits under a held lock, and the upgrade plugin cases still pass.
-  - **Pivot**: if a shared lock makes the upgrade's plugin step skip or hang in any case, keep plugin commands lock-free and add a lock on `plugins.lock` writes only.
-  - **Anchor**: plugin-name-shadowing PR, 2026-10-22; `lib/lock.sh` (shared lock for apply, sync, doctor, upgrade).
-  - **Competitive-goal**: none — plugin state safety, not a scorecard metric.
-
 ## P3
 
 - [ ] Say when a plugin's `rules:` text could contradict the shared rules

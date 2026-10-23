@@ -685,6 +685,30 @@ cmd_verify() {
   return "$failed"
 }
 
+# Commands that change plugin state (the lock file, checkouts, signers,
+# staging recovery) hold ~/.dotfiles.lock, the lock apply, sync, doctor,
+# and upgrade share, so they cannot race the Sunday `dotfiles upgrade`. The
+# command runs again as a child under the lock, so the add and update exit
+# handlers keep their own traps; the parent's EXIT trap frees the lock. A
+# child of the holder (DOTFILES_LOCK_HOLDER, set by dotfiles upgrade) runs
+# under the holder's lock. DOTFILES_PLUGIN_LOCK_WAIT: seconds to wait.
+_plugin_take_lock() {
+  local rc=0
+  # shellcheck source=../lib/lock.sh
+  source "$DOTFILES_DIR/lib/lock.sh"
+  lock_inherited && return 0
+  wait_for_lock "plugin $1" "${DOTFILES_PLUGIN_LOCK_WAIT:-120}" ||
+    die "another dotfiles command holds $DOTFILES_LOCK (see above); run this again when it finishes"
+  # Signals reach the child too; the parent waits for it, then frees the lock.
+  trap : INT TERM HUP
+  DOTFILES_LOCK_HOLDER=$$ bash "${BASH_SOURCE[0]}" "$@" || rc=$?
+  exit "$rc"
+}
+case "${1:-}:$* " in
+  *" --dry-run "*) ;;
+  add:* | update:* | remove:* | trust:* | list:* | verify:*) _plugin_take_lock "$@" ;;
+esac
+
 # An add or update that died without its exit handler is finished or
 # rolled back before any command that reads or changes the lock.
 # --dry-run changes nothing, so it runs no recovery either.

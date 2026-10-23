@@ -248,7 +248,8 @@ if command -v yq >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
     _mode=--unattended
     ! $DRY_RUN || _mode=--dry-run
     _prc=0
-    _out="$(bash "$DOTFILES_DIR/bin/dotfiles-plugin" update "$_plugin" "$_mode" < /dev/null 2>&1)" || _prc=$?
+    # The update runs under this upgrade's dotfiles lock (lib/lock.sh).
+    _out="$(DOTFILES_LOCK_HOLDER=$$ bash "$DOTFILES_DIR/bin/dotfiles-plugin" update "$_plugin" "$_mode" < /dev/null 2>&1)" || _prc=$?
     # Plugin output is bytes from git and remote hosts: read it in the C
     # locale (sed and grep stop on invalid UTF-8 otherwise), and never let
     # one line of it stop the upgrade. The log drops user:token@ parts of URLs.

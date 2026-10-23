@@ -118,6 +118,17 @@ acquire_lock() {
   done
 }
 
+# lock_inherited: succeeds when DOTFILES_LOCK_HOLDER names the live process
+# that holds the lock. A dotfiles command that holds the lock sets it for a
+# child dotfiles command (dotfiles upgrade runs `dotfiles plugin update`),
+# which then runs under the parent's lock instead of waiting on it.
+lock_inherited() {
+  local pid
+  [ -n "${DOTFILES_LOCK_HOLDER:-}" ] || return 1
+  pid="$(head -1 "$DOTFILES_LOCK" 2>/dev/null)" || return 1
+  [ "$pid" = "$DOTFILES_LOCK_HOLDER" ] && kill -0 "$pid" 2>/dev/null
+}
+
 release_lock() {
   # Not used in normal operation — locks are auto-released via the EXIT trap
   # set in acquire_lock(). Kept for manual emergency cleanup in interactive shells:

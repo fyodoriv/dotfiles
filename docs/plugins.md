@@ -72,6 +72,13 @@ contributes:
 
 - Plugins install to `~/.local/share/dotfiles/plugins/<name>`, outside every
   tracked tree.
+- `add`, `update`, `remove`, `trust`, `list`, and `verify` hold
+  `~/.dotfiles.lock`, the lock that apply, sync, doctor, and upgrade share,
+  so a manual command cannot race the Sunday `dotfiles upgrade`. They wait up
+  to `DOTFILES_PLUGIN_LOCK_WAIT` seconds (default 120), then stop and name
+  the holder. `dotfiles upgrade` runs its plugin updates under its own lock
+  (`DOTFILES_LOCK_HOLDER`, `lib/lock.sh`). `--dry-run`, `options`, `lint`,
+  `new`, and `migrate` take no lock.
 - `~/.config/dotfiles/plugins.lock` (mode 0600) records, for each plugin:
   source, ref, version, commit, `tree_hash`, `capabilities_sha`, `signer`,
   path, dev, and locked_at.

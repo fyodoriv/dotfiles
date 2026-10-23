@@ -29,7 +29,9 @@ System Settings > General > Login Items. Report them; do not change them.
 | `keep` | any | Nothing to do. |
 
 Tooling-owned jobs (`com.dotfiles.*`, `com.agentbrew.*`, `com.minsky.*`,
-`com.taskgrind.*`) come from their source repo. Change the template there and
+`com.taskgrind.*`, and owner `dotfiles-plugin`: a label a dotfiles plugin
+installed, recorded in `~/.local/state/dotfiles/plugins/<name>.launchagents`)
+come from their source repo (for a plugin job, the plugin's repo). Change the template there and
 deliver it with `/ship-it`. Never edit or delete their installed plist by hand:
 the next apply puts it back.
 

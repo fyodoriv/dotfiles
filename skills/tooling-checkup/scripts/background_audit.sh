@@ -11,9 +11,9 @@
 #   BACKGROUND_AUDIT_TOP       how many processes to list by CPU and by memory (default 12; 0 skips)
 #   DOTFILES_SOURCE            dotfiles source checkout (default: `chezmoi source-path`)
 #
-# Owners: apple, dotfiles, dotfiles-plugin (com.dotfiles-<plugin>.*, from a
-# dotfiles plugin), agentbrew, minsky, taskgrind (change these in their
-# source repo), third-party.
+# Owners: apple, dotfiles, dotfiles-plugin (a label a dotfiles plugin
+# installed), agentbrew, minsky, taskgrind (change these in their source
+# repo), third-party.
 # Verdicts:
 #   remove     the job's program does not exist (dangling job)
 #   duplicate  another job runs the same program and arguments
@@ -42,12 +42,18 @@ owner_of() {
   case "$label" in
     com.apple.*) echo apple; return ;;
     com.dotfiles.*) echo dotfiles; return ;;
-    # A dotfiles plugin's own jobs (#309): fix a failing one in the plugin.
-    com.dotfiles-*.*) echo dotfiles-plugin; return ;;
     com.agentbrew.*) echo agentbrew; return ;;
     com.minsky.*) echo minsky; return ;;
     com.taskgrind.*) echo taskgrind; return ;;
   esac
+  # A job a dotfiles plugin installed (#309): dotfiles records each plugin's
+  # labels in <state>/dotfiles/plugins/<name>.launchagents. Fix it in the plugin.
+  local plugin_state="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/plugins"
+  if ls "$plugin_state"/*.launchagents >/dev/null 2>&1 \
+      && cat "$plugin_state"/*.launchagents 2>/dev/null | grep -qxF -- "$label"; then
+    echo dotfiles-plugin
+    return
+  fi
   if [ -n "$DOTFILES_SOURCE" ] && [ -d "$DOTFILES_SOURCE/launchagents" ] \
       && ls "$DOTFILES_SOURCE/launchagents/$(basename "$file" .plist)".* >/dev/null 2>&1; then
     echo dotfiles

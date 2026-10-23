@@ -11,7 +11,8 @@
 #   BACKGROUND_AUDIT_TOP       how many processes to list by CPU and by memory (default 12; 0 skips)
 #   DOTFILES_SOURCE            dotfiles source checkout (default: `chezmoi source-path`)
 #
-# Owners: apple, dotfiles, agentbrew, minsky, taskgrind (change these in their
+# Owners: apple, dotfiles, dotfiles-plugin (com.dotfiles-<plugin>.*, from a
+# dotfiles plugin), agentbrew, minsky, taskgrind (change these in their
 # source repo), third-party.
 # Verdicts:
 #   remove     the job's program does not exist (dangling job)
@@ -41,6 +42,8 @@ owner_of() {
   case "$label" in
     com.apple.*) echo apple; return ;;
     com.dotfiles.*) echo dotfiles; return ;;
+    # A dotfiles plugin's own jobs (#309): fix a failing one in the plugin.
+    com.dotfiles-*.*) echo dotfiles-plugin; return ;;
     com.agentbrew.*) echo agentbrew; return ;;
     com.minsky.*) echo minsky; return ;;
     com.taskgrind.*) echo taskgrind; return ;;

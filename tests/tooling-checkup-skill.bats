@@ -439,7 +439,8 @@ EOF
   write_plist com.minsky.daemon /bin/sh minsky
   write_plist com.dotfiles.ok /bin/sh ok
   write_plist com.example.crashy /bin/sh crash
-  printf 'PID\tStatus\tLabel\n123\t0\tcom.minsky.daemon\n-\t0\tcom.dotfiles.ok\n-\t78\tcom.example.crashy\n' > "$TEST_DIR/launchctl.txt"
+  write_plist com.dotfiles-acme.agent-chrome-heal /bin/sh heal
+  printf 'PID\tStatus\tLabel\n123\t0\tcom.minsky.daemon\n-\t0\tcom.dotfiles.ok\n-\t78\tcom.example.crashy\n-\t0\tcom.dotfiles-acme.agent-chrome-heal\n' > "$TEST_DIR/launchctl.txt"
 
   run env BACKGROUND_AUDIT_DIRS="$agents" BACKGROUND_AUDIT_LAUNCHCTL="$TEST_DIR/launchctl.txt" \
     BACKGROUND_AUDIT_TOP=0 DOTFILES_SOURCE="$TEST_DIR/none" bash "$SCRIPTS/background_audit.sh"
@@ -450,6 +451,8 @@ EOF
   [[ "$output" == *"off-rule  minsky      com.minsky.daemon pid=123"* ]]
   [[ "$output" == *"keep      dotfiles    com.dotfiles.ok"* ]]
   [[ "$output" == *"failing   third-party com.example.crashy pid=- last_exit=78"* ]]
+  # A dotfiles plugin's job (com.dotfiles-<plugin>.*) is tooling, not third-party (#309).
+  [[ "$output" == *"keep      dotfiles-plugin com.dotfiles-acme.agent-chrome-heal"* ]]
 }
 
 @test "input latency guide checks the Claude scheduling band first" {

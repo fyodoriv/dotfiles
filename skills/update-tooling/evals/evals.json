@@ -135,6 +135,16 @@
         "Does not run a second plain `dotfiles apply` after the skip",
         "Still runs the step 4 doctor modules and health checks"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "update latest tooling (after apply, com.dotfiles.agent-browser-chrome's plist runs Chrome through dotfiles-quit-relay, but launchctl print shows the loaded job still runs Chrome directly)",
+      "expected_output": "After the apply step the agent runs dotfiles-launchagent-drift, sees the drift line for com.dotfiles.agent-browser-chrome, runs it again with --fix from $DOTFILES_APPLIED, and reports the reload.",
+      "expectations": [
+        "Runs $DOTFILES_APPLIED/bin/dotfiles-launchagent-drift after the apply step",
+        "Runs it with --fix only when a line is not ok, from $DOTFILES_APPLIED",
+        "Reports each reloaded or still-drifted job"
+      ]
     }
   ]
 }

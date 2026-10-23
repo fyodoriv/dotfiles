@@ -1,0 +1,83 @@
+#!/bin/bash
+# Check that each loaded com.dotfiles.* LaunchAgent runs what its plist says
+# (issue #297). After `dotfiles apply`, a plist on disk can be right while
+# launchd still runs the old loaded copy until the job is reloaded, and a
+# KeepAlive job bootstrapped from a non-GUI shell can stay "not running".
+#
+# Usage: dotfiles-launchagent-drift [--fix]
+#   One line per job:
+#     ok <label>
+#     drift <label>: the loaded job runs other arguments than its plist
+#     stopped <label>: KeepAlive job is not running
+#     unloaded <label>: the plist is not loaded
+#   --fix reloads a drifted job (bootout, then bootstrap), kickstarts a
+#   stopped one, and bootstraps an unloaded one. A job disabled in launchd
+#   (launchctl print-disabled) is left alone: it is off on purpose.
+#
+# Exit: 0 when every job is ok (or was fixed); 1 when a problem is left.
+
+set -uo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+fix=false
+[ "${1:-}" = --fix ] && fix=true
+LAUNCHCTL="${DOTFILES_LAUNCHCTL:-launchctl}"
+domain="gui/$(id -u)"
+agents="$HOME/Library/LaunchAgents"
+disabled="$("$LAUNCHCTL" print-disabled "$domain" 2>/dev/null | sed -n 's/^[[:space:]]*"\([^"]*\)" => \(true\|disabled\)$/\1/p')"
+
+# plist_args <plist>: ProgramArguments, one per line (or Program).
+plist_args() {
+  local i=0 v
+  if /usr/bin/plutil -extract ProgramArguments.0 raw -o - "$1" >/dev/null 2>&1; then
+    while v="$(/usr/bin/plutil -extract "ProgramArguments.$i" raw -o - "$1" 2>/dev/null)"; do
+      printf '%s\n' "$v"; i=$((i + 1))
+    done
+  else
+    /usr/bin/plutil -extract Program raw -o - "$1" 2>/dev/null
+  fi
+}
+
+# loaded_args <print output>: the "arguments = { ... }" lines, one per line.
+loaded_args() {
+  awk '/^\targuments = \{$/ { inside = 1; next } inside && /^\t\}$/ { exit } inside { sub(/^\t\t/, ""); print }' <<< "$1"
+}
+
+problems=0
+for plist in "$agents"/com.dotfiles.*.plist; do
+  [ -f "$plist" ] || continue
+  label="$(/usr/bin/plutil -extract Label raw -o - "$plist" 2>/dev/null || basename "$plist" .plist)"
+  if ! out="$("$LAUNCHCTL" print "$domain/$label" 2>/dev/null)"; then
+    if grep -qxF -- "$label" <<< "$disabled"; then continue; fi
+    if $fix && "$LAUNCHCTL" bootstrap "$domain" "$plist" >/dev/null 2>&1; then
+      echo "bootstrapped $label"
+    else
+      echo "unloaded $label: the plist is not loaded"; problems=$((problems + 1))
+    fi
+    continue
+  fi
+  if [ "$(loaded_args "$out")" != "$(plist_args "$plist")" ]; then
+    if $fix; then
+      "$LAUNCHCTL" bootout "$domain/$label" >/dev/null 2>&1
+      if "$LAUNCHCTL" bootstrap "$domain" "$plist" >/dev/null 2>&1; then
+        echo "reloaded $label"
+      else
+        echo "drift $label: the reload failed (run: launchctl bootstrap $domain $plist)"; problems=$((problems + 1))
+      fi
+    else
+      echo "drift $label: the loaded job runs other arguments than its plist"; problems=$((problems + 1))
+    fi
+    continue
+  fi
+  state="$(sed -n 's/^\tstate = //p' <<< "$out" | head -n 1)"
+  if [ "$(/usr/bin/plutil -extract KeepAlive raw -o - "$plist" 2>/dev/null)" = true ] && [ "$state" != running ]; then
+    if $fix && "$LAUNCHCTL" kickstart "$domain/$label" >/dev/null 2>&1; then
+      echo "kickstarted $label"
+    else
+      echo "stopped $label: KeepAlive job is not running"; problems=$((problems + 1))
+    fi
+    continue
+  fi
+  echo "ok $label"
+done
+[ "$problems" -eq 0 ]

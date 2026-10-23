@@ -299,6 +299,21 @@ Node-backed jobs alone while endpoint safe mode is active. The separate
 declared release whitelist; use it only from `$DOTFILES_APPLIED`, not as a
 general repair command.
 
+After the apply step, check that launchd runs what the plists say (#297):
+
+```bash
+"$DOTFILES_APPLIED/bin/dotfiles-launchagent-drift"
+```
+
+It prints one line per `com.dotfiles.*` job: `ok`, `drift` (the loaded job
+runs other arguments than its plist), `stopped` (a KeepAlive job is not
+running), or `unloaded`. A job disabled in launchd is off on purpose and
+skipped. When it prints anything but `ok`, run it again with `--fix` from
+`$DOTFILES_APPLIED`: it reloads a drifted job, kickstarts a stopped one, and
+bootstraps an unloaded one. Report each fixed and each remaining line.
+Reloading the agent Chrome (`com.dotfiles.agent-browser-chrome`) restarts it;
+its profile and sign-ins stay.
+
 Do not run `dotfiles update`, `dotfiles-upgrade`, Homebrew upgrades, or package
 manager upgrades unless the user explicitly asks to upgrade third-party
 software. Those operations have a wider and less reversible machine impact.

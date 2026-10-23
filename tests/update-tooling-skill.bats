@@ -136,3 +136,10 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   run jq -e '[.evals[] | select(.expectations | any(contains("--if-changed")))] | length >= 1' "$EVALS"
   [ "$status" -eq 0 ]
 }
+
+@test "update-tooling checks that loaded LaunchAgents match their plists after apply (#297)" {
+  grep -F -q '"$DOTFILES_APPLIED/bin/dotfiles-launchagent-drift"' "$SKILL"
+  grep -F -q 'run it again with `--fix` from' "$SKILL"
+  run jq -e '[.evals[] | select(.expectations | any(contains("dotfiles-launchagent-drift")))] | length >= 1' "$EVALS"
+  [ "$status" -eq 0 ]
+}

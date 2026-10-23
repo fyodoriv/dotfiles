@@ -20,6 +20,7 @@ names.
 | Tests affected by a committed branch | `bin/bats-affected origin/feat/chezmoi \| xargs bats` |
 | Full suite (slow; run in the background) | `make test-all` |
 | Install e2e: real chezmoi, scripts, doctor, zsh in a sandboxed scratch HOME | `make e2e` (`make check` runs it when an installer path changes) |
+| Plugin suites on macOS `/bin/bash` 3.2 | `make test-plugins-bash32` (`make check` runs it when a plugin file changes) |
 | TASKS.md only | `make lint-tasks` |
 | Review the task queue (truth, usefulness, priority) | `/review-tasks` (tasks.md command, installed by the Agentfile) |
 | Apply to this Mac | `dotfiles apply` (after `Agentfile.yaml` edits) |

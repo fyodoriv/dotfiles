@@ -1,4 +1,4 @@
-.PHONY: changelog check-steps e2e e2e-if-needed help lint lint-full lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
+.PHONY: changelog check-steps e2e e2e-if-needed test-plugins-bash32 help lint lint-full lint-tasks lint-tasks-freshness lint-tasks-rule9 test test-all test-force check audit install-deps count clean fmt coverage
 
 .DEFAULT_GOAL := help
 
@@ -131,6 +131,24 @@ test-force: ## Run full test suite (no cache)
 	@echo "═══ Tests ($(JOBS_LABEL)) ═══"
 	@$(FULLPOWER) bats $(BATS_JOBS) tests/ tests/plugin/
 
+# ── Plugin suites on macOS /bin/bash 3.2 ─────────────────────────────
+# The plugin CLI's shebang is #!/bin/bash (3.2 on macOS), but the bats files
+# run `bash` from PATH (often Homebrew bash 5). This target puts
+# tests/bash32/bash first on PATH, so every bash they start is 3.2. A full
+# run takes minutes, so it reruns only when a plugin file or /bin/bash
+# changed since it last passed (the passes are shared by all worktrees).
+PLUGIN_BASH32_TESTS = tests/plugin-update.bats tests/plugin-v2.bats
+PLUGIN_BASH32_DEPS = bin/dotfiles-plugin bin/dotfiles $(wildcard lib/plugin*.sh) lib/confirm.sh tests/bash32/bash
+test-plugins-bash32: ## Run the plugin bats suites with /bin/bash 3.2 (only when a plugin file changed)
+	@if [ ! -x /bin/bash ] || ! /bin/bash -c '[ "$${BASH_VERSINFO[0]}" = 3 ]'; then \
+	  echo "✓ Plugin bash 3.2 run skipped (/bin/bash is not bash 3.2)"; exit 0; fi; \
+	deps=$$(mktemp "$${TMPDIR:-/tmp}/bash32-deps.XXXXXX") || exit 1; \
+	trap 'rm -f "$$deps"' EXIT; \
+	for t in $(PLUGIN_BASH32_TESTS); do for d in $(PLUGIN_BASH32_DEPS); do printf '%s\t%s\n' "$$t" "$$d"; done; done > "$$deps"; \
+	echo "═══ Plugin suites on /bin/bash 3.2 ═══"; \
+	PATH="$(CURDIR)/tests/bash32:$$PATH" ./bin/cached-run --per-file --deps "$$deps" \
+	  --key "$$(/bin/bash --version | head -1)" bats -- $(PLUGIN_BASH32_TESTS)
+
 # ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
 E2E_FILES = $(wildcard tests/e2e/*.bats)
 e2e: ## Run the hermetic install and story e2e (about 100 s; E2E_FULL=1 for the whole doctor)
@@ -165,6 +183,7 @@ check-steps:
 	@scripts/gate-timed.sh lint $(MAKE) --no-print-directory lint
 	@scripts/gate-timed.sh lint-tasks $(MAKE) --no-print-directory lint-tasks
 	@scripts/gate-timed.sh test $(MAKE) --no-print-directory test
+	@scripts/gate-timed.sh plugins-bash32 $(MAKE) --no-print-directory test-plugins-bash32
 	@scripts/gate-timed.sh e2e $(MAKE) --no-print-directory e2e-if-needed
 
 changelog: ## Regenerate CHANGELOG.md from conventional commits (never edit it by hand)

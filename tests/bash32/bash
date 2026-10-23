@@ -1,0 +1,3 @@
+#!/bin/sh
+# `bash` on PATH for test-plugins-bash32: always macOS /bin/bash 3.2.
+exec /bin/bash "$@"

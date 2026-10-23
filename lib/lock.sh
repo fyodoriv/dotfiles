@@ -56,8 +56,20 @@ acquire_lock() {
     # `ln` fails if the lock exists, so exactly one caller wins, and the lock
     # file never exists without its PID (no empty-file window to misread).
     local tmp_lock="$DOTFILES_LOCK.$$.tmp"
+    # A folder at the lock path is never the lock: `ln` would put the link
+    # inside it and succeed. Checked before and after the link (a folder can
+    # appear in between); a link made inside a folder is removed again.
+    if [ -d "$DOTFILES_LOCK" ]; then
+      warn "[lock] Cannot acquire — $DOTFILES_LOCK is a directory — fix: rmdir \"$DOTFILES_LOCK\" (it should be a file)"
+      return 1
+    fi
     if printf '%s\n%s\n' "$$" "$caller" > "$tmp_lock" 2>/dev/null &&
       ln "$tmp_lock" "$DOTFILES_LOCK" 2>/dev/null; then
+      if [ -d "$DOTFILES_LOCK" ]; then
+        rm -f "$DOTFILES_LOCK/${tmp_lock##*/}" "$tmp_lock"
+        warn "[lock] Cannot acquire — $DOTFILES_LOCK is a directory — fix: rmdir \"$DOTFILES_LOCK\" (it should be a file)"
+        return 1
+      fi
       rm -f "$tmp_lock"
       # shellcheck disable=SC2064 # expand $DOTFILES_LOCK at registration so cleanup still works after the variable is unset
       trap "rm -f '$DOTFILES_LOCK'" EXIT

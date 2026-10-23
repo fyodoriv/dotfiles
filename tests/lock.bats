@@ -309,6 +309,21 @@ EOF
   [[ "$output" != *Waiting* ]]
 }
 
+@test "a folder at the lock path is never acquired (ln would link inside it)" {
+  source "$LOCK_LIB"
+  mkdir -p "$DOTFILES_LOCK"
+  run acquire_lock "apply"
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"is a directory"* ]]
+  [ -z "$(ls -A "$DOTFILES_LOCK")" ]
+  SECONDS=0
+  run wait_for_lock "apply" 20
+  [ "$status" -eq 1 ]
+  [ "$SECONDS" -lt 5 ]
+  [ -z "$(ls -A "$DOTFILES_LOCK")" ]
+}
+
 @test "wait_for_lock prints nothing when the lock is free" {
   source "$LOCK_LIB"
   run wait_for_lock "apply" 5

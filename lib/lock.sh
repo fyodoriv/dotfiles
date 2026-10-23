@@ -88,7 +88,8 @@ acquire_lock() {
     [ -z "$lock_pid" ] && [ "$(_lock_age)" -lt 10 ] && fresh_empty=1 || fresh_empty=0
     while [ "$fresh_empty" = 1 ] && [ -z "$lock_pid" ] && [ -e "$DOTFILES_LOCK" ]; do
       if [ "$tries" -ge 10 ]; then
-        warn "[lock] Skipping — another dotfiles command is taking the lock — fix: wait for it to finish, then run again"
+        [ "${_LOCK_QUIET:-0}" = 1 ] ||
+          warn "[lock] Skipping — another dotfiles command is taking the lock — fix: wait for it to finish, then run again"
         return 1
       fi
       sleep 0.1
@@ -100,7 +101,8 @@ acquire_lock() {
 
     # Check if the locking process is still alive
     if _lock_owner_alive "$lock_pid"; then
-      warn "[lock] Skipping — locked by $lock_caller (pid $lock_pid) — fix: wait for it to finish, then run again"
+      [ "${_LOCK_QUIET:-0}" = 1 ] ||
+        warn "[lock] Skipping — locked by $lock_caller (pid $lock_pid) — fix: wait for it to finish, then run again"
       return 1
     fi
     # Stale lock — process is dead, or its PID was reused by another program
@@ -138,18 +140,31 @@ release_lock() {
 
 # Wait for the dotfiles lock, stealing stale locks like acquire_lock().
 # Used by `dotfiles apply` so chezmoi does not race concurrent doctor/sync runs.
+# It says once that it waits and for whom, then at most one update every
+# DOTFILES_LOCK_NOTE_EVERY seconds (default 30), and one line when it gives
+# up. acquire_lock's per-try "Skipping" lines stay quiet meanwhile.
 wait_for_lock() {
   local caller="${1:-unknown}"
   local max_wait="${2:-120}"
-  local waited=0
+  local every="${DOTFILES_LOCK_NOTE_EVERY:-30}"
+  local waited=0 noted=-1 lock_pid lock_caller
+  local _LOCK_QUIET=1
+  case "$max_wait" in '' | *[!0-9]*) max_wait=120 ;; esac
+  case "$every" in '' | *[!0-9]* | 0) every=30 ;; esac
 
   while ! acquire_lock "$caller"; do
+    lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "?")
+    lock_caller=$(sed -n '2p' "$DOTFILES_LOCK" 2>/dev/null || echo "unknown")
     if [ "$waited" -ge "$max_wait" ]; then
-      local lock_pid lock_caller
-      lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "?")
-      lock_caller=$(sed -n '2p' "$DOTFILES_LOCK" 2>/dev/null || echo "unknown")
-      warn "[lock] Timed out after ${max_wait}s — still locked by ${lock_caller} (pid ${lock_pid})"
+      warn "[lock] Timed out after ${max_wait}s — still locked by ${lock_caller:-unknown} (pid ${lock_pid:-?})"
       return 1
+    fi
+    if [ "$noted" -lt 0 ]; then
+      warn "[lock] Waiting for the lock held by ${lock_caller:-unknown} (pid ${lock_pid:-?}), up to ${max_wait}s"
+      noted=0
+    elif [ $((waited - noted)) -ge "$every" ]; then
+      warn "[lock] Still waiting for ${lock_caller:-unknown} (pid ${lock_pid:-?}) after ${waited}s"
+      noted=$waited
     fi
     sleep 2
     waited=$((waited + 2))

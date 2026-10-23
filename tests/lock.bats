@@ -280,6 +280,31 @@ EOF
   wait "$bg_pid" 2>/dev/null || true
 }
 
+@test "wait_for_lock says once that it waits, updates at most every 30 s, and says when it gives up" {
+  source "$LOCK_LIB"
+  sleep 30 &
+  local bg_pid=$!
+  printf '%s\n%s\n' "$bg_pid" "upgrade" > "$DOTFILES_LOCK"
+  # 4 s between updates instead of 30 keeps the test short.
+  DOTFILES_LOCK_NOTE_EVERY=4 run wait_for_lock "apply" 9
+  kill "$bg_pid" 2>/dev/null || true
+  wait "$bg_pid" 2>/dev/null || true
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [ "$(grep -c 'Waiting for the lock held by upgrade (pid '"$bg_pid"')' <<< "$output")" -eq 1 ]
+  [ "$(grep -c 'Still waiting' <<< "$output")" -eq 2 ]
+  [ "$(grep -c 'Timed out after 9s' <<< "$output")" -eq 1 ]
+  [ "$(grep -c 'Skipping' <<< "$output")" -eq 0 ]
+  [ "${#lines[@]}" -eq 4 ]
+}
+
+@test "wait_for_lock prints nothing when the lock is free" {
+  source "$LOCK_LIB"
+  run wait_for_lock "apply" 5
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "lib/lock.sh shellcheck disable lines carry an inline rationale" {
   # Convention: every `# shellcheck disable=CODE` in lib/lock.sh must end
   # with `# <reason>` so a future reader (or auto-fix tool) knows why

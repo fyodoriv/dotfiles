@@ -157,6 +157,35 @@ check "agentbrew.plugin_agentfile_shared" \
   "[ -z \"\$_agentbrew_plugin_problem\" ]" \
   ""
 
+# Installed agents agentbrew does not sync. agentbrew marks an agent
+# detected when its skills folder's parent exists (agentbrew src/agents.ts),
+# but an old excludeAgents: entry leaves detected: false in state.yaml until
+# `agentbrew init` runs again, so the agent misses shared hooks and rules.
+# An agent the merged Agentfile still excludes is skipped on purpose (for
+# example openhands on the owner's Mac, by the owner's choice).
+_agentbrew_stale_agents() {
+  local state="$HOME/.config/agentbrew/state.yaml" global="$HOME/.config/agentbrew/Agentfile.yaml"
+  local excluded name dir
+  [ -f "$state" ] && command -v yq >/dev/null 2>&1 || return 0
+  excluded="$(yq -r '(.excludeAgents // [])[]' "$global" 2>/dev/null || true)"
+  yq -r '(.agents // [])[] | select(.detected == false) | .name + "\t" + (.skillsDir // "")' "$state" 2>/dev/null |
+    while IFS=$'\t' read -r name dir; do
+      [ -n "$name" ] && [ -n "$dir" ] || continue
+      case "$dir" in '~'*) dir="$HOME${dir#\~}" ;; esac
+      [ -d "$(dirname "$dir")" ] || continue
+      grep -qxF -- "$name" <<< "$excluded" || printf '%s\n' "$name"
+    done
+}
+_agentbrew_stale=""
+if [ "${LIST_MODE:-false}" != true ] &&
+  ! { declare -F is_overridden >/dev/null && is_overridden "agentbrew.installed_agents_synced"; }; then
+  _agentbrew_stale="$(_agentbrew_stale_agents | paste -sd ' ' -)"
+fi
+check "agentbrew.installed_agents_synced" \
+  "every installed agent is synced or excluded on purpose${_agentbrew_stale:+ (installed but not synced: $_agentbrew_stale; fix: run \`agentbrew init\` to sync it, or list it under excludeAgents in ~/.config/dotfiles/Agentfile.local.yaml to ignore it)}" \
+  "[ -z \"\$_agentbrew_stale\" ]" \
+  ""
+
 # ── MCP env vars — tokens needed by agentbrew-managed MCP servers ──
 # These vars must be in ~/.zshenv.secrets so MCP servers can start cleanly.
 # See home/zshenv.secrets.example for how to obtain each token.

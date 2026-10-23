@@ -77,7 +77,10 @@ Mac may still want it.
      use `excludeAgents:`, because it is your own choice on this Mac. Taking
      an agent out of `excludeAgents:` again does not bring it back by
      itself: agentbrew marks it not detected and only `agentbrew init`
-     detects it again.
+     detects it again. The doctor check `agentbrew.installed_agents_synced`
+     names such an agent. To ignore an installed agent on purpose, list it
+     under `excludeAgents:` here (the owner's Mac does this for
+     `openhands`), and the check skips it.
    - Before the merge, agentbrew reads the file alone with its own parser.
      A file it cannot read (bad YAML, a duplicate key, an unknown `!tag`,
      a second `---` document) or one whose result has hooks is skipped

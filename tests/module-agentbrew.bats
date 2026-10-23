@@ -89,6 +89,7 @@ agentbrew.hooks_enforcing
 agentbrew.memory_service_singleton
 agentbrew.memory_launchagent_identity
 agentbrew.launchagent_node_pinned
+agentbrew.installed_agents_synced
 EOF
 }
 
@@ -843,4 +844,59 @@ EOF
   mkdir -p "$TEST_HOME/Library/LaunchAgents"
   source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
   _agentbrew_launchagent_node_pinned
+}
+
+# ── installed_agents_synced ──────────────────────────────────────────
+# agentbrew marks an agent detected when its skills folder's parent exists
+# (src/agents.ts detectAgents), and an excludeAgents: entry sets
+# detected: false that only `agentbrew init` clears.
+
+_stale_setup() {
+  sed -i.bak '/^agentbrew.installed_agents_synced$/d' "$OVERRIDES_FILE" && rm -f "$OVERRIDES_FILE.bak"
+  FAILED=""
+  fail() { fail_count=$((fail_count + 1)); FAILED+="$1"$'\n'; }
+  cat > "$TEST_HOME/.config/agentbrew/state.yaml" <<'YAML'
+agents:
+  - name: claude-code
+    skillsDir: ~/.claude/skills
+    detected: true
+  - name: openhands
+    skillsDir: ~/.openhands/skills
+    detected: false
+  - name: goose
+    skillsDir: ~/.config/goose/skills
+    detected: false
+YAML
+  mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/.openhands"
+}
+
+@test "agentbrew: installed_agents_synced fails for an installed agent agentbrew no longer syncs, naming it and the fix" {
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  _stale_setup
+  echo "mcp: []" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  echo "$FAILED"
+  [[ "$FAILED" == *"installed but not synced: openhands"* ]]
+  [[ "$FAILED" == *"agentbrew init"* ]]
+  [[ "$FAILED" == *"excludeAgents"*"Agentfile.local.yaml"* ]]
+  [[ "$FAILED" != *goose* ]]
+}
+
+@test "agentbrew: installed_agents_synced passes when the merged Agentfile excludes the agent on purpose" {
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  _stale_setup
+  printf 'excludeAgents:\n  - openhands\n' > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  echo "$FAILED"
+  [[ "$FAILED" != *"not synced"* ]]
+}
+
+@test "agentbrew: installed_agents_synced passes when no undetected agent is installed" {
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  _stale_setup
+  rmdir "$TEST_HOME/.openhands"
+  echo "mcp: []" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  echo "$FAILED"
+  [[ "$FAILED" != *"not synced"* ]]
 }

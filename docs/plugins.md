@@ -229,11 +229,15 @@ plugin's Agentfile, and says why, when the plugin would:
 - **Make a local skill copy match a `skills:` entry.** A local `sources:`
   folder (of this plugin or an earlier one) holds a skill (`SKILL.md`,
   `skill.md`, or `DESIGN.md`, by folder name or front matter `name:`) that a
-  `skills:` entry asks for, and it did not match before this plugin.
+  `skills:` entry asks for, and it did not match before this plugin; or a
+  source the plugin adds holds a second copy of such a skill (agentbrew
+  would then ask which source to use).
   agentbrew installs a `skills:` name that has no catalog entry (a built-in
   skill) by searching every source, and a local source ranks before the
   built-in. A name only the plugin asks for counts when it is an agentbrew
-  built-in, because agentbrew installs no other unknown name. A remote
+  built-in, because agentbrew installs no other unknown name; when the
+  built-in list cannot be found (no `AGENTBREW_DIR`, no agentbrew
+  `dist/cli.js`, no checkout), every such name counts. A remote
   source cannot be read before the sync, so this rule does not cover it.
 
 Without `agentfile merge` (older agentbrew), a stricter rule is read from

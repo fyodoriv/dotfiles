@@ -307,7 +307,8 @@ _agentfile_plugin_merge_reasons() {
   _agentfile_skill_reason "$(_agentfile_list skills "$before")" \
     "$(_agentfile_list sources "$before" | _agentfile_local_sources)" \
     "$(_agentfile_list skills "$after")" \
-    "$(_agentfile_list sources "$after" | _agentfile_local_sources)" "$ab"
+    "$(_agentfile_list sources "$after" | _agentfile_local_sources)" "$ab" \
+    "$(_agentfile_added sources "$before" "$after" | _agentfile_local_sources)"
 }
 
 # _agentfile_plugin_raw_reasons <base Agentfile> <plugin Agentfile>
@@ -354,7 +355,8 @@ _agentfile_plugin_raw_reasons() {
     sources+="$(_agentfile_file_sources "$f")"$'\n'
   done
   _agentfile_skill_reason "$requested" "$sources" \
-    "$requested$(_agentfile_file_skills "$file")" "$sources$(_agentfile_file_sources "$file")" ""
+    "$requested$(_agentfile_file_skills "$file")" "$sources$(_agentfile_file_sources "$file")" "" \
+    "$(_agentfile_file_sources "$file")"
   [ -f "$base" ] || return 0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
@@ -432,12 +434,14 @@ _agentfile_names() {
 # at each end on its own, YAML strips a matching pair.
 _agentfile_front_name() {
   # shellcheck disable=SC2016 # perl code, not shell
-  env -u PERL5LIB -u PERL5OPT perl -0777 -ne '
+  # JavaScript's \s and trim() also cover these Unicode spaces.
+  env -u PERL5LIB -u PERL5OPT perl -CSD -0777 -ne '
+    my $w = qr/[\s\x{A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]/;
     s/\r\n/\n/g;
-    exit unless /\A---\s*\n([\s\S]*?)\n---/;
+    exit unless /\A---$w*\n([\s\S]*?)\n---/;
     for (split /\n/, $1) {
-      next unless /^name:\s*(.+)$/;
-      (my $v = $1) =~ s/^\s+|\s+$//g;
+      next unless /^name:$w*(.+)$/;
+      (my $v = $1) =~ s/^$w+|$w+$//g;
       (my $each = $v) =~ s/^["\x27]|["\x27]$//g;
       print "$each\n";
       print "$2\n" if $v =~ /^(["\x27])(.*)\1$/;
@@ -446,9 +450,10 @@ _agentfile_front_name() {
 
 # _agentfile_skill_reason <earlier skills: names> <earlier local sources>
 # <skills: names with the plugin> <local sources with the plugin> <agentbrew
-# command> (lists one per line): one line naming the skills that a skills:
-# entry asks for and a local source holds with the plugin, but not before
-# it, so a request in one plugin and a copy in another count too. agentbrew
+# command> <local sources the plugin adds> (lists one per line): one line
+# naming the skills that a skills: entry asks for and a local source holds
+# with the plugin, but not before it (so a request in one plugin and a copy
+# in another count too), or that a source the plugin adds holds. agentbrew
 # installs a skills: name that has no catalog entry (a built-in skill) by
 # searching every source it tracks, and a local source ranks before the
 # built-in, so such a copy could replace the shared or built-in skill. A
@@ -462,10 +467,16 @@ _agentfile_skill_reason() {
   if [ -n "$asked" ] && builtins="$(_agentfile_builtin_skills "$5")"; then
     asked="$(LC_ALL=C comm -12 <(printf '%s\n' "$asked") <(printf '%s\n' "$builtins"))"
   fi
-  clashes="$(LC_ALL=C comm -13 \
-    <(LC_ALL=C comm -12 <(printf '%s\n' "$earlier") <(_agentfile_skill_names "$2")) \
-    <(LC_ALL=C comm -12 <(printf '%s\n%s\n' "$earlier" "$asked" | awk 'NF' | LC_ALL=C sort -u) \
-      <(_agentfile_skill_names "$4")))"
+  # New matches, plus any copy in a source the plugin adds: a second copy
+  # makes agentbrew ask "from which source?", listing the plugin's.
+  clashes="$( {
+    LC_ALL=C comm -13 \
+      <(LC_ALL=C comm -12 <(printf '%s\n' "$earlier") <(_agentfile_skill_names "$2")) \
+      <(LC_ALL=C comm -12 <(printf '%s\n%s\n' "$earlier" "$asked" | awk 'NF' | LC_ALL=C sort -u) \
+        <(_agentfile_skill_names "$4"))
+    LC_ALL=C comm -12 <(printf '%s\n%s\n' "$earlier" "$asked" | awk 'NF' | LC_ALL=C sort -u) \
+      <(_agentfile_skill_names "$6")
+  } | LC_ALL=C sort -u)"
   [ -z "$clashes" ] ||
     echo "its sources: or skills: make a local skill copy match a skills: entry (agentbrew may install that copy instead of the shared or built-in skill): $(printf '%s\n' "$clashes" | paste -sd ' ' -)"
 }
@@ -477,11 +488,20 @@ _agentfile_lower() {
 
 # _agentfile_builtin_skills <agentbrew command>: agentbrew's built-in skill
 # names (skill-plugins/dev), lowercased; fails when no agentbrew folder is
-# found (AGENTBREW_DIR, the command's dist/cli.js, then the checkout).
+# found (AGENTBREW_DIR, the command's dist/cli.js or the agentbrew it runs
+# from PATH, then the checkout).
 _agentfile_builtin_skills() {
-  local dir="${AGENTBREW_DIR:-}" d
+  local dir="${AGENTBREW_DIR:-}" d cmd="${1#node }" bin
   if [ -z "$dir" ]; then
-    case "$1" in *"/dist/cli.js"*) dir="${1%%/dist/cli.js*}"; dir="${dir##* }" ;; esac
+    case "$cmd" in
+      */dist/cli.js) dir="${cmd%/dist/cli.js}" ;;
+      *)
+        # An agentbrew on PATH: follow its symlinks to .../dist/cli.js.
+        bin="$(command -v "$cmd" 2>/dev/null)" &&
+          bin="$(env -u PERL5LIB -u PERL5OPT perl -MCwd=abs_path -e 'print abs_path(shift)' "$bin" 2>/dev/null)" &&
+          case "$bin" in */dist/cli.js) dir="${bin%/dist/cli.js}" ;; esac
+        ;;
+    esac
   fi
   if [ -z "$dir" ] || [ ! -d "$dir/skill-plugins/dev" ]; then
     # shellcheck source=/dev/null
@@ -496,16 +516,16 @@ _agentfile_builtin_skills() {
 # _agentfile_skill_names <folders> (one per line): every name agentbrew can
 # find a skill under in those folders, lowercased, sorted: for each
 # SKILL.md, skill.md, or DESIGN.md (any letter case) down to 9 levels, its
-# folder's name and its front matter names. Like agentbrew's scan, it skips
-# hidden folders, node_modules, and __pycache__, and follows no symlinked
-# folder below the source.
+# folder's name and its front matter names (a symlinked file counts). Like
+# agentbrew's scan, it skips hidden folders, node_modules, and __pycache__,
+# and follows no symlinked folder below the source.
 _agentfile_skill_names() {
   local d f
   while IFS= read -r d; do
     [ -n "$d" ] && [ -d "$d" ] || continue
     find -H "$d" -mindepth 1 -maxdepth 9 \
       \( -type d \( -name '.*' -o -name node_modules -o -name __pycache__ \) -prune \) -o \
-      \( -type f \( -iname SKILL.md -o -iname DESIGN.md \) -print \) 2>/dev/null | while IFS= read -r f; do
+      \( \( -type f -o -type l \) \( -iname SKILL.md -o -iname DESIGN.md \) -print \) 2>/dev/null | while IFS= read -r f; do
       basename "$(dirname "$f")"
       _agentfile_front_name "$f"
     done

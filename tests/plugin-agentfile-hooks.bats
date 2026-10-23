@@ -568,6 +568,48 @@ skills: [acme-skill]' skills/acme-skill/SKILL.md
   done
 }
 
+@test "a skill copy hidden by a symlinked file or a Unicode space is still found" {
+  layer "$TEST_DIR/acme" 'sources: [./skills]
+skills: [agentbrew-status]'
+  mkdir -p "$TEST_DIR/acme/real" "$TEST_DIR/acme/skills/agentbrew-status"
+  printf -- '---\nname: x\n---\nACME\n' > "$TEST_DIR/acme/real/t.md"
+  ln -s ../../real/t.md "$TEST_DIR/acme/skills/agentbrew-status/SKILL.md"
+  run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
+  # name: followed by a no-break space, which agentbrew trims.
+  layer "$TEST_DIR/beta" 'sources: [./skills]
+skills: [agentbrew-status]'
+  mkdir -p "$TEST_DIR/beta/skills/y"
+  printf -- '---\nname: agentbrew-status\302\240\n---\nBETA\n' > "$TEST_DIR/beta/skills/y/SKILL.md"
+  run layers "$REPO_ROOT/Agentfile.yaml" beta="$TEST_DIR/beta/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
+}
+
+@test "a second local copy of a skill the shared layer already ships is refused" {
+  layer "$TEST_DIR/base" 'sources: [./skills]
+skills: [agentbrew-status]' skills/agentbrew-status/SKILL.md
+  layer "$TEST_DIR/acme" 'sources: [./skills]' skills/agentbrew-status/SKILL.md
+  for cmd in "$AGENTFILE_AGENTBREW_CMD" false; do
+    AGENTFILE_AGENTBREW_CMD="$cmd" run layers "$TEST_DIR/base/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+    echo "$output"
+    [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+    [[ "$output" == *": agentbrew-status"* ]]
+  done
+}
+
+@test "without agentbrew's built-in list, any name the plugin asks for counts; the cli.js path finds the list" {
+  layer "$TEST_DIR/acme" 'sources: [./skills]
+skills: [acme-skill]' skills/acme-skill/SKILL.md
+  run env -u AGENTBREW_DIR -u DOTFILES_REPOS_DIR AGENTFILE_AGENTBREW_CMD=false bash -c "$(declare -f layers); REPO_ROOT='$REPO_ROOT'; layers '$REPO_ROOT/Agentfile.yaml' acme='$TEST_DIR/acme/Agentfile.yaml'"
+  echo "$output"
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": acme-skill"* ]]
+  run env -u AGENTBREW_DIR -u DOTFILES_REPOS_DIR AGENTFILE_AGENTBREW_CMD="node $AGENTBREW_CHECKOUT/dist/cli.js" PATH="$(dirname "$NODE_BIN"):$PATH" bash -c "$(declare -f layers); REPO_ROOT='$REPO_ROOT'; layers '$REPO_ROOT/Agentfile.yaml' acme='$TEST_DIR/acme/Agentfile.yaml' 2>&1"
+  echo "$output"
+  [ "${lines[${#lines[@]}-1]}" = "$TEST_DIR/acme/Agentfile.yaml" ]
+}
+
 @test "without agentfile merge, the command, agent, and skill rules hold too" {
   layer "$TEST_DIR/acme" 'commands: [./commands]' commands/ship-it.md
   AGENTFILE_AGENTBREW_CMD=false run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"

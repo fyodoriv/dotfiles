@@ -323,8 +323,10 @@ cmd_run() {
   chezmoi verify --source "$REPO_DIR" --exclude scripts >/dev/null 2>&1 || critical "verification (chezmoi verify)"
   # `exit 0`, not `exit`: a plain exit returns the last startup line's status,
   # and macOS /etc/zshrc ends with a test that is false outside Terminal.app.
-  # So this checks that an interactive zsh runs, as the zsh timing does (#290).
-  zsh -i -c 'exit 0' >/dev/null 2>&1 </dev/null || critical "verification (zsh does not start cleanly)"
+  # So zsh fails the install only when it cannot run (as the zsh timing, #290);
+  # errors it prints while starting are a warning, not a rollback.
+  zsh_err="$(zsh -i -c 'exit 0' 2>&1 >/dev/null </dev/null)" || critical "verification (zsh does not run)"
+  [ -z "$zsh_err" ] || say "  ! zsh printed errors while starting: ${zsh_err%%$'\n'*}"
 
   step "6/6 agentbrew"
   if [ "$agentbrew" -eq 1 ]; then

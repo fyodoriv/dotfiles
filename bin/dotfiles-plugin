@@ -693,13 +693,24 @@ cmd_verify() {
 # child of the holder (DOTFILES_LOCK_HOLDER, set by dotfiles upgrade) runs
 # under the holder's lock. DOTFILES_PLUGIN_LOCK_WAIT: seconds to wait.
 _plugin_take_lock() {
-  local rc=0
+  local rc=0 wait="${DOTFILES_PLUGIN_LOCK_WAIT:-120}"
   # shellcheck source=../lib/lock.sh
   source "$DOTFILES_DIR/lib/lock.sh"
   lock_inherited && return 0
-  wait_for_lock "plugin $1" "${DOTFILES_PLUGIN_LOCK_WAIT:-120}" ||
-    die "another dotfiles command holds $DOTFILES_LOCK (see above); run this again when it finishes"
-  # Signals reach the child too; the parent waits for it, then frees the lock.
+  case "$wait" in '' | *[!0-9]*) wait=120 ;; esac
+  mkdir -p "$(dirname "$DOTFILES_LOCK")" 2>/dev/null || true
+  if ! acquire_lock "plugin $1"; then
+    # No lock file means it cannot be made (no folder, no write access, a
+    # folder in its place): waiting would not help.
+    [ -f "$DOTFILES_LOCK" ] || die "cannot take $DOTFILES_LOCK (see above)"
+    wait_for_lock "plugin $1" "$wait" ||
+      die "another dotfiles command holds $DOTFILES_LOCK (see above); run this again when it finishes"
+  fi
+  # A foreground child keeps the terminal's Ctrl-C (a background one would
+  # start with INT ignored and could not roll back). Bash runs these traps
+  # only after the child ends, so the lock goes after the work does. A
+  # signal sent to this parent alone waits for the child; SIGKILL of the
+  # parent alone leaves the child running unlocked.
   trap : INT TERM HUP
   DOTFILES_LOCK_HOLDER=$$ bash "${BASH_SOURCE[0]}" "$@" || rc=$?
   exit "$rc"

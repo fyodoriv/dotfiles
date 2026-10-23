@@ -79,10 +79,45 @@ hold_lock() {
   [ "$(head -1 "$HOME/.dotfiles.lock")" = "$HOLDER" ]
 }
 
-@test "a free lock is taken for the command and released after it" {
-  run bash "$CLI" remove acme --yes
+@test "a free lock is held while the command runs and released after it" {
+  # A yq wrapper records who holds the lock each time the command reads YAML.
+  real_yq="$(command -v yq)"
+  printf '#!/bin/sh\nhead -2 "$HOME/.dotfiles.lock" 2>/dev/null | paste -sd " " - >> "%s/held.log"\nexec "%s" "$@"\n' "$TEST_DIR" "$real_yq" > "$TEST_DIR/stub/yq"
+  chmod +x "$TEST_DIR/stub/yq"
+  for cmd in "list" "verify" "remove acme --yes"; do
+    : > "$TEST_DIR/held.log"
+    # shellcheck disable=SC2086
+    run bash "$CLI" $cmd
+    echo "$cmd -> $status: $output"
+    [ "$status" -eq 0 ]
+    grep -q "plugin ${cmd%% *}" "$TEST_DIR/held.log"
+    [ ! -e "$HOME/.dotfiles.lock" ]
+  done
+}
+
+@test "a lock that cannot be made stops at once with the reason" {
+  mkdir -p "$TEST_DIR/no-write" && chmod 500 "$TEST_DIR/no-write"
+  SECONDS=0
+  DOTFILES_LOCK="$TEST_DIR/no-write/x/lock" DOTFILES_PLUGIN_LOCK_WAIT=60 run bash "$CLI" list
   echo "$output"
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
+  [ "$SECONDS" -lt 10 ]
+  [[ "$output" == *"cannot take"* ]]
+}
+
+@test "Ctrl-C reaches the command, and the lock goes only after it ends" {
+  real_yq="$(command -v yq)"
+  printf '#!/bin/sh\nsleep 1\nexec "%s" "$@"\n' "$real_yq" > "$TEST_DIR/stub/yq"
+  chmod +x "$TEST_DIR/stub/yq"
+  bash "$CLI" list > "$TEST_DIR/out" 2>&1 &
+  parent=$!
+  for _ in $(seq 50); do [ -e "$HOME/.dotfiles.lock" ] && break; sleep 0.1; done
+  [ "$(head -1 "$HOME/.dotfiles.lock")" = "$parent" ]
+  child="$(pgrep -P "$parent" -f dotfiles-plugin | head -1)"
+  [ -n "$child" ]
+  kill -INT "$child"
+  wait "$parent" || true
+  ! kill -0 "$child" 2>/dev/null
   [ ! -e "$HOME/.dotfiles.lock" ]
 }
 

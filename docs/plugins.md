@@ -76,7 +76,8 @@ contributes:
   `~/.dotfiles.lock`, the lock that apply, sync, doctor, and upgrade share,
   so a manual command cannot race the Sunday `dotfiles upgrade`. They wait up
   to `DOTFILES_PLUGIN_LOCK_WAIT` seconds (default 120), then stop and name
-  the holder. `dotfiles upgrade` runs its plugin updates under its own lock
+  the holder; a lock that cannot be made at all stops them at once. Ctrl-C
+  stops the work as before, and the lock is freed only after the work ends. `dotfiles upgrade` runs its plugin updates under its own lock
   (`DOTFILES_LOCK_HOLDER`, `lib/lock.sh`). `--dry-run`, `options`, `lint`,
   `new`, and `migrate` take no lock.
 - `~/.config/dotfiles/plugins.lock` (mode 0600) records, for each plugin:

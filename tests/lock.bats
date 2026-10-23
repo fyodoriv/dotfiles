@@ -298,6 +298,17 @@ EOF
   [ "${#lines[@]}" -eq 4 ]
 }
 
+@test "wait_for_lock stops at once when the lock cannot be made" {
+  source "$LOCK_LIB"
+  DOTFILES_LOCK="$TEST_DIR/missing/.dotfiles.lock"
+  SECONDS=0
+  run wait_for_lock "apply" 20
+  [ "$status" -eq 1 ]
+  [ "$SECONDS" -lt 5 ]
+  [ "$(grep -c 'Cannot create lock' <<< "$output")" -eq 1 ]
+  [[ "$output" != *Waiting* ]]
+}
+
 @test "wait_for_lock prints nothing when the lock is free" {
   source "$LOCK_LIB"
   run wait_for_lock "apply" 5

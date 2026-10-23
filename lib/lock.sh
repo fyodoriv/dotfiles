@@ -153,6 +153,9 @@ wait_for_lock() {
   case "$every" in '' | *[!0-9]* | 0) every=30 ;; esac
 
   while ! acquire_lock "$caller"; do
+    # No lock file after a failed try means it cannot be made (no folder,
+    # no write access, a folder in its place); acquire_lock said why.
+    [ -f "$DOTFILES_LOCK" ] || return 1
     lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "?")
     lock_caller=$(sed -n '2p' "$DOTFILES_LOCK" 2>/dev/null || echo "unknown")
     if [ "$waited" -ge "$max_wait" ]; then

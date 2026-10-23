@@ -121,6 +121,16 @@ hold_lock() {
   [ ! -e "$HOME/.dotfiles.lock" ]
 }
 
+@test "a command that waits and then gets the lock prints one waiting line and no Skipping line" {
+  hold_lock
+  ( sleep 3; kill "$HOLDER" 2>/dev/null ) &
+  DOTFILES_PLUGIN_LOCK_WAIT=20 run bash "$CLI" list
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'Waiting for the lock held by upgrade' <<< "$output")" -eq 1 ]
+  [[ "$output" != *Skipping* ]]
+}
+
 @test "read-only plugin commands do not wait on the lock" {
   hold_lock
   run bash "$CLI" options

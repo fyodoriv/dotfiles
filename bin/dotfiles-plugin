@@ -699,7 +699,7 @@ _plugin_take_lock() {
   lock_inherited && return 0
   case "$wait" in '' | *[!0-9]*) wait=120 ;; esac
   mkdir -p "$(dirname "$DOTFILES_LOCK")" 2>/dev/null || true
-  if ! acquire_lock "plugin $1"; then
+  if ! _LOCK_QUIET=1 acquire_lock "plugin $1"; then
     # No lock file means it cannot be made (no folder, no write access, a
     # folder in its place): waiting would not help.
     [ -f "$DOTFILES_LOCK" ] || die "cannot take $DOTFILES_LOCK (see above)"

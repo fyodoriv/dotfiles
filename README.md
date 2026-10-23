@@ -755,7 +755,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 
 | Agent | What it does |
 |-------|-------------|
-| `com.dotfiles.agent-browser-chrome` | The one agents Chrome on port 9223 |
+| `com.dotfiles.agent-browser-chrome` | The one agents Chrome on port 9223, run through `dotfiles-quit-relay` so a macOS restart can quit it |
 
 At most three browsers run: your own Chrome, the agents Chrome on `9223`, and one locked temporary browser (`temp-browser acquire|status|release`, fresh profile each time). `~/.agent-browser/config.json` sets `"cdp": "9223"`, so agent-browser attaches by default and fails instead of starting its own browser. Keep own-tab discipline (`agent-tab` records it): open your own tab, work only there, and close extra tabs at task end. The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired; `dotfiles apply` removes them. See [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
 
@@ -1086,6 +1086,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
 | `rancher-desktop` | Start Rancher Desktop and wait until the Docker API answers | At login |
+| `dotfiles-quit-relay` | Run a LaunchAgent Chrome so a restart, shut down, or log out can quit it: a small accessory app (`lib/quit-watcher.swift`) gets the quit request that Chrome ignores, and the relay sends Chrome SIGTERM (issue #298) | Inside the agent Chrome LaunchAgent |
 | `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV` and `--decide WINDOWS ARGV` for tests; a headed agent Chrome keeps focus) | Always running (LaunchAgent) |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |

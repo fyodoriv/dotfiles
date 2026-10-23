@@ -1,0 +1,77 @@
+#!/bin/bash
+# Run a LaunchAgent Chrome so a macOS restart, shut down, or log out can quit
+# it (issue #298). Chrome started by launchd ignores the quit Apple Event, so
+# the restart stopped with "Google Chrome failed to quit". The relay runs
+# Chrome in the background and starts lib/quit-watcher.swift (compiled once,
+# cached by source hash), an accessory app that macOS does ask to quit. On its
+# SIGUSR1 (or a SIGTERM from launchctl), the relay sends SIGTERM to Chrome and
+# exits 0, so KeepAlive SuccessfulExit=false does not start it again.
+#
+# Usage: dotfiles-quit-relay <chrome binary> [chrome args...]
+#
+# Exit: 0 after a quit request; otherwise Chrome's own exit status. Without
+# swiftc, Chrome still runs, without the quit watcher.
+
+set -uo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; s/^# \{0,1\}//p' "$0"; exit 0; }
+[ "$#" -ge 1 ] || { echo "usage: dotfiles-quit-relay <chrome binary> [args...]" >&2; exit 2; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# The watcher binary: DOTFILES_QUIT_WATCHER when set (tests), else build it.
+watcher_bin() {
+  local source bin swiftc want
+  if [ -n "${DOTFILES_QUIT_WATCHER:-}" ]; then printf '%s\n' "$DOTFILES_QUIT_WATCHER"; return 0; fi
+  source="$SCRIPT_DIR/../lib/quit-watcher.swift"
+  bin="$HOME/.local/share/dotfiles/bin/quit-watcher"
+  swiftc="${DOTFILES_SWIFTC:-$(command -v swiftc || true)}"
+  if [ -z "$swiftc" ] || [ ! -x "$swiftc" ]; then
+    echo "dotfiles-quit-relay: no quit watcher: swiftc not found (install Xcode Command Line Tools); Chrome may block a restart" >&2
+    return 1
+  fi
+  want="$(shasum -a 256 "$source" | cut -d' ' -f1)"
+  if [ ! -x "$bin" ] || [ "$(cat "$bin.sha" 2>/dev/null || true)" != "$want" ]; then
+    mkdir -p "$(dirname "$bin")"
+    if ! "$swiftc" -O -o "$bin.tmp" "$source" >&2; then
+      echo "dotfiles-quit-relay: no quit watcher: the build failed; Chrome may block a restart" >&2
+      rm -f "$bin.tmp"
+      return 1
+    fi
+    mv -f "$bin.tmp" "$bin"
+    printf '%s\n' "$want" > "$bin.sha"
+  fi
+  printf '%s\n' "$bin"
+}
+
+chrome_pid="" watcher_pid=""
+
+stop_watcher() {
+  [ -n "$watcher_pid" ] && kill "$watcher_pid" 2>/dev/null
+  [ -n "$watcher_pid" ] && wait "$watcher_pid" 2>/dev/null
+  watcher_pid=""
+}
+
+# shellcheck disable=SC2329 # run by the trap below
+quit() {
+  trap '' USR1 TERM HUP INT
+  [ -n "$chrome_pid" ] && kill -TERM "$chrome_pid" 2>/dev/null
+  [ -n "$chrome_pid" ] && wait "$chrome_pid" 2>/dev/null
+  stop_watcher
+  exit 0
+}
+trap quit USR1 TERM HUP INT
+
+"$@" &
+chrome_pid=$!
+
+if watcher="$(watcher_bin)"; then
+  "$watcher" "$$" &
+  watcher_pid=$!
+fi
+
+# `wait` returns early when a trapped signal arrives; the trap then exits.
+rc=0
+wait "$chrome_pid" || rc=$?
+chrome_pid=""
+stop_watcher
+exit "$rc"

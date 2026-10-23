@@ -345,7 +345,8 @@ render_chrome_plist() {
   ! grep -q -- '--headless=new' "$TEST_DIR/c.plist"
   [ "$(grep -c -- '--restore-last-session' "$TEST_DIR/c.plist")" -eq 1 ]
   plutil -lint "$TEST_DIR/c.plist"
-  [ "$(plutil -extract ProgramArguments.1 raw -o - "$TEST_DIR/c.plist")" = --remote-debugging-port=9223 ]
+  # 0-2: /bin/bash, dotfiles-quit-relay (#298), the Chrome binary.
+  [ "$(plutil -extract ProgramArguments.3 raw -o - "$TEST_DIR/c.plist")" = --remote-debugging-port=9223 ]
 }
 
 @test "7b: the launchagents script applies the options to the purpose Chrome" {

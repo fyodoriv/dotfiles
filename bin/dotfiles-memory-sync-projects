@@ -1,17 +1,352 @@
 #!/bin/bash
-# Compatibility shim for AgentBrew-managed Claude project-memory ingestion.
+# Stable dotfiles entry point for AgentBrew-managed Claude project-memory
+# ingestion.
 #
 # Keep this stable command because the daily LaunchAgent and /ship-it use it.
 # AgentBrew owns the Streamable HTTP client, session lifecycle, and sync
 # evidence, so dotfiles must not retain a second raw JSON-RPC implementation.
+#
+# Fast path: a plain or --quiet run first compares the newest change time
+# (ctime) in each store with a stamp. When nothing is newer, it exits without
+# starting AgentBrew or calling the memory daemon.
+#
+# The stamp is a per-user file at
+# ~/.local/state/dotfiles/memory-sync-projects.stamp. Line 1 hashes the
+# projects directory and its store names. Line 2 hashes the `stores` map of
+# AgentBrew's sync ledger. Its mtime is the start of the last run after
+# which AgentBrew exited 0 and `agentbrew memory sync-projects --check` found
+# no stale store. It is never written after a skipped or degraded sync.
+# Deleting it is always safe: the next run does a full AgentBrew sync.
 
 set -uo pipefail
 
 agentbrew_bin="${DOTFILES_MEMORY_AGENTBREW_BIN:-agentbrew}"
+# `-` (not `:-`) keeps a set-but-empty value, like AgentBrew's `??`.
+projects_dir="${AGENTBREW_CLAUDE_PROJECTS_DIR-${DOTFILES_CLAUDE_PROJECTS_DIR-$HOME/.claude/projects}}"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+stamp="$state_home/dotfiles/memory-sync-projects.stamp"
+# AgentBrew's sync ledger. A change to its `stores` map that this command did
+# not see (a reset, or a concurrent run that wrote older entries) voids the
+# stamp.
+agentbrew_ledger="$state_home/agentbrew/memory-project-sync.json"
+# The same single-flight lock as AgentBrew's SessionEnd sync hook, so this
+# command, the hook, and parallel deliveries never run two syncs at once.
+lock_dir="${XDG_CACHE_HOME:-$HOME/.cache}/agentbrew/memory-sync-projects.lock"
+lock_stale_seconds=900
+log_file="$HOME/.local/share/dotfiles/logs/memory-sync-projects.log"
+# Trust the stamp for 12 hours at most. Then a run checks with AgentBrew even
+# when the change times look fresh (for example after an AgentBrew upgrade).
+stamp_max_age=43200
 
-if ! command -v "$agentbrew_bin" >/dev/null 2>&1; then
+usage() {
+  cat <<'EOF'
+Usage: dotfiles-memory-sync-projects [--background] [AgentBrew options]
+
+Forwards to `agentbrew memory sync-projects`. A plain or --quiet run skips
+AgentBrew when no store changed since the last full sync.
+
+  --background  Run the AgentBrew sync detached and return at once.
+                Log: ~/.local/share/dotfiles/logs/memory-sync-projects.log
+
+AgentBrew options:
+EOF
+}
+
+background=false
+fast_path=true
+help=false
+quiet=false
+forward=()
+for arg in "$@"; do
+  case "$arg" in
+    --background) background=true ;;
+    --quiet) quiet=true; forward+=("$arg") ;;
+    -h|--help) help=true; fast_path=false; forward+=("$arg") ;;
+    *) fast_path=false; forward+=("$arg") ;;
+  esac
+done
+
+agentbrew_available() {
+  if command -v "$agentbrew_bin" >/dev/null 2>&1; then
+    return 0
+  fi
   echo "memory sync skipped: agentbrew is not available" >&2
-  exit 0
+  return 1
+}
+
+now_ms() {
+  perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000' 2>/dev/null \
+    || printf '%s000\n' "$(date +%s)"
+}
+
+# store_scan check <stamp> <ledger> <max-age> <quiet>
+#   Exit 0 only when the stamp is valid and no store changed since it.
+# store_scan stamp <path>      Write line 1 of a stamp for the current stores.
+# store_scan digest <ledger>   Print the ledger digest ("none" when missing).
+# store_scan seal <path> <digest>
+#   Append the ledger digest, keeping the stamp's mtime.
+# Any failure, a missing perl included, means "run AgentBrew".
+store_scan() {
+  command -v perl >/dev/null 2>&1 || return 1
+  perl - "$projects_dir" "$@" <<'PERL'
+use strict;
+use warnings;
+use Digest::SHA qw(sha256_hex);
+use Time::HiRes qw(time stat lstat utime);
+
+my ($dir, $mode) = splice(@ARGV, 0, 2);
+
+# ctime: every write, rename, or utime moves it forward, and no process can
+# set it back (cp -p and touch -t can set mtime back).
+sub changed_at {
+  my @s = stat($_[0]);
+  return @s ? $s[10] : undef;
+}
+
+# Populated stores, found like AgentBrew's discoverClaudeProjectMemoryStores.
+sub stores {
+  my @found;
+  opendir(my $dh, $dir) or return @found;
+  my @projects = grep { $_ ne "." && $_ ne ".." } readdir $dh;
+  closedir $dh;
+  @projects = sort @projects;
+  for my $project (@projects) {
+    my $project_dir = "$dir/$project";
+    next if -l $project_dir || !-d $project_dir;
+    my $memory = "$project_dir/memory";
+    next unless -d $memory;
+    my $started = time;
+    opendir(my $mh, $memory) or next;
+    my @files = grep { /\.md\z/ && !-l "$memory/$_" && -f _ } readdir $mh;
+    closedir $mh;
+    next unless @files;
+    my $newest = changed_at($memory) // time;
+    # A retargeted `memory` symlink changes only the link's own ctime.
+    my @link = lstat($memory);
+    $newest = $link[10] if @link && $link[10] > $newest;
+    for my $file (@files) {
+      my $at = changed_at("$memory/$file") // time;
+      $newest = $at if $at > $newest;
+    }
+    push @found, { name => $project, files => scalar @files, newest => $newest,
+      ms => (time - $started) * 1000 };
+  }
+  return @found;
+}
+
+# A hash, so the stamp holds no paths, yet an added, removed, or renamed
+# store changes it.
+sub stores_line {
+  return sha256_hex(join("\n", $dir, map { $_->{name} } @_));
+}
+
+# A hash of the ledger's `stores` map only: AgentBrew rewrites its
+# timestamps on every run, but the map changes only when a store's sync
+# evidence does. undef when the ledger is not a version-1 ledger.
+sub ledger_digest {
+  my ($path) = @_;
+  return "none" unless -e $path;
+  require JSON::PP;
+  open(my $fh, "<", $path) or return undef;
+  my $raw = do { local $/; <$fh> };
+  close $fh;
+  my $data = eval { JSON::PP->new->decode($raw) };
+  return undef unless ref $data eq "HASH" && ($data->{version} // "") eq "1"
+    && ref $data->{stores} eq "HASH";
+  return sha256_hex(JSON::PP->new->canonical->encode($data->{stores}));
+}
+
+if ($mode eq "stamp") {
+  my ($path) = @ARGV;
+  my $line = stores_line(stores());
+  open(my $out, ">", $path) or exit 1;
+  print {$out} "$line\n";
+  close $out or exit 1;
+  exit 0;
+}
+if ($mode eq "digest") {
+  my $digest = ledger_digest($ARGV[0]);
+  exit 1 unless defined $digest;
+  print "$digest\n";
+  exit 0;
+}
+if ($mode eq "seal") {
+  my ($path, $digest) = @ARGV;
+  my @before = stat($path) or exit 1;
+  open(my $out, ">>", $path) or exit 1;
+  print {$out} "$digest\n";
+  close $out or exit 1;
+  utime($before[8], $before[9], $path) or exit 1;
+  exit 0;
+}
+
+my ($stamp, $ledger, $max_age, $quiet) = @ARGV;
+$quiet = $quiet eq "true";
+my $start = time;
+
+sub say_line { print "memory-sync: $_[0]\n" unless $quiet }
+
+# Display label only; mirrors AgentBrew's claudeProjectDirToSlug.
+sub slug {
+  my ($s) = @_;
+  $s =~ s/^-//;
+  if ($s =~ s/^Users-//) {
+    $s =~ s/^[^-]+-//;
+    $s =~ s/^apps-//;
+  }
+  return length $s ? $s : "unknown";
+}
+
+my @stamp_stat = stat($stamp);
+if (!@stamp_stat) {
+  say_line("no full-sync stamp yet");
+  exit 1;
+}
+my $stamp_mtime = $stamp_stat[9];
+if ($stamp_mtime > time) {
+  say_line("the full-sync stamp is dated in the future");
+  exit 1;
+}
+if (time - $stamp_mtime > $max_age) {
+  say_line(sprintf("the last full sync is over %d hours old", $max_age / 3600));
+  exit 1;
+}
+my @found = stores();
+my ($stamp_stores, $stamp_ledger) = ("", "");
+if (open(my $fh, "<", $stamp)) {
+  chomp($stamp_stores = <$fh> // "");
+  chomp($stamp_ledger = <$fh> // "");
+  close $fh;
+}
+if ($stamp_stores ne stores_line(@found)) {
+  say_line("the set of stores changed since the last full sync");
+  exit 1;
+}
+my $digest = ledger_digest($ledger);
+if (!defined $digest || $stamp_ledger ne $digest) {
+  say_line("the AgentBrew sync ledger changed since the last full sync");
+  exit 1;
+}
+
+my (@fresh, @changed);
+for my $store (@found) {
+  my $is_fresh = $store->{newest} < $stamp_mtime;
+  my $line = sprintf("%s — %s (%d files, %.1f ms)", slug($store->{name}),
+    $is_fresh ? "up to date" : "changed since the last full sync", $store->{files}, $store->{ms});
+  push @{ $is_fresh ? \@fresh : \@changed }, $line;
+}
+my $total_ms = (time - $start) * 1000;
+if (@changed) {
+  say_line($_) for @changed;
+  say_line(sprintf("%d/%d stores changed (check %.0f ms)", scalar @changed, scalar @found, $total_ms));
+  exit 1;
+}
+say_line($_) for @fresh;
+if (!@found) {
+  print "memory-sync: no project memory stores with content\n";
+} else {
+  printf "memory-sync: 0/%d stores synced (%d up to date; no change since the last full sync, "
+    . "AgentBrew not started, %.0f ms)\n", scalar @found, scalar @found, $total_ms;
+}
+exit 0;
+PERL
+}
+
+start_background() {
+  mkdir -p "${log_file%/*}"
+  printf '%s memory-sync: background run started\n' "$(date '+%Y-%m-%d %H:%M:%S')" >>"$log_file"
+  # setsid detaches the run so it outlives the caller's shell or tool call.
+  # Closing inherited fds keeps a caller that waits on a pipe from blocking.
+  if command -v perl >/dev/null 2>&1; then
+    perl -MPOSIX -e 'POSIX::setsid(); POSIX::close($_) for 3 .. 255; exec @ARGV' \
+      "$BASH" "$0" ${forward[@]+"${forward[@]}"} </dev/null >>"$log_file" 2>&1 &
+  else
+    nohup "$BASH" "$0" ${forward[@]+"${forward[@]}"} </dev/null >>"$log_file" 2>&1 &
+  fi
+  echo "memory-sync: AgentBrew sync runs in the background (pid $!); log: $log_file"
+}
+
+lock_held=false
+stamp_candidate=""
+cleanup() {
+  [ -n "$stamp_candidate" ] && rm -f "$stamp_candidate"
+  if $lock_held; then
+    rmdir "$lock_dir" 2>/dev/null
+  fi
+  return 0
+}
+
+# mkdir is atomic: exactly one run gets the lock. A lock older than 15
+# minutes belongs to a run that died, as in AgentBrew's hook. Returns 1 only
+# when another run holds the lock. When the lock cannot be created at all
+# (an unwritable cache dir), the run goes on without it: the lock only
+# prevents duplicate work, and the stamp rules keep the result safe.
+acquire_lock() {
+  local now lock_mtime
+  mkdir -p "${lock_dir%/*}" 2>/dev/null
+  if mkdir "$lock_dir" 2>/dev/null; then
+    lock_held=true
+    return 0
+  fi
+  [ -d "$lock_dir" ] || return 0
+  now="$(date +%s)"
+  lock_mtime="$(perl -e 'print +(stat shift)[9]' "$lock_dir" 2>/dev/null || true)"
+  if [[ "$lock_mtime" =~ ^[0-9]+$ ]] && [ "$lock_mtime" -le "$now" ] \
+    && [ $((now - lock_mtime)) -ge "$lock_stale_seconds" ]; then
+    rmdir "$lock_dir" 2>/dev/null
+  fi
+  mkdir "$lock_dir" 2>/dev/null || return 1
+  lock_held=true
+}
+
+# Runs AgentBrew, then promotes a stamp made before it started, but only when
+# AgentBrew exited 0, its own metadata check then finds no stale store, and
+# its ledger did not change during that check.
+sync_and_stamp() {
+  local started finished elapsed rc before after
+  trap cleanup EXIT
+  if ! acquire_lock; then
+    echo "memory-sync: an AgentBrew sync is already running; skipped"
+    return 0
+  fi
+  stamp_candidate="$stamp.next.$$"
+  mkdir -p "${stamp%/*}" 2>/dev/null
+  store_scan stamp "$stamp_candidate" 2>/dev/null || { rm -f "$stamp_candidate"; stamp_candidate=""; }
+  started="$(now_ms)"
+  "$agentbrew_bin" memory sync-projects ${forward[@]+"${forward[@]}"}
+  rc=$?
+  finished="$(now_ms)"
+  elapsed=$((finished - started))
+  $quiet || printf 'memory-sync: AgentBrew sync took %d.%d s\n' $((elapsed / 1000)) $((elapsed % 1000 / 100))
+  if [ -n "$stamp_candidate" ] && [ "$rc" -eq 0 ] \
+    && before="$(store_scan digest "$agentbrew_ledger" 2>/dev/null)" \
+    && "$agentbrew_bin" memory sync-projects --check >/dev/null 2>&1 \
+    && after="$(store_scan digest "$agentbrew_ledger" 2>/dev/null)" \
+    && [ "$before" = "$after" ] \
+    && store_scan seal "$stamp_candidate" "$before" 2>/dev/null; then
+    mv -f "$stamp_candidate" "$stamp" 2>/dev/null
+  fi
+  return "$rc"
+}
+
+if $help; then
+  background=false
+  usage
 fi
 
-exec "$agentbrew_bin" memory sync-projects "$@"
+if ! $fast_path; then
+  agentbrew_available || exit 0
+  if $background; then
+    start_background
+    exit 0
+  fi
+  exec "$agentbrew_bin" memory sync-projects "${forward[@]}"
+fi
+
+store_scan check "$stamp" "$agentbrew_ledger" "$stamp_max_age" "$quiet" && exit 0
+agentbrew_available || exit 0
+if $background; then
+  start_background
+  exit 0
+fi
+sync_and_stamp

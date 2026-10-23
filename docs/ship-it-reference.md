@@ -1044,7 +1044,7 @@ MCP holds the cross-project semantic index. The managed bridge below keeps the
 two in step so a fact learned in one repo is searchable from every other.
 
 ```bash
-dotfiles-memory-sync-projects
+dotfiles-memory-sync-projects --background
 ```
 
 This stable dotfiles entry point forwards to `agentbrew memory sync-projects`.
@@ -1054,8 +1054,42 @@ Ingestion is idempotent: the daemon rejects exact-match and semantically
 duplicate chunks, so a run that finds nothing new stores nothing. Re-running
 is always safe.
 
+**Fast path.** A plain or `--quiet` run first compares the newest change
+time (ctime) in each store, the `memory/` directory and its `*.md` files,
+with a stamp at `~/.local/state/dotfiles/memory-sync-projects.stamp`. When
+nothing changed, it prints one line per store with its check time and
+returns in milliseconds. It does not start AgentBrew or call the daemon, so
+it works while the daemon is down. These run the full AgentBrew sync instead:
+
+- a changed store, or an added, removed, or renamed store;
+- a missing stamp, a stamp older than 12 hours, or one dated in the future;
+- a change to the store entries in AgentBrew's sync ledger since the stamp;
+- no `perl` on `PATH`.
+
+The stamp is written only when AgentBrew exits 0 and
+`agentbrew memory sync-projects --check` then finds no stale store, so a
+skipped or degraded sync never hides a change. The 12-hour limit also covers
+an AgentBrew upgrade that changes how AgentBrew fingerprints stores. Other
+options (`--force`, `--check`, `--dry-run`, `--json`) go straight to
+AgentBrew. To sync on AgentBrew's own metadata check alone, with no stamp,
+run `agentbrew memory sync-projects`.
+
+**One sync at a time.** The full sync takes the lock that AgentBrew's
+`SessionEnd` sync hook uses (`~/.cache/agentbrew/memory-sync-projects.lock`).
+When another sync holds it, the command prints
+`an AgentBrew sync is already running; skipped` and exits 0. A lock older
+than 15 minutes is treated as left by a dead run and taken over. Options
+passed straight to AgentBrew (`--force`, `--json`, …) do not take the lock.
+
+**Background.** With `--background`, the fast check still runs in the
+foreground. If it finds work, the AgentBrew sync runs detached and the
+command returns at once. Its result, including any skipped store, goes to
+`~/.local/share/dotfiles/logs/memory-sync-projects.log`
+(`tail -n 20 ~/.local/share/dotfiles/logs/memory-sync-projects.log`). In the
+foreground, the command prints how long the AgentBrew sync took.
+
 **Non-blocking.** The script exits 0 even when the daemon is unreachable, and
-reports which stores were skipped. Memory infrastructure must never hold up a
+reports which stores were skipped (with `--background`, in the log). Memory infrastructure must never hold up a
 delivery. Record any skip in the delivery report alongside other environmental
 findings; do not retry in a loop and do not treat it as a delivery failure.
 

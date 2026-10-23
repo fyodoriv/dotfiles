@@ -22,7 +22,7 @@ if memory_enabled; then
   check_advisory "memory.project_sync_advisory" \
     "Claude project-memory metadata is fresh (advisory; global recall stays available)" \
     "agentbrew memory sync-projects --check >/dev/null 2>&1" \
-    "dotfiles-memory-sync-projects"
+    "agentbrew memory sync-projects"
 
   check_advisory "memory.transport_compatibility" \
     "shared-memory transport compatibility evidence is available for staged security hardening" \

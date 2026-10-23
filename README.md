@@ -442,15 +442,18 @@ probe failures remain visible to the AgentBrew heal/snapshot path.
 `dotfiles-memory-sync-projects` is also a compatibility shim. It forwards the
 daily `com.dotfiles.memory-sync-projects` LaunchAgent and `/ship-it` trigger to
 `agentbrew memory sync-projects`, which uses AgentBrew's session-aware MCP
-client instead of a second raw HTTP implementation. AgentBrew's Claude Code
+client instead of a second raw HTTP implementation. A plain run first checks
+each store's newest change time against a stamp from the last full sync and
+returns in milliseconds, without AgentBrew or the daemon, when nothing
+changed. `--background` runs the AgentBrew part detached. AgentBrew's Claude Code
 `SessionEnd` hook adds a debounced, non-blocking fast path. The daily job
 remains recovery when a session hook cannot run. Claude project-memory files
 are one source for the same managed store that
 Codex uses; they are not a separate backend.
 Normal project-memory sync is metadata-delta based. Use
 `agentbrew memory sync-projects --force` only for a deliberate recovery
-re-ingest. The fast path writes a bounded receipt and retries after a failed
-child instead of treating a failed schedule as fresh.
+re-ingest. The SessionEnd fast path writes a bounded receipt and retries
+after a failed child instead of treating a failed schedule as fresh.
 The memory doctor module delegates project-memory freshness and the transport
 report to AgentBrew. It never parses Claude memory files or reimplements the
 MCP protocol. Global recall remains the default; project provenance tags only

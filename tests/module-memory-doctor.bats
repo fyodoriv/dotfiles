@@ -73,6 +73,7 @@ STUB
   grep -q $'advisory\tmemory.project_sync_advisory' "$CHECK_LOG"
   grep -q $'advisory\tmemory.transport_compatibility' "$CHECK_LOG"
   grep -qx 'memory sync-projects --check' "${CHECK_LOG}.agentbrew"
+  grep -q $'\tagentbrew memory sync-projects$' "$CHECK_LOG"
   grep -qx 'memory transport-report' "${CHECK_LOG}.agentbrew"
 }
 

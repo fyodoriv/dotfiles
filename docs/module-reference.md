@@ -238,7 +238,7 @@ behavioral bootstrap, schema, and backup health.
 |----|---------------|----------|
 | `memory.agentbrew_available` | AgentBrew CLI is available for memory lifecycle | Install AgentBrew and run `agentbrew memory enable` |
 | `memory.agentbrew_doctor` | AgentBrew reports daemon, bootstrap, schema, and backups healthy | `agentbrew memory fix` |
-| `memory.project_sync_advisory` | Claude project-memory metadata is current; global recall remains available when drifted | `dotfiles-memory-sync-projects` |
+| `memory.project_sync_advisory` | Claude project-memory metadata is current; global recall remains available when drifted | `agentbrew memory sync-projects` (AgentBrew's own metadata check, without the dotfiles stamp) |
 | `memory.transport_compatibility` | AgentBrew can produce read-only transport evidence before a security migration | `agentbrew memory fix; then agentbrew memory transport-report --json` |
 
 ### agent-browser

@@ -119,9 +119,9 @@ Agents cannot push to `github.com`. Hand the operator one `land` command for eve
 
 ## Memory sync (every delivery, all repos)
 
-Before completion, run `dotfiles-memory-sync-projects` in **every** repo family. It indexes `~/.claude/projects/*/memory/` into shared memory.
+Before completion, run `dotfiles-memory-sync-projects --background` in **every** repo family. It indexes `~/.claude/projects/*/memory/` into shared memory.
 
-It exits 0 even when the daemon is down, reporting skipped stores. **Never block or retry a delivery on it** — record a skip with other environmental findings. When this session wrote memory, name the store and file count in the report.
+It exits 0 even when the daemon is down. **Never block or retry a delivery on it**; record a skip (output or log) with other environmental findings. When this session wrote memory, name the store and file count in the report.
 
 ## Delivery procedure
 

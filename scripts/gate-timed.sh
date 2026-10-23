@@ -4,7 +4,7 @@
 # can see which gate step is slow and whether it is getting slower.
 #
 # Usage: scripts/gate-timed.sh <step> <command> [args...]
-#   step  lint | lint-tasks | test | e2e | total
+#   step  lint | lint-tasks | test | plugins-bash32 | e2e | total
 #
 # Appends {"ts","step","seconds","status"} to
 # $DOTFILES_GATE_TIMINGS_FILE (default ~/.local/state/dotfiles/gate-timings.jsonl),
@@ -14,7 +14,7 @@ set -uo pipefail
 
 step="${1:?usage: gate-timed.sh <step> <command> [args...]}"
 shift
-case "$step" in lint|lint-tasks|test|e2e|total) ;; *) echo "gate-timed: unknown step $step" >&2; exit 2 ;; esac
+case "$step" in lint|lint-tasks|test|plugins-bash32|e2e|total) ;; *) echo "gate-timed: unknown step $step" >&2; exit 2 ;; esac
 
 start="$(date +%s)"
 "$@"

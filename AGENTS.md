@@ -19,9 +19,10 @@ names.
 | Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
 | Tests affected by a committed branch | `bin/bats-affected origin/feat/chezmoi \| xargs bats` |
 | Full suite (slow; run in the background) | `make test-all` |
-| Install e2e: real chezmoi, scripts, doctor, zsh in a sandboxed scratch HOME | `make e2e` (`make check` runs it when an installer path changes) |
+| Install e2e (real chezmoi and doctor) in a scratch HOME | `make e2e` (`make check` runs it when an installer path changes) |
+| Plugin suites on macOS `/bin/bash` 3.2 | `make test-plugins-bash32` (`make check` runs it on plugin changes) |
 | TASKS.md only | `make lint-tasks` |
-| Review the task queue (truth, usefulness, priority) | `/review-tasks` (tasks.md command, installed by the Agentfile) |
+| Review the task queue | `/review-tasks` |
 | Apply to this Mac | `dotfiles apply` (after `Agentfile.yaml` edits) |
 | Check one module | `dotfiles doctor --module <name>` |
 
@@ -101,13 +102,13 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
-- **Parallel agents**: at most 3 gate-running agents; check `dotfiles-load-sampler --report 1`.
+- **Parallel agents**: at most 3 run gates; check `dotfiles-load-sampler --report 1`.
 - **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: set `DOTFILES_DIR` to a temp dir in tests.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.
 - **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name; writes outside `$HOME` fail it.
-- **Human-only steps**: `sudo` and `bin/land` need a human terminal.
+- **Human-only**: `sudo` and `bin/land` need a human terminal.
 
 ## Delivery
 

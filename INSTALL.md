@@ -100,7 +100,8 @@ hooks, CLAUDE.md size, permission mode). Do not install anything by hand
 before `run`, or the "before" numbers stop being before.
 
 The script backs up, runs `chezmoi apply`, heals with `dotfiles doctor
---fix`, verifies with `chezmoi verify` and a clean zsh start, and then runs
+--fix`, verifies with `chezmoi verify` and that zsh runs (errors zsh prints
+while starting are a warning), and then runs
 agentbrew's installer. On a critical error it restores the backup by itself
 and exits 1. Then tell the person what failed and that their setup is back,
 show them any paths the restore listed as kept, and offer to open an issue

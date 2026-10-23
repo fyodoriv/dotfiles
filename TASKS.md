@@ -44,20 +44,6 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
-- [ ] Run the plugin bats files under macOS `/bin/bash` 3.2
-  - **ID**: plugin-tests-bash32
-  - **Tags**: plugins, tests
-  - **Details**: The #281 re-review (2026-10-22) found that no test runs the plugin code on `/bin/bash` 3.2. The bats files call `bash "$CLI"`, and `bin/dotfiles` runs `exec bash`, so both use the first `bash` on PATH (Homebrew bash 5 on the owner's Mac). Scripts start with `#!/bin/bash`, so a user who runs `bin/dotfiles-plugin` directly gets 3.2. The re-review checked 3.2 by hand once (TERM, INT, and HUP at 5 swap steps restored cleanly).
-  - **Files**: `tests/plugin-update.bats`, `tests/plugin-v2.bats`, `Makefile`
-  - **Output**: code
-  - **Acceptance**: `make check` (or a named target it calls) runs `tests/plugin-update.bats` and `tests/plugin-v2.bats` once with `/bin/bash` 3.2 as the CLI shell, and a construct that bash 3.2 rejects in `bin/dotfiles-plugin` fails it.
-  - **Hypothesis**: running the plugin suites with `/bin/bash` catches 3.2-only breakage before merge: the number of plugin bats files run under 3.2 goes from 0 to 2.
-  - **Measurement**: a bats case that plants a bash-4-only construct in a copy of `bin/dotfiles-plugin` and expects the 3.2 run to fail.
-  - **Success**: both plugin bats files pass under `/bin/bash` 3.2, and the planted construct fails the run.
-  - **Pivot**: if the 3.2 run adds more than 60 s to `make check`, run it only when a plugin file changed.
-  - **Anchor**: #281 re-review, 2026-10-22; Apple ships bash 3.2.57 as `/bin/bash`.
-  - **Competitive-goal**: none — test coverage for the plugin path, not a scorecard metric.
-
 - [ ] Make `dotfiles plugin` commands take the shared dotfiles lock
   - **ID**: plugin-commands-take-lock
   - **Tags**: plugins, upgrade, locking
@@ -85,20 +71,6 @@ them. -->
   - **Pivot**: if agentbrew starts detecting on each apply, close this task with that PR.
   - **Anchor**: review of the plugin shared-layer PR, 2026-10-22.
   - **Competitive-goal**: none — agent sync correctness, not a scorecard metric.
-
-- [ ] Decide what the install's "zsh starts cleanly" check means
-  - **ID**: install-zsh-verify-exit-status
-  - **Tags**: install, tests
-  - **Details**: `bin/dotfiles-install` verifies with `zsh -i -c exit >/dev/null 2>&1 || critical "verification (zsh does not start cleanly)"`. A plain `exit` returns the status of the last startup line, so the check fails on a working zsh whose last line is a false test, for example macOS's `/etc/zshrc` outside Terminal.app (`[ -r "/etc/zshrc_$TERM_PROGRAM" ] && …`) or an install line that returns 1. The review of the e2e-zsh-ms-zero-flake PR (2026-10-22) found the same issue in the zsh timing, fixed there by timing `zsh -i -c 'exit 0'`. Decide: check that zsh runs (`'exit 0'`), or keep "the last line succeeded" and say so in the message, or check for startup errors on stderr instead.
-  - **Files**: `bin/dotfiles-install`, `tests/dotfiles-install.bats`
-  - **Output**: code
-  - **Acceptance**: a bats case with a working zsh whose `.zshrc` ends with `false` passes the verification step, and a zsh that cannot run still fails it.
-  - **Hypothesis**: false "zsh does not start cleanly" verdicts on a working zsh drop to 0.
-  - **Measurement**: the bats case above.
-  - **Success**: it passes; a broken zsh still fails verification.
-  - **Pivot**: if a startup line that fails should block the install, keep the check and name the failing line in the message.
-  - **Anchor**: review of the e2e-zsh-ms-zero-flake PR, 2026-10-22.
-  - **Competitive-goal**: none — install correctness, not a scorecard metric.
 
 ## P3
 

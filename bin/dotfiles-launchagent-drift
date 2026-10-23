@@ -40,33 +40,15 @@ is_disabled() {
   grep -Fq -e "\"$1\" => disabled" -e "\"$1\" => true" <<< "$disabled"
 }
 
-# plist_args <plist>: ProgramArguments, one per line (or Program).
-plist_args() {
-  local i=0 v
-  if /usr/bin/plutil -extract ProgramArguments.0 raw -o - "$1" >/dev/null 2>&1; then
-    while v="$(/usr/bin/plutil -extract "ProgramArguments.$i" raw -o - "$1" 2>/dev/null)"; do
-      printf '%s\n' "$v"; i=$((i + 1))
-    done
-  else
-    /usr/bin/plutil -extract Program raw -o - "$1" 2>/dev/null
-  fi
-}
-
-# loaded_args <print output>: the "arguments = { ... }" lines, one per line;
-# for a job without them, its "program =" line.
-loaded_args() {
-  local args
-  args="$(awk '/^\targuments = \{$/ { inside = 1; next } inside && /^\t\}$/ { exit } inside { sub(/^\t\t/, ""); print }' <<< "$1")"
-  [ -n "$args" ] || args="$(sed -n 's/^\tprogram = //p' <<< "$1" | head -n 1)"
-  printf '%s\n' "$args"
-}
+# shellcheck source=../lib/launchagent-args.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/launchagent-args.sh"
 
 # reload <label> <plist>: bootout, wait until launchd lets the job go (a
 # Chrome can outlive the bootout for a few seconds), then bootstrap.
 reload() {
-  local i
+  local _
   "$LAUNCHCTL" bootout "$domain/$1" >/dev/null 2>&1
-  for i in $(seq 30); do
+  for _ in $(seq 30); do
     "$LAUNCHCTL" print "$domain/$1" >/dev/null 2>&1 || break
     sleep 0.5
   done
@@ -87,7 +69,7 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     fi
     continue
   fi
-  if [ "$(loaded_args "$out")" != "$(plist_args "$plist")" ]; then
+  if [ "$(launchagent_loaded_args "$out")" != "$(launchagent_plist_args "$plist")" ]; then
     if $fix; then
       if reload "$label" "$plist"; then
         echo "reloaded $label"

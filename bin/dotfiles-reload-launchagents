@@ -3,6 +3,8 @@
 #
 # Bootouts each agent by label, then bootstraps from ~/Library/LaunchAgents/*.plist.
 # Use after plist template changes so launchd picks up new ProgramArguments/PATH.
+# The shared agent Chrome is left alone while it runs its unchanged plist: a
+# reload would close every session's tabs in it (#310); --kill-chrome forces it.
 #
 # Usage:
 #   dotfiles-reload-launchagents              # bootout + bootstrap (default)
@@ -67,6 +69,9 @@ declare -F should_skip_agent >/dev/null || should_skip_agent() { return 1; }
 
 # CDP Chrome LaunchAgents — bootstrap can fail if launchd has not finished
 # bootout or an orphaned headless Chrome still holds the profile/port.
+# shellcheck source=../lib/launchagent-args.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/launchagent-args.sh"
+
 cdp_chrome_port() {
   case "$1" in
     com.dotfiles.agent-browser-chrome)     printf '%s' 9223 ;;
@@ -219,6 +224,13 @@ for label in "${DOTFILES_LAUNCHAGENTS[@]}"; do
         || warn "kickstart failed for $label (agent may not be loaded; try without --kickstart)"
       ;;
     bootstrap)
+      # A reload of the shared agent Chrome closes every session's tabs in it
+      # (#310): skip it while it runs its unchanged plist. --kill-chrome forces it.
+      if [ "$KILL_CHROME" != "1" ] && [ "$DRY_RUN" = "0" ] && cdp_chrome_port "$label" >/dev/null &&
+        launchagent_running_unchanged "$GUI_DOMAIN" "$label" "$plist"; then
+        ok "$label is running and unchanged; not restarted (use --kill-chrome to force)"
+        continue
+      fi
       info "reload $label"
       bootstrap_agent "$label" "$plist" || true
       ;;

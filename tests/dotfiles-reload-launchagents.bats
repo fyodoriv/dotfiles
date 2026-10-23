@@ -193,3 +193,48 @@ STUB
 @test "reload list holds only dotfiles-owned agents (no watchman)" {
   ! grep -q 'com.github.facebook.watchman' "$RELOAD_CMD"
 }
+
+# A running agent Chrome whose loaded job matches its plist (#310): the
+# launchctl stub prints that job, nothing for the others.
+_running_chrome() {
+  local loaded_port="$1"
+  _deploy_core_plists
+  /usr/bin/plutil -create xml1 "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  /usr/bin/plutil -insert ProgramArguments -array "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  /usr/bin/plutil -insert ProgramArguments.0 -string /x/chrome "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  /usr/bin/plutil -insert ProgramArguments.1 -string --remote-debugging-port=9223 "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  cat > "$STUB_DIR/launchctl" << STUB
+#!/bin/bash
+echo "launchctl \$*" >> "$TEST_DIR/launchctl.log"
+if [ "\$1" = print ] && [ "\${2##*/}" = com.dotfiles.agent-browser-chrome ]; then
+  printf 'x = {\n\tstate = running\n\targuments = {\n\t\t/x/chrome\n\t\t--remote-debugging-port=$loaded_port\n\t}\n}\n'
+fi
+exit 0
+STUB
+  chmod +x "$STUB_DIR/launchctl"
+}
+
+@test "a running agent Chrome whose plist is unchanged is not restarted (#310)" {
+  _running_chrome 9223
+  run bash "$RELOAD_CMD"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  ! grep -q 'bootout gui/[0-9]*/com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
+  ! grep -q 'bootstrap .*com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
+  [[ "$output" == *"com.dotfiles.agent-browser-chrome is running and unchanged"* ]]
+  grep -q 'bootout gui/[0-9]*/com.dotfiles.gui-path' "$TEST_DIR/launchctl.log"
+}
+
+@test "a running agent Chrome whose plist changed is reloaded" {
+  _running_chrome 9999
+  run bash "$RELOAD_CMD"
+  [ "$status" -eq 0 ]
+  grep -q 'bootout gui/[0-9]*/com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
+}
+
+@test "--kill-chrome restarts the agent Chrome even when unchanged" {
+  _running_chrome 9223
+  run bash "$RELOAD_CMD" --kill-chrome
+  [ "$status" -eq 0 ]
+  grep -q 'bootout gui/[0-9]*/com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
+}

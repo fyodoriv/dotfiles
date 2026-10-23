@@ -179,13 +179,17 @@ _agentfile_flat_q() {
 #   re-defines a shared server under the same name;
 # - sets recommended: true when the earlier merge did not;
 # - adds a commands: or agents: folder with a *.md file whose name (any
-#   letter case) an earlier folder of that kind also has. agentbrew keeps
-#   one command and one agent file per name, and which copy wins depends on
-#   the order the folders first reached its state (the later command folder
-#   wins, the earlier agent folder wins), so the plugin's copy can replace
-#   the shared one. Skills need no check: agentbrew deploys a skill from an
-#   Agentfile sources: folder only after `agentbrew add`, and a skills: name
-#   installs the catalog or built-in copy.
+#   letter case; for an agent also its front matter name:) an earlier
+#   folder of that kind also has, or a name with non-ASCII letters. agentbrew
+#   keeps one command and one agent file per name, and which copy wins
+#   depends on the order the folders first reached its state (the later
+#   command folder wins, the earlier agent folder wins), so the plugin's
+#   copy can replace the shared one;
+# - adds a local sources: folder with a skill (SKILL.md at any depth) that a
+#   skills: entry of the merge asks for. agentbrew installs a skills: name
+#   without a catalog entry (a built-in skill) by searching every source,
+#   and a local source ranks before the built-in. A remote source cannot be
+#   read before the sync, so this rule does not cover it.
 # A plugin Agentfile agentbrew cannot read, or a check that cannot run,
 # skips it too. Model fields (defaultModel, defaultEffort, modelOverrides)
 # may change: an overlay sets them on purpose (docs/model-configuration.md).
@@ -294,19 +298,20 @@ _agentfile_plugin_merge_reasons() {
     [ "$(yq '.recommended // false' "$before" 2>/dev/null)" != true ]; then
     echo "its recommended: true installs the whole recommended set, undoing the trimmed shared list"
   fi
-  # The plugin's folders are the ones its merge adds.
+  # The plugin's folders and sources are the ones its merge adds.
   for kind in commands agents; do
-    _agentfile_name_reason "$kind" "$(_agentfile_dirs "$kind" "$before")" \
-      "$(LC_ALL=C comm -13 <(_agentfile_dirs "$kind" "$before" | LC_ALL=C sort -u) \
-        <(_agentfile_dirs "$kind" "$after" | LC_ALL=C sort -u))"
+    _agentfile_name_reason "$kind" "$(_agentfile_list "$kind" "$before")" \
+      "$(_agentfile_added "$kind" "$before" "$after")"
   done
+  _agentfile_skill_reason "$(_agentfile_list skills "$after")" \
+    "$(_agentfile_added sources "$before" "$after" | _agentfile_local_sources)"
 }
 
 # _agentfile_plugin_raw_reasons <base Agentfile> <plugin Agentfile>
 # [<earlier plugin Agentfile>...]: the same rule without agentbrew's merge,
 # read from the files (anchors and merge keys resolved).
 _agentfile_plugin_raw_reasons() {
-  local base="$1" file="$2" name shared kind f
+  local base="$1" file="$2" name shared kind f requested
   shift 2
   if [ "$(yq 'type' "$file" 2>/dev/null | head -2 | paste -sd ' ' -)" != '!!map' ]; then
     [ ! -s "$file" ] || [ "$(yq 'type' "$file" 2>/dev/null)" = '!!null' ] ||
@@ -328,12 +333,22 @@ _agentfile_plugin_raw_reasons() {
   [ "$(yq -o=json 'explode(.) | .recommended // false' "$file" 2>/dev/null)" != true ] ||
     echo "its recommended: true installs the whole recommended set, undoing the trimmed shared list"
   for kind in commands agents; do
+    # agentbrew turns any entry into text (String()); only plain paths can
+    # be followed here.
+    [ "$(K="$kind" yq 'explode(.) | [(.[strenv(K)] // []) | select(type == "!!seq") | .[] |
+      select(type != "!!str")] | length' "$file" 2>/dev/null)" = 0 ] ||
+      echo "its $kind: list has an entry that is not a plain path, so it cannot be checked without agentfile merge"
     shared=""
     for f in "$base" "$@"; do
       [ -f "$f" ] && shared+="$(_agentfile_file_dirs "$kind" "$f")"$'\n'
     done
     _agentfile_name_reason "$kind" "$shared" "$(_agentfile_file_dirs "$kind" "$file")"
   done
+  requested=""
+  for f in "$base" "$@" "$file"; do
+    [ -f "$f" ] && requested+="$(yq -r 'explode(.) | (.skills // []) | select(type == "!!seq") | .[]' "$f" 2>/dev/null)"$'\n'
+  done
+  _agentfile_skill_reason "$requested" "$(_agentfile_file_sources "$file")"
   [ -f "$base" ] || return 0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
@@ -354,72 +369,172 @@ _agentfile_plugin_raw_reasons() {
   done < <(_agentfile_mcp_names "$file")
 }
 
-# _agentfile_name_reason <commands|agents> <shared folders> <plugin folders>:
-# one line naming the plugin's files of that kind whose names (any letter
-# case) a shared folder also has; nothing when there are none.
+# _agentfile_name_reason <commands|agents> <shared folders> <plugin folders>
+# (one per line): one line naming the plugin's files of that kind whose
+# names (any letter case) a shared folder also has, and one line for names
+# that cannot be compared; nothing when there are none. An agent's names are
+# its file name and its front matter name: (Claude Code uses the latter).
 _agentfile_name_reason() {
-  local clashes
-  clashes="$(_agentfile_name_clashes "$2" "$3")"
+  local kind="$1" mine clashes odd
+  mine="$(_agentfile_names "$kind" "$(_agentfile_other_dirs "$3" "$2")")"
+  [ -n "$mine" ] || return 0
+  # macOS folders also fold non-ASCII letters and their encodings, which a
+  # plain lowercase compare misses.
+  odd="$(LC_ALL=C grep '[^ -~]' <<< "$mine" || true)"
+  [ -z "$odd" ] ||
+    echo "its $kind have names with letters outside ASCII, so they cannot be checked against the shared names (use ASCII names): $(printf '%s\n' "$odd" | paste -sd ' ' -)"
+  clashes="$(LC_ALL=C comm -12 <(_agentfile_names "$kind" "$2") <(printf '%s\n' "$mine"))"
   [ -z "$clashes" ] ||
-    echo "its $1 have the names of shared $1 (agentbrew keeps one file per name, so the plugin's copy can replace the shared one): $(printf '%s\n' "$clashes" | paste -sd ' ' -)"
+    echo "its $kind have the names of shared $kind (agentbrew keeps one file per name, so the plugin's copy can replace the shared one): $(printf '%s\n' "$clashes" | paste -sd ' ' -)"
 }
 
-# _agentfile_name_clashes <shared folders> <plugin folders> (one per line):
-# the names both sets hold, lowercased (macOS folders ignore letter case).
-# A plugin folder that is a shared folder (same physical path) holds the
-# same files, so it is left out.
-_agentfile_name_clashes() {
-  local d p phys=""
-  local -a shared=() plugin=()
+# _agentfile_other_dirs <plugin folders> <shared folders> (one per line):
+# the plugin folders that are not a shared folder under another spelling
+# (same file, test -ef), one per line. Such a folder holds the same files.
+_agentfile_other_dirs() {
+  local d s same
   while IFS= read -r d; do
     [ -n "$d" ] || continue
-    shared+=("$d")
-    phys+="$(cd -P "$d" 2>/dev/null && pwd -P)"$'\n'
+    same=false
+    while IFS= read -r s; do
+      [ -n "$s" ] && [ "$d" -ef "$s" ] && same=true && break
+    done <<< "$2"
+    "$same" || printf '%s\n' "$d"
   done <<< "$1"
-  while IFS= read -r d; do
-    [ -n "$d" ] || continue
-    p="$(cd -P "$d" 2>/dev/null && pwd -P)" || continue
-    grep -qxF -- "$p" <<< "$phys" && continue
-    plugin+=("$d")
-  done <<< "$2"
-  [ "${#shared[@]}" -gt 0 ] && [ "${#plugin[@]}" -gt 0 ] || return 0
-  LC_ALL=C comm -12 <(_agentfile_md_names "${shared[@]}") <(_agentfile_md_names "${plugin[@]}")
 }
 
-# _agentfile_md_names <folder>...: the names (without .md, lowercased,
-# sorted) of the *.md entries at the top of each folder, the files agentbrew
-# reads as commands or agents.
-_agentfile_md_names() {
-  local d f
-  for d in "$@"; do
-    [ -d "$d" ] || continue
+# _agentfile_names <commands|agents> <folders> (one per line): the names of
+# the *.md entries at the top of each folder (the files agentbrew reads as
+# commands or agents), without .md, plus each agent's front matter name:,
+# lowercased (macOS folders ignore letter case), sorted.
+_agentfile_names() {
+  local kind="$1" d f n
+  while IFS= read -r d; do
+    [ -n "$d" ] && [ -d "$d" ] || continue
     for f in "$d"/*.md "$d"/.*.md; do
       [ -e "$f" ] || [ -L "$f" ] || continue
-      f="${f##*/}"
-      [ "$f" = .md ] || printf '%s\n' "${f%.md}"
+      n="${f##*/}"
+      [ "$n" = .md ] || printf '%s\n' "${n%.md}"
+      [ "$kind" != agents ] || [ ! -f "$f" ] || _agentfile_front_name "$f"
     done
-  done | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C sort -u
+  done <<< "$2" | LC_ALL=C tr '[:upper:]' '[:lower:]' | awk 'NF' | LC_ALL=C sort -u
 }
 
-# _agentfile_dirs <commands|agents> <merged Agentfile>: its folders of that
-# kind, one per line (agentbrew's merge writes absolute paths).
-_agentfile_dirs() {
+# _agentfile_front_name <file>: the name: value in the file's front matter
+# (the block between the first two --- lines), without quotes.
+_agentfile_front_name() {
+  awk '{ sub(/\r$/, "") }
+    NR == 1 { if ($0 !~ /^---[ \t]*$/) exit; next }
+    /^---[ \t]*$/ { exit }
+    /^name:/ { sub(/^name:[ \t]*/, ""); sub(/[ \t]+$/, "")
+      if ($0 ~ /^".*"$/ || $0 ~ /^\047.*\047$/) $0 = substr($0, 2, length($0) - 2)
+      print; exit }' "$1" 2>/dev/null
+}
+
+# _agentfile_skill_reason <skills: names> <plugin local source folders>
+# (one per line): one line naming the skills in those folders that a
+# skills: entry asks for. agentbrew installs a skills: name that has no
+# catalog entry (a built-in skill) by searching every source it tracks, and
+# a local source ranks before the built-in, so the plugin's copy could
+# replace the shared or built-in skill. Remote sources cannot be read
+# before the sync.
+_agentfile_skill_reason() {
+  local clashes
+  [ -n "$(awk 'NF' <<< "$1")" ] && [ -n "$(awk 'NF' <<< "$2")" ] || return 0
+  clashes="$(LC_ALL=C comm -12 \
+    <(printf '%s\n' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | awk 'NF' | LC_ALL=C sort -u) \
+    <(_agentfile_skill_names "$2"))"
+  [ -z "$clashes" ] ||
+    echo "its sources: hold skills that a skills: entry asks for by name (agentbrew may install the plugin's copy instead of the shared or built-in skill): $(printf '%s\n' "$clashes" | paste -sd ' ' -)"
+}
+
+# _agentfile_skill_names <folders> (one per line): every name agentbrew can
+# find a skill under in those folders: for each SKILL.md or DESIGN.md at any
+# depth, its folder's name and its front matter name:, lowercased, sorted.
+_agentfile_skill_names() {
+  local d f
+  while IFS= read -r d; do
+    [ -n "$d" ] && [ -d "$d" ] || continue
+    find -L "$d" \( -name SKILL.md -o -name DESIGN.md \) -type f 2>/dev/null | while IFS= read -r f; do
+      basename "$(dirname "$f")"
+      _agentfile_front_name "$f"
+    done
+  done <<< "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | awk 'NF' | LC_ALL=C sort -u
+}
+
+# _agentfile_list <key> <merged Agentfile>: the entries of that list key,
+# one per line (agentbrew's merge writes folders as absolute paths).
+_agentfile_list() {
   [ -s "$2" ] || return 0
   K="$1" yq -r '(.[strenv(K)] // [])[]' "$2" 2>/dev/null
 }
 
+# _agentfile_added <key> <earlier merge> <merge with the plugin>: the
+# entries of that list key that only the second merge has.
+_agentfile_added() {
+  LC_ALL=C comm -13 <(_agentfile_list "$1" "$2" | LC_ALL=C sort -u) <(_agentfile_list "$1" "$3" | LC_ALL=C sort -u)
+}
+
+# _agentfile_local_sources: reads merged sources: entries on stdin and
+# prints the local folders among them (agentbrew: a path that starts with /
+# or ~; a leading ~ is HOME). Remote sources are left out.
+_agentfile_local_sources() {
+  local d
+  while IFS= read -r d; do
+    case "$d" in
+      /*) _agentfile_norm_path "$d" ;;
+      '~'*) _agentfile_norm_path "$HOME${d#\~}" ;;
+    esac
+  done
+}
+
 # _agentfile_file_dirs <commands|agents> <Agentfile>: its folders of that
-# kind, as agentbrew resolves them: a leading ~ becomes HOME, and a relative
-# path is under the file's folder.
+# kind as agentbrew resolves them when it applies this file on its own: an
+# absolute path as it is, anything else (also ~/x) joined to the file's
+# folder. Only plain string entries of a list.
 _agentfile_file_dirs() {
   local d dir
   dir="$(cd "$(dirname "$2")" 2>/dev/null && pwd)" || return 0
-  K="$1" yq -r 'explode(.) | (.[strenv(K)] // [])[]' "$2" 2>/dev/null | while IFS= read -r d; do
-    [ -n "$d" ] || continue
-    case "$d" in '~'*) d="$HOME${d#\~}" ;; esac
-    case "$d" in /*) ;; *) d="$dir/$d" ;; esac
-    printf '%s\n' "$d"
+  K="$1" yq -r 'explode(.) | (.[strenv(K)] // []) | select(type == "!!seq") | .[] | select(type == "!!str")' "$2" 2>/dev/null |
+    while IFS= read -r d; do
+      [ -n "$d" ] || continue
+      case "$d" in /*) ;; *) d="$dir/$d" ;; esac
+      _agentfile_norm_path "$d"
+    done
+}
+
+# _agentfile_file_sources <Agentfile>: its local sources: folders as
+# agentbrew resolves them: ./x and ../x under the file's folder, a leading ~
+# as HOME, an absolute path as it is. Remote sources are left out.
+_agentfile_file_sources() {
+  local d dir
+  dir="$(cd "$(dirname "$1")" 2>/dev/null && pwd)" || return 0
+  yq -r 'explode(.) | (.sources // []) | select(type == "!!seq") | .[] | select(type == "!!str")' "$1" 2>/dev/null |
+    while IFS= read -r d; do
+      case "$d" in
+        ./* | ../*) _agentfile_norm_path "$dir/$d" ;;
+        /*) _agentfile_norm_path "$d" ;;
+        '~'*) _agentfile_norm_path "$HOME${d#\~}" ;;
+      esac
+    done
+}
+
+# _agentfile_norm_path <absolute path>: the path without . and .. parts and
+# repeated slashes, worked out on the text as Node's path.join does (a
+# missing folder in the middle does not matter).
+_agentfile_norm_path() {
+  local part out="" IFS=/
+  local -a parts=() kept=()
+  read -r -a parts <<< "$1"
+  for part in ${parts[@]+"${parts[@]}"}; do
+    case "$part" in
+      '' | .) ;;
+      ..) [ "${#kept[@]}" -eq 0 ] || unset "kept[$((${#kept[@]} - 1))]" ;;
+      *) kept+=("$part") ;;
+    esac
   done
+  for part in ${kept[@]+"${kept[@]}"}; do out="$out/$part"; done
+  printf '%s\n' "${out:-/}"
 }
 
 # _agentfile_hook_entries <merged Agentfile>: each hook entry as one line of

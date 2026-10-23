@@ -1,8 +1,9 @@
 #!/bin/bash
 # Rewrite ~/.config/agentbrew/Agentfile.yaml from the merge that dotfiles
 # apply writes (the base Agentfile, kept plugin layers, owner rules, the local
-# layer, and this Mac's model layer), then run `agentbrew sync` in the
-# background (log: ~/.local/share/dotfiles/logs/agentbrew-sync-fix.log).
+# layer, and this Mac's model layer), then run the apply-time sync script in
+# the background, one at a time (log:
+# ~/.local/share/dotfiles/logs/agentbrew-sync-fix.log).
 # This is the fix of the doctor check agentbrew.global_agentfile_in_sync
 # (#299); it uses the check's own merge, so a fixed file passes the check.
 #

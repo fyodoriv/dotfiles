@@ -64,7 +64,14 @@ _agentbrew_plugin_layers_once() {
   rm -f "$errf"
 }
 
+# _agentbrew_global_agentfile_in_sync [--write]: succeeds when the global
+# Agentfile equals the merge apply would write. With --write (the --fix),
+# a drifted file is replaced by that merge (#299), and `agentbrew sync`
+# then runs in the background (logs/agentbrew-sync-fix.log): a full sync
+# can take longer than the doctor's fix timeout.
 _agentbrew_global_agentfile_in_sync() {
+  local write=false
+  [ "${1:-}" = --write ] && write=true
   command -v agentbrew >/dev/null 2>&1 || return 0
   local merge_help
   merge_help="$(agentbrew agentfile merge --help 2>&1 || true)"
@@ -115,13 +122,23 @@ _agentbrew_global_agentfile_in_sync() {
   fi
   cmp -s "$expected" "$global_agentfile"
   status=$?
-  rm -f "$expected" "$layer"
+  rm -f "$layer"
+  if [ "$status" -ne 0 ] && $write; then
+    local log="$HOME/.local/share/dotfiles/logs/agentbrew-sync-fix.log"
+    chmod 644 "$expected" 2>/dev/null || true
+    if mv -f "$expected" "$global_agentfile"; then
+      mkdir -p "$(dirname "$log")"
+      nohup agentbrew sync --no-recommended --agentfile "$global_agentfile" >> "$log" 2>&1 < /dev/null &
+      return 0
+    fi
+  fi
+  rm -f "$expected"
   return "$status"
 }
 
 check "agentbrew.global_agentfile_in_sync" "global Agentfile matches dotfiles/overlay merge" \
   "_agentbrew_global_agentfile_in_sync" \
-  "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh'"
+  "bash '$DOTFILES_DIR/bin/dotfiles-agentfile-resync'"
 
 # This Mac's local Agentfile layer (lib/agentfile-layers.sh). A file with an
 # error is skipped by apply, so the drift check above still passes; this

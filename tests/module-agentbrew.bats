@@ -246,6 +246,42 @@ AGENTBREW_EOF
   [ "$fail_count" -eq 1 ]
 }
 
+@test "agentbrew: --fix rewrites a drifted global Agentfile from the merge (#299)" {
+  grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
+  mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"
+  echo "mcp: [context7]" > "$TEST_DOTFILES/Agentfile.yaml"
+  echo "state: ok" > "$TEST_HOME/.config/agentbrew/state.yaml"
+  echo "mcp: [stale]" > "$TEST_HOME/.config/agentbrew/Agentfile.yaml"
+  cat > "$TEST_DIR/bin/agentbrew" << 'AGENTBREW_EOF'
+#!/bin/bash
+echo "$*" >> "$(dirname "$0")/agentbrew.log"
+if [ "$1" = "agentfile" ] && [ "$2" = "merge" ]; then
+  [ "$3" = "--help" ] && { echo "Usage: agentbrew agentfile merge [options] <agentfiles...>"; exit 0; }
+  previous=""
+  for arg in "$@"; do [ "$previous" = "--output" ] && out="$arg"; previous="$arg"; done
+  echo "mcp: [context7]" > "$out"
+fi
+exit 0
+AGENTBREW_EOF
+  chmod +x "$TEST_DIR/bin/agentbrew"
+  # The real doctor runs a fix in a fresh bash (bin/dotfiles-doctor _fix), so
+  # take the fix command from the check and run it that way.
+  fix_cmd=""
+  check() { [ "$1" = agentbrew.global_agentfile_in_sync ] && fix_cmd="$4"; return 0; }
+  source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [ -n "$fix_cmd" ]
+  mkdir -p "$TEST_DOTFILES/bin" "$TEST_DOTFILES/modules/agentbrew"
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-agentfile-resync" "$TEST_DOTFILES/bin/"
+  cp "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh" "$TEST_DOTFILES/modules/agentbrew/"
+  run env PATH="$TEST_DIR/bin:$PATH" HOME="$TEST_HOME" DOTFILES_DIR="$TEST_DOTFILES" bash -c "$fix_cmd"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_HOME/.config/agentbrew/Agentfile.yaml")" = "mcp: [context7]" ]
+  # The fixed file is synced to the agents (in the background).
+  for _ in $(seq 50); do grep -q '^sync' "$TEST_DIR/bin/agentbrew.log" 2>/dev/null && break; sleep 0.1; done
+  grep -q "^sync --no-recommended --agentfile $TEST_HOME/.config/agentbrew/Agentfile.yaml" "$TEST_DIR/bin/agentbrew.log"
+}
+
 @test "agentbrew: global Agentfile drift check passes when canonical merge matches" {
   grep -v '^agentbrew.global_agentfile_in_sync$' "$OVERRIDES_FILE" > "$OVERRIDES_FILE.tmp"
   mv "$OVERRIDES_FILE.tmp" "$OVERRIDES_FILE"

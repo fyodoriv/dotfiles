@@ -1,0 +1,35 @@
+#!/bin/bash
+# Rewrite ~/.config/agentbrew/Agentfile.yaml from the merge that dotfiles
+# apply writes (the base Agentfile, kept plugin layers, owner rules, the local
+# layer, and this Mac's model layer), then run `agentbrew sync` in the
+# background (log: ~/.local/share/dotfiles/logs/agentbrew-sync-fix.log).
+# This is the fix of the doctor check agentbrew.global_agentfile_in_sync
+# (#299); it uses the check's own merge, so a fixed file passes the check.
+#
+# Usage: dotfiles-agentfile-resync
+# Exit: 0 when the file matches the merge (rewritten or already equal);
+# 1 when the merge cannot be made or written.
+
+set -uo pipefail
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; s/^# \{0,1\}//p' "$0"; exit 0; }
+
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+export DOTFILES_DIR
+
+# Load the agentbrew doctor module for its functions only: no check runs.
+# shellcheck disable=SC2329 # called by the sourced module
+check() { :; }
+check_advisory() { :; }
+audit_warn() { :; }
+is_overridden() { return 1; }
+# shellcheck disable=SC2034 # read by the sourced module
+LIST_MODE=true
+# shellcheck source=../modules/agentbrew/doctor.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/modules/agentbrew/doctor.sh" >/dev/null 2>&1
+
+if _agentbrew_global_agentfile_in_sync --write; then
+  echo "dotfiles-agentfile-resync: ~/.config/agentbrew/Agentfile.yaml matches the merge"
+  exit 0
+fi
+echo "dotfiles-agentfile-resync: cannot write the merge — fix: run dotfiles apply and read its agentbrew lines" >&2
+exit 1

@@ -204,6 +204,9 @@ if $DRY_RUN; then
   _args+=(--dry-run)
 fi
 
+# Versions before the run, so the updates-landed record names what moved.
+_versions_before="$(updates_brew_versions 2>/dev/null || true)"
+_plugins_updated=""
 if topgrade "${_args[@]}" 2>&1 | tee -a "$UPGRADE_LOG"; then
   rc=0
 else
@@ -262,7 +265,9 @@ if command -v yq >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
       0)
         _line="$(LC_ALL=C grep -aE '^(✓ |✗ |Would update plugin |Skipped plugin )' <<< "$_out" | tail -1 || true)"
         case "$_line" in
-          "✓ Updated plugin "*) _plugin_updated=1 ;;
+          "✓ Updated plugin "*)
+            _plugin_updated=1
+            _plugins_updated="${_plugins_updated:+$_plugins_updated, }$_plugin" ;;
           "Skipped plugin "*) plugin_skipped=1 ;;
           "✗ "*) plugin_failed=1 ;;
         esac ;;
@@ -303,20 +308,26 @@ if [ -f "$UPGRADE_LOG" ]; then
     && mv "$UPGRADE_LOG.tmp" "$UPGRADE_LOG"
 fi
 
+# ── What changed, for the "updates landed" nudge (#301) ─────────────
+# Only a run that moved a package version or updated a plugin is recorded,
+# so the nudge means something.
+_changes="$(updates_version_summary "$_versions_before" "$(updates_brew_versions)" 2>/dev/null || true)"
+[ -z "$_plugins_updated" ] || _changes="${_changes:+$_changes; }plugin(s) updated: $_plugins_updated"
+
 # ── Outcome notification ────────────────────────────────────────────
 if [ "$rc" -ne 0 ]; then
   echo -e "${RED}✗${NC} Upgrade complete with failures (rc=$rc). See $UPGRADE_LOG" \
     | tee -a "$UPGRADE_LOG"
   if ! $DRY_RUN; then
     notify "dotfiles-upgrade" "Upgrade finished with failures (see log)" "Basso"
-    updates_landed_record dotfiles-upgrade "upgrade ran with failures (rc=$rc, see $UPGRADE_LOG)"
+    [ -z "$_changes" ] || updates_landed_record dotfiles-upgrade "$_changes (with failures, see $UPGRADE_LOG)"
   fi
   exit "$rc"
 fi
 
 echo -e "${GREEN}✓${NC} Upgrade complete." | tee -a "$UPGRADE_LOG"
 if ! $DRY_RUN; then
-  updates_landed_record dotfiles-upgrade "software upgraded"
+  [ -z "$_changes" ] || updates_landed_record dotfiles-upgrade "$_changes"
   if [ "$plugin_skipped" = 1 ]; then
     notify "dotfiles-upgrade" "Upgrade done; a plugin needs your approval (see log)" ""
   else

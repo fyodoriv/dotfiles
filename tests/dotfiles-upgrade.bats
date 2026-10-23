@@ -360,3 +360,43 @@ STUB
   [[ "$output" != *"[topgrade-stub]"* ]]
   [ ! -f "$TEST_HOME/.local/share/dotfiles/last-upgrade" ]
 }
+
+# ── updates-landed record (#301 follow-up) ──────────────────────────────
+# A brew stub whose `list --versions` reads a file; the topgrade stub can
+# move a version during the run.
+nudge_stubs() {
+  printf 'foo 1.0\nbar 2.0\n' > "$TEST_DIR/formulae"
+  : > "$TEST_DIR/casks"
+  cat > "$TEST_BIN/brew" <<EOF2
+#!/bin/bash
+case "\$*" in
+  "list --formula --versions") cat "$TEST_DIR/formulae" ;;
+  "list --cask --versions") cat "$TEST_DIR/casks" ;;
+esac
+exit 0
+EOF2
+  cat > "$TEST_BIN/topgrade" <<EOF2
+#!/bin/bash
+[ -z "\${MOVE_VERSION:-}" ] || printf 'foo 1.1\nbar 2.0\nnew 0.1\n' > "$TEST_DIR/formulae"
+exit 0
+EOF2
+  chmod +x "$TEST_BIN/brew" "$TEST_BIN/topgrade"
+  RECORD="$HOME/.local/state/dotfiles/updates-landed.tsv"
+}
+
+@test "an upgrade that changed nothing records nothing, so the nudge stays quiet" {
+  nudge_stubs
+  run "$SCRIPT" --yes
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ ! -s "$RECORD" ]
+}
+
+@test "an upgrade that moved package versions records a short summary of them" {
+  nudge_stubs
+  MOVE_VERSION=1 run "$SCRIPT" --yes
+  echo "$output"
+  [ "$status" -eq 0 ]
+  cat "$RECORD"
+  grep -q $'\tdotfiles-upgrade\t2 Homebrew package(s): foo 1.0 → 1.1, new 0.1 (new)' "$RECORD"
+}

@@ -30,3 +30,33 @@ updates_landed_record() {
   rmdir "$lock" 2>/dev/null
   return 0
 }
+
+# updates_brew_versions: "name version" for every Homebrew formula and cask,
+# sorted (nothing without brew). Taken before and after an upgrade.
+updates_brew_versions() {
+  command -v brew >/dev/null 2>&1 || return 0
+  { brew list --formula --versions 2>/dev/null; brew list --cask --versions 2>/dev/null; } | LC_ALL=C sort
+}
+
+# updates_version_summary <before> <after>: one short phrase for the versions
+# that moved or appeared ("2 Homebrew package(s): foo 1.0 → 1.1, new 0.1
+# (new)", at most 5 named); nothing when none did.
+updates_version_summary() {
+  # The lists go in through the environment: BSD awk -v takes no newlines.
+  UL_BEFORE="$1" UL_AFTER="$2" awk 'BEGIN {
+    before = ENVIRON["UL_BEFORE"]; after = ENVIRON["UL_AFTER"]
+    n = split(before, b, "\n"); for (i = 1; i <= n; i++) if (b[i] != "") { split(b[i], f, " "); old[f[1]] = substr(b[i], length(f[1]) + 2) }
+    m = split(after, a, "\n"); count = 0; out = ""
+    for (i = 1; i <= m; i++) {
+      if (a[i] == "") continue
+      split(a[i], f, " "); name = f[1]; ver = substr(a[i], length(name) + 2)
+      if (!(name in old)) item = name " " ver " (new)"
+      else if (old[name] != ver) item = name " " old[name] " → " ver
+      else continue
+      count++
+      if (count <= 5) out = out (out == "" ? "" : ", ") item
+    }
+    if (count > 5) out = out ", +" (count - 5) " more"
+    if (count > 0) printf "%d Homebrew package(s): %s", count, out
+  }'
+}

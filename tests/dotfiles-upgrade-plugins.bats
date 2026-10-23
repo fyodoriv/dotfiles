@@ -93,6 +93,8 @@ ref_of() { N="$1" yq -r '.plugins[strenv(N)].ref' "$LOCK"; }
   [ "$(ref_of alpha)" = v1.1.0 ]
   [[ "$output" == *"Updated plugin alpha: v1.0.0 → v1.1.0"* ]]
   bash "$CLI" verify alpha
+  # The updates-landed record names the updated plugin (#301).
+  grep -q $'\tdotfiles-upgrade\t.*plugin(s) updated: alpha' "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/updates-landed.tsv"
 }
 
 @test "upgrade skips a plugin whose capabilities changed and names the command" {

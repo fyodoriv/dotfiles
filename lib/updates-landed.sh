@@ -45,11 +45,12 @@ updates_version_summary() {
   # The lists go in through the environment: BSD awk -v takes no newlines.
   UL_BEFORE="$1" UL_AFTER="$2" awk 'BEGIN {
     before = ENVIRON["UL_BEFORE"]; after = ENVIRON["UL_AFTER"]
-    n = split(before, b, "\n"); for (i = 1; i <= n; i++) if (b[i] != "") { split(b[i], f, " "); old[f[1]] = substr(b[i], length(f[1]) + 2) }
+    # Compare the newest (last) version: brew can list an old one beside it.
+    n = split(before, b, "\n"); for (i = 1; i <= n; i++) if (b[i] != "") { k = split(b[i], f, " "); old[f[1]] = f[k] }
     m = split(after, a, "\n"); count = 0; out = ""
     for (i = 1; i <= m; i++) {
       if (a[i] == "") continue
-      split(a[i], f, " "); name = f[1]; ver = substr(a[i], length(name) + 2)
+      k = split(a[i], f, " "); name = f[1]; ver = f[k]
       if (!(name in old)) item = name " " ver " (new)"
       else if (old[name] != ver) item = name " " old[name] " → " ver
       else continue

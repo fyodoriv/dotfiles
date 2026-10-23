@@ -58,6 +58,8 @@ them. -->
   - **Anchor**: plugin-name-shadowing PR, 2026-10-22; `lib/lock.sh` (shared lock for apply, sync, doctor, upgrade).
   - **Competitive-goal**: none — plugin state safety, not a scorecard metric.
 
+## P3
+
 - [ ] Say when a plugin's `rules:` text could contradict the shared rules
   - **ID**: plugin-rules-contradiction
   - **Tags**: plugins, agents, rules

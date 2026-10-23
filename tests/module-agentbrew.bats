@@ -853,8 +853,9 @@ EOF
 
 _stale_setup() {
   sed -i.bak '/^agentbrew.installed_agents_synced$/d' "$OVERRIDES_FILE" && rm -f "$OVERRIDES_FILE.bak"
-  FAILED=""
+  FAILED="" PASSED=""
   fail() { fail_count=$((fail_count + 1)); FAILED+="$1"$'\n'; }
+  pass() { pass_count=$((pass_count + 1)); PASSED+="$1"$'\n'; }
   cat > "$TEST_HOME/.config/agentbrew/state.yaml" <<'YAML'
 agents:
   - name: claude-code
@@ -889,6 +890,7 @@ YAML
   source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
   echo "$FAILED"
   [[ "$FAILED" != *"not synced"* ]]
+  [[ "$PASSED" == *"every installed agent is synced or excluded on purpose"* ]]
 }
 
 @test "agentbrew: installed_agents_synced passes when no undetected agent is installed" {
@@ -899,4 +901,5 @@ YAML
   source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
   echo "$FAILED"
   [[ "$FAILED" != *"not synced"* ]]
+  [[ "$PASSED" == *"every installed agent is synced or excluded on purpose"* ]]
 }

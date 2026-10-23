@@ -59,6 +59,12 @@ acquire_lock() {
     # A folder at the lock path is never the lock: `ln` would put the link
     # inside it and succeed. Checked before and after the link (a folder can
     # appear in between); a link made inside a folder is removed again.
+    # A symlink is never the lock either; a broken one would make the
+    # "no lock file" branch below loop forever.
+    if [ -L "$DOTFILES_LOCK" ]; then
+      warn "[lock] Cannot acquire — $DOTFILES_LOCK is a symlink — fix: rm \"$DOTFILES_LOCK\" (it should be a file)"
+      return 1
+    fi
     if [ -d "$DOTFILES_LOCK" ]; then
       warn "[lock] Cannot acquire — $DOTFILES_LOCK is a directory — fix: rmdir \"$DOTFILES_LOCK\" (it should be a file)"
       return 1

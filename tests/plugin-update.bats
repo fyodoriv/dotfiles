@@ -593,3 +593,179 @@ fake_staging() {
   [[ "$output" != *"restored the lock entry"* ]]
   cmp "$LOCK" "$TEST_DIR/lock.before"
 }
+
+# ── Unattended and dry-run modes (dotfiles upgrade, task upgrade-updates-plugins) ──
+
+@test "update --dry-run names the newer tag and changes nothing" {
+  release v1.1.0
+  cp "$LOCK" "$TEST_DIR/lock.before"
+  run bash "$CLI" update acme --dry-run < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Would update plugin acme: v1.0.0 → v1.1.0"* ]]
+  cmp "$LOCK" "$TEST_DIR/lock.before"
+  assert_kept_v1
+}
+
+@test "update --dry-run says when changed capabilities need approval" {
+  yq -i '.capabilities.shell_fragment = true' "$SRC/dotfiles-plugin.yaml"
+  release v1.1.0
+  run bash "$CLI" update acme --dry-run < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Would update plugin acme: v1.0.0 → v1.1.0"* ]]
+  [[ "$output" == *"needs approval: dotfiles plugin update acme"* ]]
+  assert_kept_v1
+}
+
+@test "update --unattended updates when the capabilities did not change" {
+  release v1.1.0
+  run bash "$CLI" update acme --unattended < /dev/null
+  [ "$status" -eq 0 ]
+  [ "$(lock_ref)" = v1.1.0 ]
+}
+
+@test "update --unattended skips changed capabilities with exit 3 and the command to run" {
+  yq -i '.capabilities.shell_fragment = true' "$SRC/dotfiles-plugin.yaml"
+  release v1.1.0
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"Skipped plugin acme"* ]]
+  [[ "$output" == *"run: dotfiles plugin update acme"* ]]
+  assert_kept_v1
+}
+
+@test "update --unattended skips an installed ref that is not a version with exit 3" {
+  sign_tag "$SRC" stable "$TEST_DIR/key"
+  bash "$CLI" update acme stable < /dev/null >/dev/null
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"Skipped plugin acme"* ]]
+  [[ "$output" == *"dotfiles plugin update acme <tag>"* ]]
+}
+
+@test "update --unattended and --yes together are refused" {
+  run bash "$CLI" update acme --unattended --yes < /dev/null
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--unattended never approves"* ]]
+}
+
+@test "update --dry-run runs no crash recovery" {
+  s="$XDG_DATA_HOME/dotfiles/plugins/.staging.dry"
+  mkdir -p "$s"
+  cp -R "$DEST" "$s/old"
+  printf '999999 %s\n' "$(boot_id)" > "$s/owner.pid"
+  run bash "$CLI" update acme --dry-run < /dev/null
+  [ -d "$s/old" ]
+}
+
+@test "update --unattended names a newer release no trusted key signed, with exit 3" {
+  release v1.1.0 "$TEST_DIR/other"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"Skipped plugin acme: its newer release v1.1.0 is not signed by a key trusted for acme"* ]]
+  [[ "$output" == *"dotfiles plugin trust acme --signer"* ]]
+  assert_kept_v1
+}
+
+@test "update --unattended fails a plugin that no longer matches its lock, not up to date" {
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"does not match plugins.lock"* ]]
+  [[ "$output" == *"fix: dotfiles plugin update acme v1.0.0"* ]]
+}
+
+@test "update --unattended gives the real reason for an unsigned newer tag, with no trust hint" {
+  gitc commit -q --allow-empty -m lightweight
+  gitc tag v1.1.0
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"Skipped plugin acme: its newer release v1.1.0 failed the signature check (v1.1.0 is not a signed tag"* ]]
+  [[ "$output" != *"plugin trust"* ]]
+}
+
+@test "update --unattended names every changed file of a disabled plugin, once" {
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  echo new > "$DEST/new.sh"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"files changed after install"* ]]
+  [[ "$output" == *"modules/acme/doctor.sh"* ]]
+  [[ "$output" == *"new.sh"* ]]
+}
+
+@test "update --unattended reports a disabled plugin as failed even with an untrusted newer tag" {
+  release v1.1.0 "$TEST_DIR/other"
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"does not match plugins.lock"* ]]
+}
+
+@test "an update to a trusted release names a newer, untrusted one it skipped" {
+  release v1.1.0
+  release v1.2.0 "$TEST_DIR/other"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"✓ Updated plugin acme: v1.0.0 → v1.1.0 (skipped newer v1.2.0: tag v1.2.0 is not signed by a trusted signer for acme)"* ]]
+}
+
+@test "update --unattended never replaces a plugin that no longer matches its lock, even with a newer release" {
+  release v1.1.0
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"does not match plugins.lock"* ]]
+  [ "$(lock_ref)" = v1.0.0 ]
+}
+
+@test "after a key rotation, update --unattended moves to the release the new key signed" {
+  release v1.1.0 "$TEST_DIR/other"
+  bash "$CLI" trust acme --signer "$(cat "$TEST_DIR/other.pub")" --yes >/dev/null
+  bash "$CLI" trust acme --signer "$KEY" --revoke >/dev/null
+  run bash "$CLI" verify acme
+  [ "$status" -ne 0 ]
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(lock_ref)" = v1.1.0 ]
+  bash "$CLI" verify acme
+}
+
+@test "a revoked signer with no newer trusted release fails with a fix that works" {
+  bash "$CLI" trust acme --signer "$KEY" --revoke >/dev/null
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"the signer of v1.0.0 is no longer trusted, and no newer release is signed by a trusted key"* ]]
+  [[ "$output" == *"install one: dotfiles plugin update acme <tag>"* ]]
+  [[ "$output" != *"fix: dotfiles plugin update acme v1.0.0"* ]]
+}
+
+@test "update <name> <ref> --dry-run previews the repair of a changed checkout" {
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  run bash "$CLI" update acme v1.0.0 --dry-run < /dev/null
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Would update plugin acme: v1.0.0 → v1.0.0"* ]]
+}
+
+@test "a changed checkout whose signer was also revoked gets a fix hint that can work" {
+  bash "$CLI" trust acme --signer "$KEY" --revoke >/dev/null
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  run bash "$CLI" update acme --unattended < /dev/null
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"fix: dotfiles plugin update acme <a tag a trusted key signed>"* ]]
+  [[ "$output" != *"fix: dotfiles plugin update acme v1.0.0"* ]]
+}

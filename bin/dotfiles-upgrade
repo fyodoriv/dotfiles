@@ -13,6 +13,8 @@
 #   - Logging to ~/.local/share/dotfiles/logs/dotfiles-upgrade.log
 #   - macOS notification on completion
 #   - last-upgrade timestamp file for `dotfiles stats`
+#   - Company plugins: each pinned plugin moves to its newest stable signed
+#     tag (`dotfiles plugin update --unattended`, docs/plugins.md)
 #
 # topgrade's own behaviour is configured via dot_config/topgrade.toml.tmpl
 # (lands at ~/.config/topgrade.toml — topgrade reads the file directly,
@@ -87,6 +89,8 @@ DRY_RUN=false
 LOG_DIR="$HOME/.local/share/dotfiles/logs"
 mkdir -p "$LOG_DIR"
 UPGRADE_LOG="$LOG_DIR/dotfiles-upgrade.log"
+# The log holds plugin update output (source URLs, git errors): owner only.
+(umask 077; touch "$UPGRADE_LOG") && chmod 600 "$UPGRADE_LOG" 2>/dev/null || true
 LAST_UPGRADE_FILE="$HOME/.local/share/dotfiles/last-upgrade"
 
 # ── Safety: skip when a real autonomous loop is in flight ───────────
@@ -220,6 +224,67 @@ if ! $DRY_RUN && [ "$rc" -eq 0 ]; then
   fi
 fi
 
+# ── Company plugins (docs/plugins.md "Update") ──────────────────────
+# Each pinned plugin in plugins.lock moves to its newest stable signed tag
+# through `dotfiles plugin update --unattended`, with all of its checks
+# (exact signed tag object, trusted signer, manifest, rollback). This runs
+# after the --yes gate above. A plugin whose capabilities changed is
+# skipped and named with the command to run: approving new capabilities
+# needs a person, and the weekly run has none. A failed update is named and
+# fails the run, as a failed topgrade step does; the other plugins still
+# update. --dry-run lists what would change. --dev links are left alone.
+plugin_failed=0 plugin_skipped=0
+if command -v yq >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
+  # shellcheck source=../lib/plugin.sh
+  source "$DOTFILES_DIR/lib/plugin.sh"
+  _plugin_lines=() _plugin_updated=0
+  _lock="$(plugin_lock_file)"
+  if [ -f "$_lock" ] && ! yq '.' "$_lock" >/dev/null 2>&1; then
+    plugin_failed=1
+    _plugin_lines+=("✗ $_lock cannot be read, so no plugin was updated (check it with: dotfiles plugin list)")
+  fi
+  for _plugin in $(plugin_lock_names); do
+    [ "$(plugin_lock_get "$_plugin" dev)" != true ] || continue
+    _mode=--unattended
+    ! $DRY_RUN || _mode=--dry-run
+    _prc=0
+    _out="$(bash "$DOTFILES_DIR/bin/dotfiles-plugin" update "$_plugin" "$_mode" < /dev/null 2>&1)" || _prc=$?
+    # Plugin output is bytes from git and remote hosts: read it in the C
+    # locale (sed and grep stop on invalid UTF-8 otherwise), and never let
+    # one line of it stop the upgrade. The log drops user:token@ parts of URLs.
+    _out="$(LC_ALL=C sed -E 's#(://)[^/@[:space:]]+@#\1#g' <<< "$_out" || true)"
+    printf '%s\n' "$_out" >> "$UPGRADE_LOG" || true
+    _line=""
+    case "$_prc" in
+      0)
+        _line="$(LC_ALL=C grep -aE '^(✓ |✗ |Would update plugin |Skipped plugin )' <<< "$_out" | tail -1 || true)"
+        case "$_line" in
+          "✓ Updated plugin "*) _plugin_updated=1 ;;
+          "Skipped plugin "*) plugin_skipped=1 ;;
+          "✗ "*) plugin_failed=1 ;;
+        esac ;;
+      3)
+        _line="$(LC_ALL=C grep -aE '^Skipped plugin ' <<< "$_out" | tail -1 || true)"
+        plugin_skipped=1 ;;
+    esac
+    if [ -z "$_line" ]; then
+      # A failure, or a result this step does not know (exit 3 included).
+      plugin_failed=1
+      _line="✗ plugin $_plugin: update failed (exit $_prc): $(LC_ALL=C grep -av '^[[:space:]]*$' <<< "$_out" | tail -1 | LC_ALL=C sed 's/^✗ //' || true)"
+    fi
+    _plugin_lines+=("$_line")
+  done
+  [ "$_plugin_updated" = 0 ] || _plugin_lines+=("Run dotfiles apply to load the updated plugins' LaunchAgents, Brewfile, and Agentfile.")
+  if [ "${#_plugin_lines[@]}" -gt 0 ]; then
+    echo -e "${BLUE}── Plugins ──${NC}" | tee -a "$UPGRADE_LOG"
+    printf '  %s\n' "${_plugin_lines[@]}" | tee -a "$UPGRADE_LOG"
+  fi
+  unset _plugin _mode _prc _out _line _plugin_lines _plugin_updated _lock
+fi
+if [ "$plugin_failed" = 1 ] && [ "$rc" -eq 0 ]; then
+  rc=1
+fi
+
 # ── Record last-upgrade timestamp (used by `dotfiles stats` + the morning
 # script's "X days since last upgrade" hint).
 if ! $DRY_RUN; then
@@ -230,7 +295,8 @@ fi
 # ── Trim log to last 1000 lines — topgrade is verbose enough that the
 # old 500-line cap was rotating mid-run.
 if [ -f "$UPGRADE_LOG" ]; then
-  tail -1000 "$UPGRADE_LOG" > "$UPGRADE_LOG.tmp" \
+  rm -f "$UPGRADE_LOG.tmp"
+  (umask 077; tail -1000 "$UPGRADE_LOG" > "$UPGRADE_LOG.tmp") \
     && mv "$UPGRADE_LOG.tmp" "$UPGRADE_LOG"
 fi
 
@@ -246,5 +312,9 @@ fi
 
 echo -e "${GREEN}✓${NC} Upgrade complete." | tee -a "$UPGRADE_LOG"
 if ! $DRY_RUN; then
-  notify "dotfiles-upgrade" "All software upgraded successfully" ""
+  if [ "$plugin_skipped" = 1 ]; then
+    notify "dotfiles-upgrade" "Upgrade done; a plugin needs your approval (see log)" ""
+  else
+    notify "dotfiles-upgrade" "All software upgraded successfully" ""
+  fi
 fi

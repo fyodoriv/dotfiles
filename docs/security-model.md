@@ -176,7 +176,7 @@ All agents install to `~/Library/LaunchAgents/com.dotfiles.*`. All run as the cu
 
 | Agent | Condition | What it does | Notable |
 |-------|-----------|--------------|---------|
-| `dotfiles-upgrade` | `auto_upgrade: true` | Weekly Topgrade: brew, Node, uv | Installs/upgrades software |
+| `dotfiles-upgrade` | `auto_upgrade: true` | Weekly Topgrade: brew, Node, uv; company plugins (signed releases, same capabilities only) | Installs/upgrades software |
 | `atuin-daemon` | `atuin` installed | Shell history sync daemon | |
 | `rancher-desktop` | App installed | Starts Rancher Desktop VM | |
 

@@ -720,7 +720,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |
-| `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools (opt-in: `auto_upgrade: true`) |
+| `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools; company plugins to their newest signed release (opt-in: `auto_upgrade: true`) |
 
 **One LaunchAgent per job.** `dotfiles apply` unloads and deletes:
 

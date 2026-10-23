@@ -44,19 +44,6 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
-- [ ] `dotfiles upgrade` updates every installed plugin to its newest signed tag
-  - **ID**: upgrade-updates-plugins
-  - **Tags**: plugins, upgrade
-  - **Details**: Issue #265 asked for this as an optional part. PR #276 added `dotfiles plugin update <name>`; the weekly `dotfiles upgrade` still leaves plugins on their old tags. Wait for the #276 review fixes (signature check on the exact ref, stable-semver pick, interrupt rollback) to merge first, then call the same update path for each lock entry. A plugin whose capabilities changed is skipped with its name and the `dotfiles plugin update <name>` command, because `upgrade` runs unattended.
-  - **Files**: `bin/dotfiles-upgrade`, `bin/dotfiles-plugin`, `tests/plugin-update.bats`, `docs/plugins.md`
-  - **Output**: code
-  - **Acceptance**: after `dotfiles upgrade`, each plugin with a newer stable signed tag and no capability change is on that tag, and each skipped plugin is named with its reason.
-  - **Hypothesis**: running the plugin update inside `dotfiles upgrade` drops the number of plugins behind their newest signed tag after an upgrade from N to 0 (except capability changes, which are named).
-  - **Measurement**: a bats test with two scratch plugin repos (one with a newer signed tag, one with a capability change) that counts plugins behind after `dotfiles upgrade`.
-  - **Success**: 0 behind without a named reason.
-  - **Pivot**: if an unattended update cannot stay safe, print the pending updates in the upgrade summary instead.
-  - **Anchor**: issue #265; PR #276 review (2026-10-22).
-
 - [ ] Run the plugin bats files under macOS `/bin/bash` 3.2
   - **ID**: plugin-tests-bash32
   - **Tags**: plugins, tests

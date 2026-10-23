@@ -62,7 +62,7 @@ contributes:
 |---|---|
 | `dotfiles plugin add <url>@<tag> [--signer <key>] [--yes]` | Clones the tag, checks the signature, validates the manifest and options, shows the capabilities, and asks once. It runs no plugin code. |
 | `dotfiles plugin add --dev <path>` | Links a local checkout for authors. Not pinned; doctor warns on every run. |
-| `dotfiles plugin update <name> [<tag>] [--yes]` | Moves an installed plugin to another signed tag in place. Without a tag, it takes the newest tag that is newer than the installed one and signed by a trusted signer. See [Update](#update). |
+| `dotfiles plugin update <name> [<tag>] [--yes] [--dry-run] [--unattended]` | Moves an installed plugin to another signed tag in place. Without a tag, it takes the newest tag that is newer than the installed one and signed by a trusted signer. `--dry-run` says what would change; `--unattended` never asks and exits 3 when a person must decide. `dotfiles upgrade` runs it for every pinned plugin. See [Update](#update). |
 | `dotfiles plugin remove <name> [--yes]` | Unloads its LaunchAgents and deletes the checkout and the lock entry. It asks first; without a terminal it needs `--yes`. |
 | `dotfiles plugin list` / `verify [<name>]` | Shows each plugin and re-checks it against the lock. |
 | `dotfiles plugin trust <name> --signer <key> [--revoke]` | Adds or removes a trusted signer (needs a terminal or `--yes`). |
@@ -114,7 +114,7 @@ always the old one or the new one.
 A crash with no exit handler (SIGKILL, a power cut) leaves a `.staging.*`
 folder. Each one holds `owner.pid` (the run's PID and boot ID), and an
 update's also holds `plugin.name`. The next `add`, `update`, `remove`,
-`list`, or `verify` looks in the plugin home and beside each pinned checkout
+`list`, or `verify` (but not a `--dry-run`) looks in the plugin home and beside each pinned checkout
 for a folder whose run is gone (another boot, or the PID no longer runs):
 - the checkout still matches the lock: the update had finished, so the old
   copy is deleted;
@@ -132,6 +132,34 @@ that no longer matches its lock reinstalls it, so the doctor fix for
 `--dev` plugin is not pinned; update it with git in its folder. Then run
 `dotfiles apply` to load new LaunchAgents, Brewfile entries, and Agentfile
 layers. A new signer must be trusted first (`plugin trust`, see below).
+
+`dotfiles upgrade` (the weekly LaunchAgent, after its `--yes` gate) runs
+`dotfiles plugin update <name> --unattended` for every pinned plugin:
+- a plugin with a newer stable signed release and the same capabilities
+  moves to it, with every check above;
+- a plugin whose capabilities changed is skipped, and the summary names it
+  with the command to run (`dotfiles plugin update <name>`), because new
+  capabilities need a person's approval;
+- a newer release that failed its signature check is skipped and named
+  with the reason; only when no trusted key signed it (after a key
+  rotation, say) does the line suggest `dotfiles plugin trust`;
+- a release it moves to says which newer, untrusted release it skipped;
+- a checkout that changed on disk (commit, files, capabilities) is never
+  replaced unattended (that would erase what changed in it): it is named
+  and fails the run;
+- after a key rotation (the installed release's signer revoked), it moves
+  to the newest release a trusted key signed; with none, it fails and
+  says to install one (`dotfiles plugin update <name> <tag>`);
+- a failed update is named in the summary and fails the run (exit 1), as
+  a failed topgrade step does; the other plugins still update;
+- `--dev` links are left alone.
+
+The summary ends with "Run dotfiles apply" when a plugin moved. The log
+(`~/.local/share/dotfiles/logs/dotfiles-upgrade.log`, mode 0600) keeps
+each plugin's full output, without any `user:token@` part of a URL.
+
+`dotfiles upgrade --dry-run` lists the pending plugin updates (with
+`dotfiles plugin update <name> --dry-run`) and changes nothing.
 
 ## Trust and signing
 

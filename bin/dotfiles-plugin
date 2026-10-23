@@ -7,10 +7,13 @@
 #                                                 clone, check the signed tag,
 #                                                 validate, approve, lock
 #   dotfiles plugin add --dev <path> [--yes]      link a local checkout (no pin)
-#   dotfiles plugin update <name> [<tag>] [--yes]
+#   dotfiles plugin update <name> [<tag>] [--yes] [--dry-run] [--unattended]
 #                                                 move to another signed tag (the
 #                                                 newest newer one when omitted);
-#                                                 swap and re-lock only after checks
+#                                                 swap and re-lock only after checks;
+#                                                 --dry-run: say what would change;
+#                                                 --unattended: never ask, exit 3
+#                                                 when a person must decide
 #   dotfiles plugin remove <name> [--yes]         delete checkout and lock entry
 #   dotfiles plugin list                          name, ref, commit, state
 #   dotfiles plugin verify [<name>]               re-check the lock against disk
@@ -303,19 +306,24 @@ _update_cleanup() {
 # passes plugin_verify, any failure or interrupt puts the old checkout and
 # lock back (_update_cleanup). No plugin code runs.
 cmd_update() {
-  local yes=0 name="" ref="" path url cur_ref cur_commit manifest errors="" signer="" tag lock new_commit oid order
+  local yes=0 dry_run=0 unattended=0 name="" ref="" path url cur_ref cur_commit manifest errors="" signer="" tag lock new_commit oid order caps_changed=0 skipped_tag="" skipped_why="" skipped_note="" fix_ref=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --yes) yes=1 ;;
+      --dry-run) dry_run=1 ;;
+      --unattended) unattended=1 ;;
       -*) die "unknown flag: $1" ;;
       *)
         if [ -z "$name" ]; then name="$1"
         elif [ -z "$ref" ]; then ref="$1"
-        else die "usage: dotfiles plugin update <name> [<tag>] [--yes]"; fi ;;
+        else die "usage: dotfiles plugin update <name> [<tag>] [--yes] [--dry-run] [--unattended]"; fi ;;
     esac
     shift
   done
-  [ -n "$name" ] || die "usage: dotfiles plugin update <name> [<tag>] [--yes]"
+  [ -n "$name" ] || die "usage: dotfiles plugin update <name> [<tag>] [--yes] [--dry-run] [--unattended]"
+  # --unattended (dotfiles upgrade) never approves: a change that needs a
+  # person is skipped with exit 3, so --yes would contradict it.
+  [ "$unattended" = 0 ] || [ "$yes" = 0 ] || die "--unattended never approves; drop --yes"
   path="$(plugin_lock_get "$name" path)"
   [ -n "$path" ] || die "plugin $name is not installed"
   [ "$(plugin_lock_get "$name" dev)" != true ] ||
@@ -324,7 +332,30 @@ cmd_update() {
   url="$(plugin_lock_get "$name" source)"
   cur_ref="$(plugin_lock_get "$name" ref)"
   cur_commit="$(plugin_lock_get "$name" commit)"
+  # Unattended or dry-run, with no tag named: a checkout that changed on
+  # disk is a failure to report, never something to replace in silence
+  # (that would erase what changed in it). A person repairs it: update
+  # <name> <ref>. A signer that is no longer trusted is not a local change:
+  # the update looks for a newer release a trusted key signed (below).
+  if { [ "$unattended" = 1 ] || [ "$dry_run" = 1 ]; } && [ -z "$ref" ] &&
+    ! errors="$(plugin_verify "$name" local 2>&1)"; then
+    # Reinstalling the locked tag repairs it, unless its signer was revoked
+    # too: then only a release a trusted key signed can.
+    fix_ref="$cur_ref"
+    signer="$(plugin_lock_get "$name" signer)"
+    if [ -z "$signer" ] || ! grep -qxF -- "$signer" <<< "$(plugin_signers_for "$name")"; then
+      fix_ref="<a tag a trusted key signed>"
+    fi
+    echo "✗ Plugin $name does not match plugins.lock, so it is disabled: $(paste -sd ' ' - <<< "$errors" | tr -s ' '); fix: dotfiles plugin update $name $fix_ref"
+    [ "$dry_run" = 1 ] && return 0
+    exit 1
+  fi
   if [ -z "$ref" ] && ! [[ "$cur_ref" =~ $SEMVER_RE ]]; then
+    if [ "$unattended" = 1 ] || [ "$dry_run" = 1 ]; then
+      echo "Skipped plugin $name: the installed ref $cur_ref is not a version, so no tag counts as newer; run: dotfiles plugin update $name <tag>"
+      [ "$dry_run" = 1 ] && return 0
+      exit 3
+    fi
     die "the installed ref $cur_ref is not a version, so no tag counts as newer; name one: dotfiles plugin update $name <tag>"
   fi
 
@@ -341,15 +372,38 @@ cmd_update() {
 
   if [ -z "$ref" ]; then
     # Newest stable release first; take the first a trusted signer signed.
+    # The newest one that failed, and why, is kept for the result line.
     while IFS= read -r tag; do
       if signer="$(plugin_verify_signed_tag "$UPD_STAGING/src" "$tag" "$name")"; then
         ref="$tag"
         break
       fi
       echo "skipped $tag: $signer"
+      [ -n "$skipped_tag" ] || { skipped_tag="$tag"; skipped_why="$signer"; }
       signer=""
     done < <(_newer_stable_tags "$UPD_STAGING/src" "$cur_ref")
     if [ -z "$ref" ]; then
+      if [ "$unattended" = 1 ] || [ "$dry_run" = 1 ]; then
+        # The installed release's signer is no longer trusted, and no newer
+        # release is signed by a trusted key: the plugin stays disabled.
+        if ! plugin_verify "$name" >/dev/null 2>&1; then
+          echo "✗ Plugin $name: the signer of $cur_ref is no longer trusted, and no newer release is signed by a trusted key${skipped_tag:+ ($skipped_tag: $skipped_why)}; install one: dotfiles plugin update $name <tag>"
+          [ "$dry_run" = 1 ] && return 0
+          exit 1
+        fi
+        # A newer release failed its signature check: a person must look.
+        # Suggest trusting a key only when the signer is the only problem.
+        if [ -n "$skipped_tag" ]; then
+          case "$skipped_why" in
+            *"not signed by a trusted signer"* | *"no trusted signer"*)
+              echo "Skipped plugin $name: its newer release $skipped_tag is not signed by a key trusted for $name; check it, then run: dotfiles plugin trust $name --signer <key>" ;;
+            *)
+              echo "Skipped plugin $name: its newer release $skipped_tag failed the signature check ($skipped_why); find out why before you trust anything for it" ;;
+          esac
+          [ "$dry_run" = 1 ] && return 0
+          exit 3
+        fi
+      fi
       echo "✓ Plugin $name is up to date at $cur_ref (no newer signed release)"
       return 0
     fi
@@ -392,8 +446,24 @@ cmd_update() {
   if [ "$(plugin_capabilities_sha "$manifest")" = "$(plugin_lock_get "$name" capabilities_sha)" ]; then
     echo "Capabilities: unchanged since you approved $cur_ref"
   else
+    caps_changed=1
     echo "Capabilities changed since you approved $cur_ref."
     show_capabilities "$name" "$manifest"
+  fi
+  [ -z "$skipped_tag" ] || skipped_note=" (skipped newer $skipped_tag: $skipped_why)"
+  if [ "$dry_run" = 1 ]; then
+    if [ "$caps_changed" = 1 ]; then
+      echo "Would update plugin $name: $cur_ref → $ref (capabilities changed; needs approval: dotfiles plugin update $name)$skipped_note"
+    else
+      echo "Would update plugin $name: $cur_ref → $ref$skipped_note"
+    fi
+    return 0
+  fi
+  if [ "$caps_changed" = 1 ]; then
+    if [ "$unattended" = 1 ]; then
+      echo "Skipped plugin $name: its capabilities changed since you approved $cur_ref; $ref needs your approval; run: dotfiles plugin update $name"
+      exit 3
+    fi
     approve "$yes"
   fi
 
@@ -416,7 +486,7 @@ cmd_update() {
   fi
   UPD_DONE=1
   refresh_outputs
-  echo "✓ Updated plugin $name: $cur_ref → $ref"
+  echo "✓ Updated plugin $name: $cur_ref → $ref$skipped_note"
   echo "  Run dotfiles apply to load its LaunchAgents, Brewfile, and Agentfile."
 }
 
@@ -617,7 +687,11 @@ cmd_verify() {
 
 # An add or update that died without its exit handler is finished or
 # rolled back before any command that reads or changes the lock.
-case "${1:-}" in add | update | remove | list | verify) _plugin_recover_staging || true ;; esac
+# --dry-run changes nothing, so it runs no recovery either.
+case "${1:-}:$* " in
+  *" --dry-run "*) ;;
+  add:* | update:* | remove:* | list:* | verify:*) _plugin_recover_staging || true ;;
+esac
 
 case "${1:-}" in
   add) shift; cmd_add "$@" ;;

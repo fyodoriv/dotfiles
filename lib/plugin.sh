@@ -99,11 +99,12 @@ plugin_capabilities_sha() {
   printf 'sha256-%s' "$hex"
 }
 
-# plugin_verify <name>: succeeds when the checkout still matches its lock
-# entry. Otherwise prints what differs and fails. A dev entry skips the
-# commit and tree checks.
+# plugin_verify <name> [local]: succeeds when the checkout still matches its
+# lock entry. Otherwise prints what differs and fails. A dev entry skips the
+# commit and tree checks. With "local", the signer check is skipped: only
+# what is on disk counts (commit, tree, files, capabilities).
 plugin_verify() {
-  local name="$1" path commit tree caps dev signer
+  local name="$1" scope="${2:-}" path commit tree caps dev signer
   path="$(plugin_lock_get "$name" path)"
   [ -n "$path" ] || { echo "$name: not in $(plugin_lock_file)"; return 1; }
   [ -d "$path" ] || { echo "$name: checkout missing: $path"; return 1; }
@@ -117,7 +118,7 @@ plugin_verify() {
     [ "$tree" = "$(plugin_lock_get "$name" tree_hash)" ] ||
       { echo "$name: tree changed"; return 1; }
     signer="$(plugin_lock_get "$name" signer)"
-    if [ -z "$signer" ] || ! plugin_signers_for "$name" | grep -qxF -- "$signer"; then
+    if [ "$scope" != local ] && { [ -z "$signer" ] || ! plugin_signers_for "$name" | grep -qxF -- "$signer"; }; then
       echo "$name: signer revoked or missing (trust it again with: dotfiles plugin trust $name --signer <key>)"
       return 1
     fi

@@ -157,7 +157,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `sleepwatcher` | At load | full | Run scripts on sleep/wake events |
 | `app-priority` | At load | full | Keep interactive apps and terminal-launched agents responsive; background agent and model workers |
 | `agent-browser-chrome` | At load, not kept alive | full | The one agents Chrome with remote debugging on port 9223; manual close for logout/shutdown is respected |
-| `dotfiles-upgrade` | Sunday 9:00 AM | opt-in | Topgrade upgrade of Homebrew, casks and tools (requires `auto_upgrade: true`) |
+| `dotfiles-upgrade` | Sunday 9:00 AM | opt-in | Topgrade upgrade of Homebrew, casks and tools, and company plugins to their newest signed release (requires `auto_upgrade: true`) |
 
 Logs are written to `~/.local/share/dotfiles/logs/<agent-name>.log`.
 

@@ -132,7 +132,8 @@ if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2
     source "$DOTFILES_DIR/lib/$_plib.sh"
   done
   # A plugin Agentfile that would take from the shared layer (hooks,
-  # excludeAgents, MCP servers, recommended) is skipped
+  # excludeAgents, MCP servers, recommended, command, agent, and skill
+  # names) is skipped
   # (lib/agentfile-layers.sh), checked with the agentbrew that merges it.
   # shellcheck source=../lib/agentfile-layers.sh
   source "$DOTFILES_DIR/lib/agentfile-layers.sh"

@@ -102,6 +102,20 @@ them. -->
 
 ## P3
 
+- [ ] Say when a plugin's `rules:` text could contradict the shared rules
+  - **ID**: plugin-rules-contradiction
+  - **Tags**: plugins, agents, rules
+  - **Details**: `agentfile_plugin_layers` (`lib/agentfile-layers.sh`) stops a plugin Agentfile from taking hooks, agents, MCP servers, or command, agent, and skill names from the shared layer. It does not read `rules:` text: agentbrew appends a plugin's rules after the shared rules, so a plugin rule can say the opposite of a shared one (content, not structure). Carried over from the closed plugin-name-shadowing task (2026-10-22).
+  - **Files**: `lib/agentfile-layers.sh`, `modules/agentbrew/doctor.sh`, `docs/plugins.md`
+  - **Output**: decision
+  - **Acceptance**: a decision in `docs/plugins.md`: either a doctor advisory that lists each plugin's rule headings next to the shared ones, or a written reason why plugin rules stay unchecked.
+  - **Hypothesis**: listing plugin rule headings makes a contradicting plugin rule visible in 1 doctor run instead of never.
+  - **Measurement**: a bats case with a scratch plugin rule and `dotfiles doctor --module agentbrew`.
+  - **Success**: the plugin's rule headings show in the doctor output, or the decision is written down.
+  - **Pivot**: if headings say too little to judge, keep the decision and drop the advisory.
+  - **Anchor**: plugin-name-shadowing PR, 2026-10-22.
+  - **Competitive-goal**: none — plugin trust boundary, not a scorecard metric.
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Blocked**: needs-time — 2026-10-22: shipped `make lint` per-file cache (`bin/cached-run --per-file`: skips a script that passed with the same content, sourced files, shellcheck version, and `.shellcheckrc`; shared by all worktrees; misses run in parallel) plus `make lint-full` (PR #257). Baseline 2026-10-22: `make lint` lines sum 6m02s/day (tooling 2m08s, dotfiles 2m04s, agentbrew 1m50s); one run 17-39 s uncached, now 11.6 s cold and 1.2-1.3 s warm at load 40-50. Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), then close or pivot.

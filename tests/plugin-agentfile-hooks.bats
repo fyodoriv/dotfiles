@@ -22,6 +22,8 @@ setup_file() {
   co="$(bash -c 'source "$1/lib/agentbrew-locate.sh"; agentbrew_locate' _ "$BATS_TEST_DIRNAME/.." 2>/dev/null || true)"
   if [ -n "$co" ] && [ -f "$co/dist/cli.js" ] && command -v node >/dev/null 2>&1; then
     export AGENTBREW_CHECKOUT="$co" NODE_BIN="$(command -v node)"
+    # The skill rule reads agentbrew's built-in skill names from here.
+    export AGENTBREW_DIR="$co"
   fi
 }
 
@@ -523,14 +525,47 @@ skills: [agentbrew-status]' skills/agentbrew-status/SKILL.md
   run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
   echo "$output"
   [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
-  [[ "$output" == *"its sources: hold skills that a skills: entry asks for by name"*": agentbrew-status"* ]]
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
   # Asked for by the shared layer, found by its front matter name, at any depth.
   layer "$TEST_DIR/beta" 'sources: ["./deep"]'
   mkdir -p "$TEST_DIR/beta/deep/a/b/other"
   printf -- '---\nname: Update-Tooling\n---\nBETA\n' > "$TEST_DIR/beta/deep/a/b/other/SKILL.md"
   run layers "$REPO_ROOT/Agentfile.yaml" beta="$TEST_DIR/beta/Agentfile.yaml"
   echo "$output"
-  [[ "$output" == *"its sources: hold skills"*": update-tooling"* ]]
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": update-tooling"* ]]
+}
+
+@test "a skill rule split across two plugins is refused in the later one" {
+  layer "$TEST_DIR/base" 'commands: [./commands]' commands/base.md
+  layer "$TEST_DIR/acme" 'sources: [./skills]' skills/agentbrew-status/SKILL.md
+  layer "$TEST_DIR/beta" 'skills: [agentbrew-status]'
+  for cmd in "$AGENTFILE_AGENTBREW_CMD" false; do
+    AGENTFILE_AGENTBREW_CMD="$cmd" run layers "$TEST_DIR/base/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml" beta="$TEST_DIR/beta/Agentfile.yaml"
+    echo "$output"
+    [[ "$output" == *"Skipping the Agentfile of plugin beta"* ]]
+    [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
+    [[ "$output" != *"plugin acme"* ]]
+  done
+}
+
+@test "a skill copy is found as agentbrew finds it: skill.md, the last name: line" {
+  layer "$TEST_DIR/acme" 'sources: [./skills]
+skills: [agentbrew-status]'
+  mkdir -p "$TEST_DIR/acme/skills/x"
+  printf -- '---\nname: harmless\nname: agentbrew-status\n---\nACME\n' > "$TEST_DIR/acme/skills/x/skill.md"
+  run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
+}
+
+@test "a plugin that asks for its own new skill is kept (agentbrew installs no unknown name)" {
+  layer "$TEST_DIR/acme" 'sources: [./skills]
+skills: [acme-skill]' skills/acme-skill/SKILL.md
+  for cmd in "$AGENTFILE_AGENTBREW_CMD" false; do
+    AGENTFILE_AGENTBREW_CMD="$cmd" run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+    echo "$output"
+    [ "$output" = "$TEST_DIR/acme/Agentfile.yaml" ]
+  done
 }
 
 @test "without agentfile merge, the command, agent, and skill rules hold too" {
@@ -557,7 +592,7 @@ skills: [agentbrew-status]' skills/agentbrew-status/SKILL.md
   layer "$TEST_DIR/p4" 'sources: [./skills]' skills/update-tooling/SKILL.md
   AGENTFILE_AGENTBREW_CMD=false run layers "$REPO_ROOT/Agentfile.yaml" p4="$TEST_DIR/p4/Agentfile.yaml"
   echo "$output"
-  [[ "$output" == *"its sources: hold skills"*": update-tooling"* ]]
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": update-tooling"* ]]
 }
 
 @test "doctor: the plugin check names the plugin and the shared command" {

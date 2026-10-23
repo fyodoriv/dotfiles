@@ -226,12 +226,15 @@ plugin's Agentfile, and says why, when the plugin would:
   depends on the order the folders first reached it, so the plugin's copy
   could replace the shared one. A name with non-ASCII letters cannot be
   compared, so it is refused too.
-- **Ship a skill that a `skills:` entry asks for.** A local `sources:`
-  folder holds a skill (a `SKILL.md` at any depth) with that name. agentbrew
-  installs a `skills:` name that has no catalog entry (a built-in skill) by
-  searching every source, and a local source ranks before the built-in.
-  A remote source cannot be read before the sync, so this rule does not
-  cover it.
+- **Make a local skill copy match a `skills:` entry.** A local `sources:`
+  folder (of this plugin or an earlier one) holds a skill (`SKILL.md`,
+  `skill.md`, or `DESIGN.md`, by folder name or front matter `name:`) that a
+  `skills:` entry asks for, and it did not match before this plugin.
+  agentbrew installs a `skills:` name that has no catalog entry (a built-in
+  skill) by searching every source, and a local source ranks before the
+  built-in. A name only the plugin asks for counts when it is an agentbrew
+  built-in, because agentbrew installs no other unknown name. A remote
+  source cannot be read before the sync, so this rule does not cover it.
 
 Without `agentfile merge` (older agentbrew), a stricter rule is read from
 the files: any `hooks:`, `excludeAgents:`, or `recommended: true`, a file

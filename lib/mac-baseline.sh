@@ -4,14 +4,57 @@
 # Sourced by bin/dotfiles-install (plan) and bin/dotfiles-metrics (--baseline),
 # so both print the same lines. Functions only; no state.
 
-# Median wall time of `zsh -i -c exit` in ms over N runs (default 3, so plan
-# stays fast). /usr/bin/time has 10 ms resolution; that is enough here.
+# Median wall time of an interactive zsh start in ms over N runs (default 3,
+# so plan stays fast). It times `zsh -i -c 'exit 0'`: a plain `exit` returns
+# the status of the last startup line (macOS's /etc/zshrc ends with a test
+# that is false outside Terminal.app), so only "zsh could not run or
+# crashed" makes a run fail, and only runs that exit 0 count.
 baseline_zsh_ms() {
   local runs="${1:-3}" i
   command -v zsh >/dev/null 2>&1 || return 1
   for ((i = 0; i < runs; i++)); do
-    /usr/bin/time -p zsh -i -c exit 2>&1 >/dev/null </dev/null | awk '/^real/ { print int($2 * 1000) }'
+    _baseline_run_ms zsh -i -c 'exit 0'
   done | sort -n | awk '{ v[NR] = $1 } END { if (NR) print v[int((NR + 1) / 2)]; else exit 1 }'
+}
+
+# _baseline_run_ms <command...>: the wall time of one run in whole ms,
+# rounded up, or nothing when the command fails. A run that finished took
+# more than 0 ms, so the result is at least 1: a fresh zsh can start in
+# under 10 ms, which /usr/bin/time (10 ms steps) printed as 0. perl's
+# Time::HiRes measures in microseconds; macOS's /usr/bin/perl comes first
+# (DOTFILES_BASELINE_PERL names another; set it empty for no perl), run
+# without PERL5LIB or PERL5OPT so another perl's modules cannot break it.
+# perl prints the number, or "fail" when the command failed, and exits 0;
+# any other exit means perl itself could not do it, and /usr/bin/time is
+# used instead (its number rounded up the same way, read with a decimal
+# point or comma). Always returns 0, so a `set -e` caller is never stopped
+# by one failed run.
+_baseline_run_ms() {
+  local perl rc=0 out real
+  if [ -n "${DOTFILES_BASELINE_PERL+set}" ]; then perl="$DOTFILES_BASELINE_PERL"
+  elif [ -x /usr/bin/perl ]; then perl=/usr/bin/perl
+  else perl="$(command -v perl 2>/dev/null || true)"
+  fi
+  if [ -n "$perl" ]; then
+    # shellcheck disable=SC2016 # perl code, not shell
+    out="$(env -u PERL5LIB -u PERL5OPT "$perl" -MTime::HiRes=time -e '
+      open(my $out, ">&", \*STDOUT) or exit 3;
+      open(STDOUT, ">", "/dev/null"); open(STDERR, ">", "/dev/null");
+      my $t = time; my $status = system(@ARGV); my $ms = (time - $t) * 1000;
+      if ($status != 0) { print $out "fail\n"; exit 0; }
+      my $c = int($ms); $c++ if $ms > $c; $c = 1 if $c < 1;
+      print $out "$c\n";' "$@" </dev/null 2>/dev/null)" || rc=$?
+    if [ "$rc" = 0 ]; then
+      case "$out" in
+        fail) return 0 ;;
+        *[!0-9]* | "") ;;  # not a number: use the fallback
+        *) printf '%s\n' "$out"; return 0 ;;
+      esac
+    fi
+  fi
+  real="$({ /usr/bin/time -p sh -c '"$@" >/dev/null 2>&1 </dev/null' _ "$@"; } 2>&1 >/dev/null)" || return 0
+  printf '%s\n' "$real" | LC_ALL=C awk '/^real/ { sub(/,/, ".", $2); ms = $2 * 1000; c = int(ms); if (ms > c) c++; if (c < 1) c = 1; print c }'
+  return 0
 }
 
 # Free space on the volume that holds $HOME, in GB with one decimal.

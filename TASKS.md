@@ -72,20 +72,6 @@ them. -->
   - **Anchor**: PR for plugin-exclude-agents-hooks, 2026-10-22; Saltzer and Schroeder 1975 (fail-safe defaults).
   - **Competitive-goal**: none — plugin trust boundary, not a scorecard metric.
 
-- [ ] Fix the US01 install e2e flake: `before.zsh_ms` can be 0 on a quiet Mac
-  - **ID**: e2e-zsh-ms-zero-flake
-  - **Tags**: tests, flaky
-  - **Details**: On 2026-10-22 `make check` failed once in `tests/e2e/dotfiles-install-e2e.bats:46` (`jq -e '.before.zsh_ms > 0 and …'` printed false) and passed on the rerun. `baseline_zsh_ms` (`lib/mac-baseline.sh`) times `zsh -i -c exit` with `/usr/bin/time -p`, which has 10 ms steps. In the e2e scratch HOME, zsh starts in under 10 ms when the Mac is quiet (`real 0.00` in 1 of 3 runs at load 5), so the median can be 0.
-  - **Files**: `lib/mac-baseline.sh`, `tests/e2e/dotfiles-install-e2e.bats`
-  - **Output**: code
-  - **Acceptance**: the US01 e2e passes 20 times in a row on a quiet Mac.
-  - **Hypothesis**: a finer timer (or a floor of 1 ms for a run that finished) drops the US01 e2e failure rate on a quiet Mac from about 1 in 3 runs to 0 in 20.
-  - **Measurement**: `for i in $(seq 20); do bats -f 'US01 e2e: a fresh install' tests/e2e/dotfiles-install-e2e.bats || echo FAIL; done | grep -c FAIL` on a quiet Mac.
-  - **Success**: 0 failures in 20 runs.
-  - **Pivot**: if a finer timer is not portable, assert that `zsh_ms` is a number (`>= 0`) instead of `> 0`.
-  - **Anchor**: the 2026-10-22 gate run of the #281-lows PR; Luo et al. 2014, "An Empirical Analysis of Flaky Tests" (timing-dependent flakes).
-  - **Competitive-goal**: none — gate stability, not a scorecard metric.
-
 - [ ] Report an installed agent that agentbrew no longer syncs after an old `excludeAgents:`
   - **ID**: agent-detected-stale
   - **Tags**: agents, doctor
@@ -99,6 +85,20 @@ them. -->
   - **Pivot**: if agentbrew starts detecting on each apply, close this task with that PR.
   - **Anchor**: review of the plugin shared-layer PR, 2026-10-22.
   - **Competitive-goal**: none — agent sync correctness, not a scorecard metric.
+
+- [ ] Decide what the install's "zsh starts cleanly" check means
+  - **ID**: install-zsh-verify-exit-status
+  - **Tags**: install, tests
+  - **Details**: `bin/dotfiles-install` verifies with `zsh -i -c exit >/dev/null 2>&1 || critical "verification (zsh does not start cleanly)"`. A plain `exit` returns the status of the last startup line, so the check fails on a working zsh whose last line is a false test, for example macOS's `/etc/zshrc` outside Terminal.app (`[ -r "/etc/zshrc_$TERM_PROGRAM" ] && …`) or an install line that returns 1. The review of the e2e-zsh-ms-zero-flake PR (2026-10-22) found the same issue in the zsh timing, fixed there by timing `zsh -i -c 'exit 0'`. Decide: check that zsh runs (`'exit 0'`), or keep "the last line succeeded" and say so in the message, or check for startup errors on stderr instead.
+  - **Files**: `bin/dotfiles-install`, `tests/dotfiles-install.bats`
+  - **Output**: code
+  - **Acceptance**: a bats case with a working zsh whose `.zshrc` ends with `false` passes the verification step, and a zsh that cannot run still fails it.
+  - **Hypothesis**: false "zsh does not start cleanly" verdicts on a working zsh drop to 0.
+  - **Measurement**: the bats case above.
+  - **Success**: it passes; a broken zsh still fails verification.
+  - **Pivot**: if a startup line that fails should block the install, keep the check and name the failing line in the message.
+  - **Anchor**: review of the e2e-zsh-ms-zero-flake PR, 2026-10-22.
+  - **Competitive-goal**: none — install correctness, not a scorecard metric.
 
 ## P3
 

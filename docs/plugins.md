@@ -229,7 +229,8 @@ plugin's Agentfile, and says why, when the plugin would:
 - **Make a local skill copy match a `skills:` entry.** A local `sources:`
   folder (of this plugin or an earlier one) holds a skill (`SKILL.md`,
   `skill.md`, or `DESIGN.md`, by folder name or front matter `name:`) that a
-  `skills:` entry asks for, and it did not match before this plugin; or a
+  `skills:` entry without a catalog entry asks for, and it did not match
+  before this plugin; or a
   source the plugin adds holds a second copy of such a skill (agentbrew
   would then ask which source to use).
   agentbrew installs a `skills:` name that has no catalog entry (a built-in

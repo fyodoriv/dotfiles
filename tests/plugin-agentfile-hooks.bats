@@ -527,12 +527,26 @@ skills: [agentbrew-status]' skills/agentbrew-status/SKILL.md
   [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
   [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
   # Asked for by the shared layer, found by its front matter name, at any depth.
+  layer "$TEST_DIR/base" 'skills: [agentbrew-status]'
   layer "$TEST_DIR/beta" 'sources: ["./deep"]'
   mkdir -p "$TEST_DIR/beta/deep/a/b/other"
-  printf -- '---\nname: Update-Tooling\n---\nBETA\n' > "$TEST_DIR/beta/deep/a/b/other/SKILL.md"
-  run layers "$REPO_ROOT/Agentfile.yaml" beta="$TEST_DIR/beta/Agentfile.yaml"
+  printf -- '---\nname: Agentbrew-Status\n---\nBETA\n' > "$TEST_DIR/beta/deep/a/b/other/SKILL.md"
+  run layers "$TEST_DIR/base/Agentfile.yaml" beta="$TEST_DIR/beta/Agentfile.yaml"
   echo "$output"
-  [[ "$output" == *"make a local skill copy match a skills: entry"*": update-tooling"* ]]
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
+  # A catalog skill installs from the catalog's source, so a copy is harmless.
+  layer "$TEST_DIR/gamma" 'sources: [./skills]' skills/update-tooling/SKILL.md
+  run layers "$REPO_ROOT/Agentfile.yaml" gamma="$TEST_DIR/gamma/Agentfile.yaml"
+  echo "$output"
+  [ "$output" = "$TEST_DIR/gamma/Agentfile.yaml" ]
+  # Bad UTF-8 on one name: line does not hide the next one.
+  layer "$TEST_DIR/delta" 'sources: [./skills]
+skills: [agentbrew-status]'
+  mkdir -p "$TEST_DIR/delta/skills/zzz"
+  printf -- '---\nname: \377junk\nname: agentbrew-status\n---\n' > "$TEST_DIR/delta/skills/zzz/SKILL.md"
+  run layers "$REPO_ROOT/Agentfile.yaml" delta="$TEST_DIR/delta/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
 }
 
 @test "a skill rule split across two plugins is refused in the later one" {
@@ -631,10 +645,11 @@ skills: [acme-skill]' skills/acme-skill/SKILL.md
   echo "$output"
   [[ "$output" == *"its commands: list has an entry that is not a plain path"* ]]
   # A skill the shared layer asks for.
-  layer "$TEST_DIR/p4" 'sources: [./skills]' skills/update-tooling/SKILL.md
-  AGENTFILE_AGENTBREW_CMD=false run layers "$REPO_ROOT/Agentfile.yaml" p4="$TEST_DIR/p4/Agentfile.yaml"
+  layer "$TEST_DIR/sbase" 'skills: [agentbrew-status]'
+  layer "$TEST_DIR/p4" 'sources: [./skills]' skills/agentbrew-status/SKILL.md
+  AGENTFILE_AGENTBREW_CMD=false run layers "$TEST_DIR/sbase/Agentfile.yaml" p4="$TEST_DIR/p4/Agentfile.yaml"
   echo "$output"
-  [[ "$output" == *"make a local skill copy match a skills: entry"*": update-tooling"* ]]
+  [[ "$output" == *"make a local skill copy match a skills: entry"*": agentbrew-status"* ]]
 }
 
 @test "doctor: the plugin check names the plugin and the shared command" {

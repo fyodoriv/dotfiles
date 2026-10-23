@@ -356,7 +356,8 @@ _agentfile_plugin_raw_reasons() {
   done
   _agentfile_skill_reason "$requested" "$sources" \
     "$requested$(_agentfile_file_skills "$file")" "$sources$(_agentfile_file_sources "$file")" "" \
-    "$(_agentfile_file_sources "$file")"
+    "$(LC_ALL=C comm -13 <(printf '%s\n' "$sources" | awk 'NF' | LC_ALL=C sort -u) \
+      <(_agentfile_file_sources "$file" | LC_ALL=C sort -u))"
   [ -f "$base" ] || return 0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
@@ -435,7 +436,10 @@ _agentfile_names() {
 _agentfile_front_name() {
   # shellcheck disable=SC2016 # perl code, not shell
   # JavaScript's \s and trim() also cover these Unicode spaces.
-  env -u PERL5LIB -u PERL5OPT perl -CSD -0777 -ne '
+  # Bad UTF-8 bytes become U+FFFD, as when Node reads the file.
+  env -u PERL5LIB -u PERL5OPT perl -MEncode -0777 -ne '
+    binmode STDOUT, ":encoding(UTF-8)";
+    $_ = Encode::decode("UTF-8", $_);
     my $w = qr/[\s\x{A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]/;
     s/\r\n/\n/g;
     exit unless /\A---$w*\n([\s\S]*?)\n---/;
@@ -461,12 +465,18 @@ _agentfile_front_name() {
 # (any name, when the built-ins cannot be found): agentbrew installs no
 # other unknown name. Remote sources cannot be read before the sync.
 _agentfile_skill_reason() {
-  local earlier asked builtins clashes
+  local earlier asked builtins catalog clashes
   earlier="$(_agentfile_lower "$1")"
   asked="$(LC_ALL=C comm -13 <(printf '%s\n' "$earlier") <(_agentfile_lower "$3"))"
   if [ -n "$asked" ] && builtins="$(_agentfile_builtin_skills "$5")"; then
     asked="$(LC_ALL=C comm -12 <(printf '%s\n' "$asked") <(printf '%s\n' "$builtins"))"
   fi
+  # A catalog name installs from the catalog's own source, never by a search.
+  if catalog="$(_agentfile_catalog_skills "$5")"; then
+    earlier="$(LC_ALL=C comm -23 <(printf '%s\n' "$earlier") <(printf '%s\n' "$catalog") | awk 'NF')"
+    asked="$(LC_ALL=C comm -23 <(printf '%s\n' "$asked") <(printf '%s\n' "$catalog") | awk 'NF')"
+  fi
+  [ -n "$earlier$asked" ] || return 0
   # New matches, plus any copy in a source the plugin adds: a second copy
   # makes agentbrew ask "from which source?", listing the plugin's.
   clashes="$( {
@@ -491,7 +501,27 @@ _agentfile_lower() {
 # found (AGENTBREW_DIR, the command's dist/cli.js or the agentbrew it runs
 # from PATH, then the checkout).
 _agentfile_builtin_skills() {
-  local dir="${AGENTBREW_DIR:-}" d cmd="${1#node }" bin
+  local dir d
+  dir="$(_agentfile_agentbrew_dir "$1")" || return 1
+  for d in "$dir"/skill-plugins/dev/*/; do
+    [ -d "$d" ] && basename "$d"
+  done | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C sort -u
+}
+
+# _agentfile_catalog_skills <agentbrew command>: the skill names in
+# agentbrew's catalog (src/catalog.yaml), lowercased; fails when it is not
+# found.
+_agentfile_catalog_skills() {
+  local dir
+  dir="$(_agentfile_agentbrew_dir "$1")" && [ -f "$dir/src/catalog.yaml" ] || return 1
+  yq -r '(.skills // [])[] | .name' "$dir/src/catalog.yaml" 2>/dev/null | LC_ALL=C tr '[:upper:]' '[:lower:]' | awk 'NF' | LC_ALL=C sort -u
+}
+
+# _agentfile_agentbrew_dir <agentbrew command>: agentbrew's folder (the one
+# with skill-plugins/dev): AGENTBREW_DIR, the command's dist/cli.js or the
+# agentbrew it runs from PATH, then the checkout; fails when none is found.
+_agentfile_agentbrew_dir() {
+  local dir="${AGENTBREW_DIR:-}" cmd="${1#node }" bin
   if [ -z "$dir" ]; then
     case "$cmd" in
       */dist/cli.js) dir="${cmd%/dist/cli.js}" ;;
@@ -508,9 +538,7 @@ _agentfile_builtin_skills() {
     source "${BASH_SOURCE[0]%/*}/agentbrew-locate.sh" 2>/dev/null && dir="$(agentbrew_locate 2>/dev/null)" || return 1
   fi
   [ -d "$dir/skill-plugins/dev" ] || return 1
-  for d in "$dir"/skill-plugins/dev/*/; do
-    [ -d "$d" ] && basename "$d"
-  done | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C sort -u
+  printf '%s\n' "$dir"
 }
 
 # _agentfile_skill_names <folders> (one per line): every name agentbrew can

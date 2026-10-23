@@ -24,11 +24,29 @@ launchagent_loaded_args() {
   printf '%s\n' "$args"
 }
 
+# launchagent_plist_env <plist>: its EnvironmentVariables as "KEY => VALUE"
+# lines, sorted (needs jq; fails without it).
+launchagent_plist_env() {
+  command -v jq >/dev/null 2>&1 || return 1
+  /usr/bin/plutil -convert json -o - "$1" 2>/dev/null |
+    jq -r '(.EnvironmentVariables // {}) | to_entries[] | "\(.key) => \(.value)"' | LC_ALL=C sort
+}
+
+# launchagent_loaded_env <print output>: the "environment = { ... }" lines.
+launchagent_loaded_env() {
+  awk '/^\tenvironment = \{$/ { inside = 1; next } inside && /^\t\}$/ { exit } inside { sub(/^\t\t/, ""); print }' <<< "$1" | LC_ALL=C sort
+}
+
 # launchagent_running_unchanged <domain> <label> <plist>: succeeds when the
-# job is loaded, running, and runs exactly its plist's arguments.
+# job is loaded, running, runs exactly its plist's arguments, and has each
+# of its plist's environment variables (launchd adds its own, so the plist's
+# are a subset). When the environment cannot be compared, it fails, so the
+# caller reloads.
 launchagent_running_unchanged() {
-  local out
+  local out want
   out="$("${LAUNCHCTL:-launchctl}" print "$1/$2" 2>/dev/null)" || return 1
   [ "$(sed -n 's/^\tstate = //p' <<< "$out" | head -n 1)" = running ] || return 1
-  [ "$(launchagent_loaded_args "$out")" = "$(launchagent_plist_args "$3")" ]
+  [ "$(launchagent_loaded_args "$out")" = "$(launchagent_plist_args "$3")" ] || return 1
+  want="$(launchagent_plist_env "$3")" || return 1
+  [ -z "$want" ] || [ -z "$(LC_ALL=C comm -23 <(printf '%s\n' "$want") <(launchagent_loaded_env "$out"))" ]
 }

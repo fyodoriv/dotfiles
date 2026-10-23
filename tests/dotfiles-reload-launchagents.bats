@@ -203,11 +203,13 @@ _running_chrome() {
   /usr/bin/plutil -insert ProgramArguments -array "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
   /usr/bin/plutil -insert ProgramArguments.0 -string /x/chrome "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
   /usr/bin/plutil -insert ProgramArguments.1 -string --remote-debugging-port=9223 "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  /usr/bin/plutil -insert EnvironmentVariables -dictionary "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  /usr/bin/plutil -insert EnvironmentVariables.LANG -string "${PLIST_LANG:-C.UTF-8}" "$TEST_HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
   cat > "$STUB_DIR/launchctl" << STUB
 #!/bin/bash
 echo "launchctl \$*" >> "$TEST_DIR/launchctl.log"
 if [ "\$1" = print ] && [ "\${2##*/}" = com.dotfiles.agent-browser-chrome ]; then
-  printf 'x = {\n\tstate = running\n\targuments = {\n\t\t/x/chrome\n\t\t--remote-debugging-port=$loaded_port\n\t}\n}\n'
+  printf 'x = {\n\tstate = running\n\targuments = {\n\t\t/x/chrome\n\t\t--remote-debugging-port=$loaded_port\n\t}\n\tenvironment = {\n\t\tLANG => C.UTF-8\n\t\tXPC_SERVICE_NAME => x\n\t}\n}\n'
 fi
 exit 0
 STUB
@@ -235,6 +237,13 @@ STUB
 @test "--kill-chrome restarts the agent Chrome even when unchanged" {
   _running_chrome 9223
   run bash "$RELOAD_CMD" --kill-chrome
+  [ "$status" -eq 0 ]
+  grep -q 'bootout gui/[0-9]*/com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
+}
+
+@test "a running agent Chrome whose plist environment changed is reloaded" {
+  PLIST_LANG=en_US.UTF-8 _running_chrome 9223
+  run bash "$RELOAD_CMD"
   [ "$status" -eq 0 ]
   grep -q 'bootout gui/[0-9]*/com.dotfiles.agent-browser-chrome' "$TEST_DIR/launchctl.log"
 }

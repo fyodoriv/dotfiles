@@ -18,11 +18,14 @@ setup() {
   cat > "$TEST_DIR/bin/launchctl" <<EOF2
 #!/bin/bash
 echo "\$*" >> "$TEST_DIR/calls"
-if [ "\$1" = print ]; then
-  f="$TEST_DIR/print/\${2##*/}"
-  [ -f "\$f" ] || exit 113
-  cat "\$f"
-fi
+case "\$1" in
+  print)
+    f="$TEST_DIR/print/\${2##*/}"
+    [ -f "\$f" ] || exit 113
+    cat "\$f" ;;
+  print-disabled) cat "$TEST_DIR/disabled" 2>/dev/null ;;
+  bootout) rm -f "$TEST_DIR/print/\${2##*/}" ;;
+esac
 exit 0
 EOF2
   chmod +x "$TEST_DIR/bin/launchctl"
@@ -107,4 +110,33 @@ loaded() {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
   [[ "$output" != *"com.other.e"* ]]
+}
+
+@test "a disabled job that is not loaded is off on purpose: no line, and --fix leaves it" {
+  plist com.dotfiles.dotfiles-upgrade true /bin/bash /x/u.sh
+  printf 'disabled services = {\n\t"com.dotfiles.dotfiles-upgrade" => disabled\n}\n' > "$TEST_DIR/disabled"
+  run env PATH="/usr/bin:/bin:$TEST_DIR/bin" bash "$SCRIPT" --fix
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *dotfiles-upgrade* ]]
+  ! grep -q '^bootstrap' "$TEST_DIR/calls"
+}
+
+@test "in endpoint safe mode --fix only reports" {
+  plist com.dotfiles.d true /bin/bash /x/d.sh
+  mkdir -p "$HOME/.local/state/dotfiles" && touch "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked"
+  run "$SCRIPT" --fix
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"endpoint safe mode: --fix only reports"* ]]
+  [[ "$output" == *"unloaded com.dotfiles.d"* ]]
+  ! grep -q '^bootstrap' "$TEST_DIR/calls"
+}
+
+@test "a job with only Program is compared by its program line" {
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict><key>Label</key><string>com.dotfiles.p</string><key>Program</key><string>/x/p</string></dict></plist>\n' > "$AGENTS/com.dotfiles.p.plist"
+  printf 'gui/501/com.dotfiles.p = {\n\tstate = running\n\tprogram = /x/p\n}\n' > "$TEST_DIR/print/com.dotfiles.p"
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok com.dotfiles.p"* ]]
 }

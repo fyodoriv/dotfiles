@@ -18,7 +18,7 @@
 #   --agentbrew-flags "..." Flags passed to agentbrew's installer (for example "--no-auto-repair")
 #   --tool URL              Also install another tool repo after agentbrew: a read-only
 #                           clone (push URL DISABLED), then its scripts/install.sh run --yes.
-#                           Repeatable; DOTFILES_INSTALL_EXTRA_REPOS adds URLs too.
+#                           Repeatable.
 #   --tool-flags "..."      Flags for the installer of the last --tool (for example "--plugin acme")
 #   --tools-dir DIR         Where to clone --tool repos (default: next to this repo)
 #   --yes                   Required: confirms the user agreed to the plan
@@ -375,13 +375,17 @@ cmd_run() {
     say "  skipped (you chose not to install agentbrew)"
   fi
 
-  # Extra tool repos (--tool, DOTFILES_INSTALL_EXTRA_REPOS): same hand-off.
-  for url in ${DOTFILES_INSTALL_EXTRA_REPOS:-}; do tool_urls+=("$url"); tool_flags+=(""); done
+  # Extra tool repos (--tool): the same hand-off as agentbrew.
   for ((i = 0; i < ${#tool_urls[@]}; i++)); do
     url="${tool_urls[$i]}"
     [ -n "$url" ] || continue
     tool_dir="${tools_dir:-$(dirname "$REPO_DIR")}/$(basename "${url%.git}")"
     step "Extra tool: $(basename "$tool_dir")"
+    # A folder of that name from another repo (agentbrew, say) is not this tool.
+    if [ -d "$tool_dir/.git" ] && [ "$(git -C "$tool_dir" remote get-url origin 2>/dev/null)" != "$url" ]; then
+      say "  ! $tool_dir is a clone of another repo; skipped (use --tools-dir to pick another folder)."
+      continue
+    fi
     if ! clone_readonly "$url" "$tool_dir"; then
       say "  ! Could not clone $url; install it later by hand. dotfiles is installed."
       continue

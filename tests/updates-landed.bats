@@ -42,3 +42,13 @@ teardown() { rm -rf "$TEST_DIR"; }
   grep -q 'updates_landed_record tooling-sync' "$BATS_TEST_DIRNAME/../bin/tooling-sync"
   grep -q 'updates_landed_record dotfiles-upgrade' "$BATS_TEST_DIRNAME/../bin/dotfiles-upgrade"
 }
+
+@test "the nudge still works after the record is trimmed (more than 200 updates)" {
+  bash -c 'source "$1"; for i in $(seq 205); do updates_landed_record tooling-sync "x $i"; done' _ "$LIB"
+  run "$CLI" --ack
+  sleep 1
+  bash -c 'source "$1"; updates_landed_record dotfiles-upgrade "software upgraded"' _ "$LIB"
+  run "$CLI" --always
+  echo "$output"
+  [[ "$output" == *"1 update(s) landed"*"dotfiles-upgrade"* ]]
+}

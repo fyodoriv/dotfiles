@@ -377,3 +377,18 @@ make_tool_repo() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"agentbrew report"* ]]
 }
+
+@test "a --tool whose folder holds another repo is skipped, not run" {
+  make_tool_repo agentbrew
+  mkdir -p "$TEST_DIR/tools"
+  git clone -q "$TEST_DIR/agentbrew.git" "$TEST_DIR/tools/agentbrew"
+  make_tool_repo other
+  mv "$TEST_DIR/other.git" "$TEST_DIR/elsewhere-agentbrew.git" 2>/dev/null || true
+  mkdir -p "$TEST_DIR/x" && mv "$TEST_DIR/elsewhere-agentbrew.git" "$TEST_DIR/x/agentbrew.git"
+  run env GIT_CONFIG_GLOBAL=/dev/null bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew \
+    --tools-dir "$TEST_DIR/tools" --tool "$TEST_DIR/x/agentbrew.git"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"is a clone of another repo; skipped"* ]]
+  ! grep -q 'agentbrew-install' "$LOG"
+}

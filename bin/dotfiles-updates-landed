@@ -16,23 +16,22 @@ file="$(updates_landed_file)"
 ack="$file.ack"
 shown="$file.shown"
 
+# The ack holds the time of the newest line seen; lines after it are new.
+# (A line count would break once the record is trimmed to 100 lines.)
 if [ "${1:-}" = --ack ]; then
   mkdir -p "$(dirname "$ack")"
-  if [ -f "$file" ]; then wc -l < "$file" | tr -d ' ' > "$ack"; else echo 0 > "$ack"; fi
+  if [ -f "$file" ]; then tail -n 1 "$file" | cut -f1 > "$ack"; else : > "$ack"; fi
   exit 0
 fi
 
 [ -f "$file" ] || exit 0
-total="$(wc -l < "$file" | tr -d ' ')"
-seen="$(cat "$ack" 2>/dev/null || echo 0)"
-case "$seen" in '' | *[!0-9]*) seen=0 ;; esac
-# The record keeps the newest 100 lines, so an old ack can exceed the count.
-[ "$seen" -le "$total" ] || seen=0
-new=$((total - seen))
-[ "$new" -gt 0 ] || exit 0
+since="$(cat "$ack" 2>/dev/null || true)"
+newlines="$(awk -F '\t' -v since="$since" '$1 > since' "$file")"
+[ -n "$newlines" ] || exit 0
+new="$(printf '%s\n' "$newlines" | grep -c .)"
 today="$(date +%Y-%m-%d)"
 if [ "${1:-}" != --always ] && [ "$(cat "$shown" 2>/dev/null)" = "$today" ]; then exit 0; fi
-sources="$(tail -n "$new" "$file" | cut -f2 | sort -u | paste -sd ',' - | sed 's/,/, /g')"
+sources="$(printf '%s\n' "$newlines" | cut -f2 | sort -u | paste -sd ',' - | sed 's/,/, /g')"
 echo "$new update(s) landed since the last checkup ($sources): run the tooling-checkup to see what changed."
 [ "${1:-}" = --always ] || printf '%s\n' "$today" > "$shown"
 exit 0

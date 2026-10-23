@@ -36,7 +36,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 }
 
 @test "make check times every gate step and the total" {
-  for step in total lint lint-tasks test e2e; do
+  for step in total lint lint-tasks test plugins-bash32 e2e; do
     grep -qE "gate-timed.sh $step " "$REPO_ROOT/Makefile" || { echo "untimed step: $step"; return 1; }
   done
 }

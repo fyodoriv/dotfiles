@@ -220,6 +220,16 @@ PROCS
   ! grep -q "Managed Chrome process count stays at one per port" "$FAIL_MESSAGES"
 }
 
+@test "agent-browser: remote-debugging process-count does not count the quit relay (#298)" {
+  REMOTE_DEBUGGING_COMMANDS="$(cat <<'PROCS'
+/bin/bash /Users/x/apps/tooling/dotfiles/bin/dotfiles-quit-relay /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9223 --headless=new
+/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9223 --headless=new
+PROCS
+)"
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  ! grep -q "Managed Chrome process count stays at one per port" "$FAIL_MESSAGES"
+}
+
 @test "agent-browser: remote-debugging process-count ignores headed SSO sessions" {
   REMOTE_DEBUGGING_COMMANDS="$(cat <<'PROCS'
 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9223

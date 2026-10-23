@@ -4,8 +4,9 @@
 # the restart stopped with "Google Chrome failed to quit". The relay runs
 # Chrome in the background and starts lib/quit-watcher.swift (compiled once,
 # cached by source hash), an accessory app that macOS does ask to quit. On its
-# SIGUSR1 (or a SIGTERM from launchctl), the relay sends SIGTERM to Chrome and
-# exits 0, so KeepAlive SuccessfulExit=false does not start it again.
+# SIGUSR1 (or a SIGTERM from launchctl), the relay sends SIGTERM to Chrome,
+# then SIGKILL after DOTFILES_QUIT_GRACE seconds (default 10) if it is still
+# running, and exits 0.
 #
 # Usage: dotfiles-quit-relay <chrome binary> [chrome args...]
 #
@@ -54,15 +55,29 @@ stop_watcher() {
 # shellcheck disable=SC2329 # run by the trap below
 quit() {
   trap '' USR1 TERM HUP INT
-  [ -n "$chrome_pid" ] && kill -TERM "$chrome_pid" 2>/dev/null
-  [ -n "$chrome_pid" ] && wait "$chrome_pid" 2>/dev/null
+  local i grace="${DOTFILES_QUIT_GRACE:-10}"
+  case "$grace" in '' | *[!0-9]*) grace=10 ;; esac
+  if [ -n "$chrome_pid" ]; then
+    kill -TERM "$chrome_pid" 2>/dev/null
+    # A Chrome that ignores SIGTERM would block the restart again.
+    for ((i = 0; i < grace * 10; i++)); do
+      kill -0 "$chrome_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -0 "$chrome_pid" 2>/dev/null && kill -KILL "$chrome_pid" 2>/dev/null
+    wait "$chrome_pid" 2>/dev/null
+  fi
   stop_watcher
   exit 0
 }
-trap quit USR1 TERM HUP INT
-
+# Signals wait until Chrome's PID is known, so a quit request cannot leave
+# Chrome running; a request that came in meanwhile runs right after.
+pending=""
+trap 'pending=1' USR1 TERM HUP INT
 "$@" &
 chrome_pid=$!
+trap quit USR1 TERM HUP INT
+[ -z "$pending" ] || quit
 
 if watcher="$(watcher_bin)"; then
   "$watcher" "$$" &

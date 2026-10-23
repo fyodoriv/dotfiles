@@ -101,3 +101,14 @@ start_relay() {
   command -v swiftc >/dev/null 2>&1 || skip "swiftc not installed"
   swiftc -typecheck "$BATS_TEST_DIRNAME/../lib/quit-watcher.swift"
 }
+
+@test "a Chrome that ignores SIGTERM is killed after the grace time, so it cannot block the restart" {
+  printf '#!/bin/bash\necho $$ > "%s/chrome.pid"\ntrap "" TERM\nwhile :; do sleep 0.1; done\n' "$TEST_DIR" > "$TEST_DIR/bin/fake-chrome"
+  DOTFILES_QUIT_GRACE=1 start_relay
+  SECONDS=0
+  kill -USR1 "$(cat "$TEST_DIR/relay.pid")"
+  rc=0; wait "$(cat "$TEST_DIR/relay.pid")" || rc=$?
+  [ "$rc" -eq 0 ]
+  [ "$SECONDS" -lt 5 ]
+  ! kill -0 "$(cat "$TEST_DIR/chrome.pid")" 2>/dev/null
+}

@@ -48,7 +48,7 @@ check "agent-browser.no_stray_newtab_targets" "managed Chromes expose no stray b
   ""
 
 check "agent-browser.remote_debugging_process_count" "Managed Chrome process count stays at one per port" \
-  "ok=1; for port in 9223; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
+  "ok=1; for port in 9223; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" && \$0 !~ \"dotfiles-quit-relay\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
   ""
 
 check "agent-browser.profile_preflight_guard" "zshrc.ai-tools guards launchd-owned AGENT_BROWSER_PROFILE" \

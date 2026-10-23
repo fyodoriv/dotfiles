@@ -275,7 +275,8 @@ last plugin in lock order wins. Lists: union.
 | Option | Effect |
 |---|---|
 | `chrome.purpose_headed` | The purpose Chrome LaunchAgent runs without `--headless=new`. |
-| `chrome.dock_guard` | Default `true`. `false` with `chrome.purpose_headed: true` removes `com.dotfiles.chrome-dock-guard` on apply and skips its doctor check. A headless purpose Chrome always keeps the guard. |
+| `chrome.dock_guard` | Default `true`. `false` with `chrome.purpose_headed: true` removes `com.dotfiles.chrome-dock-guard` on apply and skips its doctor checks (the agent-browser one and the workflow `agent.chrome-dock-guard` one, so `--fix` never loads it again). A headless purpose Chrome always keeps the guard. |
+| `chrome.keep_blank_window` | Default `false`. `true` keeps one blank page open in the agent Chrome on purpose (a headed Chrome to watch and sign in): `agent-browser-reap-strays --keep-one` and the stray-target doctor check leave that one alone. |
 | `chrome.restore_session` | It starts with `--restore-last-session`. |
 | `spotlight.exclude_worktrees` | Default true. False skips the agent-worktree Spotlight check. |
 | `mas.skip_ids` | `dotfiles-mas-upgrade` never upgrades these App Store ids. |

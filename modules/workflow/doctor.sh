@@ -26,6 +26,20 @@ for plist in "$HOME"/Library/LaunchAgents/com.dotfiles.*.plist; do
   agent_test="launchctl list 2>/dev/null | grep -q '$name'"
   agent_fix="launchctl load \"\$HOME/Library/LaunchAgents/$name.plist\" 2>/dev/null"
 
+  # Core option chrome.dock_guard false (with a headed purpose Chrome) turns
+  # the Dock guard off on purpose; checking and reloading it would fight the
+  # overlay that turned it off (#300).
+  if [ "$short" = "chrome-dock-guard" ] && [ -f "$DOTFILES_DIR/lib/chrome-purpose-options.sh" ]; then
+    # shellcheck source=../../lib/chrome-purpose-options.sh
+    source "$DOTFILES_DIR/lib/chrome-purpose-options.sh"
+    _wf_opt() { if declare -F plugin_option >/dev/null; then plugin_option "$1" 2>/dev/null || echo "$2"; else echo "$2"; fi; }
+    if ! chrome_dock_guard_enabled "${DOTFILES_CHROME_DOCK_GUARD:-$(_wf_opt chrome.dock_guard true)}" \
+      "${DOTFILES_CHROME_PURPOSE_HEADED:-$(_wf_opt chrome.purpose_headed false)}"; then
+      $LIST_MODE || skipped "chrome-dock-guard agent off on purpose (core option chrome.dock_guard)"
+      continue
+    fi
+  fi
+
   # Endpoint policy intentionally unloads this Node-backed job while the
   # Node.js Foundation publisher remains blocked. Report that safe mode as a
   # skip instead of treating the expected unloaded state as drift.

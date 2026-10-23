@@ -230,6 +230,24 @@ PROCS
   ! grep -q "Managed Chrome process count stays at one per port" "$FAIL_MESSAGES"
 }
 
+@test "agent-browser: remote-debugging process-count counts only Chrome itself, not a launcher in front of it (#300)" {
+  REMOTE_DEBUGGING_COMMANDS="$(cat <<'PROCS'
+/bin/bash /Users/x/apps/acme/bin/chrome-launch /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9223
+/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9223
+PROCS
+)"
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  ! grep -q "Managed Chrome process count stays at one per port" "$FAIL_MESSAGES"
+}
+
+@test "agent-browser: chrome.keep_blank_window passes --keep-one to the stray-target check (#300)" {
+  export DOTFILES_CHROME_KEEP_BLANK_WINDOW=true
+  CHECK_CMDS="$TEST_DIR/check-cmds"
+  check() { printf '%s\t%s\n' "$1" "$3" >> "$CHECK_CMDS"; }
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -q $'^agent-browser.no_stray_newtab_targets\t.*--keep-one' "$CHECK_CMDS"
+}
+
 @test "agent-browser: remote-debugging process-count ignores headed SSO sessions" {
   REMOTE_DEBUGGING_COMMANDS="$(cat <<'PROCS'
 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9223

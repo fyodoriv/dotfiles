@@ -3,12 +3,15 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: agent-browser-reap-strays [--dry-run] [--quiet] [--port PORT ...]
+Usage: agent-browser-reap-strays [--dry-run] [--quiet] [--keep-one] [--port PORT ...]
+  --keep-one  leave one blank page per port open (core option
+              chrome.keep_blank_window: a headed agent Chrome kept visible)
 EOF
 }
 
 dry_run=false
 quiet=false
+keep_one=false
 ports=()
 
 while [ "$#" -gt 0 ]; do
@@ -19,6 +22,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --quiet)
       quiet=true
+      shift
+      ;;
+    --keep-one)
+      keep_one=true
       shift
       ;;
     --port)
@@ -61,6 +68,10 @@ for port in "${ports[@]}"; do
     '
   )
 
+  # The first blank page stays when it is kept on purpose.
+  if $keep_one && [ "${#target_ids[@]}" -gt 0 ]; then
+    target_ids=("${target_ids[@]:1}")
+  fi
   count="${#target_ids[@]}"
   total=$((total + count))
 
@@ -73,7 +84,7 @@ for port in "${ports[@]}"; do
     continue
   fi
 
-  for target_id in "${target_ids[@]}"; do
+  for target_id in ${target_ids[@]+"${target_ids[@]}"}; do
     curl -sf --max-time "${AGENT_BROWSER_CDP_PROBE_TIMEOUT:-2}" \
       "http://127.0.0.1:${port}/json/close/${target_id}" >/dev/null
   done

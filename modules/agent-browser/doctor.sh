@@ -43,12 +43,22 @@ check "agent-browser.no_forwarded_launches" "launchd Chrome logs have no forward
   "! { for log in \"\$HOME/.local/share/dotfiles/logs/agent-browser-chrome.log\"; do [ ! -f \"\$log\" ] || grep -h 'Opening in existing browser session\\.' \"\$log\"; done; } | grep -q ." \
   "for log in \"\$HOME/.local/share/dotfiles/logs/agent-browser-chrome.log\"; do [ ! -f \"\$log\" ] || { tmp=\"\${log}.tmp.\$\$\"; sed '/Opening in existing browser session\\./d' \"\$log\" > \"\$tmp\" && mv \"\$tmp\" \"\$log\"; }; done"
 
+# Core option chrome.keep_blank_window: an overlay keeps one blank page open
+# in the agent Chrome on purpose (a headed Chrome to watch and sign in), so
+# the stray-target check leaves that one alone (#300).
+_ab_keep_one=""
+if declare -F plugin_option >/dev/null; then
+  [ "${DOTFILES_CHROME_KEEP_BLANK_WINDOW:-$(plugin_option chrome.keep_blank_window 2>/dev/null || echo false)}" = true ] && _ab_keep_one=" --keep-one"
+else
+  [ "${DOTFILES_CHROME_KEEP_BLANK_WINDOW:-false}" = true ] && _ab_keep_one=" --keep-one"
+fi
+
 check "agent-browser.no_stray_newtab_targets" "managed Chromes expose no stray blank/newtab targets" \
-  "[ ! -x \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" ] || \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" --dry-run --quiet" \
+  "[ ! -x \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" ] || \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" --dry-run --quiet$_ab_keep_one" \
   ""
 
 check "agent-browser.remote_debugging_process_count" "Managed Chrome process count stays at one per port" \
-  "ok=1; for port in 9223; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" && \$0 !~ \"dotfiles-quit-relay\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
+  "ok=1; for port in 9223; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"^[^ ]*Google Chrome\\\\.app/Contents/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \
   ""
 
 check "agent-browser.profile_preflight_guard" "zshrc.ai-tools guards launchd-owned AGENT_BROWSER_PROFILE" \

@@ -20,6 +20,10 @@ options:
     type: boolean
     default: true
     description: Run com.dotfiles.chrome-dock-guard. false is honored only with chrome.purpose_headed true; a headless purpose Chrome always keeps the guard.
+  chrome.keep_blank_window:
+    type: boolean
+    default: false
+    description: Keep one blank page open in the agent Chrome on purpose (a headed Chrome to watch and sign in); the stray-target check and agent-browser-reap-strays leave that one alone.
   spotlight.exclude_worktrees:
     type: boolean
     default: true

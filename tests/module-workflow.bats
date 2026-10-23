@@ -211,3 +211,28 @@ PLIST
   local total=$((pass_count + fail_count + skip_count))
   [ "$total" -ge 0 ]
 }
+
+@test "workflow: an overlay that turns the Dock guard off gets no chrome-dock-guard agent check, so --fix never reloads it (#300)" {
+  cp "$BATS_TEST_DIRNAME/../lib/chrome-purpose-options.sh" "$TEST_DOTFILES/lib/"
+  printf '<plist version="1.0"><dict><key>Label</key><string>com.dotfiles.chrome-dock-guard</string></dict></plist>\n' \
+    > "$TEST_HOME/Library/LaunchAgents/com.dotfiles.chrome-dock-guard.plist"
+  CHECKED="$TEST_DIR/checked"
+  check() { printf '%s\n' "$1" >> "$CHECKED"; }
+  skipped() { printf 'SKIP %s\n' "$1" >> "$CHECKED"; }
+  DOTFILES_CHROME_DOCK_GUARD=false DOTFILES_CHROME_PURPOSE_HEADED=true \
+    source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  cat "$CHECKED"
+  ! grep -qx 'agent.chrome-dock-guard' "$CHECKED"
+  grep -q 'SKIP chrome-dock-guard agent off on purpose' "$CHECKED"
+  grep -qx 'agent.test-agent' "$CHECKED"
+}
+
+@test "workflow: with the Dock guard on, its agent is checked as before" {
+  cp "$BATS_TEST_DIRNAME/../lib/chrome-purpose-options.sh" "$TEST_DOTFILES/lib/"
+  printf '<plist version="1.0"><dict><key>Label</key><string>com.dotfiles.chrome-dock-guard</string></dict></plist>\n' \
+    > "$TEST_HOME/Library/LaunchAgents/com.dotfiles.chrome-dock-guard.plist"
+  CHECKED="$TEST_DIR/checked"
+  check() { printf '%s\n' "$1" >> "$CHECKED"; }
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  grep -qx 'agent.chrome-dock-guard' "$CHECKED"
+}

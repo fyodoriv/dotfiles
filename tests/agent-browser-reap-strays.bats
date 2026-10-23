@@ -80,3 +80,24 @@ JSON
   [[ "$output" == *"9225: skipped (CDP unreachable)"* ]]
   [ ! -e "$TEST_DIR/closed" ]
 }
+
+@test "--keep-one leaves one blank target per port (an overlay's watch window, #300)" {
+  cat > "$TEST_DIR/list-9223.json" <<'JSON'
+[
+  {"id":"blank-1","type":"page","url":"about:blank"},
+  {"id":"real-1","type":"page","url":"https://example.com/"}
+]
+JSON
+  run "$SCRIPT" --dry-run --keep-one
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"9223: 0 stray target(s)"* ]]
+  cat > "$TEST_DIR/list-9223.json" <<'JSON'
+[
+  {"id":"blank-1","type":"page","url":"about:blank"},
+  {"id":"newtab-1","type":"page","url":"chrome://newtab/"}
+]
+JSON
+  run "$SCRIPT" --keep-one
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/closed")" = "9223 newtab-1" ]
+}

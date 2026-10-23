@@ -324,7 +324,9 @@ teardown() { rm -rf "$TEST_DIR"; }
 }
 
 @test "README quick start offers the one sentence for the agent, and INSTALL.md covers every phase" {
-  head -40 "$REPO/README.md" | grep -qF "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md"
+  head -40 "$REPO/README.md" | grep -qF "Install or update dotfiles on this machine by following https://github.com/fyodoriv/dotfiles/blob/HEAD/INSTALL.md"
+  # Exactly one agent prompt (#301).
+  [ "$(grep -c 'dotfiles on this machine by following\|Install dotfiles by following' "$REPO/README.md")" -eq 1 ]
   for text in "dotfiles-install plan" "dotfiles-install run --yes" "dotfiles-install restore" \
     "full context" "restores the backup by itself" "add or update a test" "dotfiles contribute"; do
     grep -qF "$text" "$REPO/INSTALL.md" || { echo "INSTALL.md missing: $text"; return 1; }
@@ -334,4 +336,44 @@ teardown() { rm -rf "$TEST_DIR"; }
     grep -qF -- "$flag" "$REPO/bin/dotfiles-install" || { echo "unknown flag in INSTALL.md: $flag"; return 1; }
   done
   grep -qx 'INSTALL.md' "$REPO/.chezmoiignore"
+}
+
+# A local repo with scripts/install.sh that logs its arguments (no network).
+make_tool_repo() {
+  local src="$TEST_DIR/src-$1"
+  mkdir -p "$src/scripts"
+  printf '#!/bin/bash\necho "%s-install $*" >> "%s"\n' "$1" "$LOG" > "$src/scripts/install.sh"
+  git -C "$src" init -q
+  git -C "$src" add -A
+  git -C "$src" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -qm init
+  git clone -q --bare "$src" "$TEST_DIR/$1.git"
+}
+
+@test "chains an extra tool repo (--tool): a read-only clone, then its installer with --tool-flags (#301)" {
+  make_tool_repo sidetool
+  run env GIT_CONFIG_GLOBAL=/dev/null bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew \
+    --tools-dir "$TEST_DIR/tools" --tool "$TEST_DIR/sidetool.git" --tool-flags "--plugin acme"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ -d "$TEST_DIR/tools/sidetool/.git" ]
+  [ "$(git -C "$TEST_DIR/tools/sidetool" remote get-url --push origin)" = DISABLED ]
+  grep -q 'sidetool-install run --yes --plugin acme' "$LOG"
+}
+
+@test "the agentbrew clone is read-only too (push URL DISABLED)" {
+  make_tool_repo agentbrew
+  run env GIT_CONFIG_GLOBAL=/dev/null DOTFILES_INSTALL_AGENTBREW_URL="$TEST_DIR/agentbrew.git" \
+    bash "$REPO/bin/dotfiles-install" run --yes --agentbrew-dir "$TEST_DIR/tools/agentbrew"
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$TEST_DIR/tools/agentbrew" remote get-url --push origin)" = DISABLED ]
+}
+
+@test "the install ends with the feedback step, after success and after a failure (#301)" {
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"agentbrew contribute"* ]]
+  [[ "$output" == *"agentbrew report"* ]]
+  FAIL_APPLY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"agentbrew report"* ]]
 }

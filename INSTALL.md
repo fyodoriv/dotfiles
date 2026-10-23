@@ -83,6 +83,12 @@ Ask these together, in one round:
 Map the answers to flags: `--profile core|full`, `--name "<name>"`,
 `--email "<email>"`, `--no-macos-defaults`, `--no-agentbrew`, and
 `--agentbrew-flags "<agentbrew flags>"` (for example `"--no-auto-repair"`).
+To install another tool repo in the same run, add `--tool <git URL>` (repeat
+it for more) and, after it, `--tool-flags "<its installer flags>"` (for
+example `"--plugin acme"`). Each one is cloned read-only next to this repo
+(push URL `DISABLED`) and its `scripts/install.sh run --yes` runs. The
+install ends with a feedback step: `agentbrew contribute` for a fix PR and
+`agentbrew report` for an issue.
 
 ## 4. Install
 

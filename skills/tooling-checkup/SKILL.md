@@ -458,6 +458,9 @@ question:
    speedup tasks and the Phase 9 research tasks).
 2. Run `bash <skill-dir>/scripts/inventory.sh` again and update the report.
    Mark the Phase 9 items as seen: `python3 <skill-dir>/scripts/ai_research.py record`.
+   Mark the background updates as seen, so the "updates landed" nudge
+   (`dotfiles-updates-landed`) stays quiet until new ones land:
+   `dotfiles-updates-landed --ack`.
 3. Record this run:
 
    ```bash

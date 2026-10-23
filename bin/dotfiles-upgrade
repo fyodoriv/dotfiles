@@ -80,6 +80,8 @@ fi
 source "$DOTFILES_DIR/lib/colors.sh"
 # shellcheck source=../lib/stats.sh
 source "$DOTFILES_DIR/lib/stats.sh"
+# shellcheck source=../lib/updates-landed.sh
+source "$DOTFILES_DIR/lib/updates-landed.sh"
 # shellcheck source=../lib/lock.sh
 source "$DOTFILES_DIR/lib/lock.sh"
 
@@ -307,12 +309,14 @@ if [ "$rc" -ne 0 ]; then
     | tee -a "$UPGRADE_LOG"
   if ! $DRY_RUN; then
     notify "dotfiles-upgrade" "Upgrade finished with failures (see log)" "Basso"
+    updates_landed_record dotfiles-upgrade "upgrade ran with failures (rc=$rc, see $UPGRADE_LOG)"
   fi
   exit "$rc"
 fi
 
 echo -e "${GREEN}✓${NC} Upgrade complete." | tee -a "$UPGRADE_LOG"
 if ! $DRY_RUN; then
+  updates_landed_record dotfiles-upgrade "software upgraded"
   if [ "$plugin_skipped" = 1 ]; then
     notify "dotfiles-upgrade" "Upgrade done; a plugin needs your approval (see log)" ""
   else

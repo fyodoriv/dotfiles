@@ -16,6 +16,11 @@
 #   --no-agentbrew          Do not install agentbrew afterwards
 #   --agentbrew-dir DIR     Where to clone agentbrew (default: next to this repo)
 #   --agentbrew-flags "..." Flags passed to agentbrew's installer (for example "--no-auto-repair")
+#   --tool URL              Also install another tool repo after agentbrew: a read-only
+#                           clone (push URL DISABLED), then its scripts/install.sh run --yes.
+#                           Repeatable; DOTFILES_INSTALL_EXTRA_REPOS adds URLs too.
+#   --tool-flags "..."      Flags for the installer of the last --tool (for example "--plugin acme")
+#   --tools-dir DIR         Where to clone --tool repos (default: next to this repo)
 #   --yes                   Required: confirms the user agreed to the plan
 #
 # Phases: preflight -> backup (chezmoi config, every file chezmoi manages,
@@ -103,6 +108,8 @@ cmd_plan() {
   say "  3. Heal: 'dotfiles doctor --fix' repairs what it can."
   say "  4. Verify: 'chezmoi verify' and a clean zsh start."
   say "  5. Install agentbrew (AI agent skills and rules) with its own installer, unless you opt out."
+  say "     Then any extra tool repos you name (--tool), each with its own installer."
+  say "  6. Feedback: how to send a fix (agentbrew contribute) or a report (agentbrew report)."
   step "If something goes wrong"
   say "  A critical error in apply or verify restores the backup automatically:"
   say "  files, LaunchAgents, and macOS settings, and it removes the files and folders"
@@ -114,6 +121,7 @@ cmd_plan() {
   say "  - Your git name and email"
   say "  - Change macOS system settings? (default yes)"
   say "  - Also install agentbrew? (default yes) and where to put it"
+  say "  - Any other tool repo to install with it? (--tool URL; default none)"
 }
 
 # Backup ids are timestamps, so the glob's sort order is oldest first.
@@ -248,6 +256,24 @@ do_restore() {
   report_leftovers "$dir"
 }
 
+# The last step of every run, success or failure (#301): how to send a fix
+# or a report upstream.
+feedback_step() {
+  step "Feedback"
+  say "  Found a bug or have an idea? Send it upstream (agentbrew scrubs private details first):"
+  say "    agentbrew contribute   open a fix PR from your branch"
+  say "    agentbrew report       draft an issue; it shows the exact text and posts only after you say yes"
+  say "  Without agentbrew: https://github.com/fyodoriv/dotfiles/issues"
+}
+
+# clone_readonly <url> <dir>: clone once, then make the clone read-only
+# (push URL DISABLED), as the dotfiles and agentbrew clones are.
+clone_readonly() {
+  [ -d "$2/.git" ] && return 0
+  git clone -q "$1" "$2" || return 1
+  git -C "$2" remote set-url --push origin DISABLED
+}
+
 critical() {
   receipt_finish false "$1"
   say ""
@@ -262,11 +288,14 @@ critical() {
     say "Automatic restore failed. Restore by hand: bash $REPO_DIR/bin/dotfiles-install restore $BACKUP_ID"
   fi
   say "Please report it: https://github.com/fyodoriv/dotfiles/issues (attach the output above)."
+  feedback_step
   exit 1
 }
 
 cmd_run() {
   local yes=0 profile=core name="" email="" macos=1 agentbrew=1 ab_dir="" ab_flags="" dir rel
+  local tools_dir="" url tool_dir i
+  local -a tool_urls=() tool_flags=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --yes) yes=1 ;;
@@ -277,6 +306,11 @@ cmd_run() {
       --no-agentbrew) agentbrew=0 ;;
       --agentbrew-dir) ab_dir="${2:-}"; shift ;;
       --agentbrew-flags) ab_flags="${2:-}"; shift ;;
+      --tool) tool_urls+=("${2:-}"); tool_flags+=(""); shift ;;
+      --tool-flags)
+        [ "${#tool_urls[@]}" -gt 0 ] || { say "--tool-flags must follow a --tool"; exit 2; }
+        tool_flags[${#tool_flags[@]}-1]="${2:-}"; shift ;;
+      --tools-dir) tools_dir="${2:-}"; shift ;;
       *) say "Unknown flag: $1"; usage; exit 2 ;;
     esac
     shift
@@ -331,7 +365,7 @@ cmd_run() {
   step "6/6 agentbrew"
   if [ "$agentbrew" -eq 1 ]; then
     ab_dir="${ab_dir:-$(dirname "$REPO_DIR")/agentbrew}"
-    if [ ! -d "$ab_dir/.git" ]; then git clone "$AGENTBREW_URL" "$ab_dir" || say "  ! Could not clone agentbrew; install it later from INSTALL.md."; fi
+    clone_readonly "$AGENTBREW_URL" "$ab_dir" || say "  ! Could not clone agentbrew; install it later from INSTALL.md."
     if [ -f "$ab_dir/scripts/install.sh" ]; then
       # shellcheck disable=SC2086  # ab_flags is a list of flags on purpose
       bash "$ab_dir/scripts/install.sh" run --yes $ab_flags ||
@@ -340,6 +374,26 @@ cmd_run() {
   else
     say "  skipped (you chose not to install agentbrew)"
   fi
+
+  # Extra tool repos (--tool, DOTFILES_INSTALL_EXTRA_REPOS): same hand-off.
+  for url in ${DOTFILES_INSTALL_EXTRA_REPOS:-}; do tool_urls+=("$url"); tool_flags+=(""); done
+  for ((i = 0; i < ${#tool_urls[@]}; i++)); do
+    url="${tool_urls[$i]}"
+    [ -n "$url" ] || continue
+    tool_dir="${tools_dir:-$(dirname "$REPO_DIR")}/$(basename "${url%.git}")"
+    step "Extra tool: $(basename "$tool_dir")"
+    if ! clone_readonly "$url" "$tool_dir"; then
+      say "  ! Could not clone $url; install it later by hand. dotfiles is installed."
+      continue
+    fi
+    if [ -f "$tool_dir/scripts/install.sh" ]; then
+      # shellcheck disable=SC2086  # the flags are a list of flags on purpose
+      bash "$tool_dir/scripts/install.sh" run --yes ${tool_flags[$i]} ||
+        say "  ! $(basename "$tool_dir") did not install. dotfiles is installed."
+    else
+      say "  ! $tool_dir has no scripts/install.sh; cloned only."
+    fi
+  done
 
   receipt_finish true
   step "Done"
@@ -352,6 +406,7 @@ cmd_run() {
   say "  cd $REPO_DIR && git switch -c fix/<short-name>"
   say "  # change the code, add a test and update the docs, then run: make check"
   say "  dotfiles contribute --dry-run && dotfiles contribute"
+  feedback_step
 }
 
 case "${1:-}" in

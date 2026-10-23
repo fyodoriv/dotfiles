@@ -45,6 +45,9 @@ for arg in "$@"; do
     esac
 done
 
+# shellcheck source=../lib/updates-landed.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/updates-landed.sh"
+
 INTERVAL=3600
 STAMP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/tooling-sync"
 STAMP_FILE="$STAMP_DIR/last-run"
@@ -113,8 +116,12 @@ sync_repo() {
         && git -C "$dir" diff --cached --quiet 2>/dev/null; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
             log "would pull   $dir ($branch) — ff-only from origin/$branch"
-        elif git -C "$dir" merge --ff-only "origin/$branch" --quiet 2>/dev/null; then
+        elif before=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null) \
+            && git -C "$dir" merge --ff-only "origin/$branch" --quiet 2>/dev/null; then
             log "OK   pull   $dir ($branch)"
+            after=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null)
+            # Tell the agent that the tooling moved (#301).
+            [ "$before" = "$after" ] || updates_landed_record tooling-sync "$(basename "$dir"): $before..$after"
         else
             log "INFO pull   $dir: already up to date or local commits ahead (ok)"
         fi

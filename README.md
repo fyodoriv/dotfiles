@@ -2,6 +2,12 @@
 
 ![shell startup < 200ms](https://img.shields.io/badge/shell_startup-%3C200ms-brightgreen)
 
+Give this prompt to your AI agent to install or update dotfiles:
+
+```text
+Install or update dotfiles on this machine by following https://github.com/fyodoriv/dotfiles/blob/HEAD/INSTALL.md (it updates an existing clone). Then run `dotfiles doctor` and fix every failing line with me. Audit the skills and commands already on this machine against these repos and propose adopt or merge for each one. From now on, extend these repos instead of building local copies. At the end, list anything that could work better and offer an issue or PR for each.
+```
+
 macOS developer dotfiles with self-healing health checks. Powered by [chezmoi](https://chezmoi.io).
 One command sets up a Mac; a weekly doctor finds drift and repairs it.
 
@@ -32,9 +38,8 @@ shows what changed and what needs you, and ends with a `Next:` command.
 
 Other ways in:
 
-- **With your AI agent**: open Claude Code (or Codex) and say
-  "Install dotfiles by following https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/INSTALL.md".
-  The agent asks your preferences first. Details: [INSTALL.md](INSTALL.md).
+- **With your AI agent**: give it the prompt at the top of this page. The
+  agent asks your preferences first. Details: [INSTALL.md](INSTALL.md).
 - **Plain chezmoi**: `chezmoi init --source ~/apps/dotfiles --apply`, then
   `dotfiles doctor --fix` (no backup).
 
@@ -1089,6 +1094,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `dotfiles-quit-relay` | Run a LaunchAgent Chrome so a restart, shut down, or log out can quit it: a small accessory app (`lib/quit-watcher.swift`) gets the quit request that Chrome ignores, and the relay sends Chrome SIGTERM (issue #298) | Inside the agent Chrome LaunchAgent |
 | `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV` and `--decide WINDOWS ARGV` for tests; a headed agent Chrome keeps focus) | Always running (LaunchAgent) |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
+| `dotfiles-updates-landed` | Say once a day that background updates landed (tooling-sync, dotfiles-upgrade record them) and the checkup should run; `--ack` marks them seen (#301) | An agent session-start hook; the checkup runs `--ack` |
 | `dotfiles-launchagent-drift` | Check that each loaded `com.dotfiles.*` LaunchAgent runs its plist's arguments and that KeepAlive jobs run; `--fix` reloads, kickstarts, or bootstraps (#297) | After `dotfiles apply` (update-tooling) |
 | `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then the apply-time sync script in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |

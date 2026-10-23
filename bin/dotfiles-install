@@ -321,7 +321,10 @@ cmd_run() {
   step "5/6 Verify"
   # Scripts never "match" a target state, so verify the managed files only.
   chezmoi verify --source "$REPO_DIR" --exclude scripts >/dev/null 2>&1 || critical "verification (chezmoi verify)"
-  zsh -i -c exit >/dev/null 2>&1 || critical "verification (zsh does not start cleanly)"
+  # `exit 0`, not `exit`: a plain exit returns the last startup line's status,
+  # and macOS /etc/zshrc ends with a test that is false outside Terminal.app.
+  # So this checks that an interactive zsh runs, as the zsh timing does (#290).
+  zsh -i -c 'exit 0' >/dev/null 2>&1 </dev/null || critical "verification (zsh does not start cleanly)"
 
   step "6/6 agentbrew"
   if [ "$agentbrew" -eq 1 ]; then

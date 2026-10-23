@@ -86,20 +86,6 @@ them. -->
   - **Anchor**: review of the plugin shared-layer PR, 2026-10-22.
   - **Competitive-goal**: none — agent sync correctness, not a scorecard metric.
 
-- [ ] Decide what the install's "zsh starts cleanly" check means
-  - **ID**: install-zsh-verify-exit-status
-  - **Tags**: install, tests
-  - **Details**: `bin/dotfiles-install` verifies with `zsh -i -c exit >/dev/null 2>&1 || critical "verification (zsh does not start cleanly)"`. A plain `exit` returns the status of the last startup line, so the check fails on a working zsh whose last line is a false test, for example macOS's `/etc/zshrc` outside Terminal.app (`[ -r "/etc/zshrc_$TERM_PROGRAM" ] && …`) or an install line that returns 1. The review of the e2e-zsh-ms-zero-flake PR (2026-10-22) found the same issue in the zsh timing, fixed there by timing `zsh -i -c 'exit 0'`. Decide: check that zsh runs (`'exit 0'`), or keep "the last line succeeded" and say so in the message, or check for startup errors on stderr instead.
-  - **Files**: `bin/dotfiles-install`, `tests/dotfiles-install.bats`
-  - **Output**: code
-  - **Acceptance**: a bats case with a working zsh whose `.zshrc` ends with `false` passes the verification step, and a zsh that cannot run still fails it.
-  - **Hypothesis**: false "zsh does not start cleanly" verdicts on a working zsh drop to 0.
-  - **Measurement**: the bats case above.
-  - **Success**: it passes; a broken zsh still fails verification.
-  - **Pivot**: if a startup line that fails should block the install, keep the check and name the failing line in the message.
-  - **Anchor**: review of the e2e-zsh-ms-zero-flake PR, 2026-10-22.
-  - **Competitive-goal**: none — install correctness, not a scorecard metric.
-
 ## P3
 
 - [ ] Make `make lint` fast in the inner loop

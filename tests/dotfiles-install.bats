@@ -219,6 +219,27 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -e "$STORE/com.apple.finder" ]
 }
 
+@test "verification passes a working zsh whose startup ends with a false test" {
+  [ -x /bin/zsh ] || skip "needs /bin/zsh"
+  # A real zsh whose last startup line returns 1, like macOS /etc/zshrc
+  # outside Terminal.app.
+  mkdir -p "$TEST_DIR/zdot"; printf 'false\n' > "$TEST_DIR/zdot/.zshrc"
+  export TEST_ZDOT="$TEST_DIR/zdot"
+  stub zsh 'ZDOTDIR="$TEST_ZDOT" exec /bin/zsh "$@"'
+  ZDOTDIR="$TEST_ZDOT" /bin/zsh -i -c exit </dev/null >/dev/null 2>&1 && { echo "fixture zsh exits 0"; return 1; }
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" != *"zsh does not start cleanly"* ]]
+}
+
+@test "verification still fails when zsh cannot run" {
+  stub zsh 'exit 127'
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"zsh does not start cleanly"* ]] || { echo "$output"; return 1; }
+  [ "$(cat "$HOME/.zshrc")" = "# my zshrc" ]
+}
+
 @test "a failed apply restores too, and --no-macos-defaults leaves settings alone" {
   FAIL_APPLY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
   [ "$status" -eq 1 ]

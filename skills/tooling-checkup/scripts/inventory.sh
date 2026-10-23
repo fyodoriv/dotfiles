@@ -19,7 +19,9 @@
 #              your own PR from a branch of the same repo)
 #   review     open PR by another author or from a fork; the owner decides
 #   salvage    uncommitted files or stashes; look before anything else
-#   clean-up   local branch already merged into the canonical branch
+#   clean-up   branch already in the canonical branch: merged, its patch is
+#              already there (git cherry, squash merges), or its tip is the
+#              head of a merged PR (one gh pr list --state merged per repo)
 #   pipeline   linked worktree under <repo>/.worktrees (an orchestrator owns it)
 #   bot        automation branches; not outstanding work (one summary line)
 #   skip       dependabot pull requests; not outstanding unless the user names one
@@ -123,6 +125,40 @@ if [ ! -d "$TOOLING_ROOT" ]; then
   exit 2
 fi
 
+# A branch whose patch is already in the base (a squash or rebase merge):
+# every commit `git cherry` lists is "-". Succeeds for clean-up.
+patch_in_base() {
+  local out
+  out="$(git -C "$repo" cherry "$base" "$1" 2>/dev/null)" || return 1
+  [ -n "$out" ] && ! grep -q '^+' <<< "$out"
+}
+
+# Branches with work to ship wait here until the merged pull requests of the
+# repo are known: "kind<TAB>name<TAB>tip<TAB>message" lines (one repo).
+deferred=""
+defer_ship() { deferred+="$1"$'\t'"$2"$'\t'"$3"$'\t'"$4"$'\n'; }
+
+# flush_deferred [<merged heads>]: says each deferred branch. A branch whose
+# tip is a merged PR's head commit, or an ancestor of it, is clean-up; the
+# rest are ship. Merged heads: "name<TAB>sha" lines from one gh call.
+flush_deferred() {
+  local merged="${1:-}" kind name tip msg head oid done_
+  while IFS=$'\t' read -r kind name tip msg; do
+    [ -n "$name" ] || continue
+    done_=0
+    while IFS=$'\t' read -r head oid; do
+      [ "$head" = "$name" ] && [ -n "$oid" ] || continue
+      if [ "$tip" = "$oid" ] || git -C "$repo" merge-base --is-ancestor "$tip" "$oid" 2>/dev/null; then
+        say clean-up "$kind $name was merged in a pull request; delete it"
+        done_=1
+        break
+      fi
+    done <<< "$merged"
+    [ "$done_" = 1 ] || say ship "$msg"
+  done <<< "$deferred"
+  deferred=""
+}
+
 found=0
 for repo in "$TOOLING_ROOT"/*; do
   # A linked worktree has a .git file, not a directory. Primary checkouts only.
@@ -163,11 +199,16 @@ for repo in "$TOOLING_ROOT"/*; do
           continue
         fi
         if is_bot "$branch"; then note_bot "$branch"; continue; fi
+        if patch_in_base "$ref"; then
+          say clean-up "branch $branch is already in $canonical (same patch); delete it"
+          continue
+        fi
         case "$track" in
-          -) say ship "branch $branch has $ahead commit(s) not in $canonical (no upstream)" ;;
-          *ahead* | *gone*) say ship "branch $branch has $ahead commit(s) not in $canonical (upstream: ${track#u:})" ;;
-          *) say ship "branch $branch has $ahead commit(s) not in $canonical (pushed)" ;;
+          -) msg="branch $branch has $ahead commit(s) not in $canonical (no upstream)" ;;
+          *ahead* | *gone*) msg="branch $branch has $ahead commit(s) not in $canonical (upstream: ${track#u:})" ;;
+          *) msg="branch $branch has $ahead commit(s) not in $canonical (pushed)" ;;
         esac
+        defer_ship branch "$branch" "$(git -C "$repo" rev-parse "$ref")" "$msg"
         ;;
       refs/remotes/origin/*)
         short="${ref#refs/remotes/origin/}"
@@ -175,7 +216,12 @@ for repo in "$TOOLING_ROOT"/*; do
         case "$locals" in *" $short "*) continue ;; esac
         [ "$ahead" = "0" ] && continue
         if is_bot "$short"; then note_bot "$short"; continue; fi
-        say ship "remote branch $short has $ahead commit(s) not in $canonical"
+        if patch_in_base "$ref"; then
+          say clean-up "remote branch $short is already in $canonical (same patch); delete it"
+          continue
+        fi
+        defer_ship "remote branch" "$short" "$(git -C "$repo" rev-parse "$ref")" \
+          "remote branch $short has $ahead commit(s) not in $canonical"
         ;;
     esac
   done < <(git -C "$repo" for-each-ref --sort=refname \
@@ -205,15 +251,18 @@ for repo in "$TOOLING_ROOT"/*; do
   done < <(git -C "$repo" worktree list --porcelain | sed -n 's/^worktree //p')
 
   if [ "$NO_GH" = "1" ]; then
+    flush_deferred
     flush_bots
     continue
   fi
   if ! command -v gh >/dev/null 2>&1; then
+    flush_deferred
     flush_bots
     say unknown "gh is not installed; pull requests and alerts not checked"
     continue
   fi
   if ! remote="$(github_slug "$(git -C "$repo" remote get-url origin)")"; then
+    flush_deferred
     flush_bots
     say unknown "origin is not a GitHub remote; pull requests not checked"
     continue
@@ -221,10 +270,15 @@ for repo in "$TOOLING_ROOT"/*; do
   host="${remote%% *}"
   slug="${remote#* }"
   if ! gh_host_known "$host"; then
+    flush_deferred
     flush_bots
     say unknown "origin host $host is not github.com and gh is not logged in to it; pull requests not checked (run: gh auth login --hostname $host, or add it to TOOLING_CHECKUP_GH_HOSTS)"
     continue
   fi
+
+  # One gh call per repo: the head branch and commit of recent merged PRs.
+  flush_deferred "$(GH_HOST="$host" gh pr list -R "$slug" --state merged --limit 200 \
+    --json headRefName,headRefOid --jq '.[] | [.headRefName, .headRefOid] | @tsv' 2>/dev/null || true)"
 
   if prs="$(GH_HOST="$host" gh pr list -R "$slug" --state open --limit 100 \
       --json number,title,headRefName,author,isDraft,isCrossRepository \
@@ -256,9 +310,11 @@ for repo in "$TOOLING_ROOT"/*; do
         say ship "$pr $head: $title"
       fi
     done <<< "$prs"
+    flush_deferred
     flush_bots
     [ "$deps" -gt 0 ] && say skip "$deps dependabot PR(s); not outstanding unless the user names one"
   else
+    flush_deferred
     flush_bots
     say unknown "gh pr list failed for $slug"
   fi

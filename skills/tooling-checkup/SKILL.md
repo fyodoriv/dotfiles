@@ -121,7 +121,7 @@ Act on each inventory line by its verdict:
 | `ship` on a `PR #N` line (or `draft PR #N`) | Get it finished (below). |
 | `review` | Someone else's PR, or a PR from a fork. Report it with its author. Never fix, push to, or merge it: the owner decides. |
 | `salvage` | Look first: `git status`, `git diff`, `git stash show -p`. Commit useful work to a branch and ship it. Report what you kept. |
-| `clean-up` | Delete the merged local branch (`git branch -d`, never `-D`). |
+| `clean-up` | Delete the branch. A merged local branch: `git branch -d`, never `-D`. A squash-merged one ("same patch" or "merged in a pull request"): a remote branch with `git push origin --delete <branch>`; a local one needs `git branch -D`, which only the owner runs (agents are blocked), so list it for the owner. |
 | `security` | Fix the critical alert: take the dependabot pull request or bump the package yourself. Ship it with `/ship-it`. |
 | `pipeline`, `bot`, `skip`, `advisory` | Report only. |
 | `unknown` | Fetch again and check by hand. Never delete. |

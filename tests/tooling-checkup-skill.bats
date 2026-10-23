@@ -757,3 +757,68 @@ broken file://$feeds/missing.xml"
   run jq -e '[.evals[] | select(.prompt | contains("dotfiles_apply_secs"))] | length >= 1' "$EVALS"
   [ "$status" -eq 0 ]
 }
+
+@test "inventory labels a squash-merged branch clean-up: its patch is already in the base (git cherry)" {
+  make_tooling_root
+  local repo="$TOOLING/alpha"
+  git_q -C "$repo" switch -c feat/squashed
+  echo one > "$repo/a.txt"; git_q -C "$repo" add a.txt; git_q -C "$repo" commit -m "feat: a"
+  git_q -C "$repo" push -u origin feat/squashed
+  git_q -C "$repo" switch main
+  # The same change lands on main as a new commit (a squash merge).
+  echo one > "$repo/a.txt"; git_q -C "$repo" add a.txt; git_q -C "$repo" commit -m "feat: a (#1)"
+  git_q -C "$repo" push origin main
+  git_q -C "$repo" switch -c feat/real
+  echo two > "$repo/b.txt"; git_q -C "$repo" add b.txt; git_q -C "$repo" commit -m "feat: b"
+  git_q -C "$repo" switch main
+
+  run env TOOLING_ROOT="$TOOLING" TOOLING_CHECKUP_NO_GH=1 TOOLING_CHECKUP_NO_FETCH=1 bash "$SCRIPTS/inventory.sh"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"clean-up  branch feat/squashed is already in main (same patch)"* ]]
+  [[ "$output" != *"ship      branch feat/squashed"* ]]
+  [[ "$output" == *"ship      branch feat/real has 1 commit(s) not in main"* ]]
+}
+
+@test "inventory labels a branch clean-up when a merged PR has its tip, with one gh call per repo" {
+  make_tooling_root
+  local repo="$TOOLING/alpha"
+  git_q -C "$repo" remote set-url origin https://github.com/acme/alpha.git
+  git_q -C "$repo" remote add store "$TEST_DIR/origin.git"
+  for b in feat/merged-a feat/merged-b feat/reused; do
+    git_q -C "$repo" switch -c "$b" main
+    echo "$b" > "$repo/${b#feat/}.txt"; git_q -C "$repo" add .; git_q -C "$repo" commit -m "feat: $b"
+  done
+  git_q -C "$repo" switch main
+  local a b r
+  a="$(git -C "$repo" rev-parse feat/merged-a)"; b="$(git -C "$repo" rev-parse feat/merged-b)"
+  r="$(git -C "$repo" rev-parse feat/reused)"
+  # feat/merged-b exists only as a remote branch.
+  git -C "$repo" update-ref refs/remotes/origin/feat/merged-b "$b"
+  git_q -C "$repo" branch -D feat/merged-b
+  # feat/reused got a new commit after its PR merged: still work to ship.
+  git_q -C "$repo" switch feat/reused
+  echo more >> "$repo/reused.txt"; git_q -C "$repo" commit -am "feat: more"
+  git_q -C "$repo" switch main
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/gh" <<EOF2
+#!/bin/sh
+echo "\$*" >> "$TEST_DIR/gh.log"
+case "\$*" in
+  *"--state merged"*) printf 'feat/merged-a\t$a\nfeat/merged-b\t$b\nfeat/reused\t$r\n' ;;
+  "pr list"*) ;;
+  "api"*" user "*) echo fyodor ;;
+  *) exit 1 ;;
+esac
+EOF2
+  chmod +x "$TEST_DIR/bin/gh"
+
+  run env -u BASH_ENV -u ENV PATH="$TEST_DIR/bin:$PATH" TOOLING_ROOT="$TOOLING" TOOLING_CHECKUP_NO_FETCH=1 \
+    bash "$SCRIPTS/inventory.sh"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"clean-up  branch feat/merged-a was merged in a pull request"* ]]
+  [[ "$output" == *"clean-up  remote branch feat/merged-b was merged in a pull request"* ]]
+  [[ "$output" == *"ship      branch feat/reused has 2 commit(s) not in main"* ]]
+  [ "$(grep -c -- '--state merged' "$TEST_DIR/gh.log")" -eq 1 ]
+}

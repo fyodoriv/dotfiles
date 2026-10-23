@@ -273,13 +273,18 @@ AGENTBREW_EOF
   mkdir -p "$TEST_DOTFILES/bin" "$TEST_DOTFILES/modules/agentbrew"
   cp "$BATS_TEST_DIRNAME/../bin/dotfiles-agentfile-resync" "$TEST_DOTFILES/bin/"
   cp "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh" "$TEST_DOTFILES/modules/agentbrew/"
+  # The apply-time sync script, as a stub that logs its run.
+  mkdir -p "$TEST_DOTFILES/.chezmoiscripts"
+  printf '#!/bin/bash\necho sync-script >> "%s/bin/agentbrew.log"\n' "$TEST_DIR" > "$TEST_DOTFILES/.chezmoiscripts/run_after_agentbrew-sync.sh"
   run env PATH="$TEST_DIR/bin:$PATH" HOME="$TEST_HOME" DOTFILES_DIR="$TEST_DOTFILES" bash -c "$fix_cmd"
   echo "$output"
   [ "$status" -eq 0 ]
   [ "$(cat "$TEST_HOME/.config/agentbrew/Agentfile.yaml")" = "mcp: [context7]" ]
-  # The fixed file is synced to the agents (in the background).
-  for _ in $(seq 50); do grep -q '^sync' "$TEST_DIR/bin/agentbrew.log" 2>/dev/null && break; sleep 0.1; done
-  grep -q "^sync --no-recommended --agentfile $TEST_HOME/.config/agentbrew/Agentfile.yaml" "$TEST_DIR/bin/agentbrew.log"
+  # The apply-time sync script then runs in the background, and frees its lock.
+  for _ in $(seq 50); do grep -q '^sync-script' "$TEST_DIR/bin/agentbrew.log" 2>/dev/null && break; sleep 0.1; done
+  grep -q '^sync-script' "$TEST_DIR/bin/agentbrew.log"
+  for _ in $(seq 50); do [ -e "$TEST_HOME/.local/state/dotfiles/agentbrew-sync-fix.lock" ] || break; sleep 0.1; done
+  [ ! -e "$TEST_HOME/.local/state/dotfiles/agentbrew-sync-fix.lock" ]
 }
 
 @test "agentbrew: global Agentfile drift check passes when canonical merge matches" {

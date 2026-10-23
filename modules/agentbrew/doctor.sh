@@ -66,8 +66,9 @@ _agentbrew_plugin_layers_once() {
 
 # _agentbrew_global_agentfile_in_sync [--write]: succeeds when the global
 # Agentfile equals the merge apply would write. With --write (the --fix),
-# a drifted file is replaced by that merge (#299), and `agentbrew sync`
-# then runs in the background (logs/agentbrew-sync-fix.log): a full sync
+# a drifted file is replaced by that merge (#299), and the apply-time sync
+# script (with its endpoint safe mode, mcpm, and hooks guards) then runs in
+# the background, one at a time (logs/agentbrew-sync-fix.log): a full sync
 # can take longer than the doctor's fix timeout.
 _agentbrew_global_agentfile_in_sync() {
   local write=false
@@ -124,13 +125,23 @@ _agentbrew_global_agentfile_in_sync() {
   status=$?
   rm -f "$layer"
   if [ "$status" -ne 0 ] && $write; then
-    local log="$HOME/.local/share/dotfiles/logs/agentbrew-sync-fix.log"
-    chmod 644 "$expected" 2>/dev/null || true
-    if mv -f "$expected" "$global_agentfile"; then
-      mkdir -p "$(dirname "$log")"
-      nohup agentbrew sync --no-recommended --agentfile "$global_agentfile" >> "$log" 2>&1 < /dev/null &
-      return 0
+    local log="$HOME/.local/share/dotfiles/logs/agentbrew-sync-fix.log" next
+    local lock="$HOME/.local/state/dotfiles/agentbrew-sync-fix.lock"
+    # Written next to the target, so the rename cannot leave half a file.
+    next="$(mktemp "$(dirname "$global_agentfile")/.Agentfile.yaml.XXXXXX")" &&
+      cat "$expected" > "$next" && chmod 644 "$next" && mv -f "$next" "$global_agentfile" || {
+      rm -f "$expected" "${next:-}"
+      return 1
+    }
+    rm -f "$expected"
+    mkdir -p "$(dirname "$log")" "$(dirname "$lock")"
+    # A lock left by a killed run is freed after an hour.
+    [ -z "$(find "$lock" -maxdepth 0 -mmin +60 2>/dev/null)" ] || rmdir "$lock" 2>/dev/null
+    if mkdir "$lock" 2>/dev/null; then
+      nohup bash -c 'trap "rmdir \"$1\"" EXIT; bash "$2"' _ "$lock" \
+        "$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh" >> "$log" 2>&1 < /dev/null &
     fi
+    return 0
   fi
   rm -f "$expected"
   return "$status"

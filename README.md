@@ -1089,7 +1089,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `dotfiles-quit-relay` | Run a LaunchAgent Chrome so a restart, shut down, or log out can quit it: a small accessory app (`lib/quit-watcher.swift`) gets the quit request that Chrome ignores, and the relay sends Chrome SIGTERM (issue #298) | Inside the agent Chrome LaunchAgent |
 | `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV` and `--decide WINDOWS ARGV` for tests; a headed agent Chrome keeps focus) | Always running (LaunchAgent) |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
-| `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then `agentbrew sync` in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
+| `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then the apply-time sync script in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 
 **Git workflow**

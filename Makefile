@@ -138,7 +138,11 @@ test-force: ## Run full test suite (no cache)
 # run takes minutes, so it reruns only when a plugin file or /bin/bash
 # changed since it last passed (the passes are shared by all worktrees).
 PLUGIN_BASH32_TESTS = tests/plugin-update.bats tests/plugin-v2.bats
-PLUGIN_BASH32_DEPS = bin/dotfiles-plugin bin/dotfiles $(wildcard lib/plugin*.sh) lib/confirm.sh tests/bash32/bash
+# Every file these suites run or read: cached-run's own scan misses `source`
+# paths with a variable in them and bats `load`, so list them here.
+PLUGIN_BASH32_DEPS = bin/dotfiles-plugin $(wildcard lib/plugin*.sh) lib/confirm.sh lib/blocked-software.sh \
+  modules/plugins/doctor.sh tests/test_helper.bash tests/host-load.bash tests/bash32/bash \
+  $(shell find data/plugin-template -type f 2>/dev/null | LC_ALL=C sort)
 test-plugins-bash32: ## Run the plugin bats suites with /bin/bash 3.2 (only when a plugin file changed)
 	@if [ ! -x /bin/bash ] || ! /bin/bash -c '[ "$${BASH_VERSINFO[0]}" = 3 ]'; then \
 	  echo "✓ Plugin bash 3.2 run skipped (/bin/bash is not bash 3.2)"; exit 0; fi; \
@@ -147,7 +151,7 @@ test-plugins-bash32: ## Run the plugin bats suites with /bin/bash 3.2 (only when
 	for t in $(PLUGIN_BASH32_TESTS); do for d in $(PLUGIN_BASH32_DEPS); do printf '%s\t%s\n' "$$t" "$$d"; done; done > "$$deps"; \
 	echo "═══ Plugin suites on /bin/bash 3.2 ═══"; \
 	PATH="$(CURDIR)/tests/bash32:$$PATH" ./bin/cached-run --per-file --deps "$$deps" \
-	  --key "$$(/bin/bash --version | head -1)" bats -- $(PLUGIN_BASH32_TESTS)
+	  --key "shim=tests/bash32; $$(/bin/bash --version | head -1)" bats -- $(PLUGIN_BASH32_TESTS)
 
 # ── E2E: hermetic install (real chezmoi/doctor/zsh in a scratch HOME) ──
 E2E_FILES = $(wildcard tests/e2e/*.bats)

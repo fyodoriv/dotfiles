@@ -36,3 +36,10 @@ teardown() { [ -z "${TEST_DIR:-}" ] || rm -rf "$TEST_DIR"; }
   [ "$status" -ne 0 ]
   [[ "$output" == *"bad substitution"* ]] || { echo "$output"; return 1; }
 }
+
+@test "make test-plugins-bash32 puts the shim first on PATH and tracks the doctor module" {
+  run make -n -C "$REPO" test-plugins-bash32
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *'PATH="'*'/tests/bash32:$PATH" ./bin/cached-run'* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"modules/plugins/doctor.sh"* ]] || { echo "$output"; return 1; }
+}

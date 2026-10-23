@@ -22,11 +22,53 @@ check "agentbrew.global_agentfile" "global Agentfile exists" \
   "[ -f '$HOME/.config/agentbrew/Agentfile.yaml' ] || [ -f '$HOME/.config/agentbrew/Agentfile' ]" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh'"
 
+# The agentbrew that apply would use, in the order
+# run_after_agentbrew-sync.sh probes: agentbrew on PATH, the checkout's
+# dist/cli.js, then its tsx with src/cli.ts.
+_agentbrew_doctor_cmd() {
+  local co=""
+  if command -v agentbrew >/dev/null 2>&1; then echo agentbrew; return 0; fi
+  if [ -f "$DOTFILES_DIR/lib/agentbrew-locate.sh" ]; then
+    # shellcheck source=../../lib/agentbrew-locate.sh
+    source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+    co="$(agentbrew_locate 2>/dev/null || true)"
+  fi
+  if [ -n "$co" ] && [ -x "$co/dist/cli.js" ]; then echo "node $co/dist/cli.js"
+  elif [ -n "$co" ] && [ -x "$co/node_modules/.bin/tsx" ]; then echo "$co/node_modules/.bin/tsx $co/src/cli.ts"
+  else echo agentbrew; fi
+}
+
+# Runs the plugin Agentfile filter (lib/agentfile-layers.sh) once per doctor run:
+# _agentbrew_plugin_kept holds the plugin Agentfiles apply merges, and
+# _agentbrew_plugin_problem what it skips and why.
+_agentbrew_plugin_layers_done="" _agentbrew_plugin_kept="" _agentbrew_plugin_problem=""
+_agentbrew_plugin_layers_once() {
+  local _plib errf pairs
+  [ -z "$_agentbrew_plugin_layers_done" ] || return 0
+  _agentbrew_plugin_layers_done=1
+  [ -f "$DOTFILES_DIR/lib/agentfile-layers.sh" ] && [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] &&
+    command -v yq >/dev/null 2>&1 || return 0
+  for _plib in plugin plugin-capabilities plugin-extensions agentfile-layers; do
+    # shellcheck source=/dev/null
+    source "$DOTFILES_DIR/lib/$_plib.sh"
+  done
+  pairs="$(plugin_agentfile_pairs)"
+  [ -n "$pairs" ] || return 0
+  if ! errf="$(mktemp "${TMPDIR:-/tmp}/dotfiles-plugin-agentfiles.XXXXXX" 2>/dev/null)"; then
+    _agentbrew_plugin_problem="cannot check plugin Agentfiles (no temp file)"
+    return 0
+  fi
+  _agentbrew_plugin_kept="$(printf '%s\n' "$pairs" |
+    AGENTFILE_AGENTBREW_CMD="$(_agentbrew_doctor_cmd)" agentfile_plugin_layers "$AGENTFILE" 2>"$errf")"
+  _agentbrew_plugin_problem="$(sed 's/^⚠ //' "$errf" | paste -sd ' ' - | sed 's/  */ /g')"
+  rm -f "$errf"
+}
+
 _agentbrew_global_agentfile_in_sync() {
   command -v agentbrew >/dev/null 2>&1 || return 0
   local merge_help
   merge_help="$(agentbrew agentfile merge --help 2>&1 || true)"
-  printf '%s\n' "$merge_help" | grep -q 'agentbrew agentfile merge' || return 0
+  grep -q 'agentbrew agentfile merge' <<< "$merge_help" || return 0
 
   local global_agentfile="$HOME/.config/agentbrew/Agentfile.yaml"
   [ -f "$global_agentfile" ] || return 0
@@ -41,9 +83,11 @@ _agentbrew_global_agentfile_in_sync() {
       # shellcheck source=/dev/null
       source "$DOTFILES_DIR/lib/$_plib.sh"
     done
+    # Match run_after_agentbrew-sync.sh: the same plugin Agentfile filter.
+    _agentbrew_plugin_layers_once
     while IFS= read -r _pf; do
       [ -n "$_pf" ] && paths+=("$_pf")
-    done < <(plugin_agentfiles)
+    done <<< "$_agentbrew_plugin_kept"
   fi
   # Match run_after_agentbrew-sync.sh: same optional layers, same helper.
   if [ -f "$DOTFILES_DIR/lib/agentfile-layers.sh" ]; then
@@ -99,6 +143,18 @@ fi
 check "agentbrew.local_agentfile_valid" \
   "local Agentfile layer is usable${_agentbrew_local_note:+ ($_agentbrew_local_note)}${_agentbrew_local_problems:+ ($(agentfile_local_layer_path): $(printf '%s\n' "$_agentbrew_local_problems" | head -1))}" \
   "[ -z \"\$_agentbrew_local_problems\" ]" \
+  ""
+
+# Company plugin Agentfiles that apply skips because they would take from
+# the shared layer (lib/agentfile-layers.sh). Not computed in --list
+# mode or when the check is overridden.
+if [ "${LIST_MODE:-false}" != true ] &&
+  ! { declare -F is_overridden >/dev/null && is_overridden "agentbrew.plugin_agentfile_shared"; }; then
+  _agentbrew_plugin_layers_once
+fi
+check "agentbrew.plugin_agentfile_shared" \
+  "no plugin Agentfile takes from the shared layer (hooks, excludeAgents, MCP servers, recommended)${_agentbrew_plugin_problem:+ ($_agentbrew_plugin_problem; fix: give a plugin hook its own command and a plugin MCP server its own name, drop excludeAgents and recommended, then release a new tag)}" \
+  "[ -z \"\$_agentbrew_plugin_problem\" ]" \
   ""
 
 # ── MCP env vars — tokens needed by agentbrew-managed MCP servers ──

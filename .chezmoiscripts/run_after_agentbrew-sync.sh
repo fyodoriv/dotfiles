@@ -131,15 +131,22 @@ if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2
     # shellcheck source=/dev/null
     source "$DOTFILES_DIR/lib/$_plib.sh"
   done
+  # A plugin Agentfile that would take from the shared layer (hooks,
+  # excludeAgents, MCP servers, recommended) is skipped
+  # (lib/agentfile-layers.sh), checked with the agentbrew that merges it.
+  # shellcheck source=../lib/agentfile-layers.sh
+  source "$DOTFILES_DIR/lib/agentfile-layers.sh"
   while IFS= read -r _pf; do
     [ -n "$_pf" ] && PLUGIN_AGENTFILES+=("$_pf") && echo "→ Including plugin Agentfile at $_pf"
-  done < <(plugin_agentfiles)
+  done < <(plugin_agentfile_pairs | AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_plugin_layers "$AGENTFILE")
 fi
 
 _agentbrew_supports_agentfile_merge() {
   local help
   help="$($AGENTBREW_CMD agentfile merge --help 2>&1 || true)"
-  printf '%s\n' "$help" | grep -q 'agentbrew agentfile merge'
+  # A here-string, not a pipe: grep -q stops early, and under pipefail the
+  # writer's SIGPIPE would turn a match into a failure.
+  grep -q 'agentbrew agentfile merge' <<< "$help"
 }
 
 _sync_from_agentfile() {

@@ -189,9 +189,10 @@ disabled, and this check prints the difference. Dev links print a warning.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
-| `plugins.<name>.verified` | Checkout matches its `plugins.lock` entry | None (remove and add again) |
+| `plugins.<name>.verified` | Checkout matches its `plugins.lock` entry | None (`dotfiles plugin update <name> <ref>` reinstalls the locked tag; a `--dev` link: remove it, then add it again) |
 | `plugins.<name>.lint` | No exported secrets in shell fragments; no `@latest` or unpinned `npx -y` | None (`dotfiles plugin lint <name>` lists lines) |
 | `plugins.<name>.blocked_software` | No software the plugin blocks is installed | None (uninstall the listed items) |
+| `plugins.staging_clean` | No `.staging.*` folder (with an `owner.pid` of a run that is gone) is left by an add or update that died without its exit handler (SIGKILL, power cut); the description names the folder | None (`dotfiles plugin list` finishes or rolls it back, or says what to move by hand) |
 
 ### sync
 
@@ -221,6 +222,7 @@ Conditional MCP checks only run when the MCP server is present in `~/.config/age
 | `agentbrew.initialized` | agentbrew state initialized | `agentbrew init` |
 | `agentbrew.global_agentfile` | Global Agentfile exists | `agentbrew sync` |
 | `agentbrew.local_agentfile_valid` | `~/.config/dotfiles/Agentfile.local.yaml`, when present, is one document agentbrew can read, has no `hooks:` (also none through a YAML merge key), and uses lists for list keys; the description names the first problem ([agentbrew-setup.md](agentbrew-setup.md#add-an-mcp-server-on-one-mac)) | None (edit the file) |
+| `agentbrew.plugin_agentfile_shared` | No company plugin Agentfile takes from the shared layer: no hook that would drop, replace, or weaken a shared agent hook, no `excludeAgents:`, no MCP server re-defined under a shared name, no `recommended: true` (checked with the real `agentbrew agentfile merge`); apply skips such an Agentfile, and the description names the plugin and what it would take ([plugins.md](plugins.md#extension-points)) | None (fix the plugin, release a new tag) |
 | `agentbrew.env_*` | Required env vars for registered MCP servers | `agentbrew setup` |
 | `agentbrew.memory_service_http` | Shared loopback memory MCP passes AgentBrew's stateful `initialize` → `notifications/initialized` → non-empty `tools/list` readiness contract when `use_ai_tools` is on and the memory MCP is registered | `agentbrew memory fix` |
 | `agentbrew.memory_launchagent_identity` | Loaded memory LaunchAgent uses the canonical `com.agentbrew.mcp-memory` plist path and operator `HOME` | `agentbrew memory fix` |

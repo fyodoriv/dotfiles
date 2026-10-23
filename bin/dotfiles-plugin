@@ -119,6 +119,7 @@ cmd_add() {
     [ "$url" != "$spec" ] && [ -n "$ref" ] || die "pin a ref: dotfiles plugin add <git-url>@<tag>"
     mkdir -p "$(plugin_home)"
     STAGING="$(mktemp -d "$(plugin_home)/.staging.XXXXXX")"
+    plugin_staging_owner_write "$STAGING"
     trap 'rm -rf "${STAGING:-}"; rm -f "${LOCK_TMP:-}"' EXIT
     git clone --quiet --no-checkout -- "$url" "$STAGING/src" || die "clone failed: $url"
     # The exact tag ref: a branch with the same name never wins.
@@ -272,7 +273,9 @@ _update_cleanup() {
   if [ "$UPD_SWAPPING" = 1 ] && [ "$UPD_DONE" != 1 ]; then
     if [ -e "$UPD_STAGING/old" ]; then
       [ ! -e "$UPD_PATH" ] || mv "$UPD_PATH" "$UPD_STAGING/new" || true
-      mv "$UPD_STAGING/old" "$UPD_PATH" || true
+      # Only into an empty path: mv into an existing folder nests the old
+      # checkout inside it. If the path is still taken, staging is kept.
+      [ -e "$UPD_PATH" ] || mv "$UPD_STAGING/old" "$UPD_PATH" || true
     elif [ "$UPD_HAD_OLD" = 0 ] && [ -e "$UPD_PATH" ] && [ ! -e "$UPD_STAGING/src" ]; then
       mv "$UPD_PATH" "$UPD_STAGING/new" || true
     fi
@@ -327,6 +330,8 @@ cmd_update() {
 
   mkdir -p "$(dirname "$path")"
   UPD_STAGING="$(mktemp -d "$(dirname "$path")/.staging.XXXXXX")"
+  plugin_staging_owner_write "$UPD_STAGING"
+  printf '%s\n' "$name" > "$UPD_STAGING/plugin.name"
   UPD_PATH="$path"
   UPD_LOCK="$(plugin_lock_file)"
   trap _update_cleanup EXIT
@@ -413,6 +418,79 @@ cmd_update() {
   refresh_outputs
   echo "✓ Updated plugin $name: $cur_ref → $ref"
   echo "  Run dotfiles apply to load its LaunchAgents, Brewfile, and Agentfile."
+}
+
+# _plugin_recover_staging: finishes or rolls back an add or update that
+# died without its exit handler (SIGKILL, power loss), for each folder that
+# plugin_staging_leftovers lists. The plugin is the one named in
+# plugin.name (update writes it), else in old/dotfiles-plugin.yaml.
+# - old/ is there: a checkout that still matches the lock means the update
+#   had finished, so the old copy goes; otherwise the old checkout and its
+#   lock entry (from plugins.lock.before) come back.
+# - old/ is gone but plugins.lock.before is there: if the checkout is the
+#   commit of the before-entry and the lock no longer matches, that entry
+#   comes back.
+# Then the folder is deleted. A folder it cannot restore stays, and the
+# doctor check plugins.staging_clean keeps naming it. Messages go to stderr.
+# It never fails the command that runs it.
+_plugin_recover_staging() {
+  local s name path before_commit head
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    name="$(cat "$s/plugin.name" 2>/dev/null || true)"
+    [ -n "$name" ] || name="$(yq -r '.name // ""' "$s/old/dotfiles-plugin.yaml" 2>/dev/null || true)"
+    path=""
+    [ -z "$name" ] || path="$(plugin_lock_get "$name" path 2>/dev/null || true)"
+    if [ -d "$s/old" ]; then
+      if [ -z "$path" ]; then
+        echo "dotfiles plugin: $s/old is a checkout of no installed plugin; move it back by hand" >&2
+        continue
+      fi
+      if [ -e "$path" ] && plugin_verify "$name" >/dev/null 2>&1; then
+        echo "dotfiles plugin: finished an interrupted update of $name" >&2
+      else
+        if [ -e "$path" ] && ! mv "$path" "$s/new"; then
+          echo "dotfiles plugin: could not move $path aside; the old checkout of $name is in $s/old" >&2
+          continue
+        fi
+        if ! mv "$s/old" "$path"; then
+          echo "dotfiles plugin: could not restore $path; the old checkout of $name is in $s/old" >&2
+          continue
+        fi
+        if ! _plugin_restore_entry "$name" "$s"; then
+          echo "dotfiles plugin: restored the old checkout of $name, but not its lock entry ($s/plugins.lock.before)" >&2
+          continue
+        fi
+        if plugin_verify "$name" >/dev/null 2>&1; then
+          echo "dotfiles plugin: restored $name after an interrupted update" >&2
+        else
+          echo "dotfiles plugin: restored $name after an interrupted update; it does not match its lock (run: dotfiles plugin verify $name)" >&2
+        fi
+      fi
+    elif [ -n "$path" ] && [ -f "$s/plugins.lock.before" ] && ! plugin_verify "$name" >/dev/null 2>&1; then
+      # Only the exact case "old checkout back, new lock": the checkout is the
+      # before-entry's commit, and the lock now names another commit.
+      before_commit="$(N="$name" yq -r '.plugins[strenv(N)].commit // ""' "$s/plugins.lock.before" 2>/dev/null || true)"
+      head="$(git -C "$path" rev-parse HEAD 2>/dev/null || true)"
+      if [ -n "$before_commit" ] && [ "$head" = "$before_commit" ] &&
+        [ "$(plugin_lock_get "$name" commit 2>/dev/null || true)" != "$head" ]; then
+        if ! _plugin_restore_entry "$name" "$s"; then
+          echo "dotfiles plugin: could not restore the lock entry of $name ($s/plugins.lock.before)" >&2
+          continue
+        fi
+        echo "dotfiles plugin: restored the lock entry of $name after an interrupted update" >&2
+      fi
+    fi
+    case "$(basename "$s")" in .staging.*) rm -rf "$s" ;; esac
+  done < <(plugin_staging_leftovers)
+}
+
+# _plugin_restore_entry <name> <staging>: puts back <name>'s lock entry from
+# <staging>/plugins.lock.before (no file: nothing to restore).
+_plugin_restore_entry() {
+  [ -f "$2/plugins.lock.before" ] || return 0
+  N="$1" BEFORE="$2/plugins.lock.before" \
+    _lock_yq '.plugins[strenv(N)] = (load(strenv(BEFORE)) | .plugins[strenv(N)])'
 }
 
 cmd_remove() {
@@ -536,6 +614,10 @@ cmd_verify() {
   done
   return "$failed"
 }
+
+# An add or update that died without its exit handler is finished or
+# rolled back before any command that reads or changes the lock.
+case "${1:-}" in add | update | remove | list | verify) _plugin_recover_staging || true ;; esac
 
 case "${1:-}" in
   add) shift; cmd_add "$@" ;;

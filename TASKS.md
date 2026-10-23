@@ -57,6 +57,62 @@ them. -->
   - **Pivot**: if an unattended update cannot stay safe, print the pending updates in the upgrade summary instead.
   - **Anchor**: issue #265; PR #276 review (2026-10-22).
 
+- [ ] Run the plugin bats files under macOS `/bin/bash` 3.2
+  - **ID**: plugin-tests-bash32
+  - **Tags**: plugins, tests
+  - **Details**: The #281 re-review (2026-10-22) found that no test runs the plugin code on `/bin/bash` 3.2. The bats files call `bash "$CLI"`, and `bin/dotfiles` runs `exec bash`, so both use the first `bash` on PATH (Homebrew bash 5 on the owner's Mac). Scripts start with `#!/bin/bash`, so a user who runs `bin/dotfiles-plugin` directly gets 3.2. The re-review checked 3.2 by hand once (TERM, INT, and HUP at 5 swap steps restored cleanly).
+  - **Files**: `tests/plugin-update.bats`, `tests/plugin-v2.bats`, `Makefile`
+  - **Output**: code
+  - **Acceptance**: `make check` (or a named target it calls) runs `tests/plugin-update.bats` and `tests/plugin-v2.bats` once with `/bin/bash` 3.2 as the CLI shell, and a construct that bash 3.2 rejects in `bin/dotfiles-plugin` fails it.
+  - **Hypothesis**: running the plugin suites with `/bin/bash` catches 3.2-only breakage before merge: the number of plugin bats files run under 3.2 goes from 0 to 2.
+  - **Measurement**: a bats case that plants a bash-4-only construct in a copy of `bin/dotfiles-plugin` and expects the 3.2 run to fail.
+  - **Success**: both plugin bats files pass under `/bin/bash` 3.2, and the planted construct fails the run.
+  - **Pivot**: if the 3.2 run adds more than 60 s to `make check`, run it only when a plugin file changed.
+  - **Anchor**: #281 re-review, 2026-10-22; Apple ships bash 3.2.57 as `/bin/bash`.
+  - **Competitive-goal**: none — test coverage for the plugin path, not a scorecard metric.
+
+- [ ] Check whether a plugin's skills, commands, or agent definitions can shadow shared ones by name
+  - **ID**: plugin-name-shadowing
+  - **Tags**: plugins, agents, security
+  - **Details**: `agentfile_plugin_layers` (PR for plugin-exclude-agents-hooks, 2026-10-22) stops a plugin Agentfile from taking hooks, agents (`excludeAgents:`), or MCP servers from the shared layer. The list keys `skills:`, `sources:`, `commands:`, and `agents:` only add in agentbrew's merge, but a plugin source or folder can hold a skill, command, or agent definition with the same name as a shared one. Find out what `agentbrew sync` does on such a name clash (which file wins in `~/.claude/`), with a real sync in a scratch HOME. If the plugin's copy can win, refuse the plugin's clashing names the same way. Not covered either: plugin `rules:` text is appended after the shared rules and can contradict them (content, not structure), and `recommended: true` turns on the recommended MCP set (adds only).
+  - **Files**: `lib/agentfile-layers.sh`, `tests/plugin-agentfile-hooks.bats`, `docs/plugins.md`
+  - **Output**: code
+  - **Acceptance**: a bats case with a scratch plugin that ships a skill named like a shared one shows which copy reaches `~/.claude/skills/`, and the shared copy wins or the plugin Agentfile is skipped.
+  - **Hypothesis**: refusing clashing names drops the ways a plugin can replace shared agent config from 1 (name clash, if agentbrew lets the later copy win) to 0.
+  - **Measurement**: the bats case above, with a real `agentbrew sync` into a scratch HOME (no network).
+  - **Success**: the shared skill, command, and agent files are unchanged after the sync.
+  - **Pivot**: if agentbrew already keeps the first copy, close this task with that evidence.
+  - **Anchor**: PR for plugin-exclude-agents-hooks, 2026-10-22; Saltzer and Schroeder 1975 (fail-safe defaults).
+  - **Competitive-goal**: none — plugin trust boundary, not a scorecard metric.
+
+- [ ] Fix the US01 install e2e flake: `before.zsh_ms` can be 0 on a quiet Mac
+  - **ID**: e2e-zsh-ms-zero-flake
+  - **Tags**: tests, flaky
+  - **Details**: On 2026-10-22 `make check` failed once in `tests/e2e/dotfiles-install-e2e.bats:46` (`jq -e '.before.zsh_ms > 0 and …'` printed false) and passed on the rerun. `baseline_zsh_ms` (`lib/mac-baseline.sh`) times `zsh -i -c exit` with `/usr/bin/time -p`, which has 10 ms steps. In the e2e scratch HOME, zsh starts in under 10 ms when the Mac is quiet (`real 0.00` in 1 of 3 runs at load 5), so the median can be 0.
+  - **Files**: `lib/mac-baseline.sh`, `tests/e2e/dotfiles-install-e2e.bats`
+  - **Output**: code
+  - **Acceptance**: the US01 e2e passes 20 times in a row on a quiet Mac.
+  - **Hypothesis**: a finer timer (or a floor of 1 ms for a run that finished) drops the US01 e2e failure rate on a quiet Mac from about 1 in 3 runs to 0 in 20.
+  - **Measurement**: `for i in $(seq 20); do bats -f 'US01 e2e: a fresh install' tests/e2e/dotfiles-install-e2e.bats || echo FAIL; done | grep -c FAIL` on a quiet Mac.
+  - **Success**: 0 failures in 20 runs.
+  - **Pivot**: if a finer timer is not portable, assert that `zsh_ms` is a number (`>= 0`) instead of `> 0`.
+  - **Anchor**: the 2026-10-22 gate run of the #281-lows PR; Luo et al. 2014, "An Empirical Analysis of Flaky Tests" (timing-dependent flakes).
+  - **Competitive-goal**: none — gate stability, not a scorecard metric.
+
+- [ ] Report an installed agent that agentbrew no longer syncs after an old `excludeAgents:`
+  - **ID**: agent-detected-stale
+  - **Tags**: agents, doctor
+  - **Details**: The fresh review of the plugin shared-layer PR (2026-10-22) found that `excludeAgents:` sticks. agentbrew's apply sets `detected: false` for an excluded agent (`src/agentfile-apply.ts`, `mergeAgentfileExcludeAgents`), and only `agentbrew init` detects agents again (`detectAgents`, from `src/init.ts`). So a Mac where a plugin (before #286) or the local Agentfile once excluded an agent keeps that agent without shared hooks after the key is gone, and no doctor check sees it. On the owner's Mac, `openhands` is installed (`~/.openhands`) but not detected, from an older state, so a check would flag it: decide with the owner whether agentbrew should manage it. Options: a dotfiles doctor check (an agent whose config folder exists, `detected: false` in `~/.config/agentbrew/state.yaml`, and not in the merged `excludeAgents`), with the fix `agentbrew init`; or an agentbrew change that detects again on each apply (agentbrew repo, its own PR).
+  - **Files**: `modules/agentbrew/doctor.sh`, `tests/module-agentbrew.bats`, `docs/module-reference.md`
+  - **Output**: code
+  - **Acceptance**: a Mac with an installed agent that agentbrew marks not detected, and that no `excludeAgents:` lists, fails a doctor check that names the agent and the fix.
+  - **Hypothesis**: the check drops the installed-but-unsynced agents nobody knows about from N (1 on the owner's Mac today) to 0 named-and-unhandled.
+  - **Measurement**: a bats case with a scratch HOME (a state.yaml with an undetected agent whose config folder exists), plus `dotfiles doctor --module agentbrew` on the owner's Mac.
+  - **Success**: the bats case fails the check with the agent's name; the owner's Mac shows the decision for `openhands`.
+  - **Pivot**: if agentbrew starts detecting on each apply, close this task with that PR.
+  - **Anchor**: review of the plugin shared-layer PR, 2026-10-22.
+  - **Competitive-goal**: none — agent sync correctness, not a scorecard metric.
+
 ## P3
 
 - [ ] Make `make lint` fast in the inner loop

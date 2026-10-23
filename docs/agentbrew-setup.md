@@ -70,7 +70,14 @@ Mac may still want it.
    - The local file may not hold `hooks:`, also not through a YAML anchor
      or merge key (`<<: *base`). In agentbrew's merge, a hook replaces
      every earlier hook with the same event and matcher, so one local
-     `Bash` hook would drop the shared `block-dangerous-git.sh`.
+     `Bash` hook would drop the shared `block-dangerous-git.sh`. A company
+     plugin's Agentfile may add to the shared layer but never take from
+     it (hooks, `excludeAgents:`, shared MCP servers, `recommended:`); apply skips one that
+     would ([plugins.md](plugins.md#extension-points)). This local file may
+     use `excludeAgents:`, because it is your own choice on this Mac. Taking
+     an agent out of `excludeAgents:` again does not bring it back by
+     itself: agentbrew marks it not detected and only `agentbrew init`
+     detects it again.
    - Before the merge, agentbrew reads the file alone with its own parser.
      A file it cannot read (bad YAML, a duplicate key, an unknown `!tag`,
      a second `---` document) or one whose result has hooks is skipped

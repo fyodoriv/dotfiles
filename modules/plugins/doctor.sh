@@ -42,5 +42,11 @@ if command -v yq >/dev/null 2>&1; then
       audit_warn "plugin $_plugin_name is a dev link: not pinned or verified"
     fi
   done
-  unset _plugin_name _plugin_root _plugin_blocked
+  # An add or update cut off by SIGKILL or a power cut (lib/plugin.sh).
+  _plugin_leftover="$(plugin_staging_leftovers 2>/dev/null | head -1)"
+  check "plugins.staging_clean" \
+    "no plugin update was cut off${_plugin_leftover:+ ($_plugin_leftover is left; fix: dotfiles plugin list finishes or rolls it back, or says what to move by hand)}" \
+    "[ -z \"\$(plugin_staging_leftovers 2>/dev/null)\" ]" \
+    ""
+  unset _plugin_name _plugin_root _plugin_blocked _plugin_leftover
 fi

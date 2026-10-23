@@ -358,6 +358,8 @@ interrupt_at() {
   mkdir -p "$TEST_DIR/sig"
   cat > "$TEST_DIR/sig/mv" <<'STUB'
 #!/bin/bash
+a2="$2"; [ "$1" != -f ] || a2="$3"
+case "${FAIL_MV:-}:$a2" in new-aside:*/.staging.*/new) exit 1 ;; esac
 /bin/mv "$@"; rc=$?
 [ "$1" != -f ] || shift
 case "$KILL_AT:$1:$2" in
@@ -411,4 +413,183 @@ run_interrupted_update() {
   [ -z "$(find "$(dirname "$LOCK")" -name 'plugins.lock.tmp.*')" ]
   run grep -n 'yq -i' "$REPO_ROOT/bin/dotfiles-plugin"
   [ "$status" -ne 0 ]
+}
+
+# ── Recovery (re-review of #281) ───────────────────────────────────────
+
+staging_dirs() { find "$XDG_DATA_HOME/dotfiles/plugins" -maxdepth 1 -name '.staging.*'; }
+
+@test "a failed move of the new checkout never nests the old one inside it" {
+  release v1.1.0
+  interrupt_at new-in TERM
+  export FAIL_MV=new-aside
+  PATH="$TEST_DIR/sig:$PATH" run bash "$CLI" update acme < /dev/null
+  unset KILL_AT KILL_SIG FAIL_MV
+  echo "$output"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"could not restore everything"* ]]
+  [ ! -e "$DEST/old" ]
+  [ -d "$(staging_dirs)/old" ]
+  # The next plugin command finishes the restore.
+  run bash "$CLI" list
+  echo "$output"
+  assert_kept_v1
+}
+
+# crash_update_at <step>: SIGKILL at <step>, so no exit handler runs (as on
+# a power cut). A staging folder is left behind.
+crash_update_at() {
+  release v1.1.0
+  interrupt_at "$1" KILL
+  PATH="$TEST_DIR/sig:$PATH" run bash "$CLI" update acme < /dev/null
+  unset KILL_AT KILL_SIG
+  [ "$status" -ne 0 ]
+  [ -n "$(staging_dirs)" ]
+}
+
+@test "after a crash between the moves, the next plugin command puts the old checkout back" {
+  crash_update_at old-aside
+  [ ! -e "$DEST" ]
+  run bash "$CLI" list
+  echo "$output"
+  [[ "$output" == *"restored acme"* ]]
+  assert_kept_v1
+}
+
+@test "after a crash before the lock write, the next plugin command rolls back" {
+  crash_update_at new-in
+  run bash "$CLI" verify acme
+  echo "$output"
+  assert_kept_v1
+}
+
+@test "after a crash once the lock is written, the next plugin command keeps the new version" {
+  crash_update_at lock-replaced
+  run bash "$CLI" list
+  echo "$output"
+  [[ "$output" == *"finished an interrupted update of acme"* ]]
+  [ "$(lock_ref)" = v1.1.0 ]
+  bash "$CLI" verify acme
+  [ -z "$(staging_dirs)" ]
+}
+
+@test "doctor reports a staging folder left by a crash" {
+  crash_update_at old-aside
+  run bash -c 'DOTFILES_DIR="$1"
+    check() { if eval "$3" >/dev/null 2>&1; then echo "$1 PASS"; else echo "$1 FAIL $2"; fi; }
+    audit_warn() { :; }
+    source "$1/modules/plugins/doctor.sh"' _ "$REPO_ROOT"
+  echo "$output"
+  [[ "$output" == *"plugins.staging_clean FAIL"* ]]
+  [[ "$output" == *"dotfiles plugin list"* ]]
+  bash "$CLI" list >/dev/null
+  run bash -c 'DOTFILES_DIR="$1"
+    check() { if eval "$3" >/dev/null 2>&1; then echo "$1 PASS"; else echo "$1 FAIL $2"; fi; }
+    audit_warn() { :; }
+    source "$1/modules/plugins/doctor.sh"' _ "$REPO_ROOT"
+  [[ "$output" == *"plugins.staging_clean PASS"* ]]
+}
+
+boot_id() { bash -c 'source "$1/lib/plugin.sh"; plugin_boot_id' _ "$REPO_ROOT"; }
+
+# fake_staging <name> <pid> <boot>: a staging folder with an old checkout
+# copy of acme and that owner.
+fake_staging() {
+  local s="$XDG_DATA_HOME/dotfiles/plugins/.staging.$1"
+  mkdir -p "$s"
+  cp -R "$DEST" "$s/old"
+  printf '%s %s\n' "$2" "$3" > "$s/owner.pid"
+  printf '%s\n' "$s"
+}
+
+@test "a staging folder whose update is still running is left alone" {
+  live="$(fake_staging live "$$" "$(boot_id)")"
+  run bash "$CLI" list
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ -d "$live/old" ]
+  [[ "$output" != *"interrupted"* ]]
+}
+
+@test "a PID saved before a reboot counts as gone" {
+  s="$(fake_staging reboot "$$" before-the-reboot)"
+  rm -rf "$DEST"
+  run bash "$CLI" list
+  echo "$output"
+  [[ "$output" == *"restored acme"* ]]
+  [ ! -e "$s" ]
+  assert_kept_v1
+}
+
+@test "recovery never stops the command, even for an old/ with no manifest" {
+  s="$XDG_DATA_HOME/dotfiles/plugins/.staging.broken"
+  mkdir -p "$s/old"
+  printf '999999 %s\n' "$(boot_id)" > "$s/owner.pid"
+  run bash "$CLI" list
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"checkout of no installed plugin"* ]]
+  [[ "$output" == *"acme"*"v1.0.0"* ]]
+  [ -d "$s/old" ]
+}
+
+@test "a staging folder beside a dev link, or one with no owner.pid, is never touched" {
+  bash "$CLI" remove acme --yes >/dev/null
+  mkdir -p "$TEST_DIR/src"
+  cp -R "$SRC" "$TEST_DIR/src/acme"
+  bash "$CLI" add --dev "$TEST_DIR/src/acme" --yes >/dev/null
+  mkdir -p "$TEST_DIR/src/.staging.site/important" "$XDG_DATA_HOME/dotfiles/plugins/.staging.old-core"
+  printf '999999 %s\n' "$(boot_id)" > "$TEST_DIR/src/.staging.site/owner.pid"
+  echo keep > "$TEST_DIR/src/.staging.site/important/file.txt"
+  touch -t 202001010000 "$XDG_DATA_HOME/dotfiles/plugins/.staging.old-core"
+  run bash "$CLI" list
+  [ "$status" -eq 0 ]
+  [ -f "$TEST_DIR/src/.staging.site/important/file.txt" ]
+  [ -d "$XDG_DATA_HOME/dotfiles/plugins/.staging.old-core" ]
+}
+
+@test "after a crash with the old checkout back but the new lock, the lock entry comes back" {
+  release v1.1.0
+  s="$XDG_DATA_HOME/dotfiles/plugins/.staging.halfway"
+  mkdir -p "$s"
+  cp "$LOCK" "$s/plugins.lock.before"
+  echo acme > "$s/plugin.name"
+  printf '999999 %s\n' "$(boot_id)" > "$s/owner.pid"
+  # The lock says v1.1.0, but the checkout is still v1.0.0.
+  NEW="$(git -C "$SRC" rev-parse 'v1.1.0^{commit}')" yq -i '.plugins.acme.commit = strenv(NEW) | .plugins.acme.ref = "v1.1.0"' "$LOCK"
+  run bash "$CLI" verify acme
+  echo "$output"
+  [[ "$output" == *"restored the lock entry of acme"* ]]
+  [ ! -e "$s" ]
+  assert_kept_v1
+}
+
+@test "when it cannot tell whether a run is live, recovery leaves its folder alone" {
+  # A run whose boot ID was unknown when it started.
+  unknown="$(fake_staging unknown "$$" unknown)"
+  # A reader that cannot read the boot ID (sysctl blocked, as in a sandbox).
+  mkdir -p "$TEST_DIR/nosysctl"
+  printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/nosysctl/sysctl"
+  chmod +x "$TEST_DIR/nosysctl/sysctl"
+  blind="$(fake_staging blind "$$" "$(boot_id)")"
+  PATH="$TEST_DIR/nosysctl:$PATH" run bash "$CLI" list
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ -d "$unknown/old" ]
+  [ -d "$blind/old" ]
+}
+
+@test "a lock-only restore needs the new lock: an unchanged lock is left as it is" {
+  s="$XDG_DATA_HOME/dotfiles/plugins/.staging.unchanged"
+  mkdir -p "$s"
+  cp "$LOCK" "$s/plugins.lock.before"
+  echo acme > "$s/plugin.name"
+  printf '999999 %s\n' "$(boot_id)" > "$s/owner.pid"
+  # The checkout fails verify for another reason (a changed file).
+  printf ' ' >> "$DEST/modules/acme/doctor.sh"
+  cp "$LOCK" "$TEST_DIR/lock.before"
+  run bash "$CLI" list
+  echo "$output"
+  [[ "$output" != *"restored the lock entry"* ]]
+  cmp "$LOCK" "$TEST_DIR/lock.before"
 }

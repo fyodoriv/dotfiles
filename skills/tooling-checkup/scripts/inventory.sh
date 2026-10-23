@@ -276,9 +276,13 @@ for repo in "$TOOLING_ROOT"/*; do
     continue
   fi
 
-  # One gh call per repo: the head branch and commit of recent merged PRs.
+  # One gh call per repo: head branch, head commit, and base of the newest
+  # 200 merged PRs (an older one leaves its branch at ship). Only PRs merged
+  # into the canonical branch count: a stacked PR merged into another
+  # feature branch is not in it yet.
   flush_deferred "$(GH_HOST="$host" gh pr list -R "$slug" --state merged --limit 200 \
-    --json headRefName,headRefOid --jq '.[] | [.headRefName, .headRefOid] | @tsv' 2>/dev/null || true)"
+    --json headRefName,headRefOid,baseRefName --jq '.[] | [.headRefName, .headRefOid, .baseRefName] | @tsv' 2>/dev/null |
+    awk -F '\t' -v base="$canonical" '$3 == base { print $1 "\t" $2 }' || true)"
 
   if prs="$(GH_HOST="$host" gh pr list -R "$slug" --state open --limit 100 \
       --json number,title,headRefName,author,isDraft,isCrossRepository \

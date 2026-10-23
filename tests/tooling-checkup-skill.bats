@@ -785,7 +785,7 @@ broken file://$feeds/missing.xml"
   local repo="$TOOLING/alpha"
   git_q -C "$repo" remote set-url origin https://github.com/acme/alpha.git
   git_q -C "$repo" remote add store "$TEST_DIR/origin.git"
-  for b in feat/merged-a feat/merged-b feat/reused; do
+  for b in feat/merged-a feat/merged-b feat/reused feat/stacked; do
     git_q -C "$repo" switch -c "$b" main
     echo "$b" > "$repo/${b#feat/}.txt"; git_q -C "$repo" add .; git_q -C "$repo" commit -m "feat: $b"
   done
@@ -793,6 +793,7 @@ broken file://$feeds/missing.xml"
   local a b r
   a="$(git -C "$repo" rev-parse feat/merged-a)"; b="$(git -C "$repo" rev-parse feat/merged-b)"
   r="$(git -C "$repo" rev-parse feat/reused)"
+  local s; s="$(git -C "$repo" rev-parse feat/stacked)"
   # feat/merged-b exists only as a remote branch.
   git -C "$repo" update-ref refs/remotes/origin/feat/merged-b "$b"
   git_q -C "$repo" branch -D feat/merged-b
@@ -805,7 +806,7 @@ broken file://$feeds/missing.xml"
 #!/bin/sh
 echo "\$*" >> "$TEST_DIR/gh.log"
 case "\$*" in
-  *"--state merged"*) printf 'feat/merged-a\t$a\nfeat/merged-b\t$b\nfeat/reused\t$r\n' ;;
+  *"--state merged"*) printf 'feat/merged-a\t$a\tmain\nfeat/merged-b\t$b\tmain\nfeat/reused\t$r\tmain\nfeat/stacked\t$s\tfeat/merged-a\n' ;;
   "pr list"*) ;;
   "api"*" user "*) echo fyodor ;;
   *) exit 1 ;;
@@ -820,5 +821,7 @@ EOF2
   [[ "$output" == *"clean-up  branch feat/merged-a was merged in a pull request"* ]]
   [[ "$output" == *"clean-up  remote branch feat/merged-b was merged in a pull request"* ]]
   [[ "$output" == *"ship      branch feat/reused has 2 commit(s) not in main"* ]]
+  # Merged into another feature branch, not into main: still work to ship.
+  [[ "$output" == *"ship      branch feat/stacked has 1 commit(s) not in main"* ]]
   [ "$(grep -c -- '--state merged' "$TEST_DIR/gh.log")" -eq 1 ]
 }

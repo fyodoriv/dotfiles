@@ -71,18 +71,18 @@ them. -->
   - **Anchor**: #281 re-review, 2026-10-22; Apple ships bash 3.2.57 as `/bin/bash`.
   - **Competitive-goal**: none — test coverage for the plugin path, not a scorecard metric.
 
-- [ ] Decide whether a plugin Agentfile's `excludeAgents:` may turn off the shared hooks
-  - **ID**: plugin-exclude-agents-hooks
+- [ ] Check whether a plugin's skills, commands, or agent definitions can shadow shared ones by name
+  - **ID**: plugin-name-shadowing
   - **Tags**: plugins, agents, security
-  - **Details**: The fresh review of the #281-lows PR (2026-10-22) found that a company plugin Agentfile can list `excludeAgents: [claude]`. The merged Agentfile then turns off all agentbrew sync for that agent, the shared hooks (`block-dangerous-git.sh`) included. `agentfile_plugin_layers` stops a plugin hook from replacing a shared hook, but not this. Decide: refuse `excludeAgents:` in plugin Agentfiles (like hooks), or allow it and name it in the doctor check `agentbrew.plugin_agentfile_hooks`.
-  - **Files**: `lib/agentfile-layers.sh`, `modules/agentbrew/doctor.sh`, `tests/plugin-agentfile-hooks.bats`, `docs/plugins.md`
+  - **Details**: `agentfile_plugin_layers` (PR for plugin-exclude-agents-hooks, 2026-10-22) stops a plugin Agentfile from taking hooks, agents (`excludeAgents:`), or MCP servers from the shared layer. The list keys `skills:`, `sources:`, `commands:`, and `agents:` only add in agentbrew's merge, but a plugin source or folder can hold a skill, command, or agent definition with the same name as a shared one. Find out what `agentbrew sync` does on such a name clash (which file wins in `~/.claude/`), with a real sync in a scratch HOME. If the plugin's copy can win, refuse the plugin's clashing names the same way. Not covered either: plugin `rules:` text is appended after the shared rules and can contradict them (content, not structure), and `recommended: true` turns on the recommended MCP set (adds only).
+  - **Files**: `lib/agentfile-layers.sh`, `tests/plugin-agentfile-hooks.bats`, `docs/plugins.md`
   - **Output**: code
-  - **Acceptance**: a plugin Agentfile with `excludeAgents:` either is skipped by apply or shows in the doctor, with a real-merge bats test.
-  - **Hypothesis**: closing this path drops the number of ways a plugin Agentfile can turn off a shared hook from 1 to 0.
-  - **Measurement**: a real-merge bats case: a plugin Agentfile with `excludeAgents: [claude]`, then check that the shared hooks still reach Claude Code or that the doctor check fails naming the plugin.
-  - **Success**: the case passes.
-  - **Pivot**: if company plugins need `excludeAgents:` for real, keep it and only report it.
-  - **Anchor**: review of the #281-lows PR, 2026-10-22; Saltzer and Schroeder 1975 (fail-safe defaults).
+  - **Acceptance**: a bats case with a scratch plugin that ships a skill named like a shared one shows which copy reaches `~/.claude/skills/`, and the shared copy wins or the plugin Agentfile is skipped.
+  - **Hypothesis**: refusing clashing names drops the ways a plugin can replace shared agent config from 1 (name clash, if agentbrew lets the later copy win) to 0.
+  - **Measurement**: the bats case above, with a real `agentbrew sync` into a scratch HOME (no network).
+  - **Success**: the shared skill, command, and agent files are unchanged after the sync.
+  - **Pivot**: if agentbrew already keeps the first copy, close this task with that evidence.
+  - **Anchor**: PR for plugin-exclude-agents-hooks, 2026-10-22; Saltzer and Schroeder 1975 (fail-safe defaults).
   - **Competitive-goal**: none — plugin trust boundary, not a scorecard metric.
 
 - [ ] Fix the US01 install e2e flake: `before.zsh_ms` can be 0 on a quiet Mac
@@ -98,6 +98,20 @@ them. -->
   - **Pivot**: if a finer timer is not portable, assert that `zsh_ms` is a number (`>= 0`) instead of `> 0`.
   - **Anchor**: the 2026-10-22 gate run of the #281-lows PR; Luo et al. 2014, "An Empirical Analysis of Flaky Tests" (timing-dependent flakes).
   - **Competitive-goal**: none — gate stability, not a scorecard metric.
+
+- [ ] Report an installed agent that agentbrew no longer syncs after an old `excludeAgents:`
+  - **ID**: agent-detected-stale
+  - **Tags**: agents, doctor
+  - **Details**: The fresh review of the plugin shared-layer PR (2026-10-22) found that `excludeAgents:` sticks. agentbrew's apply sets `detected: false` for an excluded agent (`src/agentfile-apply.ts`, `mergeAgentfileExcludeAgents`), and only `agentbrew init` detects agents again (`detectAgents`, from `src/init.ts`). So a Mac where a plugin (before #286) or the local Agentfile once excluded an agent keeps that agent without shared hooks after the key is gone, and no doctor check sees it. On the owner's Mac, `openhands` is installed (`~/.openhands`) but not detected, from an older state, so a check would flag it: decide with the owner whether agentbrew should manage it. Options: a dotfiles doctor check (an agent whose config folder exists, `detected: false` in `~/.config/agentbrew/state.yaml`, and not in the merged `excludeAgents`), with the fix `agentbrew init`; or an agentbrew change that detects again on each apply (agentbrew repo, its own PR).
+  - **Files**: `modules/agentbrew/doctor.sh`, `tests/module-agentbrew.bats`, `docs/module-reference.md`
+  - **Output**: code
+  - **Acceptance**: a Mac with an installed agent that agentbrew marks not detected, and that no `excludeAgents:` lists, fails a doctor check that names the agent and the fix.
+  - **Hypothesis**: the check drops the installed-but-unsynced agents nobody knows about from N (1 on the owner's Mac today) to 0 named-and-unhandled.
+  - **Measurement**: a bats case with a scratch HOME (a state.yaml with an undetected agent whose config folder exists), plus `dotfiles doctor --module agentbrew` on the owner's Mac.
+  - **Success**: the bats case fails the check with the agent's name; the owner's Mac shows the decision for `openhands`.
+  - **Pivot**: if agentbrew starts detecting on each apply, close this task with that PR.
+  - **Anchor**: review of the plugin shared-layer PR, 2026-10-22.
+  - **Competitive-goal**: none — agent sync correctness, not a scorecard metric.
 
 ## P3
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
-# A company plugin's Agentfile (contributes.agentbrew) may add agent hooks,
-# but never drop or replace a shared one. agentbrew's merge lets a later
+# A company plugin's Agentfile (contributes.agentbrew) may add to the shared
+# layer (hooks, MCP servers, skills), but never take from it: no replaced or
+# weakened shared hook, no excludeAgents, no re-defined shared MCP server,
+# no recommended: true. agentbrew's merge lets a later
 # hook replace every earlier hook with the same event, matcher, and agents,
 # so lib/agentfile-layers.sh (agentfile_plugin_layers) merges the earlier
 # layers with and without the plugin and skips a plugin Agentfile that
@@ -98,7 +100,7 @@ run_sync() {
 
 doctor_hook_check() {
   PATH="$TEST_DIR/bin:/usr/bin:/bin" bash -c 'DOTFILES_DIR="$1"
-    check() { [ "$1" = agentbrew.plugin_agentfile_hooks ] || return 0
+    check() { [ "$1" = agentbrew.plugin_agentfile_shared ] || return 0
       if eval "$3" >/dev/null 2>&1; then echo "PASS $2"; else echo "FAIL $2"; fi; }
     check_advisory() { :; }; audit_warn() { :; }
     source "$1/modules/agentbrew/doctor.sh"' _ "$REPO_ROOT"
@@ -199,11 +201,205 @@ doctor_hook_check() {
   base="$(dirname "$AGENTBREW_CHECKOUT")"
   [ "$(basename "$base")" != tooling ] || base="$(dirname "$base")"
   run env -u AGENTFILE_AGENTBREW_CMD PATH="$TEST_DIR/noab:/usr/bin:/bin" DOTFILES_REPOS_DIR="$base" bash -c 'DOTFILES_DIR="$1"
-    check() { [ "$1" = agentbrew.plugin_agentfile_hooks ] || return 0
+    check() { [ "$1" = agentbrew.plugin_agentfile_shared ] || return 0
       if eval "$3" >/dev/null 2>&1; then echo "PASS $2"; else echo "FAIL $2"; fi; }
     check_advisory() { :; }; audit_warn() { :; }
     source "$1/modules/agentbrew/doctor.sh"' _ "$REPO_ROOT"
   echo "$output"
   [[ "$output" == FAIL* ]]
   [[ "$output" == *"block-dangerous-git.sh"* ]]
+}
+
+# ── Other keys that could turn off or replace the shared layer ─────────
+
+@test "a plugin Agentfile that turns off an agent (excludeAgents) is skipped, naming the plugin and the agent" {
+  HOOKS_YAML='excludeAgents:
+  - claude-code' plugin_with_hook Bash
+  run filter
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+  [[ "$output" == *"turns off agentbrew sync, the shared hooks included, for: claude-code"* ]]
+  run bash -c 'printf "acme\t%s\n" "$2" | bash -c '\''source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$1/Agentfile.yaml"'\'' _ "$1" 2>/dev/null' _ "$REPO_ROOT" "$PLUGIN_AGENTFILE"
+  [ -z "$output" ]
+}
+
+@test "excludeAgents through a YAML merge key is refused too" {
+  HOOKS_YAML='x-base: &b
+  excludeAgents: [claude-code]
+<<: *b' plugin_with_hook Bash
+  run filter
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+  [[ "$output" == *"for: claude-code"* ]]
+}
+
+@test "dotfiles apply keeps every agent managed when a plugin lists excludeAgents" {
+  HOOKS_YAML='excludeAgents:
+  - claude-code' plugin_with_hook Bash
+  run run_sync
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+  global="$HOME/.config/agentbrew/Agentfile.yaml"
+  ! grep -q 'excludeAgents' "$global"
+  grep -q 'block-dangerous-git.sh' "$global"
+}
+
+@test "a plugin cannot replace a shared MCP server with its own definition" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  # The base Agentfile lists playwright; this plugin re-defines it.
+  printf 'mcp:\n  - name: playwright\n    command: "~/bin/acme-playwright"\n' > "$PLUGIN_AGENTFILE"
+  run filter
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+  [[ "$output" == *"replaces these shared MCP servers: playwright"* ]]
+}
+
+@test "a plugin MCP server with its own name is kept" {
+  printf 'mcp:\n  - name: acme-playwright\n    command: "~/bin/acme-playwright"\n' > "$TEST_DIR/af.yaml"
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  cp "$TEST_DIR/af.yaml" "$PLUGIN_AGENTFILE"
+  run bash -c 'printf "acme\t%s\n" "$2" | bash -c '\''source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$1/Agentfile.yaml"'\'' _ "$1" 2>/dev/null' _ "$REPO_ROOT" "$PLUGIN_AGENTFILE"
+  [ "$output" = "$PLUGIN_AGENTFILE" ]
+}
+
+@test "doctor: the plugin check names the plugin and says excludeAgents turns off the shared hooks" {
+  HOOKS_YAML='excludeAgents:
+  - claude-code' plugin_with_hook Bash
+  run doctor_hook_check
+  echo "$output"
+  [[ "$output" == FAIL* ]]
+  [[ "$output" == *"plugin acme"* ]]
+  [[ "$output" == *"the shared hooks included, for: claude-code"* ]]
+}
+
+@test "without agentfile merge, excludeAgents or a shared MCP name also skips the plugin Agentfile" {
+  HOOKS_YAML='excludeAgents:
+  - claude-code' plugin_with_hook Bash
+  AGENTFILE_AGENTBREW_CMD=false run filter
+  echo "$output"
+  [[ "$output" == *"without agentfile merge it would take from the shared layer"* ]]
+  [[ "$output" == *"its excludeAgents: turns off agentbrew sync"* ]]
+  printf 'mcp:\n  - name: playwright\n    command: "~/bin/acme-playwright"\n' > "$PLUGIN_AGENTFILE"
+  AGENTFILE_AGENTBREW_CMD=false run filter
+  echo "$output"
+  [[ "$output" == *"re-defines the shared MCP server playwright"* ]]
+}
+
+@test "without agentfile merge, re-listing a shared MCP server as it is keeps the plugin" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'mcp:\n  - playwright\n  - figma\n' > "$PLUGIN_AGENTFILE"
+  AGENTFILE_AGENTBREW_CMD=false run bash -c 'printf "acme\t%s\n" "$2" | bash -c '\''source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$1/Agentfile.yaml"'\'' _ "$1" 2>/dev/null' _ "$REPO_ROOT" "$PLUGIN_AGENTFILE"
+  [ "$output" = "$PLUGIN_AGENTFILE" ]
+}
+
+@test "without agentfile merge, a plugin cannot re-define the shared memory server" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'mcp:\n  - name: memory\n    command: "~/bin/acme-memory"\n' > "$PLUGIN_AGENTFILE"
+  AGENTFILE_AGENTBREW_CMD=false run filter
+  echo "$output"
+  [[ "$output" == *"re-defines the shared memory server"* ]]
+}
+
+@test "a plugin's recommended: true is refused: it would undo the trimmed shared list" {
+  HOOKS_YAML='recommended: true' plugin_with_hook Bash
+  run filter
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+  [[ "$output" == *"recommended: true installs the whole recommended set"* ]]
+}
+
+@test "a plugin cannot add a second, weaker copy of a shared hook under another agents list" {
+  HOOKS_YAML='hooks:
+  - event: PreToolUse
+    matcher: Bash
+    agents: [claude-code]
+    command: "~/.config/dotfiles/hooks/block-dangerous-git.sh"
+    async: true
+    timeout: 1' plugin_with_hook Bash
+  run filter
+  echo "$output"
+  [[ "$output" == *"second copy of these shared hook commands"* ]]
+  [[ "$output" == *"PreToolUse ~/.config/dotfiles/hooks/block-dangerous-git.sh"* ]]
+}
+
+@test "two plugins cannot replace each other's unnamed MCP server" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'mcp:\n  - name: ""\n    command: a\n' > "$TEST_DIR/p1.yaml"
+  printf 'mcp:\n  - name: ""\n    command: evil\n' > "$TEST_DIR/p2.yaml"
+  run bash -c 'printf "p1\t%s\np2\t%s\n" "$2" "$3" | bash -c '\''source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$1/Agentfile.yaml"'\'' _ "$1"' _ "$REPO_ROOT" "$TEST_DIR/p1.yaml" "$TEST_DIR/p2.yaml"
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin p2"* ]]
+  [[ "$output" == *"(no name)"* ]]
+}
+
+# raw_filter: the no-merge fallback only (prints kept files and reasons).
+raw_filter() {
+  printf 'acme\t%s\n' "$PLUGIN_AGENTFILE" | AGENTFILE_AGENTBREW_CMD=false \
+    bash -c 'source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$1/Agentfile.yaml"' _ "$REPO_ROOT"
+}
+
+@test "without agentfile merge, recommended: True (any YAML spelling of true) is refused" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'recommended: True\n' > "$PLUGIN_AGENTFILE"
+  run raw_filter
+  echo "$output"
+  [[ "$output" == *"without agentfile merge it would take from the shared layer"* ]]
+  [[ "$output" == *"recommended: true installs"* ]]
+}
+
+@test "without agentfile merge, {name: playwright} is not the shared playwright" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'mcp:\n  - name: playwright\n' > "$PLUGIN_AGENTFILE"
+  run raw_filter
+  echo "$output"
+  [[ "$output" == *"re-defines the shared MCP server playwright"* ]]
+}
+
+@test "without agentfile merge, a second entry with a shared name is refused" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'mcp:\n  - playwright\n  - name: playwright\n    command: evil\n' > "$PLUGIN_AGENTFILE"
+  run raw_filter
+  echo "$output"
+  [[ "$output" == *"re-defines the shared MCP server playwright"* ]]
+}
+
+@test "without agentfile merge, a file that is not one map gets that reason" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf -- '- playwright\n' > "$PLUGIN_AGENTFILE"
+  run raw_filter
+  echo "$output"
+  [[ "$output" == *"it is not one map of keys"* ]]
+  [[ "$output" != *"excludeAgents"* ]]
+}
+
+@test "a copy of a shared hook command under another matcher is refused too" {
+  HOOKS_YAML='hooks:
+  - event: PreToolUse
+    matcher: "*"
+    command: "~/.config/dotfiles/hooks/block-dangerous-git.sh"
+    async: true' plugin_with_hook Bash
+  run filter
+  echo "$output"
+  [[ "$output" == *"second copy of these shared hook commands"* ]]
+  [[ "$output" == *"PreToolUse ~/.config/dotfiles/hooks/block-dangerous-git.sh"* ]]
+}
+
+@test "a plugin's own hook command under a shared matcher and agents list is kept" {
+  HOOKS_YAML='hooks:
+  - event: PreToolUse
+    matcher: Bash
+    agents: [claude-code]
+    command: "~/bin/acme-log.sh"' plugin_with_hook Bash
+  run bash -c 'printf "acme\t%s\n" "$2" | bash -c '\''source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$1/Agentfile.yaml"'\'' _ "$1" 2>/dev/null' _ "$REPO_ROOT" "$PLUGIN_AGENTFILE"
+  [ "$output" = "$PLUGIN_AGENTFILE" ]
+}
+
+@test "without agentfile merge, a file with a YAML merge key is refused (yq reads it unlike agentbrew)" {
+  HOOKS_YAML='skills: []' plugin_with_hook Bash
+  printf 'x-off: &off {recommended: false, excludeAgents: []}\nrecommended: true\nexcludeAgents: [claude-code]\n<<: *off\n' > "$PLUGIN_AGENTFILE"
+  run raw_filter
+  echo "$output"
+  [[ "$output" == *"uses a YAML merge key"* ]]
+  [ "${lines[${#lines[@]}-1]}" != "$PLUGIN_AGENTFILE" ]
 }

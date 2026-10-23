@@ -22,7 +22,7 @@ agentfile_optional_layers() {
   local_layer="$(agentfile_local_layer_path)"
   [ -f "$local_layer" ] || return 0
   problems="$(agentfile_local_layer_problems "$local_layer" | grep -v '^note: ' || true)"
-  if printf '%s\n' "$problems" | grep -q '^error: '; then
+  if grep -q '^error: ' <<< "$problems"; then
     printf '⚠ Skipping %s (the other layers still sync):\n' "$local_layer" >&2
     printf '%s\n' "$problems" | sed 's/^/    /' >&2
     return 0
@@ -66,8 +66,7 @@ agentfile_local_layer_problems() {
 # Merges the file alone with agentbrew.
 _agentfile_local_agentbrew_check() {
   local file="$1" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" out err
-  # shellcheck disable=SC2086 # the command may be "node <path>/cli.js"
-  if ! $ab agentfile merge --help 2>&1 | grep -q 'agentfile merge'; then
+  if ! _agentfile_can_merge "$ab"; then
     echo "note: checked with yq only (no agentbrew here can merge Agentfiles)"
     return 0
   fi
@@ -96,7 +95,7 @@ _agentfile_local_tmp() {
 _agentfile_error_line() {
   local plain
   plain="$(printf '%s\n' "$1" | sed $'s/\x1b\\[[0-9;]*m//g')"
-  printf '%s\n' "$plain" | grep -m1 -E '^[[:space:]]*Error:' || printf '%s\n' "$plain" | tail -1
+  grep -m1 -E '^[[:space:]]*Error:' <<< "$plain" || tail -1 <<< "$plain"
 }
 
 _agentfile_local_hooks_error() {
@@ -106,7 +105,7 @@ _agentfile_local_hooks_error() {
 # Clearer messages and warnings with mikefarah yq; silent without it.
 _agentfile_local_yq_check() {
   local file="$1" err top key kind flat
-  yq --version 2>&1 | grep -q mikefarah || return 0
+  _agentfile_mikefarah_yq || return 0
   if ! err="$(yq -o=json '.' "$file" 2>&1 >/dev/null)"; then
     echo "error: not valid YAML: $(printf '%s\n' "$err" | grep -v 'level=WARN' | head -1)"
     return 0
@@ -162,37 +161,52 @@ _agentfile_flat_q() {
 # for company plugins (plugin_agentfile_pairs, lock order) on stdin and
 # prints the Agentfiles to merge, one per line.
 #
-# A plugin may add agent hooks, but never drop, replace, or weaken a shared
-# one. agentbrew's merge lets a later hook replace every earlier hook with
-# the same event, matcher, and agents, so this asks agentbrew itself: it
-# merges the earlier layers (the base, then each plugin kept so far) with
-# and without the plugin. If a hook entry of the earlier merge (compared
-# whole: command, if, async, timeout, and every other field) is missing
-# from the later one, that plugin's Agentfile is skipped, and stderr names
-# the plugin and each hook it would remove. A plugin Agentfile agentbrew
-# cannot read, or a check that cannot run, skips it too.
+# A plugin may add to the shared layer, never take from it. agentbrew's
+# merge lets a later layer replace an earlier hook (same event, matcher, and
+# agents) or MCP server (same name), add agents to excludeAgents, which
+# turns off all agentbrew sync for them, the shared hooks included, and
+# turn on recommended, which installs the whole recommended set (undoing the
+# trimmed shared list). So this asks agentbrew itself: it merges the earlier
+# layers (the base, then each plugin kept so far) with and without the
+# plugin. The plugin's Agentfile is skipped, and stderr names the plugin
+# and what it would take, when the merge with it:
+# - lacks an earlier hook entry (compared whole: command, if, async,
+#   timeout, and every other field), or adds a hook that runs a shared
+#   hook's command or prompt for the same event under any matcher or
+#   agents list (a second copy, maybe weaker, that still runs);
+# - lists an agent in excludeAgents that the earlier merge did not;
+# - lacks an earlier MCP server entry (compared whole), that is, the plugin
+#   re-defines a shared server under the same name;
+# - sets recommended: true when the earlier merge did not.
+# A plugin Agentfile agentbrew cannot read, or a check that cannot run,
+# skips it too. Model fields (defaultModel, defaultEffort, modelOverrides)
+# may change: an overlay sets them on purpose (docs/model-configuration.md).
 #
 # Without an agentbrew that can merge (AGENTFILE_AGENTBREW_CMD, default
 # agentbrew), the sync syncs each Agentfile on its own, and agentbrew then
-# sets the hooks to that file's list, so a plugin Agentfile with hooks: is
-# skipped. Without mikefarah yq nothing can be checked: every Agentfile is
-# skipped.
+# sets the hooks to that file's list. There the rule is stricter and read
+# from the files: a plugin Agentfile is skipped when it is not one map, uses
+# a YAML merge key (yq reads those unlike agentbrew), has any hooks:, excludeAgents:, recommended: true, or an entry for an MCP
+# server the base lists (or memory, when the base turns memory on) that is
+# not written the same way. Without mikefarah yq nothing can be checked:
+# every plugin Agentfile is skipped.
 agentfile_plugin_layers() {
-  local base="$1" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" name file before after err dropped
+  local base="$1" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" name file before after err reasons
   local -a earlier=()
   [ -f "$base" ] && earlier=("$base")
-  if ! yq --version 2>&1 | grep -q mikefarah; then
+  if ! _agentfile_mikefarah_yq; then
     while IFS=$'\t' read -r name file; do
-      [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check its hooks without mikefarah yq\n' "$name" >&2
+      [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check it without mikefarah yq\n' "$name" >&2
     done
     return 0
   fi
-  # shellcheck disable=SC2086 # the command may be "node <path>/cli.js"
-  if ! $ab agentfile merge --help 2>&1 | grep -q 'agentfile merge'; then
+  if ! _agentfile_can_merge "$ab"; then
     while IFS=$'\t' read -r name file; do
       [ -n "$file" ] || continue
-      if [ "$(yq 'explode(.) | has("hooks")' "$file" 2>/dev/null)" != false ]; then
-        printf '⚠ Skipping the Agentfile of plugin %s (%s): it has hooks:, and without agentfile merge they would replace every shared hook\n' "$name" "$file" >&2
+      reasons="$(_agentfile_plugin_raw_reasons "$base" "$file")"
+      if [ -n "$reasons" ]; then
+        printf '⚠ Skipping the Agentfile of plugin %s (%s): without agentfile merge it would take from the shared layer:\n' "$name" "$file" >&2
+        printf '%s\n' "$reasons" | sed 's/^/    /' >&2
         continue
       fi
       printf '%s\n' "$file"
@@ -226,11 +240,10 @@ agentfile_plugin_layers() {
         "$name" "$file" "$(_agentfile_error_line "$err")" >&2
       continue
     fi
-    dropped="$(LC_ALL=C comm -23 <(_agentfile_hook_entries "$before") <(_agentfile_hook_entries "$after"))"
-    if [ -n "$dropped" ]; then
-      printf '⚠ Skipping the Agentfile of plugin %s (%s): its hooks would replace these shared hooks (same event, matcher, and agents):\n' "$name" "$file" >&2
-      printf '%s\n' "$dropped" | yq -p=json -r '.event + " " + .matcher + " " + (.command // .prompt // "")' 2>/dev/null |
-        grep -v '^---$' | sed 's/^/    /' >&2
+    reasons="$(_agentfile_plugin_merge_reasons "$before" "$after")"
+    if [ -n "$reasons" ]; then
+      printf '⚠ Skipping the Agentfile of plugin %s (%s): it would take from the shared layer:\n' "$name" "$file" >&2
+      printf '%s\n' "$reasons" | sed 's/^/    /' >&2
       continue
     fi
     printf '%s\n' "$file"
@@ -240,9 +253,150 @@ agentfile_plugin_layers() {
   rm -f "$before" "$after"
 }
 
+# _agentfile_plugin_merge_reasons <earlier merge> <merge with the plugin>:
+# prints what the plugin would take from the shared layer, one item per
+# line; nothing when it only adds.
+_agentfile_plugin_merge_reasons() {
+  local before="$1" after="$2" dropped added copies excluded servers
+  dropped="$(LC_ALL=C comm -23 <(_agentfile_hook_entries "$before") <(_agentfile_hook_entries "$after"))"
+  if [ -n "$dropped" ]; then
+    echo "its hooks would replace these shared hooks (same event, matcher, and agents):"
+    _agentfile_hook_labels "$dropped" | sed 's/^/  /'
+  fi
+  added="$(LC_ALL=C comm -13 <(_agentfile_hook_entries "$before") <(_agentfile_hook_entries "$after"))"
+  if [ -n "$added" ]; then
+    # Same event and command (or prompt), under any matcher or agents list:
+    # a second copy that may be weaker (async, timeout) and still runs.
+    copies="$(LC_ALL=C comm -12 <(_agentfile_hook_keys "$(_agentfile_hook_entries "$before")") \
+      <(_agentfile_hook_keys "$added"))"
+    if [ -n "$copies" ]; then
+      echo "its hooks would add a second copy of these shared hook commands (same event; use your own hook command):"
+      printf '%s\n' "$copies" | yq -p=json -r '.[0] + " " + .[1]' 2>/dev/null | grep -v '^---$' | sed 's/^/  /'
+    fi
+  fi
+  excluded="$(LC_ALL=C comm -13 <(_agentfile_excluded "$before") <(_agentfile_excluded "$after"))"
+  [ -z "$excluded" ] ||
+    echo "its excludeAgents: turns off agentbrew sync, the shared hooks included, for: $(printf '%s\n' "$excluded" | paste -sd ' ' -)"
+  servers="$(LC_ALL=C comm -23 <(_agentfile_mcp_entries "$before") <(_agentfile_mcp_entries "$after"))"
+  [ -z "$servers" ] || echo "it replaces these shared MCP servers: $(_agentfile_mcp_labels "$servers")"
+  if [ "$(yq '.recommended // false' "$after" 2>/dev/null)" = true ] &&
+    [ "$(yq '.recommended // false' "$before" 2>/dev/null)" != true ]; then
+    echo "its recommended: true installs the whole recommended set, undoing the trimmed shared list"
+  fi
+}
+
+# _agentfile_plugin_raw_reasons <base Agentfile> <plugin Agentfile>: the
+# same rule without agentbrew's merge, read from the files (anchors and
+# merge keys resolved).
+_agentfile_plugin_raw_reasons() {
+  local base="$1" file="$2" name shared
+  if [ "$(yq 'type' "$file" 2>/dev/null | head -2 | paste -sd ' ' -)" != '!!map' ]; then
+    [ ! -s "$file" ] || [ "$(yq 'type' "$file" 2>/dev/null)" = '!!null' ] ||
+      echo "it is not one map of keys (a list, a second YAML document, or not YAML), so it cannot be checked"
+    return 0
+  fi
+  # yq resolves a YAML merge key (<<: *anchor) unlike agentbrew (js-yaml
+  # keeps an explicit key; yq lets a later merge key override it), so a file
+  # with one cannot be read the same way here.
+  if [ "$(yq '[.. | key | select(. == "<<")] | length' "$file" 2>/dev/null)" != 0 ]; then
+    echo "it uses a YAML merge key (<<), which yq reads unlike agentbrew, so it cannot be checked without agentfile merge"
+    return 0
+  fi
+  [ "$(yq 'explode(.) | has("hooks")' "$file" 2>/dev/null)" = false ] ||
+    echo "it has hooks:, and a separate sync would set the hooks to that list, dropping every shared hook"
+  [ "$(yq 'explode(.) | (.excludeAgents // []) | length' "$file" 2>/dev/null)" = 0 ] ||
+    echo "its excludeAgents: turns off agentbrew sync, the shared hooks included"
+  # -o=json reads True and TRUE as true, as agentbrew does.
+  [ "$(yq -o=json 'explode(.) | .recommended // false' "$file" 2>/dev/null)" != true ] ||
+    echo "its recommended: true installs the whole recommended set, undoing the trimmed shared list"
+  [ -f "$base" ] || return 0
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    shared="$(_agentfile_mcp_entries_named "$base" "$name")"
+    if [ -z "$shared" ]; then
+      if [ "$name" = memory ] &&
+        [ "$(yq -o=json 'explode(.) | .memory.enabled // false' "$base" 2>/dev/null)" = true ]; then
+        echo "it re-defines the shared memory server"
+      fi
+      continue
+    fi
+    # Every entry with that name must be one the base lists, written the
+    # same way: agentbrew applies each entry in turn, and a {name: x} map is
+    # a full definition, not the catalog server x.
+    if [ -n "$(LC_ALL=C comm -13 <(printf '%s\n' "$shared") <(_agentfile_mcp_entries_named "$file" "$name"))" ]; then
+      echo "it re-defines the shared MCP server $name"
+    fi
+  done < <(_agentfile_mcp_names "$file")
+}
+
 # _agentfile_hook_entries <merged Agentfile>: each hook entry as one line of
 # sorted-key JSON (matcher "*" when unset), sorted, for a whole-entry compare.
 _agentfile_hook_entries() {
   [ -s "$1" ] || return 0
   yq -o=json -I=0 '(.hooks // [])[] | .matcher = (.matcher // "*") | sort_keys(..)' "$1" 2>/dev/null | LC_ALL=C sort -u
+}
+
+# _agentfile_hook_keys <hook entry lines>: one JSON line per hook,
+# [event, command or prompt], sorted, for the second-copy compare.
+_agentfile_hook_keys() {
+  [ -n "$1" ] || return 0
+  printf '%s\n' "$1" | yq -p=json -o=json -I=0 '[.event, (.command // .prompt // "")]' 2>/dev/null |
+    grep -v '^---$' | LC_ALL=C sort -u
+}
+
+# _agentfile_hook_labels <hook entry lines>: "event matcher command|prompt".
+_agentfile_hook_labels() {
+  [ -n "$1" ] || return 0
+  printf '%s\n' "$1" | yq -p=json -r '.event + " " + .matcher + " " + (.command // .prompt // "")' 2>/dev/null |
+    grep -v '^---$'
+}
+
+# _agentfile_excluded <merged Agentfile>: its excludeAgents, one per line.
+_agentfile_excluded() {
+  [ -s "$1" ] || return 0
+  yq -r '(.excludeAgents // [])[]' "$1" 2>/dev/null | LC_ALL=C sort -u
+}
+
+# _agentfile_mcp_entries <merged Agentfile>: each MCP entry (a name, or a
+# map) as one line of sorted-key JSON, sorted, for a whole-entry compare.
+_agentfile_mcp_entries() {
+  [ -s "$1" ] || return 0
+  yq -o=json -I=0 '(.mcp // [])[] | sort_keys(..)' "$1" 2>/dev/null | LC_ALL=C sort -u
+}
+
+# _agentfile_mcp_labels <MCP entry lines>: their names, on one line.
+_agentfile_mcp_labels() {
+  [ -n "$1" ] || return 0
+  printf '%s\n' "$1" | yq -p=json -r 'select(type == "!!str") // (if (.name // "") == "" then "(no name)" else .name end)' 2>/dev/null |
+    grep -v '^---$' | LC_ALL=C sort -u | paste -sd ' ' -
+}
+
+# _agentfile_mcp_names <Agentfile>: the MCP server names it lists.
+_agentfile_mcp_names() {
+  yq -r 'explode(.) | (.mcp // [])[] | select(type == "!!str") // .name' "$1" 2>/dev/null | LC_ALL=C sort -u
+}
+
+# _agentfile_mcp_entries_named <Agentfile> <name>: every MCP entry with that
+# name, each as one line of sorted-key JSON (written as is), sorted.
+_agentfile_mcp_entries_named() {
+  N="$2" yq -o=json -I=0 'explode(.) | (.mcp // [])[] | select((select(type == "!!str") // .name) == strenv(N)) |
+    sort_keys(..)' "$1" 2>/dev/null | LC_ALL=C sort -u
+}
+
+# _agentfile_can_merge <agentbrew command>: succeeds when it has
+# `agentfile merge`. The help goes into a variable first: piping it into
+# grep -q would let grep stop early, and under pipefail the writer's
+# SIGPIPE would turn a match into a failure.
+_agentfile_can_merge() {
+  local help
+  # shellcheck disable=SC2086 # the command may be "node <path>/cli.js"
+  help="$($1 agentfile merge --help 2>&1 || true)"
+  grep -q 'agentfile merge' <<< "$help"
+}
+
+# _agentfile_mikefarah_yq: succeeds when yq is mikefarah yq (same reason).
+_agentfile_mikefarah_yq() {
+  local v
+  v="$(yq --version 2>&1 || true)"
+  grep -q mikefarah <<< "$v"
 }

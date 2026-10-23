@@ -415,7 +415,7 @@ plugin_lint() {
 # MCP servers, skills, rules). plugin_agentfile_pairs prints
 # "name<TAB>file" for each verified plugin, in lock order; dotfiles apply
 # passes them through agentfile_plugin_layers (lib/agentfile-layers.sh),
-# which drops a plugin Agentfile that would replace a shared hook.
+# which drops a plugin Agentfile that would take from the shared layer.
 plugin_agentfile_pairs() {
   local name path dir
   while IFS=$'\t' read -r name path; do

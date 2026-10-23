@@ -360,3 +360,50 @@ YAML
   [[ "$output" == *"checked with yq only"* ]]
   [[ "$output" == *PASS* ]]
 }
+
+# A stub agentbrew whose `agentfile merge --help` prints the usage line and
+# then much more (as a real agentbrew with a status line and long help can).
+long_help_agentbrew() {
+  local real="$TEST_DIR/bin/agentbrew.merge"
+  mv "$TEST_DIR/bin/agentbrew" "$real"
+  cat > "$TEST_DIR/bin/agentbrew" <<STUB
+#!/bin/bash
+if [ "\$1 \$2 \$3" = "agentfile merge --help" ]; then
+  echo "Usage: agentbrew agentfile merge <agentfiles...>"
+  yes x | head -c 2000000
+  echo
+  exit 0
+fi
+exec "$real" "\$@"
+STUB
+  chmod +x "$TEST_DIR/bin/agentbrew"
+}
+
+@test "a long agentfile merge --help never sends apply to the legacy sync (no SIGPIPE under pipefail)" {
+  long_help_agentbrew
+  printf 'mcp:\n  - figma\n' > "$LOCAL"
+  run run_sync
+  [[ "$output" == *"Merging agentbrew Agentfiles"* ]]
+  [[ "$output" != *"merge unavailable"* ]]
+  grep -qx '# layer: Agentfile.local.yaml' "$HOME/.config/agentbrew/Agentfile.yaml"
+}
+
+@test "a long agentfile merge --help still lets agentbrew check the local layer" {
+  long_help_agentbrew
+  printf 'mcp:\n  - figma\n' > "$LOCAL"
+  run bash -c 'set -o pipefail; source "$1/lib/agentfile-layers.sh"; PATH="$2:$PATH" agentfile_local_layer_problems' _ "$REPO_ROOT" "$TEST_DIR/bin"
+  echo "$output"
+  [[ "$output" != *"checked with yq only"* ]]
+  # And agentbrew's own check runs: its merge of a file it cannot read fails.
+  printf 'mcp: [figma\n' > "$LOCAL"
+  run bash -c 'set -o pipefail; source "$1/lib/agentfile-layers.sh"; PATH="$2:$PATH" agentfile_local_layer_problems' _ "$REPO_ROOT" "$TEST_DIR/bin"
+  echo "$output"
+  [[ "$output" == *"agentbrew cannot read it"* ]]
+}
+
+@test "the error line helper keeps one line even for a long error under pipefail" {
+  # 3 MB is more than one argument may hold, so the error goes in a file.
+  { echo "Error: bad indentation (4:2)"; yes y | head -c 3000000; echo; echo "last line"; } > "$TEST_DIR/err.txt"
+  run bash -c 'set -o pipefail; source "$1/lib/agentfile-layers.sh"; _agentfile_error_line "$(cat "$2")"' _ "$REPO_ROOT" "$TEST_DIR/err.txt"
+  [ "$output" = "Error: bad indentation (4:2)" ]
+}

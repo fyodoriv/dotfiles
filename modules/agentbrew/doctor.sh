@@ -153,7 +153,7 @@ if [ "${LIST_MODE:-false}" != true ] &&
   _agentbrew_plugin_layers_once
 fi
 check "agentbrew.plugin_agentfile_shared" \
-  "no plugin Agentfile takes from the shared layer (hooks, excludeAgents, MCP servers, recommended)${_agentbrew_plugin_problem:+ ($_agentbrew_plugin_problem; fix: give a plugin hook its own command and a plugin MCP server its own name, drop excludeAgents and recommended, then release a new tag)}" \
+  "no plugin Agentfile takes from the shared layer (hooks, excludeAgents, MCP servers, recommended, command and agent names)${_agentbrew_plugin_problem:+ ($_agentbrew_plugin_problem; fix: give a plugin hook its own command, a plugin MCP server its own name, and a plugin command or agent file its own name, drop excludeAgents and recommended, then release a new tag)}" \
   "[ -z \"\$_agentbrew_plugin_problem\" ]" \
   ""
 

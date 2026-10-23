@@ -177,7 +177,15 @@ _agentfile_flat_q() {
 # - lists an agent in excludeAgents that the earlier merge did not;
 # - lacks an earlier MCP server entry (compared whole), that is, the plugin
 #   re-defines a shared server under the same name;
-# - sets recommended: true when the earlier merge did not.
+# - sets recommended: true when the earlier merge did not;
+# - adds a commands: or agents: folder with a *.md file whose name (any
+#   letter case) an earlier folder of that kind also has. agentbrew keeps
+#   one command and one agent file per name, and which copy wins depends on
+#   the order the folders first reached its state (the later command folder
+#   wins, the earlier agent folder wins), so the plugin's copy can replace
+#   the shared one. Skills need no check: agentbrew deploys a skill from an
+#   Agentfile sources: folder only after `agentbrew add`, and a skills: name
+#   installs the catalog or built-in copy.
 # A plugin Agentfile agentbrew cannot read, or a check that cannot run,
 # skips it too. Model fields (defaultModel, defaultEffort, modelOverrides)
 # may change: an overlay sets them on purpose (docs/model-configuration.md).
@@ -188,11 +196,13 @@ _agentfile_flat_q() {
 # from the files: a plugin Agentfile is skipped when it is not one map, uses
 # a YAML merge key (yq reads those unlike agentbrew), has any hooks:, excludeAgents:, recommended: true, or an entry for an MCP
 # server the base lists (or memory, when the base turns memory on) that is
-# not written the same way. Without mikefarah yq nothing can be checked:
-# every plugin Agentfile is skipped.
+# not written the same way. The command and agent name rule is the same,
+# with the folders read from the base and the plugins kept so far.
+# Without mikefarah yq nothing can be checked: every plugin Agentfile is
+# skipped.
 agentfile_plugin_layers() {
   local base="$1" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" name file before after err reasons
-  local -a earlier=()
+  local -a earlier=() kept=()
   [ -f "$base" ] && earlier=("$base")
   if ! _agentfile_mikefarah_yq; then
     while IFS=$'\t' read -r name file; do
@@ -203,13 +213,14 @@ agentfile_plugin_layers() {
   if ! _agentfile_can_merge "$ab"; then
     while IFS=$'\t' read -r name file; do
       [ -n "$file" ] || continue
-      reasons="$(_agentfile_plugin_raw_reasons "$base" "$file")"
+      reasons="$(_agentfile_plugin_raw_reasons "$base" "$file" ${kept[@]+"${kept[@]}"})"
       if [ -n "$reasons" ]; then
         printf '⚠ Skipping the Agentfile of plugin %s (%s): without agentfile merge it would take from the shared layer:\n' "$name" "$file" >&2
         printf '%s\n' "$reasons" | sed 's/^/    /' >&2
         continue
       fi
       printf '%s\n' "$file"
+      kept+=("$file")
     done
     return 0
   fi
@@ -257,7 +268,7 @@ agentfile_plugin_layers() {
 # prints what the plugin would take from the shared layer, one item per
 # line; nothing when it only adds.
 _agentfile_plugin_merge_reasons() {
-  local before="$1" after="$2" dropped added copies excluded servers
+  local before="$1" after="$2" dropped added copies excluded servers kind
   dropped="$(LC_ALL=C comm -23 <(_agentfile_hook_entries "$before") <(_agentfile_hook_entries "$after"))"
   if [ -n "$dropped" ]; then
     echo "its hooks would replace these shared hooks (same event, matcher, and agents):"
@@ -283,13 +294,20 @@ _agentfile_plugin_merge_reasons() {
     [ "$(yq '.recommended // false' "$before" 2>/dev/null)" != true ]; then
     echo "its recommended: true installs the whole recommended set, undoing the trimmed shared list"
   fi
+  # The plugin's folders are the ones its merge adds.
+  for kind in commands agents; do
+    _agentfile_name_reason "$kind" "$(_agentfile_dirs "$kind" "$before")" \
+      "$(LC_ALL=C comm -13 <(_agentfile_dirs "$kind" "$before" | LC_ALL=C sort -u) \
+        <(_agentfile_dirs "$kind" "$after" | LC_ALL=C sort -u))"
+  done
 }
 
-# _agentfile_plugin_raw_reasons <base Agentfile> <plugin Agentfile>: the
-# same rule without agentbrew's merge, read from the files (anchors and
-# merge keys resolved).
+# _agentfile_plugin_raw_reasons <base Agentfile> <plugin Agentfile>
+# [<earlier plugin Agentfile>...]: the same rule without agentbrew's merge,
+# read from the files (anchors and merge keys resolved).
 _agentfile_plugin_raw_reasons() {
-  local base="$1" file="$2" name shared
+  local base="$1" file="$2" name shared kind f
+  shift 2
   if [ "$(yq 'type' "$file" 2>/dev/null | head -2 | paste -sd ' ' -)" != '!!map' ]; then
     [ ! -s "$file" ] || [ "$(yq 'type' "$file" 2>/dev/null)" = '!!null' ] ||
       echo "it is not one map of keys (a list, a second YAML document, or not YAML), so it cannot be checked"
@@ -309,6 +327,13 @@ _agentfile_plugin_raw_reasons() {
   # -o=json reads True and TRUE as true, as agentbrew does.
   [ "$(yq -o=json 'explode(.) | .recommended // false' "$file" 2>/dev/null)" != true ] ||
     echo "its recommended: true installs the whole recommended set, undoing the trimmed shared list"
+  for kind in commands agents; do
+    shared=""
+    for f in "$base" "$@"; do
+      [ -f "$f" ] && shared+="$(_agentfile_file_dirs "$kind" "$f")"$'\n'
+    done
+    _agentfile_name_reason "$kind" "$shared" "$(_agentfile_file_dirs "$kind" "$file")"
+  done
   [ -f "$base" ] || return 0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
@@ -327,6 +352,74 @@ _agentfile_plugin_raw_reasons() {
       echo "it re-defines the shared MCP server $name"
     fi
   done < <(_agentfile_mcp_names "$file")
+}
+
+# _agentfile_name_reason <commands|agents> <shared folders> <plugin folders>:
+# one line naming the plugin's files of that kind whose names (any letter
+# case) a shared folder also has; nothing when there are none.
+_agentfile_name_reason() {
+  local clashes
+  clashes="$(_agentfile_name_clashes "$2" "$3")"
+  [ -z "$clashes" ] ||
+    echo "its $1 have the names of shared $1 (agentbrew keeps one file per name, so the plugin's copy can replace the shared one): $(printf '%s\n' "$clashes" | paste -sd ' ' -)"
+}
+
+# _agentfile_name_clashes <shared folders> <plugin folders> (one per line):
+# the names both sets hold, lowercased (macOS folders ignore letter case).
+# A plugin folder that is a shared folder (same physical path) holds the
+# same files, so it is left out.
+_agentfile_name_clashes() {
+  local d p phys=""
+  local -a shared=() plugin=()
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    shared+=("$d")
+    phys+="$(cd -P "$d" 2>/dev/null && pwd -P)"$'\n'
+  done <<< "$1"
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    p="$(cd -P "$d" 2>/dev/null && pwd -P)" || continue
+    grep -qxF -- "$p" <<< "$phys" && continue
+    plugin+=("$d")
+  done <<< "$2"
+  [ "${#shared[@]}" -gt 0 ] && [ "${#plugin[@]}" -gt 0 ] || return 0
+  LC_ALL=C comm -12 <(_agentfile_md_names "${shared[@]}") <(_agentfile_md_names "${plugin[@]}")
+}
+
+# _agentfile_md_names <folder>...: the names (without .md, lowercased,
+# sorted) of the *.md entries at the top of each folder, the files agentbrew
+# reads as commands or agents.
+_agentfile_md_names() {
+  local d f
+  for d in "$@"; do
+    [ -d "$d" ] || continue
+    for f in "$d"/*.md "$d"/.*.md; do
+      [ -e "$f" ] || [ -L "$f" ] || continue
+      f="${f##*/}"
+      [ "$f" = .md ] || printf '%s\n' "${f%.md}"
+    done
+  done | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C sort -u
+}
+
+# _agentfile_dirs <commands|agents> <merged Agentfile>: its folders of that
+# kind, one per line (agentbrew's merge writes absolute paths).
+_agentfile_dirs() {
+  [ -s "$2" ] || return 0
+  K="$1" yq -r '(.[strenv(K)] // [])[]' "$2" 2>/dev/null
+}
+
+# _agentfile_file_dirs <commands|agents> <Agentfile>: its folders of that
+# kind, as agentbrew resolves them: a leading ~ becomes HOME, and a relative
+# path is under the file's folder.
+_agentfile_file_dirs() {
+  local d dir
+  dir="$(cd "$(dirname "$2")" 2>/dev/null && pwd)" || return 0
+  K="$1" yq -r 'explode(.) | (.[strenv(K)] // [])[]' "$2" 2>/dev/null | while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    case "$d" in '~'*) d="$HOME${d#\~}" ;; esac
+    case "$d" in /*) ;; *) d="$dir/$d" ;; esac
+    printf '%s\n' "$d"
+  done
 }
 
 # _agentfile_hook_entries <merged Agentfile>: each hook entry as one line of

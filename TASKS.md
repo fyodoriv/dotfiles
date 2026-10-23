@@ -58,19 +58,19 @@ them. -->
   - **Anchor**: #281 re-review, 2026-10-22; Apple ships bash 3.2.57 as `/bin/bash`.
   - **Competitive-goal**: none — test coverage for the plugin path, not a scorecard metric.
 
-- [ ] Check whether a plugin's skills, commands, or agent definitions can shadow shared ones by name
-  - **ID**: plugin-name-shadowing
-  - **Tags**: plugins, agents, security
-  - **Details**: `agentfile_plugin_layers` (PR for plugin-exclude-agents-hooks, 2026-10-22) stops a plugin Agentfile from taking hooks, agents (`excludeAgents:`), or MCP servers from the shared layer. The list keys `skills:`, `sources:`, `commands:`, and `agents:` only add in agentbrew's merge, but a plugin source or folder can hold a skill, command, or agent definition with the same name as a shared one. Find out what `agentbrew sync` does on such a name clash (which file wins in `~/.claude/`), with a real sync in a scratch HOME. If the plugin's copy can win, refuse the plugin's clashing names the same way. Not covered either: plugin `rules:` text is appended after the shared rules and can contradict them (content, not structure), and `recommended: true` turns on the recommended MCP set (adds only).
-  - **Files**: `lib/agentfile-layers.sh`, `tests/plugin-agentfile-hooks.bats`, `docs/plugins.md`
+- [ ] Make `dotfiles plugin` commands take the shared dotfiles lock
+  - **ID**: plugin-commands-take-lock
+  - **Tags**: plugins, upgrade, locking
+  - **Details**: `bin/dotfiles-plugin` never sources `lib/lock.sh`, so `add`, `update`, `remove`, and `trust` run without `~/.dotfiles.lock`. `dotfiles upgrade` holds that lock while it runs `dotfiles plugin update --unattended` for each plugin (the Sunday job), and `dotfiles apply` holds it while it reads `plugins.lock` and the plugin folders. A manual plugin command at the same time can race them: two writers of `plugins.lock` (each `_lock_yq` write is atomic, but each read-modify-write is not), or a plugin folder swapped while apply reads it. The child that `dotfiles upgrade` starts must not wait on its parent's lock: `acquire_lock` sees a live owner and returns 1, so a plain `acquire_lock || exit 0` would skip every plugin update. Pass the held lock down (for example an env var with the holder's PID that `lib/lock.sh` accepts) or let `dotfiles upgrade` call the update code in-process. Found while closing plugin-name-shadowing (2026-10-22).
+  - **Files**: `bin/dotfiles-plugin`, `lib/lock.sh`, `bin/dotfiles-upgrade`, `tests/plugin-update.bats`, `tests/dotfiles-upgrade-plugins.bats`
   - **Output**: code
-  - **Acceptance**: a bats case with a scratch plugin that ships a skill named like a shared one shows which copy reaches `~/.claude/skills/`, and the shared copy wins or the plugin Agentfile is skipped.
-  - **Hypothesis**: refusing clashing names drops the ways a plugin can replace shared agent config from 1 (name clash, if agentbrew lets the later copy win) to 0.
-  - **Measurement**: the bats case above, with a real `agentbrew sync` into a scratch HOME (no network).
-  - **Success**: the shared skill, command, and agent files are unchanged after the sync.
-  - **Pivot**: if agentbrew already keeps the first copy, close this task with that evidence.
-  - **Anchor**: PR for plugin-exclude-agents-hooks, 2026-10-22; Saltzer and Schroeder 1975 (fail-safe defaults).
-  - **Competitive-goal**: none — plugin trust boundary, not a scorecard metric.
+  - **Acceptance**: with `~/.dotfiles.lock` held by a live dotfiles process, `dotfiles plugin update <name>` waits or exits with a message naming the holder and leaves `plugins.lock` unchanged, while `dotfiles upgrade` still updates its plugins.
+  - **Hypothesis**: plugin commands that can run during a held dotfiles lock drop from 4 (`add`, `update`, `remove`, `trust`) to 0, with the upgrade's own plugin step still working.
+  - **Measurement**: bats cases that hold the lock with a live scratch process and run each writing plugin command, plus the existing `tests/dotfiles-upgrade-plugins.bats` cases.
+  - **Success**: every writing plugin command refuses or waits under a held lock, and the upgrade plugin cases still pass.
+  - **Pivot**: if a shared lock makes the upgrade's plugin step skip or hang in any case, keep plugin commands lock-free and add a lock on `plugins.lock` writes only.
+  - **Anchor**: plugin-name-shadowing PR, 2026-10-22; `lib/lock.sh` (shared lock for apply, sync, doctor, upgrade).
+  - **Competitive-goal**: none — plugin state safety, not a scorecard metric.
 
 - [ ] Report an installed agent that agentbrew no longer syncs after an old `excludeAgents:`
   - **ID**: agent-detected-stale

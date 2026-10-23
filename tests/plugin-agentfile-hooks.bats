@@ -7,7 +7,9 @@
 # so lib/agentfile-layers.sh (agentfile_plugin_layers) merges the earlier
 # layers with and without the plugin and skips a plugin Agentfile that
 # would remove a hook. These tests use the real `agentbrew agentfile merge`
-# and skip on a Mac without an agentbrew checkout. No network.
+# and skip on a Mac without an agentbrew checkout. The name-clash cases at
+# the end also run a real `agentbrew sync` into the scratch HOME
+# (real_sync). No network.
 
 load test_helper
 
@@ -53,9 +55,15 @@ teardown() {
 # plugin_with_hook <matcher>: a signed plugin whose Agentfile adds figma and
 # one PreToolUse hook with <matcher>, installed and locked.
 # HOOKS_YAML replaces the whole hooks: list when set.
+# PLUGIN_FILES: paths in the agentbrew folder to add (each says PLUGIN).
 plugin_with_hook() {
+  local f
   git init -q "$SRC"
   mkdir -p "$SRC/agentbrew"
+  for f in ${PLUGIN_FILES:-}; do
+    mkdir -p "$(dirname "$SRC/agentbrew/$f")"
+    printf -- '---\ndescription: acme\n---\nPLUGIN %s\n' "$f" > "$SRC/agentbrew/$f"
+  done
   cat > "$SRC/dotfiles-plugin.yaml" <<'YAML'
 schema: 1
 name: acme
@@ -402,4 +410,183 @@ raw_filter() {
   echo "$output"
   [[ "$output" == *"uses a YAML merge key"* ]]
   [ "${lines[${#lines[@]}-1]}" != "$PLUGIN_AGENTFILE" ]
+}
+
+# ── Commands and agents with a shared name ───────────────────────────
+# agentbrew keeps one command and one agent file per name. Which copy wins
+# depends on the order the folders first reached its state: the later
+# command folder wins, the earlier agent folder wins (both shown below with
+# a real sync). So a plugin may not ship a command or agent file named like
+# an earlier layer's one.
+
+# layer <dir> <Agentfile yaml> [<path>...]: a plain Agentfile folder (not
+# an installed plugin); each <path> says the folder's name in capitals.
+layer() {
+  local dir="$1" yaml="$2" word f
+  shift 2
+  word="$(basename "$dir" | tr '[:lower:]' '[:upper:]')"
+  mkdir -p "$dir"
+  printf '%s\n' "$yaml" > "$dir/Agentfile.yaml"
+  for f in "$@"; do
+    mkdir -p "$(dirname "$dir/$f")"
+    printf -- '---\nname: %s\ndescription: %s\n---\n%s %s\n' "$(basename "$f" .md)" "$word" "$word" "$f" > "$dir/$f"
+  done
+}
+
+# layers <base Agentfile> <name>=<Agentfile>...: agentfile_plugin_layers
+# with those plugins, in order (stdout: kept files; stderr: why skipped).
+layers() {
+  local base="$1" p
+  shift
+  for p in "$@"; do printf '%s\t%s\n' "${p%%=*}" "${p#*=}"; done |
+    bash -c 'source "$1/lib/agentfile-layers.sh"; agentfile_plugin_layers "$2"' _ "$REPO_ROOT" "$base"
+}
+
+@test "a plugin command named like a shared command is skipped, naming the plugin and the command" {
+  layer "$TEST_DIR/acme" 'commands: [./commands]' commands/ship-it.md commands/acme-deploy.md
+  run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin acme"* ]]
+  [[ "$output" == *"its commands have the names of shared commands"*": ship-it"* ]]
+  [[ "$output" != *"acme-deploy"* ]]
+  run bash -c "$(declare -f layers); REPO_ROOT='$REPO_ROOT'; layers '$REPO_ROOT/Agentfile.yaml' acme='$TEST_DIR/acme/Agentfile.yaml' 2>/dev/null"
+  [ -z "$output" ]
+}
+
+@test "letter case does not hide a shared name (macOS folders ignore case)" {
+  layer "$TEST_DIR/acme" 'commands: [./commands]' commands/Ship-It.md
+  run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"its commands have the names of shared commands"*": ship-it"* ]]
+}
+
+@test "a plugin agent named like an earlier plugin's agent is skipped; the earlier plugin stays" {
+  layer "$TEST_DIR/base" 'commands: [./commands]' commands/base.md
+  layer "$TEST_DIR/acme" 'agents: [./agents]' agents/reviewer.md
+  layer "$TEST_DIR/beta" 'agents: [./agents]' agents/Reviewer.md agents/beta-only.md
+  run layers "$TEST_DIR/base/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml" beta="$TEST_DIR/beta/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin beta"* ]]
+  [[ "$output" == *"its agents have the names of shared agents"*": reviewer"* ]]
+  [[ "$output" != *"plugin acme"* ]]
+  run bash -c "$(declare -f layers); REPO_ROOT='$REPO_ROOT'; layers '$TEST_DIR/base/Agentfile.yaml' acme='$TEST_DIR/acme/Agentfile.yaml' beta='$TEST_DIR/beta/Agentfile.yaml' 2>/dev/null"
+  [ "$output" = "$TEST_DIR/acme/Agentfile.yaml" ]
+}
+
+@test "plugin commands and agents with their own names are kept" {
+  layer "$TEST_DIR/acme" 'commands: [./commands]
+agents: [./agents]' commands/acme-deploy.md agents/acme-reviewer.md
+  run bash -c "$(declare -f layers); REPO_ROOT='$REPO_ROOT'; layers '$REPO_ROOT/Agentfile.yaml' acme='$TEST_DIR/acme/Agentfile.yaml' 2>&1"
+  echo "$output"
+  [ "$output" = "$TEST_DIR/acme/Agentfile.yaml" ]
+}
+
+@test "a plugin that lists a shared folder again, under another spelling, is kept: same files" {
+  layer "$TEST_DIR/acme" "commands: [\"$REPO_ROOT/commands/\"]"
+  run bash -c "$(declare -f layers); REPO_ROOT='$REPO_ROOT'; layers '$REPO_ROOT/Agentfile.yaml' acme='$TEST_DIR/acme/Agentfile.yaml' 2>&1"
+  echo "$output"
+  [ "$output" = "$TEST_DIR/acme/Agentfile.yaml" ]
+}
+
+@test "without agentfile merge, a command or agent named like an earlier layer's one is refused too" {
+  layer "$TEST_DIR/acme" 'commands: [./commands]' commands/ship-it.md
+  AGENTFILE_AGENTBREW_CMD=false run layers "$REPO_ROOT/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"without agentfile merge it would take from the shared layer"* ]]
+  [[ "$output" == *"its commands have the names of shared commands"*": ship-it"* ]]
+  layer "$TEST_DIR/base" 'commands: [./commands]' commands/base.md
+  layer "$TEST_DIR/p1" 'agents: [./agents]' agents/reviewer.md
+  layer "$TEST_DIR/p2" 'agents: ["~/p2-agents"]'
+  mkdir -p "$HOME/p2-agents" && cp "$TEST_DIR/p1/agents/reviewer.md" "$HOME/p2-agents/REVIEWER.md"
+  AGENTFILE_AGENTBREW_CMD=false run layers "$TEST_DIR/base/Agentfile.yaml" p1="$TEST_DIR/p1/Agentfile.yaml" p2="$TEST_DIR/p2/Agentfile.yaml"
+  echo "$output"
+  [[ "$output" == *"Skipping the Agentfile of plugin p2"* ]]
+  [[ "$output" == *"its agents have the names of shared agents"*": reviewer"* ]]
+  [[ "$output" != *"plugin p1"* ]]
+}
+
+@test "doctor: the plugin check names the plugin and the shared command" {
+  PLUGIN_FILES=commands/ship-it.md HOOKS_YAML='commands:
+  - ./commands' plugin_with_hook Bash
+  run doctor_hook_check
+  echo "$output"
+  [[ "$output" == FAIL* ]]
+  [[ "$output" == *"plugin acme"* ]]
+  [[ "$output" == *"names of shared commands"*"ship-it"* ]]
+}
+
+# real_sync <global Agentfile>: a real `agentbrew sync` of its commands,
+# agents, and skills into the scratch HOME. A scratch HOME does not isolate
+# launchd: `agentbrew init` would load its LaunchAgents into this Mac's real
+# launchd domain, replacing the owner's jobs. So AGENTBREW_NO_AUTO_SYNC=1,
+# and stubs stand in for launchctl, npm, npx, and uvx. git may read local
+# files only, and Node's fetch goes to a dead proxy: no network.
+real_sync() {
+  local stubs="$TEST_DIR/sync-bin" s
+  mkdir -p "$stubs" "$HOME/.claude"
+  for s in launchctl npm npx uvx; do
+    printf '#!/bin/sh\necho "%s $*" >> "%s/stub-calls.log"\nexit 1\n' "$s" "$TEST_DIR" > "$stubs/$s"
+    chmod +x "$stubs/$s"
+  done
+  (
+    cd "$TEST_DIR" || exit 1
+    ab() {
+      env -i HOME="$HOME" PATH="$stubs:$(dirname "$NODE_BIN"):/usr/bin:/bin" \
+        AGENTBREW_NO_AUTO_SYNC=1 AGENTBREW_NO_SHELL_HOOK=1 \
+        GIT_ALLOW_PROTOCOL=file GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+        NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 \
+        "$NODE_BIN" "$AGENTBREW_CHECKOUT/dist/cli.js" "$@"
+    }
+    [ -f "$HOME/.config/agentbrew/state.yaml" ] || ab init --skip-install --skip-sync >/dev/null 2>&1 || exit 1
+    ab sync --no-recommended --agentfile "$1" --only commands,agents,skills
+  )
+}
+
+# clash_layers: a shared layer and plugin acme, both with commands/dup.md
+# and agents/dup.md. acme also ships its own copy of an agentbrew built-in
+# skill ($SKILL) in a sources: folder.
+clash_layers() {
+  SKILL="$(basename "$(dirname "$(ls "$AGENTBREW_CHECKOUT"/skill-plugins/dev/*/SKILL.md | head -1)")")"
+  layer "$TEST_DIR/shared" 'commands: [./commands]
+agents: [./agents]' commands/dup.md agents/dup.md
+  layer "$TEST_DIR/acme" 'commands: [./commands]
+agents: [./agents]
+sources: [./skills]' commands/dup.md agents/dup.md "skills/$SKILL/SKILL.md"
+  GLOBAL="$HOME/.config/agentbrew/Agentfile.yaml"
+  mkdir -p "$(dirname "$GLOBAL")"
+}
+
+# apply_layers: what dotfiles apply does: filter, merge, sync.
+apply_layers() {
+  local kept
+  kept="$(layers "$TEST_DIR/shared/Agentfile.yaml" acme="$TEST_DIR/acme/Agentfile.yaml" 2>/dev/null)"
+  # shellcheck disable=SC2086
+  "$TEST_DIR/bin/agentbrew" agentfile merge "$TEST_DIR/shared/Agentfile.yaml" $kept --output "$GLOBAL" >/dev/null
+  real_sync "$GLOBAL"
+}
+
+@test "real agentbrew sync: the shared command, agent, and skill stay when a plugin ships files with their names" {
+  clash_layers
+  run apply_layers
+  echo "$output"
+  [ "$status" -eq 0 ]
+  grep -q 'SHARED' "$HOME/.claude/commands/dup.md"
+  grep -q 'SHARED' "$HOME/.claude/agents/dup.md"
+  [ -f "$HOME/.claude/skills/$SKILL/SKILL.md" ]
+  ! grep -q 'ACME' "$HOME/.claude/skills/$SKILL/SKILL.md"
+}
+
+@test "real agentbrew sync: the shared agent stays when the plugin's files reached agentbrew first" {
+  clash_layers
+  # The plugin was applied while the shared layer had no files with its
+  # names, so its folders come first in agentbrew's state.
+  "$TEST_DIR/bin/agentbrew" agentfile merge "$TEST_DIR/acme/Agentfile.yaml" --output "$GLOBAL" >/dev/null
+  run real_sync "$GLOBAL"
+  [ "$status" -eq 0 ]
+  grep -q 'ACME' "$HOME/.claude/agents/dup.md"
+  run apply_layers
+  echo "$output"
+  [ "$status" -eq 0 ]
+  grep -q 'SHARED' "$HOME/.claude/agents/dup.md"
+  grep -q 'SHARED' "$HOME/.claude/commands/dup.md"
 }

@@ -265,6 +265,32 @@ dotfiles apply
 Do not delete generated agent directories as a first step. They may contain
 agent-owned preferences outside the agentbrew-managed sections.
 
+### A Scratch-HOME agentbrew Run Replaced This Mac's Jobs
+
+A scratch `HOME` does not isolate launchd. `agentbrew init` or `agentbrew
+sync` run with a scratch `HOME` loads its LaunchAgents (`com.agentbrew.check`,
+`com.agentbrew.mcp-memory`, and others) into this Mac's real launchd domain.
+That replaces the real jobs with copies whose plist and `HOME` are in the
+scratch folder. When the folder is deleted, the jobs break; for example, the
+memory MCP server stops answering. Check:
+
+```bash
+launchctl print "gui/$(id -u)/com.agentbrew.mcp-memory" | grep -m1 'path ='
+```
+
+A path under `/var/folders` or another scratch folder is the sign. Fix each
+such job from its real plist:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.agentbrew.mcp-memory"
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.agentbrew.mcp-memory.plist
+```
+
+To run agentbrew in a scratch `HOME` (tests, experiments), set
+`AGENTBREW_NO_AUTO_SYNC=1` and put a `launchctl` stub first on `PATH`, as
+`real_sync` in `tests/plugin-agentfile-hooks.bats` does. Run it from a scratch
+folder too: a sync also applies an `Agentfile.yaml` in the working folder.
+
 ## Team Rollout Checklist
 
 - Enable `use_ai_tools: true` only for teammates who want AI agent integration.

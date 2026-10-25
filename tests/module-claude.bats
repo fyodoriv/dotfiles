@@ -72,7 +72,7 @@ WRAPPER
 
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 3 ]
+  [ "$pass_count" -eq 5 ]
   [ "$fail_count" -eq 0 ]
 }
 
@@ -87,14 +87,14 @@ WRAPPER
 
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 1 ]
+  [ "$pass_count" -eq 3 ]
   [ "$fail_count" -eq 2 ]
 }
 
 @test "claude: wrapper check fails when unmanaged wrapper is missing" {
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 1 ]
+  [ "$pass_count" -eq 3 ]
   [ "$fail_count" -eq 2 ]
 }
 
@@ -105,10 +105,12 @@ WRAPPER
   collected=()
   check() { collected+=("$1"); }
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
-  [ "${#collected[@]}" -eq 3 ]
+  [ "${#collected[@]}" -eq 5 ]
   [ "${collected[0]}" = "claude.model_wrapper" ]
   [ "${collected[1]}" = "claude.model_default" ]
   [ "${collected[2]}" = "claude.observe_plugin_server" ]
+  [ "${collected[3]}" = "claude.disabled_plugins" ]
+  [ "${collected[4]}" = "claude.no_context7_mcp" ]
 }
 
 @test "claude: observe check fails when the plugin is enabled and its server is down" {

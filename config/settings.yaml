@@ -142,3 +142,7 @@ settings:
     default: manage
     optional: true
     description: manage pins Claude Code to bypassPermissions; keep leaves your own permission prompts alone.
+  claude_disabled_plugins:
+    type: list
+    default: prisma@synced
+    description: Claude Code plugins that dotfiles apply keeps off in ~/.claude/settings.json, comma-separated. Empty = none.

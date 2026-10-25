@@ -22,3 +22,7 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 
 **Debugging:** wrong model? Check, in order:
 1. For Claude Code: `cat ~/.claude/settings.json | jq '.model, .effortLevel'` → `"claude-opus-5-5"` and `"xhigh"` (or this machine's override). The fix path is `dotfiles-doctor --module claude --fix` (which sources `.chezmoiscripts/run_after_claude-settings-model.sh`) — never hand-edit settings.json, Claude Code rewrites it on shutdown.
+
+## Claude Code env pins
+
+`.chezmoiscripts/run_after_claude-settings-env.sh` merges `AGENT_GUARD_DEPTH_MAX=2` into the `env` object of `~/.claude/settings.json` on every apply. This lets the agent-usage-guard plugin allow two levels of nested subagents instead of its default of one. Check it with `jq .env.AGENT_GUARD_DEPTH_MAX ~/.claude/settings.json`. Test: `tests/claude-settings-env.bats`.

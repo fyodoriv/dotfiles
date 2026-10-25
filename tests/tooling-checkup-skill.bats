@@ -81,22 +81,23 @@ make_tooling_root() {
   grep -F -q 'AskUserQuestion' "$SKILL"
   grep -F -q 'checkup_state.py record' "$SKILL"
   grep -F -q 'agent_time_review.py --days 7' "$SKILL"
-  grep -F -q '### Agent time (7 days)' "$SKILL"
+  grep -F -q '### Agent time (7 days)' "$SKILL_DIR/reference/report-outline.md"
   grep -F -q 'runs all twelve phases' "$SKILL"
   [ "$(grep -c '^## Phase ' "$SKILL")" -eq 12 ]
   [ "$(grep -c '^\*\*Done when:\*\*' "$SKILL")" -eq 12 ]
 }
 
 @test "tooling-checkup monthly pass covers health, cached gate, stories, speed, learnings, and P0s" {
-  grep -F -q 'bin/dotfiles-doctor --quiet' "$SKILL"
-  grep -F -q 'Cached gate: `make check`' "$SKILL"
-  grep -F -q 'Broken stories: `make e2e`' "$SKILL"
-  grep -F -q 'gate-timings.jsonl' "$SKILL"
-  grep -F -q 'bin/dotfiles-metrics --table' "$SKILL"
-  grep -F -q 'docs/learnings.md' "$SKILL"
-  grep -F -q 'Open P0s' "$SKILL"
-  grep -F -q 'Repo health (monthly):' "$SKILL"
-  grep -F -q 'make changelog' "$SKILL"
+  grep -F -q 'reference/monthly-repo-health.md' "$SKILL"
+  grep -F -q 'bin/dotfiles-doctor --quiet' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'Cached gate: `make check`' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'Broken stories: `make e2e`' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'gate-timings.jsonl' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'bin/dotfiles-metrics --table' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'docs/learnings.md' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'Open P0s' "$SKILL_DIR/reference/monthly-repo-health.md"
+  grep -F -q 'Repo health (monthly):' "$SKILL_DIR/reference/report-outline.md"
+  grep -F -q 'make changelog' "$SKILL_DIR/reference/monthly-repo-health.md"
 }
 
 @test "tooling-checkup reference links resolve one level deep" {
@@ -659,7 +660,7 @@ JS
   grep -F -q '## Phase 9: AI-work research' "$SKILL"
   grep -F -q 'ai_research.py scan' "$SKILL"
   grep -F -q 'ai_research.py record' "$SKILL"
-  grep -F -q '### AI-work research' "$SKILL"
+  grep -F -q '### AI-work research' "$SKILL_DIR/reference/report-outline.md"
   local ref="$SKILL_DIR/reference/ai-work-research.md"
   grep -F -q '| Altitude |' "$ref"
   grep -F -q '| Depth |' "$ref"
@@ -862,4 +863,42 @@ EOF
     --state "$TEST_DIR/none.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log" --explained-file "$TEST_DIR/explained.txt"
   echo "$output"
   [[ "$output" == *"load_overload_rows_explained"*" 2 "* ]]
+}
+
+# The skills audit follows the Agent Skills spec (agentskills.io/specification, #315).
+@test "audit checks every Agent Skills spec requirement" {
+  mk() { mkdir -p "$TEST_DIR/skills/$1"; printf -- '---\n%s\n---\nBody.\n' "$2" > "$TEST_DIR/skills/$1/SKILL.md"; }
+  mk -lead $'name: -lead\ndescription: Formats notes. Use when asked for notes.'
+  mk a--b $'name: a--b\ndescription: Formats notes. Use when asked for notes.'
+  mk other-dir $'name: not-the-dir\ndescription: Formats notes. Use when asked for notes.'
+  mk compat "name: compat
+description: Formats notes. Use when asked for notes.
+compatibility: $(printf 'x%.0s' $(seq 501))"
+  mk meta $'name: meta\ndescription: Formats notes. Use when asked for notes.\nmetadata:\n  author: me\n  nested:\n    deep: no'
+  mk tools $'name: tools\ndescription: Formats notes. Use when asked for notes.\nallowed-tools:\n  - Read'
+  mk big $'name: big\ndescription: Formats notes. Use when asked for notes.'
+  awk 'BEGIN { for (i = 0; i < 400; i++) print "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word" }' >> "$TEST_DIR/skills/big/SKILL.md"
+  mk fine $'name: fine\ndescription: Formats notes. Use when asked for notes.\nlicense: MIT\ncompatibility: Requires git\nmetadata:\n  author: me\n  version: "1.0"\nallowed-tools: Bash(git:*) Read'
+
+  run python3 "$SCRIPTS/audit_agent_config.py" --skills "$TEST_DIR/skills"
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"ERROR S017 "*"-lead/SKILL.md"* ]]
+  [[ "$output" == *"ERROR S018 "*"a--b/SKILL.md"* ]]
+  [[ "$output" == *"ERROR S005 "*"other-dir/SKILL.md"*"[spec: name]"* ]]
+  [[ "$output" == *"ERROR S019 "*"compat/SKILL.md"* ]]
+  [[ "$output" == *"ERROR S020 "*"meta/SKILL.md"* ]]
+  [[ "$output" == *"WARN S021 "*"tools/SKILL.md"* ]]
+  [[ "$output" == *"WARN S022 "*"big/SKILL.md"* ]]
+  [[ "$output" != *"fine/SKILL.md"* ]]
+}
+
+@test "audit --spec-coverage: every spec requirement has a check, and each rule names its spec section or says it is ours" {
+  run python3 "$SCRIPTS/audit_agent_config.py" --spec-coverage
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"spec requirements without a check: 0"* ]]
+  [[ "$output" == *"S003"*"spec: name"* ]]
+  [[ "$output" == *"S010"*"ours"* ]]
+  grep -q 'agentskills.io/specification' "$SKILL_DIR/reference/config-audit.md"
 }

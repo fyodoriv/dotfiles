@@ -26,25 +26,37 @@ python3 <skill-dir>/scripts/audit_agent_config.py --include-installed   # third-
 
 `--cache` replays the last result when no input file changed.
 
-| Code | Level | Rule | Source |
-|---|---|---|---|
-| S001 | ERROR | `SKILL.md` has YAML frontmatter | best practices |
-| S002, S003 | ERROR | `name` exists, 1 to 64 chars, lowercase letters, digits, hyphens | best practices |
-| S004 | ERROR | `name` has no reserved word (`anthropic`, `claude`) | best practices |
-| S005 | WARN | `name` matches the directory (Claude Code uses the directory for `/name`) | skills |
-| S006, S007 | ERROR | `description` exists, at most 1024 chars | best practices |
-| S008 | WARN | `description` + `when_to_use` at most 1536 chars (listing cut-off) | skills |
-| S009 | WARN | no angle-bracket tags in `name` or `description` | best practices |
-| S010 | WARN | `description` is in the third person | best practices |
-| S011 | WARN | `description` says when to use the skill | best practices |
-| S012 | WARN | body under 500 lines | best practices, skills |
-| S013 | ERROR | relative links resolve | — |
-| S014 | WARN | reference files are one level deep from `SKILL.md` | best practices |
-| S015 | INFO | reference files over 100 lines start with a table of contents | best practices |
-| S016 | WARN | forward slashes in paths | best practices |
-| R001 | WARN | an instruction file is under 200 lines | memory |
-| R002 | WARN | `@path` imports resolve | memory |
-| R003 | WARN | no line repeats inside one always-loaded file | memory ("specific and concise") |
+Skill rules follow the [Agent Skills spec](https://agentskills.io/specification).
+The Spec column names the spec section a rule enforces; "ours" marks a rule
+that comes from Anthropic's best practices, Claude Code, or this audit only.
+`audit_agent_config.py --spec-coverage` prints the same map and the count of
+spec requirements without a check (the goal is 0).
+
+| Code | Level | Rule | Spec | Source |
+|---|---|---|---|---|
+| S001 | ERROR | `SKILL.md` has YAML frontmatter | `SKILL.md` format | spec |
+| S002, S003 | ERROR | `name` exists, 1 to 64 chars, lowercase letters, digits, hyphens | name | spec |
+| S017 | ERROR | `name` does not start or end with a hyphen | name | spec |
+| S018 | ERROR | `name` has no consecutive hyphens | name | spec |
+| S005 | ERROR | `name` matches the parent directory | name | spec |
+| S004 | ERROR | `name` has no reserved word (`anthropic`, `claude`) | ours | best practices |
+| S006, S007 | ERROR | `description` exists, at most 1024 chars | description | spec |
+| S011 | WARN | `description` says when to use the skill | description | spec |
+| S019 | ERROR | `compatibility`, when present, is 1 to 500 chars | compatibility | spec |
+| S020 | ERROR | `metadata` is a map from string keys to string values | metadata | spec |
+| S021 | WARN | `allowed-tools` is one space-separated string | allowed-tools | spec |
+| S012 | WARN | body under 500 lines | progressive disclosure | spec, best practices |
+| S022 | WARN | body under about 5000 tokens (characters / 4) | progressive disclosure | spec |
+| S014 | WARN | reference files are one level deep from `SKILL.md` | file references | spec |
+| S008 | WARN | `description` + `when_to_use` at most 1536 chars (listing cut-off) | ours | skills (Claude Code) |
+| S009 | WARN | no angle-bracket tags in `name` or `description` | ours | best practices |
+| S010 | WARN | `description` is in the third person | ours | best practices |
+| S013 | ERROR | relative links resolve | ours | — |
+| S015 | INFO | reference files over 100 lines start with a table of contents | ours | best practices |
+| S016 | WARN | forward slashes in paths | ours | best practices |
+| R001 | WARN | an instruction file is under 200 lines | — | memory |
+| R002 | WARN | `@path` imports resolve | — | memory |
+| R003 | WARN | no line repeats inside one always-loaded file | — | memory ("specific and concise") |
 
 ## Judgment checks
 

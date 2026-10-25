@@ -290,24 +290,10 @@ NP=~/.claude/skills/new-project
 
 ### Monthly: repo health, stories, and gate speed review
 
-In the same monthly pass, for `dotfiles` (run from its checkout):
-
-1. Health: `bin/dotfiles-doctor --quiet`. Each failing check line names its fix.
-2. Cached gate: `make check`. `bin/cached-run` skips unchanged steps;
-   `make test-force` runs everything.
-3. Broken stories: `make e2e`. A failing test name starts with its story ID
-   (`USNN e2e: …`); report the story, not only the test.
-4. Speed review: `bin/dotfiles-metrics --table`. Compare the `make check`
-   row (from `~/.local/state/dotfiles/gate-timings.jsonl`) and every other
-   metric with its goal and pivot. Per-step times:
-   `jq -s 'group_by(.step) | map({step: .[0].step, median: (map(.seconds) | sort | .[length/2|floor])})' ~/.local/state/dotfiles/gate-timings.jsonl`.
-   A metric past its pivot becomes a P0 or P1 task with the numbers.
-5. Learnings: add a row to `docs/learnings.md` for each prediction closed
-   since the last checkup (predicted vs observed).
-6. Open P0s: list `## P0` in `TASKS.md`; each one goes to "Next: stability".
-7. Changelog: `make changelog` regenerates `CHANGELOG.md` from conventional
-   commits (dotfiles has no release tags, so the monthly pass is its
-   release). Ship the diff as a `docs(changelog):` PR; never edit it by hand.
+In the same monthly pass, follow
+[reference/monthly-repo-health.md](reference/monthly-repo-health.md) for
+`dotfiles`: doctor, cached gate, broken stories, speed review, learnings,
+open P0s, and the changelog.
 
 **Done when:** every ERROR is fixed or listed with its owner, the judgment
 checks are done, each due repository has a recorded requirements audit, and
@@ -378,58 +364,8 @@ The report is one self-contained HTML page, not chat text (shared-rules
 4. In chat, write only the page link, the one-line verdict, and then go to
    Phase 11. Do not paste the whole report.
 
-Outline of the page:
-
-```markdown
-## Tooling checkup <YYYY-MM-DD>
-
-**Verdict:** <healthy | healthy with gaps | broken: <what>>
-**Since last run (<age>):** <changed versions and heads, or "nothing changed">
-
-### Shipped
-- <PR or commit>: <what it delivers> (<evidence>)
-
-### Updated
-- <tool>: <old> → <new> | skipped: <reason> | failed: <log line>
-- Claude Code: <old> → <new>; doctor: <OK or findings>
-
-### Background processes
-- Removed: <label> (<why>) · Kept for you to decide: <label>
-- Heavy: <process> <cpu>% <mem> MB → <cause or lead>
-
-### Machine metrics (24 h)
-- act: <metric> <value> → <fix, task, or question> · warn: <metric> <value> · rest ok
-- Input latency: skipped (no trigger) | claude p95 <before> → <after> ms (<trigger>)
-
-### Config audit
-- <n> errors, <n> warnings · fixed: <list> · open: <list with owner>
-- Requirements (monthly): <repo> <score> (<change>) · waived: <n> · not due: <repos>
-- Repo health (monthly): doctor <n> failing · gate <pass/fail> · stories broken: <USNN list or none> · gate <median> s (goal 120, pivot 300)
-
-### Agent time (7 days)
-- Tool time: <h> (<change> vs last run) · active <h> · output <n>M tokens
-- Slowest recurring: <key> <total> (<n>x, p95 <s>) · <key> … · <key> …
-- Per project: <project>: <top key> <total> · …
-- Speedups: filed <repo>/<task-id> (<min/day>) · fixed: <what> · none
-
-### AI-work research
-- Scanned: <n> new items from <n> feeds (<errors>) · searches: <queries>
-- Adopt/try: <idea> (<lens>) → <task, PR, or question> · skipped: <n>
-
-### Needs you
-- <item> → <the exact question or command>
-
-### Next: stability
-1. `<repo>/<task-id>` (<priority>): <why now>
-
-### Next: features
-1. `<repo>/<task-id>` (<priority>): <why now>
-```
-
-Rules: "Shipped" lists only work that reached `origin`. Keep stability and
-feature work in separate lists, up to three each. Recommend from the refreshed
-`TASKS.md` queues of the tooling repositories. A gap with no task gets
-`new: <kebab-case-id>` and one line on why.
+The page follows the outline and rules in
+[reference/report-outline.md](reference/report-outline.md).
 
 **Done when:** the HTML page is published (or its path given), each claim on
 it has evidence, and the chat holds only the link and the verdict.

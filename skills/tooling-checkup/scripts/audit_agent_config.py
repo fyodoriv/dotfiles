@@ -48,6 +48,72 @@ FENCE_RE = re.compile(r"^\s*(```|~~~)")
 CODE_SPAN_RE = re.compile(r"`[^`]*`")
 FOLDED = {">", ">-", ">+", "|", "|-", "|+"}
 
+# Each skill rule against the Agent Skills spec (https://agentskills.io/specification,
+# #315): the spec section it enforces, or None when it is ours only (Anthropic
+# best practices, Claude Code, or this audit). --spec-coverage prints the map.
+RULE_SPEC = {
+    "S001": "SKILL.md format", "S002": "name", "S003": "name", "S004": None,
+    "S005": "name", "S006": "description", "S007": "description", "S008": None,
+    "S009": None, "S010": None, "S011": "description", "S012": "progressive disclosure",
+    "S013": None, "S014": "file references", "S015": None, "S016": None,
+    "S017": "name", "S018": "name", "S019": "compatibility", "S020": "metadata",
+    "S021": "allowed-tools", "S022": "progressive disclosure",
+}
+# Every requirement the spec states for a skill, and the rule that checks it.
+SPEC_REQUIREMENTS = {
+    "YAML frontmatter, then Markdown": "S001",
+    "name: required": "S002",
+    "name: 1-64 lowercase letters, digits, hyphens": "S003",
+    "name: no leading or trailing hyphen": "S017",
+    "name: no consecutive hyphens": "S018",
+    "name: matches the parent directory": "S005",
+    "description: required, non-empty": "S006",
+    "description: at most 1024 characters": "S007",
+    "description: says what it does and when to use it": "S011",
+    "compatibility: 1-500 characters": "S019",
+    "metadata: a map from string keys to string values": "S020",
+    "allowed-tools: a space-separated string": "S021",
+    "SKILL.md under 500 lines": "S012",
+    "instructions under 5000 tokens": "S022",
+    "file references one level deep": "S014",
+}
+
+
+def spec_tag(code):
+    section = RULE_SPEC.get(code)
+    return f" [spec: {section}]" if section else ""
+
+
+def spec_coverage():
+    print("Skill rules and the Agent Skills spec (https://agentskills.io/specification):")
+    for code, section in RULE_SPEC.items():
+        print(f"  {code}  {'spec: ' + section if section else 'ours (not in the spec)'}")
+    missing = [req for req, code in SPEC_REQUIREMENTS.items() if code not in RULE_SPEC]
+    cited = sum(1 for section in RULE_SPEC.values() if section)
+    print(f"skill rules citing a spec section: {cited} of {len(RULE_SPEC)}")
+    print(f"spec requirements: {len(SPEC_REQUIREMENTS)}; spec requirements without a check: {len(missing)}")
+    for req in missing:
+        print(f"  missing: {req}")
+    return 1 if missing else 0
+
+
+def frontmatter_blocks(text: str):
+    """Return {key: (inline value, [indented lines])} for top-level keys."""
+    lines = text.split("\n")
+    out, key = {}, None
+    if not lines or lines[0].strip() != "---":
+        return out
+    for raw in lines[1:]:
+        if raw.strip() == "---":
+            break
+        top = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", raw)
+        if top and not raw.startswith((" ", "\t")):
+            key = top.group(1)
+            out[key] = (top.group(2).strip(), [])
+        elif key is not None and raw.strip():
+            out[key][1].append(raw)
+    return out
+
 
 class Report:
     def __init__(self):
@@ -56,7 +122,7 @@ class Report:
 
     def add(self, level, code, path, message, line=None):
         where = f"{path}:{line}" if line else str(path)
-        self.lines.append(f"{level} {code} {where}: {message}")
+        self.lines.append(f"{level} {code} {where}: {message}{spec_tag(code)}")
         self.counts[level] += 1
 
 
@@ -152,8 +218,12 @@ def check_skill(skill_md: pathlib.Path, report: Report):
             report.add("ERROR", "S003", where, f"name '{name}' must be 1-64 lowercase letters, digits, or hyphens")
         if "anthropic" in name or "claude" in name:
             report.add("ERROR", "S004", where, f"name '{name}' contains a reserved word (anthropic, claude)")
+        if name.startswith("-") or name.endswith("-"):
+            report.add("ERROR", "S017", where, f"name '{name}' must not start or end with a hyphen")
+        if "--" in name:
+            report.add("ERROR", "S018", where, f"name '{name}' must not contain consecutive hyphens")
         if name != skill_md.resolve().parent.name:
-            report.add("WARN", "S005", where, f"name '{name}' differs from its directory '{skill_md.resolve().parent.name}'")
+            report.add("ERROR", "S005", where, f"name '{name}' differs from its directory '{skill_md.resolve().parent.name}'")
     if not description:
         report.add("ERROR", "S006", where, "frontmatter has no description")
     else:
@@ -171,7 +241,26 @@ def check_skill(skill_md: pathlib.Path, report: Report):
         if tag_match:
             report.add("WARN", "S009", where, f"{field} contains an angle-bracket tag {tag_match.group(0)}; Claude Code escapes it, the Skills API rejects it")
 
+    blocks = frontmatter_blocks(text)
+    if "compatibility" in fields:
+        compat = fields.get("compatibility", "")
+        if not 1 <= len(compat) <= 500:
+            report.add("ERROR", "S019", where, f"compatibility has {len(compat)} characters (must be 1-500)")
+    if "metadata" in blocks:
+        inline, nested = blocks["metadata"]
+        indents = {len(line) - len(line.lstrip()) for line in nested}
+        flat = all(re.match(r"^\s+[^\s:#][^:]*:\s*\S", line) for line in nested)
+        if inline not in ("", "{}") or not flat or len(indents) > 1:
+            report.add("ERROR", "S020", where, "metadata must be a map from string keys to string values (no lists or nested maps)")
+    if "allowed-tools" in blocks:
+        inline, nested = blocks["allowed-tools"]
+        if nested or inline.startswith("["):
+            report.add("WARN", "S021", where, "allowed-tools must be one space-separated string, not a list")
+
     body_lines = body.split("\n")
+    # The spec recommends under 5000 tokens of instructions; ~4 characters a token.
+    if len(body) // 4 > 5000:
+        report.add("WARN", "S022", where, f"body is about {len(body) // 4} tokens (keep under 5000; move detail to reference files)")
     if len(body_lines) > 500:
         report.add("WARN", "S012", where, f"body has {len(body_lines)} lines (keep under 500; move detail to reference files)")
 
@@ -308,8 +397,12 @@ def main() -> int:
     parser.add_argument("--rules", action="append", default=[], help="CLAUDE.md, AGENTS.md, or rules file")
     parser.add_argument("--include-installed", action="store_true")
     parser.add_argument("--cache", action="store_true", help="replay the last result when no input changed")
+    parser.add_argument("--spec-coverage", action="store_true",
+                        help="print each skill rule's Agent Skills spec section, and any spec requirement without a check")
     args = parser.parse_args()
 
+    if args.spec_coverage:
+        return spec_coverage()
     if args.skills or args.rules:
         skill_roots, rule_files = args.skills, args.rules
     else:

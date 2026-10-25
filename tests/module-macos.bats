@@ -153,7 +153,7 @@ teardown() {
   set_default com.apple.finder FXEnableExtensionChangeWarning "0"
   set_default com.apple.finder FXDefaultSearchScope "SCcf"
   set_default com.apple.finder FXPreferredViewStyle "clmv"
-  set_default com.apple.finder CreateDesktop "0"
+  set_default com.apple.finder CreateDesktop "1"
   set_default com.apple.desktopservices DSDontWriteNetworkStores "1"
   set_default com.apple.desktopservices DSDontWriteUSBStores "1"
   set_default com.apple.CrashReporter DialogType "none"
@@ -195,6 +195,14 @@ teardown() {
   [ "$(cat "$MOCK_DEFAULTS/NSGlobalDomain/KeyRepeat")" = "1" ]
   [ "$(cat "$MOCK_DEFAULTS/com.apple.dock/autohide")" = "1" ]
   [ "$(cat "$MOCK_DEFAULTS/com.apple.finder/AppleShowAllFiles")" = "1" ]
+}
+
+@test "macos: desktop icons are shown by default, and --fix shows hidden ones" {
+  set_default com.apple.finder CreateDesktop "0"
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/macos/doctor.sh"
+  [ "$(cat "$MOCK_DEFAULTS/com.apple.finder/CreateDesktop")" = "1" ]
+  grep -qx 'macos.finder_desktop_icons' "$CHECK_DEFAULTS_LOG"
 }
 
 @test "macos: CI mode skips all defaults checks" {

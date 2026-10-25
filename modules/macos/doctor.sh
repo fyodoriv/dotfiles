@@ -49,7 +49,7 @@ check_defaults "macos.finder_no_anim"       "Finder animations off"      com.app
 check_defaults "macos.finder_ext_warning"   "No extension change warning" com.apple.finder FXEnableExtensionChangeWarning "0" bool
 check_defaults "macos.finder_search_scope"  "Search current folder"      com.apple.finder FXDefaultSearchScope      "SCcf" string
 check_defaults "macos.finder_column_view"   "Column view default"        com.apple.finder FXPreferredViewStyle      "clmv" string
-check_defaults "macos.finder_no_desktop"    "No desktop icons"           com.apple.finder CreateDesktop             "0" bool
+check_defaults "macos.finder_desktop_icons" "Desktop icons shown"        com.apple.finder CreateDesktop             "1" bool
 
 # ── DS_Store ─────────────────────────────────────────────────────────
 check_defaults "macos.no_ds_store_network"  "No .DS_Store on network"    com.apple.desktopservices DSDontWriteNetworkStores "1" bool

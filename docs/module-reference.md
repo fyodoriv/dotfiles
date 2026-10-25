@@ -360,7 +360,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | Animations | `macos.window_animations`, `scroll_animations`, `resize_time` | 3 | Window/scroll animations disabled |
 | Keyboard | `key_repeat`, `initial_key_repeat`, `press_and_hold`, `autocorrect`, `autocapitalize`, `smartquotes`, `smartdashes`, `period_substitution`, `text_completion` | 9 | Fastest key repeat, no auto-correct/smart-quotes |
 | Dock | `dock_autohide`, `dock_autohide_delay`, `dock_launch_anim`, `dock_minimize`, `dock_mru`, `dock_recents`, `dock_expose_speed` | 7 | Instant autohide, no animations |
-| Finder | `finder_hidden_files`, `finder_pathbar`, `finder_statusbar`, `finder_folders_first`, `finder_extensions`, `finder_no_anim`, `finder_ext_warning`, `finder_search_scope`, `finder_column_view`, `finder_no_desktop` | 10 | Show hidden files, path bar, all extensions |
+| Finder | `finder_hidden_files`, `finder_pathbar`, `finder_statusbar`, `finder_folders_first`, `finder_extensions`, `finder_no_anim`, `finder_ext_warning`, `finder_search_scope`, `finder_column_view`, `finder_desktop_icons` | 10 | Show hidden files, path bar, all extensions, desktop icons |
 | DS_Store | `no_ds_store_network`, `no_ds_store_usb` | 2 | No .DS_Store on external volumes |
 | Screenshots | `screenshot_type`, `screenshot_shadow` | 2 | PNG format, no shadow |
 | Input | `mouse_speed`, `trackpad_speed`, `tap_to_click`, `three_finger_drag` | 4 | Speed settings, tap-to-click |

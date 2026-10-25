@@ -59,7 +59,7 @@ cpu_line="$(ps -A -r -o %cpu=,comm= 2>/dev/null | awk -v cpus="$cpus" '
   { sum += $1 }
   # comm is the full path and can hold spaces (#308): take the rest of the
   # line, its last path part, and "_" for a space (the list is space-separated).
-  NR <= 3 { n = $0; sub(/^[ \t]*[^ \t]+[ \t]+/, "", n); sub(/.*\//, "", n); gsub(/ /, "_", n)
+  NR <= 3 { n = $0; sub(/^[ \t]*[^ \t]+[ \t]+/, "", n); sub(/\/+$/, "", n); sub(/.*\//, "", n); gsub(/[ \t]/, "_", n)
     top = top sprintf("%s%s:%s", (NR > 1 ? " " : ""), n, $1) }
   END { printf "%s\t%d", top, (cpus > 0 ? sum / cpus : 0) }')"
 top="${cpu_line%%$'\t'*}"

@@ -37,6 +37,7 @@ DEFAULTS = {
 # DOTFILES_EXPLAINED_LOAD (comma or space separated) replaces this default;
 # ~/.config/dotfiles/explained-load (one name per line, # comments) adds to it;
 # a space in a name there matches the sampler's "_" (Google Chrome = Google_Chrome).
+# In DOTFILES_EXPLAINED_LOAD (split on spaces), write that space as "_".
 EXPLAINED_LOAD_DEFAULT = ("GeForceNOW",)
 
 # Thresholds. Overload means load1 above twice the core count.

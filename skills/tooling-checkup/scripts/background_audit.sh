@@ -106,9 +106,11 @@ fi
 
 echo "== top $TOP processes by CPU"
 ps -Ao pid=,pcpu=,rss=,etime=,comm= -r 2>/dev/null | head -n "$TOP" \
-  | awk '{ printf "  pid=%s cpu=%s%% rss_mb=%.0f up=%s %s\n", $1, $2, $3 / 1024, $4, $5 }'
+  | awk '{ c = $0; for (i = 1; i <= 4; i++) sub(/^[ \t]*[^ \t]+/, "", c); sub(/^[ \t]+/, "", c)
+      printf "  pid=%s cpu=%s%% rss_mb=%.0f up=%s %s\n", $1, $2, $3 / 1024, $4, c }'
 echo "== top $TOP processes by memory"
 ps -Ao pid=,pcpu=,rss=,etime=,comm= -m 2>/dev/null | head -n "$TOP" \
-  | awk '{ printf "  pid=%s cpu=%s%% rss_mb=%.0f up=%s %s\n", $1, $2, $3 / 1024, $4, $5 }'
+  | awk '{ c = $0; for (i = 1; i <= 4; i++) sub(/^[ \t]*[^ \t]+/, "", c); sub(/^[ \t]+/, "", c)
+      printf "  pid=%s cpu=%s%% rss_mb=%.0f up=%s %s\n", $1, $2, $3 / 1024, $4, c }'
 echo "== load"
 uptime

@@ -835,3 +835,31 @@ EOF2
   [[ "$output" == *"ship      branch feat/stacked has 1 commit(s) not in main"* ]]
   [ "$(grep -c -- '--state merged' "$TEST_DIR/gh.log")" -eq 1 ]
 }
+
+@test "background audit prints the whole path of a process with a space in it (#308)" {
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/ps" <<'EOF'
+#!/bin/bash
+printf '  501   43.8   204800   01:02 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n'
+EOF
+  chmod +x "$TEST_DIR/bin/ps"
+  run env PATH="$TEST_DIR/bin:$PATH" BACKGROUND_AUDIT_DIRS="$TEST_DIR/none" BACKGROUND_AUDIT_LAUNCHCTL="$TEST_DIR/none.txt" \
+    BACKGROUND_AUDIT_TOP=1 DOTFILES_SOURCE="$TEST_DIR/none" bash "$SCRIPTS/background_audit.sh"
+  echo "$output"
+  [[ "$output" == *"pid=501 cpu=43.8% rss_mb=200 up=01:02 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome"* ]]
+}
+
+@test "machine metrics match an explained app whose name has a space (#308)" {
+  local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
+  : > "$samples"
+  for i in 0 1; do
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tGoogle_Chrome:90.1 mds:10.0\t90\n' \
+      "$((now - 3600 + i * 30))" "$i" >> "$samples"
+  done
+  printf '  PID PRI TTY      COMM\n' > "$ps_file"
+  printf 'Google Chrome\n' > "$TEST_DIR/explained.txt"
+  run env DOTFILES_EXPLAINED_LOAD= python3 "$SCRIPTS/machine_metrics.py" --now "$now" --samples "$samples" --ps-file "$ps_file" \
+    --state "$TEST_DIR/none.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log" --explained-file "$TEST_DIR/explained.txt"
+  echo "$output"
+  [[ "$output" == *"load_overload_rows_explained"*" 2 "* ]]
+}

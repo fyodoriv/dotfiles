@@ -35,7 +35,8 @@ DEFAULTS = {
 # game streaming). An overload row with one of them in its top 3 processes is
 # "explained": it is counted apart and never gets the `act` verdict.
 # DOTFILES_EXPLAINED_LOAD (comma or space separated) replaces this default;
-# ~/.config/dotfiles/explained-load (one name per line, # comments) adds to it.
+# ~/.config/dotfiles/explained-load (one name per line, # comments) adds to it;
+# a space in a name there matches the sampler's "_" (Google Chrome = Google_Chrome).
 EXPLAINED_LOAD_DEFAULT = ("GeForceNOW",)
 
 # Thresholds. Overload means load1 above twice the core count.
@@ -95,7 +96,8 @@ def explained_leaders(path):
         for line in Path(path).read_text().splitlines():
             line = line.split("#", 1)[0].strip()
             if line:
-                names.add(line)
+                # The sampler writes a space in a process name as "_" (#308).
+                names.add(line.replace(" ", "_"))
     except OSError:
         pass
     return names

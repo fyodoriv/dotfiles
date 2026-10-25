@@ -102,3 +102,19 @@ MOCK
   grep -q 'bin/dotfiles-load-sampler' "$plist"
   grep -A1 'StartInterval' "$plist" | grep -q '<integer>30</integer>'
 }
+
+@test "load-sampler keeps a process name with a space whole (#308)" {
+  cat > "$TEST_BIN/ps" <<'MOCK'
+#!/bin/bash
+case "$*" in
+  *"-o pid="*) printf '1\n2\n' ;;
+  *) printf ' 156.3 /Library/Application Support/Vendor/zdpclassifier\n 43.8 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n 3.0 /bin/zsh\n' ;;
+esac
+MOCK
+  chmod +x "$TEST_BIN/ps"
+  run env PATH="$TEST_BIN:$PATH" "$SAMPLER_CMD"
+  [ "$status" -eq 0 ]
+  row="$(cat "$DOTFILES_LOAD_SAMPLES")"
+  # A space inside a name becomes "_": the top list itself is space-separated.
+  [[ "$(printf '%s' "$row" | cut -f10)" == "zdpclassifier:156.3 Google_Chrome:43.8 zsh:3.0" ]]
+}

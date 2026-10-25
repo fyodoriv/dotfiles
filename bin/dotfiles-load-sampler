@@ -3,7 +3,7 @@
 # A forced power-off drops the unified log buffer; this file survives it.
 # The LaunchAgent appends one row every 30 seconds and keeps about 7 days.
 # Row: epoch, time, load1, load5, load15, cpus, free memory %, swap MB used,
-# process count, top 3 processes by CPU, CPU busy %.
+# process count, top 3 processes by CPU (name:cpu, a space in a name as "_"), CPU busy %.
 # Load counts threads blocked in the kernel too, so a high load with a low
 # CPU busy % means a kernel or I/O stall, not CPU saturation.
 # Usage: dotfiles-load-sampler            # append one row
@@ -57,7 +57,10 @@ procs="$(ps -A -o pid= 2>/dev/null | wc -l | tr -d ' ')"
 # awk reads the whole list: `head` would close the pipe and pipefail would exit 141.
 cpu_line="$(ps -A -r -o %cpu=,comm= 2>/dev/null | awk -v cpus="$cpus" '
   { sum += $1 }
-  NR <= 3 { n = $2; sub(/.*\//, "", n); top = top sprintf("%s%s:%s", (NR > 1 ? " " : ""), n, $1) }
+  # comm is the full path and can hold spaces (#308): take the rest of the
+  # line, its last path part, and "_" for a space (the list is space-separated).
+  NR <= 3 { n = $0; sub(/^[ \t]*[^ \t]+[ \t]+/, "", n); sub(/.*\//, "", n); gsub(/ /, "_", n)
+    top = top sprintf("%s%s:%s", (NR > 1 ? " " : ""), n, $1) }
   END { printf "%s\t%d", top, (cpus > 0 ? sum / cpus : 0) }')"
 top="${cpu_line%%$'\t'*}"
 cpu_busy="${cpu_line##*$'\t'}"

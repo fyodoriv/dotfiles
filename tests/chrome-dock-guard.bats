@@ -128,24 +128,42 @@ need_swiftc() {
 
 # --- deaf watcher: started during login, it got no activation events for 2 days ---
 
-@test "stale: the front window owner changed with no activation event means the event stream is dead" {
+@test "stale: the window owner or frontmost pid changed with no event means a dead event stream" {
   need_swiftc
-  run bash "$GUARD_CMD" --stale 100 200 0
+  run bash "$GUARD_CMD" --stale 100 200 5 5 0
   [ "$status" -eq 0 ]
+  [ "$output" = "stale" ]
+  run bash "$GUARD_CMD" --stale 100 100 5 6 0
   [ "$output" = "stale" ]
 }
 
-@test "stale: an owner change with an event, or no change, is healthy" {
+@test "stale: a change with an event, no change, or an unknown pid (0) is healthy" {
   need_swiftc
-  run bash "$GUARD_CMD" --stale 100 200 1
+  run bash "$GUARD_CMD" --stale 100 200 5 6 1
   [ "$output" = "ok" ]
-  run bash "$GUARD_CMD" --stale 100 100 0
+  run bash "$GUARD_CMD" --stale 100 100 5 5 0
   [ "$output" = "ok" ]
-  run bash "$GUARD_CMD" --stale 0 200 0
+  run bash "$GUARD_CMD" --stale 100 0 5 5 0
+  [ "$output" = "ok" ]
+  run bash "$GUARD_CMD" --stale 0 200 0 6 0
   [ "$output" = "ok" ]
 }
 
-@test "watcher exits non-zero on a dead event stream so launchd restarts it" {
-  grep -q 'exit(75)' "$BATS_TEST_DIRNAME/../lib/chrome-dock-guard.swift"
-  grep -A2 '<key>KeepAlive</key>' "$PLIST_TMPL" | grep -q SuccessfulExit
+@test "stale-run: only two stale samples in a row trigger the exit" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale-run s h s
+  [ "$status" -eq 0 ]
+  [ "$output" = "1" ]
+  run bash "$GUARD_CMD" --stale-run h s s
+  [ "$output" = "2 exit" ]
+}
+
+@test "stale and stale-run reject bad arguments with exit 2" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale 100 x 5 5 0
+  [ "$status" -eq 2 ]
+  run bash "$GUARD_CMD" --stale 100 200
+  [ "$status" -eq 2 ]
+  run bash "$GUARD_CMD" --stale-run s x
+  [ "$status" -eq 2 ]
 }

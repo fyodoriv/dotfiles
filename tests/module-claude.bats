@@ -23,6 +23,8 @@ setup() {
   mkdir -p "$TEST_DOTFILES/.chezmoiscripts"
   cp "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-model.sh" \
      "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-model.sh"
+  cp "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-env.sh" \
+     "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-env.sh"
 
   OVERRIDES_FILE="$TEST_DOTFILES/.overrides"
   touch "$OVERRIDES_FILE"
@@ -61,7 +63,7 @@ teardown() {
 @test "claude: wrapper check passes when ~/bin/claude strips ANTHROPIC_MODEL" {
   mkdir -p "$TEST_HOME/bin" "$TEST_HOME/.claude" "$TEST_HOME/.local/bin"
   touch "$TEST_HOME/.local/bin/claude"
-  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2"}}' > "$TEST_HOME/.claude/settings.json"
   cat > "$TEST_HOME/bin/claude" <<'WRAPPER'
 #!/bin/bash
 unset ANTHROPIC_MODEL
@@ -72,7 +74,7 @@ WRAPPER
 
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 3 ]
+  [ "$pass_count" -eq 4 ]
   [ "$fail_count" -eq 0 ]
 }
 
@@ -88,14 +90,14 @@ WRAPPER
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
   [ "$pass_count" -eq 1 ]
-  [ "$fail_count" -eq 2 ]
+  [ "$fail_count" -eq 3 ]
 }
 
 @test "claude: wrapper check fails when unmanaged wrapper is missing" {
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
   [ "$pass_count" -eq 1 ]
-  [ "$fail_count" -eq 2 ]
+  [ "$fail_count" -eq 3 ]
 }
 
 @test "claude: doctor module registers expected checks" {
@@ -105,10 +107,11 @@ WRAPPER
   collected=()
   check() { collected+=("$1"); }
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
-  [ "${#collected[@]}" -eq 3 ]
+  [ "${#collected[@]}" -eq 4 ]
   [ "${collected[0]}" = "claude.model_wrapper" ]
   [ "${collected[1]}" = "claude.model_default" ]
-  [ "${collected[2]}" = "claude.observe_plugin_server" ]
+  [ "${collected[2]}" = "claude.env_pins" ]
+  [ "${collected[3]}" = "claude.observe_plugin_server" ]
 }
 
 @test "claude: observe check fails when the plugin is enabled and its server is down" {

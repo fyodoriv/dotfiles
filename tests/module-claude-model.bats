@@ -69,6 +69,8 @@ chmod +x \"\$HOME/bin/claude\"" > "$TEST_DOTFILES/.chezmoiscripts/run_after_clau
   # doctor's fix command can find it.
   cp "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-model.sh" \
      "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-model.sh"
+  cp "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_claude-settings-env.sh" \
+     "$TEST_DOTFILES/.chezmoiscripts/run_after_claude-settings-env.sh"
 }
 
 teardown() {
@@ -76,7 +78,7 @@ teardown() {
 }
 
 @test "claude.model_default passes when settings.json has the correct pin" {
-  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2"}}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -eq 0 ]
   [ "$pass_count" -ge 2 ]  # both wrapper and model_default
@@ -238,7 +240,7 @@ _write_chezmoi_data() {
 
 @test "claude.model_default passes for the override pair and fails for the base default under it" {
   export DOTFILES_CLAUDE_MODEL="claude-example-model" DOTFILES_CLAUDE_EFFORT="high"
-  echo '{"model":"claude-example-model","effortLevel":"high","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-example-model","effortLevel":"high","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2"}}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -eq 0 ]
 
@@ -371,4 +373,14 @@ _render_config() {
   run _render_config '{"claude_effort":"high"}'
   [ "$status" -eq 0 ]
   [[ "$output" != *'claude_permissions'* ]]
+}
+
+@test "claude.env_pins fails on drift and fix mode restores AGENT_GUARD_DEPTH_MAX=2" {
+  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"1"}}' > "$TEST_HOME/.claude/settings.json"
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+  [ "$fail_count" -eq 1 ]
+  fail_count=0; pass_count=0; FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
+  [ "$fail_count" -eq 0 ]
+  [ "$(jq -r '.env.AGENT_GUARD_DEPTH_MAX' "$TEST_HOME/.claude/settings.json")" = "2" ]
 }

@@ -45,6 +45,7 @@ names.
 | Change agent MCPs, skills, rules | `Agentfile.yaml` | [agentbrew-setup.md](docs/agentbrew-setup.md) |
 | Turn an opt-in agentbrew hook on for every machine | `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl` (`HOOKS=`, owner-only) | [agentbrew-setup.md](docs/agentbrew-setup.md) |
 | Change the default model | `Agentfile.yaml` + `.chezmoiscripts/run_after_claude-settings-model.sh` | [model-configuration.md](docs/model-configuration.md) |
+| Change Claude Code env pins | `.chezmoiscripts/run_after_claude-settings-env.sh` | [model-configuration.md](docs/model-configuration.md#claude-code-env-pins) |
 | Change agent wrappers | `bin/gh`, `lib/strip-agent-attribution.sh`, `agent-hooks/` | [agent-hooks.md](docs/agent-hooks.md) |
 | Change a skill or command owned here | `skills/<name>/`, `commands/` | its SKILL.md or command file |
 | Add a doc | `docs/<name>.md` | a row in [docs/README.md](docs/README.md) |

@@ -52,6 +52,19 @@ check "claude.model_default" "Claude Code config pinned to Opus 5.5 xhigh (or th
   "_claude_model_is_default" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-model.sh'"
 
+# Env pins (AGENT_GUARD_DEPTH_MAX=2: agent-usage-guard allows depth 2). The
+# expected values come from the fix script's --print-desired, so the check
+# and the fix never disagree.
+_claude_env_pinned() {
+  local settings="$HOME/.claude/settings.json" want
+  [ -s "$settings" ] && command -v jq >/dev/null 2>&1 || return 1
+  want="$(bash "$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-env.sh" --print-desired 2>/dev/null)" || return 1
+  jq -e --argjson want "$want" '(.env // {}) as $e | all($want | to_entries[]; $e[.key] == .value)' "$settings" >/dev/null 2>&1
+}
+check "claude.env_pins" "Claude Code env pins set (AGENT_GUARD_DEPTH_MAX=2: agent-usage-guard allows depth 2)" \
+  "_claude_env_pinned" \
+  "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-env.sh'"
+
 # ── agents-observe plugin server ──────────────────────────────────────
 # The agents-observe plugin hooks every Claude Code event but sends all
 # errors to /dev/null. Its hook starts the Docker server on demand, and the

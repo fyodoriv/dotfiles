@@ -42,3 +42,59 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
   [ ! -f "$HOME/.claude/settings.json" ]
 }
+
+@test "invalid JSON is refused and left byte-for-byte the same" {
+  printf '{"env": {broken' > "$HOME/.claude/settings.json"
+  cp "$HOME/.claude/settings.json" "$TEST_DIR/before"
+  run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"refusing to overwrite"* ]]
+  cmp "$TEST_DIR/before" "$HOME/.claude/settings.json"
+}
+
+@test "an empty file gets the pin" {
+  : > "$HOME/.claude/settings.json"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.env.AGENT_GUARD_DEPTH_MAX' "$HOME/.claude/settings.json")" = "2" ]
+}
+
+@test "file mode survives a rewrite" {
+  echo '{}' > "$HOME/.claude/settings.json"
+  chmod 640 "$HOME/.claude/settings.json"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(stat -f '%Lp' "$HOME/.claude/settings.json" 2>/dev/null || stat -c '%a' "$HOME/.claude/settings.json")" = "640" ]
+}
+
+@test "a symlink survives and its target gets the pin" {
+  mkdir -p "$TEST_DIR/real"
+  echo '{"a":1}' > "$TEST_DIR/real/settings.json"
+  ln -s "$TEST_DIR/real/settings.json" "$HOME/.claude/settings.json"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -L "$HOME/.claude/settings.json" ]
+  [ "$(jq -r '.env.AGENT_GUARD_DEPTH_MAX' "$TEST_DIR/real/settings.json")" = "2" ]
+  [ "$(jq -r '.a' "$TEST_DIR/real/settings.json")" = "1" ]
+}
+
+@test "running twice gives no change the second time" {
+  echo '{"model":"m"}' > "$HOME/.claude/settings.json"
+  bash "$SCRIPT"
+  cp "$HOME/.claude/settings.json" "$TEST_DIR/once"
+  run bash "$SCRIPT"
+  [ -z "$output" ]
+  cmp "$TEST_DIR/once" "$HOME/.claude/settings.json"
+}
+
+@test "non-string env values and other keys are kept" {
+  echo '{"env":{"N":3,"B":true,"O":{"x":1}},"hooks":{"k":[1]}}' > "$HOME/.claude/settings.json"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '.env.N, .env.B, .env.O, .hooks' "$HOME/.claude/settings.json" | tr '\n' ' ')" = '3 true {"x":1} {"k":[1]} ' ]
+}
+
+@test "--print-desired prints the pinned env" {
+  run bash "$SCRIPT" --print-desired
+  [ "$output" = '{"AGENT_GUARD_DEPTH_MAX":"2"}' ]
+}

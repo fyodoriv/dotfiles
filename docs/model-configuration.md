@@ -25,4 +25,4 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 
 ## Claude Code env pins
 
-`.chezmoiscripts/run_after_claude-settings-env.sh` merges `AGENT_GUARD_DEPTH_MAX=2` into the `env` object of `~/.claude/settings.json` on every apply. This lets the agent-usage-guard plugin allow two levels of nested subagents instead of its default of one. Check it with `jq .env.AGENT_GUARD_DEPTH_MAX ~/.claude/settings.json`. Test: `tests/claude-settings-env.bats`.
+`.chezmoiscripts/run_after_claude-settings-env.sh` merges `AGENT_GUARD_DEPTH_MAX=2` into the `env` object of `~/.claude/settings.json` on every apply. This lets the agent-usage-guard plugin allow nested subagents up to depth 2 instead of its default depth 1. It writes through a symlink, keeps the file mode, and refuses to touch a settings file that is not valid JSON. The doctor check `claude.env_pins` warns on drift (`dotfiles doctor --module claude --fix` repairs it). Check it with `jq .env.AGENT_GUARD_DEPTH_MAX ~/.claude/settings.json`. Test: `tests/claude-settings-env.bats`.

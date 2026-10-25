@@ -440,6 +440,7 @@ checks apply to any user with Chrome.
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `claude.settings_mcp_allowed` | MCP server allowed in settings | `agentbrew sync` |
+| `claude.env_pins` | `~/.claude/settings.json` env has `AGENT_GUARD_DEPTH_MAX=2` (agent-usage-guard allows depth 2) | `.chezmoiscripts/run_after_claude-settings-env.sh` (also runs on every apply) |
 
 Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in a company plugin's `contributes.doctor_modules` (see [plugins.md](plugins.md)).
 

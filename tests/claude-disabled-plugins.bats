@@ -102,3 +102,56 @@ run_doctor() { checks=(); source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh
   run_doctor
   [[ "$(result_for claude.no_context7_mcp)" == pass* ]]
 }
+
+@test "apply refuses to overwrite a settings file that is not a JSON object" {
+  printf '{not json' > "$S"
+  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"refusing to overwrite"* ]]
+  [ "$(cat "$S")" = "{not json" ]
+  echo '[1]' > "$S"
+  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 1 ]
+  [ "$(cat "$S")" = "[1]" ]
+}
+
+@test "apply writes through a symlinked settings file and keeps the link" {
+  mkdir -p "$TEST_DIR/real"
+  echo '{"enabledPlugins":{"prisma@synced":true}}' > "$TEST_DIR/real/settings.json"
+  ln -s "$TEST_DIR/real/settings.json" "$S"
+  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 0 ]
+  [ -L "$S" ]
+  [ "$(jq -r '.enabledPlugins["prisma@synced"]' "$TEST_DIR/real/settings.json")" = "false" ]
+}
+
+@test "apply keeps the settings file mode" {
+  echo '{"enabledPlugins":{"prisma@synced":true}}' > "$S"
+  chmod 640 "$S"
+  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 0 ]
+  [ "$(stat -f '%Lp' "$S" 2>/dev/null || stat -c '%a' "$S")" = "640" ]
+}
+
+@test "an empty claude_disabled_plugins list in chezmoi data manages nothing" {
+  printf '#!/bin/sh\nprintf ""\n' > "$TEST_DIR/bin/chezmoi"
+  echo '{"enabledPlugins":{"prisma@synced":true}}' > "$S"
+  run bash "$DOTFILES_DIR/$SCRIPT_REL" --print-list
+  [ -z "$output" ]
+  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.enabledPlugins["prisma@synced"]' "$S")" = "true" ]
+}
+
+@test "a chezmoi data list replaces the default" {
+  printf '#!/bin/sh\nprintf "a@b,c@d"\n' > "$TEST_DIR/bin/chezmoi"
+  run bash "$DOTFILES_DIR/$SCRIPT_REL" --print-list
+  [ "$output" = "$(printf 'a@b\nc@d')" ]
+}
+
+@test "doctor catches an indented context7 header in codex config.toml" {
+  mkdir -p "$HOME/.codex"
+  printf '  [mcp_servers.context7]\n  command = "x"\n' > "$HOME/.codex/config.toml"
+  run_doctor
+  [[ "$(result_for claude.no_context7_mcp)" == fail*".codex/config.toml"* ]]
+}

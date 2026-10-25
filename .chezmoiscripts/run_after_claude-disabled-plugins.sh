@@ -42,20 +42,41 @@ command -v jq >/dev/null 2>&1 || {
 }
 
 mkdir -p "$HOME/.claude"
-[ -s "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+# Follow a symlinked settings.json (dotfiles or agentbrew may link it), so the
+# write lands in the real file and the link stays.
+TARGET="$SETTINGS"
+if [ -L "$SETTINGS" ]; then
+  TARGET="$(cd "$(dirname "$SETTINGS")" && cd "$(dirname "$(readlink "$SETTINGS")")" && pwd)/$(basename "$(readlink "$SETTINGS")")"
+fi
+
+if [ -s "$TARGET" ]; then
+  jq -e 'type == "object"' "$TARGET" >/dev/null 2>&1 || {
+    echo "✗ $TARGET is not a JSON object — refusing to overwrite it" >&2
+    exit 1
+  }
+  CURRENT="$(cat "$TARGET")"
+else
+  CURRENT="{}"
+fi
 
 names_json="$(printf '%s\n' "$PLUGINS" | jq -R . | jq -sc .)"
 # Already off: leave the file untouched.
-if jq -e --argjson n "$names_json" '[$n[] as $p | .enabledPlugins[$p]] | all(. == false)' "$SETTINGS" >/dev/null 2>&1; then
+if printf '%s' "$CURRENT" | jq -e --argjson n "$names_json" '[$n[] as $p | .enabledPlugins[$p]] | all(. == false)' >/dev/null 2>&1; then
   exit 0
 fi
 
-TMP="$(mktemp)"
+# Temp file in the same folder, so mv is an atomic rename on one filesystem.
+TMP="$(mktemp "$(dirname "$TARGET")/.settings.json.XXXXXX")"
 trap 'rm -f "$TMP"' EXIT
-jq --argjson n "$names_json" 'reduce $n[] as $p (.; .enabledPlugins[$p] = false)' "$SETTINGS" > "$TMP"
-jq -e . "$TMP" >/dev/null 2>&1 || {
-  echo "✗ jq produced invalid JSON — refusing to overwrite $SETTINGS"
+printf '%s' "$CURRENT" | jq --argjson n "$names_json" 'reduce $n[] as $p (.; .enabledPlugins[$p] = false)' > "$TMP"
+jq -e 'type == "object"' "$TMP" >/dev/null 2>&1 || {
+  echo "✗ jq produced invalid JSON — refusing to overwrite $TARGET" >&2
   exit 1
 }
-mv "$TMP" "$SETTINGS"
+if [ -e "$TARGET" ]; then
+  chmod "$(stat -f '%Lp' "$TARGET" 2>/dev/null || stat -c '%a' "$TARGET")" "$TMP"
+else
+  chmod 600 "$TMP"
+fi
+mv "$TMP" "$TARGET"
 echo "✓ Claude Code plugins kept off: $(printf '%s' "$PLUGINS" | paste -sd, -)"

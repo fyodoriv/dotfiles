@@ -111,14 +111,14 @@ _claude_context7_found_in() {
       && printf '%s\n' "$f"
   done < <(_claude_context7_files)
   local codex="$HOME/.codex/config.toml"
-  [ -f "$codex" ] && grep -qE '^\[mcp_servers\."?context7"?(\]|\.)' "$codex" && printf '%s\n' "$codex"
+  [ -f "$codex" ] && grep -qE '^[[:space:]]*\[mcp_servers\."?context7"?(\]|\.)' "$codex" && printf '%s\n' "$codex"
   return 0
 }
-_claude_no_context7() { [ -z "$(_claude_context7_found_in)" ]; }
-_claude_context7_desc="No agent config lists the declined context7 MCP server"
+# Scan once; the check reads the saved result.
 _claude_context7_hits="$(_claude_context7_found_in | paste -sd, - | sed 's/,/, /g')"
+_claude_context7_desc="No agent config lists the declined context7 MCP server"
 [ -z "$_claude_context7_hits" ] || _claude_context7_desc="context7 MCP server found in $_claude_context7_hits (declined in agentbrew); remove that entry, then run agentbrew sync"
 check "claude.no_context7_mcp" "$_claude_context7_desc" \
-  "_claude_no_context7" \
+  "[ -z \"$_claude_context7_hits\" ]" \
   ""
 unset _claude_context7_desc _claude_context7_hits

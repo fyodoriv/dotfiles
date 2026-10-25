@@ -88,7 +88,9 @@ def spec_coverage():
     print("Skill rules and the Agent Skills spec (https://agentskills.io/specification):")
     for code, section in RULE_SPEC.items():
         print(f"  {code}  {'spec: ' + section if section else 'ours (not in the spec)'}")
-    missing = [req for req, code in SPEC_REQUIREMENTS.items() if code not in RULE_SPEC]
+    # A requirement is covered when its rule exists and cites the same spec field.
+    missing = [req for req, code in SPEC_REQUIREMENTS.items()
+               if code not in RULE_SPEC or (":" in req and RULE_SPEC[code] != req.split(":", 1)[0])]
     cited = sum(1 for section in RULE_SPEC.values() if section)
     print(f"skill rules citing a spec section: {cited} of {len(RULE_SPEC)}")
     print(f"spec requirements: {len(SPEC_REQUIREMENTS)}; spec requirements without a check: {len(missing)}")
@@ -110,7 +112,7 @@ def frontmatter_blocks(text: str):
         if top and not raw.startswith((" ", "\t")):
             key = top.group(1)
             out[key] = (top.group(2).strip(), [])
-        elif key is not None and raw.strip():
+        elif key is not None and raw.strip() and not raw.strip().startswith("#"):
             out[key][1].append(raw)
     return out
 
@@ -249,8 +251,10 @@ def check_skill(skill_md: pathlib.Path, report: Report):
     if "metadata" in blocks:
         inline, nested = blocks["metadata"]
         indents = {len(line) - len(line.lstrip()) for line in nested}
-        flat = all(re.match(r"^\s+[^\s:#][^:]*:\s*\S", line) for line in nested)
-        if inline not in ("", "{}") or not flat or len(indents) > 1:
+        # Each value is a scalar: not a list, map, or nothing.
+        flat = all(re.match(r"^\s+[^\s:#][^:]*:\s*[^\s\[{]", line) for line in nested)
+        flow_ok = inline == "" or re.match(r"^\{[^\[\]{}]*\}$", inline)
+        if not flow_ok or not flat or len(indents) > 1:
             report.add("ERROR", "S020", where, "metadata must be a map from string keys to string values (no lists or nested maps)")
     if "allowed-tools" in blocks:
         inline, nested = blocks["allowed-tools"]

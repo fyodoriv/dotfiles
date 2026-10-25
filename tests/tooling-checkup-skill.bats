@@ -879,6 +879,9 @@ compatibility: $(printf 'x%.0s' $(seq 501))"
   mk big $'name: big\ndescription: Formats notes. Use when asked for notes.'
   awk 'BEGIN { for (i = 0; i < 400; i++) print "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word" }' >> "$TEST_DIR/skills/big/SKILL.md"
   mk fine $'name: fine\ndescription: Formats notes. Use when asked for notes.\nlicense: MIT\ncompatibility: Requires git\nmetadata:\n  author: me\n  version: "1.0"\nallowed-tools: Bash(git:*) Read'
+  mk flow $'name: flow\ndescription: Formats notes. Use when asked for notes.\nmetadata: {author: jo}'
+  mk commented $'name: commented\ndescription: Formats notes. Use when asked for notes.\nmetadata:\n  # who wrote it\n  author: jo'
+  mk listval $'name: listval\ndescription: Formats notes. Use when asked for notes.\nmetadata:\n  tags: [a, b]'
 
   run python3 "$SCRIPTS/audit_agent_config.py" --skills "$TEST_DIR/skills"
   echo "$output"
@@ -891,6 +894,9 @@ compatibility: $(printf 'x%.0s' $(seq 501))"
   [[ "$output" == *"WARN S021 "*"tools/SKILL.md"* ]]
   [[ "$output" == *"WARN S022 "*"big/SKILL.md"* ]]
   [[ "$output" != *"fine/SKILL.md"* ]]
+  [[ "$output" != *"flow/SKILL.md"* ]]
+  [[ "$output" != *"commented/SKILL.md"* ]]
+  [[ "$output" == *"ERROR S020 "*"listval/SKILL.md"* ]]
 }
 
 @test "audit --spec-coverage: every spec requirement has a check, and each rule names its spec section or says it is ours" {

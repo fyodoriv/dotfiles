@@ -14,9 +14,16 @@
 // sign-in) has a visible window. It keeps focus; only a windowless one hands
 // off.
 //
+// A watcher started early in login can stay alive but never get another
+// workspace event (seen 2026-10-25: two days deaf, Dock clicks ignored). A
+// 15 s self-check reads the front window owner from the window server. When
+// that owner changed twice with no activation event in between, the event
+// stream is dead: the watcher exits 75 and launchd starts a fresh one.
+//
 // Usage: chrome-dock-guard                          run the watcher (LaunchAgent)
 //        chrome-dock-guard --classify ARGV          print "automation" or "user"
 //        chrome-dock-guard --decide WINDOWS ARGV    print "hand-off" or "keep"
+//        chrome-dock-guard --stale PREV CUR EVENTS  print "stale" or "ok"
 
 import AppKit
 import Darwin
@@ -32,6 +39,21 @@ func isAutomation(_ argv: [String]) -> Bool {
 
 func shouldHandOff(argv: [String], onScreenWindows: Int) -> Bool {
   isAutomation(argv) && onScreenWindows == 0
+}
+
+// The front window owner moved from one real app to another, but no
+// activation event arrived in that time.
+func isStale(previousOwner: Int32, currentOwner: Int32, eventsSince: Int) -> Bool {
+  previousOwner > 0 && currentOwner > 0 && previousOwner != currentOwner && eventsSince == 0
+}
+
+// The pid that owns the top normal (layer 0) on-screen window, or 0.
+func frontWindowOwner() -> Int32 {
+  guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+    as? [[String: Any]]
+  else { return 0 }
+  let top = windows.first { ($0[kCGWindowLayer as String] as? Int) == 0 }
+  return top?[kCGWindowOwnerPID as String] as? Int32 ?? 0
 }
 
 // Count the pid's normal (layer 0) windows that are on screen now.
@@ -80,6 +102,12 @@ if CommandLine.arguments.count > 2, CommandLine.arguments[1] == "--decide",
   print(shouldHandOff(argv: argv, onScreenWindows: windows) ? "hand-off" : "keep")
   exit(0)
 }
+if CommandLine.arguments.count == 5, CommandLine.arguments[1] == "--stale",
+   let previous = Int32(CommandLine.arguments[2]), let current = Int32(CommandLine.arguments[3]),
+   let events = Int(CommandLine.arguments[4]) {
+  print(isStale(previousOwner: previous, currentOwner: current, eventsSince: events) ? "stale" : "ok")
+  exit(0)
+}
 if CommandLine.arguments.count > 1 {
   FileHandle.standardError.write("chrome-dock-guard: unknown arguments \(CommandLine.arguments.dropFirst())\n".data(using: .utf8)!)
   exit(2)
@@ -88,6 +116,10 @@ if CommandLine.arguments.count > 1 {
 final class Guard {
   private var lastStart = Date.distantPast
   private var frontmostObservation: NSKeyValueObservation?
+  // Self-check state, owned by this Guard (process lifetime, main queue only).
+  private var eventsSinceCheck = 0
+  private var lastOwner: Int32 = 0
+  private var staleChecks = 0
 
   func start() {
     // A headless Chrome becomes frontmost without ever posting
@@ -105,11 +137,31 @@ final class Guard {
       self?.handle(app)
     }
     log("watching activations of \(chromeBundleID)")
+    // A windowless agent Chrome may already be in front when the guard starts.
+    if let front = NSWorkspace.shared.frontmostApplication { handle(front) }
+    lastOwner = frontWindowOwner()
+    Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.selfCheck() }
+  }
+
+  private func selfCheck() {
+    let owner = frontWindowOwner()
+    if isStale(previousOwner: lastOwner, currentOwner: owner, eventsSince: eventsSinceCheck) {
+      staleChecks += 1
+      if staleChecks >= 2 {
+        log("no activation events while the front app changed; exiting so launchd restarts the guard")
+        exit(75)
+      }
+    } else if eventsSinceCheck > 0 {
+      staleChecks = 0
+    }
+    lastOwner = owner
+    eventsSinceCheck = 0
   }
 
   private let debug = ProcessInfo.processInfo.environment["DOTFILES_CHROME_DOCK_GUARD_DEBUG"] == "1"
 
   private func handle(_ app: NSRunningApplication) {
+    eventsSinceCheck += 1
     if debug {
       log("activated \(app.bundleIdentifier ?? "nil") pid \(app.processIdentifier) argv \(processArguments(app.processIdentifier) ?? [])")
     }

@@ -125,3 +125,27 @@ need_swiftc() {
     "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module agent-browser --list
   [[ "$output" == *agent-browser.chrome_dock_guard* ]]
 }
+
+# --- deaf watcher: started during login, it got no activation events for 2 days ---
+
+@test "stale: the front window owner changed with no activation event means the event stream is dead" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale 100 200 0
+  [ "$status" -eq 0 ]
+  [ "$output" = "stale" ]
+}
+
+@test "stale: an owner change with an event, or no change, is healthy" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale 100 200 1
+  [ "$output" = "ok" ]
+  run bash "$GUARD_CMD" --stale 100 100 0
+  [ "$output" = "ok" ]
+  run bash "$GUARD_CMD" --stale 0 200 0
+  [ "$output" = "ok" ]
+}
+
+@test "watcher exits non-zero on a dead event stream so launchd restarts it" {
+  grep -q 'exit(75)' "$BATS_TEST_DIRNAME/../lib/chrome-dock-guard.swift"
+  grep -A2 '<key>KeepAlive</key>' "$PLIST_TMPL" | grep -q SuccessfulExit
+}

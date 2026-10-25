@@ -125,3 +125,45 @@ need_swiftc() {
     "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module agent-browser --list
   [[ "$output" == *agent-browser.chrome_dock_guard* ]]
 }
+
+# --- deaf watcher: started during login, it got no activation events for 2 days ---
+
+@test "stale: the window owner or frontmost pid changed with no event means a dead event stream" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale 100 200 5 5 0
+  [ "$status" -eq 0 ]
+  [ "$output" = "stale" ]
+  run bash "$GUARD_CMD" --stale 100 100 5 6 0
+  [ "$output" = "stale" ]
+}
+
+@test "stale: a change with an event, no change, or an unknown pid (0) is healthy" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale 100 200 5 6 1
+  [ "$output" = "ok" ]
+  run bash "$GUARD_CMD" --stale 100 100 5 5 0
+  [ "$output" = "ok" ]
+  run bash "$GUARD_CMD" --stale 100 0 5 5 0
+  [ "$output" = "ok" ]
+  run bash "$GUARD_CMD" --stale 0 200 0 6 0
+  [ "$output" = "ok" ]
+}
+
+@test "stale-run: only two stale samples in a row trigger the exit" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale-run s h s
+  [ "$status" -eq 0 ]
+  [ "$output" = "1" ]
+  run bash "$GUARD_CMD" --stale-run h s s
+  [ "$output" = "2 exit" ]
+}
+
+@test "stale and stale-run reject bad arguments with exit 2" {
+  need_swiftc
+  run bash "$GUARD_CMD" --stale 100 x 5 5 0
+  [ "$status" -eq 2 ]
+  run bash "$GUARD_CMD" --stale 100 200
+  [ "$status" -eq 2 ]
+  run bash "$GUARD_CMD" --stale-run s x
+  [ "$status" -eq 2 ]
+}

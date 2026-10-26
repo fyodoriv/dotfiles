@@ -387,6 +387,7 @@ dotfiles update             # whole-machine update: pull/apply/agentbrew/package
 dotfiles apply              # deploy all config (chezmoi apply)
 dotfiles apply --pull       # narrow path: pull dotfiles source + apply only
 dotfiles apply --if-changed # skip the apply when nothing changed and chezmoi status shows no drift
+# every apply ends with one line: "Apply timing: pull Ns, chezmoi apply Ns, doctor Ns"
 dotfiles diff               # preview pending changes without writing
 ```
 

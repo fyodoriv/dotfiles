@@ -220,6 +220,14 @@ case "$cmd" in
     _do_fix=1
     _if_changed=0
     _chezmoi_args=()
+    # Per-step timing (#338): each step appends "name Ns"; printed at the end.
+    _apply_timing=()
+    _apply_time() { _apply_timing+=("$1 $(( SECONDS - $2 ))s"); }
+    _apply_timing_print() {
+      [ "${#_apply_timing[@]}" -gt 0 ] || return 0
+      local IFS=','
+      echo "→ Apply timing: ${_apply_timing[*]}" | sed 's/,/, /g'
+    }
     while [ $# -gt 0 ]; do
       case "$1" in
         --pull) _do_pull=1; shift ;;
@@ -230,10 +238,12 @@ case "$cmd" in
     done
     if [ "$_do_pull" -eq 1 ]; then
       echo "→ Pulling latest…"
+      _t=$SECONDS
       git -C "$DOTFILES_DIR" pull --rebase || {
         echo "✗ git pull failed; aborting apply" >&2
         exit 1
       }
+      _apply_time pull "$_t"
     fi
     # Prevent concurrent doctor/sync/upgrade from racing chezmoi (shared ~/.dotfiles.lock).
     # shellcheck source=../lib/lock.sh
@@ -269,6 +279,7 @@ case "$cmd" in
         echo "→ Source, chezmoi config, plugins, or the local Agentfile changed since the last apply (or no record yet); running the full apply."
       fi
     fi
+    _t=$SECONDS
     if [ "${#_chezmoi_args[@]}" -gt 0 ]; then
       chezmoi apply --source "$DOTFILES_DIR" "${_chezmoi_args[@]}"
     else
@@ -279,14 +290,19 @@ case "$cmd" in
       apply_state_record "$DOTFILES_DIR"
     fi
     _apply_rc=$?
+    _apply_time "chezmoi apply" "$_t"
     _release_apply_lock
     trap - EXIT
     if [ "$_apply_rc" -ne 0 ]; then
+      _apply_timing_print
       exit "$_apply_rc"
     fi
     if [ "$_do_fix" -eq 1 ] && [ -x "$DOTFILES_DIR/bin/dotfiles-doctor" ]; then
+      _t=$SECONDS
       bash "$DOTFILES_DIR/bin/dotfiles-doctor" --fix --quiet || true
+      _apply_time doctor "$_t"
     fi
+    _apply_timing_print
     exit 0
     ;;
 

@@ -14,6 +14,15 @@ them. -->
 
 ## P2
 
+- [ ] Skip unchanged chezmoi scripts inside a full apply
+  - **ID**: apply-skip-unchanged-scripts
+  - **Tags**: performance
+  - **Details**: One managed-Mac checkup measured `dotfiles apply` at 537 s (#338). `--if-changed` skips a whole apply when nothing changed, and the apply now prints per-step timing (pull, chezmoi apply, doctor). Next, find which `run_after_*` scripts and doctor checks take the time, and key the slow ones on a content hash, like the JetBrains stamp.
+  - **Files**: `bin/dotfiles`, `.chezmoiscripts/`, `bin/dotfiles-doctor`
+  - **Output**: code
+  - **Acceptance**: a second full apply with no source change spends under 60 s in `chezmoi apply`, per the timing line.
+  - **Competitive-goal**: `reproducibility_pct` (docs/competition/scorecard.md).
+
 - [ ] Checkup scripts give wrong verdicts on a stock-git Mac with a flat `~/apps` layout
   - **ID**: checkup-scripts-stock-mac-gaps
   - **Tags**: agents, reliability

@@ -167,3 +167,20 @@ calls() {
   [ "$status" -eq 0 ]
   [[ "$output" == *".testrc"* ]]
 }
+
+@test "a full apply ends with a per-step timing summary (#338)" {
+  run "$REPO/bin/dotfiles" apply
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Apply timing:"* ]]
+  [[ "$output" =~ chezmoi\ apply\ [0-9]+s ]]
+  [[ "$output" =~ doctor\ [0-9]+s ]]
+}
+
+@test "--pull adds the pull step to the timing summary (#338)" {
+  git -C "$REPO" remote add origin "$REPO" 2>/dev/null || true
+  git -C "$REPO" fetch --quiet origin
+  git -C "$REPO" branch --quiet --set-upstream-to=origin/HEAD 2>/dev/null || git -C "$REPO" branch --quiet --set-upstream-to="origin/$(git -C "$REPO" branch --show-current)"
+  run "$REPO/bin/dotfiles" apply --pull
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ pull\ [0-9]+s ]]
+}

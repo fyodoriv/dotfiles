@@ -163,6 +163,18 @@ EOF
   [ "$(yq '.data.brew_skip | length' "$CFG")" = "0" ]
 }
 
+@test "a list setting with a scalar default shows it, and set writes a list" {
+  cfg get claude_disabled_plugins
+  [ "$status" -eq 0 ]
+  [ "$output" = "prisma@synced" ]
+  cfg set claude_disabled_plugins 'prisma@synced,other@synced'
+  [ "$status" -eq 0 ]
+  [ "$(yq '.data.claude_disabled_plugins | length' "$CFG")" = "2" ]
+  cfg set claude_disabled_plugins ''
+  [ "$status" -eq 0 ]
+  [ "$(yq '.data.claude_disabled_plugins | length' "$CFG")" = "0" ]
+}
+
 @test "an optional setting set to empty is removed, so the built-in default applies" {
   cfg set claude_effort high
   [ "$(yq '.data.claude_effort' "$CFG")" = "high" ]

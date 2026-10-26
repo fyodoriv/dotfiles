@@ -351,24 +351,19 @@ a verdict line, and each `adopt` or `try` has a task, a change, or a question.
 
 ## Phase 10: Report
 
-The report is one self-contained HTML page, not chat text (shared-rules
-**## Long-run reports**). Build it from the outline below, verdict first:
+Two outputs: one local HTML page for this run, and one shared tooling health
+dashboard that keeps its URL. Never publish a new page per run.
 
-1. Write it to `~/.local/state/tooling-checkup/reports/<YYYY-MM-DD>.html`.
-   Load the `artifact-design` skill first when the Artifact tool exists.
-2. Show paths as `~/…` and keep secrets, tokens, and private names out.
-   Then publish it as a private Artifact (the Artifact tool). Without the
-   Artifact tool, send the file (SendUserFile) or give its full path.
-3. Each "Needs you" item and each blocker says, in plain words, what it is,
-   why it is blocked, the options, and what each option changes.
-4. In chat, write only the page link, the one-line verdict, and then go to
-   Phase 11. Do not paste the whole report.
+1. Write the run page to `~/.local/state/tooling-checkup/reports/<YYYY-MM-DD>.html`
+   from [reference/report-outline.md](reference/report-outline.md).
+2. Record the run now (Phase 12 step 3 command), so the dashboard shows it.
+3. Run `python3 <skill-dir>/scripts/dashboard_export.py`.
+4. Update the dashboard per [reference/dashboard.md](reference/dashboard.md)
+   (create once when `dashboard-url` is missing). No Artifact tool: skip it.
+5. In chat: the dashboard link, the run page path, the verdict. Then Phase 11.
 
-The page follows the outline and rules in
-[reference/report-outline.md](reference/report-outline.md).
-
-**Done when:** the HTML page is published (or its path given), each claim on
-it has evidence, and the chat holds only the link and the verdict.
+**Done when:** the page exists, the run is recorded, and the dashboard shows it
+or the skip has a reason.
 
 ## Phase 11: Ask the owner
 
@@ -397,7 +392,8 @@ question:
    Mark the background updates as seen, so the "updates landed" nudge
    (`dotfiles-updates-landed`) stays quiet until new ones land:
    `dotfiles-updates-landed --ack`.
-3. Record this run:
+3. Record this run (in Phase 10 step 2, before the dashboard update;
+   record again here only when an answer changed the verdict):
 
    ```bash
    python3 <skill-dir>/scripts/checkup_state.py record --verdict "<verdict line>" \

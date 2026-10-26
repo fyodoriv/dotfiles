@@ -48,7 +48,8 @@ The Phase 10 page of the tooling checkup follows this outline, verdict first.
 1. `<repo>/<task-id>` (<priority>): <why now>
 ```
 
-Rules: "Shipped" lists only work that reached `origin`. Keep stability and
+Rules: show paths as `~/…`. Each "Needs you" item and blocker says what it is,
+why, the options, and what each option changes. "Shipped" lists only work that reached `origin`. Keep stability and
 feature work in separate lists, up to three each. Recommend from the refreshed
 `TASKS.md` queues of the tooling repositories. A gap with no task gets
 `new: <kebab-case-id>` and one line on why.

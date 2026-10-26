@@ -226,6 +226,19 @@
         "Still finishes the owner's own `ship  PR #N` line in Phase 2"
       ],
       "id": 19
+    },
+    {
+      "prompt": "/tooling-checkup (Phase 10; ~/.local/state/tooling-checkup/dashboard-url does not exist yet, and the Artifact tool is available)",
+      "expected_output": "The agent writes the local run page, records the run with checkup_state.py record, runs dashboard_export.py, creates the tooling health dashboard once from the Dashboard type, saves its URL in dashboard-url, uploads each manifest file and writes its datasets doc with updated and staleAfterHours, writes files/index.html from the skill's dashboard/index.html, and runs the check read. It does not publish a separate per-run page.",
+      "expectations": [
+        "Records the run before exporting, so the dashboard shows this run",
+        "Runs dashboard_export.py and uses its manifest.json for dataset ids, titles and staleAfterHours",
+        "Creates the dashboard once and saves its URL to ~/.local/state/tooling-checkup/dashboard-url, never into a repo",
+        "Writes files/index.html from the skill's dashboard/index.html template",
+        "Does not publish a new Artifact page for the run",
+        "Puts only the dashboard link, the run page path and the verdict in chat"
+      ],
+      "id": 20
     }
   ]
 }

@@ -9,6 +9,11 @@ State file: $TOOLING_CHECKUP_STATE_DIR/last-run.json
 (default ~/.local/state/tooling-checkup/last-run.json). It holds versions and
 commit ids only, never file contents or credentials.
 
+History file: history.jsonl next to it. `record` appends one row per run
+(time, verdict, metrics) and never rewrites old rows. On the first `record`
+after this file was added, the existing last-run.json becomes the first row.
+dashboard_export.py reads it.
+
 Usage: python3 checkup_state.py {snapshot|diff|record} [--verdict TEXT] [--metric NAME=VALUE ...]
 
 `record --metric` stores numbers measured during the checkup (for example the
@@ -48,6 +53,25 @@ GHOSTTY_APP = "/Applications/Ghostty.app/Contents/MacOS/ghostty"
 def state_path() -> pathlib.Path:
     base = os.environ.get("TOOLING_CHECKUP_STATE_DIR") or os.path.expanduser("~/.local/state/tooling-checkup")
     return pathlib.Path(base) / "last-run.json"
+
+
+def history_path() -> pathlib.Path:
+    return state_path().with_name("history.jsonl")
+
+
+def history_row(run: dict) -> dict:
+    return {"time": run.get("time", ""), "verdict": run.get("verdict", ""), "metrics": run.get("metrics", {})}
+
+
+def append_history(last: dict, current: dict) -> None:
+    path = history_path()
+    rows = []
+    if not path.exists() and last.get("time"):
+        rows.append(history_row(last))  # backfill the run recorded before history existed
+    rows.append(history_row(current))
+    with path.open("a") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
 
 
 def first_line(command) -> str:
@@ -166,6 +190,7 @@ def record(current: dict, verdict: str, metrics) -> int:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(current, indent=2, sort_keys=True) + "\n")
     tmp.replace(path)
+    append_history(last, current)
     print(f"checkup-state: recorded {current['time']} in {path}")
     return 0
 

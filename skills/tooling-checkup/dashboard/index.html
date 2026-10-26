@@ -1,0 +1,98 @@
+<style>
+  .tc-wrap { font-family: var(--font-anthropic-sans); color: var(--color-fg); display: grid; gap: 24px; }
+  .tc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .tc-kpi { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 8px; padding: 12px; }
+  .tc-kpi .tc-label { color: var(--color-fg-muted); font-size: 14px; }
+  .tc-kpi .tc-value { font-family: var(--font-anthropic-serif); font-size: 28px; }
+  .tc-verdict { font-size: 16px; line-height: 1.4; }
+  .tc-status-healthy { color: var(--color-ok); }
+  .tc-status-gaps { color: var(--color-warn); }
+  .tc-status-broken { color: var(--color-bad); }
+  .tc-chart { width: 100%; position: relative; }
+  .tc-chart h2, .tc-wrap h2 { font-size: 16px; margin: 0 0 8px; }
+  .tc-tip { position: absolute; pointer-events: none; background: var(--color-panel); border: 1px solid var(--color-border-line); padding: 4px 8px; border-radius: 4px; font-size: 14px; display: none; }
+  .tc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tc-table th, .tc-table td { text-align: left; padding: 6px; border-bottom: 1px solid var(--color-border-line); }
+</style>
+<div class="tc-wrap">
+  <section id="tc-latest">
+    <h2>Latest checkup</h2>
+    <p class="tc-verdict"><strong id="tc-status" data-source="latest" data-field="status" data-row="0">—</strong>:
+      <span data-source="latest" data-field="verdict" data-row="0">—</span>
+      (<span data-source="latest" data-field="time" data-row="0">—</span>)</p>
+    <div class="tc-kpis">
+      <div class="tc-kpi"><div class="tc-label">Peak load1, 24 h</div><div class="tc-value" data-source="latest" data-field="machine_peak_load1_24h" data-row="0">—</div></div>
+      <div class="tc-kpi"><div class="tc-label">Overload rows, 24 h</div><div class="tc-value" data-source="latest" data-field="machine_overload_rows_24h" data-row="0">—</div></div>
+      <div class="tc-kpi"><div class="tc-label">Agent tool hours, 7 d</div><div class="tc-value" data-source="latest" data-field="agent_tool_hours_7d" data-row="0">—</div></div>
+      <div class="tc-kpi"><div class="tc-label">Claude echo p95, ms</div><div class="tc-value" data-source="latest" data-field="claude_echo_p95_ms" data-row="0">—</div></div>
+    </div>
+  </section>
+  <section class="tc-chart" id="tc-overload" data-source="runs"><h2>Overload rows per checkup</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-gate" data-source="gate"><h2>dotfiles gate: median seconds per day</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-doctor" data-source="doctor"><h2>dotfiles doctor: failing checks per day</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section id="tc-runs">
+    <h2>Checkup runs</h2>
+    <table class="tc-table" data-source="runs" data-row-key="time">
+      <thead><tr><th data-field="time">Time</th><th data-field="status">Status</th><th data-field="machine_overload_rows_24h">Overload rows</th><th data-field="agent_tool_hours_7d">Tool hours</th><th data-field="verdict">Verdict</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</div>
+<script>
+  function tcLine(id, rows, xKey, yKey, color, parseX) {
+    var box = document.querySelector('#' + id + ' .tc-plot');
+    var tip = document.querySelector('#' + id + ' .tc-tip');
+    box.textContent = '';
+    if (!rows.length) { box.textContent = '—'; return; }
+    var w = Math.max(box.clientWidth || 320, 280), h = 180, m = { t: 8, r: 12, b: 24, l: 40 };
+    var pts = rows.map(function (r) { return { x: parseX(r[xKey]), y: Number(r[yKey]), r: r }; })
+      .filter(function (p) { return p.x && !isNaN(p.y); });
+    var x = d3.scaleTime().domain(d3.extent(pts, function (p) { return p.x; })).range([m.l, w - m.r]);
+    var y = d3.scaleLinear().domain([0, d3.max(pts, function (p) { return p.y; }) || 1]).nice().range([h - m.b, m.t]);
+    var svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', '0 0 ' + w + ' ' + h);
+    svg.append('g').attr('transform', 'translate(0,' + (h - m.b) + ')').call(d3.axisBottom(x).ticks(Math.min(6, pts.length)));
+    svg.append('g').attr('transform', 'translate(' + m.l + ',0)').call(d3.axisLeft(y).ticks(4));
+    svg.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2)
+      .attr('d', d3.line().x(function (p) { return x(p.x); }).y(function (p) { return y(p.y); }));
+    svg.selectAll('circle').data(pts).enter().append('circle').attr('r', 4).attr('fill', color)
+      .attr('cx', function (p) { return x(p.x); }).attr('cy', function (p) { return y(p.y); })
+      .on('mouseenter', function (e, p) {
+        tip.style.display = 'block';
+        tip.textContent = String(p.r[xKey]).slice(0, 16) + ': ' + p.y;
+        var left = Math.min(x(p.x) / w * box.clientWidth, box.clientWidth - 140);
+        tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '24px';
+      })
+      .on('mouseleave', function () { tip.style.display = 'none'; });
+  }
+  var tcDay = function (v) { return v ? new Date(String(v).slice(0, 10) + 'T00:00:00Z') : null; };
+  var tcTime = function (v) { return v ? new Date(String(v)) : null; };
+  var tcShow = function (v) { return v === null || v === undefined || v === '' ? '—' : String(v); };
+
+  dash.onData(function () {
+    var latest = dash.data('latest');
+    var row = latest.status === 'ok' && latest.data.length ? latest.data[0] : null;
+    document.querySelectorAll('[data-source="latest"]').forEach(function (el) {
+      el.textContent = row ? tcShow(row[el.getAttribute('data-field')]) : '—';
+    });
+    var status = document.getElementById('tc-status');
+    status.className = row ? 'tc-status-' + row.status : '';
+
+    var runs = dash.data('runs');
+    var runRows = runs.status === 'ok' ? runs.data : [];
+    tcLine('tc-overload', runRows, 'time', 'machine_overload_rows_24h', dash.colors[0], tcTime);
+    var gate = dash.data('gate');
+    tcLine('tc-gate', gate.status === 'ok' ? gate.data : [], 'day', 'median_total_s', dash.colors[1], tcDay);
+    var doctor = dash.data('doctor');
+    tcLine('tc-doctor', doctor.status === 'ok' ? doctor.data : [], 'day', 'fail', dash.colors[2], tcDay);
+
+    var tbody = document.querySelector('#tc-runs tbody');
+    tbody.textContent = '';
+    runRows.slice().reverse().forEach(function (r) {
+      var tr = document.createElement('tr');
+      ['time', 'status', 'machine_overload_rows_24h', 'agent_tool_hours_7d', 'verdict'].forEach(function (k) {
+        var td = document.createElement('td'); td.textContent = tcShow(r[k]); tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  });
+</script>

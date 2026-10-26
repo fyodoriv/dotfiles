@@ -49,6 +49,12 @@
 {{- if hasKey . "claude_disabled_plugins" -}}
 {{-   $claudeDisabledPlugins = .claude_disabled_plugins -}}
 {{- end -}}
+{{/* login_apps: apps macos-apps.sh adds as login items; a leading - removes
+     one (lib/login-apps.sh). */ -}}
+{{- $loginApps := list "Ghostty" -}}
+{{- if hasKey . "login_apps" -}}
+{{-   $loginApps = .login_apps -}}
+{{- end -}}
 {{- $autoUpgrade := promptBoolOnce . "auto_upgrade" "Enable auto-upgrade LaunchAgent (brew upgrade at 3am Sunday)" false -}}
 {{- $useEncryption := promptBoolOnce . "use_encryption" "Enable age encryption (requires ~/.config/chezmoi/key.txt)" false -}}
 {{- $ageRecipient := "unused-no-encryption-configured" -}}
@@ -219,6 +225,12 @@ data:
 {{- end }}
   claude_disabled_plugins:
 {{- range $claudeDisabledPlugins }}
+    - {{ . | quote }}
+{{- else }}
+    []
+{{- end }}
+  login_apps:
+{{- range $loginApps }}
     - {{ . | quote }}
 {{- else }}
     []

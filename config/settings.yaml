@@ -43,6 +43,10 @@ settings:
     type: list
     default: ""
     description: Homebrew packages to leave out of the install, comma-separated.
+  login_apps:
+    type: list
+    default: Ghostty
+    description: Single-word app names in /Applications that dotfiles apply adds as login items, comma-separated. A leading - removes one (-Ghostty). Empty = none.
   obsidian:
     type: bool
     default: false

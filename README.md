@@ -137,6 +137,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Split git identity | `git_personal_enabled` | `false` | Enable a separate personal identity for any `github.com` remote. Work identity stays default for enterprise remotes. |
 | Git personal name | `git_personal_name` | _(empty, only if split enabled)_ | Commit author name used for `github.com` remotes |
 | Git personal email | `git_personal_email` | _(empty, only if split enabled)_ | Commit email for `github.com` remotes — consider `<username>@users.noreply.github.com` for privacy |
+| *(not prompted)* | `login_apps` | `Ghostty` | Single-word app names in `/Applications` (no spaces) that `macos-apps.sh` (full profile) adds as login items: `dotfiles config set login_apps Ghostty,Claude`. A leading `-` removes an app from login items: `dotfiles config set login_apps -Ghostty,Claude`. Other login items stay untouched. Empty = manage none. The `DOTFILES_LOGIN_APPS` env var (comma list) wins. |
 | *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install: `dotfiles config set brew_skip watchman,rancher`, or edit the file (example below). |
 | *(not prompted)* | `obsidian` | `false` | Install Obsidian (full profile) and run the `obsidian` doctor checks. Opt-in. |
 

@@ -15,6 +15,8 @@ source "$DOTFILES_DIR/lib/colors.sh"
 source "$DOTFILES_DIR/lib/apply-defaults.sh"
 # shellcheck source=lib/dotfiles-arch.sh
 source "$DOTFILES_DIR/lib/dotfiles-arch.sh"
+# shellcheck source=lib/login-apps.sh
+source "$DOTFILES_DIR/lib/login-apps.sh"
 
 info "Applying app-specific preferences..."
 
@@ -51,17 +53,21 @@ for _name in "${_removed_login_apps[@]}"; do
     echo "  ✓ Removed $_name from login items (legacy dotfiles login item)"
   fi
 done
-_desired_login_apps=(
-  "Ghostty:/Applications/Ghostty.app"
-)
-for _entry in "${_desired_login_apps[@]}"; do
-  _name="${_entry%%:*}"
-  _path="${_entry#*:}"
-  if [[ "$_login_items" != *"$_name"* ]] && [ -d "$_path" ]; then
+# The app list comes from the login_apps setting (lib/login-apps.sh).
+# Default: Ghostty. A leading - removes an app.
+while IFS=$'\t' read -r _action _name _path; do
+  [ -n "$_name" ] || continue
+  if [ "$_action" = "remove" ]; then
+    # Whole-name match: osascript lists items as "a, b, c".
+    if [[ ", $_login_items, " == *", $_name, "* ]]; then
+      osascript -e "tell application \"System Events\" to delete login item \"$_name\"" 2>/dev/null || true
+      echo "  ✓ Removed $_name from login items (login_apps setting)"
+    fi
+  elif [[ ", $_login_items, " != *", $_name, "* ]] && [ -d "$_path" ]; then
     osascript -e "tell application \"System Events\" to make login item at end with properties {path:\"$_path\", hidden:false}" 2>/dev/null || true
     echo "  ✓ Added $_name to login items"
   fi
-done
+done < <(dotfiles_login_apps_plan "$(dotfiles_login_apps_list)")
 
 # ── Architecture: native arm64 on Apple Silicon ───────────────────────
 # Legacy dotfiles forced Ghostty (and occasionally other work apps) to x86_64

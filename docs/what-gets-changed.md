@@ -252,7 +252,7 @@ The following files and data are explicitly preserved and never created, modifie
 | `~/.config/chezmoi/key.txt` | age encryption key |
 | Existing browser profiles | Chrome/Safari profiles, bookmarks, extensions |
 | macOS iCloud settings | iCloud Drive, Photos, Keychain sync |
-| macOS user account settings | Login items (Ghostty via macos-apps.sh; other non-dotfiles items untouched), wallpaper, screen resolution |
+| macOS user account settings | Login items (macos-apps.sh adds the `login_apps` setting, default Ghostty; a leading `-` removes one, as in `dotfiles config set login_apps -Ghostty,Claude`; other items untouched), wallpaper, screen resolution |
 | `~/Library/` (except LaunchAgents) | Application data, preferences not in `defaults write` scope |
 
 `dotfiles uninstall` only removes symlinks pointing into the dotfiles repo and unloads `com.dotfiles.*` LaunchAgents. It does not revert macOS defaults -- those persist until manually changed in System Settings.

@@ -1,0 +1,53 @@
+#!/bin/bash
+# heavy-run — run one heavy command at a time on this Mac, at low priority.
+#
+# Every agent session and worker shares one lock file at a fixed path, so
+# full suites, e2e runs, and timing runs queue instead of piling up.
+# $TMPDIR is not used: sandboxed sessions can see different temp dirs.
+#
+# Usage:
+#   heavy-run make check
+#   heavy-run npm run verify
+#   heavy-run --status          # print who holds the lock, if anyone
+#
+# Env:
+#   HEAVY_RUN_DIR   lock folder (default ~/.local/state/heavy-run)
+#   HEAVY_RUN_NICE  nice level (default 15)
+
+set -euo pipefail
+
+dir="${HEAVY_RUN_DIR:-$HOME/.local/state/heavy-run}"
+lock="$dir/lock"
+owner="$dir/owner"
+
+usage() {
+  echo "Usage: heavy-run <command...> | heavy-run --status"
+}
+
+case "${1:-}" in
+  "" | -h | --help)
+    usage
+    [ -n "${1:-}" ] && exit 0
+    exit 2
+    ;;
+  --status)
+    if [ -s "$owner" ] && lsof -t "$lock" >/dev/null 2>&1; then
+      echo "held: $(cat "$owner")"
+    else
+      echo "free"
+    fi
+    exit 0
+    ;;
+esac
+
+mkdir -p "$dir"
+touch "$lock"
+
+# Re-exec under lockf; the child writes the owner line once it holds the lock.
+if [ "${HEAVY_RUN_HELD:-}" != "$lock" ]; then
+  HEAVY_RUN_HELD="$lock" exec lockf -k "$lock" "$0" "$@"
+fi
+
+printf '%s pid=%s cwd=%s cmd=%s\n' "$(date +%H:%M:%S)" "$$" "$PWD" "$*" >"$owner"
+trap ': >"$owner"' EXIT
+nice -n "${HEAVY_RUN_NICE:-15}" "$@"

@@ -1072,3 +1072,19 @@ JSON
   grep -q 'data-source="load"' "$SKILL_DIR/dashboard/index.html"
   grep -q 'data-source="agent_time"' "$SKILL_DIR/dashboard/index.html"
 }
+
+@test "config hygiene asks before deleting memory, rules, skills, or backups" {
+  local ref="$SKILL_DIR/reference/config-hygiene.md"
+  grep -F -q "Never delete memory, rule, or skill files without the owner's yes." "$ref"
+  grep -F -q '~/.local/state/tooling-checkup/backups/checkup-YYYY-MM-DD/' "$ref"
+  grep -F -q 'list the older ones in the Phase 11 questionnaire' "$ref"
+  grep -F -q 'one batch, with the backup path' "$ref"
+  run grep -F -q 'ls -lt ~/.claude/skills' "$ref"
+  [ "$status" -ne 0 ]
+  run grep -F -q '~/.claude/backups' "$ref"
+  [ "$status" -ne 0 ]
+  run grep -F -q 'old checkup backups to prune' "$SKILL"
+  [ "$status" -eq 0 ]
+  run jq -e '.evals[] | select(.id == 21) | .expectations | any(test("deletes no memory file"; "i"))' "$EVALS"
+  [ "$status" -eq 0 ]
+}

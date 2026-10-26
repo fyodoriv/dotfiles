@@ -265,9 +265,10 @@ settings. Keep those in a **private** git repo of their own.
    lines for the folders you keep), so a new cache never lands in git.
 2. Before each commit, scan the staged files for secrets and stop on a hit
    (for example a refresh token, an OAuth client secret, or a key in a URL).
-   Print file names only, never the matched value.
-3. Commit with a conventional message (the `commit-msg` hook rejects others)
-   and push only to a private remote. Check with
+   Use `gitleaks protect --staged --redact`, so it prints file names only,
+   never the matched value.
+3. Commit with a conventional message. The `commit-msg` hook (installed
+   globally by dotfiles) rejects others. Push only to a private remote. Check with
    `gh repo view <repo> --json visibility`.
 
 ### Restore on a new Mac

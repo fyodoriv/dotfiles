@@ -6,10 +6,24 @@ hooks that still work, and no new skill that repeats one the user already has.
 
 ## Back up first
 
-Before any edit to rules, settings, skills, or memory, copy them to a dated
-folder, for example `~/.claude/backups/checkup-<date>/` (`CLAUDE.md`,
+Before any edit to rules, settings, skills, or memory, copy them to
+`~/.local/state/tooling-checkup/backups/checkup-YYYY-MM-DD/` (`CLAUDE.md`,
 `settings.json`, the memory folder, and personal skills; skip folders an app
-manages). Keep the last four checkup backups and delete older ones.
+manages). Do not put backups under `~/.claude/`: Claude Code keeps its own
+backups there.
+
+Never prune backups by yourself. When more than four `checkup-YYYY-MM-DD`
+folders exist, list the older ones in the Phase 11 questionnaire. Delete
+only folders with that exact name, and only after the owner's yes.
+
+## Ask before you delete
+
+Never delete memory, rule, or skill files without the owner's yes.
+
+- Editing a stale fact in place is fine.
+- Collect every proposed deletion or merge of a memory, rule, or skill file.
+  Put them in the Phase 11 questionnaire as one batch, with the backup path.
+- Act on the batch only after the owner says yes.
 
 ## One home per fact
 
@@ -24,11 +38,13 @@ For each rule, skill section, and memory, ask: is this its one right home?
 | Must never break | a hook, with the prose as the reason |
 
 - Search for the same instruction in two places (`rg -n '<key phrase>'`
-  across the rules, skills, and memory folders). Keep the best home. Replace
-  the other copy with a one-line pointer, or delete it.
-- Merge skills whose jobs overlap. Then update every reference to the
-  renamed or removed skill.
-- Move multi-step procedures out of always-loaded files into skills.
+  across the rules, skills, and memory folders). Keep the best home. Propose
+  replacing the other copy with a one-line pointer, or deleting it, in the
+  Phase 11 batch.
+- Propose merging skills whose jobs overlap in the Phase 11 batch. After
+  the owner's yes, update every reference to the renamed or removed skill.
+- Propose moving multi-step procedures out of always-loaded files into
+  skills, in the Phase 11 batch.
 - When two places contradict each other and the intent is unclear, ask in the
   Phase 11 questionnaire. Do not guess.
 
@@ -37,12 +53,14 @@ For each rule, skill section, and memory, ask: is this its one right home?
 Skip this when the agent keeps no file memory.
 
 - Re-check each memory that names a file, flag, version, branch, or state.
-  Update it, or delete it when it is no longer true.
-- Merge duplicate memories. Delete a memory that only restates a rule or a
-  skill.
+  Edit a stale fact in place. When the whole memory is no longer true,
+  propose its deletion in the Phase 11 batch.
+- Propose merging duplicate memories, and deleting a memory that only
+  restates a rule or a skill, in the Phase 11 batch.
 - The memory index has exactly one line per memory file, and every line
   points to a file that exists.
-- Remove answered items from any open-questions memory.
+- Remove answered items from any open-questions memory. This is an edit in
+  place, not a file deletion.
 - Dates are absolute ("2026-10-25", not "yesterday").
 
 ## Hooks
@@ -59,8 +77,23 @@ to the questionnaire. Never change hooks or permissions without the user's yes.
 
 ## New upstream skills
 
-After `agentbrew sync --pull` (Phase 3), list skills that changed since the
-last run (`ls -lt ~/.claude/skills | head`). For each new one:
+After `agentbrew sync --pull` (Phase 3), find new skills by name. The
+installed skills are symlinks, so their dates do not show updates. Diff
+today's list against the list the previous run saved, then save today's:
+
+```bash
+state=~/.local/state/tooling-checkup; mkdir -p "$state"
+ls ~/.claude/skills | sort > "$state/skills-now.txt"
+if [ -f "$state/skills-last.txt" ]; then
+  comm -13 "$state/skills-last.txt" "$state/skills-now.txt"
+else
+  cat "$state/skills-now.txt"   # first run: every skill is new
+fi
+```
+
+After you review the new skills, save the list for the next run:
+`mv "$state/skills-now.txt" "$state/skills-last.txt"`. If the run stops
+before the review, do not save it. For each new one:
 
 - Compare its description with the user's own skills. Two skills must not
   claim the same triggers.

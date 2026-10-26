@@ -370,7 +370,9 @@ or the skip has a reason.
 
 Ask from the page: each question names the page section it comes from.
 Collect the questions: each "Needs you" item, each third-party job to remove,
-each big config change, and which next tasks to start. Skip a question an
+each big config change, the config-hygiene batch of memory, rule, and skill
+deletions or merges (with the backup path), old checkup backups to prune, and
+which next tasks to start. Skip a question an
 earlier answer settles.
 
 Ask with `AskUserQuestion`, up to 4 questions per call, in rounds. For each
@@ -386,7 +388,8 @@ question:
 ## Phase 12: Apply the answers and record
 
 1. Apply each answer: disable the approved jobs, ship the approved config
-   changes with `/ship-it`, and file or re-rank tasks (with the Phase 8
+   changes with `/ship-it`, delete or merge the approved memory, rule, and skill
+   files and old backups, and file or re-rank tasks (with the Phase 8
    speedup tasks and the Phase 9 research tasks).
 2. Run `bash <skill-dir>/scripts/inventory.sh` again and update the report.
    Mark the Phase 9 items as seen: `python3 <skill-dir>/scripts/ai_research.py record`.

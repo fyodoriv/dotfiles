@@ -119,14 +119,15 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -q 'not applied' "$SKILL"
 }
 
-@test "update-tooling ends with an HTML page and asks next work from it" {
-  grep -q "End with one self-contained HTML page" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+@test "update-tooling ends with a published Artifact and asks next work from it" {
+  grep -q "End with a published Artifact, not chat text and not a loose HTML file" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
+  ! grep -q "End with one self-contained HTML page" "$BATS_TEST_DIRNAME/../skills/update-tooling/SKILL.md"
 }
 
-@test "ship-it ends a multi-PR run with an HTML page" {
+@test "ship-it ends a multi-PR run with a published Artifact" {
   grep -q "Steps 1–16" "$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -q "^## 16. Run report (two or more PRs)" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
-  grep -q "self-contained HTML" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  grep -q "ends with a published Artifact" "$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
 }
 
 @test "update-tooling skips the full dotfiles apply only when nothing changed" {

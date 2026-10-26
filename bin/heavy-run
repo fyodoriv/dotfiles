@@ -1,0 +1,87 @@
+#!/bin/bash
+# heavy-run — run one heavy command at a time on this Mac, at low priority.
+#
+# Every agent session and worker shares one lock file at a fixed path, so
+# full suites, e2e runs, and timing runs queue instead of piling up.
+# $TMPDIR is not used: sandboxed sessions can see different temp dirs.
+#
+# A perl parent holds an flock (fd closed on exec, so no child or leftover
+# daemon inherits it), runs the command, forwards TERM/INT/HUP to it, and
+# exits with its status. The lock lasts exactly as long as the command.
+#
+# Usage:
+#   heavy-run make check
+#   heavy-run npm run verify
+#   heavy-run --status          # print who holds the lock, if anyone
+#
+# Env:
+#   HEAVY_RUN_DIR   lock folder (default ~/.local/state/heavy-run)
+#   HEAVY_RUN_NICE  nice level (default 15)
+
+set -euo pipefail
+
+dir="${HEAVY_RUN_DIR:-$HOME/.local/state/heavy-run}"
+lock="$dir/lock"
+owner="$dir/owner"
+level="${HEAVY_RUN_NICE:-15}"
+
+usage() {
+  echo "Usage: heavy-run <command...> | heavy-run --status"
+}
+
+case "${1:-}" in
+  "" | -h | --help)
+    usage
+    [ -n "${1:-}" ] && exit 0
+    exit 2
+    ;;
+  --status)
+    if [ ! -e "$lock" ]; then echo "free"; exit 0; fi
+    if perl -e 'use Fcntl qw(:flock); open(my $f, "<", $ARGV[0]) or exit 0; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1)' "$lock"; then
+      echo "free"
+    else
+      echo "held: $(cat "$owner" 2>/dev/null)"
+    fi
+    exit 0
+    ;;
+esac
+
+case "$level" in
+  '' | *[!0-9]* | 2[1-9] | [3-9][0-9] | [0-9][0-9][0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
+esac
+
+# Already inside a heavy-run that still holds the lock: run at once.
+# A leftover daemon keeps HEAVY_RUN_HELD after the run ends, so check the lock.
+if [ "${HEAVY_RUN_HELD:-}" = "$lock" ] && [ "$("$0" --status)" != "free" ]; then
+  exec "$@"
+fi
+
+mkdir -p "$dir"
+export HEAVY_RUN_HELD="$lock"
+
+exec perl -e '
+  use Fcntl qw(:flock);
+  use POSIX ();
+  my ($lock, $owner, $level, @cmd) = @ARGV;
+  open(my $fh, ">>", $lock) or die "heavy-run: cannot open $lock: $!\n";
+  flock($fh, LOCK_EX) or die "heavy-run: cannot lock $lock: $!\n";
+  # Block signals across fork so none can kill the parent before it forwards.
+  my $set = POSIX::SigSet->new(POSIX::SIGTERM(), POSIX::SIGINT(), POSIX::SIGHUP());
+  POSIX::sigprocmask(POSIX::SIG_BLOCK(), $set);
+  my $pid = fork() // die "heavy-run: cannot fork: $!\n";
+  if ($pid == 0) {
+    POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
+    exec("nice", "-n", $level, "--", @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
+  }
+  for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid }; }
+  POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
+  my @t = localtime;
+  if (open(my $o, ">", $owner)) {
+    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd);
+    close $o;
+  }
+  while (waitpid($pid, 0) == -1) { last unless $!{EINTR}; }
+  my $st = $?;
+  truncate($owner, 0);
+  exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));
+' "$lock" "$owner" "$level" "$@"

@@ -5,6 +5,12 @@
 # agentbrew) allow nested subagents up to depth 2 instead of its default
 # depth 1. Owner choice 2026-10-25.
 #
+# CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000 makes Claude Code compact a
+# conversation near 350k tokens. The guard refuses tool calls above 400k
+# (AGENT_GUARD_TOOL_CONTEXT) when nobody can answer, which stopped day-long
+# /goal runs (2026-10-25). Compacting first keeps a run below that line.
+# Keep it at least 30k below the guard's line (tests/claude-settings-env.bats).
+#
 # Claude Code owns settings.json and writes other keys into it, so this script
 # merges only the keys below with jq and keeps every other field. It writes
 # through a symlink to its real target and keeps the file mode. Runs after
@@ -13,7 +19,7 @@
 set -euo pipefail
 
 SETTINGS="$HOME/.claude/settings.json"
-DESIRED_ENV='{"AGENT_GUARD_DEPTH_MAX":"2"}'
+DESIRED_ENV='{"AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
 
 if [ "${1:-}" = "--print-desired" ]; then
   printf '%s\n' "$DESIRED_ENV"
@@ -63,4 +69,4 @@ else
   chmod 600 "$TMP"
 fi
 mv "$TMP" "$TARGET"
-echo "✓ Claude Code settings.json env pinned: AGENT_GUARD_DEPTH_MAX=2"
+echo "✓ Claude Code settings.json env pinned: AGENT_GUARD_DEPTH_MAX=2, CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000"

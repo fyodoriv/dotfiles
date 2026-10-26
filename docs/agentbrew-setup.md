@@ -18,7 +18,7 @@ recovering from an `agentbrew sync` failure.
 | `~/.config/agentbrew/state.yaml` | agentbrew | Local registry of installed items and detected agents |
 | `~/.claude/` | agentbrew or the agent | Generated agent config; do not edit by hand |
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
-| `~/.config/agentbrew/hooks-overlay/manifest.yaml` | you, plus dotfiles | Per-machine hook overlay. Your `disabled:` list and comments stay. `dotfiles apply` only adds missing opt-in hooks to `enabled:`, through `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl`. It adds the owner-workflow hooks (`gh-pr-body-requires-docs`, `perf-task-review`, `poll-loop-hint`, `usage-tip`, and others) only when `owner_machine` is true, so a new user gets none. List a hook under `disabled:` to opt out on one machine. |
+| `~/.config/agentbrew/hooks-overlay/manifest.yaml` | you, plus dotfiles | Per-machine hook overlay. Your `disabled:` list and comments stay. `dotfiles apply` only adds missing opt-in hooks to `enabled:`, through `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl`. It adds the owner-workflow hooks (`gh-pr-body-requires-docs`, `perf-task-review`, `poll-loop-hint`, `usage-tip`, `no-home-crawl`, and others) only when `owner_machine` is true, so a new user gets none. List a hook under `disabled:` to opt out on one machine. |
 
 ### Agent time skills
 

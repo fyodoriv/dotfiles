@@ -118,3 +118,9 @@ wait_held() {
   HEAVY_RUN_NICE=25 run "$SCRIPT" true
   [ "$status" -eq 2 ]
 }
+
+@test "heavy-run: a stale HEAVY_RUN_HELD does not skip a free lock" {
+  mkdir -p "$HEAVY_RUN_DIR"
+  HEAVY_RUN_HELD="$HEAVY_RUN_DIR/lock" run "$SCRIPT" sh -c "'$SCRIPT' --status"
+  [[ "$output" == held:* ]]
+}

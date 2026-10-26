@@ -50,8 +50,9 @@ case "$level" in
   '' | *[!0-9]* | 2[1-9] | [3-9][0-9] | [0-9][0-9][0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
 esac
 
-# Already inside a heavy-run: the outer run holds the lock and owns the owner file.
-if [ "${HEAVY_RUN_HELD:-}" = "$lock" ]; then
+# Already inside a heavy-run that still holds the lock: run at once.
+# A leftover daemon keeps HEAVY_RUN_HELD after the run ends, so check the lock.
+if [ "${HEAVY_RUN_HELD:-}" = "$lock" ] && [ "$("$0" --status)" != "free" ]; then
   exec "$@"
 fi
 
@@ -64,11 +65,16 @@ exec perl -e '
   my ($lock, $owner, $level, @cmd) = @ARGV;
   open(my $fh, ">>", $lock) or die "heavy-run: cannot open $lock: $!\n";
   flock($fh, LOCK_EX) or die "heavy-run: cannot lock $lock: $!\n";
+  # Block signals across fork so none can kill the parent before it forwards.
+  my $set = POSIX::SigSet->new(POSIX::SIGTERM(), POSIX::SIGINT(), POSIX::SIGHUP());
+  POSIX::sigprocmask(POSIX::SIG_BLOCK(), $set);
   my $pid = fork() // die "heavy-run: cannot fork: $!\n";
   if ($pid == 0) {
+    POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
     exec("nice", "-n", $level, "--", @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
   }
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid }; }
+  POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
   my @t = localtime;
   if (open(my $o, ">", $owner)) {
     printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd);

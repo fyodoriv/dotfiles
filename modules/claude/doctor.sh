@@ -52,6 +52,19 @@ check "claude.model_default" "Claude Code config pinned to Opus 5.5 xhigh (or th
   "_claude_model_is_default" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-model.sh'"
 
+# Env pins (AGENT_GUARD_DEPTH_MAX=2: agent-usage-guard allows depth 2). The
+# expected values come from the fix script's --print-desired, so the check
+# and the fix never disagree.
+_claude_env_pinned() {
+  local settings="$HOME/.claude/settings.json" want
+  [ -s "$settings" ] && command -v jq >/dev/null 2>&1 || return 1
+  want="$(bash "$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-env.sh" --print-desired 2>/dev/null)" || return 1
+  jq -e --argjson want "$want" '(.env // {}) as $e | all($want | to_entries[]; $e[.key] == .value)' "$settings" >/dev/null 2>&1
+}
+check "claude.env_pins" "Claude Code env pins set (AGENT_GUARD_DEPTH_MAX=2: agent-usage-guard allows depth 2)" \
+  "_claude_env_pinned" \
+  "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-env.sh'"
+
 # ── agents-observe plugin server ──────────────────────────────────────
 # The agents-observe plugin hooks every Claude Code event but sends all
 # errors to /dev/null. Its hook starts the Docker server on demand, and the
@@ -69,3 +82,56 @@ _claude_observe_plugin_ok() {
 check "claude.observe_plugin_server" "agents-observe plugin can start its server (Docker API answers; opt out: claude plugin disable agents-observe@agents-observe)" \
   "_claude_observe_plugin_ok" \
   "bash '$DOTFILES_DIR/bin/rancher-desktop'"
+
+# ── Plugins kept off ──────────────────────────────────────────────────
+# The account plugin sync can turn a synced plugin back on. On every apply,
+# .chezmoiscripts/run_after_claude-disabled-plugins.sh sets each plugin in
+# claude_disabled_plugins (config/settings.yaml) to false. These checks find
+# the plugin back on in Claude Code.
+_claude_disabled_plugins_list() {
+  bash "$DOTFILES_DIR/.chezmoiscripts/run_after_claude-disabled-plugins.sh" --print-list 2>/dev/null
+}
+_claude_disabled_plugins_off() {
+  local settings="$HOME/.claude/settings.json" p
+  [ -s "$settings" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ "$(jq -r --arg p "$p" '.enabledPlugins[$p] // false' "$settings" 2>/dev/null)" = "true" ] && return 1
+  done < <(_claude_disabled_plugins_list)
+  return 0
+}
+check "claude.disabled_plugins" "Claude Code plugins in claude_disabled_plugins are off in ~/.claude/settings.json" \
+  "_claude_disabled_plugins_off" \
+  "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-disabled-plugins.sh'"
+
+# ── Declined MCP servers stay out ─────────────────────────────────────
+# agentbrew lists context7 in declinedMcpServers. This check fails when an
+# agent config still has it as an MCP server key.
+_claude_context7_files() {
+  printf '%s\n' \
+    "$HOME/.claude.json" \
+    "$HOME/Library/Application Support/Claude/claude_desktop_config.json" \
+    "$HOME/.config/opencode/opencode.json" \
+    "$HOME/.local/share/dotfiles-vscode/settings.generated.json"
+}
+_claude_context7_found_in() {
+  local f
+  while IFS= read -r f; do
+    [ -s "$f" ] || continue
+    command -v jq >/dev/null 2>&1 || continue
+    jq -e '[paths | select(length >= 2 and .[-1] == "context7" and ((.[-2] | tostring) | test("^(mcpServers|servers|mcp)$")))] | length > 0' "$f" >/dev/null 2>&1 \
+      && printf '%s\n' "$f"
+  done < <(_claude_context7_files)
+  local codex="$HOME/.codex/config.toml"
+  [ -f "$codex" ] && grep -qE '^[[:space:]]*\[mcp_servers\."?context7"?(\]|\.)' "$codex" && printf '%s\n' "$codex"
+  return 0
+}
+# Scan once; the check reads the saved result.
+_claude_context7_hits="$(_claude_context7_found_in | paste -sd, - | sed 's/,/, /g')"
+_claude_context7_desc="No agent config lists the declined context7 MCP server"
+[ -z "$_claude_context7_hits" ] || _claude_context7_desc="context7 MCP server found in $_claude_context7_hits (declined in agentbrew); remove that entry, then run agentbrew sync"
+check "claude.no_context7_mcp" "$_claude_context7_desc" \
+  "[ -z \"$_claude_context7_hits\" ]" \
+  ""
+unset _claude_context7_desc _claude_context7_hits

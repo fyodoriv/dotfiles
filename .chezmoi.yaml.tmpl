@@ -43,6 +43,12 @@
 {{- if hasKey . "claude_permissions" -}}
 {{-   $claudePermissions = .claude_permissions -}}
 {{- end -}}
+{{/* claude_disabled_plugins: Claude Code plugins kept off on every apply
+     (.chezmoiscripts/run_after_claude-disabled-plugins.sh). */ -}}
+{{- $claudeDisabledPlugins := list "prisma@synced" -}}
+{{- if hasKey . "claude_disabled_plugins" -}}
+{{-   $claudeDisabledPlugins = .claude_disabled_plugins -}}
+{{- end -}}
 {{- $autoUpgrade := promptBoolOnce . "auto_upgrade" "Enable auto-upgrade LaunchAgent (brew upgrade at 3am Sunday)" false -}}
 {{- $useEncryption := promptBoolOnce . "use_encryption" "Enable age encryption (requires ~/.config/chezmoi/key.txt)" false -}}
 {{- $ageRecipient := "unused-no-encryption-configured" -}}
@@ -186,4 +192,10 @@ data:
 {{- end }}
 {{- if ne $claudePermissions "manage" }}
   claude_permissions: {{ $claudePermissions | quote }}
+{{- end }}
+  claude_disabled_plugins:
+{{- range $claudeDisabledPlugins }}
+    - {{ . | quote }}
+{{- else }}
+    []
 {{- end }}

@@ -5,6 +5,10 @@
 # full suites, e2e runs, and timing runs queue instead of piling up.
 # $TMPDIR is not used: sandboxed sessions can see different temp dirs.
 #
+# The lock is an flock on an fd the command inherits, so it lasts exactly as
+# long as the command: a signal to the wrapper's pid reaches the command
+# itself, and the lock cannot be freed while the command still runs.
+#
 # Usage:
 #   heavy-run make check
 #   heavy-run npm run verify
@@ -19,6 +23,7 @@ set -euo pipefail
 dir="${HEAVY_RUN_DIR:-$HOME/.local/state/heavy-run}"
 lock="$dir/lock"
 owner="$dir/owner"
+level="${HEAVY_RUN_NICE:-15}"
 
 usage() {
   echo "Usage: heavy-run <command...> | heavy-run --status"
@@ -31,7 +36,9 @@ case "${1:-}" in
     exit 2
     ;;
   --status)
-    if [ -s "$owner" ] && lsof -t "$lock" >/dev/null 2>&1; then
+    pid=""
+    [ -s "$owner" ] && pid="$(sed -n 's/.* pid=\([0-9]*\) .*/\1/p' "$owner")"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
       echo "held: $(cat "$owner")"
     else
       echo "free"
@@ -40,14 +47,30 @@ case "${1:-}" in
     ;;
 esac
 
-mkdir -p "$dir"
-touch "$lock"
+case "$level" in
+  '' | *[!0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
+esac
 
-# Re-exec under lockf; the child writes the owner line once it holds the lock.
-if [ "${HEAVY_RUN_HELD:-}" != "$lock" ]; then
-  HEAVY_RUN_HELD="$lock" exec lockf -k "$lock" "$0" "$@"
+# Already inside a heavy-run: the outer run holds the lock and owns the owner file.
+if [ "${HEAVY_RUN_HELD:-}" = "$lock" ]; then
+  exec "$@"
 fi
 
-printf '%s pid=%s cwd=%s cmd=%s\n' "$(date +%H:%M:%S)" "$$" "$PWD" "$*" >"$owner"
-trap ': >"$owner"' EXIT
-nice -n "${HEAVY_RUN_NICE:-15}" "$@"
+mkdir -p "$dir"
+export HEAVY_RUN_HELD="$lock"
+
+# perl takes the flock, writes the owner line, then execs the command in place
+# (same pid). $^F keeps the lock fd open across exec.
+exec perl -e '
+  use Fcntl qw(:flock);
+  my ($lock, $owner, $level, @cmd) = @ARGV;
+  $^F = 255;
+  open(my $fh, ">>", $lock) or die "heavy-run: cannot open $lock: $!\n";
+  flock($fh, LOCK_EX) or die "heavy-run: cannot lock $lock: $!\n";
+  my @t = localtime;
+  if (open(my $o, ">", $owner)) {
+    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\n", @t[2,1,0], $$, $ENV{PWD} // "", join(" ", @cmd);
+    close $o;
+  }
+  exec("nice", "-n", $level, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
+' "$lock" "$owner" "$level" "$@"

@@ -45,6 +45,7 @@ names.
 | Change agent MCPs, skills, rules | `Agentfile.yaml` | [agentbrew-setup.md](docs/agentbrew-setup.md) |
 | Turn an opt-in agentbrew hook on for every machine | `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl` (`HOOKS=`, owner-only) | [agentbrew-setup.md](docs/agentbrew-setup.md) |
 | Change the default model | `Agentfile.yaml` + `.chezmoiscripts/run_after_claude-settings-model.sh` | [model-configuration.md](docs/model-configuration.md) |
+| Change Claude Code env pins | `.chezmoiscripts/run_after_claude-settings-env.sh` | [model-configuration.md](docs/model-configuration.md#claude-code-env-pins) |
 | Change agent wrappers | `bin/gh`, `lib/strip-agent-attribution.sh`, `agent-hooks/` | [agent-hooks.md](docs/agent-hooks.md) |
 | Change a skill or command owned here | `skills/<name>/`, `commands/` | its SKILL.md or command file |
 | Add a doc | `docs/<name>.md` | a row in [docs/README.md](docs/README.md) |
@@ -102,7 +103,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
-- **Parallel agents**: at most 3 run gates; check `dotfiles-load-sampler --report 1`.
+- **Parallel agents**: gates run one at a time via `heavy-run`; `dotfiles-load-sampler`.
 - **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: set `DOTFILES_DIR` to a temp dir in tests.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.

@@ -22,3 +22,7 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 
 **Debugging:** wrong model? Check, in order:
 1. For Claude Code: `cat ~/.claude/settings.json | jq '.model, .effortLevel'` → `"claude-opus-5-5"` and `"xhigh"` (or this machine's override). The fix path is `dotfiles-doctor --module claude --fix` (which sources `.chezmoiscripts/run_after_claude-settings-model.sh`) — never hand-edit settings.json, Claude Code rewrites it on shutdown.
+
+## Claude Code env pins
+
+`.chezmoiscripts/run_after_claude-settings-env.sh` merges `AGENT_GUARD_DEPTH_MAX=2` into the `env` object of `~/.claude/settings.json` on every apply. This lets the agent-usage-guard plugin allow nested subagents up to depth 2 instead of its default depth 1. It writes through a symlink, keeps the file mode, and refuses to touch a settings file that is not valid JSON. The doctor check `claude.env_pins` warns on drift (`dotfiles doctor --module claude --fix` repairs it). It also pins `CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000`, so Claude Code compacts a conversation near 350k tokens. Without it, a 1M-context model grows past 400k, where the guard refuses tool calls that nobody can approve, and a long `/goal` run stops until someone types `/compact`. Check both with `jq .env ~/.claude/settings.json`. Test: `tests/claude-settings-env.bats`.

@@ -381,12 +381,11 @@ the queue is the source of truth.
 
 ## 6. Report
 
-End with one self-contained HTML page, not chat text (shared-rules
-**## Long-run reports**): write it under `~/.local/state/update-tooling/`,
-publish it as a private Artifact when the Artifact tool exists (else send the
-file or give its path), then ask in chat which next work to start, with the
-options from the page. Paths show as `~/…`; no secrets. Build the page from
-this outline:
+End with a published Artifact, not chat text and not a loose HTML file
+(shared-rules **## Long-run reports**). Only without the Artifact tool, write
+one self-contained HTML file under `~/.local/state/update-tooling/` and give
+its path. Then ask in chat which next work to start, with the options from
+the Artifact. Paths show as `~/…`; no secrets. Build it from this outline:
 
 ```markdown
 ## Repository refresh

@@ -3,6 +3,8 @@
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/heavy-run"
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   export HEAVY_RUN_DIR="$BATS_TEST_TMPDIR/hr"
   unset HEAVY_RUN_HELD
@@ -19,7 +21,7 @@ wait_held() {
 }
 
 @test "heavy-run: runs the command and returns its exit status" {
-  run "$SCRIPT" sh -c 'echo hi; exit 3'
+  run --separate-stderr "$SCRIPT" sh -c 'echo hi; exit 3'
   [ "$status" -eq 3 ]
   [ "$output" = "hi" ]
 }
@@ -79,7 +81,7 @@ wait_held() {
 }
 
 @test "heavy-run: a nested call runs at once and keeps the outer owner line" {
-  run "$SCRIPT" sh -c "'$SCRIPT' sh -c 'echo inner'; '$SCRIPT' --status"
+  run --separate-stderr "$SCRIPT" sh -c "'$SCRIPT' sh -c 'echo inner'; '$SCRIPT' --status"
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "inner" ]
   [[ "${lines[1]}" == held:* ]]
@@ -97,4 +99,22 @@ wait_held() {
   [[ "$output" == Usage:* ]]
   run "$SCRIPT" --help
   [ "$status" -eq 0 ]
+}
+
+@test "heavy-run: a leftover background child does not keep the lock" {
+  "$SCRIPT" sh -c '(sleep 4 &) ; exit 0'
+  start=$(date +%s)
+  "$SCRIPT" true
+  [ $(( $(date +%s) - start )) -lt 3 ]
+  run "$SCRIPT" --status
+  [ "$output" = "free" ]
+}
+
+@test "heavy-run: a command that starts with a dash is not a nice option" {
+  run -127 --separate-stderr "$SCRIPT" -n 5 true
+}
+
+@test "heavy-run: rejects HEAVY_RUN_NICE above 20" {
+  HEAVY_RUN_NICE=25 run "$SCRIPT" true
+  [ "$status" -eq 2 ]
 }

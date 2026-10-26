@@ -182,5 +182,9 @@ rules: |
   result, and never commit the image. A transcript is copyable and diffable, so
   it beats a picture of the same text; a terminal image is an equal alternative,
   never a requirement. Drag and drop any image into the PR description.
+  Run every heavy command (a full test suite, an e2e or browser run, a timing
+  run) as `heavy-run <command>`: one Mac-wide lock at nice 15 that every agent
+  session shares, so heavy runs queue instead of piling up. Start a run that
+  may queue in the background. Check the holder with `heavy-run --status`.
   Never drive AppleScript, keystrokes, or window activation to stage a terminal
   image; that steals focus and can type into whatever is frontmost.

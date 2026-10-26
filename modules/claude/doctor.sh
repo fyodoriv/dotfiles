@@ -106,6 +106,30 @@ check "claude.disabled_plugins" "Claude Code plugins in claude_disabled_plugins 
   "_claude_disabled_plugins_off" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-disabled-plugins.sh'"
 
+# ── agentbrew mods installed ──────────────────────────────────────────
+# .chezmoiscripts/run_after_claude-mods.sh installs each mod in claude_mods
+# (config/settings.yaml) from agentbrew's mods/ folder. This check finds one
+# that is not enabled. Skips when there is no agentbrew checkout with mods/.
+_claude_mods_list() {
+  bash "$DOTFILES_DIR/.chezmoiscripts/run_after_claude-mods.sh" --print-list 2>/dev/null
+}
+_claude_mods_on() {
+  local settings="$HOME/.claude/settings.json" m d found=""
+  command -v jq >/dev/null 2>&1 || return 0
+  for d in "${AGENTBREW_DIR:-}" "${DOTFILES_REPOS_DIR:-$HOME/apps}/tooling/agentbrew" "${DOTFILES_REPOS_DIR:-$HOME/apps}/agentbrew"; do
+    [ -n "$d" ] && [ -f "$d/mods/.claude-plugin/marketplace.json" ] && { found=1; break; }
+  done
+  [ -n "$found" ] || return 0
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    [ "$(jq -r --arg p "$m@agentbrew-mods" '.enabledPlugins[$p] // false' "$settings" 2>/dev/null)" = "true" ] || return 1
+  done < <(_claude_mods_list)
+  return 0
+}
+check "claude.mods" "agentbrew mods in claude_mods (default work-pane) are installed in Claude Code" \
+  "_claude_mods_on" \
+  "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-mods.sh'"
+
 # ── Declined MCP servers stay out ─────────────────────────────────────
 # agentbrew lists context7 in declinedMcpServers. This check fails when an
 # agent config still has it as an MCP server key.

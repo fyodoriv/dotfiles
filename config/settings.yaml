@@ -162,3 +162,7 @@ settings:
     type: list
     default: prisma@synced
     description: Claude Code plugins that dotfiles apply keeps off in ~/.claude/settings.json, comma-separated. Empty = none.
+  claude_mods:
+    type: list
+    default: work-pane
+    description: agentbrew Claude Code mods (from its mods/ folder) that dotfiles apply installs, comma-separated. work-pane shows /work progress beside the chat. Empty = none.

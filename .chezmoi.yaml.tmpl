@@ -49,6 +49,12 @@
 {{- if hasKey . "claude_disabled_plugins" -}}
 {{-   $claudeDisabledPlugins = .claude_disabled_plugins -}}
 {{- end -}}
+{{/* claude_mods: agentbrew Claude Code mods installed on every apply
+     (.chezmoiscripts/run_after_claude-mods.sh). */ -}}
+{{- $claudeMods := list "work-pane" -}}
+{{- if hasKey . "claude_mods" -}}
+{{-   $claudeMods = .claude_mods -}}
+{{- end -}}
 {{/* login_apps: apps macos-apps.sh adds as login items; a leading - removes
      one (lib/login-apps.sh). */ -}}
 {{- $loginApps := list "Ghostty" -}}
@@ -225,6 +231,12 @@ data:
 {{- end }}
   claude_disabled_plugins:
 {{- range $claudeDisabledPlugins }}
+    - {{ . | quote }}
+{{- else }}
+    []
+{{- end }}
+  claude_mods:
+{{- range $claudeMods }}
     - {{ . | quote }}
 {{- else }}
     []

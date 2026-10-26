@@ -442,6 +442,7 @@ checks apply to any user with Chrome.
 | `claude.settings_mcp_allowed` | MCP server allowed in settings | `agentbrew sync` |
 | `claude.env_pins` | `~/.claude/settings.json` env has `AGENT_GUARD_DEPTH_MAX=2` (agent-usage-guard allows depth 2) and `CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000` (compact before the guard's 400k tool-budget line) | `.chezmoiscripts/run_after_claude-settings-env.sh` (also runs on every apply) |
 | `claude.disabled_plugins` | Plugins in `claude_disabled_plugins` (default `prisma@synced`) are `false` in `enabledPlugins` | `.chezmoiscripts/run_after_claude-disabled-plugins.sh` (also runs on every apply) |
+| `claude.mods` | Mods in `claude_mods` (default `work-pane`) are enabled as `<mod>@agentbrew-mods` | `.chezmoiscripts/run_after_claude-mods.sh` (also runs on every apply) |
 | `claude.no_context7_mcp` | No `context7` MCP server key in `~/.claude.json`, the Claude Desktop config, `~/.codex/config.toml`, opencode, or the generated VS Code settings | No auto-fix: the line names the file; remove the entry, then `agentbrew sync` |
 
 Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in a company plugin's `contributes.doctor_modules` (see [plugins.md](plugins.md)).

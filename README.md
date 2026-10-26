@@ -95,6 +95,19 @@ Settings drift. Scripts break. Nobody notices until something is slow again.
 - **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac. `--share FILE` writes a privacy-safe snapshot. `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot. `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you; it asks first (`--yes` skips the question).
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
 
+## Personal and corporate machines
+
+dotfiles sets up both kinds of Mac from the same repo. One answer at `chezmoi init` picks the mode: `is_enterprise` (default `false`).
+
+| | Personal Mac | Corporate Mac (your work laptop) |
+|---|---|---|
+| Tools | the base set | the base set, plus generic enterprise tools (AWS CLI, K8s, Gradle, Java 21, enterprise SSH) |
+| Company setup | none | only from your company's signed plugin (`dotfiles-<org>`): internal hosts, packages, and settings. This public repo never names a company |
+| Your data | stays on this Mac; secrets use age encryption or the macOS Keychain, never plaintext in git | the same. **Company names and internal links stay private**: they live only in the plugin and in a local pattern file (mode 600), and the leak gates block a push or a GitHub post that holds one |
+| Setup steps | [Installation](#installation) | [Installation](#installation), then [Enterprise setup](#enterprise-setup) |
+
+**Corporate plugins.** A company plugin is a private repo named `dotfiles-<org>`. Its companions are `agentbrew-<org>` (agent skills and MCP servers) and `careerbrew-<org>` (career workflows). To find yours, ask your team for its `dotfiles-<org>` link. To build one, read [docs/plugins.md](docs/plugins.md) and [For other companies](#for-other-companies).
+
 ## Installation
 
 ```bash

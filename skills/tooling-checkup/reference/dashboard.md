@@ -22,6 +22,8 @@ JSON file that the checkup uploads. There are no live queries.
 | `latest` | one: newest checkup, every numeric metric | same | 72 |
 | `gate` | one per day: runs, failed runs, median `total` seconds | `~/.local/state/dotfiles/gate-timings.jsonl` | none |
 | `doctor` | one per day: last pass, fail, warn, skip | `~/.dotfiles-stats.jsonl` (`task: doctor`) | none |
+| `load` | one per hour, last 7 days (local time): samples, peak and mean load1, lowest free memory %, peak swap MB, overload samples (load1 > 2 x CPUs) | `~/.local/state/dotfiles/load-samples.tsv` | 24 |
+| `agent_time` | one per day and project, last 14 days: tool hours, calls, failed calls | agentbrew perf log `~/.local/state/agentbrew/perf/*.jsonl` | 48 |
 
 ## Update steps (Phase 10 step 4)
 
@@ -40,4 +42,6 @@ Rows hold tooling metrics only. The exporter maps the home folder to `~`,
 redacts token-like strings, and replaces any text that matches the local
 private-pattern file (`~/.config/oss-readiness/oss-readiness.env`) with
 `[redacted]`. Metric keys outside `[a-z0-9_]` and non-numeric values are
-dropped from `latest`. Anyone who can open the dashboard can read the files.
+dropped from `latest`. `agent_time` names only the tooling projects
+(agentbrew, dotfiles, minsky, taskgrind, tasks.md, tooling); every other
+project is grouped as `other`, so private repo names never reach the page. Anyone who can open the dashboard can read the files.

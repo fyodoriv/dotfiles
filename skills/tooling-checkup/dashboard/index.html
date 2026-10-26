@@ -30,6 +30,15 @@
   <section class="tc-chart" id="tc-overload" data-source="runs"><h2>Overload rows per checkup</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
   <section class="tc-chart" id="tc-gate" data-source="gate"><h2>dotfiles gate: median seconds per day</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
   <section class="tc-chart" id="tc-doctor" data-source="doctor"><h2>dotfiles doctor: failing checks per day</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-load" data-source="load"><h2>Machine load: peak load1 per hour, last 7 days (local time)</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-agent" data-source="agent_time"><h2>Agent tool hours per day, last 14 days</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section id="tc-agent-projects">
+    <h2>Agent tool hours by project, last 14 days</h2>
+    <table class="tc-table" data-source="agent_time">
+      <thead><tr><th>Project</th><th>Tool hours</th><th>Calls</th><th>Failed calls</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
   <section id="tc-runs">
     <h2>Checkup runs</h2>
     <table class="tc-table" data-source="runs" data-row-key="time">
@@ -66,6 +75,7 @@
   }
   var tcDay = function (v) { return v ? new Date(String(v).slice(0, 10) + 'T00:00:00Z') : null; };
   var tcTime = function (v) { return v ? new Date(String(v)) : null; };
+  var tcHour = function (v) { return v ? new Date(String(v).slice(0, 13) + ':00:00') : null; };
   var tcShow = function (v) { return v === null || v === undefined || v === '' ? '—' : String(v); };
 
   dash.onData(function () {
@@ -84,6 +94,30 @@
     tcLine('tc-gate', gate.status === 'ok' ? gate.data : [], 'day', 'median_total_s', dash.colors[1], tcDay);
     var doctor = dash.data('doctor');
     tcLine('tc-doctor', doctor.status === 'ok' ? doctor.data : [], 'day', 'fail', dash.colors[2], tcDay);
+
+    var load = dash.data('load');
+    tcLine('tc-load', load.status === 'ok' ? load.data : [], 'hour', 'peak_load1', dash.colors[3], tcHour);
+
+    var agent = dash.data('agent_time');
+    var agentRows = agent.status === 'ok' ? agent.data : [];
+    var perDay = {}, perProject = {};
+    agentRows.forEach(function (r) {
+      perDay[r.day] = (perDay[r.day] || 0) + Number(r.tool_hours || 0);
+      var p = perProject[r.project] || (perProject[r.project] = { h: 0, c: 0, f: 0 });
+      p.h += Number(r.tool_hours || 0); p.c += Number(r.calls || 0); p.f += Number(r.failed_calls || 0);
+    });
+    tcLine('tc-agent', Object.keys(perDay).sort().map(function (d) {
+      return { day: d, tool_hours: Math.round(perDay[d] * 100) / 100 };
+    }), 'day', 'tool_hours', dash.colors[4], tcDay);
+    var pbody = document.querySelector('#tc-agent-projects tbody');
+    pbody.textContent = '';
+    Object.keys(perProject).sort(function (a, b) { return perProject[b].h - perProject[a].h; }).forEach(function (k) {
+      var tr = document.createElement('tr');
+      [k, Math.round(perProject[k].h * 100) / 100, perProject[k].c, perProject[k].f].forEach(function (v) {
+        var td = document.createElement('td'); td.textContent = tcShow(v); tr.appendChild(td);
+      });
+      pbody.appendChild(tr);
+    });
 
     var tbody = document.querySelector('#tc-runs tbody');
     tbody.textContent = '';

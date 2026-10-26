@@ -962,7 +962,7 @@ JSON
 run_dashboard_export() {
   python3 "$SCRIPTS/dashboard_export.py" --state-dir "$TEST_DIR/state" --out "$TEST_DIR/out" \
     --gate-timings "$TEST_DIR/gate.jsonl" --doctor-stats "$TEST_DIR/stats.jsonl" \
-    --pattern-env "$TEST_DIR/pattern.env" "$@"
+    --load-samples "$TEST_DIR/none" --perf-dir "$TEST_DIR/none" --pattern-env "$TEST_DIR/pattern.env" "$@"
 }
 
 @test "dashboard export writes runs, latest, gate and doctor with a manifest" {
@@ -970,7 +970,7 @@ run_dashboard_export() {
   run run_dashboard_export
   [ "$status" -eq 0 ]
   run jq -r '[.[] | .id + ":" + (.staleAfterHours // 0 | tostring)] | join(",")' "$TEST_DIR/out/manifest.json"
-  [ "$output" = "runs:72,latest:72,gate:0,doctor:0" ]
+  [ "$output" = "runs:72,latest:72,gate:0,doctor:0,load:24,agent_time:48" ]
   run jq -r '[.[] | .status + "=" + (.machine_overload_rows_24h | tostring)] | join(",")' "$TEST_DIR/out/runs.json"
   [ "$output" = "healthy=5,gaps=197" ]
   run jq -r '.[0] | [.machine_overload_rows_24h, has("odd key!"), has("note")] | map(tostring) | join(",")' "$TEST_DIR/out/latest.json"
@@ -1036,4 +1036,31 @@ run_dashboard_export() {
   ! grep -qiE 'secret[[:space:]]corp' "$TEST_DIR"/out/*.json
   grep -qF '[private]' "$TEST_DIR/out/latest.json"
   grep -qF '[email]' "$TEST_DIR/out/latest.json"
+}
+
+@test "dashboard export adds hourly load and per-project agent time, grouping private projects" {
+  make_dashboard_fixtures
+  local now=1792975050
+  printf '%s\t2026-10-25T20:00:00\t30\t1\t1\t10\t80\t5\t800\tx:1\t50\n' "$((now - 60))" > "$TEST_DIR/load.tsv"
+  printf '%s\t2026-10-25T20:30:00\t10\t1\t1\t10\t70\t9\t800\tx:1\t50\n' "$((now - 30))" >> "$TEST_DIR/load.tsv"
+  printf '%s\t2026-10-10T20:30:00\t99\t1\t1\t10\t70\t9\t800\tx:1\t50\n' "$((now - 15 * 86400))" >> "$TEST_DIR/load.tsv"
+  mkdir -p "$TEST_DIR/perf"
+  cat > "$TEST_DIR/perf/2026-10.jsonl" <<'JSON'
+{"project":"dotfiles","ts":"2026-10-25T10:00:00Z","tool":"Bash","ms":3600000,"ok":true}
+{"project":"dotfiles","ts":"2026-10-25T11:00:00Z","tool":"Bash","ms":1800000,"ok":false}
+{"project":"secretcorp-app","ts":"2026-10-25T11:00:00Z","tool":"Read","ms":360000,"ok":true}
+{"project":"dotfiles","ts":"2026-10-25T11:00:00Z","ev":"attempt","tool":"Bash"}
+{"project":"dotfiles","ts":"2026-09-01T11:00:00Z","tool":"Bash","ms":99,"ok":true}
+JSON
+  run run_dashboard_export --load-samples "$TEST_DIR/load.tsv" --perf-dir "$TEST_DIR/perf" --now "$now"
+  [ "$status" -eq 0 ]
+  run jq -c '.' "$TEST_DIR/out/load.json"
+  [ "$output" = '[{"hour":"2026-10-25T20:00","max_swap_mb":9,"mean_load1":20,"min_free_mem_pct":70,"overload_samples":1,"peak_load1":30,"samples":2}]' ]
+  run jq -c '.' "$TEST_DIR/out/agent_time.json"
+  [ "$output" = '[{"calls":2,"day":"2026-10-25","failed_calls":1,"project":"dotfiles","tool_hours":1.5},{"calls":1,"day":"2026-10-25","failed_calls":0,"project":"other","tool_hours":0.1}]' ]
+  ! grep -qi secretcorp "$TEST_DIR"/out/*.json
+  run jq -r '[.[].id] | join(",")' "$TEST_DIR/out/manifest.json"
+  [ "$output" = "runs,latest,gate,doctor,load,agent_time" ]
+  grep -q 'data-source="load"' "$SKILL_DIR/dashboard/index.html"
+  grep -q 'data-source="agent_time"' "$SKILL_DIR/dashboard/index.html"
 }

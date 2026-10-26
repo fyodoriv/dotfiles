@@ -10,6 +10,9 @@ Datasets:
   latest  one row: the newest checkup and all its numeric metrics
   gate    dotfiles `make check` per day: runs, failures, median total seconds
   doctor  dotfiles doctor per day: the last pass, fail, warn and skip counts
+  load    machine load per hour, last 7 days (dotfiles-load-sampler)
+  agent_time  agent tool hours per day and tooling project, last 14 days
+              (agentbrew perf log; other projects grouped as "other")
 
 Privacy: rows hold tooling metrics only, and the exporter fails closed. Text
 values lose home folders ("~"), emails ("[email]") and secrets ("[redacted]").
@@ -19,7 +22,8 @@ missing env file, an empty pattern, or any output line that still matches
 makes it exit 2 and write nothing.
 
 Usage: python3 dashboard_export.py [--out DIR] [--state-dir DIR]
-       [--gate-timings FILE] [--doctor-stats FILE] [--pattern-env FILE]
+       [--gate-timings FILE] [--doctor-stats FILE] [--load-samples FILE]
+       [--perf-dir DIR] [--pattern-env FILE]
 """
 
 import argparse
@@ -29,6 +33,7 @@ import re
 import statistics
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HOME = Path.home()
@@ -240,11 +245,81 @@ def doctor_rows(path: Path) -> list:
     return out
 
 
+LOAD_HOURS = 7 * 24
+AGENT_DAYS = 14
+# Agent projects shown by name; every other project becomes "other", so the
+# dashboard never names private repos.
+TOOLING_PROJECTS = ("agentbrew", "dotfiles", "minsky", "taskgrind", "tasks.md", "tooling")
+
+
+def load_rows(path: Path, now: float) -> list:
+    """One row per hour from dotfiles-load-sampler: peak and mean load1,
+    lowest free memory %, peak swap MB and overload samples (load1 > 2 x CPUs)."""
+    hours = {}
+    if not path.is_file():
+        return []
+    since = now - LOAD_HOURS * 3600
+    for line in path.read_text(errors="replace").splitlines():
+        cols = line.split("\t")
+        if len(cols) < 9:
+            continue
+        epoch, load1, cpus, free, swap = (number(cols[i]) for i in (0, 2, 5, 6, 7))
+        if None in (epoch, load1, cpus) or epoch < since or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}", cols[1][:13]):
+            continue
+        h = hours.setdefault(cols[1][:13], {"load": [], "free": [], "swap": [], "over": 0})
+        h["load"].append(load1)
+        if free is not None:
+            h["free"].append(free)
+        if swap is not None:
+            h["swap"].append(swap)
+        if load1 > 2 * cpus:
+            h["over"] += 1
+    return [
+        {
+            "hour": hour + ":00",
+            "samples": len(h["load"]),
+            "peak_load1": number(max(h["load"])),
+            "mean_load1": number(sum(h["load"]) / len(h["load"])),
+            "min_free_mem_pct": number(min(h["free"])) if h["free"] else None,
+            "max_swap_mb": number(max(h["swap"])) if h["swap"] else None,
+            "overload_samples": h["over"],
+        }
+        for hour, h in sorted(hours.items())
+    ]
+
+
+def agent_rows(perf_dir: Path, now: float) -> list:
+    """One row per day and project from the agentbrew perf log: tool hours,
+    finished tool calls and failed calls. Only rows with a duration count."""
+    import datetime
+
+    since = datetime.datetime.fromtimestamp(now - AGENT_DAYS * 86400, datetime.timezone.utc).strftime("%Y-%m-%d")
+    days = {}
+    for path in sorted(perf_dir.glob("*.jsonl")) if perf_dir.is_dir() else []:
+        for row in read_jsonl(path):
+            ms = number(row.get("ms"))
+            day = str(row.get("ts", ""))[:10]
+            if ms is None or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or day < since:
+                continue
+            project = row.get("project") if row.get("project") in TOOLING_PROJECTS else "other"
+            entry = days.setdefault((day, project), {"ms": 0, "calls": 0, "failed": 0})
+            entry["ms"] += ms
+            entry["calls"] += 1
+            if row.get("ok") is False:
+                entry["failed"] += 1
+    return [
+        {"day": day, "project": project, "tool_hours": number(e["ms"] / 3_600_000), "calls": e["calls"], "failed_calls": e["failed"]}
+        for (day, project), e in sorted(days.items())
+    ]
+
+
 MANIFEST = (
     ("runs", "Checkup runs", "One row per tooling checkup: verdict, status and key metrics.", STALE_AFTER_HOURS),
     ("latest", "Latest checkup", "The newest tooling checkup with every numeric metric it recorded.", STALE_AFTER_HOURS),
     ("gate", "dotfiles gate per day", "dotfiles `make check` runs per day: count, failures and median total seconds.", None),
     ("doctor", "dotfiles doctor per day", "The last dotfiles doctor result of each day: pass, fail, warn and skip counts.", None),
+    ("load", "Machine load per hour", "Last 7 days from dotfiles-load-sampler: peak and mean load1, lowest free memory %, peak swap MB, overload samples.", 24),
+    ("agent_time", "Agent tool time per day", "Last 14 days from the agentbrew perf log: tool hours, calls and failed calls per day and tooling project (others grouped as other).", 48),
 )
 
 
@@ -255,18 +330,24 @@ def main() -> int:
     parser.add_argument("--out", default="")
     parser.add_argument("--gate-timings", default=os.environ.get("DOTFILES_GATE_TIMINGS_FILE") or str(HOME / ".local/state/dotfiles/gate-timings.jsonl"))
     parser.add_argument("--doctor-stats", default=os.environ.get("DOTFILES_STATS_FILE") or str(HOME / ".dotfiles-stats.jsonl"))
+    parser.add_argument("--load-samples", default=os.environ.get("DOTFILES_LOAD_SAMPLES") or str(HOME / ".local/state/dotfiles/load-samples.tsv"))
+    parser.add_argument("--perf-dir", default=str(Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local/state") / "agentbrew/perf"))
+    parser.add_argument("--now", type=float, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--pattern-env", default=os.environ.get("OSS_READINESS_ENV_FILE") or str(HOME / ".config/oss-readiness/oss-readiness.env"))
     args = parser.parse_args()
 
     state_dir = Path(args.state_dir)
     out = Path(args.out) if args.out else state_dir / "dashboard"
     scrub = Scrubber()
+    now = args.now if args.now is not None else time.time()
     runs = history(state_dir)
     data = {
         "runs": runs_rows(runs, scrub),
         "latest": latest_rows(runs, scrub),
         "gate": gate_rows(Path(args.gate_timings)),
         "doctor": doctor_rows(Path(args.doctor_stats)),
+        "load": load_rows(Path(args.load_samples), now),
+        "agent_time": agent_rows(Path(args.perf_dir), now),
     }
     manifest = []
     files = {}

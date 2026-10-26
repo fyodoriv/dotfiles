@@ -78,7 +78,7 @@ teardown() {
 }
 
 @test "claude.model_default passes when settings.json has the correct pin" {
-  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2"}}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-opus-5-5","effortLevel":"xhigh","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -eq 0 ]
   [ "$pass_count" -ge 2 ]  # both wrapper and model_default
@@ -240,7 +240,7 @@ _write_chezmoi_data() {
 
 @test "claude.model_default passes for the override pair and fails for the base default under it" {
   export DOTFILES_CLAUDE_MODEL="claude-example-model" DOTFILES_CLAUDE_EFFORT="high"
-  echo '{"model":"claude-example-model","effortLevel":"high","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2"}}' > "$TEST_HOME/.claude/settings.json"
+  echo '{"model":"claude-example-model","effortLevel":"high","permissions":{"defaultMode":"bypassPermissions"},"skipAutoPermissionPrompt":true,"env":{"AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}}' > "$TEST_HOME/.claude/settings.json"
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
   [ "$fail_count" -eq 0 ]
 

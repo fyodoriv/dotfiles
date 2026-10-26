@@ -179,7 +179,9 @@ rules: |
   its lifecycle, cleanup, and deletion condition in that module.
   Every PR needs uncommitted visual proof: use a browser screenshot for UI work
   and a pasted terminal transcript for non-UI work, name the covered case and
-  result, and never commit the image. A transcript is copyable and diffable, so
+  result, and never commit the image. A UI behavior or design change needs one
+  labeled before/after pair per changed part (before left, after right) from
+  the real running app in a deployed test environment, not a component sandbox. A transcript is copyable and diffable, so
   it beats a picture of the same text; a terminal image is an equal alternative,
   never a requirement. Drag and drop any image into the PR description.
   Run every heavy command (a full test suite, an e2e or browser run, a timing

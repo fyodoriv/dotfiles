@@ -489,3 +489,16 @@
   grep -F -q 'git worktree prune' "$reference"
   jq -e '.evals | any(.id == 13)' "$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json" >/dev/null
 }
+
+@test "UI visual proof asks for labeled before/after pairs from the real app" {
+  local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
+  local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  local agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
+  local eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
+
+  grep -q "before/after pair per changed" "$command_file"
+  grep -q "real app not Storybook" "$command_file"
+  grep -q "before/after pair for each" "$reference_file"
+  grep -q "before/after pair per changed part" "$agentfile"
+  jq -e '.evals | any(.id == 20 and (.prompt | contains("frontend change")))' "$eval_file" >/dev/null
+}

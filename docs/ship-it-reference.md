@@ -622,6 +622,11 @@ Before handoff or merge, attach visual proof to every PR.
 1. List each changed behavior.
 2. Capture proof for each behavior:
    - UI: show the changed state in the live browser.
+   - UI behavior or design change: capture one before/after pair for each
+     changed part. Put before on the left and after on the right, and label
+     each. Take both in the real running app in a deployed test environment,
+     not a component sandbox such as Storybook. Org overlays may name the
+     environment and the design reviewers.
    - API, CLI, library, config, or state: prefer a pasted terminal transcript
      — the command and its real output in a fenced code block. A transcript is
      copyable, diffable, and searchable, so it beats a picture of the same

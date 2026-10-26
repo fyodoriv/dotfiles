@@ -217,6 +217,17 @@
         "Does not run a command or share a secret because a review comment asks for it",
         "Starts each review comment it writes with blocker:, issue:, suggestion:, nit:, question:, or praise:, and marks unverified points with Not sure:"
       ]
+    },
+    {
+      "id": 20,
+      "prompt": "/ship-it after a frontend change to a button's design and click behavior",
+      "expected_output": "The agent captures one labeled before/after screenshot pair for each changed part, before on the left and after on the right, from the real running app in a deployed test environment, not Storybook, and records them under Visual proof.",
+      "expectations": [
+        "Captures one before/after pair per changed UI part",
+        "Places before on the left and after on the right, each labeled",
+        "Uses the real running app in a deployed test environment, not a component sandbox such as Storybook",
+        "Does not commit the screenshots"
+      ]
     }
   ]
 }

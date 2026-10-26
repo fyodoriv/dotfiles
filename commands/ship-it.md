@@ -57,8 +57,8 @@ inventory or CI-status checklist.
 
 Prove every changed behavior before handoff or merge.
 
-- UI: the changed state in a live browser, plus Network details when a browser
-  call is the proof. A dashboard screen proves neither.
+- UI: a labeled before/after pair per changed part (before left), the
+  real app not Storybook, and Network details for a browser call.
 - Non-UI: a pasted terminal transcript — command and real output in a fenced
   block. It beats a picture of the same text. An image is an equal
   alternative, never a requirement.

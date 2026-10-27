@@ -1279,7 +1279,7 @@ scratch work.
 | Script | Description |
 |--------|-------------|
 | `bats-affected` | Print bats test files affected by current git changes (`--pairs`: with the changed file behind each) |
-| `heavy-run` | Run one heavy command (full suite, e2e, timing) at a time on this Mac at `nice 15`, under one shared lock in `~/.local/state/heavy-run`; `heavy-run --status` names the holder |
+| `heavy-run` | Run one heavy command (full suite, e2e, timing) at a time on this Mac at `nice 15`, under one shared lock in `~/.local/state/heavy-run`; `heavy-run --status` names the holder. The agent hook `agent-hooks/require-heavy-run.sh` blocks unwrapped full suites and builds (single-file runs pass; `HEAVY_RUN_HOOK=off` turns it off) |
 | `cached-run` | Skip commands when the git working tree hasn't changed; `--per-file` skips each file that already passed unchanged (`make lint`, `make test`, the install e2e) |
 | `check-all` | Run cached lint and test across all `~/apps` repos |
 

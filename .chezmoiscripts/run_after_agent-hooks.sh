@@ -31,7 +31,7 @@ fi
 HOOKS_DIR="${HOME}/.config/dotfiles/hooks"
 mkdir -p "$HOOKS_DIR"
 
-for hook in block-dangerous-git.sh bootstrap-endpoint-path.sh prepend-endpoint-path.sh session-endpoint-path.sh with-endpoint-path.sh; do
+for hook in block-dangerous-git.sh require-heavy-run.sh bootstrap-endpoint-path.sh prepend-endpoint-path.sh session-endpoint-path.sh with-endpoint-path.sh; do
   src="$DOTFILES_DIR/agent-hooks/$hook"
   dest="$HOOKS_DIR/$hook"
   if [ ! -f "$src" ]; then

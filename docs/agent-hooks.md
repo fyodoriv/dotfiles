@@ -42,3 +42,14 @@ The 8 deterministic hooks deployed today:
 See `agentbrew/hooks/manifest.yaml` for the canonical hook source and
 `agentbrew/docs/research/deterministic-rules-via-hooks.md` for the
 migration architecture.
+
+## require-heavy-run (dotfiles hook)
+
+`agent-hooks/require-heavy-run.sh` is a `PreToolUse` Bash hook from the
+dotfiles Agentfile. It blocks full test suites and builds that do not start
+with `heavy-run`: `npm test`, `npm run test*`, `yarn`/`pnpm` test or build
+scripts, `vitest`/`jest` with no file argument, `playwright test`, and `bats`
+on a folder. It checks each part of a `&&`, `||`, `;`, or `|` chain.
+Single-file runs (`npx vitest run one.test.ts`, `bats tests/x.bats`) pass.
+Set `HEAVY_RUN_HOOK=off` to turn it off. Tests:
+`tests/agent-hooks-require-heavy-run.bats`.

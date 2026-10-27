@@ -13,6 +13,9 @@ hooks:
     matcher: Bash
     command: "~/.config/dotfiles/hooks/block-dangerous-git.sh"
   - event: PreToolUse
+    matcher: Bash
+    command: "~/.config/dotfiles/hooks/require-heavy-run.sh"
+  - event: PreToolUse
     matcher: Shell
     command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
   - event: PreToolUse

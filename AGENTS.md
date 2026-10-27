@@ -79,7 +79,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 
 ### Agentfile lifecycle
 
-`dotfiles apply` merges `Agentfile.yaml` with any plugin Agentfile into `~/.config/agentbrew/Agentfile.yaml` and runs `agentbrew sync`. Org-gated MCPs go in a plugin, never here. Never edit generated agent config under `~/.claude/`. Full text: [docs/constitution.md](docs/constitution.md#agentfile-lifecycle).
+`dotfiles apply` merges the Agentfiles and syncs. Org-gated MCPs go in a plugin; never edit `~/.claude/`. [Full text](docs/constitution.md#agentfile-lifecycle).
 
 ### Hook-based enforcement
 
@@ -100,11 +100,11 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 
 - **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
-- **`make test` misses committed changes**: it runs tests for uncommitted files only. On a branch, use `bin/bats-affected origin/feat/chezmoi | xargs bats`.
+- **`make test` misses committed changes**: it tests uncommitted files only. On a branch: `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
 - **Parallel agents**: gates run one at a time via `heavy-run`; `dotfiles-load-sampler`.
-- **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: set `DOTFILES_DIR` to a temp dir in tests.
+- **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: use a temp `DOTFILES_DIR` in tests.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.

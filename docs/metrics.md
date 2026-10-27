@@ -53,3 +53,4 @@ Guards must not get worse, but they are not goals:
 | `~/.local/state/dotfiles/load-samples.tsv` | `bin/dotfiles-load-sampler` | `dotfiles metrics` |
 | `~/.local/state/dotfiles/errors.jsonl` | `lib/errors-log.sh` (see [observability.md](observability.md#errors)) | `jq`, the monthly audit |
 | `~/.local/share/dotfiles/logs/*.log` | each LaunchAgent | this table (local-AI row) |
+| `docs/proof/metrics.json` | `scripts/proof.sh` (aggregates `~/.dotfiles-stats.jsonl` per machine under a salted hash label; the salt stays in `~/.local/state/dotfiles/proof-salt`) | the README Proof section, `tests/proof.bats` |

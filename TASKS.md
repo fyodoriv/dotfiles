@@ -14,6 +14,33 @@ them. -->
 
 ## P2
 
+- [ ] Record each real install run so the README can prove one-command setup
+  - **ID**: proof-install-field-outcome
+  - **Tags**: metrics, proof
+  - **Details**: The README Proof row "One command sets up a Mac" says `not measured yet`. `bin/dotfiles-install run` writes no stats event, so no real install is counted. Add a content-free `log_run install` event with ok/error, minutes to a clean doctor, and the failing-check count, then a `scripts/proof.sh` row that reads it.
+  - **Files**: `bin/dotfiles-install`, `lib/stats.sh`, `scripts/proof.sh`, `tests/proof.bats`
+  - **Output**: code
+  - **Acceptance**: after one real install, `scripts/proof.sh` fills the row with `real use` and the README test passes.
+  - **Competitive-goal**: `manual_bootstrap_steps` (docs/competition/scorecard.md).
+
+- [ ] Record shell start time on real machines for the README Proof section
+  - **ID**: proof-shell-start-field
+  - **Tags**: metrics, proof, performance
+  - **Details**: The Proof row "The shell starts fast" says `not measured yet`; only a local run is shown (230 ms on 2026-10-26, above the 200 ms budget and the "~30ms" Highlights line). Sample the start time of real interactive shells (for example, once a day from the existing zsh startup timer) into the stats log, then add a `real use` row.
+  - **Files**: `home/zshrc`, `lib/stats.sh`, `scripts/proof.sh`
+  - **Output**: code
+  - **Acceptance**: the row shows a median of real shell starts with its machine count; the Highlights line matches the measured number.
+  - **Competitive-goal**: none; shell start is the "Interactive shell startup" row of docs/metrics.md, not a scorecard metric.
+
+- [ ] Add ok/error and duration to stats events, then send them through one PostHog adapter
+  - **ID**: proof-stats-ok-duration-posthog
+  - **Tags**: metrics, proof
+  - **Details**: Stats events hold task, time, seconds saved, units, and (doctor only) a failure count. Add `ok` and `duration_ms` to `log_run`. Later, when careerbrew's reference PostHog EU adapter merges, copy its shape: one adapter module, `DO_NOT_TRACK=1` and a `telemetry off` switch, a key the owner types, a fake endpoint in tests. Until then nothing leaves the machine.
+  - **Files**: `lib/stats.sh`, `scripts/proof.sh`
+  - **Output**: code
+  - **Acceptance**: every `log_run` event has `ok` and `duration_ms`; with no key, no event is sent (test with a fake endpoint).
+  - **Competitive-goal**: `reproducibility_pct` (docs/competition/scorecard.md).
+
 - [ ] Skip unchanged chezmoi scripts inside a full apply
   - **ID**: apply-skip-unchanged-scripts
   - **Tags**: performance

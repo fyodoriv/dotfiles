@@ -29,7 +29,9 @@ answers. Agents start with [AGENTS.md](AGENTS.md).
 It backs up your files and macOS settings, applies dotfiles, heals, verifies,
 and installs agentbrew. It is safe to run again. A critical error restores the
 backup by itself; optional steps (agentbrew, a failing doctor check) only warn.
-macOS may ask for permission prompts on the way. Preview first with
+macOS may ask for permission prompts on the way.
+
+Preview first with
 `bin/dotfiles-install plan`; undo with `bin/dotfiles-install restore` (it asks first). The
 last command is the doctor: every failing line names its fix.
 
@@ -58,9 +60,19 @@ Other ways in:
 | [For other companies](#for-other-companies) | [LaunchAgents](#launchagents) | [Development](#development) | [Repo layout](#repo-layout) |
 | [Troubleshooting](#troubleshooting) | [AI agent config](#ai-agent-config) | [Performance](#performance) | [FAQ](#faq) |
 
+## Use cases
+
+- Set up a new Mac in one command, with a backup and an automatic restore.
+- Keep a Mac in step with the source: a sync every 30 minutes and a weekly doctor that repairs drift.
+- Roll one setup out to a team with the `core` profile and an org overlay.
+- Give AI coding agents (Claude Code, Codex) one shared, local memory and safe defaults.
+- See how much time the automation saves with `dotfiles stats`.
+
 ## The problem
 
-A new Mac ships with conservative defaults — slow key repeat, Spotlight crawling `node_modules`, NVM adding 300ms to every shell, `git status` doing single-threaded I/O. You fix these manually, then forget what you changed. Six months later you get a new machine and start over. Settings drift. Scripts break. Nobody notices until something is slow again.
+A new Mac ships with conservative defaults — slow key repeat, Spotlight crawling `node_modules`, NVM adding 300ms to every shell, `git status` doing single-threaded I/O. You fix these manually, then forget what you changed. Six months later you get a new machine and start over.
+
+Settings drift. Scripts break. Nobody notices until something is slow again.
 
 **This repo fixes it.** One command deploys macOS defaults, per-module health checks, and LaunchAgents for continuous automation. A weekly doctor catches drift and auto-repairs it.
 
@@ -79,7 +91,7 @@ A new Mac ships with conservative defaults — slow key repeat, Spotlight crawli
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
-- **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac; `--share FILE` writes a privacy-safe snapshot; `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot; `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you; it asks first (`--yes` skips the question).
+- **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac. `--share FILE` writes a privacy-safe snapshot. `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot. `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you; it asks first (`--yes` skips the question).
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
 
 ## Installation
@@ -104,7 +116,9 @@ Plain chezmoi works too (`chezmoi init --source ~/apps/dotfiles --apply`), witho
 
 ### Configuration
 
-During `chezmoi init`, you'll be prompted for these values. They're stored in `~/.config/chezmoi/chezmoi.yaml`. To change one later, run `dotfiles config set <key> <value>` (it checks the value first), then `dotfiles apply`. `dotfiles config` lists every setting with its value and source (`default` or `chezmoi.yaml`). Every default is in one table, [`config/settings.yaml`](config/settings.yaml); a test keeps it equal to `.chezmoi.yaml.tmpl`.
+During `chezmoi init`, you'll be prompted for these values. They're stored in `~/.config/chezmoi/chezmoi.yaml`. To change one later, run `dotfiles config set <key> <value>` (it checks the value first), then `dotfiles apply`.
+
+`dotfiles config` lists every setting with its value and source (`default` or `chezmoi.yaml`). Every default is in one table, [`config/settings.yaml`](config/settings.yaml); a test keeps it equal to `.chezmoi.yaml.tmpl`.
 
 | Prompt | Variable | Default | What it does |
 |--------|----------|---------|-------------|
@@ -173,7 +187,7 @@ Then run `dotfiles apply` — the listed packages will be excluded from `brew bu
 | **What's NOT included** | Shell customization, IDE config, AI tools, visual tweaks | — |
 | **Best for** | Team rollouts, new users, shared machines | Power users, solo machines |
 
-**Which should I choose?** Start with `core` if you're new to the team, evaluating these dotfiles, or deploying across multiple machines — it gives you solid git config, macOS defaults, and automation without changing your shell or editor setup. Choose `full` if you want the complete experience: Ghostty terminal, starship prompt, tmux, AI agent tooling, and all the visual tweaks. You can switch at any time with `dotfiles profile core` or `dotfiles profile full`, then `dotfiles apply`.
+**Which should I choose?** Start with `core` if you're new to the team, evaluating these dotfiles, or deploying across multiple machines. It gives you solid git config, macOS defaults, and automation without changing your shell or editor setup. Choose `full` if you want the complete experience: Ghostty terminal, starship prompt, tmux, AI agent tooling, and all the visual tweaks. You can switch at any time with `dotfiles profile core` or `dotfiles profile full`, then `dotfiles apply`.
 
 ### Profile module list
 
@@ -457,18 +471,26 @@ daily `com.dotfiles.memory-sync-projects` LaunchAgent and `/ship-it` trigger to
 client instead of a second raw HTTP implementation. A plain run first checks
 each store's newest change time against a stamp from the last full sync and
 returns in milliseconds, without AgentBrew or the daemon, when nothing
-changed. `--background` runs the AgentBrew part detached. AgentBrew's Claude Code
+changed.
+
+`--background` runs the AgentBrew part detached. AgentBrew's Claude Code
 `SessionEnd` hook adds a debounced, non-blocking fast path. The daily job
-remains recovery when a session hook cannot run. Claude project-memory files
+remains recovery when a session hook cannot run.
+
+Claude project-memory files
 are one source for the same managed store that
 Codex uses; they are not a separate backend.
 Normal project-memory sync is metadata-delta based. Use
 `agentbrew memory sync-projects --force` only for a deliberate recovery
-re-ingest. The SessionEnd fast path writes a bounded receipt and retries
+re-ingest.
+
+The SessionEnd fast path writes a bounded receipt and retries
 after a failed child instead of treating a failed schedule as fresh.
 The memory doctor module delegates project-memory freshness and the transport
 report to AgentBrew. It never parses Claude memory files or reimplements the
-MCP protocol. Global recall remains the default; project provenance tags only
+MCP protocol.
+
+Global recall remains the default; project provenance tags only
 support intentional filtering.
 Repository knowledge learned by `/learn-repos`
 is accepted as authoritative only when repo path, Git revision, and the
@@ -504,7 +526,7 @@ dotfiles audit               # SSH permissions, secrets, git credentials, repo h
 dotfiles audit --report      # markdown report
 ```
 
-Checks: SSH key permissions (600), agent forwarding safety, secret patterns in tracked files, `.env` file detection, sensitive file permissions, git credential helper audit, and root-level stray agent artifacts such as `=5.5.0` pip redirects or absolute Homebrew symlinks. Secret-scan fixtures must use an explicit fixture path or an inline `# dotfiles-secret-allowlist: reason` comment.
+Checks: SSH key permissions (600), agent forwarding safety, secret patterns in tracked files, and `.env` file detection. It also checks sensitive file permissions, the git credential helper, and root-level stray agent artifacts such as `=5.5.0` pip redirects or absolute Homebrew symlinks. Secret-scan fixtures must use an explicit fixture path or an inline `# dotfiles-secret-allowlist: reason` comment.
 
 **Security model summary:** everything runs as your user — no system-level changes outside `~/`. The only `sudo` calls are `pmset` (power management) and `dscacheutil` (DNS flush), both fail silently if sudo is unavailable. Secrets use age encryption or macOS Keychain, never plaintext in tracked files. See [docs/security-model.md](docs/security-model.md) for the full trust boundary analysis.
 
@@ -529,12 +551,16 @@ The global `git-hooks/pre-push` applies a privacy gate to pushes of dotfiles,
 agentbrew, and every repo in `config/public-push-remotes.txt` to github.com.
 It blocks commits whose author or committer email matches the private-email
 pattern. It also blocks files changed in the push (read at the pushed commit)
-that match the private-identifier pattern, and lists paths only. Each pushed
+that match the private-identifier pattern, and lists paths only.
+
+Each pushed
 commit's added lines, file names, and message are checked too; that message
 lists commit ids only. Both patterns come from the org
 overlay's `oss-readiness.env`, which `lib/oss-readiness.sh` parses as data. With no
 overlay, those two checks have nothing to match; with an overlay but no
-pattern, the push is blocked. The hook then runs the overlay's
+pattern, the push is blocked.
+
+The hook then runs the overlay's
 `hooks/pre-push`, then the repo-local `hooks/pre-push`.
 
 The structural deletion guard remains active for `bin/`, `tests/`, `lib/`,
@@ -580,6 +606,60 @@ dotfiles stats --oneliner    # single line for embedding
 dotfiles stats --recalc      # rewrite historical data with current estimates
 ```
 
+## Proof
+
+Each claim above is measured below. Run `scripts/proof.sh` to refresh the numbers; `tests/proof.bats` fails when this section and the generator differ.
+
+<!-- proof:start -->
+Every number below comes from `docs/proof/metrics.json`. `scripts/proof.sh` writes that file and this section.
+Headline rows are field outcomes. `real use` numbers come from the local, content-free stats log that each real automation run writes (`~/.dotfiles-stats.jsonl`, see [observability](docs/observability.md)).
+
+Nothing is uploaded. Each machine aggregates its own log.
+
+| Claim | Theory | Metric | Result | Source |
+|---|---|---|---|---|
+| Self-healing: the doctor detects drift | A check that runs on a schedule catches drift before a person notices it (Forsgren, Humble, Kim 2018, *Accelerate*: fast feedback) | doctor runs with no failing check, last 30 runs | 40 % (last 30 doctor runs, 2026-10-18 to 2026-10-26; a run is clean when no check fails) | `docs/proof/metrics.json`, real use |
+| Self-healing: what the doctor still finds | The failures per run show how much drift is left for `--fix` or a person; this row shows drift found, not drift healed | failing checks per doctor run | 1 failing check(s) (median per doctor run, max 19, last 30 runs) | `docs/proof/metrics.json`, real use |
+| Automation saves time | Time saved is the outcome automation promises; each task has a per-run estimate | minutes saved by automation, last 30 days | 117 min (estimated: per-run estimates in lib/stats.sh times 36349 automation runs, 2026-09-26 to 2026-10-26) | `docs/proof/metrics.json`, real use |
+| The Mac stays in step with the source by itself | A sync that runs every 30 minutes keeps drift small | background syncs, last 30 days | 1,066 runs (background syncs, 2026-09-27 to 2026-10-26) | `docs/proof/metrics.json`, real use |
+| The morning routine gets used | A habit tool only helps when it runs most days | days with a `morning` run, last 7 days | 7 days (days with a morning run, 2026-10-20 to 2026-10-26) | `docs/proof/metrics.json`, real use |
+| One command sets up a Mac | Time to a clean doctor is the outcome a one-step install promises | install runs and their minutes to a clean doctor | not measured yet (an install writes no stats event yet; task `proof-install-field-outcome` in TASKS.md) | not measured yet |
+| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | not measured yet (task `proof-shell-start-field` in TASKS.md) | not measured yet |
+
+Field data comes from 1 machine(s), each named by a salted hash: `m-f72c0c4501` (36,349 runs in 30 days, 30 doctor runs, log since 2026-05-06, as of 2026-10-26).
+
+Engineering health (a local run, not field proof):
+
+- interactive shell start: 90 ms (median of 5 interactive zsh starts); local run, 2026-10-26, m-f72c0c4501 (darwin arm64)
+
+Minutes saved by automation per month (real use):
+
+```mermaid
+xychart-beta
+  title "Minutes saved per month"
+  x-axis ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]
+  y-axis "minutes"
+  bar [915, 90, 73, 64, 67, 93]
+```
+
+May 2026 is high because the app-priority task then counted 15 s per run; its estimate is 0 now.
+
+Automation runs by task, last 30 days (real use). `app-priority` runs every minute and saves no time.
+
+```mermaid
+pie title Automation runs by task, last 30 days
+  "app-priority" : 34844
+  "sync" : 1066
+  "doctor" : 332
+  "git-maintain" : 32
+  "morning" : 28
+  "audit" : 20
+  "upgrade" : 16
+  "cleanup" : 9
+  "dotfiles-agent-keepawake" : 2
+```
+<!-- proof:end -->
+
 ## Modules
 
 Profile selection happens at `chezmoi init` time. Each module provides health checks via `modules/*/doctor.sh`.
@@ -619,11 +699,27 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 
 AI agent configuration (MCP servers, skills, rules, commands) is managed by [agentbrew](https://www.npmjs.com/package/agentbrew), not dotfiles. The `Agentfile.yaml` in this repo is the declarative manifest — see [Agentfile.yaml](Agentfile.yaml) for the full config and [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for teammate setup and recovery. The no-argument `/learn-repos` command repairs its shared-memory connection before scanning and uses the `/ship-it` safety and ownership gates to deliver only source-backed repository healing.
 
-Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `dotfiles` (the start screen), `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Codex, and other command-capable agents. `/ship-it` requires visual proof for every PR. Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository. `/learn-repos` takes no arguments: every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps`, protects active worktrees, refreshes missing or stale dossiers, extracts operational procedures, validates exact and hybrid retrieval, runs grounded evals, and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
+Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `dotfiles` (the start screen), `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Codex, and other command-capable agents. `/ship-it` requires visual proof for every PR.
+
+Use a browser screenshot for UI behavior or a terminal screenshot for non-UI behavior. Drag and drop the image into the PR description. Keep it outside the repository.
+
+`/learn-repos` takes no arguments. Every invocation uses `bin/learn-repos-inventory` to select the next bounded batch under `~/apps` and protects active worktrees. It refreshes missing or stale dossiers, extracts operational procedures, and validates exact and hybrid retrieval.
+
+It runs grounded evals and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
 
 The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
 
-The `tooling-checkup` skill (`/tooling-checkup`) is the one command to run by hand every few days. To end any session, `/wrap-up` (agentbrew) delivers finished work and leaves the rest in a leak-checked draft PR plus a task. It ships outstanding tooling work and tries to finish each of your open pull requests (conflicts, red checks, review threads, then merge; a `wrap-up` draft continues from its Pending list), runs `update-tooling`, upgrades third-party packages through `dotfiles-upgrade` and `claude update`, runs `claude doctor`, audits LaunchAgents and heavy processes, reads the recent machine metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals) and measures input latency only when a lag signal fires, and lints skills and instruction files against Anthropic's best practices. It also researches new ways to work with AI on its own: `scripts/ai_research.py` lists unseen posts from a few AI feeds (add your own in `~/.config/dotfiles/ai-research-feeds`), and each idea is judged with the Speed, Altitude, Depth, and Range lenses before it becomes a task or a question. It reports what changed since the last run (state in `~/.local/state/tooling-checkup/`), asks a short questionnaire, and applies the answers. Each run appends a row to `~/.local/state/tooling-checkup/history.jsonl` and refreshes one tooling health dashboard (a claude.ai Dashboard that keeps its URL; it shows checkup runs, gate and doctor trends, hourly machine load, and agent tool time per tooling project): `scripts/dashboard_export.py` writes its datasets to `~/.local/state/tooling-checkup/dashboard/`. It ignores dependabot pull requests unless a critical alert is open, and it touches only repositories under the tooling root.
+The `tooling-checkup` skill (`/tooling-checkup`) is the one command to run by hand every few days. To end any session, `/wrap-up` (agentbrew) delivers finished work and leaves the rest in a leak-checked draft PR plus a task. It ships outstanding tooling work and tries to finish each of your open pull requests (conflicts, red checks, review threads, then merge).
+
+A `wrap-up` draft continues from its Pending list. It runs `update-tooling`, upgrades third-party packages through `dotfiles-upgrade` and `claude update`, and runs `claude doctor`. It audits LaunchAgents and heavy processes.
+
+It reads the recent machine metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals) and measures input latency only when a lag signal fires. It lints skills and instruction files against Anthropic's best practices. It also researches new ways to work with AI on its own.
+
+`scripts/ai_research.py` lists unseen posts from a few AI feeds (add your own in `~/.config/dotfiles/ai-research-feeds`). Each idea is judged with the Speed, Altitude, Depth, and Range lenses before it becomes a task or a question. It reports what changed since the last run (state in `~/.local/state/tooling-checkup/`), asks a short questionnaire, and applies the answers.
+
+Each run appends a row to `~/.local/state/tooling-checkup/history.jsonl` and refreshes one tooling health dashboard. That is a claude.ai Dashboard that keeps its URL. It shows checkup runs, gate and doctor trends, hourly machine load, and agent tool time per tooling project.
+
+`scripts/dashboard_export.py` writes its datasets to `~/.local/state/tooling-checkup/dashboard/`. It ignores dependabot pull requests unless a critical alert is open, and it touches only repositories under the tooling root.
 
 ### Agent time metrics
 
@@ -631,7 +727,7 @@ agentbrew records how long each agent tool call takes (hooks `perf-record`, `per
 
 - **Status line.** Claude Code shows model, session time, API time, tool time, the slowest step, and context use, for example `Opus 5.5 · 42m (api 18m · tools 15m) · slowest: npm run verify 6m12s · ctx 38%`. agentbrew manages this `statusLine`. A `statusLine` that you set yourself wins.
 - **Reports.** `node ~/.config/agentbrew/scripts/agent-perf.mjs report --all --days 7` lists tool time, calls, and per-step count, total, p50, p95, and max, with the change against the previous 7 days. `--session latest` reports one session; `--json` gives machine output. A step is a redacted key such as `npm run verify` or `git push`, never the full command.
-- **Reviews.** `/tooling-checkup` Phase 8 runs `skills/tooling-checkup/scripts/agent_time_review.py`: the 3 slowest recurring steps per project and overall, a known fix for each, speedup tasks for tooling repos, and the change since the last checkup. `/ship-it` ends each delivery with a Time review of the session. The `session-report` skill adds tokens and active hours.
+- **Reviews.** `/tooling-checkup` Phase 8 runs `skills/tooling-checkup/scripts/agent_time_review.py`. It shows the 3 slowest recurring steps per project and overall, with a known fix for each. It adds speedup tasks for tooling repos and shows the change since the last checkup. `/ship-it` ends each delivery with a Time review of the session. The `session-report` skill adds tokens and active hours.
 
 The log lives in `${XDG_STATE_HOME:-~/.local/state}/agentbrew/perf/YYYY-MM.jsonl` (one file per month, kept 180 days). It holds no prompts, file contents, or full commands. To opt out on one machine, list the hook IDs under `disabled:` in `~/.config/agentbrew/hooks-overlay/manifest.yaml`, or set `HOOK_BYPASS_PERF_RECORD=1`. Full reference: agentbrew `docs/agent-perf.md`.
 
@@ -639,7 +735,13 @@ Do not put live authentication material or customer payload snapshots in test da
 logs, screenshots, pull request descriptions, or committed files. Use safe
 placeholders and fixtures.
 
-The `memory` MCP gives those agents one local cross-session store through pinned `mcp-memory-service` 11.7.0. AgentBrew owns the canonical `com.agentbrew.mcp-memory` LaunchAgent, its operator `HOME`, the loopback endpoint, MCP registration, and pack reconciliation; dotfiles contributes only the declarative `memory.enabled` intent. The endpoint is `http://127.0.0.1:18765/mcp`, so concurrent agents share one Python/ONNX process instead of launching a copy per chat. On macOS it persists at `~/Library/Application Support/mcp-memory/sqlite_vec.db` and uses SQLite WAL plus hybrid BM25/vector retrieval with RRF fusion. Behavioral bootstrap is enabled with a 1,536-token cap; the synced rules supply the current task, retrieve relevant context and mistake notes at session start, and automatically search current-revision procedure and repository memory before answering local architecture or operational questions. Agents refresh stale or missing knowledge from source docs, then commit structured decisions, errors, and corrections after substantive work. The service consolidates associations and summaries daily and weekly with forgetting disabled, while its built-in daily backups remain enabled. It never automatically archives raw transcripts or sends content to a cloud service.
+The `memory` MCP gives those agents one local cross-session store through pinned `mcp-memory-service` 11.7.0. AgentBrew owns the canonical `com.agentbrew.mcp-memory` LaunchAgent, its operator `HOME`, the loopback endpoint, MCP registration, and pack reconciliation; dotfiles contributes only the declarative `memory.enabled` intent. The endpoint is `http://127.0.0.1:18765/mcp`, so concurrent agents share one Python/ONNX process instead of launching a copy per chat.
+
+On macOS it persists at `~/Library/Application Support/mcp-memory/sqlite_vec.db` and uses SQLite WAL plus hybrid BM25/vector retrieval with RRF fusion. Behavioral bootstrap is enabled with a 1,536-token cap. The synced rules supply the current task and retrieve relevant context and mistake notes at session start.
+
+They also search current-revision procedure and repository memory before answering local architecture or operational questions. Agents refresh stale or missing knowledge from source docs, then commit structured decisions, errors, and corrections after substantive work. The service consolidates associations and summaries daily and weekly with forgetting disabled, while its built-in daily backups remain enabled.
+
+It never automatically archives raw transcripts or sends content to a cloud service.
 
 Agent artifact coverage is enforced source-side: every `commands/*.md` file must have either `commands/evals/<command>.evals.json` or a literal Bats assertion, and `tests/agent-artifact-coverage.bats` also checks Agentfile command/rule/skill invariants plus `AGENTS.md`/`CLAUDE.md` delivery-safety mirroring. Add or update that coverage whenever changing command markdown, `Agentfile.yaml`, or global delivery rules.
 
@@ -647,13 +749,19 @@ Agent Shell/Bash/Task commands pass through `agent-hooks/prepend-endpoint-path.s
 
 On managed endpoints, uv Python may remain **Publisher: N/A** because python-build-standalone has no Developer ID authority; ad-hoc signing is not equivalent to publisher approval. Apply-time hook edits and high-frequency pre-tool JSON parsing use Apple-signed `plutil`; the pipx-based mcpm bridge and Python-dependent base/overlay doctors—including local-LLM checks—default to endpoint-policy safe mode. Set `DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=1` only after the machine-scoped exception is approved.
 
-Official fnm Node can likewise be blocked by its upstream Developer ID, **Node.js Foundation (HX7739G8FX)**, regardless of its user-directory path. In that state, `dotfiles apply` skips agentbrew sync, unloads all `com.agentbrew.*` LaunchAgents plus the weekly Topgrade job, and weekly doctor skips Node-dependent modules. The pre-commit hook skips its TASKS.md lint only while the marker `~/.local/state/dotfiles/endpoint-node-publisher-blocked` exists; without the marker it runs the lint with any Node. The Ollama supervisor independently refuses blocked publisher Team ID `3MU9H2V9Y9`. Set `DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER=1` or `DOTFILES_ALLOW_BLOCKED_OLLAMA_PUBLISHER=1` only after the corresponding machine-scoped exception is approved.
+Official fnm Node can likewise be blocked by its upstream Developer ID, **Node.js Foundation (HX7739G8FX)**, regardless of its user-directory path. In that state, `dotfiles apply` skips agentbrew sync, unloads all `com.agentbrew.*` LaunchAgents plus the weekly Topgrade job, and weekly doctor skips Node-dependent modules. The pre-commit hook skips its TASKS.md lint only while the marker `~/.local/state/dotfiles/endpoint-node-publisher-blocked` exists; without the marker it runs the lint with any Node.
 
-To keep agentbrew running while that publisher is blocked, set `DOTFILES_AGENT_NODE_BIN` to a Node from another publisher, for example `/opt/homebrew/bin/node`. When that binary exists and is not signed by the blocked publisher, `dotfiles apply` runs agentbrew sync on it, keeps the `com.agentbrew.*` LaunchAgents that run only that Node, and weekly doctor runs the agentbrew modules on it. The default `node` and the Topgrade safe mode do not change. A job whose program, or the first `node` on whose PATH, is the blocked Node stays off until agentbrew sync rewrites it. The `agentbrew` shim runs `dist/cli.js` on that Node too, so `agentbrew auto-sync install` writes jobs that run it. A job on that Node that safe mode disabled earlier is enabled again on the next `dotfiles apply`, also after safe mode is off; doctor check `security.agent_node_jobs_enabled` reports it until then.
+The Ollama supervisor independently refuses blocked publisher Team ID `3MU9H2V9Y9`. Set `DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER=1` or `DOTFILES_ALLOW_BLOCKED_OLLAMA_PUBLISHER=1` only after the corresponding machine-scoped exception is approved.
+
+To keep agentbrew running while that publisher is blocked, set `DOTFILES_AGENT_NODE_BIN` to a Node from another publisher, for example `/opt/homebrew/bin/node`. When that binary exists and is not signed by the blocked publisher, `dotfiles apply` runs agentbrew sync on it. It keeps the `com.agentbrew.*` LaunchAgents that run only that Node, and weekly doctor runs the agentbrew modules on it.
+
+The default `node` and the Topgrade safe mode do not change. A job whose program, or the first `node` on whose PATH, is the blocked Node stays off until agentbrew sync rewrites it. The `agentbrew` shim runs `dist/cli.js` on that Node too, so `agentbrew auto-sync install` writes jobs that run it.
+
+A job on that Node that safe mode disabled earlier is enabled again on the next `dotfiles apply`, also after safe mode is off; doctor check `security.agent_node_jobs_enabled` reports it until then.
 
 Dotfiles exposes `agentbrew` as a real executable shim in `bin/agentbrew`, so it works from interactive zsh, non-interactive shells, launch agents, and agent tool calls. The shim reuses a local checkout at `~/apps/agentbrew` or `~/apps/tooling/agentbrew` and falls back to any later `agentbrew` binary on `PATH`. With an approved `DOTFILES_AGENT_NODE_BIN`, it runs the checkout's `dist/cli.js` on that Node.
 
-**On `dotfiles apply`**, a chezmoi `run_after` script merges this file plus any overlay `Agentfile.yaml` and this Mac's untracked `~/.config/dotfiles/Agentfile.local.yaml` (an extra MCP server on one Mac, [docs/agentbrew-setup.md](docs/agentbrew-setup.md#add-an-mcp-server-on-one-mac)) into `~/.config/agentbrew/Agentfile.yaml`, then syncs agentbrew from that canonical global file when the installed `agentbrew` supports `agentfile merge`. On endpoint-policy-blocked Node publishers, that run exits in safe mode before executing Node. Older agentbrew releases fall back to the legacy safe path: sync the base Agentfile first, then sync the overlay with `--no-prune`. To sync by hand, run the same step that `dotfiles apply` runs. It builds the full layer list (base, plugins, owner rules, the local file, the model override), merges it, and syncs:
+**On `dotfiles apply`**, a chezmoi `run_after` script merges three files into `~/.config/agentbrew/Agentfile.yaml`. They are this file, any overlay `Agentfile.yaml`, and this Mac's untracked `~/.config/dotfiles/Agentfile.local.yaml` (an extra MCP server on one Mac, [docs/agentbrew-setup.md](docs/agentbrew-setup.md#add-an-mcp-server-on-one-mac)). Then it syncs agentbrew from that canonical global file when the installed `agentbrew` supports `agentfile merge`. On endpoint-policy-blocked Node publishers, that run exits in safe mode before executing Node. Older agentbrew releases fall back to the legacy safe path: sync the base Agentfile first, then sync the overlay with `--no-prune`. To sync by hand, run the same step that `dotfiles apply` runs. It builds the full layer list (base, plugins, owner rules, the local file, the model override), merges it, and syncs:
 
 ```bash
 bash ~/apps/dotfiles/.chezmoiscripts/run_after_agentbrew-sync.sh
@@ -676,7 +784,14 @@ For a fresh machine, run `agentbrew init` first, then `agentbrew setup` for any 
 
 **Agent public-write guard:** dotfiles wraps `gh` and `git` when `use_ai_tools` is enabled. Agent-shaped `gh pr create` calls must include a rationale and the canonical `_🤖 Written by an agent, not Fyodor..._` footer; cross-repo PR creation also requires an `AGENT_PUBLIC_WRITE_APPROVAL` marker that names the repo, base branch, title, and body hash. Agent-shaped GitHub pushes are limited to the exact repositories in `config/public-push-remotes.txt`; enterprise remotes pass through, and other public GitHub repositories are blocked. Agent-shaped `git push --no-verify` still requires the approval marker to cover the remote and ref. This is a user-owned backstop; the separately managed editor egress hook remains authoritative for editor sessions. Human interactive `gh` usage and read-only commands pass through unchanged. The `git` wrapper runs the real git it picks (`git --version`) before using it, so an executable `/usr/bin/git` that fails, for example after an unaccepted Xcode licence, falls through to the next git on `PATH`. `DOTFILES_REAL_GIT` overrides the choice.
 
-**Approved-family delivery mandate:** in any tooling repo under `~/apps/tooling`, any own repo on `github.com/<owner>/*`, and any extra repo family the org overlay declares, agent-delivered work is not done until it is verified, committed, pushed to a feature branch, opened as a PR, watched through CI, and merged once checks are green. `/ship-it` explicitly covers all user-owned/current-session work in those approved repo families, not only the repo where the session began. In any other repository explicitly named by the active request, `/ship-it` also pre-approves normal feature-branch push/PR/CI delivery and rebasing a verified user-owned/current-session PR branch onto its actual base; rewritten branches must preserve the old remote OID and use explicit `git push --force-with-lease=<ref>:<old-oid>`. Product-repo delivery does not inherit the approved-family admin-bypass or release allowlist. `/ship-it` also resolves a clean canonical branch that is ahead/behind after delivery by preserving local-only commits, sending them through a PR branch, and only realigning the local branch after backup plus merge proof. If duplicate PRs/branches contain the same intended changes, the reviewed PR wins by default: move newer branch content onto the PR that already has human review history/comments/approvals, then close/supersede the duplicate only after the reviewed PR is open and complete; duplicate closure includes a reasoned closing comment with replacement links and head-branch deletion unless a documented exception applies. If sibling worktrees exist, `/ship-it` inventories them before cleanup, salvages any useful current-session/user-owned commits or dirty diffs into the winning PR/branch, proves already-represented work with `git cherry`/tree-diff/PR evidence, and removes only clean or redundant worktrees after that proof is recorded. For the four own-tool repos (`agentbrew`, `dotfiles`, `tasks.md`/`tasks-md`, and `minsky`), `/ship-it` also means run the repo-documented release path automatically after merge: agentbrew's auto-release plus `npm run publish-latest`, dotfiles' documented apply flow, tasks.md's GitHub Release-triggered npm publish workflow, and Minsky's semantic-release workflow when commit types warrant it. After tooling-repo delivery it also applies the machine's latest recommended updates — reconcile/rebuild the canonical tooling checkout per repo docs, run `agentbrew sync --pull` (recommended installs enabled by default) or `dotfiles apply` from a directory without a project Agentfile, and confirm `agentbrew status` is clean — because merged-but-not-applied tooling work leaves the machine running stale config. This is standing approval for approved-family branch pushes, PR creation/editing, guarded `git push --force-with-lease` PR-branch rewrites after preserving the old remote head and verifying ownership, safe cleanup of shipped/redundant current-session worktrees, and normal/admin PR merges for owned current-session work; when required checks are green, the PR is otherwise mergeable, and normal merge is blocked only by review/base-branch policy, the admin/bypass merge is required — do not leave the PR open or start a fresh branch for that policy-only blocker. It does not permit plain `--force`, hook bypasses, protected-branch pushes, unrelated branch deletion, secrets work, production/deployment changes, or publishing outside the current-task/approved repo scope.
+**Approved-family delivery mandate:** the approved families are any tooling repo under `~/apps/tooling`, any own repo on `github.com/<owner>/*`, and any extra repo family the org overlay declares. There, agent-delivered work is not done until it is verified, committed, and pushed to a feature branch. It must also be opened as a PR, watched through CI, and merged once checks are green. `/ship-it` explicitly covers all user-owned/current-session work in those approved repo families, not only the repo where the session began. In any other repository explicitly named by the active request, `/ship-it` also pre-approves normal feature-branch push/PR/CI delivery. It also pre-approves rebasing a verified user-owned/current-session PR branch onto its actual base. Rewritten branches must preserve the old remote OID and use explicit `git push --force-with-lease=<ref>:<old-oid>`. Product-repo delivery does not inherit the approved-family admin-bypass or release allowlist. `/ship-it` also resolves a clean canonical branch that is ahead/behind after delivery. It preserves local-only commits and sends them through a PR branch. It realigns the local branch only after backup plus merge proof. If duplicate PRs/branches contain the same intended changes, the reviewed PR wins by default. Move newer branch content onto the PR that already has human review history/comments/approvals. Close/supersede the duplicate only after the reviewed PR is open and complete. Duplicate closure includes a reasoned closing comment with replacement links and head-branch deletion unless a documented exception applies. If sibling worktrees exist, `/ship-it` inventories them before cleanup. It salvages any useful current-session/user-owned commits or dirty diffs into the winning PR/branch. It proves already-represented work with `git cherry`/tree-diff/PR evidence. It removes only clean or redundant worktrees after that proof is recorded. For the four own-tool repos (`agentbrew`, `dotfiles`, `tasks.md`/`tasks-md`, and `minsky`), `/ship-it` also runs the repo-documented release path automatically after merge. The release paths are agentbrew's auto-release plus `npm run publish-latest`, dotfiles' documented apply flow, tasks.md's GitHub Release-triggered npm publish workflow, and Minsky's semantic-release workflow when commit types warrant it. After tooling-repo delivery it also applies the machine's latest recommended updates, because merged-but-not-applied tooling work leaves the machine running stale config. It reconciles/rebuilds the canonical tooling checkout per repo docs. It runs `agentbrew sync --pull` (recommended installs enabled by default) or `dotfiles apply` from a directory without a project Agentfile. It confirms `agentbrew status` is clean. This is standing approval for these approved-family actions:
+
+- branch pushes and PR creation/editing;
+- guarded `git push --force-with-lease` PR-branch rewrites after preserving the old remote head and verifying ownership;
+- safe cleanup of shipped/redundant current-session worktrees;
+- normal/admin PR merges for owned current-session work.
+
+When required checks are green, the PR is otherwise mergeable, and only review/base-branch policy blocks a normal merge, the admin/bypass merge is required. Do not leave the PR open or start a fresh branch for that policy-only blocker. It does not permit plain `--force`, hook bypasses, protected-branch pushes, unrelated branch deletion, secrets work, production/deployment changes, or publishing outside the current-task/approved repo scope.
 
 **Linked Jira delivery:** when one Jira ticket governs the work, `/ship-it`
 updates it after each successful final delivery milestone: review after the
@@ -769,7 +884,9 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 |-------|-------------|
 | `com.dotfiles.agent-browser-chrome` | The one agents Chrome on port 9223, run through `dotfiles-quit-relay` so a macOS restart can quit it |
 
-At most three browsers run: your own Chrome, the agents Chrome on `9223`, and one locked temporary browser (`temp-browser acquire|status|release`, fresh profile each time). `~/.agent-browser/config.json` sets `"cdp": "9223"`, so agent-browser attaches by default and fails instead of starting its own browser. Keep own-tab discipline (`agent-tab` records it): open your own tab, work only there, and close extra tabs at task end. The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired; `dotfiles apply` removes them. See [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
+At most three browsers run: your own Chrome, the agents Chrome on `9223`, and one locked temporary browser (`temp-browser acquire|status|release`, fresh profile each time). `~/.agent-browser/config.json` sets `"cdp": "9223"`, so agent-browser attaches by default and fails instead of starting its own browser. Keep own-tab discipline (`agent-tab` records it): open your own tab, work only there, and close extra tabs at task end.
+
+The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225) agents are retired; `dotfiles apply` removes them. See [docs/agent-browser-policy.md](docs/agent-browser-policy.md).
 
 The managed agents Chrome is `RunAtLoad` only, with `KeepAlive=false`. If you quit Chrome while shutting down or logging out, launchd and `dotfiles doctor --fix` must not reopen it. They come back on the next login, or you can restart one explicitly with `launchctl start <agent-label>`.
 
@@ -913,7 +1030,9 @@ names, the `--help` text gives the usage, arguments, and what each one does,
 the "Usage:" header of the script an arm runs gives the sub-forms
 (`subforms`, for example `dotfiles config get <key>`), and comments in a
 dispatch arm add the notes. `terminal_only` says why an agent cannot run it
-(an editor, a wizard, a person-only step). `confirm` says what it changes that
+(an editor, a wizard, a person-only step).
+
+`confirm` says what it changes that
 is hard to undo, so agents ask first. Each form that needs a yes
 (`needs_yes`; `# yes-for:` narrows it to some sub-commands, such as `plugin
 remove`) asks y/N on the terminal and refuses without one unless you pass
@@ -924,14 +1043,18 @@ changed). The gate lives in each script, so `dotfiles-update` and `dotfiles
 update` ask the same way. Only `apply` and `sync` run without a yes, and
 their `unattended` note says why (skills run `apply`; the
 `com.dotfiles.dotfiles-sync` LaunchAgent runs the same sync script every 30
-minutes). `gated` means a `confirm_*` call is on the form's code path; a
+minutes).
+
+`gated` means a `confirm_*` call is on the form's code path; a
 script may still skip the question on some branches. dotfiles
 has no UI, so parity covers the CLI and agents. `dotfiles actions --check`
 ([`tests/dotfiles-actions.bats`](tests/dotfiles-actions.bats)) fails when a
 command has no `--help` line, a `--help` line names no command, a usage runs
 into its description, or a form that needs a yes takes no `--yes` or has no
 `confirm_*` call on its code path (`gated`). It reads the code with a small
-shell lexer, so quoted text and heredocs do not count. `cheat` builds its dotfiles lines from the same list
+shell lexer, so quoted text and heredocs do not count.
+
+`cheat` builds its dotfiles lines from the same list
 (without jq it reads the `--help` text in `bin/dotfiles`), and
 [`tests/cheat.bats`](tests/cheat.bats) fails when an action is missing from
 it. The start screen footer points at `dotfiles actions`.
@@ -1008,7 +1131,9 @@ config uses Ghostty's upstream 10 MB cap to prevent verbose commands from
 retaining 100 MB per tab. The `app-priority` LaunchAgent runs every minute:
 it keeps Ghostty, WebStorm, and Claude Code launched from a terminal app
 (Ghostty, WebStorm, Terminal, iTerm2, WezTerm, kitty, Alacritty, Warp) or from
-the Claude desktop app's Code tab interactive. Claude Code with no such
+the Claude desktop app's Code tab interactive.
+
+Claude Code with no such
 ancestor (launchd jobs, Remote Control) and other agent and model workers
 yield under CPU contention. Test runners that agents start (vitest, tsc,
 biome, bats) run at nice 10, so they yield CPU to the desktop. They stay off

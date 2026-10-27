@@ -1,0 +1,162 @@
+{
+  "metrics": {
+    "doctor_clean_pct": {
+      "value": 40,
+      "unit": "%",
+      "date": "2026-10-26",
+      "kind": "real use",
+      "command": "scripts/proof.sh",
+      "detail": "last 30 doctor runs, 2026-10-18 to 2026-10-26; a run is clean when no check fails",
+      "history": [
+        {
+          "date": "2026-10-26",
+          "value": 40
+        }
+      ]
+    },
+    "doctor_fail_median": {
+      "value": 1,
+      "unit": "failing check(s)",
+      "date": "2026-10-26",
+      "kind": "real use",
+      "command": "scripts/proof.sh",
+      "detail": "median per doctor run, max 19, last 30 runs",
+      "history": [
+        {
+          "date": "2026-10-26",
+          "value": 1
+        }
+      ]
+    },
+    "minutes_saved_30d": {
+      "value": 117,
+      "unit": "min",
+      "date": "2026-10-26",
+      "kind": "real use",
+      "command": "scripts/proof.sh",
+      "detail": "estimated: per-run estimates in lib/stats.sh times 36349 automation runs, 2026-09-26 to 2026-10-26",
+      "history": [
+        {
+          "date": "2026-10-26",
+          "value": 117
+        }
+      ]
+    },
+    "sync_runs_30d": {
+      "value": 1066,
+      "unit": "runs",
+      "date": "2026-10-26",
+      "kind": "real use",
+      "command": "scripts/proof.sh",
+      "detail": "background syncs, 2026-09-27 to 2026-10-26",
+      "history": [
+        {
+          "date": "2026-10-26",
+          "value": 1066
+        }
+      ]
+    },
+    "morning_runs_7d": {
+      "value": 7,
+      "unit": "days",
+      "date": "2026-10-26",
+      "kind": "real use",
+      "command": "scripts/proof.sh",
+      "detail": "days with a morning run, 2026-10-20 to 2026-10-26",
+      "history": [
+        {
+          "date": "2026-10-26",
+          "value": 7
+        }
+      ]
+    },
+    "shell_startup_ms": {
+      "value": 90,
+      "unit": "ms",
+      "date": "2026-10-26",
+      "kind": "local run, 2026-10-26, m-f72c0c4501 (darwin arm64)",
+      "command": "scripts/proof.sh",
+      "detail": "median of 5 interactive zsh starts",
+      "history": [
+        {
+          "date": "2026-10-26",
+          "value": 90
+        }
+      ]
+    }
+  },
+  "charts": {
+    "minutes_saved_by_month": [
+      {
+        "month": "2026-05",
+        "minutes": 915
+      },
+      {
+        "month": "2026-06",
+        "minutes": 90
+      },
+      {
+        "month": "2026-07",
+        "minutes": 73
+      },
+      {
+        "month": "2026-08",
+        "minutes": 64
+      },
+      {
+        "month": "2026-09",
+        "minutes": 67
+      },
+      {
+        "month": "2026-10",
+        "minutes": 93
+      }
+    ],
+    "runs_by_task_30d": [
+      {
+        "task": "app-priority",
+        "runs": 34844
+      },
+      {
+        "task": "sync",
+        "runs": 1066
+      },
+      {
+        "task": "doctor",
+        "runs": 332
+      },
+      {
+        "task": "git-maintain",
+        "runs": 32
+      },
+      {
+        "task": "morning",
+        "runs": 28
+      },
+      {
+        "task": "audit",
+        "runs": 20
+      },
+      {
+        "task": "upgrade",
+        "runs": 16
+      },
+      {
+        "task": "cleanup",
+        "runs": 9
+      },
+      {
+        "task": "dotfiles-agent-keepawake",
+        "runs": 2
+      }
+    ]
+  },
+  "machines": {
+    "m-f72c0c4501": {
+      "date": "2026-10-26",
+      "runs_30d": 36349,
+      "doctor_runs": 30,
+      "first_event": "2026-05-06"
+    }
+  }
+}

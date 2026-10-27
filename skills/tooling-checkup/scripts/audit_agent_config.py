@@ -336,22 +336,31 @@ def check_rules(path: pathlib.Path, report: Report):
         report.add("WARN", "R003", where, f"{len(repeats) - 5} more repeated line(s)")
 
 
-def default_scope(include_installed: bool):
+TOOLING_REPOS = ("agentbrew", "dotfiles", "minsky", "taskgrind", "tasks.md")
+
+
+def tooling_repos():
+    """Primary checkouts under TOOLING_ROOT, or the flat ~/apps/<repo> layout."""
     root = pathlib.Path(os.environ.get("TOOLING_ROOT") or HOME / "apps" / "tooling")
-    skill_roots, rule_files = [], []
     if root.is_dir():
-        for repo in sorted(root.iterdir()):
-            if not (repo / ".git").is_dir():
-                continue
-            for sub in ("skills", "skill-plugins", ".claude/skills", "commands"):
-                if (repo / sub).is_dir():
-                    skill_roots.append(repo / sub)
-            for name in ("CLAUDE.md", "AGENTS.md"):
-                if (repo / name).is_file():
-                    rule_files.append(repo / name)
-            rules_dir = repo / ".claude" / "rules"
-            if rules_dir.is_dir():
-                rule_files.extend(sorted(rules_dir.glob("*.md")))
+        return [repo for repo in sorted(root.iterdir()) if (repo / ".git").is_dir()]
+    if os.environ.get("TOOLING_ROOT"):
+        return []
+    return [HOME / "apps" / name for name in TOOLING_REPOS if (HOME / "apps" / name / ".git").is_dir()]
+
+
+def default_scope(include_installed: bool):
+    skill_roots, rule_files = [], []
+    for repo in tooling_repos():
+        for sub in ("skills", "skill-plugins", ".claude/skills", "commands"):
+            if (repo / sub).is_dir():
+                skill_roots.append(repo / sub)
+        for name in ("CLAUDE.md", "AGENTS.md"):
+            if (repo / name).is_file():
+                rule_files.append(repo / name)
+        rules_dir = repo / ".claude" / "rules"
+        if rules_dir.is_dir():
+            rule_files.extend(sorted(rules_dir.glob("*.md")))
     agentbrew_config = HOME / ".config" / "agentbrew"
     if (agentbrew_config / "shared-rules.md").is_file():
         rule_files.append(agentbrew_config / "shared-rules.md")
@@ -360,13 +369,18 @@ def default_scope(include_installed: bool):
             rule_files.append(generated)
     if include_installed and (agentbrew_config / "installed-skills").is_dir():
         skill_roots.append(agentbrew_config / "installed-skills")
+    # A machine with no tooling checkout still has its installed skills.
+    if not skill_roots and (HOME / ".claude" / "skills").is_dir():
+        skill_roots.append(HOME / ".claude" / "skills")
     return skill_roots, rule_files
 
 
 def find_skills(roots):
     found = []
     for root in roots:
-        for skill_md in sorted(pathlib.Path(root).rglob("SKILL.md")):
+        # rglob does not enter symlinked folders; installed skills are symlinks.
+        root = pathlib.Path(root)
+        for skill_md in sorted(set(root.rglob("SKILL.md")) | set(root.glob("*/SKILL.md"))):
             parts = set(skill_md.parts)
             if parts & {"node_modules", ".git", "evals", "fixtures", "test", "tests"}:
                 continue

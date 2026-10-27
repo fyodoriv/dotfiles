@@ -276,7 +276,7 @@ source in the agentbrew checkout when it is not installed:
 
 ```bash
 NP=~/.claude/skills/new-project
-[ -d "$NP" ] || NP="$(fd -t d -H '^new-project$' ~/apps/tooling/agentbrew -E node_modules | head -1)"
+[ -d "$NP" ] || NP="$(fd -t d -H '^new-project$' ~/apps/{tooling/,}agentbrew -E node_modules | head -1)"
 [ -n "$NP" ] && [ -f "$NP/scripts/check-setup.sh" ] || echo "new-project skill not found; skip this audit and report it"
 ```
 

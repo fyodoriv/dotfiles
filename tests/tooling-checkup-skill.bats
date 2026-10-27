@@ -1088,3 +1088,70 @@ JSON
   run jq -e '.evals[] | select(.id == 21) | .expectations | any(test("deletes no memory file"; "i"))' "$EVALS"
   [ "$status" -eq 0 ]
 }
+
+# Stock-git Mac with a flat ~/apps layout (checkup-scripts-stock-mac-gaps).
+make_flat_home() {
+  FLAT_HOME="$TEST_DIR/home"
+  mkdir -p "$FLAT_HOME/apps"
+  git_q init --bare "$TEST_DIR/flat-origin.git"
+  for name in agentbrew dotfiles; do
+    git_q clone "$TEST_DIR/flat-origin.git" "$FLAT_HOME/apps/$name"
+    git_q -C "$FLAT_HOME/apps/$name" commit --allow-empty -m "chore: init"
+    git_q -C "$FLAT_HOME/apps/$name" push origin HEAD:main
+    git_q -C "$FLAT_HOME/apps/$name" remote set-head origin main
+  done
+  git_q init "$FLAT_HOME/apps/unrelated"
+}
+
+@test "inventory finds agentbrew and dotfiles in a flat ~/apps layout, and only them" {
+  make_flat_home
+  run env -u TOOLING_ROOT HOME="$FLAT_HOME" TOOLING_CHECKUP_NO_GH=1 TOOLING_CHECKUP_NO_FETCH=1 bash "$SCRIPTS/inventory.sh"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"== agentbrew"* && "$output" == *"== dotfiles"* ]]
+  [[ "$output" != *"== unrelated"* ]]
+}
+
+@test "inventory counts ahead/behind on git older than 2.41 with no fatal line" {
+  make_tooling_root
+  git_q -C "$TOOLING/alpha" switch -c feat/old-git
+  git_q -C "$TOOLING/alpha" commit --allow-empty -m "feat: one"
+  git_q -C "$TOOLING/alpha" switch main
+  local shim="$TEST_DIR/oldgit"; mkdir -p "$shim"
+  local real_git; real_git="$(command -v git)"
+  printf '#!/bin/bash\nfor a in "$@"; do case "$a" in *ahead-behind*) echo "fatal: unknown field name: ahead-behind:origin/main" >&2; exit 128 ;; esac; done\nexec %s "$@"\n' "$real_git" > "$shim/git"
+  chmod +x "$shim/git"
+  run env PATH="$shim:$PATH" TOOLING_ROOT="$TOOLING" TOOLING_CHECKUP_NO_GH=1 bash "$SCRIPTS/inventory.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"fatal:"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"branch feat/old-git has 1 commit(s) not in main"* ]] || { echo "$output"; return 1; }
+}
+
+@test "background audit never uses plutil error text as a job's program" {
+  local agents="$TEST_DIR/LaunchAgents" shim="$TEST_DIR/plutil-shim"
+  mkdir -p "$agents" "$shim"
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>\n<key>Label</key><string>com.owner.daily</string>\n<key>ProgramArguments</key><array><string>/bin/sh</string><string>daily</string></array>\n</dict></plist>\n' > "$agents/com.owner.daily.plist"
+  # Some macOS versions print the plutil error on stdout.
+  printf '#!/bin/bash\nfor a in "$@"; do [ "$a" = Program ] && { echo "Could not extract value, error: No value at that key path"; exit 1; }; done\nexec /usr/bin/plutil "$@"\n' > "$shim/plutil"
+  chmod +x "$shim/plutil"
+  printf 'PID\tStatus\tLabel\n-\t0\tcom.owner.daily\n' > "$TEST_DIR/launchctl.txt"
+  run env PATH="$shim:$PATH" BACKGROUND_AUDIT_DIRS="$agents" BACKGROUND_AUDIT_LAUNCHCTL="$TEST_DIR/launchctl.txt" \
+    BACKGROUND_AUDIT_TOP=0 DOTFILES_SOURCE="$TEST_DIR/none" XDG_STATE_HOME="$TEST_DIR/state" bash "$SCRIPTS/background_audit.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Could not extract"* ]] || { echo "$output"; return 1; }
+  [[ "$output" != *"remove"*"com.owner.daily"* ]] || { echo "$output"; return 1; }
+}
+
+@test "config audit counts installed skills when no tooling checkout has skills" {
+  local home="$TEST_DIR/skillhome" src="$TEST_DIR/skill-src"
+  mkdir -p "$home/.claude/skills" "$src/one" "$src/two"
+  for s in one two; do
+    printf -- '---\nname: %s\ndescription: Does %s things. Use when the user asks for %s.\n---\nBody.\n' "$s" "$s" "$s" > "$src/$s/SKILL.md"
+    ln -s "$src/$s" "$home/.claude/skills/$s"
+  done
+  run env -u TOOLING_ROOT HOME="$home" python3 "$SCRIPTS/audit_agent_config.py"
+  [[ "$output" == *"audit: 2 skill(s)"* ]] || { echo "$output"; return 1; }
+}
+
+@test "Phase 7 also looks for new-project in a flat ~/apps/agentbrew checkout" {
+  grep -qF 'apps/{tooling/,}agentbrew -E' "$SKILL"
+}

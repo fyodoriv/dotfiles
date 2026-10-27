@@ -34,8 +34,10 @@ else
   launchd_list="$(launchctl list 2>/dev/null || true)"
 fi
 
-plist_value() { plutil -extract "$2" raw -o - "$1" 2>/dev/null; }
-plist_json() { plutil -extract "$2" json -o - "$1" 2>/dev/null; }
+# A missing key fails; some macOS versions print the error on stdout, so
+# keep the output only when plutil succeeds.
+plist_value() { local v; v="$(plutil -extract "$2" raw -o - "$1" 2>/dev/null)" && printf '%s' "$v"; }
+plist_json() { local v; v="$(plutil -extract "$2" json -o - "$1" 2>/dev/null)" && printf '%s' "$v"; }
 
 owner_of() {
   local label="$1" file="$2"

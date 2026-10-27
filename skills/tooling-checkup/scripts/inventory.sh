@@ -5,7 +5,9 @@
 # Usage: inventory.sh
 #
 # Environment:
-#   TOOLING_ROOT                     parent of the tooling checkouts (default ~/apps/tooling)
+#   TOOLING_ROOT                     parent of the tooling checkouts (default ~/apps/tooling;
+#                                    when unset and that folder is missing, the flat layout
+#                                    ~/apps/<repo> is used for the known tooling repos only)
 #   TOOLING_CHECKUP_BOT_BRANCH_RE    ERE for automation branches that are never outstanding work
 #   TOOLING_CHECKUP_NO_FETCH=1       skip `git fetch`
 #   TOOLING_CHECKUP_NO_GH=1          skip pull request and security-alert lookups
@@ -31,6 +33,16 @@
 
 set -uo pipefail
 
+# Flat layout (contributing-upstream clones to ~/apps/<repo>): only the known
+# tooling repos, never every repo under ~/apps.
+TOOLING_REPOS=""
+if [ -z "${TOOLING_ROOT:-}" ] && [ ! -d "$HOME/apps/tooling" ]; then
+  for name in agentbrew dotfiles minsky taskgrind tasks.md; do
+    [ -d "$HOME/apps/$name/.git" ] && TOOLING_REPOS="$TOOLING_REPOS $HOME/apps/$name"
+  done
+  [ -n "$TOOLING_REPOS" ] && TOOLING_ROOT="$HOME/apps" &&
+    echo "inventory: no ~/apps/tooling; using the flat layout ~/apps (known tooling repos only)" >&2
+fi
 TOOLING_ROOT="${TOOLING_ROOT:-$HOME/apps/tooling}"
 BOT_BRANCH_RE="${TOOLING_CHECKUP_BOT_BRANCH_RE:-^(dependabot/|mape-k-ingestion/|observer-dogfood/|tasks-claims$|tasksmd/generated-snapshot$)}"
 NO_FETCH="${TOOLING_CHECKUP_NO_FETCH:-0}"
@@ -159,11 +171,20 @@ flush_deferred() {
   deferred=""
 }
 
+# git 2.41+ has the ahead-behind atom; older git (Apple git 2.39) counts per ref.
+# Probed once, inside the first checkout (the cwd may not be a repository).
+AB_ATOM=""
+
 found=0
-for repo in "$TOOLING_ROOT"/*; do
+# shellcheck disable=SC2086  # TOOLING_REPOS is a space-separated path list
+for repo in ${TOOLING_REPOS:-"$TOOLING_ROOT"/*}; do
   # A linked worktree has a .git file, not a directory. Primary checkouts only.
   [ -d "$repo/.git" ] || continue
   found=$((found + 1))
+  if [ -z "$AB_ATOM" ]; then
+    AB_ATOM=1
+    git -C "$repo" for-each-ref --count=1 --format='%(ahead-behind:HEAD)' refs/heads >/dev/null 2>&1 || AB_ATOM=0
+  fi
   echo "== $(basename "$repo")"
 
   if [ "$NO_FETCH" != "1" ] && ! git -C "$repo" fetch --prune --quiet origin 2>/dev/null; then
@@ -189,7 +210,11 @@ for repo in "$TOOLING_ROOT"/*; do
   locals=" "
   while IFS=$'\t' read -r ref ahead_behind track; do
     [ -n "$ref" ] || continue
-    ahead="${ahead_behind%% *}"
+    if [ "$AB_ATOM" = 1 ]; then
+      ahead="${ahead_behind%% *}"
+    else
+      ahead="$(git -C "$repo" rev-list --count "$base..$ref" 2>/dev/null || echo 0)"
+    fi
     case "$ref" in
       refs/heads/*)
         branch="${ref#refs/heads/}"
@@ -225,7 +250,7 @@ for repo in "$TOOLING_ROOT"/*; do
         ;;
     esac
   done < <(git -C "$repo" for-each-ref --sort=refname \
-    --format="%(refname)%09%(ahead-behind:$base)%09%(if)%(upstream)%(then)u:%(upstream:track,nobracket)%(else)-%(end)" \
+    --format="%(refname)%09$([ "$AB_ATOM" = 1 ] && printf '%%(ahead-behind:%s)' "$base" || printf -- -)%09%(if)%(upstream)%(then)u:%(upstream:track,nobracket)%(else)-%(end)" \
     refs/heads refs/remotes/origin)
 
   # Linked worktrees. git prints real paths, so compare with the real path.

@@ -13,6 +13,8 @@
 
 # shellcheck source=../../lib/agent-keepawake.sh
 source "$DOTFILES_DIR/lib/agent-keepawake.sh"
+# shellcheck source=../../lib/run-with-timeout.sh
+source "$DOTFILES_DIR/lib/run-with-timeout.sh"
 
 # ── tmux ──────────────────────────────────────────────────────────────
 check "resilience.tmux_installed" "tmux installed (session persistence for agents)" \
@@ -105,18 +107,62 @@ check_advisory "resilience.amphetamine_stale_single_use" "No stale Amphetamine S
   "_amphetamine_no_stale_single_use_assertion" \
   "osascript -e 'tell application \"Amphetamine\" to end session'"
 
+# Read the whole com.if.Amphetamine domain once, with a short time limit.
+# `defaults read` on this sandboxed app can wait forever on the macOS
+# "access data from other apps" prompt, which an agent shell or a
+# LaunchAgent cannot answer (issue #359). Returns 124 on a timeout.
+_amphetamine_read_prefs_domain() {
+  run_with_timeout "${AMPHETAMINE_DEFAULTS_TIMEOUT_SEC:-5}" defaults read com.if.Amphetamine
+}
+
+# Print one top-level value from a `defaults read <domain>` dump.
+# For "Trigger Data", print the number of trigger dicts instead.
+_amphetamine_prefs_value() {
+  local dump="$1" key="$2"
+  printf '%s\n' "$dump" | awk -v key="$key" '
+    BEGIN { qkey = "\"" key "\"" }
+    !in_td {
+      line = $0
+      sub(/^    /, "", line)
+      if (index(line, qkey " = ") == 1) rest = substr(line, length(qkey) + 4)
+      else if (index(line, key " = ") == 1) rest = substr(line, length(key) + 4)
+      else next
+      if (key == "Trigger Data") {
+        count = gsub(/\{/, "{", rest)
+        if (rest !~ /\);$/) in_td = 1
+        else { print count; exit }
+        next
+      }
+      sub(/;$/, "", rest); print rest; exit
+    }
+    in_td {
+      count += gsub(/\{/, "{")
+      if ($0 ~ /^    \);$/) { print count; exit }
+    }'
+}
+
 # Amphetamine must not own generic automatic sessions. The process manager
 # starts one only for live Claude Code work, then ends its own session.
+# Uses $_AMPHETAMINE_PREFS when the module already read the domain
+# (module-run scope: set once per doctor run of this module).
 _amphetamine_managed_session_policy() {
   local app_path="${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}"
-  local trigger_count triggers_enabled at_launch on_wake on_ac_reconnect
+  local dump trigger_count triggers_enabled at_launch on_wake on_ac_reconnect
   [ -d "$app_path" ] || return 0
-  trigger_count="$(defaults read com.if.Amphetamine 'Trigger Data' 2>/dev/null | { grep -c '{' || true; })"
+  if [ "${_AMPHETAMINE_PREFS_READ:-0}" = "1" ]; then
+    dump="${_AMPHETAMINE_PREFS-}"
+  else
+    # A missing domain exits non-zero: treat it as "no keys set".
+    local rc=0
+    dump="$(_amphetamine_read_prefs_domain)" || rc=$?
+    [ "$rc" -ne 124 ] || return 1
+  fi
+  trigger_count="$(_amphetamine_prefs_value "$dump" 'Trigger Data')"
   [[ "$trigger_count" =~ ^[0-9]+$ ]] || trigger_count=0
-  triggers_enabled="$(defaults read com.if.Amphetamine 'Enable Triggers' 2>/dev/null || echo 0)"
-  at_launch="$(defaults read com.if.Amphetamine 'Start Session At Launch' 2>/dev/null || echo 0)"
-  on_wake="$(defaults read com.if.Amphetamine 'Start Session On Wake' 2>/dev/null || echo 0)"
-  on_ac_reconnect="$(defaults read com.if.Amphetamine 'Restart DD Session on AC Reconnect' 2>/dev/null || echo 0)"
+  triggers_enabled="$(_amphetamine_prefs_value "$dump" 'Enable Triggers')"
+  at_launch="$(_amphetamine_prefs_value "$dump" 'Start Session At Launch')"
+  on_wake="$(_amphetamine_prefs_value "$dump" 'Start Session On Wake')"
+  on_ac_reconnect="$(_amphetamine_prefs_value "$dump" 'Restart DD Session on AC Reconnect')"
   [ "$trigger_count" -eq 0 ] \
     && [ "$triggers_enabled" != "1" ] \
     && [ "$at_launch" != "1" ] \
@@ -125,6 +171,8 @@ _amphetamine_managed_session_policy() {
 }
 
 _amphetamine_apply_managed_session_policy() {
+  # The cached read is stale after a write: make the re-check read again.
+  _AMPHETAMINE_PREFS_READ=0
   defaults write com.if.Amphetamine 'Start Session At Launch' -bool false &&
     defaults write com.if.Amphetamine 'Start Session On Wake' -bool false &&
     defaults write com.if.Amphetamine 'Restart DD Session on AC Reconnect' -bool false &&
@@ -134,9 +182,19 @@ _amphetamine_apply_managed_session_policy() {
     defaults write com.if.Amphetamine 'Trigger Data' -array
 }
 
-check "resilience.amphetamine_managed_session_policy" "Amphetamine has no generic trigger or automatic session" \
-  "_amphetamine_managed_session_policy" \
-  "_amphetamine_apply_managed_session_policy"
+_AMPHETAMINE_PREFS=""
+_amphetamine_read_rc=0
+if [ -d "${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}" ]; then
+  _AMPHETAMINE_PREFS="$(_amphetamine_read_prefs_domain)" || _amphetamine_read_rc=$?
+  _AMPHETAMINE_PREFS_READ=1
+fi
+if [ "$_amphetamine_read_rc" -eq 124 ]; then
+  audit_warn "cannot read Amphetamine prefs (privacy prompt?): skipped resilience.amphetamine_managed_session_policy"
+else
+  check "resilience.amphetamine_managed_session_policy" "Amphetamine has no generic trigger or automatic session" \
+    "_amphetamine_managed_session_policy" \
+    "_amphetamine_apply_managed_session_policy"
+fi
 
 # Cross-machine sync of the managed Amphetamine preferences via
 # dotfiles/data/amphetamine-prefs.json.

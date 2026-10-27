@@ -11,6 +11,7 @@ setup() {
   cp "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" "$TEST_DOTFILES/modules/resilience/"
   # doctor.sh sources this helper at load time.
   cp "$BATS_TEST_DIRNAME/../lib/agent-keepawake.sh" "$TEST_DOTFILES/lib/"
+  cp "$BATS_TEST_DIRNAME/../lib/run-with-timeout.sh" "$TEST_DOTFILES/lib/"
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
 

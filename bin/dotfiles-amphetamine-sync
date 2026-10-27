@@ -42,6 +42,10 @@ set -euo pipefail
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PREFS_FILE="$DOTFILES_DIR/data/amphetamine-prefs.json"
 DOMAIN="com.if.Amphetamine"
+# shellcheck source=../lib/run-with-timeout.sh
+source "$DOTFILES_DIR/lib/run-with-timeout.sh"
+# Reads of the app domain can hang on the macOS privacy prompt (issue #359).
+DEFAULTS_TIMEOUT_SEC="${AMPHETAMINE_DEFAULTS_TIMEOUT_SEC:-5}"
 
 # The exact keys to sync. Ordering matters for stable diffs.
 # Grouped by Amphetamine Preferences tab so it's obvious which checkbox
@@ -117,8 +121,11 @@ capture_local_subset() {
   tmp_plist=$(mktemp -t amphetamine-export.XXXXXX.plist)
   # `defaults export <domain> -` writes the entire plist to stdout as XML.
   # plutil converts to JSON, jq filters to the synced subset.
-  if ! defaults export "$DOMAIN" "$tmp_plist" 2>/dev/null; then
+  local export_rc=0
+  run_with_timeout "$DEFAULTS_TIMEOUT_SEC" defaults export "$DOMAIN" "$tmp_plist" || export_rc=$?
+  if [ "$export_rc" -ne 0 ]; then
     rm -f "$tmp_plist"
+    [ "$export_rc" -ne 124 ] || err "cannot read Amphetamine prefs (privacy prompt?): timed out after ${DEFAULTS_TIMEOUT_SEC}s"
     return 1
   fi
   plutil -convert json -o - "$tmp_plist" | jq "$JQ_SUBSET_FILTER"
@@ -270,11 +277,17 @@ cmd_status() {
   fi
 
   local local_triggers_on local_trigger_count
-  local_triggers_on=$(defaults read "$DOMAIN" "Enable Triggers" 2>/dev/null || echo "(absent)")
+  local read_rc=0
+  local_triggers_on=$(run_with_timeout "$DEFAULTS_TIMEOUT_SEC" defaults read "$DOMAIN" "Enable Triggers") || read_rc=$?
+  if [ "$read_rc" -eq 124 ]; then
+    warn "cannot read Amphetamine prefs (privacy prompt?): timed out after ${DEFAULTS_TIMEOUT_SEC}s"
+    return 0
+  fi
+  [ "$read_rc" -eq 0 ] || local_triggers_on="(absent)"
   # `grep -c` exits 1 when there are zero matches, so the `|| true` keeps
   # set -e happy. The `|| echo 0` pattern in earlier drafts produced
   # `0\n0` because grep printed "0" AND the fallback printed "0".
-  local_trigger_count=$(defaults read "$DOMAIN" "Trigger Data" 2>/dev/null | { grep -c '{' || true; })
+  local_trigger_count=$({ run_with_timeout "$DEFAULTS_TIMEOUT_SEC" defaults read "$DOMAIN" "Trigger Data" || true; } | { grep -c '{' || true; })
   local_trigger_count=${local_trigger_count:-0}
   printf '\n  %sLocal:%s Enable Triggers=%s, %d trigger(s)\n' "$_DIM" "$_RST" "$local_triggers_on" "$local_trigger_count"
 

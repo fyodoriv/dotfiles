@@ -16,6 +16,8 @@ setup() {
   STUB_BIN="$TEST_DIR/stub-bin"
   mkdir -p "$FAKE_DOTFILES/bin" "$FAKE_DOTFILES/data" "$STUB_BIN" "$TEST_DIR/Amphetamine.app"
   cp "$BATS_TEST_DIRNAME/../bin/dotfiles-amphetamine-sync" "$FAKE_DOTFILES/bin/"
+  mkdir -p "$FAKE_DOTFILES/lib"
+  cp "$BATS_TEST_DIRNAME/../lib/run-with-timeout.sh" "$FAKE_DOTFILES/lib/"
   cat > "$FAKE_DOTFILES/data/amphetamine-prefs.json" <<'EOF'
 {
   "Enable Triggers": 0,
@@ -26,6 +28,11 @@ EOF
   # Blocked-container `defaults`: export writes an empty plist and exits 0.
   cat > "$STUB_BIN/defaults" <<'EOF'
 #!/bin/bash
+if [ -n "${DEFAULTS_HANG:-}" ]; then
+  # Simulates the unanswerable macOS privacy prompt (issue #359).
+  sleep 30
+  exit 0
+fi
 if [ "$1" = "export" ]; then
   cat > "$3" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -83,4 +90,22 @@ teardown() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"drift detected"* ]]
   [[ "$output" != *"cannot read Amphetamine preferences"* ]]
+}
+
+@test "diff warns and stops when defaults hangs on the privacy prompt (issue #359)" {
+  export DEFAULTS_HANG=1 AMPHETAMINE_DEFAULTS_TIMEOUT_SEC=1
+  local start=$SECONDS
+  run "$FAKE_DOTFILES/bin/dotfiles-amphetamine-sync" diff
+  [ "$status" -ne 0 ]
+  [ $((SECONDS - start)) -lt 10 ]
+  [[ "$output" == *"cannot read Amphetamine prefs (privacy prompt?)"* ]]
+}
+
+@test "status warns instead of hanging when defaults hangs (issue #359)" {
+  export DEFAULTS_HANG=1 AMPHETAMINE_DEFAULTS_TIMEOUT_SEC=1
+  local start=$SECONDS
+  run "$FAKE_DOTFILES/bin/dotfiles-amphetamine-sync" status
+  [ "$status" -eq 0 ]
+  [ $((SECONDS - start)) -lt 10 ]
+  [[ "$output" == *"cannot read Amphetamine prefs (privacy prompt?)"* ]]
 }

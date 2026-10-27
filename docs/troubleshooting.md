@@ -914,7 +914,12 @@ LaunchAgents in `~/Library/LaunchAgents` that a closed lid would delay.
 **One-time lid-close setup:** Install Amphetamine. Apply the managed baseline
 with `dotfiles-amphetamine-sync apply`. If it reports `cannot read Amphetamine
 preferences`, macOS blocks your terminal from the Amphetamine app container.
-Grant the terminal Full Disk Access, then run `apply` again. Leave generic Amphetamine Triggers,
+Grant the terminal Full Disk Access, then run `apply` again. If `dotfiles doctor`
+or `dotfiles-amphetamine-sync` warns `cannot read Amphetamine prefs (privacy
+prompt?)`, the read waited on the macOS "access data from other apps" prompt
+and was stopped after 5 seconds (set `AMPHETAMINE_DEFAULTS_TIMEOUT_SEC` to
+change it). The doctor skips the policy check instead of hanging. Run the
+command once in a normal terminal and answer the prompt. Leave generic Amphetamine Triggers,
 Start Session At Launch, Start Session On Wake, and AC-reconnect sessions off.
 In Amphetamine → Preferences → Sessions, toggle **Allow System to Sleep When
 Display is Closed** once and choose **Do Not Show This Message Again** in its

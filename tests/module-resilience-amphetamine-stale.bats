@@ -41,7 +41,18 @@ EOF
 
   cat > "$STUB_BIN/defaults" <<'EOF'
 #!/bin/bash
-if [ "$1" = "read" ] && [ "$2" = "com.if.Amphetamine" ]; then
+if [ "$1" = "read" ] && [ "$2" = "com.if.Amphetamine" ] && [ -n "${DEFAULTS_HANG:-}" ]; then
+  # Simulates the unanswerable macOS privacy prompt (issue #359).
+  sleep 30
+elif [ "$1" = "read" ] && [ "$2" = "com.if.Amphetamine" ] && [ "$#" -eq 2 ]; then
+  printf '{\n'
+  printf '    "Enable Triggers" = %s;\n' "${DEFAULTS_ENABLE_TRIGGERS:-0}"
+  printf '    "Restart DD Session on AC Reconnect" = %s;\n' "${DEFAULTS_RESTART_ON_AC_RECONNECT:-0}"
+  printf '    "Start Session At Launch" = %s;\n' "${DEFAULTS_START_SESSION_AT_LAUNCH:-0}"
+  printf '    "Start Session On Wake" = %s;\n' "${DEFAULTS_START_SESSION_ON_WAKE:-0}"
+  printf '    "Trigger Data" = %s;\n' "${DEFAULTS_TRIGGER_DATA:-()}"
+  printf '}\n'
+elif [ "$1" = "read" ] && [ "$2" = "com.if.Amphetamine" ]; then
   case "$3" in
     "Trigger Data") printf '%s\n' "${DEFAULTS_TRIGGER_DATA:-()}" ;;
     "Enable Triggers") printf '%s\n' "${DEFAULTS_ENABLE_TRIGGERS:-0}" ;;
@@ -77,6 +88,18 @@ EOF
   ' "$doctor_sh")"
   [ -n "$helper_src" ] || { echo "helper not found in doctor.sh"; return 1; }
   eval "$helper_src"
+
+  # shellcheck source=../lib/run-with-timeout.sh
+  source "$BATS_TEST_DIRNAME/../lib/run-with-timeout.sh"
+  local fn fn_src
+  for fn in _amphetamine_read_prefs_domain _amphetamine_prefs_value; do
+    fn_src="$(awk -v fn="$fn" '
+      index($0, fn "() {") == 1 { in_func = 1 }
+      in_func { print }
+      in_func && /^}/ { exit }
+    ' "$doctor_sh")"
+    [ -n "$fn_src" ] && eval "$fn_src"
+  done
 
   local policy_src
   policy_src="$(awk '
@@ -297,4 +320,35 @@ EOF
   grep -Fx 'com.if.Amphetamine|Allow Closed-Display Sleep|-bool|false' "$DEFAULTS_WRITES_FILE"
   grep -Fx 'com.if.Amphetamine|Enable Triggers|-bool|false' "$DEFAULTS_WRITES_FILE"
   grep -Fx 'com.if.Amphetamine|Trigger Data|-array|' "$DEFAULTS_WRITES_FILE"
+}
+
+@test "amphetamine-policy: counts multi-line Trigger Data dicts" {
+  export DEFAULTS_TRIGGER_DATA="$(printf '(\n        {\n            a = 1;\n        },\n        {\n            b = 2;\n        }\n    )')"
+  run _amphetamine_prefs_value "$(defaults read com.if.Amphetamine)" "Trigger Data"
+  [ "$output" = "2" ]
+  run _amphetamine_managed_session_policy
+  [ "$status" -ne 0 ]
+}
+
+@test "amphetamine-policy: a hanging defaults read times out fast (issue #359)" {
+  export DEFAULTS_HANG=1
+  export AMPHETAMINE_DEFAULTS_TIMEOUT_SEC=1
+  local start=$SECONDS
+  run _amphetamine_managed_session_policy
+  [ "$status" -ne 0 ]
+  [ $((SECONDS - start)) -lt 5 ]
+}
+
+@test "amphetamine-policy: module warns and skips the check on a hang (issue #359)" {
+  export DEFAULTS_HANG=1
+  export AMPHETAMINE_DEFAULTS_TIMEOUT_SEC=1
+  export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
+  run bash -c '
+    check() { echo "CHECK $1"; }
+    check_advisory() { echo "ADVISORY $1"; }
+    audit_warn() { echo "WARN $*"; }
+    source "$DOTFILES_DIR/modules/resilience/doctor.sh"
+  '
+  [[ "$output" == *"WARN cannot read Amphetamine prefs (privacy prompt?)"* ]]
+  [[ "$output" != *"CHECK resilience.amphetamine_managed_session_policy"* ]]
 }

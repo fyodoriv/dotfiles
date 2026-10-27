@@ -105,6 +105,7 @@ Advanced:
   managed                      List all managed files
   status                       Show git status of dotfiles repo
   stats                        Show automation stats (runs, time saved, streak)
+  telemetry [status|on|off|send [--dry-run]]  Opt-in anonymous usage counts to PostHog EU
   install plan|run|restore     One-step install with backup and auto-restore
   metrics [--share FILE]       Agent time, hook blocks, MCP health, machine load
   contribute [--repo agentbrew] [--yes]  Open a PR upstream from your branch (forks
@@ -394,6 +395,12 @@ case "$cmd" in
   stats)
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-stats" "$@"
+    ;;
+
+  telemetry)
+    # agent: ask the user before `telemetry send` or `telemetry on`; `status` and `send --dry-run` send nothing.
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-telemetry" "$@"
     ;;
 
   install)

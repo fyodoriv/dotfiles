@@ -9,7 +9,7 @@
 #
 # Field data is the local, content-free stats log (~/.dotfiles-stats.jsonl,
 # lib/stats.sh): task name, time, estimated seconds saved, units, and the
-# doctor's failure count. Nothing is uploaded. The machine label is a salted
+# doctor's failure count. This script uploads nothing. The machine label is a salted
 # hash; the salt stays in ${XDG_STATE_HOME:-~/.local/state}/dotfiles/proof-salt.
 
 set -euo pipefail
@@ -123,7 +123,7 @@ render() {
       "Every number below comes from `docs/proof/metrics.json`. `scripts/proof.sh` writes that file and this section.",
       "Headline rows are field outcomes. `real use` numbers come from the local, content-free stats log that each real automation run writes (`~/.dotfiles-stats.jsonl`, see [observability](docs/observability.md)).",
       "",
-      "Nothing is uploaded. Each machine aggregates its own log.",
+      "Each machine aggregates its own log here. Opt-in telemetry (`dotfiles telemetry`, off until the owner sets a key) can send the same content-free counts to PostHog EU; this section does not read them yet.",
       "",
       "| Claim | Theory | Metric | Result | Source |",
       "|---|---|---|---|---|",

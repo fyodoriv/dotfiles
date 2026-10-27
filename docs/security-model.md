@@ -317,5 +317,5 @@ writes `~/.local/share/dotfiles/metrics/weekly-<YYYY-Www>.json`.
 - Does not modify `/etc/` or `/Library/` (system-wide) directories
 - Does not run any daemons as root
 - Does not modify other users' files or configuration
-- Does not phone home or send telemetry. The opt-in weekly metrics file (below) stays local; only `agentbrew metrics share` can send it, and only after you opt in there too.
+- Does not phone home. Telemetry is opt-in only: `dotfiles telemetry` sends content-free usage counts to PostHog EU only after the owner stores a key, and `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([observability](observability.md#telemetry)). The opt-in weekly metrics file (below) stays local; only `agentbrew metrics share` can send it, and only after you opt in there too.
 - Does not store passwords or tokens in tracked files

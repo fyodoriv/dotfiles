@@ -91,6 +91,7 @@ Settings drift. Scripts break. Nobody notices until something is slow again.
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
+- **Opt-in telemetry** — `dotfiles telemetry` sends anonymous usage counts to PostHog EU only after you store a key; `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([details](docs/observability.md#telemetry)).
 - **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac. `--share FILE` writes a privacy-safe snapshot. `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot. `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you; it asks first (`--yes` skips the question).
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
 
@@ -614,7 +615,7 @@ Each claim above is measured below. Run `scripts/proof.sh` to refresh the number
 Every number below comes from `docs/proof/metrics.json`. `scripts/proof.sh` writes that file and this section.
 Headline rows are field outcomes. `real use` numbers come from the local, content-free stats log that each real automation run writes (`~/.dotfiles-stats.jsonl`, see [observability](docs/observability.md)).
 
-Nothing is uploaded. Each machine aggregates its own log.
+Each machine aggregates its own log here. Opt-in telemetry (`dotfiles telemetry`, off until the owner sets a key) can send the same content-free counts to PostHog EU; this section does not read them yet.
 
 | Claim | Theory | Metric | Result | Source |
 |---|---|---|---|---|
@@ -1183,6 +1184,7 @@ dotfiles sync                                     Commit tracked/staged local ch
 dotfiles managed                                  List all managed files
 dotfiles status                                   Git status of dotfiles repo
 dotfiles stats [--oneliner] [--recalc]            Automation stats (runs, time saved, streak)
+dotfiles telemetry [status|on|off|send --dry-run] Opt-in anonymous usage counts (PostHog EU)
 dotfiles install plan|run|restore                 One-step install with backup and auto-restore (see INSTALL.md)
 dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP health, machine load (local only)
 dotfiles metrics --table                         Every docs/metrics.md metric: value, goal, pivot ((stub) if no data)

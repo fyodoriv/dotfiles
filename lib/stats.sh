@@ -81,6 +81,13 @@ log_run() {
     echo "⚠ stats: cannot write to $DOTFILES_STATS_FILE" >&2
     return 0
   fi
+  # Opt-in telemetry: at most one send a day, in the background, never in a
+  # test (bin/dotfiles-telemetry sends nothing without a key and the notice).
+  if [ -z "${BATS_TEST_FILENAME:-}" ]; then
+    local _tel
+    _tel="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry"
+    [ -x "$_tel" ] && (bash "$_tel" daily >/dev/null 2>&1 &)
+  fi
   return 0
 }
 

@@ -1,8 +1,9 @@
 # Observability
 
 How to see what dotfiles did on this Mac, what failed, and how healthy it is.
-Everything stays on the Mac. Nothing is uploaded; `dotfiles metrics --share`
-writes an aggregate-only snapshot only when you ask for one.
+Everything stays on the Mac, with one opt-in exit: `dotfiles telemetry` (see
+[Telemetry](#telemetry)). `dotfiles metrics --share` writes an aggregate-only
+snapshot only when you ask for one.
 
 ## Logs
 
@@ -61,6 +62,28 @@ jq -r 'select(.source == "doctor") | .check' ~/.local/state/dotfiles/errors.json
 There is no external error reporter. dotfiles is a local tool, and its
 privacy contract keeps machine data on the machine (accepted push back,
 agentbrew new-project requirements map, 2026-10-16).
+
+## Telemetry
+
+`bin/dotfiles-telemetry` is the one adapter that can send the stats log to
+PostHog EU (`https://eu.i.posthog.com/batch/`). It is opt-in by key:
+
+- **Sends nothing** until the owner stores a project key:
+  `security add-generic-password -s dotfiles -a posthog_key -w` (or sets
+  `DOTFILES_POSTHOG_KEY`). The key is never printed, logged, or committed.
+- **What leaves**: per stats line, `dotfiles.run`, its time, `task`, and the
+  number fields (`seconds_saved`, `units`, `pass`, `fail`, `fixed`, `warn`,
+  `skip`, `ok`, `duration_ms`), keyed by a random install id. Never paths,
+  names, host, or messages. `$process_person_profile: false` and
+  `$geoip_disable: true` on every event; no replay, flags, or surveys.
+- **When**: at most once a day, batched, after `dotfiles` showed its one-line
+  notice. A failed send never fails a command; the cursor moves only after a
+  send works.
+- **Off switches**: `dotfiles telemetry off`, or `DO_NOT_TRACK=1`.
+- **Check it**: `dotfiles telemetry status`; `dotfiles telemetry send --dry-run`
+  prints the exact body with the key hidden.
+- **State**: `~/.local/state/dotfiles/telemetry.json` (install id, cursor,
+  on/off, last send day; mode 600). Delete it to reset.
 
 ## Health check
 

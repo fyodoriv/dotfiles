@@ -266,6 +266,17 @@ names the plugin and what it would take. Give a plugin hook its own command,
 and a plugin MCP server, command, agent, or skill its own name. To keep
 people off an agent, use `blocked_software`.
 
+
+### Plugin rules
+
+Decision (2026-10-27): apply does not block a plugin's `rules:` text.
+agentbrew appends it after the shared rules, so a plugin rule can say the
+opposite of a shared one. That is content, not structure, and no script can
+judge it. Instead the doctor check `agentbrew.plugin_rule_headings` lists,
+for each kept plugin, its rule headings (or the first line of each
+paragraph when it has no headings) next to the openings of the shared rules.
+A person reads both lists and fixes a contradiction in the plugin.
+
 ## Core options
 
 A plugin sets values only for options declared in

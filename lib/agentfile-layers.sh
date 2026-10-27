@@ -712,3 +712,17 @@ _agentfile_mikefarah_yq() {
   v="$(yq --version 2>&1 || true)"
   grep -q mikefarah <<< "$v"
 }
+
+# agentfile_rule_headings <Agentfile>: prints the Markdown headings of its
+# rules: text, or, when it has none, the first line of each paragraph (cut to
+# 60 characters), joined with "; ". The doctor lists them for each kept
+# plugin next to the shared ones, so a plugin rule that could contradict a
+# shared rule is visible (content is not checked; docs/plugins.md).
+agentfile_rule_headings() {
+  local text heads
+  [ -f "$1" ] || return 0
+  text="$(yq -r '.rules // ""' "$1" 2>/dev/null)"
+  heads="$(printf '%s\n' "$text" | sed -n 's/^#\{1,6\} \{1,\}//p')"
+  [ -n "$heads" ] || heads="$(printf '%s\n' "$text" | awk 'NF && !p { print substr($0, 1, 60); p = 1 } !NF { p = 0 }')"
+  printf '%s\n' "$heads" | sed '/^$/d' | paste -sd ';' - | sed 's/;/; /g'
+}

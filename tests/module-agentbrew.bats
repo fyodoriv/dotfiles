@@ -85,6 +85,7 @@ agentbrew.mcp_servers_ready
 agentbrew.global_agentfile_in_sync
 agentbrew.local_agentfile_valid
 agentbrew.plugin_agentfile_shared
+agentbrew.plugin_rule_headings
 agentbrew.hooks_enforcing
 agentbrew.memory_service_singleton
 agentbrew.memory_launchagent_identity

@@ -773,3 +773,18 @@ skills: [$name]" "skills/$name/SKILL.md"
   [ -f "$HOME/.claude/skills/$name/SKILL.md" ]
   [[ "$(cat "$HOME/.claude/skills/$name/SKILL.md")" != *ACME* ]]
 }
+
+@test "the doctor lists a kept plugin's rule headings next to the shared ones" {
+  HOOKS_YAML='rules: |
+  ## Commit straight to main
+  Always.
+  ### Skip tests' plugin_with_hook Write
+  run bash -c 'source "$1/lib/agentfile-layers.sh"; agentfile_rule_headings "$2"' _ "$REPO_ROOT" "$PLUGIN_AGENTFILE"
+  [ "$output" = "Commit straight to main; Skip tests" ]
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" bash -c 'DOTFILES_DIR="$1"
+    check() { :; }; audit_warn() { :; }
+    check_advisory() { [ "$1" = agentbrew.plugin_rule_headings ] && echo "ADVISORY $2"; return 0; }
+    source "$1/modules/agentbrew/doctor.sh"' _ "$REPO_ROOT"
+  echo "$output"
+  [[ "$output" == *"ADVISORY plugin rule headings"*"acme"*"Commit straight to main; Skip tests"*"shared rules:"* ]]
+}

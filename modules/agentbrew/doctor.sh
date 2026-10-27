@@ -185,6 +185,22 @@ check "agentbrew.plugin_agentfile_shared" \
   "[ -z \"\$_agentbrew_plugin_problem\" ]" \
   ""
 
+# Plugin rules: agentbrew appends a plugin's rules: after the shared rules, so
+# a plugin rule can say the opposite of a shared one. Content is not checked;
+# this lists each kept plugin's rule headings so a person can compare them.
+_agentbrew_plugin_rule_lines=""
+if [ "${LIST_MODE:-false}" != true ] && [ -n "$_agentbrew_plugin_kept" ]; then
+  while IFS= read -r _pf; do
+    [ -n "$_pf" ] || continue
+    _ph="$(agentfile_rule_headings "$_pf")"
+    [ -n "$_ph" ] && _agentbrew_plugin_rule_lines="${_agentbrew_plugin_rule_lines:+$_agentbrew_plugin_rule_lines | }$(basename "$(dirname "$(dirname "$_pf")")"): $_ph"
+  done <<< "$_agentbrew_plugin_kept"
+fi
+check_advisory "agentbrew.plugin_rule_headings" \
+  "plugin rule headings, to compare with the shared rules (${_agentbrew_plugin_rule_lines:-no plugin adds rules}; shared rules: $(agentfile_rule_headings "$AGENTFILE" 2>/dev/null | cut -c1-300)...)" \
+  "true" \
+  "read each plugin rule against the shared rules; see docs/plugins.md (Plugin rules)"
+
 # Installed agents agentbrew does not sync. agentbrew marks an agent
 # detected when its skills folder's parent exists (agentbrew src/agents.ts),
 # but an old excludeAgents: entry leaves detected: false in state.yaml until

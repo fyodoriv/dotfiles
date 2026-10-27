@@ -62,3 +62,21 @@ REPO="$BATS_TEST_DIRNAME/.."
   ! grep -qiF "$(hostname -s)" "$TEST_DIR/out.json"
   ! grep -qF "$USER" "$TEST_DIR/out.json"
 }
+
+@test "proof: install events fill the one-command row with real use minutes to a clean doctor" {
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  {
+    printf '{"task":"install","timestamp":"%s","ok":true,"duration_ms":600000,"fail":0}\n' "$now"
+    printf '{"task":"install","timestamp":"%s","ok":true,"duration_ms":900000,"fail":2}\n' "$now"
+    printf '{"task":"install","timestamp":"%s","ok":false,"duration_ms":60000}\n' "$now"
+  } >"$TEST_DIR/stats.jsonl"
+  export DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl" XDG_STATE_HOME="$TEST_DIR/state"
+  run bash "$REPO/scripts/proof.sh" --collect "$TEST_DIR/out.json"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ "$(jq -r '.metrics.install_clean_minutes.value' "$TEST_DIR/out.json")" = "10" ]
+  [ "$(jq -r '.metrics.install_clean_minutes.kind' "$TEST_DIR/out.json")" = "real use" ]
+  [[ "$(jq -r '.metrics.install_clean_minutes.detail' "$TEST_DIR/out.json")" == *"1 of 3 install runs"* ]]
+  cp "$TEST_DIR/out.json" "$TEST_DIR/metrics.json"
+  row="$(PROOF_METRICS="$TEST_DIR/metrics.json" bash "$REPO/scripts/proof.sh" --render | grep '^| One command sets up a Mac')"
+  [[ "$row" == *"10 min"* && "$row" == *"real use"* ]] || { echo "$row"; return 1; }
+}

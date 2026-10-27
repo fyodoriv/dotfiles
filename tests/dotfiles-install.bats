@@ -392,3 +392,19 @@ make_tool_repo() {
   [[ "$output" == *"is a clone of another repo; skipped"* ]]
   ! grep -q 'agentbrew-install' "$LOG"
 }
+
+@test "a real install records one content-free install event with ok, duration, and the doctor's failing-check count" {
+  export DOTFILES_STATS_LOG=1 DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl"
+  echo '{"task":"doctor","timestamp":"2026-01-01T00:00:00Z","fail":9}' > "$DOTFILES_STATS_FILE"
+  stub doctor 'echo "{\"task\":\"doctor\",\"timestamp\":\"2026-01-02T00:00:00Z\",\"fail\":2}" >> "$DOTFILES_STATS_FILE"'
+  run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  jq -se '[.[] | select(.task == "install")] | length == 1 and .[0].ok == true and .[0].fail == 2 and (.[0].duration_ms | type) == "number"' "$DOTFILES_STATS_FILE"
+}
+
+@test "a failed install records an install event with ok false" {
+  export DOTFILES_STATS_LOG=1 DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl"
+  FAIL_VERIFY=1 run bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew
+  [ "$status" -eq 1 ]
+  jq -se '[.[] | select(.task == "install")] | length == 1 and .[0].ok == false' "$DOTFILES_STATS_FILE"
+}

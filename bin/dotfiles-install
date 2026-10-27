@@ -42,6 +42,13 @@ AGENTBREW_URL="${DOTFILES_INSTALL_AGENTBREW_URL:-https://github.com/fyodoriv/age
 source "$REPO_DIR/lib/mac-baseline.sh"
 # shellcheck source=../lib/confirm.sh
 source "$REPO_DIR/lib/confirm.sh"
+# shellcheck source=../lib/stats.sh
+source "$REPO_DIR/lib/stats.sh"
+
+# install_event <ok|error> [fail]: one content-free stats line per real run
+# (task, ok, run time, the heal doctor's failing-check count). README Proof
+# reads it (scripts/proof.sh, install_* metrics).
+install_event() { log_run install 1 "$1" "$((SECONDS * 1000))" "${2:-}"; }
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
@@ -276,6 +283,7 @@ clone_readonly() {
 
 critical() {
   receipt_finish false "$1"
+  install_event error
   say ""
   say "✗ Critical error during $1. Restoring your previous setup..."
   if do_restore "$BACKUP_ID"; then
@@ -348,9 +356,15 @@ cmd_run() {
   chezmoi apply --source "$REPO_DIR" --force || critical "chezmoi apply"
 
   step "4/6 Heal"
+  local stats_lines=0 heal_fail=""
+  [ -f "$DOTFILES_STATS_FILE" ] && stats_lines="$(wc -l < "$DOTFILES_STATS_FILE" | tr -d ' ')"
   if ! bash "$DOCTOR" --fix; then
     say "  ! Some checks still fail. Your setup works; run 'dotfiles doctor' to see them."
   fi
+
+  # The heal run's own doctor line holds its failing-check count.
+  [ -f "$DOTFILES_STATS_FILE" ] && heal_fail="$(tail -n +"$((stats_lines + 1))" "$DOTFILES_STATS_FILE" |
+    jq -r 'select(.task == "doctor") | .fail // empty' 2>/dev/null | tail -1)"
 
   step "5/6 Verify"
   # Scripts never "match" a target state, so verify the managed files only.
@@ -400,6 +414,7 @@ cmd_run() {
   done
 
   receipt_finish true
+  install_event ok "$heal_fail"
   step "Done"
   say "dotfiles is installed. Backup: $dir"
   say "Undo any time: bash $REPO_DIR/bin/dotfiles-install restore $BACKUP_ID"

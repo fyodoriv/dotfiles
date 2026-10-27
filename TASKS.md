@@ -36,6 +36,7 @@ them. -->
   - **Output**: code
   - **Acceptance**: after one real install, `scripts/proof.sh` fills the row with `real use` and the README test passes.
   - **Competitive-goal**: `manual_bootstrap_steps` (docs/competition/scorecard.md).
+  - **Blocked**: needs-time — 2026-10-27: shipped the recording part. `bin/dotfiles-install run` writes one `install` stats line (ok, `duration_ms`, the heal doctor's `fail` count) and `scripts/proof.sh` fills the row from `install_clean_minutes`. No real install has run since. Unblock: after the next real install on any Mac, run `scripts/proof.sh` there and check the row says `real use`; then close.
 
 - [ ] Record shell start time on real machines for the README Proof section
   - **ID**: proof-shell-start-field

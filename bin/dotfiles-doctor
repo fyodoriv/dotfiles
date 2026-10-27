@@ -1051,7 +1051,7 @@ elif ! $LIST_MODE; then
 
   # Log detailed doctor run for trend tracking
   local_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  dotfiles_stats_log_on && echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1}" >> "$DOCTOR_TRENDS_FILE"
+  dotfiles_stats_log_on && echo "{\"task\":\"doctor\",\"timestamp\":\"$local_timestamp\",\"pass\":$pass_count,\"fail\":$fail_count,\"fixed\":$fix_count,\"warn\":$warn_count,\"skip\":$skip_count,\"seconds_saved\":2,\"units\":1,\"ok\":$( ((fail_count == 0)) && echo true || echo false),\"duration_ms\":$((SECONDS * 1000))}" >> "$DOCTOR_TRENDS_FILE"
   # Opt-in weekly aggregate file (weekly_metrics; off by default).
   weekly_metrics_write "$pass_count" "$fail_count" "$fix_count" "$warn_count" "$skip_count"
   # One errors-log event per failing check: story US05 (config heals itself).

@@ -369,3 +369,24 @@ JSONL
     return 1
   } || true
 }
+
+@test "log_run records ok and duration_ms on every event" {
+  log_run sync
+  jq -e '.ok == true and (.duration_ms | type) == "number"' "$DOTFILES_STATS_FILE"
+}
+
+@test "log_run records an error and an explicit duration" {
+  log_run sync 1 error 1234
+  jq -e '.ok == false and .duration_ms == 1234' "$DOTFILES_STATS_FILE"
+}
+
+@test "log_run allow-lists ok and duration_ms" {
+  log_run sync 1 'x"y' 'nope'
+  jq -e '.ok == true and (.duration_ms | type) == "number"' "$DOTFILES_STATS_FILE"
+}
+
+@test "the doctor trends line records ok and duration_ms" {
+  line="$(grep '"task\\":\\"doctor' "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" | grep DOCTOR_TRENDS_FILE)"
+  [[ "$line" == *'\"ok\":'* ]]
+  [[ "$line" == *'\"duration_ms\":'* ]]
+}

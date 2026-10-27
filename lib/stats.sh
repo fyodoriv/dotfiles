@@ -35,6 +35,10 @@ _task_estimate() {
 #       Use units when one invocation actually does N units of work
 #       (e.g. doctor reports 100 checks pass — pass units=100 if you
 #       want to scale; existing convention is units=1 for doctor).
+#   $3  outcome (optional, default ok). `error`, `fail`, `false`, or `0`
+#       record "ok":false; anything else records "ok":true.
+#   $4  duration in ms (optional). Default: the caller shell's $SECONDS
+#       times 1000, which is the script run time when log_run runs at the end.
 #
 # Side effects: appends one JSONL line to $DOTFILES_STATS_FILE (off when
 # DOTFILES_STATS_LOG=0; the Makefile and tests/test_helper.bash set it)
@@ -60,11 +64,14 @@ dotfiles_stats_log_on() {
 
 log_run() {
   dotfiles_stats_log_on || return 0
-  local task="$1" units="${2:-1}"
+  local task="$1" units="${2:-1}" outcome="${3:-ok}" duration_ms="${4:-$((SECONDS * 1000))}"
   # Allow-list both fields so no free text can reach the log
   # (docs/observability.md#logs): a task is a short name, units a number.
   [[ "$task" =~ ^[a-z0-9-]{1,40}$ ]] || task="invalid"
   [[ "$units" =~ ^[0-9]{1,6}$ ]] || units=1
+  local ok=true
+  case "$outcome" in error | fail | false | 0) ok=false ;; esac
+  [[ "$duration_ms" =~ ^[0-9]{1,10}$ ]] || duration_ms=$((SECONDS * 1000))
   local estimate
   estimate="$(_task_estimate "$task")"
   local seconds_saved=$((estimate * units))
@@ -76,7 +83,7 @@ log_run() {
   fi
   # Suppress write errors AND swallow the non-zero exit so a read-only
   # or full stats file never aborts the calling automation script.
-  if ! echo "{\"task\":\"$task\",\"timestamp\":\"$timestamp\",\"seconds_saved\":$seconds_saved,\"units\":$units}" \
+  if ! echo "{\"task\":\"$task\",\"timestamp\":\"$timestamp\",\"seconds_saved\":$seconds_saved,\"units\":$units,\"ok\":$ok,\"duration_ms\":$duration_ms}" \
         >> "$DOTFILES_STATS_FILE" 2>/dev/null; then
     echo "⚠ stats: cannot write to $DOTFILES_STATS_FILE" >&2
     return 0

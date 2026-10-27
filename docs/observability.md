@@ -9,7 +9,7 @@ snapshot only when you ask for one.
 
 | Log | Written by | What one entry holds | Read it with |
 |---|---|---|---|
-| `~/.dotfiles-stats.jsonl` | `lib/stats.sh` `log_run`, and the doctor | One JSON line per automation run: `task`, `timestamp`, `seconds_saved`, `units`; doctor runs add `pass`, `fail`, `fixed`, `warn`, `skip` counts. No paths or messages. | `dotfiles stats`, `dotfiles doctor --trends`, [metrics.md](metrics.md) |
+| `~/.dotfiles-stats.jsonl` | `lib/stats.sh` `log_run`, and the doctor | One JSON line per automation run: `task`, `timestamp`, `seconds_saved`, `units`, `ok` (true or false), `duration_ms`; doctor runs add `pass`, `fail`, `fixed`, `warn`, `skip` counts. No paths or messages. | `dotfiles stats`, `dotfiles doctor --trends`, [metrics.md](metrics.md) |
 | `~/.local/state/dotfiles/errors.jsonl` | `lib/errors-log.sh` `log_error` | One JSON line per failure (see [Errors](#errors)) | `jq` (below) |
 | `~/.local/state/dotfiles/load-samples.tsv` | `bin/dotfiles-load-sampler` (every 30 s) | Load, CPU, memory, swap, process count, top 3 process names | `dotfiles-load-sampler --report 24`, `dotfiles metrics`, the `load` dataset of the tooling health dashboard |
 | `~/.local/state/dotfiles/gate-timings.jsonl` | `scripts/gate-timed.sh` (each `make check` step) | `ts`, `step`, `seconds`, `status` | `dotfiles metrics --table`, the speed review in `/tooling-checkup`, the `gate` dataset of the tooling health dashboard |
@@ -22,7 +22,9 @@ hold free text, and they never leave the Mac. The load samples name processes,
 so `dotfiles metrics --share` keeps only their numeric lines.
 
 `log_run` allow-lists its fields too: a task is a short lowercase name and
-`units` a number; anything else is written as `invalid` and `1`.
+`units` a number; anything else is written as `invalid` and `1`. The outcome
+(`log_run <task> [units] [ok|error] [duration_ms]`) becomes `ok` true or false,
+and a non-number duration falls back to the script run time (`$SECONDS`).
 
 Tests never write the real errors or stats logs: both logs stay off inside
 any bats test unless the test sets `DOTFILES_ERRORS_LOG=1` or

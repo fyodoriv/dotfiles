@@ -11,7 +11,7 @@ setup() {
   export DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl"
   export DOTFILES_TELEMETRY_STATE="$TEST_DIR/telemetry.json"
   export DOTFILES_TELEMETRY_URL="http://127.0.0.1:9/fake"
-  export DOTFILES_POSTHOG_KEY="phc_test_canary_key"
+  export DOTFILES_POSTHOG_KEY="phc_test_fake_key"
   unset DO_NOT_TRACK
   FAKE="$TEST_DIR/fake-curl"
   cat >"$FAKE" <<'SH'

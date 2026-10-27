@@ -189,6 +189,15 @@ dotfiles doctor --fix --module workflow
 launchctl list | grep com.dotfiles
 ```
 
+### `brew upgrade` fails with "same file: /opt/homebrew/bin/python3"
+
+An old dotfiles script (removed 2026-10-27) linked `/opt/homebrew/bin/python3`
+to the uv shim. Homebrew owns that path. Remove the link with
+`rm /opt/homebrew/bin/python3 /opt/homebrew/bin/python3.13` (only when
+`ls -l` shows them pointing at a uv or dotfiles path), then run
+`brew link --overwrite python@3.15` or upgrade again.
+`tests/brew-bin-python-ownership.bats` keeps it from coming back.
+
 ### How do I completely uninstall?
 
 ```bash

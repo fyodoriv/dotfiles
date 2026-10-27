@@ -61,7 +61,7 @@ def verdict(value, warn, act, higher_is_worse=True):
 
 
 def load_samples(path, hours, now):
-    """Rows: epoch, time, load1, load5, load15, cpus, free %, swap MB, procs, top3, busy %."""
+    """Rows: epoch, time, load1, load5, load15, cpus, free %, swap MB, procs, top3, busy %, owners."""
     rows = []
     try:
         lines = Path(path).read_text().splitlines()
@@ -84,6 +84,7 @@ def load_samples(path, hours, now):
                 "free": float(f[6]),
                 "swap": float(f[7]),
                 "top": f[9] if len(f) > 9 else "",
+                "owners": f[11] if len(f) > 11 else "",
             })
         except ValueError:
             continue
@@ -108,8 +109,30 @@ def top_names(row):
     return [item.rsplit(":", 1)[0] for item in row["top"].split()]
 
 
+INTERPRETERS = {"node", "python", "python3", "bash", "zsh", "sh", "ruby", "perl", "deno", "bun"}
+
+
+def owner_label(name, owner):
+    """`node (vitest, parent claude)` from a sampler owner item `pid/ppid/parent/command` (#358)."""
+    parts = owner.split("/", 3)
+    if len(parts) < 4:
+        return name
+    parent, cmd = parts[2], parts[3].split()
+    hint = ""
+    if cmd and cmd[0].rsplit("/", 1)[-1] in INTERPRETERS:
+        hint = next((a.rsplit("/", 1)[-1] for a in cmd[1:] if not a.startswith("-")), "")
+    label = ", ".join(x for x in (hint, f"parent {parent}" if parent else "") if x)
+    return f"{name} ({label})" if label else name
+
+
+def row_labels(row):
+    names = top_names(row)
+    owners = [o.strip() for o in row.get("owners", "").split(" | ")] if row.get("owners") else []
+    return [owner_label(n, owners[i]) if i < len(owners) else n for i, n in enumerate(names)]
+
+
 def offender_summary(rows):
-    offenders = Counter(name for r in rows for name in top_names(r))
+    offenders = Counter(label for r in rows for label in row_labels(r))
     return ", ".join(f"{name} x{n}" for name, n in offenders.most_common(3)) or "none"
 
 

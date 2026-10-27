@@ -24,8 +24,8 @@ MOCK
   cat > "$TEST_BIN/ps" <<'MOCK'
 #!/bin/bash
 case "$*" in
+  *"-o pid=,"*) printf '11 1 98.0 /usr/bin/node\n12 1 40.5 /System/WindowServer\n13 1 3.0 /bin/zsh\n14 1 1.0 /bin/ls\n' ;;
   *"-o pid="*) printf '1\n2\n3\n' ;;
-  *) printf ' 98.0 /usr/bin/node\n 40.5 /System/WindowServer\n 3.0 /bin/zsh\n 1.0 /bin/ls\n' ;;
 esac
 MOCK
   chmod +x "$TEST_BIN/sysctl" "$TEST_BIN/ps"
@@ -68,7 +68,7 @@ teardown() {
 @test "load-sampler survives a long process list (no SIGPIPE under pipefail)" {
   cat > "$TEST_BIN/ps" <<'MOCK'
 #!/bin/bash
-for i in $(seq 1 20000); do echo " 1.0 /usr/bin/proc$i"; done
+case "$*" in *"-o pid=,"*) for i in $(seq 1 20000); do echo "$i 1 1.0 /usr/bin/proc$i"; done ;; esac
 MOCK
   chmod +x "$TEST_BIN/ps"
   run env PATH="$TEST_BIN:$PATH" "$SAMPLER_CMD"
@@ -107,8 +107,8 @@ MOCK
   cat > "$TEST_BIN/ps" <<'MOCK'
 #!/bin/bash
 case "$*" in
+  *"-o pid=,"*) printf '21 1 156.3 /Library/Application Support/Vendor/zdpclassifier\n22 1 43.8 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n23 1 3.0 /bin/zsh\n' ;;
   *"-o pid="*) printf '1\n2\n' ;;
-  *) printf ' 156.3 /Library/Application Support/Vendor/zdpclassifier\n 43.8 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n 3.0 /bin/zsh\n' ;;
 esac
 MOCK
   chmod +x "$TEST_BIN/ps"
@@ -117,4 +117,27 @@ MOCK
   row="$(cat "$DOTFILES_LOAD_SAMPLES")"
   # A space inside a name becomes "_": the top list itself is space-separated.
   [[ "$(printf '%s' "$row" | cut -f10)" == "zdpclassifier:156.3 Google_Chrome:43.8 zsh:3.0" ]]
+}
+
+@test "load-sampler records pid, parent, and a redacted command for each top process (#358)" {
+  cat > "$TEST_BIN/ps" <<'MOCK'
+#!/bin/bash
+case "$*" in
+  *"command= -p 501"*) echo "node /repo/node_modules/.bin/vitest run --token=abc123secret" ;;
+  *"command= -p 502"*) echo "/System/WindowServer -daemon" ;;
+  *"command= -p 503"*) echo "-zsh" ;;
+  *"comm= -p 400"*) echo "/Users/x/.local/bin/claude" ;;
+  *"comm= -p 1"*) echo "/sbin/launchd" ;;
+  *"-o pid=,"*) printf '501 400 98.0 /usr/bin/node\n502 1 40.5 /System/WindowServer\n503 400 3.0 /bin/zsh\n504 1 1.0 /bin/ls\n' ;;
+  *"-o pid="*) printf '1\n2\n3\n' ;;
+esac
+MOCK
+  chmod +x "$TEST_BIN/ps"
+  run env PATH="$TEST_BIN:$PATH" "$SAMPLER_CMD"
+  [ "$status" -eq 0 ]
+  owners="$(cut -f12 "$DOTFILES_LOAD_SAMPLES")"
+  [[ "$owners" == *"501/400/claude/node /repo/node_modules/.bin/vitest run --token=***"* ]]
+  [[ "$owners" == *"502/1/launchd//System/WindowServer -daemon"* ]]
+  [[ "$owners" != *"abc123secret"* ]]
+  [ "$(cut -f10 "$DOTFILES_LOAD_SAMPLES")" = "node:98.0 WindowServer:40.5 zsh:3.0" ]
 }

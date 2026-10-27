@@ -3,7 +3,9 @@
 # A forced power-off drops the unified log buffer; this file survives it.
 # The LaunchAgent appends one row every 30 seconds and keeps about 7 days.
 # Row: epoch, time, load1, load5, load15, cpus, free memory %, swap MB used,
-# process count, top 3 processes by CPU (name:cpu, a space in a name as "_"), CPU busy %.
+# process count, top 3 processes by CPU (name:cpu, a space in a name as "_"), CPU busy %,
+# and who owns each top process (pid/ppid/parent name/first 80 chars of the command,
+# secret-shaped values replaced by ***; items joined by " | ").
 # Load counts threads blocked in the kernel too, so a high load with a low
 # CPU busy % means a kernel or I/O stall, not CPU saturation.
 # Usage: dotfiles-load-sampler            # append one row
@@ -55,19 +57,32 @@ mem_free="$(sysctl -n kern.memorystatus_level 2>/dev/null || echo 0)"
 swap_used="$(sysctl -n vm.swapusage 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "used") { v = $(i + 2); sub(/M$/, "", v); printf "%d", v } }')"
 procs="$(ps -A -o pid= 2>/dev/null | wc -l | tr -d ' ')"
 # awk reads the whole list: `head` would close the pipe and pipefail would exit 141.
-cpu_line="$(ps -A -r -o %cpu=,comm= 2>/dev/null | awk -v cpus="$cpus" '
-  { sum += $1 }
+cpu_line="$(ps -A -r -o pid=,ppid=,%cpu=,comm= 2>/dev/null | awk -v cpus="$cpus" '
+  { sum += $3 }
   # comm is the full path and can hold spaces (#308): take the rest of the
   # line, its last path part, and "_" for a space (the list is space-separated).
-  NR <= 3 { n = $0; sub(/^[ \t]*[^ \t]+[ \t]+/, "", n); sub(/\/+$/, "", n); sub(/.*\//, "", n); gsub(/[ \t]/, "_", n)
-    top = top sprintf("%s%s:%s", (NR > 1 ? " " : ""), n, $1) }
-  END { printf "%s\t%d", top, (cpus > 0 ? sum / cpus : 0) }')"
+  NR <= 3 { n = $0; sub(/^[ \t]*[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+/, "", n); sub(/\/+$/, "", n); sub(/.*\//, "", n); gsub(/[ \t]/, "_", n)
+    top = top sprintf("%s%s:%s", (NR > 1 ? " " : ""), n, $3); ids = ids sprintf("%s%s/%s", (NR > 1 ? " " : ""), $1, $2) }
+  END { printf "%s\t%d\t%s", top, (cpus > 0 ? sum / cpus : 0), ids }')"
 top="${cpu_line%%$'\t'*}"
+ids="${cpu_line##*$'\t'}"
+cpu_line="${cpu_line%$'\t'*}"
 cpu_busy="${cpu_line##*$'\t'}"
 
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+# Who owns each top process (#358): a bare "node" does not name the tool.
+owners=""
+for id in $ids; do
+  pid="${id%/*}" ppid="${id#*/}"
+  cmd="$(ps -o command= -p "$pid" 2>/dev/null | cut -c1-80 | tr '\t|' '  ' \
+    | sed -E 's/(([Tt]oken|TOKEN|[Kk]ey|KEY|[Ss]ecret|SECRET|[Pp]ass(word|wd)?|PASS(WORD|WD)?|[Aa]uth|AUTH)[A-Za-z_-]*[=:])[^ ]+/\1***/g; s/[A-Za-z0-9+_-]{32,}/***/g')" || cmd=""
+  parent="$(ps -o comm= -p "$ppid" 2>/dev/null)" || parent=""
+  parent="${parent##*/}"
+  owners="${owners:+$owners | }$pid/$ppid/${parent// /_}/$cmd"
+done
+
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
   "$(date +%s)" "$(date '+%Y-%m-%dT%H:%M:%S')" "$load1" "$load5" "$load15" \
-  "$cpus" "$mem_free" "${swap_used:-0}" "$procs" "$top" "$cpu_busy" >> "$SAMPLES"
+  "$cpus" "$mem_free" "${swap_used:-0}" "$procs" "$top" "$cpu_busy" "$owners" >> "$SAMPLES"
 
 rows="$(wc -l < "$SAMPLES" | tr -d ' ')"
 if [ "$rows" -gt "$MAX_ROWS" ]; then

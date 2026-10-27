@@ -608,6 +608,21 @@ JS
   [[ "$output" == *"--metric machine_overload_rows_24h=12"* ]]
 }
 
+@test "machine metrics name the owner of unexplained overload from the sampler owners column (#358)" {
+  local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
+  : > "$samples"
+  for i in $(seq 0 5); do
+    printf '%s\t2026-10-16T08:%02d:00\t35.0\t30.0\t20.0\t10\t40\t1200\t800\tnode:90.1 mds:10.0\t90\t501/400/claude/node /r/node_modules/.bin/vitest run | 502/1/launchd//usr/libexec/mds\n' \
+      "$((now - 3600 + i * 30))" "$i" >> "$samples"
+  done
+  printf '  PID PRI TTY      COMM\n' > "$ps_file"
+  run env -u DOTFILES_EXPLAINED_LOAD python3 "$SCRIPTS/machine_metrics.py" --now "$now" --samples "$samples" --ps-file "$ps_file" \
+    --state "$TEST_DIR/none.json" --claude-json "$TEST_DIR/none.json" --upgrade-log "$TEST_DIR/none.log" --explained-file "$TEST_DIR/none.txt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"node (vitest, parent claude) x6"* ]]
+  [[ "$output" == *"mds (parent launchd) x6"* ]]
+}
+
 @test "machine metrics count overload explained by a known app apart, without act" {
   local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
   : > "$samples"

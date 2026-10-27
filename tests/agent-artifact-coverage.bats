@@ -123,6 +123,7 @@ EOF
   [[ "$skills" == *"test-driven-development"* ]]
   [[ "$sources" == *"anthropics/skills"* ]]
   [[ "$sources" == *"modelcontextprotocol/ext-apps"* ]]
+  [[ "$sources" == *"nutlope/hallmark"* ]]
   [[ "$skills$sources" != *"~/.claude"* ]]
   [[ "$skills$sources" != *"~/.cursor"* ]]
   [[ "$skills$sources" != *"~/.config/devin"* ]]
@@ -137,7 +138,7 @@ EOF
   [ -z "$(printf '%s\n' "$skills" | sort | uniq -d)" ]
   # Each pair does the same job; keep the first, never both.
   for pair in skill-creator:skill-development \
-    frontend-design:effective-ui-design; do
+    hallmark:frontend-design hallmark:effective-ui-design; do
     a="${pair%%:*}"; b="${pair##*:}"
     printf '%s\n' "$skills" | grep -qx "$a"
     ! printf '%s\n' "$skills" | grep -qx "$b"

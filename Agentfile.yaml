@@ -105,12 +105,13 @@ skills:
   - perf-review              # slowest recurring steps → speedup tasks (agentbrew)
   - session-report           # tokens, cache, active hours (official plugin; back after the 2026-10-13 trim)
   # ── web design quality skills ───────────────────────────────────
-  # frontend-design (anthropics/skills): Anthropic's official creative
-  # design guidance for distinctive, production-grade frontend. Bold
-  # aesthetics for landing pages and artifacts; complements `taste`
-  # (rule-based dashboard UI). It replaces `effective-ui-design`, which
+  # hallmark (nutlope/hallmark, MIT): design skill for new pages that
+  # look designed, not generated. Fifty themes, a browser lint for AI
+  # tells, and a fresh-context review; `/hallmark redesign|audit <path>`
+  # for existing pages. Owner chose it on 2026-10-27; it replaces
+  # `frontend-design` (and `effective-ui-design` before it), which
   # covered the same ground.
-  - frontend-design
+  - hallmark
   # ui-ux-rankings (agentbrew): the comfort budget every UI is built to
   # (references/comfort-patterns.md) and the rankings that measure it.
   # docs/shared-rules.md loads it for all frontend/UI work.
@@ -158,6 +159,9 @@ sources:
   # https://github.com/modelcontextprotocol/ext-apps
   - modelcontextprotocol/ext-apps
   - mattpocock/skills
+  # nutlope/hallmark: source for the hallmark design skill (MIT, by
+  # Together AI). https://github.com/nutlope/hallmark
+  - nutlope/hallmark
   - addyosmani/agent-skills
   # Workflow skills (handoff, iterate, writing-plans, task-command-center, …)
   # live in agentbrew's skill-plugins/workflow/ and install by name from the

@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Headless browser test runs bypass the heavy-run lock
+  - **ID**: headless-browser-runs-bypass-heavy-run
+  - **Tags**: performance, reliability, agents
+  - **Details**: The 2026-10-27 `/tooling-checkup` found 197 unexplained overload rows (load1 over 20) in the last 24 h of `machine_metrics`, peak load1 257.6 at 2026-10-27T09:16. The top processes in those rows were `chrome-headless-shell` (112 rows), `python` (105), and `node` (84). The 2026-10-25 checkup had the same 197 count, so the problem persists. `heavy-run` only queues commands that agents wrap by hand; Playwright and agent-browser runs started directly (e2e suites, UI audits, MCP browser sessions) do not take the lock. Find which callers start headless Chrome without the lock, then make the lock hard to skip: for example, a Playwright/agent-browser wrapper on PATH that takes the `heavy-run` lock, or a doctor/hook warning when a browser test runs outside it.
+  - **Files**: `bin/heavy-run`, `modules/resilience/doctor.sh`, `docs/` (heavy-run doc), `tests/`
+  - **Output**: code
+  - **Acceptance**: a headless browser test run started without `heavy-run` either queues on the lock or is reported by the doctor; the next two checkups show the unexplained overload count under the Success threshold.
+  - **Hypothesis**: routing headless browser test runs through the `heavy-run` lock cuts unexplained overload rows (load1 over 20) in 24 h of `machine_metrics` from 197 to under 40, because parallel `chrome-headless-shell` fan-out is the top process in those rows.
+  - **Measurement**: the unexplained-overload count in the tooling-checkup machine-metrics phase (24 h window of `machine_metrics`, rows with load1 over 20 and no `heavy-run` holder), on the next two checkups after the change lands.
+  - **Success**: under 40 rows per 24 h and peak load1 under 100 on both checkups.
+  - **Pivot**: over 150 rows on both checkups -> the lock is not the lever; profile the `python` and `node` rows instead and drop the wrapper approach.
+  - **Anchor**: tooling-checkup runs 2026-10-25 and 2026-10-27 (machine_metrics phase); Gunther 2007, *Guerrilla Capacity Planning* (load beyond core count); Forsgren, Humble, Kim 2018 (stability).
+  - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
+
 ## P2
 
 - [ ] Record each real install run so the README can prove one-command setup
@@ -49,6 +63,7 @@ them. -->
   - **Output**: code
   - **Acceptance**: a second full apply with no source change spends under 60 s in `chezmoi apply`, per the timing line.
   - **Competitive-goal**: `reproducibility_pct` (docs/competition/scorecard.md).
+  - **Blocked**: needs-real-machine-data — 2026-10-27: the 537 s apply was measured on a managed Mac, and the apply timing line shows only pull, chezmoi apply, and doctor. Finding the slow `run_after_*` scripts needs a timed full apply there (for example `chezmoi apply -v` with each script start and end time noted, or `DOTFILES_DEBUG` per-script timing). A guess at which scripts to hash-key, without that data, could skip real work. Unblock: one timed full apply on that Mac, with the per-script seconds pasted into this task.
 
 - [ ] Checkup scripts give wrong verdicts on a stock-git Mac with a flat `~/apps` layout
   - **ID**: checkup-scripts-stock-mac-gaps

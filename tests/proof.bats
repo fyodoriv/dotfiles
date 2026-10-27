@@ -80,3 +80,17 @@ REPO="$BATS_TEST_DIRNAME/.."
   row="$(PROOF_METRICS="$TEST_DIR/metrics.json" bash "$REPO/scripts/proof.sh" --render | grep '^| One command sets up a Mac')"
   [[ "$row" == *"10 min"* && "$row" == *"real use"* ]] || { echo "$row"; return 1; }
 }
+
+@test "proof: shell-start samples fill the shell row with a real use median" {
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  for ms in 120 180 400; do
+    printf '{"task":"shell-start","timestamp":"%s","seconds_saved":0,"units":1,"ok":true,"duration_ms":%s}\n' "$now" "$ms"
+  done >"$TEST_DIR/stats.jsonl"
+  export DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl" XDG_STATE_HOME="$TEST_DIR/state"
+  run bash "$REPO/scripts/proof.sh" --collect "$TEST_DIR/out.json"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [ "$(jq -r '.metrics.shell_start_field_ms.value' "$TEST_DIR/out.json")" = "180" ]
+  [[ "$(jq -r '.metrics.shell_start_field_ms.detail' "$TEST_DIR/out.json")" == *"3 daily samples"*"1 machine"* ]]
+  row="$(PROOF_METRICS="$TEST_DIR/out.json" bash "$REPO/scripts/proof.sh" --render | grep '^| The shell starts fast')"
+  [[ "$row" == *"180 ms"* && "$row" == *"real use"* ]] || { echo "$row"; return 1; }
+}

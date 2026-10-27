@@ -46,6 +46,7 @@ them. -->
   - **Output**: code
   - **Acceptance**: the row shows a median of real shell starts with its machine count; the Highlights line matches the measured number.
   - **Competitive-goal**: none; shell start is the "Interactive shell startup" row of docs/metrics.md, not a scorecard metric.
+  - **Blocked**: needs-time — 2026-10-27: shipped the recording part. `home/zshrc` logs one `shell-start` stats line a day (first prompt, `duration_ms`), and `scripts/proof.sh` fills the row from `shell_start_field_ms`. Unblock: on or after 2026-11-03 (7 daily samples after `dotfiles apply`), run `scripts/proof.sh`, then set the Highlights line to the measured median and close.
 
 - [ ] Skip unchanged chezmoi scripts inside a full apply
   - **ID**: apply-skip-unchanged-scripts

@@ -625,7 +625,7 @@ Each machine aggregates its own log here. Opt-in telemetry (`dotfiles telemetry`
 | The Mac stays in step with the source by itself | A sync that runs every 30 minutes keeps drift small | background syncs, last 30 days | 1,066 runs (background syncs, 2026-09-27 to 2026-10-26) | `docs/proof/metrics.json`, real use |
 | The morning routine gets used | A habit tool only helps when it runs most days | days with a `morning` run, last 7 days | 7 days (days with a morning run, 2026-10-20 to 2026-10-26) | `docs/proof/metrics.json`, real use |
 | One command sets up a Mac | Time to a clean doctor is the outcome a one-step install promises | install runs and their minutes to a clean doctor | not measured yet | not measured yet |
-| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | not measured yet (task `proof-shell-start-field` in TASKS.md) | not measured yet |
+| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | not measured yet | not measured yet |
 
 Field data comes from 1 machine(s), each named by a salted hash: `m-f72c0c4501` (36,349 runs in 30 days, 30 doctor runs, log since 2026-05-06, as of 2026-10-26).
 

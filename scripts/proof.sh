@@ -70,12 +70,13 @@ collect() {
       | if .task == "cursor-priority" then .task = "app-priority" else . end)
     | sort_by(.timestamp) as $all
     # Only known task names reach the chart; any other name counts as "other".
-    | ["sync","doctor","audit","cleanup","git-maintain","app-priority","morning","upgrade","pr","hotfix","review","dotfiles-agent-keepawake","install"] as $known
+    | ["sync","doctor","audit","cleanup","git-maintain","app-priority","morning","upgrade","pr","hotfix","review","dotfiles-agent-keepawake","install","shell-start"] as $known
     | ($all | since(30)) as $m30
     | ($all | since(7)) as $m7
     | ([$all[] | select(.task == "doctor" and .fail != null)] | .[-30:]) as $doc
     | ([$all[] | select(.task == "install")]) as $inst
     | ([$inst[] | select(.ok == true and .fail == 0 and (.duration_ms | type) == "number")]) as $clean
+    | ([$m30[] | select(.task == "shell-start" and (.duration_ms | type) == "number")]) as $shell30
     | ([$m30[] | select(.task == "sync")]) as $sync
     | ([$m7[] | select(.task == "morning")] | unique_by(.timestamp[0:10])) as $morning
     | (($m30 | map(.seconds_saved // 0) | add // 0) / 60 | floor) as $saved
@@ -100,7 +101,11 @@ collect() {
           install_clean_minutes: m(
             (if ($clean | length) == 0 then null else ($clean | map(.duration_ms) | sort | .[length / 2 | floor] / 6000 | round / 10) end);
             "min"; "median run time of \($clean | length) of \($inst | length) install runs that ended with a clean doctor, \($inst | range)";
-            "real use"; "install_clean_minutes")
+            "real use"; "install_clean_minutes"),
+          shell_start_field_ms: m(
+            (if ($shell30 | length) == 0 then null else ($shell30 | map(.duration_ms) | sort | .[length / 2 | floor]) end);
+            "ms"; "median of \($shell30 | length) daily samples, ~/.zshrc start to first prompt, last 30 days, 1 machine";
+            "real use"; "shell_start_field_ms")
         } + (if $shell == "" then {} else {
           shell_startup_ms: m(($shell | tonumber); "ms"; "median of 5 interactive zsh starts";
             $local; "shell_startup_ms") } end)
@@ -139,7 +144,7 @@ render() {
       "| The Mac stays in step with the source by itself | A sync that runs every 30 minutes keeps drift small | background syncs, last 30 days | \($f | res("sync_runs_30d")) | \($f | src("sync_runs_30d")) |",
       "| The morning routine gets used | A habit tool only helps when it runs most days | days with a `morning` run, last 7 days | \($f | res("morning_runs_7d")) | \($f | src("morning_runs_7d")) |",
       "| One command sets up a Mac | Time to a clean doctor is the outcome a one-step install promises | install runs and their minutes to a clean doctor | \($f | res("install_clean_minutes")) | \($f | src("install_clean_minutes")) |",
-      "| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | not measured yet (task `proof-shell-start-field` in TASKS.md) | not measured yet |",
+      "| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | \($f | res("shell_start_field_ms")) | \($f | src("shell_start_field_ms")) |",
       "",
       "Field data comes from \($f.machines | length) machine(s), each named by a salted hash: \([$f.machines | to_entries[] | "`\(.key)` (\(fmt(.value.runs_30d)) runs in 30 days, \(.value.doctor_runs) doctor runs, log since \(.value.first_event), as of \(.value.date))"] | join("; "))." ,
       "",

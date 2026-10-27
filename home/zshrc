@@ -1,3 +1,7 @@
+# ── Shell start sample (README Proof, docs/observability.md) ───────
+# Start the clock first; the first prompt logs the time once a day.
+zmodload zsh/datetime 2>/dev/null && typeset -g _dotfiles_zshrc_t0=$EPOCHREALTIME
+
 # ── Session logging (opt-in: export TERMINAL_LOG=1 in ~/.zshrc.local) ─
 # Logs full terminal I/O to ~/.local/share/terminal-logs/<date>/<time>.log
 # Enable:  export TERMINAL_LOG=1  (in ~/.zshrc.local or shell env)
@@ -480,7 +484,30 @@ _load_plugins() {
     HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND="bg=#44475a,fg=#ff5555,bold"
   fi
 }
+# shell-start-sample:begin
+# One-shot precmd hook: at the first prompt, append one content-free stats
+# line (task shell-start, duration_ms = ~/.zshrc start to first prompt) to
+# ~/.dotfiles-stats.jsonl, at most once a day per machine. The day stamp lives
+# in ${XDG_STATE_HOME:-~/.local/state}/dotfiles/shell-start-day.
+# DOTFILES_STATS_LOG=0 turns it off.
+_dotfiles_shell_start_sample() {
+  add-zsh-hook -d precmd _dotfiles_shell_start_sample
+  unfunction _dotfiles_shell_start_sample 2>/dev/null
+  [[ "${DOTFILES_STATS_LOG:-}" == 0 || -z "${_dotfiles_zshrc_t0:-}" ]] && return 0
+  local -i ms=$(( (EPOCHREALTIME - _dotfiles_zshrc_t0) * 1000 ))
+  local stamp="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/shell-start-day"
+  local today="${(%):-%D{%Y-%m-%d}}"
+  [[ -f "$stamp" && "$(<"$stamp")" == "$today" ]] && return 0
+  mkdir -p "${stamp:h}" 2>/dev/null || return 0
+  print -r -- "$today" >| "$stamp" 2>/dev/null
+  local ts; ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  print -r -- "{\"task\":\"shell-start\",\"timestamp\":\"$ts\",\"seconds_saved\":0,\"units\":1,\"ok\":true,\"duration_ms\":$ms}" \
+    >> "${DOTFILES_STATS_FILE:-$HOME/.dotfiles-stats.jsonl}" 2>/dev/null
+  return 0
+}
+# shell-start-sample:end
 autoload -Uz add-zsh-hook
+add-zsh-hook precmd _dotfiles_shell_start_sample
 add-zsh-hook precmd _load_plugins
 
 # ── zoxide: smarter cd (must be at end of .zshrc) ───────────────────

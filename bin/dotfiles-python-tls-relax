@@ -1,0 +1,31 @@
+#!/bin/bash
+# dotfiles-python-tls-relax: opt one Python venv into clearing only
+# VERIFY_X509_STRICT, for TLS-inspection proxies whose root CA marks
+# basicConstraints as non-critical (dotfiles #349). Chain, hostname, and
+# expiry checks stay on. See lib/python/dotfiles_tls_relax.py.
+#
+# Usage: dotfiles-python-tls-relax <venv-dir>          install
+#        dotfiles-python-tls-relax --remove <venv-dir>  uninstall
+
+set -euo pipefail
+
+usage() { echo "Usage: dotfiles-python-tls-relax [--remove] <venv-dir>" >&2; exit 2; }
+remove=0
+[ "${1:-}" = --remove ] && { remove=1; shift; }
+[ "$#" -eq 1 ] || usage
+venv="$1"
+py="$venv/bin/python"
+[ -x "$py" ] || { echo "error: $py not found (is $venv a venv?)" >&2; exit 1; }
+
+src="$(cd "$(dirname "$0")/.." && pwd -P)/lib/python/dotfiles_tls_relax.py"
+site="$("$py" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+
+if [ "$remove" = 1 ]; then
+  rm -f "$site/dotfiles_tls_relax.py" "$site/dotfiles_tls_relax.pth"
+  echo "removed TLS relax from $site"
+  exit 0
+fi
+[ -f "$src" ] || { echo "error: missing $src" >&2; exit 1; }
+cp "$src" "$site/dotfiles_tls_relax.py"
+echo "import dotfiles_tls_relax" > "$site/dotfiles_tls_relax.pth"
+echo "installed TLS relax in $site (only VERIFY_X509_STRICT is cleared)"

@@ -276,7 +276,7 @@ On `profile: core`, the module runs only when the `agent-browser` CLI is install
 | `focus.no_steal_open_flags` | `open -a` in bin/lib/launchagents uses `-g`, `--gj`, or `--background` | Fix offending script |
 | `focus.no_osascript_activate` | no `to activate` in bin/lib/launchagents/macos-apps.sh | Fix offending script |
 | `agent-browser.launchagent_headless` | managed Chromes use `--headless=new` at login | Reload LaunchAgents |
-| `agent-browser.launchagent_no_startup_window` | managed Chromes use `--no-startup-window` at login | Reload LaunchAgents |
+| `agent-browser.launchagent_silent_launch` | managed Chromes use `--silent-launch` at login; `--no-startup-window` with a debug port ignores the quit event and halts restart (#348) | Reload LaunchAgents |
 | `agent-browser.launchagent_no_offscreen_position` | managed Chromes omit `--window-position` (prevents flash-quit loop) | Reload LaunchAgents after removing off-screen flags from plist templates |
 | `agent-browser.launchagent_runatload` | agent-browser-chrome LaunchAgent has `RunAtLoad=true` | None |
 | `agent-browser.agent_session_isolation` | agent contexts use a named agent-browser session | None |

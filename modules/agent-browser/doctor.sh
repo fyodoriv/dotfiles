@@ -109,8 +109,8 @@ check "agent-browser.focus_restore_wired" "zshrc.ai-tools restores focus after a
   "grep -q 'dotfiles-restore-focus-after-chrome' \"\$DOTFILES_DIR/home/zshrc.ai-tools\"" \
   ""
 
-check "agent-browser.launchagent_no_startup_window" "managed Chromes use --no-startup-window at login" \
-  "grep -q -- '--no-startup-window' \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\"" \
+check "agent-browser.launchagent_silent_launch" "managed Chromes use --silent-launch at login (quit event ends them, #348)" \
+  "grep -q -- '--silent-launch' \"\$DOTFILES_DIR/launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl\"" \
   ""
 
 check "agent-browser.restore_no_activate" "focus-restore helper never osascript-activates or hides Chrome (no Space switch)" \

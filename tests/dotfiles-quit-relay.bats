@@ -97,6 +97,13 @@ start_relay() {
   [ "$(sed -n 3p <<< "$args")" = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]
 }
 
+@test "the agent-browser Chrome starts with --silent-launch, not --no-startup-window, so a quit event ends it (#348)" {
+  plist="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.agent-browser-chrome.plist.tmpl"
+  args="$(awk '/<key>ProgramArguments<\/key>/,/<\/array>/' "$plist")"
+  [[ "$args" == *"<string>--silent-launch</string>"* ]]
+  [[ "$args" != *"--no-startup-window"* ]]
+}
+
 @test "the quit watcher Swift source type-checks" {
   command -v swiftc >/dev/null 2>&1 || skip "swiftc not installed"
   swiftc -typecheck "$BATS_TEST_DIRNAME/../lib/quit-watcher.swift"

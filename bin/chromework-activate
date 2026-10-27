@@ -35,7 +35,7 @@ SURVIVE_SLEEP="${CHROMEWORK_SURVIVE_SLEEP:-0.05}"
 
 _is_automation_chrome_line() {
   case "$1" in
-    *remote-debugging*|*playwright*|*agent-browser*|*AutomationControlled*|*--no-startup-window*|*"Chrome for Testing"*)
+    *remote-debugging*|*playwright*|*agent-browser*|*AutomationControlled*|*--no-startup-window*|*--silent-launch*|*"Chrome for Testing"*)
       return 0
       ;;
   esac

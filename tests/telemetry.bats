@@ -97,5 +97,5 @@ SH
 
 @test "the state file is private" {
   bash "$TEL" status >/dev/null
-  [ "$(stat -f %Lp "$DOTFILES_TELEMETRY_STATE" 2>/dev/null || stat -c %a "$DOTFILES_TELEMETRY_STATE")" = "600" ]
+  [ "$(stat -c %a "$DOTFILES_TELEMETRY_STATE" 2>/dev/null || stat -f %Lp "$DOTFILES_TELEMETRY_STATE")" = "600" ]
 }

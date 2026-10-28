@@ -44,13 +44,14 @@ check "home_theater.no_sleep_on_ac" \
   "[ \"\$(pmset -g custom 2>/dev/null | awk '/AC Power/{f=1} f && \$1==\"sleep\"{print \$2; exit}')\" = 0 ]" \
   ""
 
-# Samsung Tizen TVs answer GET :8001/api/v2/ on the LAN with device info.
+# Samsung Tizen TVs answer GET :8001/api/v2/ on the LAN with device info. The
+# JSON holds raw control characters (seen on a QN77S92C), so strip them first.
 # 4K remuxes need a steady 80+ Mbit/s; Wi-Fi drops frames, Ethernet does not.
 # The host goes into an eval'd check, so only plain host characters pass.
 case "${SAMSUNG_TV_HOST:-}" in *[!A-Za-z0-9.:-]*) SAMSUNG_TV_HOST="" ;; esac
 if [ -n "${SAMSUNG_TV_HOST:-}" ]; then
   check "home_theater.tv_wired" \
     "Samsung TV at $SAMSUNG_TV_HOST is on wired Ethernet (fix: plug in a cable; TV Settings > Connection > Network)" \
-    "curl -fsS -m 3 'http://$SAMSUNG_TV_HOST:8001/api/v2/' | jq -e '.device.networkType == \"wired\"'" \
+    "curl -fsS -m 3 'http://$SAMSUNG_TV_HOST:8001/api/v2/' | tr -d '\\000-\\037' | jq -e '.device.networkType == \"wired\"'" \
     ""
 fi

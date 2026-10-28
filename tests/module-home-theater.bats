@@ -148,3 +148,11 @@ good_machine() {
   [ -z "$(result home_theater.tv_wired)" ]
   [ ! -e "$TEST_DIR/pwned" ]
 }
+
+@test "home-theater: real Samsung JSON with raw control characters still parses" {
+  command -v jq >/dev/null || skip "jq not installed"
+  good_machine
+  printf '{"device":{"modelName":"QN77S92C","networkType":"wired","name":"[TV]\tLiving\n"}}' > "$TEST_DIR/tv"
+  source "$MODULE"
+  [ "$(result home_theater.tv_wired)" = pass ]
+}

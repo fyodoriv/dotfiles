@@ -166,3 +166,23 @@ footer_count_in_file() {
   strip_file
   [ "$(cat "$MSG_FILE")" = "$msg" ]
 }
+
+@test "file rewrite keeps its temp files under TMPDIR (agent sandbox)" {
+  # Stand-in for the agent sandbox: mktemp works only under $TMPDIR.
+  # Bare macOS mktemp ignores TMPDIR, so the hook failed there.
+  mkdir -p "$TEST_DIR/bin" "$TEST_DIR/tmp"
+  cat > "$TEST_DIR/bin/mktemp" <<'STUB'
+#!/bin/bash
+printf '%s\n' "${1:-<none>}" >> "$MKTEMP_LOG"
+case "${1:-}" in "$TMPDIR"/*) exec /usr/bin/mktemp "$@" ;; esac
+exit 1
+STUB
+  chmod +x "$TEST_DIR/bin/mktemp"
+  write_msg $'feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n'
+  run env PATH="$TEST_DIR/bin:$PATH" TMPDIR="$TEST_DIR/tmp" MKTEMP_LOG="$TEST_DIR/calls" \
+    bash -c '. "$1"; _strip_agent_attribution_in_file "$2"' _ "$LIB" "$MSG_FILE" < /dev/null
+  [ "$status" -eq 0 ]
+  [ -s "$TEST_DIR/calls" ]
+  run grep -vc "^$TEST_DIR/tmp/" "$TEST_DIR/calls"
+  [ "$output" = "0" ]
+}

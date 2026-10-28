@@ -101,9 +101,9 @@ dotfiles sets up both kinds of Mac from the same repo. One answer at `chezmoi in
 
 | | Personal Mac | Corporate Mac (your work laptop) |
 |---|---|---|
-| Tools | the base set | the base set, plus generic enterprise tools (AWS CLI, K8s, Gradle, Java 21, enterprise SSH) |
+| Tools | the base set | the base set, plus the tools of [enterprise mode](#2-enterprise-mode) |
 | Company setup | none | only from your company's signed plugin (`dotfiles-<org>`): internal hosts, packages, and settings. This public repo never names a company |
-| Your data | stays on this Mac; secrets use age encryption or the macOS Keychain, never plaintext in git | the same. **Company names and internal links stay private**: they live only in the plugin and in a local pattern file (mode 600), and the leak gates block a push or a GitHub post that holds one |
+| Your data | stays on this Mac; see [Where do I put personal secrets?](#where-do-i-put-personal-secrets) | the same. Company names and internal links live in the plugin, not in this repo; when a plugin supplies a pattern, the [privacy gates](docs/privacy-gates.md) block a push that holds one |
 | Setup steps | [Installation](#installation) | [Installation](#installation), then [Enterprise setup](#enterprise-setup) |
 
 **Corporate plugins.** A company plugin is a private repo named `dotfiles-<org>`. Its companions are `agentbrew-<org>` (agent skills and MCP servers) and `careerbrew-<org>` (career workflows). To find yours, ask your team for its `dotfiles-<org>` link. To build one, read [docs/plugins.md](docs/plugins.md) and [For other companies](#for-other-companies).

@@ -24,10 +24,24 @@ block() {
 #   2. its tip is already in the default branch, or
 #   3. its whole diff is already on the default branch as one commit (same
 #      stable patch-id).
+# Run gh with a time limit (default 10 s, DOTFILES_GH_TIMEOUT). A hung or missing
+# gh gives no output, so the PR proof fails and the local proof decides.
+gh_with_timeout() {
+  local t="${DOTFILES_GH_TIMEOUT:-10}" tmo
+  tmo="$(command -v gtimeout || command -v timeout || true)"
+  if [ -n "$tmo" ]; then
+    "$tmo" "$t" "${DOTFILES_GH:-gh}" "$@"
+  elif [ -x /usr/bin/perl ]; then
+    /usr/bin/perl -e '$SIG{ALRM} = "DEFAULT"; alarm shift; exec @ARGV' "$t" "${DOTFILES_GH:-gh}" "$@"
+  else
+    return 1
+  fi
+}
+
 branch_is_merged() {
   local branch="$1" tip default base pid cand
   tip="$(git rev-parse --verify -q "refs/heads/$branch")" || return 1
-  if "${DOTFILES_GH:-gh}" pr list --state merged --head "$branch" \
+  if gh_with_timeout pr list --state merged --head "$branch" \
       --json headRefOid --jq '.[].headRefOid' 2>/dev/null | grep -qx "$tip"; then
     return 0
   fi
@@ -59,6 +73,13 @@ branch_delete_allowed() {
   prefix="${command%%"$flag"*}"
   [ -z "${prefix//[[:space:]]/}" ] || return 1
   rest="${command#*git branch -D}"
+  # A backslash can continue the line, so the shell would delete branches this
+  # parser cuts off at the newline. Fail closed.
+  case "$rest" in *\\*) return 1 ;; esac
+  # A redirect to /dev/null or stderr-to-stdout never changes which branches go.
+  rest="${rest//2>&1/}"
+  rest="${rest//2>\/dev\/null/}"
+  rest="${rest//>\/dev\/null/}"
   rest="${rest%%[;&|$'\n']*}"
   if [ -n "$hook_cwd" ]; then cd "$hook_cwd" 2>/dev/null || return 1; fi
   for word in $rest; do

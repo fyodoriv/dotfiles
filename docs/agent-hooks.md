@@ -59,8 +59,21 @@ A branch with unmerged work, an unknown name, a quote or expansion in the
 arguments, or a chained blocked command stays blocked. The hook also blocks
 when the flag appears more than once, or when anything (a `cd`, `GIT_DIR=...`,
 another command) comes before it, because the proof runs in the hook's own
-folder. Known gap: the hook still matches the flag text anywhere in the
-command line, so a heredoc or file body that only mentions it is blocked. Tests:
+folder. A backslash after the flag blocks (a line continuation could hide a
+second branch). A trailing `2>&1`, `2>/dev/null`, or `>/dev/null` is ignored.
+`gh pr list` runs under a time limit (`DOTFILES_GH_TIMEOUT`, default 10 s); a
+hung or missing `gh` falls back to the local proof, and a non-repo folder blocks.
+
+Known gaps (the same as before this change; none is newly allowed):
+- The hook matches the flag text anywhere in the command line, so a heredoc or
+  file body that only mentions it is blocked.
+- Only the exact text `git branch -D` is matched. These spellings never reach
+  the merged check: `git branch -d -f x`, `--delete --force`, `-fd`,
+  `git branch x -D`, a double space, and `git -C <dir> branch -D x`. Tracked as
+  `block-dangerous-git-dash-c-bypass` in `TASKS.md`.
+- A command before the delete (`git checkout main && git branch -D x`) is
+  blocked, because a `cd` could change the repo the proof must check. Run the
+  delete as its own command. Tests:
 `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.
 

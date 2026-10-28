@@ -30,10 +30,11 @@ setup() {
 # Two-commit feature branch touching b.txt; leaves HEAD on main.
 make_feature_branch() {
   git checkout -q -b "$1"
-  printf 'x\n' > b.txt
-  git add b.txt && git commit -q -m "$1 part 1"
-  printf 'x\ny\n' > b.txt
-  git add b.txt && git commit -q -m "$1 part 2"
+  local f="${1//\//_}.txt"
+  printf 'x\n' > "$f"
+  git add "$f" && git commit -q -m "$1 part 1"
+  printf 'x\ny\n' > "$f"
+  git add "$f" && git commit -q -m "$1 part 2"
   git checkout -q main
 }
 
@@ -149,4 +150,81 @@ merged_and_unmerged() {
   merged_and_unmerged
   run_hook "git branch -D feat/m && git status"
   [ "$status" -eq 0 ]
+}
+
+# Second review round on PR 385.
+
+@test "blocks a backslash-newline continuation that hides a second branch" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m \\"$'\n'"feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a backslash anywhere in the branch arguments" {
+  merged_and_unmerged
+  run_hook 'git branch -D feat/m\ x'
+  [ "$status" -eq 2 ]
+}
+
+@test "allows a merged force-delete with a trailing 2>&1" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m 2>&1"
+  [ "$status" -eq 0 ]
+}
+
+@test "allows a merged force-delete with a trailing 2>/dev/null" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m 2>/dev/null"
+  [ "$status" -eq 0 ]
+}
+
+@test "a redirect does not hide an unmerged branch" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m 2>&1 feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "still blocks a redirect to a real file" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m 2>$BATS_TEST_TMPDIR/err"
+  [ "$status" -eq 2 ]
+}
+
+@test "known gap: a command before the delete is blocked (fail closed)" {
+  merged_and_unmerged
+  run_hook "git checkout main && git branch -D feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "fails closed when the working folder is not a git repo" {
+  merged_and_unmerged
+  REPO="$BATS_TEST_TMPDIR/not-a-repo"
+  mkdir -p "$REPO"
+  run_hook "git branch -D feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "missing gh falls back to the local proof, and fails closed without it" {
+  merged_and_unmerged
+  export DOTFILES_GH="$BATS_TEST_TMPDIR/no-such-gh"
+  run_hook "git branch -D feat/m"
+  [ "$status" -eq 0 ]
+  git checkout -q -b feat/pr-only
+  printf 'only\n' > only.txt && git add only.txt && git commit -q -m only
+  git checkout -q main
+  run_hook "git branch -D feat/pr-only"
+  [ "$status" -eq 2 ]
+}
+
+@test "a hung gh times out and the hook fails closed" {
+  merged_and_unmerged
+  printf '#!/bin/bash\nsleep 30\n' > "$GH_STUB"
+  export DOTFILES_GH_TIMEOUT=1
+  git checkout -q -b feat/pr-only2
+  printf 'only2\n' > only2.txt && git add only2.txt && git commit -q -m only2
+  git checkout -q main
+  SECONDS=0
+  run_hook "git branch -D feat/pr-only2"
+  [ "$status" -eq 2 ]
+  [ "$SECONDS" -lt 15 ]
 }

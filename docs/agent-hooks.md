@@ -43,6 +43,23 @@ See `agentbrew/hooks/manifest.yaml` for the canonical hook source and
 `agentbrew/docs/research/deterministic-rules-via-hooks.md` for the
 migration architecture.
 
+## block-dangerous-git (dotfiles hook)
+
+`agent-hooks/block-dangerous-git.sh` blocks `git reset --hard`,
+`git clean -f`, `git checkout .`, `git restore .`, and the force-delete of a
+local branch. A force-delete passes only when every named branch is proven
+merged:
+
+1. The branch tip is the head commit of a merged PR (`gh pr list --state merged`).
+2. The tip is already an ancestor of the default branch.
+3. The whole branch diff is already on the default branch as one commit (same
+   stable patch-id), which is the squash-merge case.
+
+A branch with unmerged work, an unknown name, a quote or expansion in the
+arguments, or a chained blocked command stays blocked. Tests:
+`tests/agent-hooks-block-dangerous-git.bats`,
+`tests/agent-hooks-block-dangerous-git-merged.bats`.
+
 ## require-heavy-run (dotfiles hook)
 
 `agent-hooks/require-heavy-run.sh` is a `PreToolUse` Bash hook from the

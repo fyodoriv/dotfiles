@@ -835,8 +835,10 @@ exists, ship/preserve/report it instead of deleting.
 ### Local branches and stashes
 
 Squash-merged branches are not ancestors of the default branch, so the safe
-lowercase delete refuses them, and the `block-dangerous-git` hook blocks the
-forced delete. Do not work around the hook. Prove each one redundant
+lowercase delete refuses them. The `block-dangerous-git` hook allows the
+forced delete only for a branch it can prove merged (see
+[agent-hooks.md](agent-hooks.md#block-dangerous-git-dotfiles-hook)); it blocks
+the rest. Do not work around the hook. Prove each blocked one redundant
 (`gh pr view <n> --json state` is MERGED and no open PR uses the branch), then
 list them in the report under "Needs you" with one forced-delete command for the
 owner to run.

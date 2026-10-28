@@ -50,7 +50,14 @@ branch_is_merged() {
 # True when every branch named after the force-delete flag is proven merged.
 # Any quote, expansion, redirect, or extra flag in the argument list fails closed.
 branch_delete_allowed() {
-  local rest word seen=0
+  local rest word seen=0 flag="git branch -D" stripped prefix
+  # Fail closed on more than one occurrence: only the first would be checked.
+  stripped="${command//"$flag"/}"
+  [ $(( (${#command} - ${#stripped}) / ${#flag} )) -eq 1 ] || return 1
+  # Fail closed on anything before the command (a cd, GIT_DIR=..., another
+  # command): the proof below runs in the hook's folder, not where that would act.
+  prefix="${command%%"$flag"*}"
+  [ -z "${prefix//[[:space:]]/}" ] || return 1
   rest="${command#*git branch -D}"
   rest="${rest%%[;&|$'\n']*}"
   if [ -n "$hook_cwd" ]; then cd "$hook_cwd" 2>/dev/null || return 1; fi

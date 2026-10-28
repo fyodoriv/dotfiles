@@ -103,3 +103,50 @@ run_hook() {
   run_hook 'git branch -D $(git branch --show-current)'
   [ "$status" -eq 2 ]
 }
+
+# Review findings on PR 385: every occurrence counts, and the proof must run in
+# the folder the command acts on.
+
+merged_and_unmerged() {
+  make_feature_branch feat/m
+  make_feature_branch feat/u
+  git merge -q --squash feat/m && git commit -q -m "squash m"
+  git push -q origin main
+  unset STUB_GH_OUT
+}
+
+@test "blocks a second force-delete after a semicolon" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m; git branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a second force-delete after &&" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m && git branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a second force-delete on the next line" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m"$'\n'"git branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a force-delete that follows a cd" {
+  merged_and_unmerged
+  run_hook "cd /tmp && git branch -D feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a force-delete that follows an env assignment" {
+  merged_and_unmerged
+  run_hook "GIT_DIR=$REPO/.git git branch -D feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "still allows a lone merged force-delete with a trailing command" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/m && git status"
+  [ "$status" -eq 0 ]
+}

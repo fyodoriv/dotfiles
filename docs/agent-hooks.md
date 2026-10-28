@@ -56,7 +56,11 @@ merged:
    stable patch-id), which is the squash-merge case.
 
 A branch with unmerged work, an unknown name, a quote or expansion in the
-arguments, or a chained blocked command stays blocked. Tests:
+arguments, or a chained blocked command stays blocked. The hook also blocks
+when the flag appears more than once, or when anything (a `cd`, `GIT_DIR=...`,
+another command) comes before it, because the proof runs in the hook's own
+folder. Known gap: the hook still matches the flag text anywhere in the
+command line, so a heredoc or file body that only mentions it is blocked. Tests:
 `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.
 

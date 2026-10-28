@@ -99,6 +99,15 @@ them. -->
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
 
+- [ ] Tighten the perl alarm guard test
+  - **ID**: perl-alarm-guard-gaps
+  - **Tags**: tests, reliability
+  - **Details**: Two gaps in `tests/perl-alarm.bats`, found in review of the SIGALRM fix. (1) The guard greps one line at a time, so a multi-line `perl -e '...'` that calls `alarm` without resetting the handler is not caught. (2) The guard skips all of `tests/morning.bats`, but only its perl stub lines need to be skipped.
+  - **Files**: `tests/perl-alarm.bats`
+  - **Output**: code
+  - **Acceptance**: a fixture with a multi-line `perl -e` that arms `alarm` and has no reset makes the guard fail; the guard still passes on the repo; the skip covers only the stub lines of `tests/morning.bats`, so a bad `alarm` line elsewhere in that file fails the guard.
+  - **Competitive-goal**: none — test hardening, not a scorecard metric.
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Blocked**: needs-time — 2026-10-22: shipped `make lint` per-file cache (`bin/cached-run --per-file`: skips a script that passed with the same content, sourced files, shellcheck version, and `.shellcheckrc`; shared by all worktrees; misses run in parallel) plus `make lint-full` (PR #257). Baseline 2026-10-22: `make lint` lines sum 6m02s/day (tooling 2m08s, dotfiles 2m04s, agentbrew 1m50s); one run 17-39 s uncached, now 11.6 s cold and 1.2-1.3 s warm at load 40-50. Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), then close or pivot.

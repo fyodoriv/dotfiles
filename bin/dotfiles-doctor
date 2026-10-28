@@ -468,7 +468,7 @@ _timeout() {
   elif command -v timeout &>/dev/null; then
     timeout "$secs" "$@"
   elif command -v perl &>/dev/null; then
-    perl -e "alarm $secs; exec @ARGV" "$@"
+    perl -e "\$SIG{ALRM} = 'DEFAULT'; alarm $secs; exec @ARGV" "$@"
   else
     "$@"
   fi

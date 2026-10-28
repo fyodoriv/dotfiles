@@ -336,7 +336,7 @@ EOF
   ln -s "$TEST_DIR/nowhere" "$DOTFILES_LOCK"
   SECONDS=0
   # perl's alarm stops an endless loop (no coreutils timeout needed).
-  run perl -e 'alarm 10; exec @ARGV' bash -c 'source "$1"; wait_for_lock apply 20' _ "$LOCK_LIB"
+  run perl -e '$SIG{ALRM} = "DEFAULT"; alarm 10; exec @ARGV' bash -c 'source "$1"; wait_for_lock apply 20' _ "$LOCK_LIB"
   [ "$status" -eq 1 ]
   [ "$SECONDS" -lt 5 ]
   [[ "$output" == *"is a symlink"* ]]

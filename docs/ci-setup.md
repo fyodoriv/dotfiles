@@ -215,3 +215,5 @@ runs-on: [self-hosted, macOS]
 **`doctor` job fails**: The doctor job runs `chezmoi apply` first, then `dotfiles doctor --report`. Failures usually mean a module check assumes something about the environment that CI runners don't have. The `DOTFILES_CI=1` env var is set so modules can skip CI-incompatible checks.
 
 **Shell startup exceeds 200ms**: The doctor job measures shell startup time. CI runners are slower than local machines. If this fails, check for slow tool inits in `home/zshrc`.
+
+**A `perl -e 'alarm N; exec ...'` timeout hangs under `bats --jobs`**: GNU parallel starts every job with SIGALRM ignored, and `exec` keeps an ignored signal ignored, so the alarm never fires. Reset the handler first: `perl -e '$SIG{ALRM} = "DEFAULT"; alarm N; exec @ARGV'`. `tests/perl-alarm.bats` fails any `perl ... alarm` line in `bin/`, `lib/`, or `tests/` that lacks the reset, and checks that the `bin/morning` and `bin/dotfiles-doctor` wrappers still time out with SIGALRM ignored.

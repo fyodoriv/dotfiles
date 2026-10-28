@@ -502,3 +502,12 @@
   grep -q "before/after pair per changed part" "$agentfile"
   jq -e '.evals | any(.id == 20 and (.prompt | contains("frontend change")))' "$eval_file" >/dev/null
 }
+
+@test "ship-it opens the linked design before building review-asked UI" {
+  local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
+  local eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
+
+  grep -q "open the linked design" "$command_file"
+  grep -q "post it only after the user says yes" "$command_file"
+  jq -e '.evals | any(.id == 21 and (.prompt | contains("Figma frame")))' "$eval_file" >/dev/null
+}

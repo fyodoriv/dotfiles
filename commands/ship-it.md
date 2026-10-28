@@ -44,7 +44,8 @@ that must go green first.
 reviewer is reading a moving target. Batch changes and say what is coming.
 A comment that asks for new or changed UI: open the linked design (a Figma
 frame, a design spec) first and build what it shows. No design is linked, or
-the design and the comment disagree: ask the reviewer in the thread first.
+the design and the comment disagree: draft a question to the reviewer and
+post it only after the user says yes.
 
 ## PR description refresh
 

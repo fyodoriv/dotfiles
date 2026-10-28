@@ -26,8 +26,16 @@ power adapter (`sudo pmset -c sleep 0`), and the TV uses Ethernet.
 3. Remote Access can stay off for home use.
 
 **Plex app on the TV** (Settings):
-1. **Home streaming quality: Original** (direct play, no transcode).
-2. **Audio passthrough: Dolby Digital Plus** (Atmos inside DD+ reaches the soundbar).
+1. **Home streaming quality: Original**, with **Automatically adjust quality** off.
+2. **Direct Play: off, Direct Stream: on.** The Samsung player fails at once with
+   "unexpected playback error" on some 4K MKVs that it should play. Direct Stream repackages
+   the file on the Mac and copies the picture and sound as they are, so quality stays the same.
+3. **Audio passthrough: Dolby Digital Plus** (Atmos inside DD+ reaches the soundbar).
+
+**Language** (Plex account, Settings > Languages): set the audio and subtitle language, and
+turn on **Automatically select audio and subtitle tracks**. Files you already have keep their
+old track choice: pick the tracks once per file in the player, or with
+`PUT /library/parts/<id>?audioStreamID=<a>&subtitleStreamID=<s>&allParts=1`.
 
 **Samsung TV** (Settings > Sound > Expert Settings):
 1. **Sound Output**: the soundbar on **HDMI eARC**.
@@ -39,7 +47,12 @@ power adapter (`sudo pmset -c sleep 0`), and the TV uses Ethernet.
 
 ## Limits
 
-- Samsung TV apps cannot pass Dolby TrueHD or DTS; Plex converts those tracks. Pick a DD+
-  track, or play the file from the Mac over HDMI.
+- Samsung TVs cannot play DTS or Dolby TrueHD. Pick a DD+ track, or add one once and
+  keep the video as it is:
+  `ffmpeg -i in.mkv -map 0:v:0 -map 0:a:<n> -map 0:a:<n> -map 0:s? -c copy -c:a:0 eac3 -b:a:0 768k out.mkv`.
+- The TV cannot show ASS or PGS subtitles, so Plex burns them into the 4K picture and playback
+  stalls. Pick an SRT track.
+- VLC can hang on 4K HDR at about 50 Mbit/s. Set Settings > Input / Codecs > Hardware Decoding
+  to Automatic.
 - YouTube has no Dolby Atmos. Test Atmos with Netflix, Disney+ or Apple TV+.
 - Samsung TVs play Dolby Vision files as HDR10.

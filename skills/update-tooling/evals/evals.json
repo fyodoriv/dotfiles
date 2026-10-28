@@ -145,6 +145,16 @@
         "Runs it with --fix only when a line is not ok, from $DOTFILES_APPLIED",
         "Reports each reloaded or still-drifted job"
       ]
+    },
+    {
+      "prompt": "update latest tooling (a heavy-run PreToolUse hook blocks unwrapped builds)",
+      "expected_output": "After the applied AgentBrew checkout fast-forwards, the agent rebuilds it with `heavy-run npm run build` on the first try, so the hook does not block the call and `agentbrew status --ci` shows no cli-build drift.",
+      "expectations": [
+        "The applied checkout build runs as heavy-run npm run build",
+        "No blocked npm run build call",
+        "agentbrew status --ci reports drift=0 after the build"
+      ],
+      "id": 14
     }
   ]
 }

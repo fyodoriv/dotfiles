@@ -97,6 +97,10 @@ bash <skill-dir>/scripts/inventory.sh
 python3 <skill-dir>/scripts/pty_capture.py --timeout 60 -- claude doctor
 ```
 
+Run these with the Bash sandbox off from the first call: inside it `gh`
+fails TLS (x509), and `$TMPDIR` is a different folder from the one outside.
+Write files that later calls read to the session scratchpad, not `$TMPDIR`.
+
 - `diff` prints the last run time, its verdict and numbers, and every tool
   version or repository head that changed since.
 - `inventory.sh` prints one verdict per item: `ship`, `review`, `salvage`,

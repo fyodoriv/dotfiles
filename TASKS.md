@@ -12,20 +12,6 @@ them. -->
 
 ## P1
 
-- [ ] heavy-run serves waiters in arrival order
-  - **ID**: heavy-run-fifo-queue
-  - **Tags**: performance, reliability, agents
-  - **Details**: `bin/heavy-run` takes the Mac-wide lock with a plain blocking perl `flock(LOCK_EX)`. macOS gives no order guarantee among waiters, so a waiter can lose the lock again and again to runs that queued later. In the 2026-10-28 goal run, one worker's dotfiles gate lost the lock to later runs for about 40 minutes. Add a ticket queue: each caller takes a numbered ticket file in the lock folder and waits until its ticket is the lowest live one, then takes the flock. Drop tickets whose pid is gone. `heavy-run --status` lists the queue in order.
-  - **Files**: `bin/heavy-run`, `tests/` (heavy-run bats), heavy-run doc
-  - **Output**: code
-  - **Acceptance**: a bats test starts three waiters in a known order behind a holder and sees them run in that order; a dead waiter's ticket does not block the queue; `heavy-run --status` prints the queue.
-  - **Hypothesis**: arrival-order service cuts the longest single wait on the heavy-run lock in a 3-worker goal run from about 40 min to under 15 min, because today one waiter can be skipped many times.
-  - **Measurement**: this task makes `heavy-run` append one `waited=<seconds>` line per run to `~/.local/state/dotfiles/heavy-run-waits.log`; take `sort -t= -k2 -n ~/.local/state/dotfiles/heavy-run-waits.log | tail -1` after the next 3-worker run, plus the new bats order test. Baseline: about 40 min, read by hand from the 2026-10-28 goal run transcript (no wait log exists yet).
-  - **Success**: slowest heavy-run wait under 15 min and the order test passes.
-  - **Pivot**: slowest wait still over 30 min -> the lock order is not the lever; cap gate length or split the lock per repo instead.
-  - **Anchor**: tooling-checkup goal run 2026-10-28; Lamport 1974, "A new solution of Dijkstra's concurrent programming problem" (bakery algorithm, first-come-first-served).
-  - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
-
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

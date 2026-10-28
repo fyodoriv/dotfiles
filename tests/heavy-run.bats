@@ -124,3 +124,79 @@ wait_held() {
   HEAVY_RUN_HELD="$HEAVY_RUN_DIR/lock" run "$SCRIPT" sh -c "'$SCRIPT' --status"
   [[ "$output" == held:* ]]
 }
+
+# Wait up to 5 s until the queue folder holds $1 live tickets.
+wait_queued() {
+  local i
+  for i in $(seq 50); do
+    [ "$(ls "$HEAVY_RUN_DIR/queue" 2>/dev/null | wc -l | tr -d ' ')" -ge "$1" ] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+@test "heavy-run: three waiters run in arrival order behind a holder" {
+  log="$BATS_TEST_TMPDIR/fifo"
+  "$SCRIPT" sleep 2 &
+  wait_held
+  for n in A B C; do
+    "$SCRIPT" sh -c "echo $n >>'$log'" &
+    wait_queued $(( $(printf '%d' "'$n") - 64 ))
+  done
+  wait
+  run cat "$log"
+  [ "${lines[0]}" = "A" ]
+  [ "${lines[1]}" = "B" ]
+  [ "${lines[2]}" = "C" ]
+}
+
+@test "heavy-run: a dead waiter's ticket does not block the queue and is removed" {
+  mkdir -p "$HEAVY_RUN_DIR/queue"
+  sh -c 'exit 0' & dead=$!
+  wait "$dead"
+  echo "pid=$dead cwd=/x cmd=ghost" >"$HEAVY_RUN_DIR/queue/0000000000-$dead"
+  run timeout 10 "$SCRIPT" echo ran
+  [ "$status" -eq 0 ]
+  [ "$output" = "ran" ]
+  [ ! -e "$HEAVY_RUN_DIR/queue/0000000000-$dead" ]
+}
+
+@test "heavy-run: --status lists the queue in order" {
+  "$SCRIPT" sleep 2 &
+  wait_held
+  "$SCRIPT" sh -c "echo first" &
+  wait_queued 1
+  "$SCRIPT" sh -c "echo second" &
+  wait_queued 2
+  run "$SCRIPT" --status
+  [[ "${lines[0]}" == held:* ]]
+  [[ "${lines[1]}" == "queue 1: "*"echo first"* ]]
+  [[ "${lines[2]}" == "queue 2: "*"echo second"* ]]
+  wait
+}
+
+@test "heavy-run: a waiter stopped by SIGTERM removes its own ticket" {
+  "$SCRIPT" sleep 2 &
+  wait_held
+  "$SCRIPT" true &
+  pid=$!
+  wait_queued 1
+  kill -TERM "$pid"
+  wait "$pid" || true
+  [ -z "$(ls "$HEAVY_RUN_DIR/queue")" ]
+  wait
+}
+
+@test "heavy-run: each run appends a waited=<seconds> line to the wait log" {
+  "$SCRIPT" true
+  "$SCRIPT" true
+  run cat "$HEAVY_RUN_DIR/waits.log"
+  [ "${#lines[@]}" -eq 2 ]
+  [[ "${lines[0]}" =~ waited=[0-9]+ ]]
+}
+
+@test "heavy-run: HEAVY_RUN_WAIT_LOG moves the wait log" {
+  HEAVY_RUN_WAIT_LOG="$BATS_TEST_TMPDIR/w.log" "$SCRIPT" true
+  grep -q 'waited=' "$BATS_TEST_TMPDIR/w.log"
+  [ ! -e "$HEAVY_RUN_DIR/waits.log" ]
+}

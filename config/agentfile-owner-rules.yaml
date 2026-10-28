@@ -8,6 +8,11 @@ rules: |
   as a one-liner: "**Needed from you:** <action or exact command>". If you need
   nothing, write "**Needed from you:** nothing". Never put the request only
   mid-message.
+  Before the Needed-from-you line asks for anything, an independent judge
+  subagent checks the ask against live evidence: the thing exists and was
+  checked live (not from memory), it is still needed, and I have not done it
+  already. Write the ask only after the judge approves; otherwise write
+  "**Needed from you:** nothing" or the corrected ask.
   At session start, when the memory MCP is available, call get_bootstrap_profile with this agent's ID and current task_summary, then search ranked memory and mistake notes before consequential decisions.
   Before answering questions about local repositories, architecture, configuration, operations, or domain workflows, automatically search memory with the task and relevant repo/topic tags. Prefer current-revision repo-procedure and pattern memories over generic repo-docs dossiers; if grounded memory is missing or stale, read the current source docs, answer from them, and store the reusable correction with source paths and revision.
   Before the final response after substantive work, when the memory MCP is available, call commit_session_legacy once; encode decisions as {what, why}, errors as {error, tool, resolution}, and user corrections as {original, corrected_to}.

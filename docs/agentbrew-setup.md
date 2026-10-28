@@ -13,7 +13,7 @@ recovering from an `agentbrew sync` failure.
 | Source | Owner | Target |
 |--------|-------|--------|
 | `Agentfile.yaml` | dotfiles | Declarative list of MCP servers, skills, sources, and shared rules |
-| `config/agentfile-owner-rules.yaml` | dotfiles | The owner's personal workflow rules (closing "Needed from you" line, memory-MCP calls, approved-family delivery, deprecated-agent notes). `dotfiles apply` merges it into `~/.config/agentbrew/Agentfile.yaml` only when `owner_machine` is true (or `DOTFILES_OWNER_MACHINE=true`), so a new user's agents get only the general rules in `Agentfile.yaml`. The sync script and the `agentbrew.global_agentfile_in_sync` doctor check both get this layer from `lib/agentfile-layers.sh`, so they cannot drift. |
+| `config/agentfile-owner-rules.yaml` | dotfiles | The owner's personal workflow rules (closing "Needed from you" line and its judge check, memory-MCP calls, approved-family delivery, deprecated-agent notes). `dotfiles apply` merges it into `~/.config/agentbrew/Agentfile.yaml` only when `owner_machine` is true (or `DOTFILES_OWNER_MACHINE=true`), so a new user's agents get only the general rules in `Agentfile.yaml`. The sync script and the `agentbrew.global_agentfile_in_sync` doctor check both get this layer from `lib/agentfile-layers.sh`, so they cannot drift. |
 | `~/.config/dotfiles/Agentfile.local.yaml` | you | Optional, untracked Agentfile layer for this Mac only, for example an extra MCP server. See [Add an MCP server on one Mac](#add-an-mcp-server-on-one-mac). |
 | `~/.config/agentbrew/state.yaml` | agentbrew | Local registry of installed items and detected agents |
 | `~/.claude/` | agentbrew or the agent | Generated agent config; do not edit by hand |

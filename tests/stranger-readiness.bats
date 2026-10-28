@@ -149,7 +149,8 @@ OWNER_RULE_PATTERN='Needed from you|get_bootstrap_profile|commit_session_legacy|
   cp "$REPO/.chezmoiscripts/run_after_agentbrew-sync.sh" "$SRC/.chezmoiscripts/"
   run _merged_agentfile fyodor@sent.com
   for want in 'Needed from you' get_bootstrap_profile commit_session_legacy 'search memory' \
-      Augment Windsurf Approved-family 'approved repo families' 'lifecycle scope'; do
+      Augment Windsurf Approved-family 'approved repo families' 'lifecycle scope' \
+      'Before the Needed-from-you line asks for anything'; do
     [[ "$output" == *"$want"* ]] || { echo "owner Agentfile lacks: $want"; return 1; }
   done
 }

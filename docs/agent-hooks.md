@@ -49,7 +49,17 @@ migration architecture.
 dotfiles Agentfile. It blocks full test suites and builds that do not start
 with `heavy-run`: `npm test`, `npm run test*`, `yarn`/`pnpm` test or build
 scripts, `vitest`/`jest` with no file argument, `playwright test`, and `bats`
-on a folder. It checks each part of a `&&`, `||`, `;`, or `|` chain.
+on a folder. It also blocks the other headless-browser entry points:
+`e2e*` and `ui*` package scripts, `npm exec`/`pnpm exec`/`yarn playwright test`,
+and `make e2e` or `make test-all`. It checks each part of a `&&`, `||`, `;`, or `|` chain.
 Single-file runs (`npx vitest run one.test.ts`, `bats tests/x.bats`) pass.
 Set `HEAVY_RUN_HOOK=off` to turn it off. Tests:
 `tests/agent-hooks-require-heavy-run.bats`.
+
+The doctor check `resilience.headless_chrome_under_heavy_run` is the safety
+net for runs the hook cannot see (a plain `node script.js` that starts
+Chrome). `bin/headless-chrome-unlocked` counts headless Chrome main
+processes with no `heavy-run` parent; the check warns above
+`HEADLESS_UNLOCKED_MAX` (default 3). Why: the 2026-10-27 checkup found
+`chrome-headless-shell` on top of the overload rows. A launcher that starts
+Chrome itself must also pass `--use-mock-keychain --password-store=basic`.

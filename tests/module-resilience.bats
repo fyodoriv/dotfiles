@@ -66,3 +66,8 @@ EOF
   source "$TEST_DOTFILES/modules/resilience/doctor.sh"
   [ "$pass_count" -ge 2 ]
 }
+
+@test "resilience: doctor declares the headless Chrome lock check" {
+  grep -q 'resilience.headless_chrome_under_heavy_run' "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh"
+  [ -x "$BATS_TEST_DIRNAME/../bin/headless-chrome-unlocked" ]
+}

@@ -28,6 +28,7 @@ them. -->
 
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
+  - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).
   - **Tags**: performance, reliability, agents
   - **Details**: The 2026-10-27 `/tooling-checkup` found 197 unexplained overload rows (load1 over 20) in the last 24 h of `machine_metrics`, peak load1 257.6 at 2026-10-27T09:16. The top processes in those rows were `chrome-headless-shell` (112 rows), `python` (105), and `node` (84). The 2026-10-25 checkup had the same 197 count, so the problem persists. `heavy-run` only queues commands that agents wrap by hand; Playwright and agent-browser runs started directly (e2e suites, UI audits, MCP browser sessions) do not take the lock. Find which callers start headless Chrome without the lock, then make the lock hard to skip: for example, a Playwright/agent-browser wrapper on PATH that takes the `heavy-run` lock, or a doctor/hook warning when a browser test runs outside it.
   - **Files**: `bin/heavy-run`, `modules/resilience/doctor.sh`, `docs/` (heavy-run doc), `tests/`

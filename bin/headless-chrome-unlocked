@@ -1,0 +1,45 @@
+#!/bin/bash
+# headless-chrome-unlocked — count headless Chrome runs outside the heavy-run lock.
+#
+# A run is one headless Chrome main process (no --type=) with no heavy-run
+# process among its parents. Playwright and e2e fan-out show up here.
+#
+# Usage:
+#   headless-chrome-unlocked            # print the count
+#   headless-chrome-unlocked --check    # exit 1 and say why when over the max
+#
+# Env:
+#   HEADLESS_UNLOCKED_MAX   allowed unlocked runs (default 3: one shared
+#                           agent-browser Chrome plus a little slack)
+
+set -euo pipefail
+
+max="${HEADLESS_UNLOCKED_MAX:-3}"
+
+count=$(ps -axo pid=,ppid=,command= | awk '
+  { pid = $1; ppid[pid] = $2; $1 = ""; $2 = ""; cmd[pid] = $0 }
+  END {
+    n = 0
+    for (p in cmd) {
+      c = cmd[p]
+      if (c !~ /(chrome-headless-shell|--headless)/ || c ~ /--type=/) continue
+      locked = 0; q = ppid[p]; hops = 0
+      while (q in cmd && hops < 30) {
+        if (cmd[q] ~ /heavy-run/) { locked = 1; break }
+        q = ppid[q]; hops++
+      }
+      if (!locked) n++
+    }
+    print n
+  }')
+
+case "${1:-}" in
+  --check)
+    if [ "$count" -gt "$max" ]; then
+      echo "$count headless Chrome runs are outside the heavy-run lock (max $max). Start browser test runs as: heavy-run <command>"
+      exit 1
+    fi
+    ;;
+  "") echo "$count" ;;
+  *) echo "Usage: headless-chrome-unlocked [--check]" >&2; exit 2 ;;
+esac

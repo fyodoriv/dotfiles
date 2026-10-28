@@ -28,8 +28,13 @@ _has_file_arg() {
 
 # True when the script name is a test or build script.
 _heavy_script() {
-  case "$1" in test|test:*|test-*|t|build) return 0 ;; esac
+  case "$1" in test|test:*|test-*|t|build|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac
   return 1
+}
+
+# True when the words after an exec-style runner start a Playwright test run.
+_playwright_test_run() {
+  [ "${1:-}" = playwright ] && [ "${2:-}" = test ]
 }
 
 # True when one simple command (no && ; |) is a heavy run.
@@ -44,6 +49,11 @@ _is_heavy() {
   local -a rest=("${w[@]:1}")
   case "$tool" in
     npm|yarn|pnpm)
+      # npm exec / pnpm exec / yarn playwright test
+      if [ "${rest[0]:-}" = exec ]; then
+        _playwright_test_run "${rest[1]:-}" "${rest[2]:-}" && return 0
+      fi
+      _playwright_test_run "${rest[0]:-}" "${rest[1]:-}" && return 0
       for a in ${rest[@]+"${rest[@]}"}; do
         case "$a" in -*|run|run-script) continue ;; esac
         _heavy_script "$a" && return 0
@@ -53,6 +63,11 @@ _is_heavy() {
     vitest|jest)
       _has_file_arg ${rest[@]+"${rest[@]}"} && return 1
       return 0 ;;
+    make)
+      for a in ${rest[@]+"${rest[@]}"}; do
+        case "$a" in e2e|test-all) return 0 ;; esac
+      done
+      return 1 ;;
     playwright)
       [ "${rest[0]:-}" = test ] && return 0
       return 1 ;;

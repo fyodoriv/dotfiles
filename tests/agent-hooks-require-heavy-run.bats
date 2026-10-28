@@ -20,11 +20,21 @@ run_hook() {
   done
 }
 
+@test "blocks other headless-browser entry points (e2e, ui, exec playwright, make e2e)" {
+  for c in "npm run e2e" "npm run e2e:ci" "yarn e2e" "npm run ui" "pnpm ui:audit" \
+           "pnpm exec playwright test" "yarn playwright test" "npm exec playwright test" \
+           "npx playwright test --ui" "make e2e" "make test-all" "cd app && npm run ui"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+}
+
 @test "allows wrapped runs and single-file runs" {
   for c in "heavy-run yarn test:coverage" "heavy-run npm run build" "npx vitest run one.test.ts" \
            "npx vitest run src/a/b.test.ts" "npx jest src/x.test.js" "bats tests/foo.bats" \
            "bats -f 'x' tests/foo.bats" "git status" "echo npm test" "rg 'yarn build' docs" \
-           "cd app && heavy-run yarn test" "npm install" "npm run lint"; do
+           "cd app && heavy-run yarn test" "npm install" "npm run lint" \
+           "heavy-run npm run ui" "heavy-run make e2e" "pnpm exec playwright install" "make lint"; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }
   done

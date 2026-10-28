@@ -320,6 +320,12 @@ check_advisory "resilience.launchd_maxfiles" "launchd maxfiles soft limit >= 409
   "[ ! -x /bin/launchctl ] || \"\$DOTFILES_DIR/bin/dotfiles-launchd-maxfiles\" --check" \
   "Run in a human terminal (needs sudo once): dotfiles-launchd-maxfiles"
 
+# Headless Chrome fan-out (Playwright, e2e, UI audits) started without the
+# heavy-run lock tops the overload rows in machine_metrics (load1 over 20).
+check_advisory "resilience.headless_chrome_under_heavy_run" "Headless Chrome runs sit under the heavy-run lock" \
+  "\"\$DOTFILES_DIR/bin/headless-chrome-unlocked\" --check" \
+  "Start browser test runs as: heavy-run <command> (see docs/agent-hooks.md#require-heavy-run-dotfiles-hook)"
+
 # ── Native arm64 shell (Apple Silicon) ────────────────────────────────
 # On Apple Silicon Macs, the shell must run natively as arm64. If it runs
 # under Rosetta (sysctl.proc_translated=1), every npx/node/playwright child

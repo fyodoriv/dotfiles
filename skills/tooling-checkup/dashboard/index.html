@@ -1,9 +1,9 @@
 <style>
   /* Hallmark · shape: app screen · genre: modern-minimal · theme: brand (host tokens) · redesign: full
    * paper: host --color-panel · accent: host chart colours · display: host serif · body: host sans
-   * nav: none, a single-column board · signature: the verdict line over four ruled figures · states: loading, empty
+   * nav: none, a one-column board on phones, two columns of charts on desktop · signature: the verdict line over four ruled figures · states: loading, empty
    * axes: host/host/host · posture: settled · contrast: pass · v2.0.0 */
-  /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, charts are hover-only; the figures and the table carry the same numbers */
+  /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, the charts are small; the figures and the table carry the same numbers */
   :root {
     --tc-fg: var(--color-fg);
     --tc-muted: var(--color-fg-muted);
@@ -175,8 +175,12 @@
   }
   var tcLabel = function (table) {
     var heads = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent; });
+    // Phone CSS makes table parts display:block, which drops table semantics in Safari. Explicit roles keep them.
+    table.setAttribute('role', 'table');
+    table.querySelectorAll('thead tr, tbody tr').forEach(function (tr) { tr.setAttribute('role', 'row'); });
+    table.querySelectorAll('thead th').forEach(function (th) { th.setAttribute('role', 'columnheader'); });
     table.querySelectorAll('tbody tr').forEach(function (tr) {
-      Array.prototype.forEach.call(tr.children, function (td, i) { td.setAttribute('data-label', heads[i] || ''); });
+      Array.prototype.forEach.call(tr.children, function (td, i) { td.setAttribute('data-label', heads[i] || ''); td.setAttribute('role', 'cell'); });
     });
   };
   var tcCap = function (table, keep) {

@@ -60,7 +60,7 @@ Comfort gate: `NODE_PATH=<dir with playwright, axe-core, d3> node scripts/dashbo
 (run it as `heavy-run`). It renders the page on phone and desktop, light and
 dark, with reduced motion, and exits 1 on a serious axe issue, text under 14
 px, a touch target under 44 px, sideways overflow, a word split inside a table
-cell, more than 5 run rows before "Show N more", a chart without `role="img"`,
+cell, a table part without its ARIA role (`table`, `row`, `columnheader`, `cell`), more than 5 run rows before "Show N more", a chart without `role="img"`,
 an `aria-label` with latest, min and max, a visible latest value, or a tooltip
 on focus and tap, or a missing dataset that stops other panels drawing.
 Overflow is measured with `scrollWidth > clientWidth` on the document and each

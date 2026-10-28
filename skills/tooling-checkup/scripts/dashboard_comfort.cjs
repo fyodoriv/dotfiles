@@ -11,6 +11,7 @@
 //                element ends past the viewport. The element check sees through `overflow-x: clip`.
 //   splitWords   a word breaks across two lines in a table cell although it fits on a line by itself
 //   runsCap      the runs table shows more than 5 rows before "Show N more"
+//   tableRoles   a table, row, header or cell lacks its ARIA role (phone CSS drops native table semantics)
 //   charts       a chart has no svg role=img, no aria-label, no visible latest value, or no tooltip on focus/tap
 //   resize       after the window narrows, a chart svg is scaled below 97% (14 px text would shrink)
 //   badDay       a calendar day that does not exist (2026-02-30) is drawn as a point
@@ -101,7 +102,15 @@ function measure() {
     if (!/latest .*min .*max /.test(svg.getAttribute('aria-label') || '')) charts.push(sec.id + ': aria-label lacks latest, min, max');
     if (!sec.querySelector('.tc-now').textContent.trim()) charts.push(sec.id + ': no visible latest value');
   });
-  return { splitWords, overflow, runsRows: rows.length, runsVisible: rows.filter(r => r.getClientRects().length).length, smallText: [...small], smallTargets: targets, charts };
+  const tableRoles = [];
+  document.querySelectorAll('table').forEach(t => {
+    const id = t.closest('section').id;
+    if (t.getAttribute('role') !== 'table') tableRoles.push(id + ': table has no role=table');
+    if (t.querySelectorAll('thead th:not([role=columnheader])').length) tableRoles.push(id + ': th without role=columnheader');
+    if (t.querySelectorAll('tr:not([role=row])').length) tableRoles.push(id + ': tr without role=row');
+    if (t.querySelectorAll('tbody td:not([role=cell])').length) tableRoles.push(id + ': td without role=cell');
+  });
+  return { tableRoles, splitWords, overflow, runsRows: rows.length, runsVisible: rows.filter(r => r.getClientRects().length).length, smallText: [...small], smallTargets: targets, charts };
 }
 
 (async () => {
@@ -163,6 +172,7 @@ function measure() {
     if (r.overflow.length) fails.push(k + ' overflow ' + r.overflow.slice(0, 3));
     if (r.splitWords.length) fails.push(k + ' splitWords ' + r.splitWords.slice(0, 3));
     if (r.runsVisible > 5) fails.push(k + ' runsCap ' + r.runsVisible);
+    if (r.tableRoles.length) fails.push(k + ' tableRoles ' + r.tableRoles.slice(0, 3));
     if (r.charts.length) fails.push(k + ' charts ' + r.charts.slice(0, 3));
     if (r.interaction.length) fails.push(k + ' interaction ' + r.interaction);
     if (r.resize.length) fails.push(k + ' resize ' + JSON.stringify(r.resize.slice(0, 2)));

@@ -42,6 +42,14 @@ setup() {
   [[ "$output" =~ FAIL\ [a-z]+-desktop\ resize ]]
 }
 
+@test "the gate fails when table cells lose their ARIA role" {
+  # Phone CSS makes table parts display:block; without explicit roles Safari drops table semantics.
+  sed "s/td.setAttribute('role', 'cell');//" "$PAGE" > "$BATS_TEST_TMPDIR/no-roles.html"
+  run node "$GATE" "$BATS_TEST_TMPDIR/no-roles.html" noroles
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ FAIL\ [a-z]+-[a-z]+\ tableRoles ]]
+}
+
 @test "a missing dataset leaves the other panels drawn" {
   DASH_DROP=load run node "$GATE" "$PAGE" nodata
   [ "$status" -eq 0 ]

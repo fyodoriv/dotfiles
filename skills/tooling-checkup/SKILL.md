@@ -319,8 +319,9 @@ and one speedup line per step that recurs in 2 or more sessions and costs
 1 min/day or more. A step repeated inside one session is not a task.
 A subagent that ran in the background, ran inside another subagent, or ran
 while the lead made other calls gets its own `background subagents` line;
-it is left out of the ranking and the speedup lines, because its time
-overlaps tool time already counted:
+it is left out of the totals, the ranking and the speedup lines, because
+its time overlaps tool time already counted. A subagent the lead waited on
+stays ranked. Each speedup line says what to do:
 
 | Line | Do this |
 |---|---|

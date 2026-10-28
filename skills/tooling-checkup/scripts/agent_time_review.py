@@ -175,7 +175,8 @@ def split_agent_rows(days: int) -> dict:
     rows = list(tool_rows_in_log(days))
     lead = {}
     for row in rows:
-        if not row.get("agent") and row.get("sid"):
+        # Lead calls only: a parallel subagent's completion is not lead work.
+        if not row.get("agent") and row.get("sid") and not str(row.get("key") or "").startswith("agent:"):
             lead.setdefault(row["sid"], []).append(ts_of(row))
     for times in lead.values():
         times.sort()
@@ -199,20 +200,23 @@ def split_agent_rows(days: int) -> dict:
 
 
 def foreground_only(report: dict, split: dict, project: str = "") -> dict:
-    """The report with each `agent:` step cut to its foreground calls."""
-    keys = []
+    """The report with each `agent:` step, and the totals, cut to its foreground calls."""
+    keys, cut_ms, cut_calls = [], 0, 0
     for step in report.get("keys", []):
         if not step.get("key", "").startswith("agent:"):
             keys.append(step)
             continue
         ms = [v for (p, k), vals in split["fg"].items() if k == step["key"] and (not project or p == project)
               for v in vals]
+        cut_ms += max(0, step.get("sumMs", 0) - sum(ms))
+        cut_calls += max(0, step.get("count", 0) - len(ms))
         if ms:
             keys.append(dict(step, count=len(ms), sumMs=sum(ms), p95Ms=p95(ms)))
-    fg_ms = {v for (p, _), vals in split["fg"].items() if not project or p == project for v in vals}
+    fg_calls = {(k, v) for (p, k), vals in split["fg"].items() if not project or p == project for v in vals}
     slowest = [c for c in report.get("slowest") or []
-               if not str(c.get("key", "")).startswith("agent:") or c.get("ms") in fg_ms]
-    return dict(report, keys=keys, slowest=slowest)
+               if not str(c.get("key", "")).startswith("agent:") or (c.get("key"), c.get("ms")) in fg_calls]
+    return dict(report, keys=keys, slowest=slowest, toolMs=max(0, report.get("toolMs", 0) - cut_ms),
+                calls=max(0, report.get("calls", 0) - cut_calls))
 
 
 def background_line(ms: list) -> str:

@@ -598,6 +598,8 @@ JS
   {
     printf '{"ts":"%s","project":"alpha","sid":"s5","key":"agent:Explore","ms":600000}\n' "$now"
     printf '{"ts":"%s","project":"alpha","sid":"s6","key":"agent:Explore","ms":600000}\n' "$now"
+    # A parallel subagent ending inside s6's Explore run is not lead work.
+    printf '{"ts":"%s","project":"alpha","sid":"s6","key":"agent:Plan","ms":5}\n' "$before"
     printf '{"ts":"%s","project":"alpha","sid":"s1","key":"git status","ms":5}\n' "$before"
     printf '{"ts":"%s","project":"alpha","sid":"s1","key":"agent:general-purpose","ms":600000}\n' "$now"
     printf '{"ts":"%s","project":"alpha","sid":"s2","key":"agent:general-purpose","ms":600000,"bg":true}\n' "$now"
@@ -612,6 +614,7 @@ JS
   [ "$status" -eq 0 ]
   [[ "$output" == *"background subagents (overlap the lead, not ranked): 2x, 20m00s total"* ]]
   [[ "$output" == *"1. agent:Explore: 20m00s total, 2x"* ]]
+  [[ "$output" == *"tool time 20m00s over 2 calls"* ]]
   [[ "$output" == *"file    alpha speed-up-agent-explore"* ]]
   [[ "$output" != *"agent:general-purpose"* ]]
   [[ "$output" != *"speed-up-agent-general-purpose"* ]]

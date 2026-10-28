@@ -36,9 +36,22 @@
   .tc-plot text { font-size: 14px; font-variant-numeric: tabular-nums; }
   .tc-tip { position: absolute; pointer-events: none; background: var(--tc-panel); border: 1px solid var(--tc-line); padding: 4px 8px; border-radius: 4px; font-size: 14px; display: none; }
   .tc-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .tc-table th, .tc-table td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--tc-line); overflow-wrap: anywhere; vertical-align: top; }
+  .tc-table th, .tc-table td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--tc-line); vertical-align: top; }
   .tc-table th { font-weight: 600; color: var(--tc-muted); }
+  .tc-table td[data-label="Verdict"] { overflow-wrap: anywhere; }
   .tc-table tbody tr:last-child td { border-bottom: 0; }
+  .tc-table tr[hidden] { display: none; }
+  .tc-more { min-height: 44px; min-width: 44px; margin-top: var(--tc-pad); padding: 8px 16px; font: inherit; font-size: 14px; color: var(--tc-fg); background: var(--tc-panel); border: 1px solid var(--tc-line); border-radius: 4px; cursor: pointer; }
+  .tc-more:hover { border-color: var(--tc-fg); }
+  .tc-more:focus-visible { outline: 2px solid var(--tc-fg); outline-offset: 2px; }
+  @media (max-width: 639px) {
+    .tc-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .tc-table, .tc-table tbody, .tc-table tr, .tc-table td { display: block; }
+    .tc-table tr { padding: 8px 0; border-bottom: 1px solid var(--tc-line); }
+    .tc-table tr[hidden] { display: none; }
+    .tc-table td { display: grid; grid-template-columns: minmax(96px, 40%) minmax(0, 1fr); gap: 8px; border-bottom: 0; padding: 4px 0; }
+    .tc-table td::before { content: attr(data-label); color: var(--tc-muted); font-weight: 600; }
+  }
   @media (min-width: 900px) {
     .tc-wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
     #tc-latest, #tc-runs { grid-column: 1 / -1; }
@@ -112,6 +125,25 @@
     var day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: String(v).length <= 10 ? 'UTC' : undefined });
     return String(v).length <= 10 ? day : day + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
+  var tcLabel = function (table) {
+    var heads = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent; });
+    table.querySelectorAll('tbody tr').forEach(function (tr) {
+      Array.prototype.forEach.call(tr.children, function (td, i) { td.setAttribute('data-label', heads[i] || ''); });
+    });
+  };
+  var tcCap = function (table, keep) {
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+    var id = table.closest('section').id + '-more';
+    var old = document.getElementById(id);
+    if (old) old.remove();
+    if (rows.length <= keep) return;
+    rows.forEach(function (tr, i) { tr.hidden = i >= keep; });
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.id = id; btn.className = 'tc-more';
+    btn.textContent = 'Show ' + (rows.length - keep) + ' more';
+    btn.addEventListener('click', function () { rows.forEach(function (tr) { tr.hidden = false; }); btn.remove(); });
+    table.parentNode.appendChild(btn);
+  };
   var tcShow = function (v) { return v === null || v === undefined || v === '' ? 'n/a' : String(v); };
 
   dash.onData(function () {
@@ -155,6 +187,7 @@
       });
       pbody.appendChild(tr);
     });
+    tcLabel(pbody.closest('table'));
 
     var tbody = document.querySelector('#tc-runs tbody');
     tbody.textContent = '';
@@ -165,5 +198,7 @@
       });
       tbody.appendChild(tr);
     });
+    tcLabel(tbody.closest('table'));
+    tcCap(tbody.closest('table'), 5);
   });
 </script>

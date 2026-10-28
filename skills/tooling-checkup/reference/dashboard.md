@@ -55,3 +55,10 @@ tokens at `:root` and sets no literal colour. Check it with
 `node ~/.claude/skills/hallmark/scripts/sloplint.mjs skills/tooling-checkup/dashboard/index.html --genre modern-minimal --scope app`.
 The render tier needs `puppeteer-core`; without it, check the page in a stub
 host (fixture `dash` object, d3, light and dark tokens) with Playwright.
+
+Comfort gate: `NODE_PATH=<dir with playwright, axe-core, d3> node scripts/dashboard_comfort.cjs <index.html> <prefix>`
+(run it as `heavy-run`). It renders the page on phone and desktop, light and
+dark, with reduced motion, and exits 1 on a serious axe issue, text under 14
+px, a touch target under 44 px, sideways scroll, a word split inside a table
+cell, or more than 5 run rows before "Show N more". The `load` fixture matches
+the exporter: one row per hour over 7 days, `YYYY-MM-DDTHH:00`.

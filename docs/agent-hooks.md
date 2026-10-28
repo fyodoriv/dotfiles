@@ -72,7 +72,11 @@ and `{ ...; }` groups, and `$(...)` or backticks inside double quotes. A `-g`, `
 `--testNamePattern` filter, or a spec path, marks a one-test run; the value of any other flag
 (`--output out/res`) does not.
 
-Still not seen by the hook (task `heavy-run-hook-wrapper-coverage`): `npx` flags and version
-suffixes (`npx -y playwright@1 test`), `./node_modules/.bin/playwright test`, `bun`, `turbo`,
-`gmake`, `bash -c "..."`, and a `$(...)` that sits inside a word (`make -j$(nproc) e2e`).
+Also read: `npx`/`bunx`/`npm exec`/`pnpm dlx`/`bun x` with flags and version suffixes
+(`npx -y playwright@1 test`), program paths (`./node_modules/.bin/playwright test`),
+`bun` and `turbo` scripts, `gmake`, the string after `bash -c` or `sh -c`, and a `$(...)` or
+backtick sitting inside a word (`make -j$(nproc) e2e`). A string after `bash -c` is read as a
+command of its own, so `bash -c "heavy-run make e2e"` passes.
+
+Still not seen by the hook: a program started by a script (`node run.js`) or by `eval`.
 The doctor check is the net for these.

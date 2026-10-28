@@ -50,7 +50,7 @@ _heavy_script() {
 
 # True when the words after an exec-style runner start a Playwright test run.
 _playwright_test_run() {
-  [ "${1:-}" = playwright ] && [ "${2:-}" = test ]
+  [ "${1%%@*}" = playwright ] && [ "${2:-}" = test ]
 }
 
 # Drop leading flags of a command prefix from the array w. Arguments name the
@@ -85,10 +85,14 @@ _is_heavy() {
     esac
   done
   [ "${#w[@]}" -gt 0 ] || return 1
+  # A path runs the same program: ./node_modules/.bin/playwright, /usr/bin/make.
+  w[0]="${w[0]##*/}"
   [ "${w[0]}" = heavy-run ] && return 1
-  case "${w[0]}" in npx|bunx) w=("${w[@]:1}") ;; esac
+  case "${w[0]}" in npx|bunx) w=("${w[@]:1}"); _skip_flags -p --package -c --call ;; esac
   [ "${#w[@]}" -gt 0 ] || return 1
-  local tool="${w[0]}" a
+  local tool="${w[0]##*/}" a
+  # npx -y playwright@1 test: a version suffix names the same tool.
+  case "$tool" in @*) ;; *) tool="${tool%%@*}" ;; esac
   local -a rest=() raw=("${w[@]:1}")
   local i=0
   # Drop workspace selectors (and their value) so `pnpm --filter web e2e` reads as `pnpm e2e`.
@@ -99,11 +103,13 @@ _is_heavy() {
     rest+=("${raw[$i]}"); i=$((i + 1))
   done
   case "$tool" in
-    npm|yarn|pnpm)
-      # npm exec / pnpm exec / pnpm dlx / yarn playwright test
+    npm|yarn|pnpm|bun|turbo)
+      # npm exec / pnpm exec / pnpm dlx / bun x / yarn playwright test; turbo run <script>
       case "${rest[0]:-}" in
-        exec|dlx)
-          _playwright_test_run "${rest[1]:-}" "${rest[2]:-}" && ! _one_test_args "${rest[@]:3}" && return 0
+        exec|dlx|x)
+          # Drop flags (-y, --yes, -p pkg, --) between exec and the program.
+          w=("${rest[@]:1}"); _skip_flags -p --package -c --call
+          _playwright_test_run "${w[0]:-}" "${w[1]:-}" && ! _one_test_args "${w[@]:2}" && return 0
           return 1 ;;
       esac
       if _playwright_test_run "${rest[0]:-}" "${rest[1]:-}"; then
@@ -121,7 +127,7 @@ _is_heavy() {
     vitest|jest)
       _one_test_args ${rest[@]+"${rest[@]}"} && return 1
       return 0 ;;
-    make)
+    make|gmake)
       for a in ${rest[@]+"${rest[@]}"}; do
         case "$a" in -n|--dry-run|--just-print|--recon) return 1 ;; esac
       done
@@ -145,16 +151,30 @@ _is_heavy() {
 }
 
 # Remove heredoc bodies, then replace each quoted string with Q (empty quotes vanish; a lone . or .* stays), so words inside commit messages and PR bodies are never matched.
+# Text that runs as a command moves to its own line at the end: $(...) and backticks (quoted or inside a word, so `make -j$(nproc) e2e` keeps its words) and the string after `bash -c` / `sh -c`.
 _strip_text() {
   /usr/bin/perl -0777 -pe '
-    s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
-    s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
-      my $q = $1; my $in = substr($q, 1, -1);
-      my $r = $in =~ m{^\.\*?$} ? $in : length($in) ? "Q" : "";
-      if (substr($q, 0, 1) eq "\"") {
-        while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { $r .= "\n" . (defined $1 ? $1 : $2) . "\n"; }
-      }
-      $r/gsex;
+    sub strip {
+      my ($s) = @_;
+      my @extra;
+      $s =~ s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
+      $s =~ s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
+        my $q = $1; my $pre = $`; my $in = substr($q, 1, -1);
+        my $dq = substr($q, 0, 1) eq "\"";
+        my $r = $in =~ m{^\.\*?$} ? $in : length($in) ? "Q" : "";
+        if ($dq) {
+          while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }
+        }
+        if ($pre =~ m{(?:^|[;&|(){}\n]|\b(?:then|do|else)\b)[ \t]*(?:[A-Za-z_]\w*=\S*[ \t]+)*(?:(?:sudo|env|time|nohup|exec|command)[ \t]+(?:-\S+[ \t]+)*)*(?:\S*\/)?(?:ba|z|da|k)?sh[ \t]+(?:-\w+[ \t]+)*-\w*c\w*[ \t]+$}) {
+          $in =~ s{\\(["\\$`])}{$1}g if $dq;
+          push @extra, strip($in);
+        }
+        $r/gsex;
+      $s =~ s/\$(\((?:[^()]++|(?1))*\))/push @extra, substr($1, 1, -1); "S"/ge;
+      $s =~ s/`([^`]*)`/push @extra, $1; "S"/ge;
+      return $s . join("", map { "\n$_\n" } @extra);
+    }
+    $_ = strip($_);
   '
 }
 

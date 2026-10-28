@@ -20,7 +20,7 @@ them. -->
   - **Output**: code
   - **Acceptance**: a bats test starts three waiters in a known order behind a holder and sees them run in that order; a dead waiter's ticket does not block the queue; `heavy-run --status` prints the queue.
   - **Hypothesis**: arrival-order service cuts the longest single wait on the heavy-run lock in a 3-worker goal run from about 40 min to under 15 min, because today one waiter can be skipped many times.
-  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (the `heavy-run` lines' p95 and slowest call) on the next 3-worker run, plus the new bats order test.
+  - **Measurement**: this task makes `heavy-run` append one `waited=<seconds>` line per run to `~/.local/state/dotfiles/heavy-run-waits.log`; take `sort -t= -k2 -n ~/.local/state/dotfiles/heavy-run-waits.log | tail -1` after the next 3-worker run, plus the new bats order test. Baseline: about 40 min, read by hand from the 2026-10-28 goal run transcript (no wait log exists yet).
   - **Success**: slowest heavy-run wait under 15 min and the order test passes.
   - **Pivot**: slowest wait still over 30 min -> the lock order is not the lever; cap gate length or split the lock per repo instead.
   - **Anchor**: tooling-checkup goal run 2026-10-28; Lamport 1974, "A new solution of Dijkstra's concurrent programming problem" (bakery algorithm, first-come-first-served).
@@ -64,7 +64,7 @@ them. -->
   - **Output**: code
   - **Acceptance**: a fixture with one background and one foreground subagent shows the background one only in the new line; no speedup task is filed for background subagents.
   - **Hypothesis**: separating background subagents drops false speedup tasks from the review from 2 per run to 0, without hiding foreground waits.
-  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7 | rg -c "file .*speed-up-agent-general-purpose"` on the next checkup.
+  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7 | rg -c "filed? .*speed-up-agent-general-purpose"` on the next checkup.
   - **Success**: 0 such lines, and the fixture test passes.
   - **Pivot**: the transcripts do not mark background vs foreground subagents -> report the overlap share instead and keep the list.
   - **Anchor**: tooling-checkup run 2026-10-28; Basili, Caldiera, Rombach 1994 (GQM: a metric must answer the question asked).

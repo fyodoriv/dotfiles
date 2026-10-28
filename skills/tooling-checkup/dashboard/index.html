@@ -31,7 +31,11 @@
   .tc-kpi .tc-label { color: var(--tc-muted); font-size: 14px; line-height: 1.3; }
   .tc-kpi .tc-value { font-family: var(--tc-serif); font-size: 32px; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .tc-chart { width: 100%; position: relative; min-width: 0; }
+  .tc-now { margin: 0 0 var(--tc-pad); font-size: 14px; color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+  .tc-now:empty { display: none; }
   .tc-plot { min-width: 0; }
+  .tc-plot svg:focus-visible { outline: 2px solid var(--tc-fg); outline-offset: 2px; }
+  .tc-plot svg { touch-action: pan-y; }
   .tc-plot svg { display: block; max-width: 100%; height: auto; }
   .tc-plot text { font-size: 14px; font-variant-numeric: tabular-nums; }
   .tc-tip { position: absolute; pointer-events: none; background: var(--tc-panel); border: 1px solid var(--tc-line); padding: 4px 8px; border-radius: 4px; font-size: 14px; display: none; }
@@ -70,11 +74,11 @@
       <div class="tc-kpi"><div class="tc-label">Claude echo p95, ms</div><div class="tc-value" data-source="latest" data-field="claude_echo_p95_ms" data-row="0">n/a</div></div>
     </div>
   </section>
-  <section class="tc-chart" id="tc-overload" data-source="runs"><h2>Overload rows per checkup</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
-  <section class="tc-chart" id="tc-gate" data-source="gate"><h2>dotfiles gate: median seconds per day</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
-  <section class="tc-chart" id="tc-doctor" data-source="doctor"><h2>dotfiles doctor: failing checks per day</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
-  <section class="tc-chart" id="tc-load" data-source="load"><h2>Machine load: peak load1 per hour, last 7 days (local time)</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
-  <section class="tc-chart" id="tc-agent" data-source="agent_time"><h2>Agent tool hours per day, last 14 days</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-overload" data-source="runs"><h2>Overload rows per checkup</h2><p class="tc-now"></p><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-gate" data-source="gate"><h2>dotfiles gate: median seconds per day</h2><p class="tc-now"></p><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-doctor" data-source="doctor"><h2>dotfiles doctor: failing checks per day</h2><p class="tc-now"></p><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-load" data-source="load"><h2>Machine load: peak load1 per hour, last 7 days (local time)</h2><p class="tc-now"></p><div class="tc-plot"></div><div class="tc-tip"></div></section>
+  <section class="tc-chart" id="tc-agent" data-source="agent_time"><h2>Agent tool hours per day, last 14 days</h2><p class="tc-now"></p><div class="tc-plot"></div><div class="tc-tip"></div></section>
   <section id="tc-agent-projects">
     <h2>Agent tool hours by project, last 14 days</h2>
     <table class="tc-table" data-source="agent_time">
@@ -91,40 +95,79 @@
   </section>
 </div>
 <script>
+  var tcShow = function (v) { return v === null || v === undefined || v === '' ? 'n/a' : String(v); };
+  // 'YYYY-MM-DD' is a calendar day: build it as a local date so the point sits on its own tick label.
+  var tcIsDay = function (v) { return /^\d{4}-\d{2}-\d{2}$/.test(String(v)); };
+  var tcDay = function (v) {
+    var m = v ? /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v)) : null;
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  };
+  var tcTime = function (v) { return v ? new Date(String(v)) : null; };
+  var tcHour = function (v) { return v ? new Date(String(v).slice(0, 13) + ':00:00') : null; };
+  var tcWhen = function (v) {
+    var d = tcIsDay(v) ? tcDay(v) : (v ? new Date(String(v)) : null);
+    if (!d || isNaN(+d)) return tcShow(v);
+    var day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return tcIsDay(v) ? day : day + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+  // dash.data(id) can return undefined before a dataset is attached: treat that as "no data" for that panel only.
+  var tcData = function (id) {
+    var d = dash.data(id);
+    return d && d.status === 'ok' && Array.isArray(d.data) ? d.data : [];
+  };
+
   function tcLine(id, rows, xKey, yKey, color, parseX) {
-    var box = document.querySelector('#' + id + ' .tc-plot');
-    var tip = document.querySelector('#' + id + ' .tc-tip');
-    box.textContent = '';
-    if (!rows.length) { box.textContent = 'n/a'; return; }
-    var w = Math.max(box.clientWidth || 320, 280), h = 180, m = { t: 8, r: 12, b: 24, l: 40 };
+    var section = document.getElementById(id);
+    var box = section.querySelector('.tc-plot');
+    var tip = section.querySelector('.tc-tip');
+    var now = section.querySelector('.tc-now');
+    box.textContent = ''; now.textContent = ''; tip.style.display = 'none';
     var pts = rows.map(function (r) { return { x: parseX(r[xKey]), y: Number(r[yKey]), r: r }; })
-      .filter(function (p) { return p.x && !isNaN(p.y); });
+      .filter(function (p) { return p.x && !isNaN(+p.x) && !isNaN(p.y); });
+    if (!pts.length) { box.textContent = 'no data'; return; }
+    var w = Math.max(box.clientWidth || 320, 280), h = 180, m = { t: 8, r: 12, b: 24, l: 40 };
+    var last = pts[pts.length - 1];
+    var lo = d3.min(pts, function (p) { return p.y; }), hi = d3.max(pts, function (p) { return p.y; });
+    now.textContent = 'Latest ' + last.y + ' on ' + tcWhen(last.r[xKey]);
     var x = d3.scaleTime().domain(d3.extent(pts, function (p) { return p.x; })).range([m.l, w - m.r]);
-    var y = d3.scaleLinear().domain([0, d3.max(pts, function (p) { return p.y; }) || 1]).nice().range([h - m.b, m.t]);
-    var svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', '0 0 ' + w + ' ' + h);
+    var y = d3.scaleLinear().domain([0, hi || 1]).nice().range([h - m.b, m.t]);
+    var svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', '0 0 ' + w + ' ' + h)
+      .attr('role', 'img').attr('tabindex', 0)
+      .attr('aria-label', section.querySelector('h2').textContent + ': latest ' + last.y + ' on ' + tcWhen(last.r[xKey]) + ', min ' + lo + ', max ' + hi + '. Arrow keys step through points.');
     svg.append('g').attr('transform', 'translate(0,' + (h - m.b) + ')').call(d3.axisBottom(x).ticks(Math.min(w < 500 ? 3 : 6, pts.length)));
     svg.append('g').attr('transform', 'translate(' + m.l + ',0)').call(d3.axisLeft(y).ticks(4));
     svg.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2)
       .attr('d', d3.line().x(function (p) { return x(p.x); }).y(function (p) { return y(p.y); }));
     svg.selectAll('circle').data(pts).enter().append('circle').attr('r', 4).attr('fill', color)
-      .attr('cx', function (p) { return x(p.x); }).attr('cy', function (p) { return y(p.y); })
-      .on('mouseenter', function (e, p) {
-        tip.style.display = 'block';
-        tip.textContent = tcWhen(p.r[xKey]) + ': ' + p.y;
-        var left = Math.min(x(p.x) / w * box.clientWidth, box.clientWidth - 140);
-        tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '24px';
-      })
-      .on('mouseleave', function () { tip.style.display = 'none'; });
+      .attr('cx', function (p) { return x(p.x); }).attr('cy', function (p) { return y(p.y); });
+    var mark = svg.append('circle').attr('r', 7).attr('fill', 'none').attr('stroke', 'currentColor').attr('stroke-width', 2).style('display', 'none');
+    tip.setAttribute('aria-live', 'polite');
+    var at = pts.length - 1;
+    function showAt(i) {
+      at = Math.max(0, Math.min(pts.length - 1, i));
+      var p = pts[at];
+      tip.style.display = 'block';
+      tip.textContent = tcWhen(p.r[xKey]) + ': ' + p.y;
+      var left = Math.min(x(p.x) / w * box.clientWidth, box.clientWidth - 140);
+      tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '24px';
+      mark.style('display', null).attr('cx', x(p.x)).attr('cy', y(p.y));
+    }
+    function hide() { tip.style.display = 'none'; mark.style('display', 'none'); }
+    function nearest(e) {
+      var px = d3.pointer(e, svg.node())[0], best = 0;
+      pts.forEach(function (p, i) { if (Math.abs(x(p.x) - px) < Math.abs(x(pts[best].x) - px)) best = i; });
+      return best;
+    }
+    svg.on('pointerdown', function (e) { showAt(nearest(e)); })
+      .on('pointermove', function (e) { if (e.pointerType === 'mouse') showAt(nearest(e)); })
+      .on('pointerleave', function (e) { if (e.pointerType === 'mouse' && document.activeElement !== svg.node()) hide(); })
+      .on('focus', function () { showAt(at); })
+      .on('blur', hide)
+      .on('keydown', function (e) {
+        var k = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: pts.length - 1 }[e.key];
+        if (k !== undefined) { e.preventDefault(); showAt(k); }
+      });
   }
-  var tcDay = function (v) { return v ? new Date(String(v).slice(0, 10) + 'T00:00:00Z') : null; };
-  var tcTime = function (v) { return v ? new Date(String(v)) : null; };
-  var tcHour = function (v) { return v ? new Date(String(v).slice(0, 13) + ':00:00') : null; };
-  var tcWhen = function (v) {
-    var d = v ? new Date(String(v)) : null;
-    if (!d || isNaN(d)) return tcShow(v);
-    var day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: String(v).length <= 10 ? 'UTC' : undefined });
-    return String(v).length <= 10 ? day : day + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
   var tcLabel = function (table) {
     var heads = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent; });
     table.querySelectorAll('tbody tr').forEach(function (tr) {
@@ -141,14 +184,19 @@
     var btn = document.createElement('button');
     btn.type = 'button'; btn.id = id; btn.className = 'tc-more';
     btn.textContent = 'Show ' + (rows.length - keep) + ' more';
-    btn.addEventListener('click', function () { rows.forEach(function (tr) { tr.hidden = false; }); btn.remove(); });
+    btn.addEventListener('click', function () {
+      rows.forEach(function (tr) { tr.hidden = false; });
+      btn.remove();
+      // The button had focus: hand it to the first newly shown row so keyboard users keep their place.
+      rows[keep].setAttribute('tabindex', '-1');
+      rows[keep].focus();
+    });
     table.parentNode.appendChild(btn);
   };
-  var tcShow = function (v) { return v === null || v === undefined || v === '' ? 'n/a' : String(v); };
 
   dash.onData(function () {
-    var latest = dash.data('latest');
-    var row = latest.status === 'ok' && latest.data.length ? latest.data[0] : null;
+    var latestRows = tcData('latest');
+    var row = latestRows.length ? latestRows[0] : null;
     document.querySelectorAll('[data-source="latest"]').forEach(function (el) {
       var f = el.getAttribute('data-field');
       el.textContent = row ? (f === 'time' ? tcWhen(row[f]) : tcShow(row[f])) : 'n/a';
@@ -156,19 +204,13 @@
     var status = document.getElementById('tc-status');
     status.className = row ? 'tc-status-' + row.status : '';
 
-    var runs = dash.data('runs');
-    var runRows = runs.status === 'ok' ? runs.data : [];
+    var runRows = tcData('runs');
     tcLine('tc-overload', runRows, 'time', 'machine_overload_rows_24h', dash.colors[0], tcTime);
-    var gate = dash.data('gate');
-    tcLine('tc-gate', gate.status === 'ok' ? gate.data : [], 'day', 'median_total_s', dash.colors[1], tcDay);
-    var doctor = dash.data('doctor');
-    tcLine('tc-doctor', doctor.status === 'ok' ? doctor.data : [], 'day', 'fail', dash.colors[2], tcDay);
+    tcLine('tc-gate', tcData('gate'), 'day', 'median_total_s', dash.colors[1], tcDay);
+    tcLine('tc-doctor', tcData('doctor'), 'day', 'fail', dash.colors[2], tcDay);
+    tcLine('tc-load', tcData('load'), 'hour', 'peak_load1', dash.colors[3], tcHour);
 
-    var load = dash.data('load');
-    tcLine('tc-load', load.status === 'ok' ? load.data : [], 'hour', 'peak_load1', dash.colors[3], tcHour);
-
-    var agent = dash.data('agent_time');
-    var agentRows = agent.status === 'ok' ? agent.data : [];
+    var agentRows = tcData('agent_time');
     var perDay = {}, perProject = {};
     agentRows.forEach(function (r) {
       perDay[r.day] = (perDay[r.day] || 0) + Number(r.tool_hours || 0);

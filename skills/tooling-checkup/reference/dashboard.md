@@ -59,6 +59,16 @@ host (fixture `dash` object, d3, light and dark tokens) with Playwright.
 Comfort gate: `NODE_PATH=<dir with playwright, axe-core, d3> node scripts/dashboard_comfort.cjs <index.html> <prefix>`
 (run it as `heavy-run`). It renders the page on phone and desktop, light and
 dark, with reduced motion, and exits 1 on a serious axe issue, text under 14
-px, a touch target under 44 px, sideways scroll, a word split inside a table
-cell, or more than 5 run rows before "Show N more". The `load` fixture matches
-the exporter: one row per hour over 7 days, `YYYY-MM-DDTHH:00`.
+px, a touch target under 44 px, sideways overflow, a word split inside a table
+cell, more than 5 run rows before "Show N more", a chart without `role="img"`,
+an `aria-label` with latest, min and max, a visible latest value, or a tooltip
+on focus and tap, or a missing dataset that stops other panels drawing.
+Overflow is measured with `scrollWidth > clientWidth` on the document and each
+panel, and by every element's right edge, so `overflow-x: clip` (which Hallmark
+requires on `html` and `body`) cannot hide it. The fixture holds a word wider
+than a phone cell. The `load` fixture matches the exporter: one row per hour
+over 7 days, `YYYY-MM-DDTHH:00`.
+
+`tests/tooling-checkup-dashboard.bats` runs the gate, plants an overflow and a
+break-anywhere rule to prove it fails on each, and skips when Playwright,
+axe-core or d3 are missing, with a visible SKIPPED line. It looks in `DASHBOARD_NODE_PATH`, `NODE_PATH`, then the cache folder `~/.cache/dotfiles/dashboard-gate/node_modules`. Install once with `npm i --prefix ~/.cache/dotfiles/dashboard-gate playwright@1.64.1 axe-core@4.14.0 d3@7.9.0`.

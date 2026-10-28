@@ -735,6 +735,8 @@ It reads the recent machine metrics (load, memory, swap, disk, upgrade failures,
 
 Each run appends a row to `~/.local/state/tooling-checkup/history.jsonl` and refreshes one tooling health dashboard. That is a claude.ai Dashboard that keeps its URL. It shows checkup runs, gate and doctor trends, hourly machine load, and agent tool time per tooling project.
 
+The page (`skills/tooling-checkup/dashboard/index.html`) is built to the Hallmark design skill and the comfort budget. `tests/tooling-checkup-dashboard.bats` guards it (needs Playwright, axe-core and d3 in `~/.cache/dotfiles/dashboard-gate`; skips with a SKIPPED line otherwise; see `skills/tooling-checkup/reference/dashboard.md`).
+
 `scripts/dashboard_export.py` writes its datasets to `~/.local/state/tooling-checkup/dashboard/`. It ignores dependabot pull requests unless a critical alert is open, and it touches only repositories under the tooling root.
 
 ### Agent time metrics

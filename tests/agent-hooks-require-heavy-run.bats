@@ -133,6 +133,33 @@ run_hook() {
   done
 }
 
+@test "blocks vitest, jest, and turbo behind exec, dlx, and bun x" {
+  for c in "pnpm exec vitest" "npm exec -- jest" "pnpm dlx vitest" "bun x vitest" "pnpm exec turbo run test" \
+           "yarn dlx vitest run" "npm exec -y vitest@2 run"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+  for c in "pnpm exec vitest run src/a.test.ts" "npm exec -- jest src/x.test.js" "pnpm exec turbo run lint" \
+           "heavy-run pnpm exec vitest" "pnpm exec prettier --check ."; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }
+  done
+}
+
+@test "blocks bash -c behind timeout, nice, caffeinate, and shell flags with values" {
+  for c in 'timeout 600 bash -c "make e2e"' 'nice -n 5 bash -c "make e2e"' 'caffeinate -i bash -c "make e2e"' \
+           'bash -euo pipefail -c "make e2e"' 'timeout -s KILL 600 sh -c "npm test"'; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+  for c in 'timeout 600 bash -c "heavy-run make e2e"' 'nice -n 5 bash -c "heavy-run make e2e"' \
+           'caffeinate -i bash -c "heavy-run make e2e"' 'bash -euo pipefail -c "heavy-run make e2e"' \
+           'timeout 600 bash -c "echo hi"'; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }
+  done
+}
+
 @test "allows the new forms under heavy-run and their single-test runs" {
   for c in "heavy-run npx -y playwright@1 test" "heavy-run npm exec -y playwright test" \
            "heavy-run ./node_modules/.bin/playwright test" "~/bin/heavy-run make e2e" "heavy-run bun test" \

@@ -107,9 +107,11 @@ _is_heavy() {
       # npm exec / pnpm exec / pnpm dlx / bun x / yarn playwright test; turbo run <script>
       case "${rest[0]:-}" in
         exec|dlx|x)
-          # Drop flags (-y, --yes, -p pkg, --) between exec and the program.
+          # Drop flags (-y, --yes, -p pkg, --) between exec and the program, then
+          # read the program like a plain command (vitest, jest, turbo run test, ...).
           w=("${rest[@]:1}"); _skip_flags -p --package -c --call
-          _playwright_test_run "${w[0]:-}" "${w[1]:-}" && ! _one_test_args "${w[@]:2}" && return 0
+          [ "${#w[@]}" -gt 0 ] || return 1
+          _is_heavy "${w[*]}" && return 0
           return 1 ;;
       esac
       if _playwright_test_run "${rest[0]:-}" "${rest[1]:-}"; then
@@ -165,7 +167,7 @@ _strip_text() {
         if ($dq) {
           while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }
         }
-        if ($pre =~ m{(?:^|[;&|(){}\n]|\b(?:then|do|else)\b)[ \t]*(?:[A-Za-z_]\w*=\S*[ \t]+)*(?:(?:sudo|env|time|nohup|exec|command)[ \t]+(?:-\S+[ \t]+)*)*(?:\S*\/)?(?:ba|z|da|k)?sh[ \t]+(?:-\w+[ \t]+)*-\w*c\w*[ \t]+$}) {
+        if ($pre =~ m{(?:^|[;&|(){}\n]|\b(?:then|do|else)\b)[ \t]*(?:[A-Za-z_]\w*=\S*[ \t]+)*(?:(?:sudo|env|time|nohup|exec|command|nice|caffeinate|timeout)[ \t]+(?:-\S+[ \t]+|\d\S*[ \t]+|[A-Z]+[ \t]+)*)*(?:\S*\/)?(?:ba|z|da|k)?sh[ \t]+(?:-\w+[ \t]+(?:[A-Za-z]\w*[ \t]+)?)*-\w*c\w*[ \t]+$}) {
           $in =~ s{\\(["\\$`])}{$1}g if $dq;
           push @extra, strip($in);
         }

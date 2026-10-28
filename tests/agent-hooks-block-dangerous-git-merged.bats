@@ -463,3 +463,49 @@ run_hook_in() {
   [ "$status" -eq 0 ]
   [ "$(grep -c 'git log -n 200' "$BATS_TEST_TMPDIR/trace")" -eq 1 ]
 }
+
+# Review of the parsed match: quoting, long-option prefixes, in-command aliases.
+
+@test "quoted, escaped or path-qualified words do not hide a force-delete" {
+  merged_and_unmerged
+  for c in "\\git branch -d -f feat/u" "/usr/bin/git branch -d -f feat/u" \
+           "'git' branch -D feat/u" "\"git\" branch -D feat/u" \
+           "g''it branch -D feat/u" "git 'branch' -d -f feat/u" \
+           "git \\branch -d -f feat/u" "git branch -d '-f' feat/u" \
+           "git branch -d \"\"-f feat/u"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ]
+  done
+}
+
+@test "shortened long options are read as --delete and --force" {
+  merged_and_unmerged
+  run_hook "git branch --del --force feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "git branch -d --forc feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "git branch --del --for feat/u"
+  [ "$status" -eq 2 ]
+  # A merged branch is still allowed with the shortened spelling.
+  run_hook "git branch --del --force feat/m"
+  [ "$status" -eq 0 ]
+}
+
+@test "an in-command git alias cannot hide the branch subcommand" {
+  merged_and_unmerged
+  run_hook "git -c alias.b=branch b -D feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "AB=branch git --config-env alias.b=AB b -D feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "git --config-env=alias.b=AB b -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "global options on other git commands are not blocked" {
+  merged_and_unmerged
+  for c in "git -c core.pager=cat log --oneline" "git --no-pager branch" \
+           "git -C $REPO status" "git --git-dir=$REPO/.git log"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ]
+  done
+}

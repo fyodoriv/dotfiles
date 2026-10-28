@@ -100,38 +100,56 @@ branch_is_merged() {
 is_git_word() { case "$1" in [gG][iI][tT]) return 0 ;; esac; return 1; }
 is_branch_word() { case "$1" in [bB][rR][aA][nN][cC][hH]) return 0 ;; esac; return 1; }
 
+# True when the word is a long option that git would read as --delete (or
+# --force): git accepts any unambiguous prefix, so --del and --forc count.
+is_long_prefix() {
+  local name="${1#--}"
+  [ "${#name}" -ge 3 ] || return 1
+  case "$2" in "$name"*) return 0 ;; esac
+  return 1
+}
+
 # True when the command could force-delete a branch: the old literal text
-# anywhere (covers quoted or nested spellings), or a word "git", then global
-# options, then "branch", then delete flags (-D, -d with -f, --delete with
-# --force, glued letters like -Dr or -fd).
+# anywhere, or a git word, then global options, then "branch" (or an alias
+# option that could rename a subcommand to it), then delete flags (-D, -d with
+# -f, --delete with --force or their prefixes, glued letters like -Dr or -fd).
+# Words are normalized first (quotes and backslashes dropped, path stripped),
+# so 'git', g''it, \git, /usr/bin/git and git \branch are all seen. The strict
+# parser below then rejects every such form, so they block.
 looks_like_branch_delete() {
   local -a w
-  local i n j k opt hasD hasd hasf
+  local i n j k opt norm hasD hasd hasf unk
   case "$command" in
     *[gG][iI][tT]" "[bB][rR][aA][nN][cC][hH]" -D"*) return 0 ;;
   esac
+  norm="${command//\'/}"
+  norm="${norm//\"/}"
+  norm="${norm//\\/}"
   # shellcheck disable=SC2206
-  w=($command)
+  w=($norm)
   n=${#w[@]}
   for ((i = 0; i < n; i++)); do
-    is_git_word "${w[i]}" || continue
-    hasD=0 hasd=0 hasf=0
+    is_git_word "${w[i]##*/}" || continue
+    hasD=0 hasd=0 hasf=0 unk=0
     j=$((i + 1))
-    # Skip global options that may precede the subcommand.
+    # Skip global options that may precede the subcommand. -c, --config-env and
+    # unknown options can define an alias for branch, so they count as a match.
     while [ "$j" -lt "$n" ]; do
       case "${w[j]}" in
-        -C|-c|--git-dir|--work-tree|--namespace) j=$((j + 2)) ;;
-        -*) j=$((j + 1)) ;;
+        -C|--git-dir|--work-tree|--namespace) j=$((j + 2)) ;;
+        -c|--config-env) unk=1; j=$((j + 2)) ;;
+        --git-dir=*|--work-tree=*|--namespace=*|--no-pager|-p|--paginate) j=$((j + 1)) ;;
+        -*) unk=1; j=$((j + 1)) ;;
         *) break ;;
       esac
     done
-    if [ "$j" -lt "$n" ] && is_branch_word "${w[j]}"; then
+    if [ "$j" -lt "$n" ] && { is_branch_word "${w[j]}" || [ "$unk" -eq 1 ]; }; then
       for ((k = j + 1; k < n; k++)); do
         opt="${w[k]}"
         case "$opt" in
-          --delete) hasd=1 ;;
-          --force) hasf=1 ;;
-          --*) ;;
+          --*)
+            if is_long_prefix "$opt" delete; then hasd=1; fi
+            if is_long_prefix "$opt" force; then hasf=1; fi ;;
           -?*)
             case "$opt" in *D*) hasD=1 ;; esac
             case "$opt" in *d*) hasd=1 ;; esac
@@ -203,6 +221,11 @@ branch_delete_allowed() {
       --) continue ;;
       --delete) dflag=1; continue ;;
       --force) fflag=1; continue ;;
+      --*)
+        # A shortened long option (--del, --forc) is the same option.
+        if is_long_prefix "$word" delete; then dflag=1; continue; fi
+        if is_long_prefix "$word" force; then fflag=1; continue; fi
+        return 1 ;;
       -D) Dflag=1; continue ;;
       -d) dflag=1; continue ;;
       -f) fflag=1; continue ;;

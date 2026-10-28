@@ -69,6 +69,13 @@ Global options before the subcommand are understood: `-C <dir>` and
 `--git-dir[=]<dir>` move the proof into that repo. `-c`, `--work-tree` and any
 other global option block. Only plain delete flags are allowed: a glued extra
 letter such as `-Dr` blocks, because `-r` would delete remote-tracking refs.
+Git reads any unambiguous prefix of a long option, so `--del` and `--forc` count
+as `--delete` and `--force` (3 letters or more). Before matching, the hook drops
+quotes and backslashes and strips the path from the `git` word, so `'git'`,
+`g''it`, `\git`, `/usr/bin/git`, `git 'branch'` and `-d '-f'` are all seen as a
+force-delete; the strict parser then rejects every such form, so they block. An
+in-command alias (`git -c alias.b=branch b -D x`, `--config-env`) counts as a
+force-delete too and blocks.
 
 Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
 quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as
@@ -97,6 +104,10 @@ Known gaps (the same as before this change; none is newly allowed):
   hook cannot detect either offline.
 - A shell alias, function or wrapper that runs `git branch` under another name
   never shows the word `git` to the hook.
+- Other commands that delete or overwrite a branch are not checked at all:
+  `git update-ref -d refs/heads/<b>`, `git push . :<b>`, `git branch -M <x> <b>`,
+  and `git branch -f <b> <x>` over an unmerged branch. Tracked as
+  `git-ref-delete-other-commands` in `TASKS.md`.
 
 Tests: `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.

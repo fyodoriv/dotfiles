@@ -251,6 +251,16 @@
         "Reports the new skill that overlaps a personal skill, with a proposal"
       ],
       "id": 21
+    },
+    {
+      "prompt": "/tooling-checkup (Claude Code, Bash sandbox on by default)",
+      "expected_output": "Phase 1 runs inventory.sh with the sandbox off on its first call, so gh works, and writes the inventory to the session scratchpad. Later phases read it from there. No inventory run is wasted on an x509 error or a file not found under $TMPDIR.",
+      "expectations": [
+        "The first inventory.sh call runs with the sandbox off",
+        "No x509 TLS failure from gh in Phase 1",
+        "Files shared across calls go to the scratchpad, not $TMPDIR"
+      ],
+      "id": 22
     }
   ]
 }

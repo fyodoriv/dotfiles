@@ -157,7 +157,7 @@ elif ! git -C "$AGENTBREW_APPLIED" diff --quiet HEAD origin/main; then
   if $ENDPOINT_NODE_SAFE_MODE; then
     echo "deferred applied AgentBrew build: endpoint Node safe mode is active"
   else
-    (cd "$AGENTBREW_APPLIED" && npm run build)
+    (cd "$AGENTBREW_APPLIED" && heavy-run npm run build)
   fi
 else
   echo "applied AgentBrew checkout is current"

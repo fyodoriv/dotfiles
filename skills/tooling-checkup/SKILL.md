@@ -87,7 +87,7 @@ Phase 1 compares the machine with it. Use it to keep a repeat run short:
 - Phase 6 runs the slow echo test only when `machine_metrics.py` prints
   `latency-check: run`.
 - Phase 9 shows only feed items no earlier run has seen.
-- Phases 1, 3, 5, 6, 8, and 9 always run. They check live state.
+- Phases 1, 3, 5, 6, 8, and 9 always run (live state).
 
 ## Phase 1: Take stock (read-only)
 
@@ -97,8 +97,10 @@ bash <skill-dir>/scripts/inventory.sh
 python3 <skill-dir>/scripts/pty_capture.py --timeout 60 -- claude doctor
 ```
 
-- `diff` prints the last run time, its verdict and numbers, and every tool
-  version or repository head that changed since.
+Run them unsandboxed (`gh` TLS); pass files via the scratchpad, not `$TMPDIR`.
+
+- `diff` prints the last run, its verdict and numbers, and every tool
+  version or repo head that changed since.
 - `inventory.sh` prints one verdict per item: `ship`, `review`, `salvage`,
   `clean-up`, `pipeline`, `bot`, `skip`, `security`, `advisory`, or `unknown`.
 - A PR is `ship` only when it is yours (its author is your `gh` login) and
@@ -334,7 +336,7 @@ questionnaire. Use the perf-review skill for deeper analysis.
 
 ## Phase 9: AI-work research
 
-Look for new ways to work with AI, on your own, every run. Follow
+Look for new ways to work with AI every run. Follow
 [reference/ai-work-research.md](reference/ai-work-research.md). In short:
 
 1. Run `python3 <skill-dir>/scripts/ai_research.py scan` outside the sandbox.
@@ -381,7 +383,6 @@ question:
 - **Context:** what it is, what is true now, and the evidence.
 - **Options:** 2 to 4 concrete choices. Each says what you will do and what it
   costs. Put your recommendation first, with "(Recommended)" in its label.
-- The header has 12 characters or fewer.
 
 **Done when:** every question has an answer, or the user chose to stop.
 
@@ -396,8 +397,8 @@ question:
    Mark the background updates as seen, so the "updates landed" nudge
    (`dotfiles-updates-landed`) stays quiet until new ones land:
    `dotfiles-updates-landed --ack`.
-3. Record this run (in Phase 10 step 2, before the dashboard update;
-   record again here only when an answer changed the verdict):
+3. Record this run in Phase 10 step 2; record again here only when an
+   answer changed the verdict:
 
    ```bash
    python3 <skill-dir>/scripts/checkup_state.py record --verdict "<verdict line>" \

@@ -42,20 +42,6 @@ them. -->
 
 ## P2
 
-- [ ] tooling-checkup Phase 1 says to run gh scripts outside the sandbox
-  - **ID**: tooling-checkup-sandbox-gh-note
-  - **Tags**: docs, agents
-  - **Details**: In the 2026-10-28 checkup the first two inventory runs were wasted: inside the Claude Code Bash sandbox `gh` fails TLS (x509), and `$TMPDIR` inside the sandbox is a different folder from the one outside, so a file written outside was not found inside. Add one line to the tooling-checkup Phase 1 steps: run `gh`-dependent scripts with the sandbox off from the first call, and write files shared across calls to the session scratchpad, not `$TMPDIR`.
-  - **Files**: `skills/tooling-checkup/SKILL.md`, `skills/tooling-checkup/evals/`
-  - **Output**: docs
-  - **Acceptance**: the Phase 1 text has the note; an eval case checks that an agent runs the inventory outside the sandbox on its first try.
-  - **Hypothesis**: the note cuts wasted Phase 1 inventory runs from 2 per checkup to 0, which saves about 2 minutes and one round trip each run.
-  - **Measurement**: count inventory runs before the first good one in the next two checkup transcripts (`rg -c inventory.sh` on the session jsonl).
-  - **Success**: 0 wasted runs on both checkups.
-  - **Pivot**: still 1 or more wasted runs -> make `inventory.sh` detect the sandbox and exit with a clear message instead.
-  - **Anchor**: tooling-checkup run 2026-10-28; Nielsen 1994, error prevention heuristic.
-  - **Competitive-goal**: none — agent workflow speed.
-
 - [ ] agent_time_review counts subagent waits apart from real work
   - **ID**: agent-time-review-subagent-noise
   - **Tags**: metrics, agents

@@ -15,9 +15,9 @@ names.
 
 | Task | Command (from the repo root) |
 |---|---|
-| Gate, once before a commit | `make check` (lint, TASKS.md lint, affected bats, including the branch's commits ahead of `origin/feat/chezmoi`; skips unchanged) |
+| Gate, once before a commit | `make check` (lint, TASKS.md lint, affected bats; skips unchanged) |
 | Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
-| Tests affected by a committed branch | `bin/bats-affected origin/feat/chezmoi \| xargs bats` |
+| Tests affected by a committed branch | `make check` (it adds commits ahead of base) |
 | Full suite (background) | `heavy-run make test-all` |
 | Install e2e (real chezmoi and doctor) in a scratch HOME | `heavy-run make e2e` (`make check` runs it when an installer path changes) |
 | Plugin suites on macOS `/bin/bash` 3.2 | `make test-plugins-bash32` (`make check` runs it on plugin changes) |

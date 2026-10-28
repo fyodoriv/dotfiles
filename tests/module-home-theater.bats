@@ -35,7 +35,7 @@ printf 'VLC\n/Applications/VLC.app\norg.videolan.vlc\n' > "$MOCK_DIR/duti"
 MOCK
   cat > "$MOCK_BIN/pmset" <<'MOCK'
 #!/bin/bash
-printf 'Battery Power:\n sleep                1\nAC Power:\n sleep                %s\n' "$(cat "$MOCK_DIR/sleep" 2>/dev/null || echo 10)"
+printf 'Battery Power:\n sleep                %s\nAC Power:\n sleep                %s\n' "$(cat "$MOCK_DIR/battery" 2>/dev/null || echo 1)" "$(cat "$MOCK_DIR/sleep" 2>/dev/null || echo 10)"
 MOCK
   chmod +x "$MOCK_BIN"/*
   export MOCK_DIR="$TEST_DIR"
@@ -82,6 +82,7 @@ good_machine() {
 }
 
 @test "home-theater: a good machine passes all six checks" {
+  command -v jq >/dev/null || skip "jq not installed"
   good_machine
   source "$MODULE"
   [ "${#results[@]}" -eq 6 ]
@@ -117,11 +118,13 @@ good_machine() {
 @test "home-theater: system sleep on AC power fails (reads the AC section, not battery)" {
   good_machine
   echo 10 > "$TEST_DIR/sleep"
+  echo 0 > "$TEST_DIR/battery"
   source "$MODULE"
   [ "$(result home_theater.no_sleep_on_ac)" = fail ]
 }
 
 @test "home-theater: Samsung TV on Wi-Fi fails; no host means no TV check" {
+  command -v jq >/dev/null || skip "jq not installed"
   good_machine
   echo '{"device":{"modelName":"QN65S92C","networkType":"wireless"}}' > "$TEST_DIR/tv"
   source "$MODULE"
@@ -136,4 +139,12 @@ good_machine() {
   grep -A4 'dig "home_theater" false' "$tmpl" | grep -q 'cask "plex-media-server"'
   grep -A4 'dig "home_theater" false' "$tmpl" | grep -q 'cask "vlc"'
   grep -A4 'dig "home_theater" false' "$tmpl" | grep -q 'brew "duti"'
+}
+
+@test "home-theater: a TV host with shell characters is ignored, not eval'd" {
+  good_machine
+  export SAMSUNG_TV_HOST="tv';touch $TEST_DIR/pwned;'"
+  source "$MODULE"
+  [ -z "$(result home_theater.tv_wired)" ]
+  [ ! -e "$TEST_DIR/pwned" ]
 }

@@ -46,6 +46,8 @@ check "home_theater.no_sleep_on_ac" \
 
 # Samsung Tizen TVs answer GET :8001/api/v2/ on the LAN with device info.
 # 4K remuxes need a steady 80+ Mbit/s; Wi-Fi drops frames, Ethernet does not.
+# The host goes into an eval'd check, so only plain host characters pass.
+case "${SAMSUNG_TV_HOST:-}" in *[!A-Za-z0-9.:-]*) SAMSUNG_TV_HOST="" ;; esac
 if [ -n "${SAMSUNG_TV_HOST:-}" ]; then
   check "home_theater.tv_wired" \
     "Samsung TV at $SAMSUNG_TV_HOST is on wired Ethernet (fix: plug in a cable; TV Settings > Connection > Network)" \

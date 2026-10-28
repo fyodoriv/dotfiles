@@ -18,6 +18,7 @@ It never prints prompts, commands beyond the redacted step key, or file paths.
 """
 
 import argparse
+import bisect
 import datetime as dt
 import glob
 import json
@@ -154,6 +155,71 @@ def sessions_by_step(days: int) -> dict:
     return {k: len(v - {""}) for k, v in sids.items()}
 
 
+def ts_of(row) -> dt.datetime:
+    return dt.datetime.fromisoformat(str(row["ts"]).replace("Z", "+00:00"))
+
+
+def p95(values: list) -> int:
+    ordered = sorted(values)
+    return ordered[max(0, -(-len(ordered) * 95 // 100) - 1)] if ordered else 0
+
+
+def split_agent_rows(days: int) -> dict:
+    """Split subagent rows (`agent:` keys) into foreground and background.
+
+    Background: marked "bg": true, called from inside a subagent (the row has
+    `agent`), or the lead made another tool call while it ran. Its time
+    overlaps tool time that is already counted, so it stays out of the step
+    ranking and the speedup tasks. Foreground: the lead waited on it.
+    """
+    rows = list(tool_rows_in_log(days))
+    lead = {}
+    for row in rows:
+        if not row.get("agent") and row.get("sid"):
+            lead.setdefault(row["sid"], []).append(ts_of(row))
+    for times in lead.values():
+        times.sort()
+    out = {"fg": {}, "fgSessions": {}, "bg": {}}
+    for row in rows:
+        key = row.get("key") or ""
+        if not key.startswith("agent:"):
+            continue
+        project, ms = str(row["project"]), row.get("ms") or 0
+        end = ts_of(row)
+        start = end - dt.timedelta(milliseconds=ms)
+        times = lead.get(row.get("sid"), [])
+        i = bisect.bisect_right(times, start)
+        overlapped = any(t != end for t in times[i:bisect.bisect_left(times, end)])
+        if row.get("bg") is True or row.get("agent") or overlapped:
+            out["bg"].setdefault(project, []).append(ms)
+        else:
+            out["fg"].setdefault((project, key), []).append(ms)
+            out["fgSessions"].setdefault((project, key), set()).add(row.get("sid") or "")
+    return out
+
+
+def foreground_only(report: dict, split: dict, project: str = "") -> dict:
+    """The report with each `agent:` step cut to its foreground calls."""
+    keys = []
+    for step in report.get("keys", []):
+        if not step.get("key", "").startswith("agent:"):
+            keys.append(step)
+            continue
+        ms = [v for (p, k), vals in split["fg"].items() if k == step["key"] and (not project or p == project)
+              for v in vals]
+        if ms:
+            keys.append(dict(step, count=len(ms), sumMs=sum(ms), p95Ms=p95(ms)))
+    fg_ms = {v for (p, _), vals in split["fg"].items() if not project or p == project for v in vals}
+    slowest = [c for c in report.get("slowest") or []
+               if not str(c.get("key", "")).startswith("agent:") or c.get("ms") in fg_ms]
+    return dict(report, keys=keys, slowest=slowest)
+
+
+def background_line(ms: list) -> str:
+    return (f"background subagents (overlap the lead, not ranked): {len(ms)}x, "
+            f"{fmt_ms(sum(ms))} total, p95 {fmt_ms(p95(ms))}")
+
+
 def tooling_repo(project: str) -> str:
     """Map a perf project name to a tooling repo name, or '' when it is not one."""
     root = pathlib.Path(os.environ.get("TOOLING_ROOT") or os.path.expanduser("~/apps/tooling"))
@@ -261,24 +327,33 @@ def main() -> int:
     if overall is None:
         print(f"agent-time-review: no agent-perf data ({error}). Check `agentbrew status` for the perf-record hook.")
         return 1
+    split = split_agent_rows(days)
+    overall = foreground_only(overall, split)
     per_project = {}
     for project in projects_in_log(days):
         report, _ = perf_report(days, project)
         if report and report.get("calls", 0):
-            per_project[project] = report
+            per_project[project] = foreground_only(report, split, project)
     session = {}
     script = session_report_script()
     if script:
         data, _ = run_json(["node", script, "--json", "--since", f"{days}d"], timeout=180)
         session = (data or {}).get("overall", {})  # never read top_prompts: it holds prompt text
-    candidates = task_candidates(per_project, days, sessions_by_step(days))
+    sessions = sessions_by_step(days)
+    for step, sids in split["fgSessions"].items():
+        sessions[step] = len(sids - {""})
+    for step in [s for s in sessions if s[1].startswith("agent:") and s not in split["fgSessions"]]:
+        sessions[step] = 0
+    candidates = task_candidates(per_project, days, sessions)
+    background = {p: {"count": len(ms), "totalMs": sum(ms), "p95Ms": p95(ms)} for p, ms in split["bg"].items()}
     values = metrics(overall, session, days)
     previous = last_metrics()
 
     if args.json:
         print(json.dumps({"days": days, "overall": {k: overall.get(k) for k in ("toolMs", "calls", "failures", "previous")},
                           "top": top_steps(overall), "projects": {p: top_steps(r) for p, r in per_project.items()},
-                          "tasks": candidates, "metrics": values, "lastMetrics": previous}, indent=2))
+                          "tasks": candidates, "backgroundAgents": background,
+                          "metrics": values, "lastMetrics": previous}, indent=2))
         return 0
 
     prev = overall.get("previous") or {}
@@ -299,12 +374,17 @@ def main() -> int:
         print(f"    {i}. {step_line(step, days)}")
     if slowest_line(overall):
         print(f"    {slowest_line(overall)}")
+    all_bg = [ms for values in split["bg"].values() for ms in values]
+    if all_bg:
+        print(f"    {background_line(all_bg)}")
     for project, report in per_project.items():
         print(f"  {project}: {fmt_ms(report.get('toolMs'))} over {report.get('calls', 0)} calls")
         for i, step in enumerate(top_steps(report), 1):
             print(f"    {i}. {step_line(step, days)}")
         if slowest_line(report):
             print(f"    {slowest_line(report)}")
+        if split["bg"].get(project):
+            print(f"    {background_line(split['bg'][project])}")
     print(f"  speedup tasks (recurring in {RECURRING_MIN_SESSIONS}+ sessions, {TASK_MIN_MS_PER_DAY // 60000}+ min/day):")
     if not candidates:
         print(f"    none: no step in {RECURRING_MIN_SESSIONS}+ sessions costs 1 min/day or more")

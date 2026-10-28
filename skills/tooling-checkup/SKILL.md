@@ -316,7 +316,11 @@ It wraps `agent-perf.mjs report --all --days 7 --json` and the
 recurring steps (2 or more calls) per project and overall, a `fix:` line for
 each step that matches a known safe fix, the change since the last checkup,
 and one speedup line per step that recurs in 2 or more sessions and costs
-1 min/day or more. A step repeated inside one session is not a task:
+1 min/day or more. A step repeated inside one session is not a task.
+A subagent that ran in the background, ran inside another subagent, or ran
+while the lead made other calls gets its own `background subagents` line;
+it is left out of the ranking and the speedup lines, because its time
+overlaps tool time already counted:
 
 | Line | Do this |
 |---|---|

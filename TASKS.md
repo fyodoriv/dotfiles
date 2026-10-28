@@ -43,20 +43,6 @@ them. -->
 
 ## P2
 
-- [ ] agent_time_review counts subagent waits apart from real work
-  - **ID**: agent-time-review-subagent-noise
-  - **Tags**: metrics, agents
-  - **Details**: `skills/tooling-checkup/scripts/agent_time_review.py` puts `agent:general-purpose` at the top of every project (10.7 h in 7 days on 2026-10-28) and files a "speed-up-agent-general-purpose" task for agentbrew and dotfiles. Most of that time is a background worker's whole life, which overlaps the lead's own tool time, so it is double counted and the suggested fix ("narrower prompt") is rarely the lever. Report background subagents in their own line (count, total, p95) and leave them out of the speedup-task list unless a foreground subagent blocked the lead.
-  - **Files**: `skills/tooling-checkup/scripts/agent_time_review.py`, its tests
-  - **Output**: code
-  - **Acceptance**: a fixture with one background and one foreground subagent shows the background one only in the new line; no speedup task is filed for background subagents.
-  - **Hypothesis**: separating background subagents drops false speedup tasks from the review from 2 per run to 0, without hiding foreground waits.
-  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7 | rg -c "filed? .*speed-up-agent-general-purpose"` on the next checkup.
-  - **Success**: 0 such lines, and the fixture test passes.
-  - **Pivot**: the transcripts do not mark background vs foreground subagents -> report the overlap share instead and keep the list.
-  - **Anchor**: tooling-checkup run 2026-10-28; Basili, Caldiera, Rombach 1994 (GQM: a metric must answer the question asked).
-  - **Competitive-goal**: none — metric quality.
-
 - [ ] Rebuild the UI to the Hallmark design skill
   - **ID**: hallmark-design
   - **Details**: The owner chose Hallmark (nutlope/hallmark, installed through agentbrew on

@@ -586,6 +586,37 @@ JS
   [[ "$output" == *"no agent-perf data"* ]]
 }
 
+@test "time review keeps background subagents out of the ranking and the tasks" {
+  command -v node >/dev/null || skip "node not installed"
+  make_tooling_root
+  make_perf_fixtures
+  local now before
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  before="$(python3 -c 'import datetime as d; print((d.datetime.now(d.timezone.utc) - d.timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"
+  # agent:Explore blocked the lead (no lead call during it). agent:general-purpose
+  # overlapped a lead call (s1) or was a marked background launch (s2).
+  {
+    printf '{"ts":"%s","project":"alpha","sid":"s5","key":"agent:Explore","ms":600000}\n' "$now"
+    printf '{"ts":"%s","project":"alpha","sid":"s6","key":"agent:Explore","ms":600000}\n' "$now"
+    printf '{"ts":"%s","project":"alpha","sid":"s1","key":"git status","ms":5}\n' "$before"
+    printf '{"ts":"%s","project":"alpha","sid":"s1","key":"agent:general-purpose","ms":600000}\n' "$now"
+    printf '{"ts":"%s","project":"alpha","sid":"s2","key":"agent:general-purpose","ms":600000,"bg":true}\n' "$now"
+  } > "$PERF_FIXTURES/log/2026-10.jsonl"
+  local fg='{"key":"agent:Explore","count":2,"sumMs":1200000,"p95Ms":600000}'
+  local bg='{"key":"agent:general-purpose","count":2,"sumMs":1200000,"p95Ms":600000}'
+  printf '{"toolMs":2400000,"calls":4,"keys":[%s,%s],"slowest":[{"key":"agent:general-purpose","ms":600001}]}' "$bg" "$fg" \
+    > "$PERF_FIXTURES/all.json"
+  cp "$PERF_FIXTURES/all.json" "$PERF_FIXTURES/alpha.json"
+
+  run env TOOLING_ROOT="$TOOLING" python3 "$SCRIPTS/agent_time_review.py" --days 7
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"background subagents (overlap the lead, not ranked): 2x, 20m00s total"* ]]
+  [[ "$output" == *"1. agent:Explore: 20m00s total, 2x"* ]]
+  [[ "$output" == *"file    alpha speed-up-agent-explore"* ]]
+  [[ "$output" != *"agent:general-purpose"* ]]
+  [[ "$output" != *"speed-up-agent-general-purpose"* ]]
+}
+
 @test "machine metrics flag overload and skip the echo test without a lag signal" {
   local now=1792153670 samples="$TEST_DIR/load.tsv" ps_file="$TEST_DIR/ps.txt"
   : > "$samples"

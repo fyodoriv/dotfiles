@@ -192,6 +192,18 @@ Some hosts enforce `required_pull_request_reviews`. Behavior depends on **§ Rep
 
 **Contrast with own-tool repos:** In `~/apps/tooling/**` (`agentbrew`, `dotfiles`, `tasks-md`, `minsky`), cascade step 2 (`--admin`) or step 5 (GraphQL) is usually the completion path when `reviewDecision: REVIEW_REQUIRED` is the only blocker.
 
+## Setting branch protection
+
+Before you set branch protection, read `gh api repos/<o>/<r>/actions/permissions`
+and the recent workflow runs.
+
+- **Actions on, checks reported:** require those checks.
+- **Actions off, or no check ever reported:** require a PR review only. A
+  required check that never runs blocks every PR forever. Note in
+  CONTRIBUTING that contributors run the checks themselves.
+- **Always:** keep `enforce_admins` false, so a standing bypass-merge rule
+  still works. Verify with `gh api repos/<o>/<r>/branches/<branch>/protection`.
+
 ## Bypass merge cascade (mandatory under `/ship-it` when `BYPASS_ALLOWED=true`)
 
 When `BYPASS_ALLOWED=true` and a session-owned PR has green substantive checks and `reviewDecision: REVIEW_REQUIRED`, ship-it mode **MUST run every step below** before treating review as irreducible. **Never stop** after the first `REVIEW_REQUIRED` from `gh pr merge --admin` — continue through self-approve, GraphQL, and REST. Record each command and its stderr/JSON error in the delivery report.
@@ -636,13 +648,38 @@ Before handoff or merge, attach visual proof to every PR.
    is available.
 4. Do not commit images, request bodies with secrets, session data, or customer
    data. Redact secrets from a transcript the same way.
-5. Open the PR in the browser. Drag and drop the images into the PR
-   description. Do not add local image paths or fake image links. A transcript
-   is pasted directly, so it needs no upload.
+5. Attach each image with the CDP comment-box upload (default, no focus
+   change). Do not add local image paths or fake image links. A transcript is
+   pasted directly, so it needs no upload. See "Upload proof images over CDP"
+   below. Dragging into the PR description by hand is the fallback.
 6. Add `## Visual proof` to the description. For each image or transcript,
    state the case, action, expected result, and observed result.
 7. A screenshot of a dashboard does not prove a state change or a network call.
    Capture the relevant request or output too.
+
+### Upload proof images over CDP
+
+This is the default non-interactive way to attach an image. It works on
+github.com and on a GitHub Enterprise host.
+
+1. Connect over CDP to the signed-in agents Chrome on port `9223`.
+2. Open the PR in a background tab. Do not front it.
+3. Call `setInputFiles` on the comment box `input[type=file]`.
+4. Read the inserted markdown from `#new_comment_field`. It looks like
+   `<img ... src=".../user-attachments/assets/...">`.
+5. Clear the box. **Never submit the comment.**
+6. Put the tag under `## Visual proof` and run
+   `gh pr edit <n> --body-file <file>`.
+
+Caution: an uploaded attachment URL is reachable even if the comment is never
+sent. Upload only images that are safe to make public.
+
+### Scripts-only lockfile gate
+
+When a repo gate rejects `package.json` without a lockfile change, run
+`git diff -- package.json`. A diff that touches only `scripts` is a gate false
+positive. Fix the gate in that repo, or file a task. Never add an empty
+lockfile change to pass it.
 
 ### Never stage a terminal image with GUI automation
 

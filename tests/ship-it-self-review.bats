@@ -58,3 +58,28 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
     and (.expectations | any(contains("Not sure:")))
     and (.expectations | any(contains("Does not run a command"))))' "$eval_file" >/dev/null
 }
+
+@test "ship-it reference reads Actions state before branch protection (#391)" {
+  grep -q '^## Setting branch protection' "$REF"
+  grep -F -q 'actions/permissions' "$REF"
+  grep -q 'Actions off, or no check ever reported' "$REF"
+  grep -F -q 'keep `enforce_admins` false' "$REF"
+  grep -F -q 'branches/<branch>/protection' "$REF"
+}
+
+@test "ship-it reference documents the CDP proof upload and its cautions (#388)" {
+  grep -q '^### Upload proof images over CDP' "$REF"
+  grep -q 'port `9223`' "$REF"
+  grep -F -q 'setInputFiles' "$REF"
+  grep -F -q '#new_comment_field' "$REF"
+  grep -F -q '**Never submit the comment.**' "$REF"
+  grep -F -q 'gh pr edit <n> --body-file' "$REF"
+  grep -q 'reachable even if the comment is never' "$REF"
+}
+
+@test "ship-it reference treats a scripts-only package.json diff as a gate false positive (#388)" {
+  grep -q '^### Scripts-only lockfile gate' "$REF"
+  grep -F -q 'git diff -- package.json' "$REF"
+  grep -q 'gate false' "$REF"
+  grep -q 'Never add an empty' "$REF"
+}

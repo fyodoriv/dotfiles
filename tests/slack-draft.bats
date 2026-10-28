@@ -10,14 +10,21 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   export CALLS="$TEST_DIR/calls.log"
   export DRAFTS_JSON="$TEST_DIR/drafts.json" INPUT_STATE="$TEST_DIR/input"
-  export PAGE MARK="$TEST_DIR/injected"
+  export PAGE MARK="$TEST_DIR/injected" DELCOUNT="$TEST_DIR/delcount"
   echo '[]' > "$DRAFTS_JSON"
   echo 1 > "$INPUT_STATE"
   cat > "$TEST_DIR/agent-tab" <<'STUB'
 #!/bin/bash
 echo "$*" >> "$CALLS"
 case "$1" in
-  eval) out="$(node "$PAGE" "$5")"; echo "$out"
+  eval) if [[ "$5" == *"  b.click();"* ]]; then
+          dn=$(( $(cat "$DELCOUNT" 2>/dev/null || echo 0) + 1 )); echo "$dn" > "$DELCOUNT"
+          if [ "${FAIL_ON_DELETE_CALL:-0}" = "$dn" ]; then echo "agent-tab: cdp Runtime.evaluate: no answer in 10 s" >&2; exit 1; fi
+        fi
+        out="$(node "$PAGE" "$5")"; echo "$out"
+        if [[ "$5" == *"  b.click();"* ]] && [ "${INJECT_AFTER_DELETE:-0}" = "$(cat "$DELCOUNT")" ]; then
+          jq '[{to:"Bob",body:"hello NEW unseen"}] + .' "$DRAFTS_JSON" > "$DRAFTS_JSON.n"; mv "$DRAFTS_JSON.n" "$DRAFTS_JSON"
+        fi
         # INJECT: change the list right after the first read (what the user confirmed)
         if [ -n "${INJECT:-}" ] && [ ! -e "$MARK" ] && [[ "$5" == *"JSON.stringify(hits().map"* ]]; then
           touch "$MARK"
@@ -198,6 +205,47 @@ left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
   drafts '[{"to":"Bob","body":"hello 1"},{"to":"Bob","body":"hello 2"}]'
   INJECT=prepend run "$SCRIPT" delete T1 hello --to Bob --all --yes
   [ "$status" -eq 1 ]
+  [ "$(jq length "$DRAFTS_JSON")" -eq 3 ]
+}
+
+@test "agent-tab failing on the 3rd delete of --all prints the count and exits 1" {
+  drafts '[{"to":"Bob","body":"hello 1"},{"to":"Bob","body":"hello 2"},{"to":"Bob","body":"hello 3"}]'
+  FAIL_ON_DELETE_CALL=3 run "$SCRIPT" delete T1 hello --to Bob --all --yes
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown: 2 confirmed deleted, then agent-tab failed"* ]]
+  [ "$(jq length "$DRAFTS_JSON")" -eq 1 ]
+}
+
+@test "rows hiding while the delete dialog stays open is unknown, not removed" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  FAKE_STUCK_MODAL=1 run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown"* ]]
+  [[ "$output" != *"deleted 1"* ]]
+}
+
+@test "a Delete dialog that was already open before the click is never answered" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  export DECOY_HIT="$TEST_DIR/decoy"
+  FAKE_CONFIRM=1 FAKE_OLD_DELETE_DIALOG=1 run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 0 ]
+  [ ! -e "$DECOY_HIT" ]
+  [ "$(left)" = "" ]
+}
+
+@test "duplicate drafts: --all deletes both Bob drafts and keeps Eve's" {
+  drafts '[{"to":"Bob","body":"hello"},{"to":"Bob","body":"hello"},{"to":"Eve","body":"hello"}]'
+  run "$SCRIPT" delete T1 hello --to Bob --all --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"deleted 2 draft(s)"* ]]
+  [ "$(left)" = "Eve" ]
+}
+
+@test "a new match after the first delete stops --all and reports how many went" {
+  drafts '[{"to":"Bob","body":"hello 1"},{"to":"Bob","body":"hello 2"},{"to":"Bob","body":"hello 3"}]'
+  INJECT_AFTER_DELETE=1 run "$SCRIPT" delete T1 hello --to Bob --all --yes
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"changed"*"1 deleted"* ]]
   [ "$(jq length "$DRAFTS_JSON")" -eq 3 ]
 }
 

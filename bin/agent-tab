@@ -294,7 +294,7 @@ refuse_secret_file() {
   lower="$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')"
   home="$(printf '%s' "$home" | tr '[:upper:]' '[:lower:]')"
   case "$lower" in
-    "$home"/.ssh/*|"$home"/.gnupg/*|"$home"/.aws/*|"$home"/.netrc|"$home"/.config/gh/*|"$home"/library/keychains/*|*/keychains/*|*.keychain|*.keychain-db|*.pem|*.key|*.p12)
+    "$home"/.ssh/*|"$home"/.gnupg/*|"$home"/.aws/*|"$home"/.netrc|"$home"/.config/gh/*|"$home"/library/keychains/*|*/keychains/*|*.keychain|*.keychain-db|*.pem|*.key|*.p12|*.kdbx|*/.env|*/.env.*|*/.git-credentials|*/.npmrc|*/.pgpass|*/id_*|"$home"/.kube/*|"$home"/.docker/config.json|"$home"/.config/gcloud/*)
       die "refusing to upload $f (looks like a key, keychain, or credential file); pass --force to send it anyway" 2 ;;
   esac
   links="$(stat -f %l "$f" 2>/dev/null || stat -c %h "$f" 2>/dev/null || echo 1)"

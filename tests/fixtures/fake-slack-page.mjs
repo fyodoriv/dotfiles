@@ -8,6 +8,8 @@
 //   FAKE_NO_DELETE_BUTTON  set: rows have no delete button
 //   INPUT_STATE   file: "1" when the main composer file input exists
 //   FAKE_INPUT_AFTER_CLICK  set: the input appears only after the attach click
+// FAKE_STUCK_MODAL: a delete click hides the row but the dialog stays open.
+// FAKE_OLD_DELETE_DIALOG: a "Delete message?" dialog is open before the click.
 // FAKE_DECOY: another modal (with its own confirm button) is open too;
 // its click writes the file DECOY_HIT.
 // Selectors are told apart by marker: dialog, _delete, _to, _body,
@@ -20,6 +22,11 @@ const file = process.env.DRAFTS_JSON;
 const load = () => (file ? JSON.parse(fs.readFileSync(file, "utf8")) : []);
 const save = (rows) => file && fs.writeFileSync(file, JSON.stringify(rows));
 let pending = null;
+let openDialog = null;  // the delete dialog opened by a click (one object, so identity is stable)
+// FAKE_OLD_DELETE_DIALOG: a "Delete message?" dialog open before any click.
+const oldDialog = process.env.FAKE_OLD_DELETE_DIALOG
+  ? { innerText: "Delete message?", querySelector: () => el("", () => fs.writeFileSync(process.env.DECOY_HIT, "1")) }
+  : null;
 
 const el = (text, onClick) => ({ innerText: text, click: onClick || (() => {}) });
 // Deletes by POSITION in the list at query time, like a virtualized list: a
@@ -30,7 +37,19 @@ const rowEl = (r, i) => ({
     if (sel.includes("_delete")) {
       if (process.env.FAKE_NO_DELETE_BUTTON) return null;
       return el("", () => {
-        if (process.env.FAKE_CONFIRM) { pending = i; return; }
+        if (process.env.FAKE_STUCK_MODAL) {
+          // The row hides, but the dialog never closes.
+          const cur = load(); cur.splice(i, 1); save(cur);
+          openDialog = { innerText: "Delete draft?", querySelector: () => el("", () => {}) };
+          return;
+        }
+        if (process.env.FAKE_CONFIRM) {
+          pending = i;
+          openDialog = { innerText: "Delete draft?", querySelector: () => el("", () => {
+            const cur = load(); cur.splice(pending, 1); save(cur); pending = null; openDialog = null;
+          }) };
+          return;
+        }
         const cur = load(); cur.splice(i, 1); save(cur);
       });
     }
@@ -48,11 +67,8 @@ const document = {
       if (process.env.FAKE_DECOY) {
         out.push({ innerText: "Leave channel?", querySelector: () => el("", () => fs.writeFileSync(process.env.DECOY_HIT, "1")) });
       }
-      if (pending !== null) {
-        out.push({ innerText: "Delete draft?", querySelector: () => el("", () => {
-          const cur = load(); cur.splice(pending, 1); save(cur); pending = null;
-        }) });
-      }
+      if (oldDialog) out.push(oldDialog);
+      if (openDialog) out.push(openDialog);
       return out;
     }
     return load().map(rowEl);

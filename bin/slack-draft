@@ -19,9 +19,14 @@
 # --yes skips the question. Without --yes and without a terminal it refuses.
 # It re-reads the list after each delete, answers Slack's confirm dialog, and
 # reports how many drafts really went. It deletes only the rows it showed you
-# (exact recipient and full body) and stops if the list changed. Slack's list
-# may be virtualized: if a delete cannot be confirmed it says "unknown". attach uses the file input of the main
-# composer (not a thread pane) and clicks the attach button first if needed.
+# (exact recipient and full body) and stops if the list changed.
+#
+# Slack's list may be virtualized: if a delete cannot be confirmed (the row is
+# still there, the delete dialog is still open, or agent-tab failed), it says
+# "unknown" and exits 1.
+#
+# attach uses the file input of the main composer (not a thread pane) and
+# clicks the attach button first if needed.
 #
 # Env: SLACK_DRAFT_URL (workspace URL for `open`; no default, never stored in
 #      the repo), AGENT_TAB_OWNER (default --owner), SLACK_DRAFT_AGENT_TAB
@@ -89,7 +94,8 @@ page_prelude() {
      const hits = () => rows().filter((r) => NAME && TEXT && norm(r.rawTo) === NAME && norm(r.rawBody).includes(TEXT));
      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
      const DEL = \($del | @json), OK = \($ok | @json), DLG = \($dlg | @json);
-     const dialog = () => [...document.querySelectorAll(DLG)].find((d) => /delete/i.test(txt(d)));"'
+     const dialogs = () => [...document.querySelectorAll(DLG)];
+     const isDelete = (d) => /delete/i.test(txt(d));"'
 }
 
 # Prints a JSON array of {to, body} (full, exact field text) for the matches.
@@ -162,14 +168,23 @@ delete_one() {
   const target = h.find((r) => eq(conf[0], r));
   const b = target.el.querySelector(DEL);
   if (!b) return JSON.stringify({ status: \"unknown\" });
+  // Only a delete dialog that was not open before this click is ours.
+  const pre = new Set(dialogs());
+  const fresh = () => dialogs().find((d) => !pre.has(d) && isDelete(d));
   b.click();
-  for (let t = 0; t < 30 && count() >= before; t++) {
+  let gone = false;
+  for (let t = 0; t < 30 && !gone; t++) {
     await sleep(100);
-    const d = dialog();
+    const d = fresh();
     const ok = d && d.querySelector(OK);
     if (ok) ok.click();
+    gone = count() < before && !fresh();
   }
-  return JSON.stringify({ status: count() < before ? \"removed\" : \"unknown\" });
+  if (gone) {
+    await sleep(300);
+    gone = count() < before && !fresh();
+  }
+  return JSON.stringify({ status: gone ? \"removed\" : \"unknown\" });
 })()"
 }
 
@@ -196,7 +211,8 @@ cmd_delete() {
     case "$answer" in y|Y|yes) ;; *) die "not confirmed" 4 ;; esac
   fi
   while [ "$(jq 'length' <<< "$rem")" -gt 0 ]; do
-    res="$(delete_one "$tab" "${POS[1]}" "$rem")"
+    res="$(delete_one "$tab" "${POS[1]}" "$rem")" ||
+      die "unknown: $deleted confirmed deleted, then agent-tab failed. Check the tab"
     st="$(jq -r '.status' <<< "$res")"
     case "$st" in
       removed) deleted=$((deleted + 1)); rem="$(jq -c '.[1:]' <<< "$rem")" ;;

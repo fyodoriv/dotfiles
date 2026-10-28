@@ -446,6 +446,21 @@ upload_ws_setup() {
   ! grep -q DOM. "$CDP_CALLS"
 }
 
+@test "upload refuses env files, token files, cloud and tool configs, and id_* keys" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME/.kube" "$HOME/.docker" "$HOME/.config/gcloud" "$TEST_DIR/proj"
+  for f in "$TEST_DIR/proj/.env" "$TEST_DIR/proj/.env.local" "$TEST_DIR/proj/.git-credentials" \
+           "$TEST_DIR/proj/.npmrc" "$TEST_DIR/proj/.pgpass" "$HOME/.kube/config" "$HOME/.docker/config.json" \
+           "$HOME/.config/gcloud/credentials.db" "$TEST_DIR/proj/vault.kdbx" "$TEST_DIR/proj/id_rsa" "$TEST_DIR/proj/id_ed25519.pub"; do
+    echo s > "$f"
+    run "$SCRIPT" upload --owner agent-a "$id" "$f"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refusing"* ]]
+  done
+}
+
 @test "upload refuses a symlink that points into ~/.ssh" {
   cdp_setup
   id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/

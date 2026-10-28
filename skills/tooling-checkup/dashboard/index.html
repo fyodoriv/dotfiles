@@ -1,30 +1,60 @@
 <style>
-  .tc-wrap { font-family: var(--font-anthropic-sans); color: var(--color-fg); display: grid; gap: 24px; }
-  .tc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-  .tc-kpi { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 8px; padding: 12px; }
-  .tc-kpi .tc-label { color: var(--color-fg-muted); font-size: 14px; }
-  .tc-kpi .tc-value { font-family: var(--font-anthropic-serif); font-size: 28px; }
-  .tc-verdict { font-size: 16px; line-height: 1.4; }
-  .tc-status-healthy { color: var(--color-ok); }
-  .tc-status-gaps { color: var(--color-warn); }
-  .tc-status-broken { color: var(--color-bad); }
-  .tc-chart { width: 100%; position: relative; }
-  .tc-chart h2, .tc-wrap h2 { font-size: 16px; margin: 0 0 8px; }
-  .tc-tip { position: absolute; pointer-events: none; background: var(--color-panel); border: 1px solid var(--color-border-line); padding: 4px 8px; border-radius: 4px; font-size: 14px; display: none; }
-  .tc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .tc-table th, .tc-table td { text-align: left; padding: 6px; border-bottom: 1px solid var(--color-border-line); }
+  /* Hallmark · shape: app screen · genre: modern-minimal · theme: brand (host tokens) · redesign: full
+   * paper: host --color-panel · accent: host chart colours · display: host serif · body: host sans
+   * nav: none, a single-column board · signature: the verdict line over four ruled figures · states: loading, empty
+   * axes: host/host/host · posture: settled · contrast: pass · v2.0.0 */
+  /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, charts are hover-only; the figures and the table carry the same numbers */
+  :root {
+    --tc-fg: var(--color-fg);
+    --tc-muted: var(--color-fg-muted);
+    --tc-panel: var(--color-panel);
+    --tc-line: var(--color-border-line);
+    --tc-ok: var(--color-ok);
+    --tc-warn: var(--color-warn);
+    --tc-bad: var(--color-bad);
+    --tc-sans: var(--font-anthropic-sans);
+    --tc-serif: var(--font-anthropic-serif);
+    --tc-gap: 24px;
+    --tc-pad: 8px;
+  }
+  html, body { overflow-x: clip; }
+  .tc-wrap { font-family: var(--tc-sans); color: var(--tc-fg); display: grid; gap: var(--tc-gap); max-width: 1120px; margin-inline: 0; min-width: 0; }
+  .tc-wrap h2 { font-size: 16px; font-weight: 600; line-height: 1.3; margin: 0 0 var(--tc-pad); text-wrap: balance; overflow-wrap: break-word; min-width: 0; }
+  #tc-latest { display: grid; gap: 16px; padding-bottom: var(--tc-gap); border-bottom: 1px solid var(--tc-line); }
+  .tc-verdict { font-family: var(--tc-serif); font-size: 24px; line-height: 1.3; margin: 0; max-width: 60ch; text-wrap: pretty; overflow-wrap: break-word; }
+  .tc-verdict strong { font-weight: 600; }
+  .tc-status-healthy { color: var(--tc-ok); }
+  .tc-status-gaps { color: var(--tc-warn); }
+  .tc-status-broken { color: var(--tc-bad); }
+  .tc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 16px; }
+  .tc-kpi { border-top: 2px solid var(--tc-fg); padding-top: var(--tc-pad); min-width: 0; }
+  .tc-kpi .tc-label { color: var(--tc-muted); font-size: 14px; line-height: 1.3; }
+  .tc-kpi .tc-value { font-family: var(--tc-serif); font-size: 32px; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .tc-chart { width: 100%; position: relative; min-width: 0; }
+  .tc-plot { min-width: 0; }
+  .tc-plot svg { display: block; max-width: 100%; height: auto; }
+  .tc-plot text { font-size: 14px; font-variant-numeric: tabular-nums; }
+  .tc-tip { position: absolute; pointer-events: none; background: var(--tc-panel); border: 1px solid var(--tc-line); padding: 4px 8px; border-radius: 4px; font-size: 14px; display: none; }
+  .tc-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .tc-table th, .tc-table td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--tc-line); overflow-wrap: anywhere; vertical-align: top; }
+  .tc-table th { font-weight: 600; color: var(--tc-muted); }
+  .tc-table tbody tr:last-child td { border-bottom: 0; }
+  @media (min-width: 900px) {
+    .tc-wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+    #tc-latest, #tc-runs { grid-column: 1 / -1; }
+  }
 </style>
 <div class="tc-wrap">
   <section id="tc-latest">
     <h2>Latest checkup</h2>
-    <p class="tc-verdict"><strong id="tc-status" data-source="latest" data-field="status" data-row="0">—</strong>:
-      <span data-source="latest" data-field="verdict" data-row="0">—</span>
-      (<span data-source="latest" data-field="time" data-row="0">—</span>)</p>
+    <p class="tc-verdict"><strong id="tc-status" data-source="latest" data-field="status" data-row="0">n/a</strong>:
+      <span data-source="latest" data-field="verdict" data-row="0">n/a</span>
+      (<span data-source="latest" data-field="time" data-row="0">n/a</span>)</p>
     <div class="tc-kpis">
-      <div class="tc-kpi"><div class="tc-label">Peak load1, 24 h</div><div class="tc-value" data-source="latest" data-field="machine_peak_load1_24h" data-row="0">—</div></div>
-      <div class="tc-kpi"><div class="tc-label">Overload rows, 24 h</div><div class="tc-value" data-source="latest" data-field="machine_overload_rows_24h" data-row="0">—</div></div>
-      <div class="tc-kpi"><div class="tc-label">Agent tool hours, 7 d</div><div class="tc-value" data-source="latest" data-field="agent_tool_hours_7d" data-row="0">—</div></div>
-      <div class="tc-kpi"><div class="tc-label">Claude echo p95, ms</div><div class="tc-value" data-source="latest" data-field="claude_echo_p95_ms" data-row="0">—</div></div>
+      <div class="tc-kpi"><div class="tc-label">Peak load1, 24 h</div><div class="tc-value" data-source="latest" data-field="machine_peak_load1_24h" data-row="0">n/a</div></div>
+      <div class="tc-kpi"><div class="tc-label">Overload rows, 24 h</div><div class="tc-value" data-source="latest" data-field="machine_overload_rows_24h" data-row="0">n/a</div></div>
+      <div class="tc-kpi"><div class="tc-label">Agent tool hours, 7 d</div><div class="tc-value" data-source="latest" data-field="agent_tool_hours_7d" data-row="0">n/a</div></div>
+      <div class="tc-kpi"><div class="tc-label">Claude echo p95, ms</div><div class="tc-value" data-source="latest" data-field="claude_echo_p95_ms" data-row="0">n/a</div></div>
     </div>
   </section>
   <section class="tc-chart" id="tc-overload" data-source="runs"><h2>Overload rows per checkup</h2><div class="tc-plot"></div><div class="tc-tip"></div></section>
@@ -52,14 +82,14 @@
     var box = document.querySelector('#' + id + ' .tc-plot');
     var tip = document.querySelector('#' + id + ' .tc-tip');
     box.textContent = '';
-    if (!rows.length) { box.textContent = '—'; return; }
+    if (!rows.length) { box.textContent = 'n/a'; return; }
     var w = Math.max(box.clientWidth || 320, 280), h = 180, m = { t: 8, r: 12, b: 24, l: 40 };
     var pts = rows.map(function (r) { return { x: parseX(r[xKey]), y: Number(r[yKey]), r: r }; })
       .filter(function (p) { return p.x && !isNaN(p.y); });
     var x = d3.scaleTime().domain(d3.extent(pts, function (p) { return p.x; })).range([m.l, w - m.r]);
     var y = d3.scaleLinear().domain([0, d3.max(pts, function (p) { return p.y; }) || 1]).nice().range([h - m.b, m.t]);
     var svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', '0 0 ' + w + ' ' + h);
-    svg.append('g').attr('transform', 'translate(0,' + (h - m.b) + ')').call(d3.axisBottom(x).ticks(Math.min(6, pts.length)));
+    svg.append('g').attr('transform', 'translate(0,' + (h - m.b) + ')').call(d3.axisBottom(x).ticks(Math.min(w < 500 ? 3 : 6, pts.length)));
     svg.append('g').attr('transform', 'translate(' + m.l + ',0)').call(d3.axisLeft(y).ticks(4));
     svg.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2)
       .attr('d', d3.line().x(function (p) { return x(p.x); }).y(function (p) { return y(p.y); }));
@@ -67,7 +97,7 @@
       .attr('cx', function (p) { return x(p.x); }).attr('cy', function (p) { return y(p.y); })
       .on('mouseenter', function (e, p) {
         tip.style.display = 'block';
-        tip.textContent = String(p.r[xKey]).slice(0, 16) + ': ' + p.y;
+        tip.textContent = tcWhen(p.r[xKey]) + ': ' + p.y;
         var left = Math.min(x(p.x) / w * box.clientWidth, box.clientWidth - 140);
         tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '24px';
       })
@@ -76,13 +106,20 @@
   var tcDay = function (v) { return v ? new Date(String(v).slice(0, 10) + 'T00:00:00Z') : null; };
   var tcTime = function (v) { return v ? new Date(String(v)) : null; };
   var tcHour = function (v) { return v ? new Date(String(v).slice(0, 13) + ':00:00') : null; };
-  var tcShow = function (v) { return v === null || v === undefined || v === '' ? '—' : String(v); };
+  var tcWhen = function (v) {
+    var d = v ? new Date(String(v)) : null;
+    if (!d || isNaN(d)) return tcShow(v);
+    var day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: String(v).length <= 10 ? 'UTC' : undefined });
+    return String(v).length <= 10 ? day : day + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+  var tcShow = function (v) { return v === null || v === undefined || v === '' ? 'n/a' : String(v); };
 
   dash.onData(function () {
     var latest = dash.data('latest');
     var row = latest.status === 'ok' && latest.data.length ? latest.data[0] : null;
     document.querySelectorAll('[data-source="latest"]').forEach(function (el) {
-      el.textContent = row ? tcShow(row[el.getAttribute('data-field')]) : '—';
+      var f = el.getAttribute('data-field');
+      el.textContent = row ? (f === 'time' ? tcWhen(row[f]) : tcShow(row[f])) : 'n/a';
     });
     var status = document.getElementById('tc-status');
     status.className = row ? 'tc-status-' + row.status : '';
@@ -124,7 +161,7 @@
     runRows.slice().reverse().forEach(function (r) {
       var tr = document.createElement('tr');
       ['time', 'status', 'machine_overload_rows_24h', 'agent_tool_hours_7d', 'verdict'].forEach(function (k) {
-        var td = document.createElement('td'); td.textContent = tcShow(r[k]); tr.appendChild(td);
+        var td = document.createElement('td'); td.textContent = k === 'time' ? tcWhen(r[k]) : tcShow(r[k]); tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });

@@ -45,3 +45,13 @@ private-pattern file (`~/.config/oss-readiness/oss-readiness.env`) with
 dropped from `latest`. `agent_time` names only the tooling projects
 (agentbrew, dotfiles, minsky, taskgrind, tasks.md, tooling); every other
 project is grouped as `other`, so private repo names never reach the page. Anyone who can open the dashboard can read the files.
+
+## Design
+
+`dashboard/index.html` is built with the Hallmark design skill (redesign, app
+screen scope) and the `ui-ux-rankings` comfort budget. The host Dashboard type
+owns the `--color-*` and `--font-*` tokens; the page maps them to `--tc-*`
+tokens at `:root` and sets no literal colour. Check it with
+`node ~/.claude/skills/hallmark/scripts/sloplint.mjs skills/tooling-checkup/dashboard/index.html --genre modern-minimal --scope app`.
+The render tier needs `puppeteer-core`; without it, check the page in a stub
+host (fixture `dash` object, d3, light and dark tokens) with Playwright.

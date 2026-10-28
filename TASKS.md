@@ -29,14 +29,6 @@ them. -->
 
 ## P2
 
-- [ ] `make check` on a committed branch tests the branch, not "nothing changed"
-  - **ID**: make-check-committed-branch
-  - **Tags**: performance, agents
-  - **Details**: On 2026-10-28, delivery step 2 (`make check`) took 9m40s (mostly waiting on the heavy-run lock) and then printed "No affected test files (nothing changed)", because the fix was already committed. The agent had to run `bin/bats-affected origin/feat/chezmoi | xargs bats` as well, a run of over 10 minutes. When the tree is clean and HEAD is ahead of `origin/feat/chezmoi`, `make check` should pick the affected tests from the branch diff, so one run is enough.
-  - **Files**: `Makefile`, `bin/bats-affected`
-  - **Output**: code
-  - **Acceptance**: on a clean branch one commit ahead that touches `lib/strip-agent-attribution.sh`, `make check` runs `tests/strip-agent-attribution.bats` (bats test proves it).
-
 - [ ] agent_time_review counts subagent waits apart from real work
   - **ID**: agent-time-review-subagent-noise
   - **Tags**: metrics, agents

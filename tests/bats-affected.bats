@@ -73,13 +73,16 @@ setup_file() {
   cp "$DOTFILES_DIR/tests/verify-counts-doc-paths.sh" "$TEST_REPO/tests/verify-counts-doc-paths.sh"
   git -C "$TEST_REPO" add bin/bats-affected tests/verify-counts-doc-paths.sh
   git -C "$TEST_REPO" commit -q --no-verify -m "chore: add bats-affected"
+  git -C "$TEST_REPO" rev-parse HEAD > "$BATS_FILE_TMPDIR/base-sha"
 }
 
 setup() {
   # Reset index and working tree to the committed state (no per-test git init).
   # Unstaging matters: a file a test stages stays a changed file in every
   # later selector run, and each changed file costs a scan of every test.
-  git -C "$TEST_REPO" reset -q --hard 2>/dev/null
+  # A test may commit or add an origin ref; go back to the setup_file commit.
+  git -C "$TEST_REPO" reset -q --hard "$(cat "$BATS_FILE_TMPDIR/base-sha")" 2>/dev/null
+  git -C "$TEST_REPO" update-ref -d refs/remotes/origin/feat/chezmoi 2>/dev/null || true
   git -C "$TEST_REPO" clean -fdq 2>/dev/null
 }
 
@@ -138,6 +141,27 @@ assert_affected_includes() {
   run bash -c "cd '$TEST_REPO' && bash bin/bats-affected"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
+}
+
+@test "clean branch ahead of the base tests its committed changes" {
+  local orig
+  orig=$(git -C "$TEST_REPO" rev-parse HEAD)
+  git -C "$TEST_REPO" update-ref refs/remotes/origin/feat/chezmoi "$orig"
+  echo "# change" >> "$TEST_REPO/bin/dotfiles-doctor"
+  git -C "$TEST_REPO" commit -qam "fix: doctor" --no-verify
+  echo "# change" >> "$TEST_REPO/bin/dotfiles-audit"
+  run bash -c "cd '$TEST_REPO' && bash bin/bats-affected"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tests/doctor.bats"* ]]
+  [[ "$output" == *"tests/audit.bats"* ]]
+}
+
+@test "explicit HEAD still includes untracked files" {
+  echo "# new" > "$TEST_REPO/bin/dotfiles-stats"
+  git -C "$TEST_REPO" rm -q --cached bin/dotfiles-stats
+  run bash -c "cd '$TEST_REPO' && bash bin/bats-affected HEAD"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tests/stats.bats"* ]]
 }
 
 @test "deleted test file is not emitted as an affected test" {

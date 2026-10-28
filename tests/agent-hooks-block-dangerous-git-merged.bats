@@ -216,6 +216,60 @@ merged_and_unmerged() {
   [ "$status" -eq 2 ]
 }
 
+# Third review round on PR 385.
+
+@test "blocks a redirect glued to the branch name (feat/m2>&1 is branch m2)" {
+  merged_and_unmerged
+  make_feature_branch feat/m2
+  run_hook "git branch -D feat/m2>&1"
+  [ "$status" -eq 2 ]
+  run_hook "git branch -D feat/m2>/dev/null"
+  [ "$status" -eq 2 ]
+  run_hook "git branch -D feat/m2 2>&1"
+  [ "$status" -eq 2 ]
+}
+
+@test "without a timeout binary the PR proof is skipped, not run unbounded" {
+  merged_and_unmerged
+  git checkout -q -b feat/pr-only3
+  printf 'only3\n' > only3.txt && git add only3.txt && git commit -q -m only3
+  git checkout -q main
+  export STUB_GH_OUT="$(git rev-parse feat/pr-only3)"
+  printf '#!/bin/bash\ntrap "" ALRM\ntouch "%s"\nsleep 30\n' "$BATS_TEST_TMPDIR/gh-ran" > "$GH_STUB"
+  export DOTFILES_TIMEOUT_BIN=""
+  SECONDS=0
+  run_hook "git branch -D feat/pr-only3"
+  [ "$status" -eq 2 ]
+  [ "$SECONDS" -lt 10 ]
+  [ ! -e "$BATS_TEST_TMPDIR/gh-ran" ]
+  # The local diff proof still decides without gh.
+  run_hook "git branch -D feat/m"
+  [ "$status" -eq 0 ]
+}
+
+@test "the merged-PR proof is limited to PRs into the default branch" {
+  merged_and_unmerged
+  git checkout -q -b feat/pr-only4
+  printf 'only4\n' > only4.txt && git add only4.txt && git commit -q -m only4
+  git checkout -q main
+  export STUB_GH_OUT="$(git rev-parse feat/pr-only4)"
+  export ARGS_FILE="$BATS_TEST_TMPDIR/gh-args"
+  cat > "$GH_STUB" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$ARGS_FILE"
+case "$*" in *"--base main"*) printf '%s' "$STUB_GH_OUT" ;; esac
+STUB
+  run_hook "git branch -D feat/pr-only4"
+  [ "$status" -eq 0 ]
+  grep -q -- '--base main' "$ARGS_FILE"
+}
+
+@test "a branch name that looks like a glob is not expanded" {
+  merged_and_unmerged
+  run_hook "git branch -D feat/*"
+  [ "$status" -eq 2 ]
+}
+
 @test "a hung gh times out and the hook fails closed" {
   merged_and_unmerged
   printf '#!/bin/bash\nsleep 30\n' > "$GH_STUB"

@@ -3,6 +3,8 @@
 # Receives tool input as JSON on stdin.
 
 set -euo pipefail
+# No globbing: a branch word like feat/* must stay literal when split below.
+set -f
 _hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=bootstrap-endpoint-path.sh
 source "$_hook_dir/bootstrap-endpoint-path.sh"
@@ -24,27 +26,21 @@ block() {
 #   2. its tip is already in the default branch, or
 #   3. its whole diff is already on the default branch as one commit (same
 #      stable patch-id).
-# Run gh with a time limit (default 10 s, DOTFILES_GH_TIMEOUT). A hung or missing
-# gh gives no output, so the PR proof fails and the local proof decides.
+# Run gh with a time limit (default 10 s, DOTFILES_GH_TIMEOUT) using gtimeout or
+# timeout. With neither binary the PR proof is skipped: a perl alarm cannot stop
+# gh (Go ignores SIGALRM), so the local patch-id proof decides alone. A hung or
+# missing gh gives no output, so the PR proof fails the same way.
+# DOTFILES_TIMEOUT_BIN overrides the lookup (empty = none; used by tests).
 gh_with_timeout() {
   local t="${DOTFILES_GH_TIMEOUT:-10}" tmo
-  tmo="$(command -v gtimeout || command -v timeout || true)"
-  if [ -n "$tmo" ]; then
-    "$tmo" "$t" "${DOTFILES_GH:-gh}" "$@"
-  elif [ -x /usr/bin/perl ]; then
-    /usr/bin/perl -e '$SIG{ALRM} = "DEFAULT"; alarm shift; exec @ARGV' "$t" "${DOTFILES_GH:-gh}" "$@"
-  else
-    return 1
-  fi
+  tmo="${DOTFILES_TIMEOUT_BIN-$(command -v gtimeout || command -v timeout || true)}"
+  [ -n "$tmo" ] || return 1
+  "$tmo" "$t" "${DOTFILES_GH:-gh}" "$@"
 }
 
 branch_is_merged() {
   local branch="$1" tip default base pid cand
   tip="$(git rev-parse --verify -q "refs/heads/$branch")" || return 1
-  if gh_with_timeout pr list --state merged --head "$branch" \
-      --json headRefOid --jq '.[].headRefOid' 2>/dev/null | grep -qx "$tip"; then
-    return 0
-  fi
   default="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)"
   if [ -z "$default" ]; then
     for cand in origin/main origin/master main master; do
@@ -52,6 +48,11 @@ branch_is_merged() {
     done
   fi
   [ -n "$default" ] || return 1
+  # Only a PR merged into the default branch counts (not a side branch).
+  if gh_with_timeout pr list --state merged --head "$branch" --base "${default#origin/}" \
+      --json headRefOid --jq '.[].headRefOid' 2>/dev/null | grep -qx "$tip"; then
+    return 0
+  fi
   if git merge-base --is-ancestor "$tip" "$default" 2>/dev/null; then return 0; fi
   base="$(git merge-base "$default" "$tip" 2>/dev/null)" || return 1
   pid="$(git diff "$base" "$tip" | git patch-id --stable | cut -d' ' -f1)"
@@ -76,10 +77,15 @@ branch_delete_allowed() {
   # A backslash can continue the line, so the shell would delete branches this
   # parser cuts off at the newline. Fail closed.
   case "$rest" in *\\*) return 1 ;; esac
-  # A redirect to /dev/null or stderr-to-stdout never changes which branches go.
-  rest="${rest//2>&1/}"
-  rest="${rest//2>\/dev\/null/}"
-  rest="${rest//>\/dev\/null/}"
+  # A redirect to /dev/null or stderr-to-stdout never changes which branches go,
+  # but only when it is its own word: glued to a name (m2>&1) it is part of the
+  # name m2, so it stays and the check below rejects the ">".
+  rest=" $rest "
+  for _ in 1 2 3; do
+    rest="${rest// 2>&1 / }"
+    rest="${rest// 2>\/dev\/null / }"
+    rest="${rest// >\/dev\/null / }"
+  done
   rest="${rest%%[;&|$'\n']*}"
   if [ -n "$hook_cwd" ]; then cd "$hook_cwd" 2>/dev/null || return 1; fi
   for word in $rest; do

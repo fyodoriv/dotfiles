@@ -60,9 +60,14 @@ arguments, or a chained blocked command stays blocked. The hook also blocks
 when the flag appears more than once, or when anything (a `cd`, `GIT_DIR=...`,
 another command) comes before it, because the proof runs in the hook's own
 folder. A backslash after the flag blocks (a line continuation could hide a
-second branch). A trailing `2>&1`, `2>/dev/null`, or `>/dev/null` is ignored.
-`gh pr list` runs under a time limit (`DOTFILES_GH_TIMEOUT`, default 10 s); a
-hung or missing `gh` falls back to the local proof, and a non-repo folder blocks.
+second branch). A trailing `2>&1`, `2>/dev/null`, or `>/dev/null` is ignored
+only when it is its own word; glued to a name (`m2>&1` is branch `m2`) it
+blocks. The merged-PR proof counts only PRs into the default branch
+(`--base`). `gh pr list` runs under `gtimeout` or `timeout`
+(`DOTFILES_GH_TIMEOUT`, default 10 s). With neither binary the PR proof is
+skipped, because a perl alarm cannot stop `gh`; the local patch-id proof then
+decides alone. A hung or missing `gh` falls back the same way, and a non-repo
+folder blocks.
 
 Known gaps (the same as before this change; none is newly allowed):
 - The hook matches the flag text anywhere in the command line, so a heredoc or

@@ -55,19 +55,23 @@ merged:
 3. The whole branch diff is already on the default branch as one commit (same
    stable patch-id), which is the squash-merge case.
 
-A branch with unmerged work, an unknown name, a quote or expansion in the
-arguments, or a chained blocked command stays blocked. The hook also blocks
-when the flag appears more than once, or when anything (a `cd`, `GIT_DIR=...`,
-another command) comes before it, because the proof runs in the hook's own
-folder. A backslash after the flag blocks (a line continuation could hide a
-second branch). A trailing `2>&1`, `2>/dev/null`, or `>/dev/null` is ignored
-only when it is its own word; glued to a name (`m2>&1` is branch `m2`) it
-blocks. The merged-PR proof counts only PRs into the default branch
-(`--base`). `gh pr list` runs under `gtimeout` or `timeout`
-(`DOTFILES_GH_TIMEOUT`, default 10 s). With neither binary the PR proof is
-skipped, because a perl alarm cannot stop `gh`; the local patch-id proof then
-decides alone. A hung or missing `gh` falls back the same way, and a non-repo
-folder blocks.
+Order of proofs: the cheap local ones (ancestor, patch-id) run first; `gh` is
+asked only for branches they do not prove.
+
+Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
+quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as
+`refs/heads/<name>` (checked with `git show-ref --verify`). The default branch
+is read from `origin/HEAD`; its target must start with `refs/remotes/origin/`,
+and it must not have the name of the branch to delete, or the hook blocks. Any
+`;`, `&`, `|`, newline or backslash after the flag blocks, so a chained command
+never hides a second delete. A command before the flag, or a second flag, also
+blocks. `git branch` is matched in any letter case. A trailing `2>&1`,
+`2>/dev/null`, or `>/dev/null` is ignored only as its own word. The merged-PR
+proof counts only PRs into the default branch (`--base`). `gh` runs under
+`gtimeout` or `timeout`: one call gets `DOTFILES_GH_TIMEOUT` (default 10 s) and
+all calls together get `DOTFILES_GH_BUDGET` (default 15 s), then the PR proof
+fails closed. With neither binary the PR proof is skipped (a perl alarm cannot
+stop `gh`). A non-repo folder blocks.
 
 Known gaps (the same as before this change; none is newly allowed):
 - The hook matches the flag text anywhere in the command line, so a heredoc or
@@ -78,8 +82,11 @@ Known gaps (the same as before this change; none is newly allowed):
   `block-dangerous-git-dash-c-bypass` in `TASKS.md`.
 - A command before the delete (`git checkout main && git branch -D x`) is
   blocked, because a `cd` could change the repo the proof must check. Run the
-  delete as its own command. Tests:
-`tests/agent-hooks-block-dangerous-git.bats`,
+  delete as its own command.
+- `git update-ref refs/remotes/origin/main <local branch>` forges the default
+  ref itself. The hook cannot detect that offline.
+
+Tests: `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.
 
 ## require-heavy-run (dotfiles hook)

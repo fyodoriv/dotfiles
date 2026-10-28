@@ -25,6 +25,20 @@ setup() {
   printf '#!/bin/bash\nprintf "%%s" "${STUB_GH_OUT:-}"\n' > "$GH_STUB"
   chmod +x "$GH_STUB"
   export DOTFILES_GH="$GH_STUB"
+
+  # Timeout shim, so the tests do not depend on gtimeout being installed.
+  TMO_SHIM="$BATS_TEST_TMPDIR/tmo"
+  cat > "$TMO_SHIM" <<'SHIM'
+#!/bin/bash
+t="$1"; shift
+"$@" & p=$!
+( sleep "$t"; kill -9 "$p" 2>/dev/null ) & w=$!
+wait "$p"; rc=$?
+kill "$w" 2>/dev/null
+exit $rc
+SHIM
+  chmod +x "$TMO_SHIM"
+  export DOTFILES_TIMEOUT_BIN="$TMO_SHIM"
 }
 
 # Two-commit feature branch touching b.txt; leaves HEAD on main.
@@ -146,10 +160,80 @@ merged_and_unmerged() {
   [ "$status" -eq 2 ]
 }
 
-@test "still allows a lone merged force-delete with a trailing command" {
+@test "blocks a merged force-delete chained with any later command (fail closed)" {
   merged_and_unmerged
   run_hook "git branch -D feat/m && git status"
+  [ "$status" -eq 2 ]
+  run_hook "git branch -D feat/m && git -C . branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+# Fourth review round on PR 385.
+
+@test "blocks brace expansion in the branch word" {
+  merged_and_unmerged
+  run_hook "git branch -D {feat/m,feat/u}"
+  [ "$status" -eq 2 ]
+  # The reviewer's probe: one name is a real merged branch, the braces hide more.
+  git branch atmain2 origin/main
+  run_hook "git branch -D {atmain2,feat/u}"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks revision syntax and other names outside the allow list" {
+  merged_and_unmerged
+  run_hook 'git branch -D main@{0}'
+  [ "$status" -eq 2 ]
+  run_hook 'git branch -D feat/m^'
+  [ "$status" -eq 2 ]
+  run_hook 'git branch -D HEAD'
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks when origin/HEAD is forged to point at a local branch" {
+  merged_and_unmerged
+  git symbolic-ref refs/remotes/origin/HEAD refs/heads/feat/u
+  run_hook "git branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks when the default branch carries the name of the branch to delete" {
+  merged_and_unmerged
+  git update-ref refs/remotes/origin/feat/u "$(git rev-parse feat/u)"
+  git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/feat/u
+  run_hook "git branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "matches git branch in any letter case" {
+  merged_and_unmerged
+  run_hook "GIT branch -D feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "Git Branch -D feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "GIT branch -D feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "local proofs run first and gh time is capped for the whole command" {
+  merged_and_unmerged
+  make_feature_branch feat/x1
+  make_feature_branch feat/x2
+  make_feature_branch feat/x3
+  printf '#!/bin/bash\nexec sleep 30\n' > "$GH_STUB"
+  export DOTFILES_GH_TIMEOUT=10 DOTFILES_GH_BUDGET=3
+  SECONDS=0
+  run_hook "git branch -D feat/x1 feat/x2 feat/x3"
+  [ "$status" -eq 2 ]
+  [ "$SECONDS" -lt 9 ]
+}
+
+@test "a branch proven by the local proof never calls gh" {
+  merged_and_unmerged
+  printf '#!/bin/bash\ntouch "%s"\n' "$BATS_TEST_TMPDIR/gh-called" > "$GH_STUB"
+  run_hook "git branch -D feat/m"
   [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/gh-called" ]
 }
 
 # Second review round on PR 385.
@@ -235,7 +319,7 @@ merged_and_unmerged() {
   printf 'only3\n' > only3.txt && git add only3.txt && git commit -q -m only3
   git checkout -q main
   export STUB_GH_OUT="$(git rev-parse feat/pr-only3)"
-  printf '#!/bin/bash\ntrap "" ALRM\ntouch "%s"\nsleep 30\n' "$BATS_TEST_TMPDIR/gh-ran" > "$GH_STUB"
+  printf '#!/bin/bash\ntrap "" ALRM\ntouch "%s"\nexec sleep 30\n' "$BATS_TEST_TMPDIR/gh-ran" > "$GH_STUB"
   export DOTFILES_TIMEOUT_BIN=""
   SECONDS=0
   run_hook "git branch -D feat/pr-only3"
@@ -272,7 +356,7 @@ STUB
 
 @test "a hung gh times out and the hook fails closed" {
   merged_and_unmerged
-  printf '#!/bin/bash\nsleep 30\n' > "$GH_STUB"
+  printf '#!/bin/bash\nexec sleep 30\n' > "$GH_STUB"
   export DOTFILES_GH_TIMEOUT=1
   git checkout -q -b feat/pr-only2
   printf 'only2\n' > only2.txt && git add only2.txt && git commit -q -m only2

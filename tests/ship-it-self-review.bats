@@ -63,8 +63,11 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -q '^## Setting branch protection' "$REF"
   grep -F -q 'actions/permissions' "$REF"
   grep -q 'Actions off, or no check ever reported' "$REF"
-  grep -F -q 'keep `enforce_admins` false' "$REF"
-  grep -F -q 'branches/<branch>/protection' "$REF"
+  grep -F -q 'send `enforce_admins: false` explicitly' "$REF"
+  grep -F -q 'PUT repos/{owner}/{repo}/branches/<branch>/protection' "$REF"
+  grep -F -q 'actions/permissions --jq .enabled' "$REF"
+  grep -F -q 'check-runs' "$REF"
+  grep -F -q '.enforce_admins.enabled' "$REF"
 }
 
 @test "ship-it reference documents the CDP proof upload and its cautions (#388)" {
@@ -74,12 +77,19 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -F -q '#new_comment_field' "$REF"
   grep -F -q '**Never submit the comment.**' "$REF"
   grep -F -q 'gh pr edit <n> --body-file' "$REF"
-  grep -q 'reachable even if the comment is never' "$REF"
+  grep -q 'reachable even if the' "$REF"
+  grep -F -q 'safe to make public, because the attachment URL' "$REF"
+  grep -F -q 'redact or skip any screenshot that shows private' "$REF"
+  grep -F -q 'Never call' "$REF"
+  grep -F -q '`page.bringToFront()` or any focus API' "$REF"
+  grep -q 'close the background tab' "$REF"
 }
 
 @test "ship-it reference treats a scripts-only package.json diff as a gate false positive (#388)" {
   grep -q '^### Scripts-only lockfile gate' "$REF"
   grep -F -q 'git diff -- package.json' "$REF"
   grep -q 'gate false' "$REF"
+  grep -F -q 'confirm it touches only `scripts`' "$REF"
+  grep -F -q '`postinstall`' "$REF"
   grep -q 'Never add an empty' "$REF"
 }

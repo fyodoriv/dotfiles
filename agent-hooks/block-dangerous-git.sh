@@ -64,8 +64,19 @@ default_ref() {
   return 1
 }
 
+# Patch-ids of the default branch's last 200 commits, computed once per run.
+FP_CACHE="" FP_DONE=0
+default_fingerprints() {
+  local default="$1" cand
+  [ "$FP_DONE" -eq 1 ] && return 0
+  FP_CACHE="$(git log -n 200 --format=%H "$default" | while read -r cand; do
+    git show "$cand" | git patch-id --stable | cut -d' ' -f1
+  done)"
+  FP_DONE=1
+}
+
 branch_is_merged() {
-  local branch="$1" tip default name base pid cand
+  local branch="$1" tip default name base pid out
   git show-ref --verify --quiet "refs/heads/$branch" || return 1
   tip="$(git rev-parse "refs/heads/$branch")" || return 1
   default="$(default_ref)" || return 1
@@ -75,52 +86,137 @@ branch_is_merged() {
   if git merge-base --is-ancestor "$tip" "$default" 2>/dev/null; then return 0; fi
   base="$(git merge-base "$default" "$tip" 2>/dev/null)" || return 1
   pid="$(git diff "$base" "$tip" | git patch-id --stable | cut -d' ' -f1)"
-  if [ -n "$pid" ] && git log -n 200 --format=%H "$base..$default" | while read -r cand; do
-    git show "$cand" | git patch-id --stable | cut -d' ' -f1
-  done | grep -qx "$pid"; then
-    return 0
+  if [ -n "$pid" ]; then
+    default_fingerprints "$default"
+    if grep -qx -- "$pid" <<<"$FP_CACHE"; then return 0; fi
   fi
-  # Only a PR merged into the default branch counts (not a side branch).
-  gh_with_timeout pr list --state merged --head "$branch" --base "$name" \
-    --json headRefOid --jq '.[].headRefOid' 2>/dev/null | grep -qx "$tip"
+  # Only a PR merged into the default branch counts (not a side branch). Save
+  # gh's answer first: grep -q would stop reading early and kill a big answer.
+  out="$(gh_with_timeout pr list --state merged --head "$branch" --base "$name" \
+    --json headRefOid --jq '.[].headRefOid' 2>/dev/null)" || return 1
+  grep -qx -- "$tip" <<<"$out"
 }
 
-# True when the command is one plain force-delete and every branch named after
-# it is proven merged. Anything unusual fails closed.
+is_git_word() { case "$1" in [gG][iI][tT]) return 0 ;; esac; return 1; }
+is_branch_word() { case "$1" in [bB][rR][aA][nN][cC][hH]) return 0 ;; esac; return 1; }
+
+# True when the command could force-delete a branch: the old literal text
+# anywhere (covers quoted or nested spellings), or a word "git", then global
+# options, then "branch", then delete flags (-D, -d with -f, --delete with
+# --force, glued letters like -Dr or -fd).
+looks_like_branch_delete() {
+  local -a w
+  local i n j k opt hasD hasd hasf
+  case "$command" in
+    *[gG][iI][tT]" "[bB][rR][aA][nN][cC][hH]" -D"*) return 0 ;;
+  esac
+  # shellcheck disable=SC2206
+  w=($command)
+  n=${#w[@]}
+  for ((i = 0; i < n; i++)); do
+    is_git_word "${w[i]}" || continue
+    hasD=0 hasd=0 hasf=0
+    j=$((i + 1))
+    # Skip global options that may precede the subcommand.
+    while [ "$j" -lt "$n" ]; do
+      case "${w[j]}" in
+        -C|-c|--git-dir|--work-tree|--namespace) j=$((j + 2)) ;;
+        -*) j=$((j + 1)) ;;
+        *) break ;;
+      esac
+    done
+    if [ "$j" -lt "$n" ] && is_branch_word "${w[j]}"; then
+      for ((k = j + 1; k < n; k++)); do
+        opt="${w[k]}"
+        case "$opt" in
+          --delete) hasd=1 ;;
+          --force) hasf=1 ;;
+          --*) ;;
+          -?*)
+            case "$opt" in *D*) hasD=1 ;; esac
+            case "$opt" in *d*) hasd=1 ;; esac
+            case "$opt" in *f*) hasf=1 ;; esac ;;
+        esac
+      done
+      if [ "$hasD" -eq 1 ] || { [ "$hasd" -eq 1 ] && [ "$hasf" -eq 1 ]; }; then return 0; fi
+    fi
+  done
+  return 1
+}
+
+# True when the command is one plain git call that force-deletes branches and
+# every branch named is proven merged, in the repo the command acts on.
+# Anything unusual fails closed.
 branch_delete_allowed() {
-  local rest word seen=0 flag="git branch -D" stripped prefix name_re='^[A-Za-z0-9._/-]+$'
-  # The flag must be spelled exactly (git matches case-insensitively on some
-  # file systems, but the parser below does not).
-  case "$command" in *"$flag"*) ;; *) return 1 ;; esac
-  # Fail closed on more than one occurrence: only the first would be checked.
-  stripped="${command//"$flag"/}"
-  [ $(( (${#command} - ${#stripped}) / ${#flag} )) -eq 1 ] || return 1
-  # Fail closed on anything before the command (a cd, GIT_DIR=..., another
-  # command): the proof below runs in the hook's folder, not where that would act.
-  prefix="${command%%"$flag"*}"
-  [ -z "${prefix//[[:space:]]/}" ] || return 1
-  rest="${command#*"$flag"}"
+  local rest word seen=0 name_re='^[A-Za-z0-9._/-]+$' dir_re='^[A-Za-z0-9._/-]+$'
+  local -a w
+  local i n opt dflag=0 Dflag=0 fflag=0 gitdir=""
+  # A chained command (; & | newline) may hide a second delete, and a backslash
+  # can continue the line. Fail closed on any of them, anywhere in the command.
   # A redirect to /dev/null or stderr-to-stdout never changes which branches go,
-  # but only when it is its own word: glued to a name (m2>&1) it is part of the
-  # name m2, so it stays and the name check below rejects the ">".
-  rest=" $rest "
+  # but only as its own word: glued to a name (m2>&1) it stays and fails below.
+  rest=" $command "
   for _ in 1 2 3; do
     rest="${rest// 2>&1 / }"
     rest="${rest// 2>\/dev\/null / }"
     rest="${rest// >\/dev\/null / }"
   done
-  # A chained command (; & | newline) may hide a second delete after it, and a
-  # backslash can continue the line. Fail closed on any of them.
   case "$rest" in *[\;\&\|\\$'\n']*) return 1 ;; esac
+  # shellcheck disable=SC2206
+  w=($rest)
+  n=${#w[@]}
+  [ "$n" -ge 3 ] || return 1
+  # Nothing may come before git (a cd, GIT_DIR=..., another command).
+  is_git_word "${w[0]}" || return 1
   if [ -n "$hook_cwd" ]; then cd "$hook_cwd" 2>/dev/null || return 1; fi
-  for word in $rest; do
-    [ "$word" = "--" ] && continue
-    # Strict allow list: no braces, quotes, expansions, globs, or flags.
+  i=1
+  # Global options: only -C <dir> and --git-dir[=]<dir> are understood.
+  while [ "$i" -lt "$n" ]; do
+    opt="${w[i]}"
+    case "$opt" in
+      -C)
+        [ $((i + 1)) -lt "$n" ] || return 1
+        [[ "${w[i+1]}" =~ $dir_re ]] || return 1
+        cd "${w[i+1]}" 2>/dev/null || return 1
+        i=$((i + 2)) ;;
+      --git-dir)
+        [ $((i + 1)) -lt "$n" ] || return 1
+        [[ "${w[i+1]}" =~ $dir_re ]] || return 1
+        gitdir="${w[i+1]}"; i=$((i + 2)) ;;
+      --git-dir=*)
+        gitdir="${opt#--git-dir=}"
+        [[ "$gitdir" =~ $dir_re ]] || return 1
+        i=$((i + 1)) ;;
+      -*) return 1 ;;
+      *) break ;;
+    esac
+  done
+  { [ "$i" -lt "$n" ] && is_branch_word "${w[i]}"; } || return 1
+  if [ -n "$gitdir" ]; then
+    gitdir="$(cd "$gitdir" 2>/dev/null && pwd -P)" || return 1
+    export GIT_DIR="$gitdir"
+  fi
+  i=$((i + 1))
+  for ((; i < n; i++)); do
+    word="${w[i]}"
+    case "$word" in
+      --) continue ;;
+      --delete) dflag=1; continue ;;
+      --force) fflag=1; continue ;;
+      -D) Dflag=1; continue ;;
+      -d) dflag=1; continue ;;
+      -f) fflag=1; continue ;;
+      -df|-fd) dflag=1; fflag=1; continue ;;
+      -Df|-fD) Dflag=1; fflag=1; continue ;;
+    esac
+    # Strict allow list: no braces, quotes, expansions, globs, or other flags
+    # (-Dr and -r would touch remote-tracking refs).
     [[ "$word" =~ $name_re ]] || return 1
     case "$word" in -*) return 1 ;; esac
     seen=1
     branch_is_merged "$word" || return 1
   done
+  { [ "$Dflag" -eq 1 ] || { [ "$dflag" -eq 1 ] && [ "$fflag" -eq 1 ]; }; } || return 1
   [ "$seen" -eq 1 ]
 }
 
@@ -132,11 +228,10 @@ case "$command" in
 esac
 
 # Checked last so a merged-branch delete never masks another blocked command.
-# "git branch" is matched in any letter case (git does so on case-insensitive
-# file systems); the flag stays capital D. The exact-case parser then fails closed.
-case "$command" in
-  *[gG][iI][tT]" "[bB][rR][aA][nN][cC][hH]" -D"*)
-    branch_delete_allowed || block "git branch -D" ;;
-esac
+# The subcommand is parsed, so "git -C <dir> branch", "-d -f", "--delete --force",
+# "-fd", and a flag after the branch name are checked like the plain form.
+if looks_like_branch_delete; then
+  branch_delete_allowed || block "git branch -D"
+fi
 
 exit 0

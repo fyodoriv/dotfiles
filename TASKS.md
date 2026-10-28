@@ -29,20 +29,6 @@ them. -->
 
 ## P2
 
-- [ ] Branch-delete hook misses `git -C <dir> branch` with the force flag
-  - **ID**: block-dangerous-git-dash-c-bypass
-  - **Tags**: safety, agents, hooks
-  - **Details**: `agent-hooks/block-dangerous-git.sh` matches the literal text `git branch -D`. A command such as `git -C <dir> branch -D <b>` does not contain that text, so the hook never sees it and the force-delete runs with no merged-branch proof. The probe in review of the merged-branch change showed rc=0 for it. The same gap applies to `git --git-dir=... branch -D`, to `-d -f`, `--delete --force`, `-fd`, `git branch x -D`, and a double space before the flag. Close it by detecting any `git` call whose subcommand is `branch` with a force-delete flag (including `-C`, `--git-dir`, `--work-tree`, and `-c` options before the subcommand), then apply the same rule as today: allow only when the branch is proven merged, in the repo the command acts on. Also fix three smaller gaps found in review of #385 (merged-branch force-delete): (1) Letters glued to the flag (`-Dr`, `-Df`) are read as branch names, so `git branch -Dr r` passes when a merged local branch `r` exists, and git then deletes remote-tracking refs. Require a space or the end of the command right after `-D`. (2) The merged-PR proof pipes gh into `grep -q`. grep stops reading at the first match, so when gh prints more than a pipe buffer (about 64 KB) gh is killed and, under `pipefail`, the proof fails and the hook blocks a merged branch. Save gh's output first, then search it. (3) The local proof recomputes the default branch's last 200 patch fingerprints for every branch named, so a long delete list repeats the same work. Compute them once per hook run. Also add the forged `origin/HEAD` form (point it at a forged `refs/remotes/origin/<x>`) to the known-gaps list in `docs/agent-hooks.md`.
-  - **Files**: `agent-hooks/block-dangerous-git.sh`, `tests/agent-hooks-block-dangerous-git-merged.bats`, `docs/agent-hooks.md`
-  - **Output**: code
-  - **Acceptance**: `git -C <repo> branch -D <unmerged>` and `git --git-dir=<repo>/.git branch -D <unmerged>` exit 2; the same command for a branch proven merged in `<repo>` exits 0; `git branch -Dr <merged-local-r>` exits 2; a gh stub that prints more than 64 KB, with the merged tip first, still proves the merged PR (this test fails before the fix); with 5 merged branches, a counting stub shows the default branch's fingerprints are computed once, not 5 times; `docs/agent-hooks.md` names the `origin/HEAD` forged-ref form; the existing cases keep their results.
-  - **Hypothesis**: matching the force-delete by parsed subcommand instead of literal text cuts the number of probe commands that delete an unmerged branch without a block from the current 4 (the `-C`, `--git-dir`, long-flag and glued `-Dr` forms) to 0, because the hook then sees every spelling. Guards: false blocks of a merged branch with large gh output go from 1 probe to 0, and default-branch fingerprint runs per hook call go from N (one per branch) to 1.
-  - **Measurement**: `bats tests/agent-hooks-block-dangerous-git-merged.bats` with the new probe cases; each case counts as a pass when an unmerged branch exits 2, plus the large-gh-output case exits 0 and the counting stub reads 1.
-  - **Success**: 0 of the probe spellings delete an unmerged branch, the large-output probe passes, the fingerprint count is 1, and all existing hook tests still pass.
-  - **Pivot**: if the parsed match blocks more than 2 legitimate non-delete `git branch` commands in the test matrix, drop the parser and block every `git` call that has `branch` and a force flag in the same segment.
-  - **Anchor**: Saltzer and Schroeder 1975, "The Protection of Information in Computer Systems" (fail-safe defaults, complete mediation); OWASP Command Injection Prevention (deny-list gaps).
-  - **Competitive-goal**: none — agent safety hardening, not a scorecard metric.
-
 - [ ] Record each real install run so the README can prove one-command setup
   - **ID**: proof-install-field-outcome
   - **Tags**: metrics, proof

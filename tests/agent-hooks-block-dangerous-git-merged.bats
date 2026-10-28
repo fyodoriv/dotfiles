@@ -211,8 +211,9 @@ merged_and_unmerged() {
   [ "$status" -eq 2 ]
   run_hook "Git Branch -D feat/u"
   [ "$status" -eq 2 ]
+  # A merged branch is checked like any other, whatever the letter case.
   run_hook "GIT branch -D feat/m"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 0 ]
 }
 
 @test "local proofs run first and gh time is capped for the whole command" {
@@ -365,4 +366,100 @@ STUB
   run_hook "git branch -D feat/pr-only2"
   [ "$status" -eq 2 ]
   [ "$SECONDS" -lt 15 ]
+}
+
+# Task block-dangerous-git-dash-c-bypass: parse the subcommand, not the text.
+
+run_hook_in() {
+  local dir="$1" cmd="$2"
+  run bash -c 'jq -n --arg c "$1" --arg d "$2" "{cwd:\$d, tool_input:{command:\$c}}" | "$3"' _ "$cmd" "$dir" "$HOOK"
+}
+
+@test "git -C <repo> blocks an unmerged branch and allows a merged one" {
+  merged_and_unmerged
+  run_hook_in "$BATS_TEST_TMPDIR" "git -C $REPO branch -D feat/u"
+  [ "$status" -eq 2 ]
+  run_hook_in "$BATS_TEST_TMPDIR" "git -C $REPO branch -D feat/m"
+  [ "$status" -eq 0 ]
+}
+
+@test "git --git-dir=<repo>/.git blocks an unmerged branch and allows a merged one" {
+  merged_and_unmerged
+  run_hook_in "$BATS_TEST_TMPDIR" "git --git-dir=$REPO/.git branch -D feat/u"
+  [ "$status" -eq 2 ]
+  run_hook_in "$BATS_TEST_TMPDIR" "git --git-dir=$REPO/.git branch -D feat/m"
+  [ "$status" -eq 0 ]
+  run_hook_in "$BATS_TEST_TMPDIR" "git --git-dir $REPO/.git branch -D feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "git -c and unknown global options before branch fail closed" {
+  merged_and_unmerged
+  run_hook "git -c core.x=y branch -D feat/m"
+  [ "$status" -eq 2 ]
+  run_hook "git --exec-path=/tmp branch -D feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "other spellings of the force-delete are checked, not ignored" {
+  merged_and_unmerged
+  for c in "git branch -d -f feat/u" "git branch --delete --force feat/u" \
+           "git branch -fd feat/u" "git branch -df feat/u" "git branch feat/u -D" \
+           "git  branch  -D  feat/u" "git branch -D -f feat/u"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ]
+  done
+  for c in "git branch -d -f feat/m" "git branch --delete --force feat/m" \
+           "git branch -fd feat/m" "git branch feat/m -D" "git  branch  -D  feat/m"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "glued letters after the flag are not branch names (-Dr, -Df)" {
+  merged_and_unmerged
+  git branch r feat/m
+  run_hook "git branch -Dr r"
+  [ "$status" -eq 2 ]
+  run_hook "git branch -rD r"
+  [ "$status" -eq 2 ]
+  run_hook "git branch -Dx feat/m"
+  [ "$status" -eq 2 ]
+}
+
+@test "ordinary git branch commands are not blocked" {
+  merged_and_unmerged
+  for c in "git branch" "git branch -a" "git branch -r" "git branch newb" \
+           "git branch -d feat/m" "git -C $REPO branch -m old new" \
+           "git commit -m 'branch only'" "git log --oneline"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "a gh answer over 64 KB still proves the merged PR" {
+  make_feature_branch feat/big
+  # The squash commit differs from the branch diff, so only the PR proof applies.
+  git merge -q --squash feat/big
+  printf 'tweak\n' >> a.txt && git add a.txt
+  git commit -q -m "squash feat/big with a tweak"
+  git push -q origin main
+  tip="$(git rev-parse feat/big)"
+  printf '#!/bin/bash\nprintf "%%s\\n" "%s"\nyes abcdefghijklmnopqrstuvwxyz | head -n 20000\n' "$tip" > "$GH_STUB"
+  run_hook "git branch -D feat/big"
+  [ "$status" -eq 0 ]
+}
+
+@test "default-branch fingerprints are computed once for many branches" {
+  local names="" n
+  for n in 1 2 3 4 5; do
+    make_feature_branch feat/s$n
+    git merge -q --squash feat/s$n && git commit -q -m "squash s$n"
+    names="$names feat/s$n"
+  done
+  git push -q origin main
+  # GIT_TRACE lists every git command the hook runs; count the history walks.
+  GIT_TRACE="$BATS_TEST_TMPDIR/trace" run_hook "git branch -D$names"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'git log -n 200' "$BATS_TEST_TMPDIR/trace")" -eq 1 ]
 }

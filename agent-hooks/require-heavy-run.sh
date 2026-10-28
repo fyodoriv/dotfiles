@@ -16,16 +16,6 @@ command="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"
 [ -n "$command" ] || exit 0
 
-# True when an argument names one file (a path or a dotted file name).
-_has_file_arg() {
-  local a
-  for a in "$@"; do
-    case "$a" in -*|run|test) continue ;; esac
-    case "$a" in */*|*.*) return 0 ;; esac
-  done
-  return 1
-}
-
 # True when the arguments pick one test: a filter (-g, --grep, -t,
 # --testNamePattern) with a real value, or an explicit spec path. "." , ".*",
 # a folder ("tests/"), and the value of any other flag (--config, --output
@@ -129,7 +119,7 @@ _is_heavy() {
       done
       return 1 ;;
     vitest|jest)
-      _has_file_arg ${rest[@]+"${rest[@]}"} && return 1
+      _one_test_args ${rest[@]+"${rest[@]}"} && return 1
       return 0 ;;
     make)
       for a in ${rest[@]+"${rest[@]}"}; do

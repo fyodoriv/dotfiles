@@ -70,6 +70,19 @@ run_hook() {
   done
 }
 
+@test "vitest and jest: a flag value is not a test file" {
+  for c in "npx vitest --reporter=junit --outputFile a/b.xml" "npx jest --outputFile a/b.json" \
+           "vitest run --outputFile a/b.xml" "npx vitest run --coverage.reportsDirectory cov/out"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+  for c in "npx vitest run src/a.test.ts" "npx jest src/x.test.js" "npx vitest run -t foo" \
+           "npx vitest --outputFile a/b.xml src/a.test.ts"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }
+  done
+}
+
 @test "allows wrapped prefixed runs, control flow, and test filters" {
   for c in "time -p heavy-run make e2e" "sudo heavy-run make e2e" "timeout -s KILL 5 heavy-run npm test" \
            "if true; then heavy-run npm test; fi" "npm run test -- -t foo" "pnpm ui -t foo" \

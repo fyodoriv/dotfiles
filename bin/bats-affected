@@ -6,7 +6,7 @@
 # touch shared infrastructure (test_helper, Makefile, etc.).
 #
 # Usage:
-#   bats-affected              # changed vs HEAD (unstaged + staged)
+#   bats-affected              # changed vs HEAD, plus branch commits ahead of the base
 #   bats-affected --cached     # staged only
 #   bats-affected HEAD~3       # changed in last 3 commits
 #   bats-affected main          # changed vs main branch
@@ -31,6 +31,7 @@ if [ "${1:-}" = "--pairs" ]; then
   shift
 fi
 diff_args=()
+include_untracked=0
 case "${1:-}" in
   --help|-h)
     sed -n '2,/^$/s/^# //p' "$0"
@@ -40,8 +41,15 @@ case "${1:-}" in
     diff_args=(--cached)
     ;;
   "")
-    # Default: all uncommitted changes (staged + unstaged) vs HEAD
+    # Default: uncommitted changes vs HEAD, plus the branch's own commits
+    # when HEAD is ahead of the base (BATS_AFFECTED_BASE, default
+    # origin/feat/chezmoi), so `make check` after a commit still tests it.
     diff_args=(HEAD)
+    include_untracked=1
+    if base=$(git -C "$DOTFILES_DIR" merge-base HEAD "${BATS_AFFECTED_BASE:-origin/feat/chezmoi}" 2>/dev/null) &&
+      [ "$base" != "$(git -C "$DOTFILES_DIR" rev-parse HEAD)" ]; then
+      diff_args=("$base")
+    fi
     ;;
   *)
     diff_args=("$1")
@@ -55,7 +63,7 @@ while IFS= read -r file; do
 done < <(git -C "$DOTFILES_DIR" diff --name-only "${diff_args[@]}" 2>/dev/null || true)
 
 # Also include untracked files (only for default/HEAD mode)
-if [ "${#diff_args[@]}" -eq 1 ] && [ "${diff_args[0]}" = "HEAD" ]; then
+if [ "${include_untracked:-0}" -eq 1 ]; then
   while IFS= read -r file; do
     [ -n "$file" ] && changed_files+=("$file")
   done < <(git -C "$DOTFILES_DIR" ls-files --others --exclude-standard 2>/dev/null || true)

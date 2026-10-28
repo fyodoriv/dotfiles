@@ -140,6 +140,21 @@ assert_affected_includes() {
   [ -z "$output" ]
 }
 
+@test "clean branch ahead of the base tests its committed changes" {
+  local orig
+  orig=$(git -C "$TEST_REPO" rev-parse HEAD)
+  git -C "$TEST_REPO" update-ref refs/remotes/origin/feat/chezmoi "$orig"
+  echo "# change" >> "$TEST_REPO/bin/dotfiles-doctor"
+  git -C "$TEST_REPO" commit -qam "fix: doctor" --no-verify
+  echo "# change" >> "$TEST_REPO/bin/dotfiles-audit"
+  run bash -c "cd '$TEST_REPO' && bash bin/bats-affected"
+  git -C "$TEST_REPO" reset -q --hard "$orig"
+  git -C "$TEST_REPO" update-ref -d refs/remotes/origin/feat/chezmoi
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tests/doctor.bats"* ]]
+  [[ "$output" == *"tests/audit.bats"* ]]
+}
+
 @test "deleted test file is not emitted as an affected test" {
   rm "$TEST_REPO/tests/smoke.bats"
   git -C "$TEST_REPO" add tests/smoke.bats

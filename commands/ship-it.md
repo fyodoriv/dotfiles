@@ -24,7 +24,7 @@ implementation or delivery.
 
 ## Session auto-ship (default)
 
-**review lessons (2a) → verify → commit → push/PR → CI → review (6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?”, “should I push?”, or tell the user to run delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
+**review lessons (2a) → verify → commit → push/PR → CI → review (6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?” or “should I push?”, or hand the user delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
 
 ### Push early, let CI verify (IRON LAW)
 
@@ -42,9 +42,8 @@ that must go green first.
 
 **Once the PR has a review or review comment**, stop pushing silently: a
 reviewer is reading a moving target. Batch changes and say what is coming.
-A comment that asks for new or changed UI: open the linked design (a Figma
-frame, a design spec) first and build what it shows. No design is linked, or
-the design and the comment disagree: draft a question to the reviewer and
+UI asked for in a review: open the linked design first and build what it
+shows. No design, or it disagrees: draft a reviewer question and
 post it only after the user says yes.
 
 ## PR description refresh
@@ -77,7 +76,7 @@ Prove every changed behavior before handoff or merge.
 
 For any repository explicitly named by the active request, `/ship-it` pre-approves normal feature-branch pushes, PR create/update, CI watch/fix, and rebasing work verified as user-owned or current-session:
 
-- Fetch the actual PR base, preserve the old remote head, rebase onto `origin/<base>`, resolve conflicts, and re-run required gates. Rebasing owned work is always approved.
+- Fetch the PR base, keep the old remote head, rebase onto `origin/<base>`, resolve conflicts, re-run gates. Rebasing owned work is always approved.
 - Publish rewritten owned PR branches only with an explicit `--force-with-lease=<ref>:<old-oid>`. Never use plain `--force`.
 - Never bypass a “Pushing source code … manually” guard; see **Push unblock**.
 - Verify PR author, head owner, and branch before rewriting. Never rewrite someone else’s branch.
@@ -86,13 +85,13 @@ This does not permit admin/bypass merge or release in product repos; the allowli
 
 ## Approved repo families
 
-Broad sibling-repo inventory, auto-merge/bypass, release, cleanup, and machine-refresh scope across approved repo families is limited to:
+Broad sibling inventory, auto-merge/bypass, release, cleanup, and machine refresh across approved repo families is limited to:
 
 - tooling repos whose real path is under `~/apps/tooling/**`
 - own repos on `github.com/<owner>/*` (minsky, own tools)
 - extra families the org overlay declares (`SHIP_IT_EXTRA_REPO_FAMILIES`, colon-separated path globs)
 
-Other product repos are eligible only when explicitly named by the active request, and only for normal delivery plus the owned-work rebase authorization above. They are not added to the bypass/release allowlist.
+Other product repos are eligible only when explicitly named by the active request, for normal delivery plus owned-work rebases. They are not added to the bypass/release allowlist.
 
 Own-tool release automation is explicitly enabled for `agentbrew`, `dotfiles`, `tasks.md` / `tasks-md`, and `minsky`.
 
@@ -105,7 +104,7 @@ Own-tool release automation is explicitly enabled for `agentbrew`, `dotfiles`, `
 - **Dangerous — stop and report:** plain `--force`, unleased rewrites, protected pushes, hook bypasses, bypass before green, someone else's PR, non-allowlist bypass, unsalvaged deletion, secrets, unapproved production deploy, or human UI/OTP.
 - **Dangerous blocker output:** the category, exact blocked action, safer paths tried, and shipped/remaining status.
 
-**Jira:** After final non-draft PR open/ready, move linked ticket to review; after merge, done. Keep live status in transitions/comments, not descriptions.
+**Jira:** After final non-draft PR open/ready, move the ticket to review; after merge, done. Live status goes in transitions/comments.
 
 ## Push unblock
 
@@ -119,16 +118,16 @@ BRANCH="$(git -C "$REPO" branch --show-current)"
 
 Use the same `cd "$REPO"` and enterprise `GH_HOST` for `gh pr create`/`merge`. If it still denies, do not evade it.
 
-Agents cannot push to `github.com`. Hand the operator one `land` command for every pending checkout, as the last line of the message. Then refresh PR bodies, watch CI, and merge with `GH_HOST=github.com gh pr …` yourself. Details: `docs/ship-it-reference.md` § Push delivery.
+Agents cannot push to `github.com`. Hand the operator one `land` command per pending checkout as the message's last line. Then refresh PR bodies, watch CI, and merge with `GH_HOST=github.com gh pr …` yourself. Details: `docs/ship-it-reference.md` § Push delivery.
 
 ## Memory sync (every delivery, all repos)
 
-Before completion, run `dotfiles-memory-sync-projects --background` in **every** repo family. It indexes `~/.claude/projects/*/memory/` into shared memory.
+Before completion, run `dotfiles-memory-sync-projects --background` in **every** repo family; it indexes `~/.claude/projects/*/memory/` into shared memory.
 
-It exits 0 even when the daemon is down. **Never block or retry a delivery on it**; record a skip (output or log) with other environmental findings. When this session wrote memory, name the store and file count in the report.
+It exits 0 when the daemon is down. **Never block or retry a delivery on it**; record a skip with other environment findings. When this session wrote memory, name the store and file count in the report.
 
 ## Delivery procedure
 
-Follow `~/apps/tooling/dotfiles/docs/ship-it-reference.md` Steps 1–16. Step 9 cleanup researches every local branch and stash in the touched repos and removes those proven safe; do not wait to be asked. Run tooling Steps 12–13 via Shell (`dotfiles apply`, LaunchAgent reload/CDP checks, `agentbrew sync --pull`, context measurement, doctor), then Steps 14 (memory sync) and 15 (time review: `agent-perf.mjs report --session latest`; reuse a `perf-task-review` Stop-hook review from this turn) on every delivery, any repo. Report **Merged N/M PRs**, never “complete” while session PRs remain open, and remind the user to start a new chat after config sync.
+Follow `~/apps/tooling/dotfiles/docs/ship-it-reference.md` Steps 1–16. Step 9 checks every local branch and stash in touched repos and removes those proven safe, unasked. Run tooling Steps 12–13 via Shell (`dotfiles apply`, LaunchAgent/CDP checks, `agentbrew sync --pull`, context, doctor), then Steps 14 (memory sync) and 15 (time review: `agent-perf.mjs report --session latest`; reuse a `perf-task-review` Stop-hook review from this turn) on every delivery, any repo. Report **Merged N/M PRs**, never “complete” while session PRs remain open, and remind the user to start a new chat after config sync.
 
 <!-- turbo -->

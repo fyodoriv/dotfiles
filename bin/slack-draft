@@ -1,0 +1,140 @@
+#!/bin/bash
+# slack-draft: attach a file to, count, and delete Slack drafts.
+#
+# A Slack MCP can save a draft. It cannot attach a file, count matching
+# drafts, or delete a stale one. This tool drives Slack web in a tab you own
+# in the agents Chrome. It goes through agent-tab, so it checks your lease,
+# talks CDP, and never raises or focuses a window.
+#
+# Usage:
+#   slack-draft open --owner <id> [--lease <s>]       # prints the tab id
+#   slack-draft attach --owner <id> <tab> <file>
+#   slack-draft count  --owner <id> <tab> <text> --to <name>
+#   slack-draft delete --owner <id> <tab> <text> --to <name> [--all] [--yes]
+#
+# count and delete read the Drafts view of the open tab. A draft matches when
+# its row text holds both <name> and <text> (case-insensitive). delete removes
+# exactly one match, or every match with --all. It prints the matches and asks
+# before it deletes; --yes skips the question. Without --yes and without a
+# terminal it refuses.
+#
+# Env: SLACK_DRAFT_URL (workspace URL for `open`; no default, never stored in
+#      the repo), AGENT_TAB_OWNER (default --owner), SLACK_DRAFT_AGENT_TAB
+#      (agent-tab path override, used by tests).
+#
+# Exit codes: 0 ok, 1 error or no match, 2 usage, 3 busy (from agent-tab),
+#             4 refused (several matches without --all, or no confirmation).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_TAB="${SLACK_DRAFT_AGENT_TAB:-$HERE/agent-tab}"
+
+# Slack web markup the page scripts rely on. Slack changes it; fix it here.
+SEL_FILE_INPUT='input[type=file]'
+SEL_DRAFT_ROW='[data-qa="drafts_list_item"], [data-qa="draft-item"]'
+SEL_DRAFT_DELETE='[data-qa="drafts_list_item_delete"], [data-qa="draft-item-delete"], button[aria-label^="Delete"]'
+
+usage() {
+  sed -n '/^# Usage:/,/^#   slack-draft delete/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+die() { echo "slack-draft: $1" >&2; exit "${2:-1}"; }
+
+parse() {
+  OWNER="${AGENT_TAB_OWNER:-}" TO="" ALL="" YES="" LEASE="" POS=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --owner) OWNER="${2:-}"; shift 2 || shift ;;
+      --to) TO="${2:-}"; shift 2 || shift ;;
+      --lease) LEASE="${2:-}"; shift 2 || shift ;;
+      --all) ALL=1; shift ;;
+      --yes) YES=1; shift ;;
+      -h|--help) usage; exit 0 ;;
+      -?*) usage >&2; die "unknown option: $1" 2 ;;
+      *) POS+=("$1"); shift ;;
+    esac
+  done
+  [ -n "$OWNER" ] || die "needs --owner or AGENT_TAB_OWNER" 2
+}
+
+tab_eval() { "$AGENT_TAB" eval --owner "$OWNER" "$1" "$2"; }
+
+# Page script: prints a JSON array of the matching rows' text.
+# Name and text reach the page as JSON strings, never spliced into code.
+find_js() {
+  jq -rn --arg n "$1" --arg t "$2" --arg row "$SEL_DRAFT_ROW" '
+    "(() => {
+      const name = \($n | ascii_downcase | @json), text = \($t | ascii_downcase | @json);
+      return JSON.stringify([...document.querySelectorAll(\($row | @json))]
+        .map((r) => r.innerText.toLowerCase())
+        .filter((s) => s.includes(name) && s.includes(text)));
+    })()"'
+}
+
+matches() { tab_eval "$1" "$(find_js "$TO" "$2")"; }
+
+cmd_open() {
+  parse "$@"
+  [ -n "${SLACK_DRAFT_URL:-}" ] || die "set SLACK_DRAFT_URL to your Slack workspace URL" 2
+  local args=(open --owner "$OWNER" --reason "slack drafts")
+  [ -z "$LEASE" ] || args+=(--lease "$LEASE")
+  "$AGENT_TAB" "${args[@]}" "$SLACK_DRAFT_URL"
+}
+
+cmd_attach() {
+  parse "$@"
+  [ "${#POS[@]}" -eq 2 ] || die "attach needs a tab and a file" 2
+  [ -f "${POS[1]}" ] || die "file not found: ${POS[1]}" 2
+  "$AGENT_TAB" upload --owner "$OWNER" --selector "$SEL_FILE_INPUT" "${POS[0]}" "${POS[1]}"
+  echo "slack-draft: attached $(basename "${POS[1]}")"
+}
+
+cmd_count() {
+  parse "$@"
+  [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "count needs a tab, a text, and --to <name>" 2
+  matches "${POS[0]}" "${POS[1]}" | jq 'length'
+}
+
+cmd_delete() {
+  parse "$@"
+  [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "delete needs a tab, a text, and --to <name>" 2
+  local tab="${POS[0]}" found n answer
+  found="$(matches "$tab" "${POS[1]}")"
+  n="$(printf '%s' "$found" | jq 'length')"
+  [ "$n" -gt 0 ] || die "no draft to $TO matches that text"
+  if [ "$n" -gt 1 ] && [ -z "$ALL" ]; then
+    die "$n drafts to $TO match; refine the text or pass --all" 4
+  fi
+  [ -n "$ALL" ] || n=1
+  if [ -z "$YES" ]; then
+    [ -t 0 ] || die "delete changes data; pass --yes to confirm" 4
+    read -r -p "slack-draft: delete $n draft(s) to $TO? [y/N] " answer
+    case "$answer" in y|Y|yes) ;; *) die "not confirmed" 4 ;; esac
+  fi
+  local js
+  js="$(jq -rn --arg n "$TO" --arg t "${POS[1]}" --arg row "$SEL_DRAFT_ROW" --arg del "$SEL_DRAFT_DELETE" --argjson max "$n" '
+    "(() => {
+      const name = \($n | ascii_downcase | @json), text = \($t | ascii_downcase | @json);
+      const rows = [...document.querySelectorAll(\($row | @json))]
+        .filter((r) => r.innerText.toLowerCase().includes(name) && r.innerText.toLowerCase().includes(text))
+        .slice(0, \($max));
+      let done = 0;
+      for (const r of rows) {
+        const b = r.querySelector(\($del | @json));
+        if (b) { b.click(); done++; }
+      }
+      return done;
+    })()"')"
+  answer="$(tab_eval "$tab" "$js")"
+  [ "$answer" -eq "$n" ] || die "deleted $answer of $n drafts; check the tab"
+  echo "slack-draft: deleted $answer draft(s) to $TO"
+}
+
+case "${1:-}" in
+  open) shift; cmd_open "$@" ;;
+  attach) shift; cmd_attach "$@" ;;
+  count) shift; cmd_count "$@" ;;
+  delete) shift; cmd_delete "$@" ;;
+  -h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

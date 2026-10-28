@@ -18,6 +18,7 @@
 #   agent-tab text|shot --owner <id> <tab>
 #   agent-tab eval --owner <id> <tab> <js>     # or - to read the js from stdin
 #   agent-tab nav --owner <id> <tab> <url>
+#   agent-tab upload --owner <id> [--selector <css>] <tab> <file>
 #   agent-tab health [--fix]
 #   agent-tab clear-cookies <domain>
 #
@@ -51,6 +52,9 @@ Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
        agent-tab eval --owner <id> <tab> <js>     # evaluate, print the value;
                                                   # <js> of - reads it from stdin
        agent-tab nav --owner <id> <tab> <url>     # navigate
+       agent-tab upload --owner <id> [--selector <css>] <tab> <file>
+                                                  # set a file on an <input type=file>
+                                                  # (default selector: input[type=file])
        agent-tab shot --owner <id> <tab>          # PNG path, under AGENT_TAB_SHOT_DIR
        agent-tab health [--fix]                   # list tabs that do not answer;
                                                   # --fix reloads, closes unowned
@@ -91,12 +95,13 @@ write_state() {
 rec() { jq -r --arg id "$1" --arg k "$2" '.[$id][$k] // empty' "$STATE"; }
 
 parse_opts() {
-  OWNER="${AGENT_TAB_OWNER:-}" REASON="" LEASE_OPT="" ARG="" ARG2="" FIX=""
+  OWNER="${AGENT_TAB_OWNER:-}" REASON="" LEASE_OPT="" ARG="" ARG2="" FIX="" SELECTOR=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --owner) OWNER="${2:-}"; shift 2 || shift ;;
       --reason) REASON="${2:-}"; shift 2 || shift ;;
       --lease) LEASE_OPT="${2:-}"; shift 2 || shift ;;
+      --selector) SELECTOR="${2:-}"; shift 2 || shift ;;
       --fix) FIX=1; shift ;;
       -?*) usage >&2; die "unknown option: $1" 2 ;;
       *) if [ -z "$ARG" ]; then ARG="$1"; else ARG2="$1"; fi; shift ;;
@@ -278,6 +283,57 @@ cmd_page() {
   esac
 }
 
+# Sets a local file on a file input of a tab you own. It never focuses the tab
+# and never opens a file dialog: DOM.setFileInputFiles hands Chrome the path.
+# DOM node ids live per websocket session, so the real path runs all three
+# DOM calls on one socket. Tests stub AGENT_TAB_CDP and get three calls.
+cmd_upload() {
+  parse_opts "$@"
+  [ -n "$ARG" ] && [ -n "$ARG2" ] || die "upload needs a tab id and a file" 2
+  [ -f "$ARG2" ] || die "file not found: $ARG2" 2
+  require_own_live "$ARG"
+  local ws file sel root node
+  ws="$(tab_ws "$ARG")"
+  file="$(cd "$(dirname "$ARG2")" && pwd)/$(basename "$ARG2")"
+  sel="${SELECTOR:-input[type=file]}"
+  if [ -n "${AGENT_TAB_CDP:-}" ]; then
+    root="$(cdp "$ws" DOM.getDocument '{}' | jq -r '.root.nodeId')" || die "upload failed"
+    node="$(cdp "$ws" DOM.querySelector "$(jq -cn --argjson r "$root" --arg s "$sel" '{nodeId: $r, selector: $s}')" |
+      jq -r '.nodeId // 0')" || die "upload failed"
+    [ "$node" != 0 ] || die "no element matches $sel in tab $ARG"
+    cdp "$ws" DOM.setFileInputFiles "$(jq -cn --argjson n "$node" --arg f "$file" '{nodeId: $n, files: [$f]}')" >/dev/null ||
+      die "upload failed"
+  else
+    node --input-type=module -e '
+      const [ws, sel, file] = process.argv.slice(1);
+      const fail = (why) => { console.error(`agent-tab: cdp upload: ${why}`); process.exit(1); };
+      if (typeof WebSocket !== "function") fail(`node ${process.version} has no WebSocket; use Node 22 or newer`);
+      const sock = new WebSocket(ws);
+      const t = setTimeout(() => fail("no answer in 10 s"), 10000);
+      let id = 0; const pending = new Map();
+      const call = (method, params) => new Promise((res, rej) => {
+        pending.set(++id, { res, rej }); sock.send(JSON.stringify({ id, method, params }));
+      });
+      sock.onerror = () => {};
+      sock.onclose = (e) => fail(`websocket closed before the answer (code ${e.code})`);
+      sock.onmessage = (m) => {
+        const r = JSON.parse(m.data); const p = pending.get(r.id);
+        if (!p) return; pending.delete(r.id);
+        r.error ? p.rej(new Error(JSON.stringify(r.error))) : p.res(r.result);
+      };
+      sock.onopen = async () => {
+        try {
+          const doc = await call("DOM.getDocument", {});
+          const q = await call("DOM.querySelector", { nodeId: doc.root.nodeId, selector: sel });
+          if (!q.nodeId) fail(`no element matches ${sel}`);
+          await call("DOM.setFileInputFiles", { nodeId: q.nodeId, files: [file] });
+          clearTimeout(t); process.exit(0);
+        } catch (e) { fail(e.message); }
+      };' "$ws" "$sel" "$file" || die "upload failed"
+  fi
+  echo "agent-tab: uploaded $(basename "$file") to tab $ARG"
+}
+
 # Live-lease holder of a tab, or empty.
 live_holder() {
   [ -f "$STATE" ] || return 0
@@ -351,6 +407,7 @@ cmd_clear_cookies() {
 
 case "${1:-}" in
   text|eval|nav|shot) sub="$1"; shift; cmd_page "$sub" "$@" ;;
+  upload) shift; cmd_upload "$@" ;;
   health) shift; cmd_health "$@" ;;
   clear-cookies) shift; cmd_clear_cookies "$@" ;;
   open) shift; cmd_open "$@" ;;

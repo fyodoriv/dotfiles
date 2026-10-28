@@ -367,3 +367,32 @@ expected_eval() {
   # The close is reported at once, not after the 10 s no-answer timeout.
   [ "$SECONDS" -lt 8 ]
 }
+
+@test "upload sets the file on the tab's file input through DOM calls" {
+  cdp_setup
+  cat > "$TEST_DIR/cdp" <<'STUB'
+#!/bin/bash
+echo "$1 $2 $3" >> "$CDP_CALLS"
+case "$2" in
+  DOM.getDocument) echo '{"root":{"nodeId":1}}' ;;
+  DOM.querySelector) echo '{"nodeId":7}' ;;
+  *) echo '{}' ;;
+esac
+STUB
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  echo data > "$TEST_DIR/f.txt"
+  run "$SCRIPT" upload --owner agent-a "$id" "$TEST_DIR/f.txt"
+  [ "$status" -eq 0 ]
+  grep -q 'DOM.querySelector.*input\[type=file\]' "$CDP_CALLS"
+  grep -q "DOM.setFileInputFiles.*\"nodeId\":7.*f.txt" "$CDP_CALLS"
+}
+
+@test "upload from another owner exits 3 and a missing file exits 2" {
+  cdp_setup
+  id="$(open_tab agent-a "bot login")"; chrome_has "$id" https://example.com/
+  echo data > "$TEST_DIR/f.txt"
+  run "$SCRIPT" upload --owner agent-b "$id" "$TEST_DIR/f.txt"
+  [ "$status" -eq 3 ]
+  run "$SCRIPT" upload --owner agent-a "$id" "$TEST_DIR/none.txt"
+  [ "$status" -eq 2 ]
+}

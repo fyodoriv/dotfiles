@@ -70,6 +70,7 @@ agent-tab eval "$tab" 'document.title'           # value of a JS expression
 agent-tab eval "$tab" - < script.js              # a large script, from stdin
 agent-tab nav "$tab" https://example.com/next
 agent-tab shot "$tab"                            # prints the PNG path
+agent-tab upload "$tab" ./file.pdf                # file into input[type=file]; --selector <css> to pick
 agent-tab health [--fix]                         # tabs that do not answer
 agent-tab clear-cookies example.com              # one site's cookies
 ```
@@ -93,3 +94,19 @@ This Chrome runs the real `Google Chrome.app`, so macOS registers them as `com.g
 Do not set `AGENT_BROWSER_PROFILE` to the launchd-owned profile `~/.agent-browser/chrome-profile`. `agent-browser-singleton-preflight` maps only that profile (to `9223`). It refuses the retired `debug-profile` and `tooling-profile` and points at `temp-browser`; no mapping to `9224` or `9225` is left. Chrome ProcessSingleton forwards those launches into the existing browser and creates stray `chrome://newtab` windows; the wrapper delegates such profiles to `agent-browser-singleton-preflight` or refuses. These helpers stay in dotfiles because they encode this repo's launchd profile-to-port contract ([decision](plans/replace-relocate-agent-browser-singleton-helpers.md)).
 
 Use the temporary browser only for true isolation, conflicting credentials, or a disposable sign-in. For a visible human sign-in, ask the user; `--session-name` calls now run in the headless temporary browser. Never start another browser on ports `9222`-`9225`.
+
+### Slack drafts: `slack-draft`
+
+A Slack MCP saves drafts but cannot attach a file, count drafts, or delete one. `slack-draft` does those three in a tab you own, through `agent-tab`, so it never takes the user's focus.
+
+```bash
+export SLACK_DRAFT_URL=https://<your-workspace>.slack.com/   # set in your shell; never commit it
+tab="$(slack-draft open --owner "$AGENT_ID")"
+slack-draft attach --owner "$AGENT_ID" "$tab" ./report.pdf
+slack-draft count  --owner "$AGENT_ID" "$tab" "weekly report" --to Alex
+slack-draft delete --owner "$AGENT_ID" "$tab" "weekly report" --to Alex --yes
+```
+
+- `count` and `delete` match a row of the Drafts view when its text holds both the name and the text (case-insensitive). Open the Drafts view in the tab first.
+- `delete` changes data. It asks first; `--yes` skips the question; with no terminal and no `--yes` it exits 4. Several matches exit 4 unless you pass `--all`.
+- The Slack selectors sit in one block at the top of `bin/slack-draft`. `tests/slack-draft.bats` stubs `agent-tab`, so no test touches a real workspace. Check the selectors by hand in a throwaway workspace when Slack changes its markup.

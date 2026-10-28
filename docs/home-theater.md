@@ -18,6 +18,14 @@ See [module-reference.md](module-reference.md#home-theater--full-only-opt-in) fo
 In short: both apps installed, Plex answering, VLC opens `.mkv`, the Mac never sleeps on its
 power adapter (`sudo pmset -c sleep 0`), and the TV uses Ethernet.
 
+## Why this module stays here (decision 2026-10-28)
+
+Rule 0 check: no maintained tool replaces these checks, and the module is not private.
+- Plex and VLC installs: the Homebrew casks (`plex-media-server`, `vlc`) already install them; the doctor only confirms the app is there. No Plex CLI is needed for a `/identity` probe.
+- TV wired check: the SmartThings CLI ([SmartThingsCommunity/smartthings-cli](https://github.com/SmartThingsCommunity/smartthings-cli)) talks to the cloud REST API with a login or token, and its docs show no network-type command. The local Tizen API call is simpler and needs no account.
+- `duti` and `pmset` have no wrapper to adopt.
+- Relocate: the module is opt-in (`home_theater` is off by default), holds no private data (the TV address is a setting), and any Mac can use it. It stays in the public base repo.
+
 ## One-time settings that a script cannot set
 
 **Plex server** (browser at `http://127.0.0.1:32400/web`):

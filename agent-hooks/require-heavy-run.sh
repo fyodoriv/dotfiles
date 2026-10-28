@@ -26,6 +26,15 @@ _has_file_arg() {
   return 1
 }
 
+# True when the arguments pick one test: a grep filter or an explicit spec path.
+_one_test_args() {
+  local a
+  for a in "$@"; do
+    case "$a" in -g|--grep|--grep=*|-g=*) return 0 ;; esac
+  done
+  _has_file_arg "$@"
+}
+
 # True when the script name is a test or build script.
 _heavy_script() {
   case "$1" in test|test:*|test-*|t|build|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac
@@ -43,21 +52,36 @@ _is_heavy() {
   read -r -a w <<< "$1" || true
   while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == *=* ]]; do w=("${w[@]:1}"); done
   [ "${#w[@]}" -gt 0 ] || return 1
-  [ "${w[0]}" = npx ] && w=("${w[@]:1}")
+  case "${w[0]}" in npx|bunx) w=("${w[@]:1}") ;; esac
   [ "${#w[@]}" -gt 0 ] || return 1
   local tool="${w[0]}" a
-  local -a rest=("${w[@]:1}")
+  local -a rest=() raw=("${w[@]:1}")
+  local i=0
+  # Drop workspace selectors (and their value) so `pnpm --filter web e2e` reads as `pnpm e2e`.
+  while [ "$i" -lt "${#raw[@]}" ]; do
+    case "${raw[$i]}" in
+      --filter|-F|--workspace|-w|--prefix|-C) i=$((i + 2)); continue ;;
+    esac
+    rest+=("${raw[$i]}"); i=$((i + 1))
+  done
   case "$tool" in
     npm|yarn|pnpm)
-      # npm exec / pnpm exec / yarn playwright test
-      if [ "${rest[0]:-}" = exec ]; then
-        _playwright_test_run "${rest[1]:-}" "${rest[2]:-}" && return 0
+      # npm exec / pnpm exec / pnpm dlx / yarn playwright test
+      case "${rest[0]:-}" in
+        exec|dlx)
+          _playwright_test_run "${rest[1]:-}" "${rest[2]:-}" && ! _one_test_args "${rest[@]:3}" && return 0
+          return 1 ;;
+      esac
+      if _playwright_test_run "${rest[0]:-}" "${rest[1]:-}"; then
+        _one_test_args "${rest[@]:2}" && return 1
+        return 0
       fi
-      _playwright_test_run "${rest[0]:-}" "${rest[1]:-}" && return 0
-      for a in ${rest[@]+"${rest[@]}"}; do
+      for i in "${!rest[@]}"; do
+        a="${rest[$i]}"
         case "$a" in -*|run|run-script) continue ;; esac
-        _heavy_script "$a" && return 0
-        return 1
+        _heavy_script "$a" || return 1
+        _one_test_args "${rest[@]:$((i + 1))}" && return 1
+        return 0
       done
       return 1 ;;
     vitest|jest)
@@ -65,11 +89,17 @@ _is_heavy() {
       return 0 ;;
     make)
       for a in ${rest[@]+"${rest[@]}"}; do
-        case "$a" in e2e|test-all) return 0 ;; esac
+        case "$a" in -n|--dry-run|--just-print|--recon) return 1 ;; esac
+      done
+      for a in ${rest[@]+"${rest[@]}"}; do
+        case "$a" in e2e|test-all|test-force) return 0 ;; esac
       done
       return 1 ;;
     playwright)
-      [ "${rest[0]:-}" = test ] && return 0
+      if [ "${rest[0]:-}" = test ]; then
+        _one_test_args "${rest[@]:1}" && return 1
+        return 0
+      fi
       return 1 ;;
     bats)
       for a in ${rest[@]+"${rest[@]}"}; do

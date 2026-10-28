@@ -47,6 +47,17 @@ T
   [ "$output" = "1" ]
 }
 
+@test "headless-chrome-unlocked: counts only Chrome binaries, not wrappers or search tools" {
+  cat > "$PS_TABLE" <<T
+43399 1 /bin/bash /d/bin/dotfiles-quit-relay /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new --remote-debugging-port=9223
+43414 43399 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless=new --remote-debugging-port=9223
+500 1 rg --headless src
+501 1 grep -r --headless-shell docs
+T
+  run "$SCRIPT"
+  [ "$output" = "1" ]
+}
+
 @test "headless-chrome-unlocked: --check fails above HEADLESS_UNLOCKED_MAX" {
   cat > "$PS_TABLE" <<T
 100 1 node pw

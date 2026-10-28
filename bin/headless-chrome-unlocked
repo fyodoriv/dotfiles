@@ -22,7 +22,13 @@ count=$(ps -axo pid=,ppid=,command= | awk '
     n = 0
     for (p in cmd) {
       c = cmd[p]
-      if (c !~ /(chrome-headless-shell|--headless)/ || c ~ /--type=/) continue
+      if (c ~ /--type=/ || c !~ /(chrome-headless-shell|--headless)/) continue
+      # The part before the first flag must be a Chrome binary, not a wrapper
+      # (bash dotfiles-quit-relay <chrome>) or a search tool (rg --headless).
+      pre = c; i = index(c, " --"); if (i > 0) pre = substr(c, 1, i - 1)
+      sub(/^ +/, "", pre)
+      if (pre !~ /^\// || pre ~ /^\/[^ ]*\/(bash|sh|zsh|node|perl|python[0-9.]*|ruby) /) continue
+      if (pre !~ /(chrome-headless-shell|MacOS\/(Google Chrome|Chromium)( for Testing)?)$/) continue
       locked = 0; q = ppid[p]; hops = 0
       while (q in cmd && hops < 30) {
         if (cmd[q] ~ /heavy-run/) { locked = 1; break }

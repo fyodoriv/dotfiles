@@ -6,8 +6,8 @@ In the same monthly pass, for `dotfiles` (run from its checkout):
 
 1. Health: `bin/dotfiles-doctor --quiet`. Each failing check line names its fix.
 2. Cached gate: `make check`. `bin/cached-run` skips unchanged steps;
-   `make test-force` runs everything.
-3. Broken stories: `make e2e`. A failing test name starts with its story ID
+   `heavy-run make test-force` runs everything.
+3. Broken stories: `heavy-run make e2e`. A failing test name starts with its story ID
    (`USNN e2e: …`); report the story, not only the test.
 4. Speed review: `bin/dotfiles-metrics --table`. Compare the `make check`
    row (from `~/.local/state/dotfiles/gate-timings.jsonl`) and every other

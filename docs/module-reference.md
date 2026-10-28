@@ -323,6 +323,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `resilience.wakeup_hook_exists` | `~/.wakeup` hook fires network-watchdog | None (hint: `dotfiles apply`) |
 | `resilience.network_watchdog_exec` | network-watchdog is executable | `chmod +x` |
 | `resilience.network_watchdog_clean` | network-resilience LaunchAgent last exit is not 127 | None (hint: reload the LaunchAgent) |
+| `resilience.headless_chrome_under_heavy_run` | Headless Chrome main processes outside a `heavy-run` parent stay at or under `HEADLESS_UNLOCKED_MAX` (default 3), counted by `bin/headless-chrome-unlocked` (advisory) | None (hint: start browser test runs as `heavy-run <command>`) |
 | `resilience.network_watchdog_loaded` | network-resilience LaunchAgent loaded | None (hint: `launchctl bootstrap`) |
 | `resilience.mas_installed` | `mas` (App Store CLI) installed | None (hint: `brew install mas`) |
 | `resilience.amphetamine_installed` | Amphetamine.app installed | None (hint: `dotfiles-resilience-setup`) |

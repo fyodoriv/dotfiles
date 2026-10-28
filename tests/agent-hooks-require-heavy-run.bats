@@ -23,7 +23,8 @@ run_hook() {
 @test "blocks other headless-browser entry points (e2e, ui, exec playwright, make e2e)" {
   for c in "npm run e2e" "npm run e2e:ci" "yarn e2e" "npm run ui" "pnpm ui:audit" \
            "pnpm exec playwright test" "yarn playwright test" "npm exec playwright test" \
-           "npx playwright test --ui" "make e2e" "make test-all" "cd app && npm run ui"; do
+           "npx playwright test --ui" "make e2e" "make test-all" "cd app && npm run ui" \
+           "make test-force" "pnpm --filter web e2e" "pnpm -F web run e2e" "pnpm dlx playwright test" "bunx playwright test"; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
   done
@@ -34,6 +35,8 @@ run_hook() {
            "npx vitest run src/a/b.test.ts" "npx jest src/x.test.js" "bats tests/foo.bats" \
            "bats -f 'x' tests/foo.bats" "git status" "echo npm test" "rg 'yarn build' docs" \
            "cd app && heavy-run yarn test" "npm install" "npm run lint" \
+           "pnpm ui -g login" "pnpm ui tests/one.spec.ts" "npm run e2e -- --grep=login" "npx playwright test -g login" \
+           "npx playwright test tests/a.spec.ts" "make -n e2e" "make --dry-run test-all" "pnpm exec playwright test -g x" \
            "heavy-run npm run ui" "heavy-run make e2e" "pnpm exec playwright install" "make lint"; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }

@@ -51,8 +51,10 @@ with `heavy-run`: `npm test`, `npm run test*`, `yarn`/`pnpm` test or build
 scripts, `vitest`/`jest` with no file argument, `playwright test`, and `bats`
 on a folder. It also blocks the other headless-browser entry points:
 `e2e*` and `ui*` package scripts, `npm exec`/`pnpm exec`/`yarn playwright test`,
-and `make e2e` or `make test-all`. It checks each part of a `&&`, `||`, `;`, or `|` chain.
-Single-file runs (`npx vitest run one.test.ts`, `bats tests/x.bats`) pass.
+and `make e2e`, `make test-all`, or `make test-force` (`make -n` passes). It checks each part of a `&&`, `||`, `;`, or `|` chain.
+Single-file and single-test runs (`npx vitest run one.test.ts`, `bats tests/x.bats`,
+`pnpm ui -g login`, `playwright test tests/one.spec.ts`) pass. It also reads
+`pnpm --filter <pkg> e2e`, `pnpm dlx`, and `bunx playwright test`.
 Set `HEAVY_RUN_HOOK=off` to turn it off. Tests:
 `tests/agent-hooks-require-heavy-run.bats`.
 

@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] heavy-run serves waiters in arrival order
+  - **ID**: heavy-run-fifo-queue
+  - **Tags**: performance, reliability, agents
+  - **Details**: `bin/heavy-run` takes the Mac-wide lock with a plain blocking perl `flock(LOCK_EX)`. macOS gives no order guarantee among waiters, so a waiter can lose the lock again and again to runs that queued later. In the 2026-10-28 goal run, one worker's dotfiles gate lost the lock to later runs for about 40 minutes. Add a ticket queue: each caller takes a numbered ticket file in the lock folder and waits until its ticket is the lowest live one, then takes the flock. Drop tickets whose pid is gone. `heavy-run --status` lists the queue in order.
+  - **Files**: `bin/heavy-run`, `tests/` (heavy-run bats), heavy-run doc
+  - **Output**: code
+  - **Acceptance**: a bats test starts three waiters in a known order behind a holder and sees them run in that order; a dead waiter's ticket does not block the queue; `heavy-run --status` prints the queue.
+  - **Hypothesis**: arrival-order service cuts the longest single wait on the heavy-run lock in a 3-worker goal run from about 40 min to under 15 min, because today one waiter can be skipped many times.
+  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (the `heavy-run` lines' p95 and slowest call) on the next 3-worker run, plus the new bats order test.
+  - **Success**: slowest heavy-run wait under 15 min and the order test passes.
+  - **Pivot**: slowest wait still over 30 min -> the lock order is not the lever; cap gate length or split the lock per repo instead.
+  - **Anchor**: tooling-checkup goal run 2026-10-28; Lamport 1974, "A new solution of Dijkstra's concurrent programming problem" (bakery algorithm, first-come-first-served).
+  - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Tags**: performance, reliability, agents
@@ -27,6 +41,34 @@ them. -->
   - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
 
 ## P2
+
+- [ ] tooling-checkup Phase 1 says to run gh scripts outside the sandbox
+  - **ID**: tooling-checkup-sandbox-gh-note
+  - **Tags**: docs, agents
+  - **Details**: In the 2026-10-28 checkup the first two inventory runs were wasted: inside the Claude Code Bash sandbox `gh` fails TLS (x509), and `$TMPDIR` inside the sandbox is a different folder from the one outside, so a file written outside was not found inside. Add one line to the tooling-checkup Phase 1 steps: run `gh`-dependent scripts with the sandbox off from the first call, and write files shared across calls to the session scratchpad, not `$TMPDIR`.
+  - **Files**: `skills/tooling-checkup/SKILL.md`, `skills/tooling-checkup/evals/`
+  - **Output**: docs
+  - **Acceptance**: the Phase 1 text has the note; an eval case checks that an agent runs the inventory outside the sandbox on its first try.
+  - **Hypothesis**: the note cuts wasted Phase 1 inventory runs from 2 per checkup to 0, which saves about 2 minutes and one round trip each run.
+  - **Measurement**: count inventory runs before the first good one in the next two checkup transcripts (`rg -c inventory.sh` on the session jsonl).
+  - **Success**: 0 wasted runs on both checkups.
+  - **Pivot**: still 1 or more wasted runs -> make `inventory.sh` detect the sandbox and exit with a clear message instead.
+  - **Anchor**: tooling-checkup run 2026-10-28; Nielsen 1994, error prevention heuristic.
+  - **Competitive-goal**: none — agent workflow speed.
+
+- [ ] agent_time_review counts subagent waits apart from real work
+  - **ID**: agent-time-review-subagent-noise
+  - **Tags**: metrics, agents
+  - **Details**: `skills/tooling-checkup/scripts/agent_time_review.py` puts `agent:general-purpose` at the top of every project (10.7 h in 7 days on 2026-10-28) and files a "speed-up-agent-general-purpose" task for agentbrew and dotfiles. Most of that time is a background worker's whole life, which overlaps the lead's own tool time, so it is double counted and the suggested fix ("narrower prompt") is rarely the lever. Report background subagents in their own line (count, total, p95) and leave them out of the speedup-task list unless a foreground subagent blocked the lead.
+  - **Files**: `skills/tooling-checkup/scripts/agent_time_review.py`, its tests
+  - **Output**: code
+  - **Acceptance**: a fixture with one background and one foreground subagent shows the background one only in the new line; no speedup task is filed for background subagents.
+  - **Hypothesis**: separating background subagents drops false speedup tasks from the review from 2 per run to 0, without hiding foreground waits.
+  - **Measurement**: `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7 | rg -c "file .*speed-up-agent-general-purpose"` on the next checkup.
+  - **Success**: 0 such lines, and the fixture test passes.
+  - **Pivot**: the transcripts do not mark background vs foreground subagents -> report the overlap share instead and keep the list.
+  - **Anchor**: tooling-checkup run 2026-10-28; Basili, Caldiera, Rombach 1994 (GQM: a metric must answer the question asked).
+  - **Competitive-goal**: none — metric quality.
 
 - [ ] Rebuild the UI to the Hallmark design skill
   - **ID**: hallmark-design

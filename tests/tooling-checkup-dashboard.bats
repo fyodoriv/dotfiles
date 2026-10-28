@@ -6,7 +6,7 @@
 
 setup() {
   ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-  GATE="$ROOT/skills/tooling-checkup/scripts/dashboard_comfort.cjs"
+  GATE="${DASHBOARD_GATE:-$ROOT/skills/tooling-checkup/scripts/dashboard_comfort.cjs}"
   PAGE="$ROOT/skills/tooling-checkup/dashboard/index.html"
   command -v node >/dev/null || skip "node not installed"
   CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/dashboard-gate"
@@ -24,13 +24,22 @@ setup() {
 @test "the gate fails on a planted sideways overflow" {
   DASH_PLANT=overflow run node "$GATE" "$PAGE" overflow
   [ "$status" -eq 1 ]
-  [[ "$output" == *"overflow"* ]]
+  # The gate prints "FAIL <theme>-<size> <check> ..." on stderr; JSON keys alone must not satisfy this.
+  [[ "$output" =~ FAIL\ [a-z]+-[a-z]+\ overflow ]]
 }
 
 @test "the gate fails on a planted break-anywhere rule in table cells" {
   DASH_PLANT=breakall run node "$GATE" "$PAGE" breakall
   [ "$status" -eq 1 ]
-  [[ "$output" == *"splitWords"* ]]
+  [[ "$output" =~ FAIL\ [a-z]+-[a-z]+\ splitWords ]]
+}
+
+@test "the gate fails when a chart does not redraw after the window narrows" {
+  # A page that never redraws keeps the old viewBox width, so its text scales down.
+  sed 's/if (window.ResizeObserver) {/if (false) {/' "$PAGE" > "$BATS_TEST_TMPDIR/no-resize.html"
+  run node "$GATE" "$BATS_TEST_TMPDIR/no-resize.html" noresize
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ FAIL\ [a-z]+-desktop\ resize ]]
 }
 
 @test "a missing dataset leaves the other panels drawn" {

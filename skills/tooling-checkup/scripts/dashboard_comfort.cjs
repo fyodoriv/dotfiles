@@ -12,6 +12,8 @@
 //   splitWords   a word breaks across two lines in a table cell although it fits on a line by itself
 //   runsCap      the runs table shows more than 5 rows before "Show N more"
 //   charts       a chart has no svg role=img, no aria-label, no visible latest value, or no tooltip on focus/tap
+//   resize       after the window narrows, a chart svg is scaled below 97% (14 px text would shrink)
+//   badDay       a calendar day that does not exist (2026-02-30) is drawn as a point
 //   noData       a dataset that dash.data() returns as undefined must not stop the other panels from drawing
 //   pageErrors   an uncaught page error
 // The fixture holds a word wider than a phone cell (a long verdict and a long project name), so a rule that
@@ -41,7 +43,8 @@ const data = {
   latest: { status: 'ok', data: [{ ...runs[19], status: 'gaps', machine_peak_load1_24h: 6.4, claude_echo_p95_ms: 220 }] },
   runs: { status: 'ok', data: runs },
   gate: { status: 'ok', data: Array.from({ length: 14 }, (_, i) => ({ day: day(i), median_total_s: 60 + i * 3 })) },
-  doctor: { status: 'ok', data: Array.from({ length: 14 }, (_, i) => ({ day: day(i), fail: i % 4 })) },
+  // One impossible day (Feb 30) must be dropped, not rolled over to Mar 2.
+  doctor: { status: 'ok', data: [...Array.from({ length: 14 }, (_, i) => ({ day: day(i), fail: i % 4 })), { day: '2026-02-30', fail: 9 }] },
   // The real export: one row per hour for 7 days, 'YYYY-MM-DDTHH:00' in local time.
   load: { status: 'ok', data: Array.from({ length: 168 }, (_, i) => ({ hour: day(Math.floor(i / 24)) + 'T' + String(i % 24).padStart(2, '0') + ':00', samples: 12, peak_load1: Math.round((2 + 3 * Math.abs(Math.sin(i / 9)) + (i % 24 > 9 && i % 24 < 18 ? 2 : 0)) * 10) / 10 })) },
   agent_time: { status: 'ok', data: ['agentbrew', 'dotfiles', 'minsky', 'tooling-checkup-dashboard-fixture-repo-name'].flatMap(p => Array.from({ length: 14 }, (_, i) => ({ day: day(i), project: p, tool_hours: 0.5 + i / 10, calls: 100 + i, failed_calls: i % 3 }))) },
@@ -126,6 +129,16 @@ function measure() {
       await p.click('#tc-doctor svg', { position: { x: 120, y: 60 } });
       if (await tipOf('tc-doctor') !== 'block') interaction.push('no tooltip on tap');
     }
+    const badDay = await p.evaluate(() => document.querySelectorAll('#tc-doctor svg circle[r="4"]').length);
+    if (!DROP && badDay !== 14) interaction.push('doctor chart drew ' + badDay + ' points, expected 14 (Feb 30 dropped)');
+    let resize = [];
+    if (!DROP && sn === 'desktop') {
+      await p.setViewportSize({ width: 375, height: 812 });
+      await p.waitForTimeout(600);
+      resize = await p.evaluate(() => [...document.querySelectorAll('.tc-chart svg')].map(s => ({ id: s.closest('.tc-chart').id, scale: s.getBoundingClientRect().width / s.viewBox.baseVal.width })).filter(x => x.scale < 0.97 || x.scale > 1.03));
+      await p.setViewportSize({ width: 1280, height: 800 });
+      await p.waitForTimeout(600);
+    }
     const more = await p.$('#tc-runs-more');
     if (more) {
       await more.focus(); await more.press('Enter');
@@ -136,7 +149,7 @@ function measure() {
     }
     // A dataset that is missing must leave the other panels drawn.
     const noData = DROP ? await p.evaluate(d => ({ dropped: document.querySelector('[data-source="' + d + '"].tc-chart .tc-plot')?.textContent, others: document.querySelectorAll('.tc-chart svg').length }), DROP) : null;
-    out[`${t}-${sn}`] = { axeSerious: axe, ...m, interaction, noData, pageErrors: errs };
+    out[`${t}-${sn}`] = { axeSerious: axe, ...m, interaction, resize, noData, pageErrors: errs };
     await p.screenshot({ path: path.join(OUT, `${prefix}-${t}-${sn}.png`), fullPage: true });
     await ctx.close();
   }
@@ -152,6 +165,7 @@ function measure() {
     if (r.runsVisible > 5) fails.push(k + ' runsCap ' + r.runsVisible);
     if (r.charts.length) fails.push(k + ' charts ' + r.charts.slice(0, 3));
     if (r.interaction.length) fails.push(k + ' interaction ' + r.interaction);
+    if (r.resize.length) fails.push(k + ' resize ' + JSON.stringify(r.resize.slice(0, 2)));
     if (r.noData && (r.noData.dropped !== 'no data' || r.noData.others < 4)) fails.push(k + ' noData ' + JSON.stringify(r.noData));
     if (r.pageErrors.length) fails.push(k + ' pageErrors ' + r.pageErrors[0]);
   }

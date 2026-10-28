@@ -119,6 +119,14 @@ them. -->
 
 ## P3
 
+- [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
+  - **ID**: dashboard-chart-gate-hardening
+  - **Tags**: ui, tooling-checkup
+  - **Details**: Four leftovers from the round-2 review of the Hallmark dashboard redesign. (1) The load chart can show a duplicate or a missing local hour on a daylight-saving change, because the exporter keys rows by local time: key them by UTC and format in the page. (2) The gate's tap test uses a mouse click, not `touchscreen.tap`. (3) The gate presses ArrowLeft but never checks that the tooltip moved. (4) Chart line colours (non-text contrast, WCAG 1.4.11) are not gated.
+  - **Files**: `skills/tooling-checkup/scripts/dashboard_export.py`, `skills/tooling-checkup/dashboard/index.html`, `skills/tooling-checkup/scripts/dashboard_comfort.cjs`, `tests/tooling-checkup-dashboard.bats`
+  - **Output**: code
+  - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Blocked**: needs-time — 2026-10-22: shipped `make lint` per-file cache (`bin/cached-run --per-file`: skips a script that passed with the same content, sourced files, shellcheck version, and `.shellcheckrc`; shared by all worktrees; misses run in parallel) plus `make lint-full` (PR #257). Baseline 2026-10-22: `make lint` lines sum 6m02s/day (tooling 2m08s, dotfiles 2m04s, agentbrew 1m50s); one run 17-39 s uncached, now 11.6 s cold and 1.2-1.3 s warm at load 40-50. Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), then close or pivot.

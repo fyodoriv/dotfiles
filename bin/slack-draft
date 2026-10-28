@@ -18,7 +18,9 @@
 # every match with --all. It prints the matches and asks before it deletes;
 # --yes skips the question. Without --yes and without a terminal it refuses.
 # It re-reads the list after each delete, answers Slack's confirm dialog, and
-# reports how many drafts really went. attach uses the file input of the main
+# reports how many drafts really went. It deletes only the rows it showed you
+# (exact recipient and full body) and stops if the list changed. Slack's list
+# may be virtualized: if a delete cannot be confirmed it says "unknown". attach uses the file input of the main
 # composer (not a thread pane) and clicks the attach button first if needed.
 #
 # Env: SLACK_DRAFT_URL (workspace URL for `open`; no default, never stored in
@@ -41,13 +43,16 @@ SEL_DRAFT_ROW='[data-qa="drafts_list_item"], [data-qa="draft-item"]'
 SEL_DRAFT_TO='[data-qa="drafts_list_item_to"], [data-qa="draft-item-to"]'        # recipient field
 SEL_DRAFT_BODY='[data-qa="drafts_list_item_body"], [data-qa="draft-item-body"]'  # draft text
 SEL_DRAFT_DELETE='[data-qa="drafts_list_item_delete"], [data-qa="draft-item-delete"]'
-SEL_CONFIRM='[data-qa="confirm_modal_go"], [data-qa="draft-delete-confirm"]'
+SEL_DIALOG='[role="dialog"], [data-qa="delete_draft_modal"]'                        # the dialog that holds "Delete"
+SEL_CONFIRM='[data-qa="confirm_modal_go"], [data-qa="draft-delete-confirm"]'      # its confirm button, searched inside the dialog only
 
 usage() {
   sed -n '/^# Usage:/,/^#   slack-draft delete/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 die() { echo "slack-draft: $1" >&2; exit "${2:-1}"; }
+
+blank() { [[ -z "${1//[[:space:]]/}" ]]; }
 
 parse() {
   OWNER="${AGENT_TAB_OWNER:-}" TO="" ALL="" YES="" LEASE="" POS=()
@@ -69,26 +74,28 @@ parse() {
 tab_eval() { "$AGENT_TAB" eval --owner "$OWNER" "$1" "$2"; }
 
 # Page-script prelude. Name and text arrive as JSON strings, never spliced into
-# code. Both sides are normalized by the page (NFKC, lower case, one space, no
-# leading @ or "To:"), so non-ASCII names match. A draft matches when its
-# recipient field EQUALS the name and its body field CONTAINS the text.
+# code. Both sides are normalized by the page (NFC, lower case, one space, no
+# leading @ or "To:"); NFKC is not used, so full-width and math-bold names stay
+# different people. A draft matches when its recipient field EQUALS the name and
+# its body field CONTAINS the (non-empty) text.
 page_prelude() {
   jq -rn --arg n "$1" --arg t "$2" --arg row "$SEL_DRAFT_ROW" --arg to "$SEL_DRAFT_TO" \
-    --arg body "$SEL_DRAFT_BODY" --arg del "$SEL_DRAFT_DELETE" --arg ok "$SEL_CONFIRM" '
-    "const norm = (s) => String(s || \"\").normalize(\"NFKC\").toLowerCase().replace(/\\s+/g, \" \").trim().replace(/^to:\\s*/, \"\").replace(/^@/, \"\");
+    --arg body "$SEL_DRAFT_BODY" --arg del "$SEL_DRAFT_DELETE" --arg ok "$SEL_CONFIRM" --arg dlg "$SEL_DIALOG" '
+    "const norm = (s) => String(s || \"\").normalize(\"NFC\").toLowerCase().replace(/\\s+/g, \" \").trim().replace(/^to:\\s*/, \"\").replace(/^@/, \"\");
      const NAME = norm(\($n | @json)), TEXT = norm(\($t | @json));
      const txt = (e) => (e ? e.innerText : \"\");
      const rows = () => [...document.querySelectorAll(\($row | @json))].map((el) => ({
        el, rawTo: txt(el.querySelector(\($to | @json))).trim(), rawBody: txt(el.querySelector(\($body | @json))).trim() }));
-     const hits = () => rows().filter((r) => NAME && norm(r.rawTo) === NAME && norm(r.rawBody).includes(TEXT));
+     const hits = () => rows().filter((r) => NAME && TEXT && norm(r.rawTo) === NAME && norm(r.rawBody).includes(TEXT));
      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-     const DEL = \($del | @json), OK = \($ok | @json);"'
+     const DEL = \($del | @json), OK = \($ok | @json), DLG = \($dlg | @json);
+     const dialog = () => [...document.querySelectorAll(DLG)].find((d) => /delete/i.test(txt(d)));"'
 }
 
-# Prints a JSON array of {to, body} for the matching drafts.
+# Prints a JSON array of {to, body} (full, exact field text) for the matches.
 matches() {
   tab_eval "$1" "$(page_prelude "$TO" "$2")
-(() => JSON.stringify(hits().map((r) => ({ to: r.rawTo, body: r.rawBody.slice(0, 120) }))))()"
+(() => JSON.stringify(hits().map((r) => ({ to: r.rawTo, body: r.rawBody }))))()"
 }
 
 cmd_open() {
@@ -125,51 +132,79 @@ cmd_attach() {
 cmd_count() {
   parse "$@"
   [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "count needs a tab, a text, and --to <name>" 2
+  blank "$TO" && die "--to must not be blank" 2
+  blank "${POS[1]}" && die "the text must not be blank: it would match every draft" 2
   matches "${POS[0]}" "${POS[1]}" | jq 'length'
+}
+
+show_rows() { jq -r --argjson w "${2:-1000}" '.[:$w][] | "  - to \(.to): \(.body[:120])"' <<< "$1"; }
+
+# Deletes ONE confirmed draft per eval call, so no call outlasts agent-tab's
+# 10 s eval timeout. The page deletes only if the live matches are exactly the
+# confirmed rows still left (same recipient, same full body); otherwise it
+# clicks nothing and says "changed". It answers the delete dialog only, waits
+# for the row to go, and says "removed" or "unknown".
+delete_one() {
+  tab_eval "$1" "$(page_prelude "$TO" "$2")
+(async () => {
+  const conf = $3;
+  const eq = (c, r) => c.to === r.rawTo && c.body === r.rawBody;
+  const h = hits(), left = conf.slice();
+  let same = h.length === conf.length;
+  for (const r of h) {
+    const k = left.findIndex((c) => eq(c, r));
+    if (k < 0) { same = false; break; }
+    left.splice(k, 1);
+  }
+  if (!same) return JSON.stringify({ status: \"changed\" });
+  const count = () => hits().filter((r) => eq(conf[0], r)).length;
+  const before = count();
+  const target = h.find((r) => eq(conf[0], r));
+  const b = target.el.querySelector(DEL);
+  if (!b) return JSON.stringify({ status: \"unknown\" });
+  b.click();
+  for (let t = 0; t < 30 && count() >= before; t++) {
+    await sleep(100);
+    const d = dialog();
+    const ok = d && d.querySelector(OK);
+    if (ok) ok.click();
+  }
+  return JSON.stringify({ status: count() < before ? \"removed\" : \"unknown\" });
+})()"
 }
 
 cmd_delete() {
   parse "$@"
   [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "delete needs a tab, a text, and --to <name>" 2
-  local tab="${POS[0]}" found n want answer result removed
+  blank "$TO" && die "--to must not be blank" 2
+  blank "${POS[1]}" && die "the text must not be blank: it would match every draft" 2
+  local tab="${POS[0]}" found n want answer rem res st deleted=0
   found="$(matches "$tab" "${POS[1]}")"
-  n="$(printf '%s' "$found" | jq 'length')"
+  n="$(jq 'length' <<< "$found")"
   [ "$n" -gt 0 ] || die "no draft to $TO matches that text"
   if [ "$n" -gt 1 ] && [ -z "$ALL" ]; then
-    printf '%s' "$found" | jq -r '.[] | "  - to \(.to): \(.body)"' >&2
+    show_rows "$found" >&2
     die "$n drafts to $TO match; refine the text or pass --all" 4
   fi
   want=1; [ -z "$ALL" ] || want="$n"
+  rem="$(jq -c --argjson w "$want" '.[:$w]' <<< "$found")"
   echo "slack-draft: $want draft(s) to delete:"
-  printf '%s' "$found" | jq -r --argjson w "$want" '.[:$w][] | "  - to \(.to): \(.body)"'
+  show_rows "$rem"
   if [ -z "$YES" ]; then
     [ -t 0 ] || die "delete changes data; pass --yes to confirm" 4
     read -r -p "slack-draft: delete $want draft(s) to $TO? [y/N] " answer
     case "$answer" in y|Y|yes) ;; *) die "not confirmed" 4 ;; esac
   fi
-  # Re-queries the list before every click (Slack redraws it), answers a
-  # confirm dialog, waits for the row to go, and reports before/after counts.
-  result="$(tab_eval "$tab" "$(page_prelude "$TO" "${POS[1]}")
-(async () => {
-  const before = hits().length;
-  for (let i = 0; i < $want; i++) {
-    const h = hits()[0];
-    if (!h) break;
-    const b = h.el.querySelector(DEL);
-    if (!b) break;
-    const n = rows().length;
-    b.click();
-    for (let t = 0; t < 30 && rows().length >= n; t++) {
-      await sleep(100);
-      const ok = document.querySelector(OK);
-      if (ok) ok.click();
-    }
-  }
-  return JSON.stringify({ before, after: hits().length });
-})()")"
-  removed="$(printf '%s' "$result" | jq -r '.before - .after')"
-  [ "$removed" -eq "$want" ] || die "deleted $removed of $want drafts; check the tab"
-  echo "slack-draft: deleted $removed draft(s) to $TO"
+  while [ "$(jq 'length' <<< "$rem")" -gt 0 ]; do
+    res="$(delete_one "$tab" "${POS[1]}" "$rem")"
+    st="$(jq -r '.status' <<< "$res")"
+    case "$st" in
+      removed) deleted=$((deleted + 1)); rem="$(jq -c '.[1:]' <<< "$rem")" ;;
+      changed) die "the draft list changed after you confirmed; stopped with $deleted deleted. Run it again to see the new list" ;;
+      *) die "unknown whether the draft was deleted (the list may be virtualized); $deleted confirmed deleted. Check the tab" ;;
+    esac
+  done
+  echo "slack-draft: deleted $deleted draft(s) to $TO"
 }
 
 case "${1:-}" in

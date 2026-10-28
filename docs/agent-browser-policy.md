@@ -71,7 +71,7 @@ agent-tab eval "$tab" - < script.js              # a large script, from stdin
 agent-tab nav "$tab" https://example.com/next
 agent-tab shot "$tab"                            # prints the PNG path
 agent-tab upload "$tab" ./file.pdf                # file into input[type=file]; --selector <css> to pick;
-                                                 # refuses ~/.ssh, ~/.gnupg, keychains, *.pem unless --force
+                                                 # refuses key, keychain, and credential files unless --force
 agent-tab health [--fix]                         # tabs that do not answer
 agent-tab clear-cookies example.com              # one site's cookies
 ```
@@ -108,8 +108,9 @@ slack-draft count  --owner "$AGENT_ID" "$tab" "weekly report" --to Alex
 slack-draft delete --owner "$AGENT_ID" "$tab" "weekly report" --to Alex --yes
 ```
 
-- `count` and `delete` read the Drafts view, so open it in the tab first. A draft matches when its recipient field equals the name and its body holds the text (both sides ignore case, extra spaces, and a leading `@`; non-ASCII names work). `--to Al` never matches Alexandra.
-- `delete` prints the matched drafts before it asks. It re-reads the list after each click, answers Slack's confirm dialog, and reports the number of drafts that really went. It exits 1 when the count is short.
+- `count` and `delete` read the Drafts view, so open it in the tab first. A draft matches when its recipient field equals the name and its body holds the text (both sides ignore case, extra spaces, and a leading `@`; non-ASCII names work, but full-width and math-bold look-alikes stay different names). `--to Al` never matches Alexandra.
+- `delete` prints the matched drafts before it asks, then deletes only those rows (exact recipient and full body), one per call. If the live list differs from what you confirmed, it deletes nothing more and exits 1. It answers Slack's delete dialog only. Blank text is refused (exit 2), because it would match every draft.
+- Slack's list may be virtualized. When a delete cannot be confirmed, `delete` says "unknown" and exits 1; it never reports a false "deleted 0". Check the tab then.
 - `attach` uses the file input of the main composer, not a thread pane. If the input is missing it clicks the attach button first (the menu opens; no file dialog does).
 - `delete` changes data. It asks first; `--yes` skips the question; with no terminal and no `--yes` it exits 4. Several matches exit 4 unless you pass `--all`.
 - The Slack selectors sit in one block at the top of `bin/slack-draft`. `tests/slack-draft.bats` stubs `agent-tab`, so no test touches a real workspace. Check the selectors by hand in a throwaway workspace when Slack changes its markup.

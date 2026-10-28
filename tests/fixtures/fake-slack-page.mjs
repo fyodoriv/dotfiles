@@ -8,7 +8,9 @@
 //   FAKE_NO_DELETE_BUTTON  set: rows have no delete button
 //   INPUT_STATE   file: "1" when the main composer file input exists
 //   FAKE_INPUT_AFTER_CLICK  set: the input appears only after the attach click
-// Selectors are told apart by marker: _delete, _to, _body, confirm,
+// FAKE_DECOY: another modal (with its own confirm button) is open too;
+// its click writes the file DECOY_HIT.
+// Selectors are told apart by marker: dialog, _delete, _to, _body,
 // type=file, attach, else a draft row.
 // Usage: node fake-slack-page.mjs '<script>'
 import fs from "node:fs";
@@ -20,14 +22,16 @@ const save = (rows) => file && fs.writeFileSync(file, JSON.stringify(rows));
 let pending = null;
 
 const el = (text, onClick) => ({ innerText: text, click: onClick || (() => {}) });
-const rowEl = (r) => ({
+// Deletes by POSITION in the list at query time, like a virtualized list: a
+// script that reuses a stale row removes the wrong draft.
+const rowEl = (r, i) => ({
   innerText: `To: ${r.to}\n${r.body}`,
   querySelector(sel) {
     if (sel.includes("_delete")) {
       if (process.env.FAKE_NO_DELETE_BUTTON) return null;
       return el("", () => {
-        if (process.env.FAKE_CONFIRM) { pending = r; return; }
-        save(load().filter((x) => !(x.to === r.to && x.body === r.body)));
+        if (process.env.FAKE_CONFIRM) { pending = i; return; }
+        const cur = load(); cur.splice(i, 1); save(cur);
       });
     }
     if (sel.includes("_to")) return r.to === undefined ? null : el(r.to);
@@ -37,14 +41,23 @@ const rowEl = (r) => ({
 });
 
 const document = {
-  querySelectorAll() { return load().map(rowEl); },
-  querySelector(sel) {
-    if (sel.includes("confirm")) {
-      return pending ? el("", () => {
-        save(load().filter((x) => !(x.to === pending.to && x.body === pending.body)));
-        pending = null;
-      }) : null;
+  querySelectorAll(sel) {
+    if (sel.includes("dialog")) {
+      // Another modal first (FAKE_DECOY), then the delete dialog while pending.
+      const out = [];
+      if (process.env.FAKE_DECOY) {
+        out.push({ innerText: "Leave channel?", querySelector: () => el("", () => fs.writeFileSync(process.env.DECOY_HIT, "1")) });
+      }
+      if (pending !== null) {
+        out.push({ innerText: "Delete draft?", querySelector: () => el("", () => {
+          const cur = load(); cur.splice(pending, 1); save(cur); pending = null;
+        }) });
+      }
+      return out;
     }
+    return load().map(rowEl);
+  },
+  querySelector(sel) {
     const state = () => fs.existsSync(process.env.INPUT_STATE || "") && fs.readFileSync(process.env.INPUT_STATE, "utf8").trim() === "1";
     if (sel.includes("type=file")) return state() ? el("") : null;
     if (sel.includes("attach")) {

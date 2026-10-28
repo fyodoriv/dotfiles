@@ -454,6 +454,25 @@ upload_ws_setup() {
   ln -s "$HOME/.ssh/id" "$TEST_DIR/innocent.txt"
   run "$SCRIPT" upload --owner agent-a "$id" "$TEST_DIR/innocent.txt"
   [ "$status" -eq 2 ]
+  [[ "$output" == *"refusing"* ]]
+}
+
+@test "upload refuses more secret paths, in any case, and hard links to them" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME/.aws" "$HOME/.config/gh" "$TEST_DIR/x"
+  echo s > "$HOME/.netrc"; echo s > "$HOME/.aws/credentials"; echo s > "$HOME/.config/gh/hosts.yml"
+  echo s > "$TEST_DIR/x/SERVER.PEM"; echo s > "$TEST_DIR/x/a.key"; echo s > "$TEST_DIR/x/b.P12"
+  for f in "$HOME/.netrc" "$HOME/.aws/credentials" "$HOME/.config/gh/hosts.yml" "$TEST_DIR/x/SERVER.PEM" "$TEST_DIR/x/a.key" "$TEST_DIR/x/b.P12"; do
+    run "$SCRIPT" upload --owner agent-a "$id" "$f"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refusing"* ]]
+  done
+  ln "$HOME/.netrc" "$TEST_DIR/x/plain.txt"
+  run "$SCRIPT" upload --owner agent-a "$id" "$TEST_DIR/x/plain.txt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"refusing"* ]]
 }
 
 @test "upload --force sends a pem file" {

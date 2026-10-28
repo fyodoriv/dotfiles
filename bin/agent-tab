@@ -55,8 +55,8 @@ Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
        agent-tab upload --owner <id> [--selector <css>] [--force] <tab> <file>
                                                   # set a file on an <input type=file>
                                                   # (default selector: input[type=file]);
-                                                  # refuses ~/.ssh, ~/.gnupg, keychains,
-                                                  # and *.pem unless --force
+                                                  # refuses key, keychain, and credential
+                                                  # files and hard links unless --force
        agent-tab shot --owner <id> <tab>          # PNG path, under AGENT_TAB_SHOT_DIR
        agent-tab health [--fix]                   # list tabs that do not answer;
                                                   # --fix reloads, closes unowned
@@ -286,14 +286,20 @@ cmd_page() {
   esac
 }
 
-# Exits 2 when the (symlink-resolved) path looks like a secret.
+# Exits 2 when the (symlink-resolved) path looks like a secret, or the file has
+# several hard links (a hard link can hide a secret under an innocent name).
 refuse_secret_file() {
-  local f="$1" home
+  local f="$1" home lower links
   home="$(cd "$HOME" 2>/dev/null && pwd -P || echo "$HOME")"
-  case "$f" in
-    "$home"/.ssh/*|"$home"/.gnupg/*|"$home"/Library/Keychains/*|*/Keychains/*|*.keychain|*.keychain-db|*.pem)
-      die "refusing to upload $f (looks like a key or keychain); pass --force to send it anyway" 2 ;;
+  lower="$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')"
+  home="$(printf '%s' "$home" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    "$home"/.ssh/*|"$home"/.gnupg/*|"$home"/.aws/*|"$home"/.netrc|"$home"/.config/gh/*|"$home"/library/keychains/*|*/keychains/*|*.keychain|*.keychain-db|*.pem|*.key|*.p12)
+      die "refusing to upload $f (looks like a key, keychain, or credential file); pass --force to send it anyway" 2 ;;
   esac
+  links="$(stat -f %l "$f" 2>/dev/null || stat -c %h "$f" 2>/dev/null || echo 1)"
+  [ "$links" -le 1 ] ||
+    die "refusing to upload $f (it has $links hard links; one may be a secret); pass --force to send it anyway" 2
 }
 
 # Sets a local file on a file input of a tab you own. It never focuses the tab

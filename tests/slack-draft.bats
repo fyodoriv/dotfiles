@@ -10,14 +10,23 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   export CALLS="$TEST_DIR/calls.log"
   export DRAFTS_JSON="$TEST_DIR/drafts.json" INPUT_STATE="$TEST_DIR/input"
-  export PAGE
+  export PAGE MARK="$TEST_DIR/injected"
   echo '[]' > "$DRAFTS_JSON"
   echo 1 > "$INPUT_STATE"
   cat > "$TEST_DIR/agent-tab" <<'STUB'
 #!/bin/bash
 echo "$*" >> "$CALLS"
 case "$1" in
-  eval) node "$PAGE" "$5" ;;
+  eval) out="$(node "$PAGE" "$5")"; echo "$out"
+        # INJECT: change the list right after the first read (what the user confirmed)
+        if [ -n "${INJECT:-}" ] && [ ! -e "$MARK" ] && [[ "$5" == *"JSON.stringify(hits().map"* ]]; then
+          touch "$MARK"
+          case "$INJECT" in
+            prepend) jq '[{to:"Bob",body:"hello NEW unseen"}] + .' "$DRAFTS_JSON" > "$DRAFTS_JSON.n" ;;
+            replace) jq 'map(.body = "hello NEW unseen")' "$DRAFTS_JSON" > "$DRAFTS_JSON.n" ;;
+          esac
+          mv "$DRAFTS_JSON.n" "$DRAFTS_JSON"
+        fi ;;
   open) echo T1 ;;
   upload) echo "agent-tab: uploaded" ;;
 esac
@@ -162,11 +171,67 @@ left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
   [ "$(left)" = "" ]
 }
 
-@test "delete exits 1 and says so when the draft is still there after the click" {
+@test "delete reports unknown, exit 1, never a false 'deleted 0', when the list does not change" {
   drafts '[{"to":"Bob","body":"hello"}]'
   FAKE_NO_DELETE_BUTTON=1 run "$SCRIPT" delete T1 hello --to Bob --yes
   [ "$status" -eq 1 ]
-  [[ "$output" == *"deleted 0 of 1"* ]]
+  [[ "$output" == *"unknown"* ]]
+  [[ "$output" != *"deleted 0"* ]]
+}
+
+@test "delete deletes only the rows the user was shown: a new draft landing after the read aborts" {
+  drafts '[{"to":"Bob","body":"hello old"}]'
+  INJECT=prepend run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"changed"* ]]
+  [ "$(jq length "$DRAFTS_JSON")" -eq 2 ]
+}
+
+@test "delete aborts when the confirmed row is replaced by a different one" {
+  drafts '[{"to":"Bob","body":"hello old"}]'
+  INJECT=replace run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 1 ]
+  [ "$(jq -r '.[0].body' "$DRAFTS_JSON")" = "hello NEW unseen" ]
+}
+
+@test "delete --all aborts with nothing deleted when a new match lands after the read" {
+  drafts '[{"to":"Bob","body":"hello 1"},{"to":"Bob","body":"hello 2"}]'
+  INJECT=prepend run "$SCRIPT" delete T1 hello --to Bob --all --yes
+  [ "$status" -eq 1 ]
+  [ "$(jq length "$DRAFTS_JSON")" -eq 3 ]
+}
+
+@test "empty or blank text is refused with exit 2 and deletes nothing" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  for t in "" "   "; do
+    run "$SCRIPT" delete T1 "$t" --to Bob --yes
+    [ "$status" -eq 2 ]
+    run "$SCRIPT" count T1 "$t" --to Bob
+    [ "$status" -eq 2 ]
+  done
+  [ "$(jq length "$DRAFTS_JSON")" -eq 1 ]
+}
+
+@test "--all does one delete per eval call, so no call outlasts the eval timeout" {
+  drafts '[{"to":"Bob","body":"hello 1"},{"to":"Bob","body":"hello 2"},{"to":"Bob","body":"hello 3"}]'
+  run "$SCRIPT" delete T1 hello --to Bob --all --yes
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^  b.click();' "$CALLS")" -eq 3 ]
+}
+
+@test "full-width and math-bold names do not merge with plain ones" {
+  drafts '[{"to":"Ａｌ","body":"hello"},{"to":"𝐀𝐥","body":"hello"},{"to":"Al","body":"hello"}]'
+  run "$SCRIPT" count T1 hello --to Al
+  [ "$output" = "1" ]
+}
+
+@test "the confirm click goes to the delete dialog, not another modal" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  export DECOY_HIT="$TEST_DIR/decoy"
+  FAKE_CONFIRM=1 FAKE_DECOY=1 run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 0 ]
+  [ ! -e "$DECOY_HIT" ]
+  [ "$(left)" = "" ]
 }
 
 @test "delete with no match exits 1" {

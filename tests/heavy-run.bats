@@ -277,3 +277,31 @@ fake_live_ticket() {
   [ "$output" = "ran" ]
   [[ "$stderr" == *"heavy-run: queue unavailable"* ]]
 }
+
+@test "heavy-run: a wait log folder that cannot be made does not stop the command" {
+  : >"$BATS_TEST_TMPDIR/afile"
+  HEAVY_RUN_WAIT_LOG="$BATS_TEST_TMPDIR/afile/sub/waits.log" run "$SCRIPT" echo ran
+  [ "$status" -eq 0 ]
+  [ "$output" = "ran" ]
+}
+
+@test "heavy-run: an emptied seq file cannot jump the queue" {
+  fake_live_ticket 0000000005
+  : >"$HEAVY_RUN_DIR/seq"
+  marker="$BATS_TEST_TMPDIR/ran"
+  "$SCRIPT" sh -c "echo x >'$marker'" &
+  waiter=$!
+  sleep 1.5
+  [ ! -e "$marker" ]
+  kill "$FAKE_PID"
+  wait "$waiter"
+  [ -e "$marker" ]
+}
+
+@test "heavy-run: the sweep removes a stale temp ticket nobody holds" {
+  mkdir -p "$HEAVY_RUN_DIR/queue"
+  echo "pid=1" >"$HEAVY_RUN_DIR/queue/.new-424242"
+  touch -t 202001010000 "$HEAVY_RUN_DIR/queue/.new-424242"
+  "$SCRIPT" true
+  [ -z "$(ls -A "$HEAVY_RUN_DIR/queue")" ]
+}

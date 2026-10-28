@@ -11,7 +11,9 @@
 # the lock. A ticket nobody holds (its owner died, even by SIGKILL) is deleted
 # by the next waiter; liveness never depends on a pid. If the queue folder is
 # unusable, heavy-run warns once and uses the plain lock. Each run appends
-# "waited=<seconds>" to the wait log.
+# "waited=<seconds>" to the wait log (skipped if its folder cannot be made).
+# Known limits: a stopped (Ctrl-Z) waiter at the head blocks the queue until it
+# resumes; callers on the fallback path or an old binary can overtake the head.
 #
 # A perl parent holds an flock (fd closed on exec, so no child or leftover
 # daemon inherits it), runs the command, forwards TERM/INT/HUP to it, and
@@ -79,7 +81,8 @@ if [ "${HEAVY_RUN_HELD:-}" = "$lock" ] && [ "$("$0" --status | sed -n 1p)" != "f
   exec "$@"
 fi
 
-mkdir -p "$dir" "$(dirname "$waitlog")"
+mkdir -p "$dir"
+mkdir -p "$(dirname "$waitlog")" 2>/dev/null || true
 export HEAVY_RUN_HELD="$lock"
 
 exec perl -e '
@@ -95,7 +98,12 @@ exec perl -e '
     -d $queue or mkdir $queue or die "cannot create $queue: $!\n";
     sysopen(my $sf, $seqfile, O_RDWR | O_CREAT) or die "cannot open $seqfile: $!\n";
     flock($sf, LOCK_EX) or die "cannot lock $seqfile: $!\n";
-    my $n = (scalar <$sf> // 0) + 1;
+    my $max = scalar <$sf> // 0; $max = 0 unless $max =~ /^\d+/;
+    if (opendir(my $qd, $queue)) {
+      for my $t (readdir $qd) { $max = $1 + 0 if $t =~ /^(\d+)-\d+$/ && $1 + 0 > $max; }
+      closedir $qd;
+    }
+    my $n = $max + 1;
     seek($sf, 0, 0); truncate($sf, 0); print $sf "$n\n"; $sf->flush;
     my $tmp = "$queue/.new-$$";
     open($tfh, ">", $tmp) or die "cannot create $tmp: $!\n";
@@ -117,7 +125,15 @@ exec perl -e '
     while (1) {
       my $first;
       if (opendir(my $qd, $queue)) {
-        for my $t (sort grep { /^\d+-\d+$/ } readdir $qd) {
+        my @all = readdir $qd;
+        # A temp ticket nobody holds (and older than 5 s) is a leftover.
+        for my $t (grep { /^\.new-\d+$/ } @all) {
+          next if $t eq ".new-$$";
+          next unless open(my $xf, "<", "$queue/$t");
+          next if time - (stat $xf)[9] < 5;
+          unlink "$queue/$t" if flock($xf, LOCK_EX | LOCK_NB);
+        }
+        for my $t (sort grep { /^\d+-\d+$/ } @all) {
           if ($t ne $name) {
             open(my $xf, "<", "$queue/$t") or next;
             if (flock($xf, LOCK_EX | LOCK_NB)) { unlink "$queue/$t"; next; }

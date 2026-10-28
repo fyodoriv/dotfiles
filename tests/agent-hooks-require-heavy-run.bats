@@ -57,6 +57,29 @@ run_hook() {
   [ "$status" -eq 2 ] || { echo "heredoc hid a real run"; return 1; }
 }
 
+@test "blocks prefix flags, sudo, control flow, flag values, and command substitution" {
+  for c in "time -p npm test" "timeout -s KILL 5 npm test" "nice -n 10 make e2e" "env A=1 make e2e" \
+           "env -u FOO make e2e" "sudo npm test" "sudo -u me make e2e" "caffeinate -t 60 make e2e" \
+           "if true; then npm test; fi" "while true; do make e2e; done" "true && (npm test)" \
+           "{ make e2e; }" "for f in a b; do npm run ui; done" \
+           "npx playwright test --output out/res" "npx playwright test --outputFile a/b.xml" \
+           "npm run e2e -- --output-dir results/run1" \
+           'echo "$(npm test)"' 'echo "`make e2e`"'; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+}
+
+@test "allows wrapped prefixed runs, control flow, and test filters" {
+  for c in "time -p heavy-run make e2e" "sudo heavy-run make e2e" "timeout -s KILL 5 heavy-run npm test" \
+           "if true; then heavy-run npm test; fi" "npm run test -- -t foo" "pnpm ui -t foo" \
+           "npx playwright test --headed tests/a.spec.ts" 'echo "hello (world)"' 'echo "$(date)"' \
+           "if true; then echo ok; fi"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }
+  done
+}
+
 @test "allows wrapped runs and single-file runs" {
   for c in "heavy-run yarn test:coverage" "heavy-run npm run build" "npx vitest run one.test.ts" \
            "npx vitest run src/a/b.test.ts" "npx jest src/x.test.js" "bats tests/foo.bats" \

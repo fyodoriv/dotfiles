@@ -148,7 +148,7 @@ them. -->
 - [ ] Close the remaining heavy-run hook bypasses
   - **ID**: heavy-run-hook-wrapper-coverage
   - **Tags**: performance, reliability, agents
-  - **Details**: The `require-heavy-run` hook reads simple commands only. It misses `npx` flags and version suffixes (`npx -y playwright@1 test`), `npm exec` with flags, `./node_modules/.bin/playwright test`, `bun`, `turbo`, `gmake`, `bash -c "..."`, subshells, and `{ ...; }` groups. Review of dotfiles #373 listed them. Parse these forms, or move the check to a shell wrapper on PATH, and keep the single-test allowances.
+  - **Details**: The `require-heavy-run` hook reads simple commands only. It misses `npx` flags and version suffixes (`npx -y playwright@1 test`), `npm exec` with flags, `./node_modules/.bin/playwright test`, `bun`, `turbo`, `gmake`, `bash -c "..."`, and `$(...)` inside a word (`make -j$(nproc) e2e`). Review of dotfiles #373 listed them. Parse these forms, or move the check to a shell wrapper on PATH, and keep the single-test allowances.
   - **Files**: `agent-hooks/require-heavy-run.sh`, `tests/agent-hooks-require-heavy-run.bats`, `docs/agent-hooks.md`
   - **Output**: code
   - **Acceptance**: each bypass form above is blocked unwrapped and allowed under `heavy-run`, in the hook test.

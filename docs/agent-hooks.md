@@ -66,6 +66,13 @@ processes with no `heavy-run` parent; the check warns above
 `chrome-headless-shell` on top of the overload rows. A launcher that starts
 Chrome itself must also pass `--use-mock-keychain --password-store=basic`.
 
+The hook strips the prefixes `time`, `timeout`, `env`, `sudo`, `nice`, `nohup`, `caffeinate`,
+`command`, and `exec` (with their own flags), reads `if`/`while`/`then`/`do` bodies, `( ... )`
+and `{ ...; }` groups, and `$(...)` or backticks inside double quotes. A `-g`, `--grep`, `-t`, or
+`--testNamePattern` filter, or a spec path, marks a one-test run; the value of any other flag
+(`--output out/res`) does not.
+
 Still not seen by the hook (task `heavy-run-hook-wrapper-coverage`): `npx` flags and version
 suffixes (`npx -y playwright@1 test`), `./node_modules/.bin/playwright test`, `bun`, `turbo`,
-`gmake`, `bash -c "..."`, and subshells or `{ ...; }` groups. The doctor check is the net for these.
+`gmake`, `bash -c "..."`, and a `$(...)` that sits inside a word (`make -j$(nproc) e2e`).
+The doctor check is the net for these.

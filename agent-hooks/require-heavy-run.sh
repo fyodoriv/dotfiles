@@ -26,22 +26,25 @@ _has_file_arg() {
   return 1
 }
 
-# True when the arguments pick one test: a grep filter with a real value, or
-# an explicit spec path. "." , ".*", a folder ("tests/"), and the value of
-# --config, -c, or --project do not count.
+# True when the arguments pick one test: a filter (-g, --grep, -t,
+# --testNamePattern) with a real value, or an explicit spec path. "." , ".*",
+# a folder ("tests/"), and the value of any other flag (--config, --output
+# out/res, --outputFile a/b.xml) do not count.
 _one_test_args() {
   local a v
   while [ $# -gt 0 ]; do
     a="$1"; shift
     case "$a" in
-      --config|-c|--project) shift || true ;;
-      -g|--grep)
+      -g|--grep|-t|--testNamePattern)
         v="${1:-}"
         case "$v" in ""|-*|.|".*") ;; *) return 0 ;; esac
         case "$v" in -*) ;; *) shift || true ;; esac ;;
-      -g=*|--grep=*)
+      -g=*|--grep=*|-t=*|--testNamePattern=*)
         v="${a#*=}"
         case "$v" in ""|.|".*") ;; *) return 0 ;; esac ;;
+      --|--headed|--ui|--debug|--list|--quiet|--forbid-only|--fully-parallel|--last-failed|--no-deps|--pass-with-no-tests|--update-snapshots|--coverage|--watch|--run) ;;
+      --*=*) ;;
+      -c|--*) case "${1:-}" in ""|-*) ;; *) shift ;; esac ;;
       -*|run|test|.|..|./|*/) ;;
       */*|*.*) return 0 ;;
     esac
@@ -60,26 +63,34 @@ _playwright_test_run() {
   [ "${1:-}" = playwright ] && [ "${2:-}" = test ]
 }
 
+# Drop leading flags of a command prefix from the array w. Arguments name the
+# flags that take a value, which is dropped too.
+_skip_flags() {
+  local vf=" $* "
+  while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do
+    if [[ "$vf" == *" ${w[0]} "* ]]; then w=("${w[@]:2}"); else w=("${w[@]:1}"); fi
+  done
+}
+
 # True when one simple command (no && ; |) is a heavy run.
 _is_heavy() {
   local -a w
   read -r -a w <<< "$1" || true
-  # Strip VAR=x and the prefixes time, command, exec, nohup, timeout N, env,
-  # nice [-n N], caffeinate [-flags].
+  # Strip VAR=x, control words (if, then, do, ...), and the prefixes time,
+  # command, exec, nohup, timeout, env, sudo, nice, caffeinate with their own
+  # flags and flag values.
   while [ "${#w[@]}" -gt 0 ]; do
     case "${w[0]}" in
-      *=*|time|command|exec|nohup) w=("${w[@]:1}") ;;
+      *=*|if|while|until|then|do|else|elif|'!') w=("${w[@]:1}") ;;
+      time|command|nohup) w=("${w[@]:1}"); _skip_flags ;;
+      exec) w=("${w[@]:1}"); _skip_flags -a ;;
       timeout)
-        w=("${w[@]:1}")
-        while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do w=("${w[@]:1}"); done
+        w=("${w[@]:1}"); _skip_flags -s -k --signal --kill-after
         w=("${w[@]:1}") ;;
-      env|caffeinate)
-        w=("${w[@]:1}")
-        while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* || "${w[0]}" == *=* ]]; do w=("${w[@]:1}"); done ;;
-      nice)
-        w=("${w[@]:1}")
-        if [ "${w[0]:-}" = -n ]; then w=("${w[@]:2}")
-        elif [[ "${w[0]:-}" == -[0-9]* ]]; then w=("${w[@]:1}"); fi ;;
+      env) w=("${w[@]:1}"); _skip_flags -u -S -C ;;
+      sudo) w=("${w[@]:1}"); _skip_flags -u -g -h -p -C -D -R -T -U -r -t ;;
+      nice) w=("${w[@]:1}"); _skip_flags -n --adjustment ;;
+      caffeinate) w=("${w[@]:1}"); _skip_flags -t -w ;;
       *) break ;;
     esac
   done
@@ -147,7 +158,13 @@ _is_heavy() {
 _strip_text() {
   /usr/bin/perl -0777 -pe '
     s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
-    s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/my $i = substr($1, 1, -1); $i =~ m{^\.\*?$} ? $i : length($i) ? "Q" : ""/gse;
+    s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
+      my $q = $1; my $in = substr($q, 1, -1);
+      my $r = $in =~ m{^\.\*?$} ? $in : length($in) ? "Q" : "";
+      if (substr($q, 0, 1) eq "\"") {
+        while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { $r .= "\n" . (defined $1 ? $1 : $2) . "\n"; }
+      }
+      $r/gsex;
   '
 }
 
@@ -158,6 +175,6 @@ while IFS= read -r seg; do
     echo "BLOCKED: a full test suite or build must queue on the Mac-wide lock. Run this as \`heavy-run <command>\`." >&2
     exit 2
   fi
-done < <(printf '%s\n' "$command" | _strip_text | sed -E 's/(&&|\|\||;|\|)/\n/g')
+done < <(printf '%s\n' "$command" | _strip_text | sed -E 's/(&&|\|\||;|\||[(){}])/\n/g')
 
 exit 0

@@ -18,7 +18,7 @@
 #   agent-tab text|shot --owner <id> <tab>
 #   agent-tab eval --owner <id> <tab> <js>     # or - to read the js from stdin
 #   agent-tab nav --owner <id> <tab> <url>
-#   agent-tab upload --owner <id> [--selector <css>] <tab> <file>
+#   agent-tab upload --owner <id> [--selector <css>] [--force] <tab> <file>
 #   agent-tab health [--fix]
 #   agent-tab clear-cookies <domain>
 #
@@ -52,9 +52,11 @@ Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
        agent-tab eval --owner <id> <tab> <js>     # evaluate, print the value;
                                                   # <js> of - reads it from stdin
        agent-tab nav --owner <id> <tab> <url>     # navigate
-       agent-tab upload --owner <id> [--selector <css>] <tab> <file>
+       agent-tab upload --owner <id> [--selector <css>] [--force] <tab> <file>
                                                   # set a file on an <input type=file>
-                                                  # (default selector: input[type=file])
+                                                  # (default selector: input[type=file]);
+                                                  # refuses ~/.ssh, ~/.gnupg, keychains,
+                                                  # and *.pem unless --force
        agent-tab shot --owner <id> <tab>          # PNG path, under AGENT_TAB_SHOT_DIR
        agent-tab health [--fix]                   # list tabs that do not answer;
                                                   # --fix reloads, closes unowned
@@ -95,7 +97,7 @@ write_state() {
 rec() { jq -r --arg id "$1" --arg k "$2" '.[$id][$k] // empty' "$STATE"; }
 
 parse_opts() {
-  OWNER="${AGENT_TAB_OWNER:-}" REASON="" LEASE_OPT="" ARG="" ARG2="" FIX="" SELECTOR=""
+  OWNER="${AGENT_TAB_OWNER:-}" REASON="" LEASE_OPT="" ARG="" ARG2="" FIX="" SELECTOR="" FORCE=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --owner) OWNER="${2:-}"; shift 2 || shift ;;
@@ -103,6 +105,7 @@ parse_opts() {
       --lease) LEASE_OPT="${2:-}"; shift 2 || shift ;;
       --selector) SELECTOR="${2:-}"; shift 2 || shift ;;
       --fix) FIX=1; shift ;;
+      --force) FORCE=1; shift ;;
       -?*) usage >&2; die "unknown option: $1" 2 ;;
       *) if [ -z "$ARG" ]; then ARG="$1"; else ARG2="$1"; fi; shift ;;
     esac
@@ -283,6 +286,16 @@ cmd_page() {
   esac
 }
 
+# Exits 2 when the (symlink-resolved) path looks like a secret.
+refuse_secret_file() {
+  local f="$1" home
+  home="$(cd "$HOME" 2>/dev/null && pwd -P || echo "$HOME")"
+  case "$f" in
+    "$home"/.ssh/*|"$home"/.gnupg/*|"$home"/Library/Keychains/*|*/Keychains/*|*.keychain|*.keychain-db|*.pem)
+      die "refusing to upload $f (looks like a key or keychain); pass --force to send it anyway" 2 ;;
+  esac
+}
+
 # Sets a local file on a file input of a tab you own. It never focuses the tab
 # and never opens a file dialog: DOM.setFileInputFiles hands Chrome the path.
 # DOM node ids live per websocket session, so the real path runs all three
@@ -293,8 +306,9 @@ cmd_upload() {
   [ -f "$ARG2" ] || die "file not found: $ARG2" 2
   require_own_live "$ARG"
   local ws file sel root node
+  file="$(realpath "$ARG2" 2>/dev/null || echo "$(cd "$(dirname "$ARG2")" && pwd -P)/$(basename "$ARG2")")"
+  [ -n "$FORCE" ] || refuse_secret_file "$file"
   ws="$(tab_ws "$ARG")"
-  file="$(cd "$(dirname "$ARG2")" && pwd)/$(basename "$ARG2")"
   sel="${SELECTOR:-input[type=file]}"
   if [ -n "${AGENT_TAB_CDP:-}" ]; then
     root="$(cdp "$ws" DOM.getDocument '{}' | jq -r '.root.nodeId')" || die "upload failed"

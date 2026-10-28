@@ -1,22 +1,23 @@
 #!/usr/bin/env bats
 # slack-draft: attach, count, and delete Slack drafts. agent-tab is stubbed,
+# and the page scripts run against a fake DOM (fixtures/fake-slack-page.mjs),
 # so no browser and no Slack workspace is touched.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/slack-draft"
+PAGE="$BATS_TEST_DIRNAME/fixtures/fake-slack-page.mjs"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
   export CALLS="$TEST_DIR/calls.log"
-  export FOUND='[]' DELETED=0
+  export DRAFTS_JSON="$TEST_DIR/drafts.json" INPUT_STATE="$TEST_DIR/input"
+  export PAGE
+  echo '[]' > "$DRAFTS_JSON"
+  echo 1 > "$INPUT_STATE"
   cat > "$TEST_DIR/agent-tab" <<'STUB'
 #!/bin/bash
 echo "$*" >> "$CALLS"
 case "$1" in
-  eval)
-    case "$5" in
-      *"b.click"*) echo "$DELETED" ;;
-      *) echo "$FOUND" ;;
-    esac ;;
+  eval) node "$PAGE" "$5" ;;
   open) echo T1 ;;
   upload) echo "agent-tab: uploaded" ;;
 esac
@@ -29,11 +30,30 @@ STUB
 
 teardown() { rm -rf "$TEST_DIR"; }
 
-@test "attach uploads the file through agent-tab upload" {
+drafts() { echo "$1" > "$DRAFTS_JSON"; }
+left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
+
+# --- attach ---
+
+@test "attach uploads to the main composer's file input" {
   run "$SCRIPT" attach T1 "$TEST_DIR/report.pdf"
   [ "$status" -eq 0 ]
   [[ "$output" == *"attached report.pdf"* ]]
-  grep -q "^upload --owner agent-a --selector input\[type=file\] T1 $TEST_DIR/report.pdf" "$CALLS"
+  grep -q "^upload --owner agent-a --selector .*primary_view.* input\[type=file\] T1 $TEST_DIR/report.pdf" "$CALLS"
+}
+
+@test "attach clicks the attach button when the input is not there yet" {
+  echo 0 > "$INPUT_STATE"
+  FAKE_INPUT_AFTER_CLICK=1 run "$SCRIPT" attach T1 "$TEST_DIR/report.pdf"
+  [ "$status" -eq 0 ]
+  grep -q '^upload ' "$CALLS"
+}
+
+@test "attach fails without uploading when the composer has no file input" {
+  echo 0 > "$INPUT_STATE"
+  run "$SCRIPT" attach T1 "$TEST_DIR/report.pdf"
+  [ "$status" -eq 1 ]
+  ! grep -q '^upload ' "$CALLS"
 }
 
 @test "attach rejects a missing file with exit 2 and never calls the browser" {
@@ -42,10 +62,33 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -e "$CALLS" ]
 }
 
-@test "count prints the number of matching drafts" {
-  FOUND='["to bob: hello","to bob: hello again"]' run "$SCRIPT" count T1 hello --to Bob
+# --- count ---
+
+@test "count matches the recipient exactly, not as a substring" {
+  drafts '[{"to":"Alexandra","body":"hello"},{"to":"Carol","body":"tell Al hello"},{"to":"Al","body":"hello there"}]'
+  run "$SCRIPT" count T1 hello --to Al
   [ "$status" -eq 0 ]
-  [ "$output" = "2" ]
+  [ "$output" = "1" ]
+}
+
+@test "count ignores case, spacing, and a leading @ in the recipient" {
+  drafts '[{"to":"@Alex  Kim","body":"Hello"}]'
+  run "$SCRIPT" count T1 hello --to "alex kim"
+  [ "$output" = "1" ]
+}
+
+@test "count matches the text against the body, not the recipient" {
+  drafts '[{"to":"Hello Kitty","body":"bye"}]'
+  run "$SCRIPT" count T1 hello --to "Hello Kitty"
+  [ "$output" = "0" ]
+}
+
+@test "count matches non-ASCII names in any case" {
+  drafts '[{"to":"Фёдор","body":"привет"},{"to":"Ålex","body":"hej"}]'
+  run "$SCRIPT" count T1 привет --to "фЁдор"
+  [ "$output" = "1" ]
+  run "$SCRIPT" count T1 HEJ --to "ÅLEX"
+  [ "$output" = "1" ]
 }
 
 @test "count prints 0 when nothing matches" {
@@ -71,43 +114,67 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 2 ]
 }
 
-@test "delete without --yes and without a terminal refuses with exit 4" {
-  FOUND='["to bob: hello"]' run "$SCRIPT" delete T1 hello --to Bob < /dev/null
-  [ "$status" -eq 4 ]
-  [[ "$output" == *"--yes"* ]]
-  ! grep -q 'b.click' "$CALLS"
+# --- delete ---
+
+@test "delete --to Al never removes Alexandra's draft or a draft that only mentions Al" {
+  drafts '[{"to":"Alexandra","body":"hello"},{"to":"Carol","body":"tell Al hello"},{"to":"Al","body":"hello there"}]'
+  run "$SCRIPT" delete T1 hello --to Al --yes
+  [ "$status" -eq 0 ]
+  [ "$(left)" = "Alexandra,Carol" ]
 }
 
-@test "delete --yes removes the one match" {
-  FOUND='["to bob: hello"]' DELETED=1 run "$SCRIPT" delete T1 hello --to Bob --yes
+@test "delete shows the matched rows before it asks, and refuses without a terminal" {
+  drafts '[{"to":"Bob","body":"hello there"}]'
+  run "$SCRIPT" delete T1 hello --to Bob < /dev/null
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"Bob"*"hello there"* ]]
+  [[ "$output" == *"--yes"* ]]
+  [ "$(left)" = "Bob" ]
+}
+
+@test "delete --yes removes the one match and reports the real count" {
+  drafts '[{"to":"Bob","body":"hello"},{"to":"Eve","body":"hello"}]'
+  run "$SCRIPT" delete T1 hello --to Bob --yes
   [ "$status" -eq 0 ]
   [[ "$output" == *"deleted 1 draft(s) to Bob"* ]]
-  grep -q 'b.click' "$CALLS"
+  [ "$(left)" = "Eve" ]
 }
 
 @test "delete with several matches and no --all refuses with exit 4" {
-  FOUND='["a","b"]' run "$SCRIPT" delete T1 hello --to Bob --yes
+  drafts '[{"to":"Bob","body":"hello 1"},{"to":"Bob","body":"hello 2"}]'
+  run "$SCRIPT" delete T1 hello --to Bob --yes
   [ "$status" -eq 4 ]
-  ! grep -q 'b.click' "$CALLS"
+  [ "$(left)" = "Bob,Bob" ]
 }
 
-@test "delete --all --yes removes every match" {
-  FOUND='["a","b"]' DELETED=2 run "$SCRIPT" delete T1 hello --to Bob --all --yes
+@test "delete --all --yes removes every match and re-reads the list after each delete" {
+  drafts '[{"to":"Bob","body":"hello 1"},{"to":"Eve","body":"hello"},{"to":"Bob","body":"hello 2"}]'
+  run "$SCRIPT" delete T1 hello --to Bob --all --yes
   [ "$status" -eq 0 ]
   [[ "$output" == *"deleted 2 draft(s)"* ]]
+  [ "$(left)" = "Eve" ]
 }
 
-@test "delete with no match exits 1 and clicks nothing" {
-  run "$SCRIPT" delete T1 hello --to Bob --yes
-  [ "$status" -eq 1 ]
-  ! grep -q 'b.click' "$CALLS"
+@test "delete answers a Slack confirm dialog" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  FAKE_CONFIRM=1 run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 0 ]
+  [ "$(left)" = "" ]
 }
 
-@test "delete reports a short count when the page deletes fewer drafts" {
-  FOUND='["a"]' DELETED=0 run "$SCRIPT" delete T1 hello --to Bob --yes
+@test "delete exits 1 and says so when the draft is still there after the click" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  FAKE_NO_DELETE_BUTTON=1 run "$SCRIPT" delete T1 hello --to Bob --yes
   [ "$status" -eq 1 ]
   [[ "$output" == *"deleted 0 of 1"* ]]
 }
+
+@test "delete with no match exits 1" {
+  run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 1 ]
+}
+
+# --- the rest ---
 
 @test "open needs SLACK_DRAFT_URL and passes it to agent-tab open" {
   run "$SCRIPT" open

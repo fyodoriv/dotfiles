@@ -70,7 +70,8 @@ agent-tab eval "$tab" 'document.title'           # value of a JS expression
 agent-tab eval "$tab" - < script.js              # a large script, from stdin
 agent-tab nav "$tab" https://example.com/next
 agent-tab shot "$tab"                            # prints the PNG path
-agent-tab upload "$tab" ./file.pdf                # file into input[type=file]; --selector <css> to pick
+agent-tab upload "$tab" ./file.pdf                # file into input[type=file]; --selector <css> to pick;
+                                                 # refuses ~/.ssh, ~/.gnupg, keychains, *.pem unless --force
 agent-tab health [--fix]                         # tabs that do not answer
 agent-tab clear-cookies example.com              # one site's cookies
 ```
@@ -107,6 +108,8 @@ slack-draft count  --owner "$AGENT_ID" "$tab" "weekly report" --to Alex
 slack-draft delete --owner "$AGENT_ID" "$tab" "weekly report" --to Alex --yes
 ```
 
-- `count` and `delete` match a row of the Drafts view when its text holds both the name and the text (case-insensitive). Open the Drafts view in the tab first.
+- `count` and `delete` read the Drafts view, so open it in the tab first. A draft matches when its recipient field equals the name and its body holds the text (both sides ignore case, extra spaces, and a leading `@`; non-ASCII names work). `--to Al` never matches Alexandra.
+- `delete` prints the matched drafts before it asks. It re-reads the list after each click, answers Slack's confirm dialog, and reports the number of drafts that really went. It exits 1 when the count is short.
+- `attach` uses the file input of the main composer, not a thread pane. If the input is missing it clicks the attach button first (the menu opens; no file dialog does).
 - `delete` changes data. It asks first; `--yes` skips the question; with no terminal and no `--yes` it exits 4. Several matches exit 4 unless you pass `--all`.
 - The Slack selectors sit in one block at the top of `bin/slack-draft`. `tests/slack-draft.bats` stubs `agent-tab`, so no test touches a real workspace. Check the selectors by hand in a throwaway workspace when Slack changes its markup.

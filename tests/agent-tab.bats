@@ -396,3 +396,80 @@ STUB
   run "$SCRIPT" upload --owner agent-a "$id" "$TEST_DIR/none.txt"
   [ "$status" -eq 2 ]
 }
+
+# --- upload over the real one-socket node client (no AGENT_TAB_CDP stub) ---
+
+upload_ws_setup() {
+  cdp_setup
+  unset AGENT_TAB_CDP
+  node "$BATS_TEST_DIRNAME/fixtures/fake-cdp-dom-ws.mjs" "$TEST_DIR/port" "$TEST_DIR/dom.log" &
+  srv=$!
+  for _ in $(seq 50); do [ -s "$TEST_DIR/port" ] && break; sleep 0.1; done
+  id="$(open_tab agent-a r)"
+  jq --arg id "$id" --arg ws "ws://127.0.0.1:$(cat "$TEST_DIR/port")/$id" \
+    '. + [{id: $id, type: "page", url: "https://example.com/", webSocketDebuggerUrl: $ws}]' \
+    "$TABS_JSON" > "$TEST_DIR/t.json" && mv "$TEST_DIR/t.json" "$TABS_JSON"
+  echo data > "$TEST_DIR/f.txt"
+}
+
+@test "upload runs getDocument, querySelector, setFileInputFiles on one socket" {
+  upload_ws_setup
+  run "$SCRIPT" upload --owner agent-a --selector '.main input[type=file]' "$id" "$TEST_DIR/f.txt"
+  kill "$srv" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(cut -d' ' -f1 "$TEST_DIR/dom.log" | tr '\n' ,)" = "DOM.getDocument,DOM.querySelector,DOM.setFileInputFiles," ]
+  grep -q '"selector":".main input\[type=file\]"' "$TEST_DIR/dom.log"
+  grep -q 'f.txt' "$TEST_DIR/dom.log"
+}
+
+@test "upload fails when no element matches the selector" {
+  upload_ws_setup
+  run "$SCRIPT" upload --owner agent-a --selector '#missing' "$id" "$TEST_DIR/f.txt"
+  kill "$srv" 2>/dev/null || true
+  [ "$status" -eq 1 ]
+  ! grep -q setFileInputFiles "$TEST_DIR/dom.log"
+}
+
+# --- upload refuses secret-looking files unless --force ---
+
+@test "upload refuses ssh, gnupg, keychain, and pem files without --force" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME/.ssh" "$HOME/.gnupg" "$HOME/Library/Keychains" "$TEST_DIR/x"
+  for f in "$HOME/.ssh/id_ed25519" "$HOME/.gnupg/pubring.kbx" "$HOME/Library/Keychains/login.keychain-db" "$TEST_DIR/x/cert.pem"; do
+    echo secret > "$f"
+    run "$SCRIPT" upload --owner agent-a "$id" "$f"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"--force"* ]]
+  done
+  ! grep -q DOM. "$CDP_CALLS"
+}
+
+@test "upload refuses a symlink that points into ~/.ssh" {
+  cdp_setup
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  export HOME="$TEST_DIR/home"
+  mkdir -p "$HOME/.ssh"; echo secret > "$HOME/.ssh/id"
+  ln -s "$HOME/.ssh/id" "$TEST_DIR/innocent.txt"
+  run "$SCRIPT" upload --owner agent-a "$id" "$TEST_DIR/innocent.txt"
+  [ "$status" -eq 2 ]
+}
+
+@test "upload --force sends a pem file" {
+  cdp_setup
+  cat > "$TEST_DIR/cdp" <<'STUB'
+#!/bin/bash
+echo "$1 $2 $3" >> "$CDP_CALLS"
+case "$2" in
+  DOM.getDocument) echo '{"root":{"nodeId":1}}' ;;
+  DOM.querySelector) echo '{"nodeId":7}' ;;
+  *) echo '{}' ;;
+esac
+STUB
+  id="$(open_tab agent-a r)"; chrome_has "$id" https://example.com/
+  echo cert > "$TEST_DIR/cert.pem"
+  run "$SCRIPT" upload --owner agent-a --force "$id" "$TEST_DIR/cert.pem"
+  [ "$status" -eq 0 ]
+  grep -q DOM.setFileInputFiles "$CDP_CALLS"
+}

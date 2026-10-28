@@ -13,10 +13,13 @@
 #   slack-draft delete --owner <id> <tab> <text> --to <name> [--all] [--yes]
 #
 # count and delete read the Drafts view of the open tab. A draft matches when
-# its row text holds both <name> and <text> (case-insensitive). delete removes
-# exactly one match, or every match with --all. It prints the matches and asks
-# before it deletes; --yes skips the question. Without --yes and without a
-# terminal it refuses.
+# its recipient field equals <name> and its body contains <text> (both sides
+# normalized: case, spacing, leading @). delete removes exactly one match, or
+# every match with --all. It prints the matches and asks before it deletes;
+# --yes skips the question. Without --yes and without a terminal it refuses.
+# It re-reads the list after each delete, answers Slack's confirm dialog, and
+# reports how many drafts really went. attach uses the file input of the main
+# composer (not a thread pane) and clicks the attach button first if needed.
 #
 # Env: SLACK_DRAFT_URL (workspace URL for `open`; no default, never stored in
 #      the repo), AGENT_TAB_OWNER (default --owner), SLACK_DRAFT_AGENT_TAB
@@ -30,9 +33,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_TAB="${SLACK_DRAFT_AGENT_TAB:-$HERE/agent-tab}"
 
 # Slack web markup the page scripts rely on. Slack changes it; fix it here.
-SEL_FILE_INPUT='input[type=file]'
+# Unverified against a live workspace: check by hand in a throwaway one.
+SEL_MAIN='.p-workspace__primary_view_contents'            # main pane, not a thread pane
+SEL_FILE_INPUT="$SEL_MAIN input[type=file]"
+SEL_ATTACH_BTN="$SEL_MAIN [data-qa=\"shortcuts_attach_button\"], $SEL_MAIN [data-qa=\"composer_attach_button\"]"
 SEL_DRAFT_ROW='[data-qa="drafts_list_item"], [data-qa="draft-item"]'
-SEL_DRAFT_DELETE='[data-qa="drafts_list_item_delete"], [data-qa="draft-item-delete"], button[aria-label^="Delete"]'
+SEL_DRAFT_TO='[data-qa="drafts_list_item_to"], [data-qa="draft-item-to"]'        # recipient field
+SEL_DRAFT_BODY='[data-qa="drafts_list_item_body"], [data-qa="draft-item-body"]'  # draft text
+SEL_DRAFT_DELETE='[data-qa="drafts_list_item_delete"], [data-qa="draft-item-delete"]'
+SEL_CONFIRM='[data-qa="confirm_modal_go"], [data-qa="draft-delete-confirm"]'
 
 usage() {
   sed -n '/^# Usage:/,/^#   slack-draft delete/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -59,19 +68,28 @@ parse() {
 
 tab_eval() { "$AGENT_TAB" eval --owner "$OWNER" "$1" "$2"; }
 
-# Page script: prints a JSON array of the matching rows' text.
-# Name and text reach the page as JSON strings, never spliced into code.
-find_js() {
-  jq -rn --arg n "$1" --arg t "$2" --arg row "$SEL_DRAFT_ROW" '
-    "(() => {
-      const name = \($n | ascii_downcase | @json), text = \($t | ascii_downcase | @json);
-      return JSON.stringify([...document.querySelectorAll(\($row | @json))]
-        .map((r) => r.innerText.toLowerCase())
-        .filter((s) => s.includes(name) && s.includes(text)));
-    })()"'
+# Page-script prelude. Name and text arrive as JSON strings, never spliced into
+# code. Both sides are normalized by the page (NFKC, lower case, one space, no
+# leading @ or "To:"), so non-ASCII names match. A draft matches when its
+# recipient field EQUALS the name and its body field CONTAINS the text.
+page_prelude() {
+  jq -rn --arg n "$1" --arg t "$2" --arg row "$SEL_DRAFT_ROW" --arg to "$SEL_DRAFT_TO" \
+    --arg body "$SEL_DRAFT_BODY" --arg del "$SEL_DRAFT_DELETE" --arg ok "$SEL_CONFIRM" '
+    "const norm = (s) => String(s || \"\").normalize(\"NFKC\").toLowerCase().replace(/\\s+/g, \" \").trim().replace(/^to:\\s*/, \"\").replace(/^@/, \"\");
+     const NAME = norm(\($n | @json)), TEXT = norm(\($t | @json));
+     const txt = (e) => (e ? e.innerText : \"\");
+     const rows = () => [...document.querySelectorAll(\($row | @json))].map((el) => ({
+       el, rawTo: txt(el.querySelector(\($to | @json))).trim(), rawBody: txt(el.querySelector(\($body | @json))).trim() }));
+     const hits = () => rows().filter((r) => NAME && norm(r.rawTo) === NAME && norm(r.rawBody).includes(TEXT));
+     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+     const DEL = \($del | @json), OK = \($ok | @json);"'
 }
 
-matches() { tab_eval "$1" "$(find_js "$TO" "$2")"; }
+# Prints a JSON array of {to, body} for the matching drafts.
+matches() {
+  tab_eval "$1" "$(page_prelude "$TO" "$2")
+(() => JSON.stringify(hits().map((r) => ({ to: r.rawTo, body: r.rawBody.slice(0, 120) }))))()"
+}
 
 cmd_open() {
   parse "$@"
@@ -81,10 +99,25 @@ cmd_open() {
   "$AGENT_TAB" "${args[@]}" "$SLACK_DRAFT_URL"
 }
 
+# Makes sure the main composer has a file input. If it does not yet, click the
+# attach button (this opens Slack's menu; no menu item is clicked, so no file
+# dialog opens and focus stays where it is).
 cmd_attach() {
   parse "$@"
   [ "${#POS[@]}" -eq 2 ] || die "attach needs a tab and a file" 2
   [ -f "${POS[1]}" ] || die "file not found: ${POS[1]}" 2
+  local found
+  found="$(tab_eval "${POS[0]}" "$(jq -rn --arg i "$SEL_FILE_INPUT" --arg b "$SEL_ATTACH_BTN" '
+    "(async () => {
+       const q = () => document.querySelector(\($i | @json));
+       if (!q()) {
+         const b = document.querySelector(\($b | @json));
+         if (b) b.click();
+         for (let t = 0; t < 20 && !q(); t++) await new Promise((r) => setTimeout(r, 100));
+       }
+       return q() ? 1 : 0;
+     })()"')")"
+  [ "$found" = 1 ] || die "no file input in the main composer; open a channel or DM first"
   "$AGENT_TAB" upload --owner "$OWNER" --selector "$SEL_FILE_INPUT" "${POS[0]}" "${POS[1]}"
   echo "slack-draft: attached $(basename "${POS[1]}")"
 }
@@ -98,36 +131,45 @@ cmd_count() {
 cmd_delete() {
   parse "$@"
   [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "delete needs a tab, a text, and --to <name>" 2
-  local tab="${POS[0]}" found n answer
+  local tab="${POS[0]}" found n want answer result removed
   found="$(matches "$tab" "${POS[1]}")"
   n="$(printf '%s' "$found" | jq 'length')"
   [ "$n" -gt 0 ] || die "no draft to $TO matches that text"
   if [ "$n" -gt 1 ] && [ -z "$ALL" ]; then
+    printf '%s' "$found" | jq -r '.[] | "  - to \(.to): \(.body)"' >&2
     die "$n drafts to $TO match; refine the text or pass --all" 4
   fi
-  [ -n "$ALL" ] || n=1
+  want=1; [ -z "$ALL" ] || want="$n"
+  echo "slack-draft: $want draft(s) to delete:"
+  printf '%s' "$found" | jq -r --argjson w "$want" '.[:$w][] | "  - to \(.to): \(.body)"'
   if [ -z "$YES" ]; then
     [ -t 0 ] || die "delete changes data; pass --yes to confirm" 4
-    read -r -p "slack-draft: delete $n draft(s) to $TO? [y/N] " answer
+    read -r -p "slack-draft: delete $want draft(s) to $TO? [y/N] " answer
     case "$answer" in y|Y|yes) ;; *) die "not confirmed" 4 ;; esac
   fi
-  local js
-  js="$(jq -rn --arg n "$TO" --arg t "${POS[1]}" --arg row "$SEL_DRAFT_ROW" --arg del "$SEL_DRAFT_DELETE" --argjson max "$n" '
-    "(() => {
-      const name = \($n | ascii_downcase | @json), text = \($t | ascii_downcase | @json);
-      const rows = [...document.querySelectorAll(\($row | @json))]
-        .filter((r) => r.innerText.toLowerCase().includes(name) && r.innerText.toLowerCase().includes(text))
-        .slice(0, \($max));
-      let done = 0;
-      for (const r of rows) {
-        const b = r.querySelector(\($del | @json));
-        if (b) { b.click(); done++; }
-      }
-      return done;
-    })()"')"
-  answer="$(tab_eval "$tab" "$js")"
-  [ "$answer" -eq "$n" ] || die "deleted $answer of $n drafts; check the tab"
-  echo "slack-draft: deleted $answer draft(s) to $TO"
+  # Re-queries the list before every click (Slack redraws it), answers a
+  # confirm dialog, waits for the row to go, and reports before/after counts.
+  result="$(tab_eval "$tab" "$(page_prelude "$TO" "${POS[1]}")
+(async () => {
+  const before = hits().length;
+  for (let i = 0; i < $want; i++) {
+    const h = hits()[0];
+    if (!h) break;
+    const b = h.el.querySelector(DEL);
+    if (!b) break;
+    const n = rows().length;
+    b.click();
+    for (let t = 0; t < 30 && rows().length >= n; t++) {
+      await sleep(100);
+      const ok = document.querySelector(OK);
+      if (ok) ok.click();
+    }
+  }
+  return JSON.stringify({ before, after: hits().length });
+})()")"
+  removed="$(printf '%s' "$result" | jq -r '.before - .after')"
+  [ "$removed" -eq "$want" ] || die "deleted $removed of $want drafts; check the tab"
+  echo "slack-draft: deleted $removed draft(s) to $TO"
 }
 
 case "${1:-}" in

@@ -26,13 +26,27 @@ _has_file_arg() {
   return 1
 }
 
-# True when the arguments pick one test: a grep filter or an explicit spec path.
+# True when the arguments pick one test: a grep filter with a real value, or
+# an explicit spec path. "." , ".*", a folder ("tests/"), and the value of
+# --config, -c, or --project do not count.
 _one_test_args() {
-  local a
-  for a in "$@"; do
-    case "$a" in -g|--grep|--grep=*|-g=*) return 0 ;; esac
+  local a v
+  while [ $# -gt 0 ]; do
+    a="$1"; shift
+    case "$a" in
+      --config|-c|--project) shift || true ;;
+      -g|--grep)
+        v="${1:-}"
+        case "$v" in ""|-*|.|".*") ;; *) return 0 ;; esac
+        case "$v" in -*) ;; *) shift || true ;; esac ;;
+      -g=*|--grep=*)
+        v="${a#*=}"
+        case "$v" in ""|.|".*") ;; *) return 0 ;; esac ;;
+      -*|run|test|.|..|./|*/) ;;
+      */*|*.*) return 0 ;;
+    esac
   done
-  _has_file_arg "$@"
+  return 1
 }
 
 # True when the script name is a test or build script.
@@ -50,8 +64,27 @@ _playwright_test_run() {
 _is_heavy() {
   local -a w
   read -r -a w <<< "$1" || true
-  while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == *=* ]]; do w=("${w[@]:1}"); done
+  # Strip VAR=x and the prefixes time, command, exec, nohup, timeout N, env,
+  # nice [-n N], caffeinate [-flags].
+  while [ "${#w[@]}" -gt 0 ]; do
+    case "${w[0]}" in
+      *=*|time|command|exec|nohup) w=("${w[@]:1}") ;;
+      timeout)
+        w=("${w[@]:1}")
+        while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do w=("${w[@]:1}"); done
+        w=("${w[@]:1}") ;;
+      env|caffeinate)
+        w=("${w[@]:1}")
+        while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* || "${w[0]}" == *=* ]]; do w=("${w[@]:1}"); done ;;
+      nice)
+        w=("${w[@]:1}")
+        if [ "${w[0]:-}" = -n ]; then w=("${w[@]:2}")
+        elif [[ "${w[0]:-}" == -[0-9]* ]]; then w=("${w[@]:1}"); fi ;;
+      *) break ;;
+    esac
+  done
   [ "${#w[@]}" -gt 0 ] || return 1
+  [ "${w[0]}" = heavy-run ] && return 1
   case "${w[0]}" in npx|bunx) w=("${w[@]:1}") ;; esac
   [ "${#w[@]}" -gt 0 ] || return 1
   local tool="${w[0]}" a
@@ -110,6 +143,14 @@ _is_heavy() {
   return 1
 }
 
+# Remove heredoc bodies, then replace each quoted string with Q (empty quotes vanish; a lone . or .* stays), so words inside commit messages and PR bodies are never matched.
+_strip_text() {
+  /usr/bin/perl -0777 -pe '
+    s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
+    s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/my $i = substr($1, 1, -1); $i =~ m{^\.\*?$} ? $i : length($i) ? "Q" : ""/gse;
+  '
+}
+
 while IFS= read -r seg; do
   seg="${seg#"${seg%%[![:space:]]*}"}"
   case "$seg" in heavy-run|heavy-run\ *) continue ;; esac
@@ -117,6 +158,6 @@ while IFS= read -r seg; do
     echo "BLOCKED: a full test suite or build must queue on the Mac-wide lock. Run this as \`heavy-run <command>\`." >&2
     exit 2
   fi
-done < <(printf '%s\n' "$command" | sed -E 's/(&&|\|\||;|\|)/\n/g')
+done < <(printf '%s\n' "$command" | _strip_text | sed -E 's/(&&|\|\||;|\|)/\n/g')
 
 exit 0

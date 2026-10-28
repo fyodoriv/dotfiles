@@ -65,3 +65,7 @@ processes with no `heavy-run` parent; the check warns above
 `HEADLESS_UNLOCKED_MAX` (default 3). Why: the 2026-10-27 checkup found
 `chrome-headless-shell` on top of the overload rows. A launcher that starts
 Chrome itself must also pass `--use-mock-keychain --password-store=basic`.
+
+Still not seen by the hook (task `heavy-run-hook-wrapper-coverage`): `npx` flags and version
+suffixes (`npx -y playwright@1 test`), `./node_modules/.bin/playwright test`, `bun`, `turbo`,
+`gmake`, `bash -c "..."`, and subshells or `{ ...; }` groups. The doctor check is the net for these.

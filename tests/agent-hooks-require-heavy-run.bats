@@ -30,6 +30,33 @@ run_hook() {
   done
 }
 
+@test "blocks fake one-test forms and prefixed runs" {
+  for c in "npx playwright test -g ." "npx playwright test --config a/b.ts" "pnpm ui -g ''" \
+           "npm run e2e -- --grep=." "pnpm e2e ." "pnpm e2e tests/" \
+           "npm run e2e -- --config playwright.config.ts" "playwright test -g '.*'" \
+           "time make e2e" "timeout 600 make e2e" "env CI=1 make e2e" "nice -n 5 make e2e" \
+           "nohup make test-all" "caffeinate -i make e2e" "command make e2e" "exec make e2e" \
+           "time nice -n 5 npm run ui"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+}
+
+@test "allows quoted text, heredoc bodies, and prefixed wrapped runs" {
+  for c in 'git commit -m "fix; make e2e now"' 'gh pr create --body "npm ci && make e2e"' \
+           "echo 'make e2e && npm test'" "printf 'make test-all\\n'" "time heavy-run make e2e" \
+           "nice -n 5 heavy-run npm run ui" "timeout 600 heavy-run make e2e" "pnpm ui -g 'login flow'"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; return 1; }
+  done
+  run_hook $'cat > notes.md <<\'EOF\'\nmake e2e\nnpm test\nEOF\ngit status'
+  [ "$status" -eq 0 ] || { echo "blocked heredoc ($output)"; return 1; }
+  run_hook $'git commit -q -F - <<EOF\nfix: x\n\nmake e2e\nEOF'
+  [ "$status" -eq 0 ] || { echo "blocked heredoc2 ($output)"; return 1; }
+  run_hook $'cat <<\'EOF\'\nhi\nEOF\nmake e2e'
+  [ "$status" -eq 2 ] || { echo "heredoc hid a real run"; return 1; }
+}
+
 @test "allows wrapped runs and single-file runs" {
   for c in "heavy-run yarn test:coverage" "heavy-run npm run build" "npx vitest run one.test.ts" \
            "npx vitest run src/a/b.test.ts" "npx jest src/x.test.js" "bats tests/foo.bats" \

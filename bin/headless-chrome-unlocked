@@ -18,6 +18,18 @@ max="${HEADLESS_UNLOCKED_MAX:-3}"
 
 count=$(ps -axo pid=,ppid=,command= | awk '
   { pid = $1; ppid[pid] = $2; $1 = ""; $2 = ""; cmd[pid] = $0 }
+  # The lock holder: bin/heavy-run itself, or its perl lock process
+  # (perl ... <dir>/lock <dir>/owner <nice> <command>). Text that only
+  # mentions heavy-run (grep, a commit message) is not the lock.
+  function is_lock(c,   t, b) {
+    sub(/^ +/, "", c)
+    split(c, t, " ")
+    b = t[1]
+    if (b ~ /(^|\/)(ba|z|da)?sh$/) b = t[2]
+    if (b ~ /(^|\/)heavy-run$/) return 1
+    if (t[1] ~ /(^|\/)perl$/ && c ~ / [^ ]*\/lock [^ ]*\/owner [0-9]+ /) return 1
+    return 0
+  }
   END {
     n = 0
     for (p in cmd) {
@@ -31,7 +43,7 @@ count=$(ps -axo pid=,ppid=,command= | awk '
       if (pre !~ /(chrome-headless-shell|MacOS\/(Google Chrome|Chromium)( for Testing)?)$/) continue
       locked = 0; q = ppid[p]; hops = 0
       while (q in cmd && hops < 30) {
-        if (cmd[q] ~ /heavy-run/) { locked = 1; break }
+        if (is_lock(cmd[q])) { locked = 1; break }
         q = ppid[q]; hops++
       }
       if (!locked) n++

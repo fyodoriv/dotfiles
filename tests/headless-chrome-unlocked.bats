@@ -58,6 +58,28 @@ T
   [ "$output" = "1" ]
 }
 
+@test "headless-chrome-unlocked: a parent that only mentions heavy-run is not the lock" {
+  cat > "$PS_TABLE" <<T
+50 1 zsh -c grep heavy-run notes; npx playwright test
+100 50 node /usr/bin/playwright test
+101 100 $shell
+102 100 $shell
+103 100 $shell
+T
+  run "$SCRIPT"
+  [ "$output" = "3" ]
+}
+
+@test "headless-chrome-unlocked: the bin/heavy-run script itself counts as the lock" {
+  cat > "$PS_TABLE" <<T
+50 1 /bin/bash /d/bin/heavy-run npm run ui
+100 50 node /usr/bin/playwright test
+101 100 $shell
+T
+  run "$SCRIPT"
+  [ "$output" = "0" ]
+}
+
 @test "headless-chrome-unlocked: --check fails above HEADLESS_UNLOCKED_MAX" {
   cat > "$PS_TABLE" <<T
 100 1 node pw

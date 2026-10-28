@@ -145,6 +145,20 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
+- [ ] Close the remaining heavy-run hook bypasses
+  - **ID**: heavy-run-hook-wrapper-coverage
+  - **Tags**: performance, reliability, agents
+  - **Details**: The `require-heavy-run` hook reads simple commands only. It misses `npx` flags and version suffixes (`npx -y playwright@1 test`), `npm exec` with flags, `./node_modules/.bin/playwright test`, `bun`, `turbo`, `gmake`, `bash -c "..."`, subshells, and `{ ...; }` groups. Review of dotfiles #373 listed them. Parse these forms, or move the check to a shell wrapper on PATH, and keep the single-test allowances.
+  - **Files**: `agent-hooks/require-heavy-run.sh`, `tests/agent-hooks-require-heavy-run.bats`, `docs/agent-hooks.md`
+  - **Output**: code
+  - **Acceptance**: each bypass form above is blocked unwrapped and allowed under `heavy-run`, in the hook test.
+  - **Hypothesis**: closing these forms cuts headless Chrome runs outside the lock (`bin/headless-chrome-unlocked`, sampled by the resilience doctor) to 0 on at least 90 percent of daily samples, from the level after #373.
+  - **Measurement**: `bin/headless-chrome-unlocked` count in the 24 h `machine_metrics` window of the tooling-checkup, 7 days after the change lands.
+  - **Success**: count is 0 on at least 90 percent of samples.
+  - **Pivot**: still over 20 percent of samples non-zero -> the bypasses are not in the hook's blind spots; profile the callers with `ps` ancestry and drop the hook approach.
+  - **Anchor**: dotfiles #373 review; Gunther 2007, *Guerrilla Capacity Planning* (load beyond core count).
+  - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
+
 ## P3
 
 - [ ] Make `make lint` fast in the inner loop

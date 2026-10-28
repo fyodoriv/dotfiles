@@ -51,6 +51,14 @@ settings:
     type: bool
     default: false
     description: Install Obsidian (full profile) and run the obsidian doctor checks.
+  home_theater:
+    type: bool
+    default: false
+    description: Install Plex Media Server, VLC and duti (full profile) and run the home-theater doctor checks.
+  samsung_tv_host:
+    type: text
+    default: ""
+    description: Samsung TV IP or hostname; the home-theater doctor checks it is on wired Ethernet. Empty = skip.
   auto_upgrade:
     type: bool
     default: false

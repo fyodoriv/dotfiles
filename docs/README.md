@@ -28,6 +28,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [key-rotation.md](key-rotation.md) | How do I rotate SSH and API keys? | human |
 | [agentbrew-setup.md](agentbrew-setup.md) | How do I set up or repair agentbrew on this Mac? | both |
 | [local-llm.md](local-llm.md) | How do I run the local-LLM stack? | both |
+| [home-theater.md](home-theater.md) | How do I play 4K movies from the Mac on a Samsung TV with a soundbar? | human |
 | [obsidian.md](obsidian.md) | How do I use Obsidian with Claude Code? | human |
 | [workspace.md](workspace.md) | How do I see work across several workspaces? | both |
 | [ship-it-reference.md](ship-it-reference.md) | How does an agent verify, commit, open a PR, and merge? | agent |

@@ -83,6 +83,13 @@ cask "font-jetbrains-mono-nerd-font"
 cask "obsidian"
 {{ end -}}
 
+{{ if dig "home_theater" false . -}}
+# ── Full: Home theater (opt-in: home_theater: true; docs/home-theater.md) ──
+cask "plex-media-server"
+cask "vlc"
+brew "duti"
+{{ end -}}
+
 # ── Full: Extras ─────────────────────────────────────────────────
 brew "difftastic"
 brew "dockutil"

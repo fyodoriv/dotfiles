@@ -110,6 +110,17 @@ them. -->
 
 ## P3
 
+- [ ] Replace? Relocate? the home-theater module
+  - **ID**: home-theater-replace-relocate
+  - **Details**: Rule 0 pair for `modules/home-theater/`. Check whether a maintained tool
+    (a Plex CLI, a Homebrew service, a SmartThings CLI) can replace the doctor checks, or
+    whether the module belongs in a personal overlay instead of the public base repo.
+  - **Hypothesis**: one or more of its checks can be replaced by a maintained tool.
+  - **Success**: a decision recorded in this block with links.
+  - **Pivot**: no maintained tool covers them; keep the module and close this task.
+  - **Measurement**: `bats tests/module-home-theater.bats` stays green after any change.
+  - **Anchor**: dotfiles rule 0 (GET, WRAP, CONTRIBUTE, ABSORB).
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Blocked**: needs-time — 2026-10-22: shipped `make lint` per-file cache (`bin/cached-run --per-file`: skips a script that passed with the same content, sourced files, shellcheck version, and `.shellcheckrc`; shared by all worktrees; misses run in parallel) plus `make lint-full` (PR #257). Baseline 2026-10-22: `make lint` lines sum 6m02s/day (tooling 2m08s, dotfiles 2m04s, agentbrew 1m50s); one run 17-39 s uncached, now 11.6 s cold and 1.2-1.3 s warm at load 40-50. Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), then close or pivot.

@@ -19,6 +19,14 @@
 {{- if hasKey . "obsidian" -}}
 {{-   $obsidian = .obsidian -}}
 {{- end -}}
+{{- $homeTheater := false -}}
+{{- if hasKey . "home_theater" -}}
+{{-   $homeTheater = .home_theater -}}
+{{- end -}}
+{{- $samsungTvHost := "" -}}
+{{- if hasKey . "samsung_tv_host" -}}
+{{-   $samsungTvHost = .samsung_tv_host -}}
+{{- end -}}
 {{- $claudeRemoteControl := false -}}
 {{- if hasKey . "claude_remote_control" -}}
 {{-   $claudeRemoteControl = .claude_remote_control -}}
@@ -197,6 +205,8 @@ data:
     []
 {{- end }}
   obsidian: {{ $obsidian }}
+  home_theater: {{ $homeTheater }}
+  samsung_tv_host: {{ $samsungTvHost | quote }}
   auto_upgrade: {{ $autoUpgrade }}
   auto_sync: {{ $autoSync }}
   owner_machine: {{ $ownerMachine }}

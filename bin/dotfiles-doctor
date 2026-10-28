@@ -133,6 +133,12 @@ fi
 # shellcheck disable=SC2034  # used by sourced doctor modules
 OBSIDIAN_ENABLED="${DOTFILES_OBSIDIAN:-$(chezmoi execute-template '{{ dig "obsidian" false . }}' 2>/dev/null || echo "false")}"
 
+# home_theater: opt-in chezmoi key; samsung_tv_host adds the TV network check.
+# shellcheck disable=SC2034  # used by sourced doctor modules
+HOME_THEATER_ENABLED="${DOTFILES_HOME_THEATER:-$(chezmoi execute-template '{{ dig "home_theater" false . }}' 2>/dev/null || echo "false")}"
+# shellcheck disable=SC2034  # used by sourced doctor modules
+SAMSUNG_TV_HOST="${SAMSUNG_TV_HOST:-$(chezmoi execute-template '{{ dig "samsung_tv_host" "" . }}' 2>/dev/null || true)}"
+
 # brew_skipped <check-id>: true for tool.<name> when <name> is in BREW_SKIP.
 brew_skipped() {
   case "$1" in tool.*) ;; *) return 1 ;; esac

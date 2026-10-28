@@ -50,7 +50,7 @@ Every module declares one of four severity tiers in `modules/<name>/severity`. T
 | **critical** | Security & safety — failures need immediate attention | `security`, `ssh`, `workflow` |
 | **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `local-bin`, `memory`, `personal-machine`, `resilience`, `shell`, `sync`, `upgrade` |
 | **performance** | System performance — nice to have, not blocking | `macos`, `tools` |
-| **cosmetic** | Personal preference — ok to skip | `claude`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
+| **cosmetic** | Personal preference — ok to skip | `claude`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `home-theater`, `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
 
 Filter usage:
 
@@ -506,6 +506,19 @@ Runs only when chezmoi data has `obsidian: true`. Skipped when `brew_skip` or th
 | `obsidian.vim_mode` | Vim mode enabled in the vault | None |
 | `obsidian.daily_folder` | `daily/` folder exists | `mkdir -p` |
 | `obsidian.templates_folder` | `templates/` folder exists | `mkdir -p` |
+
+### home-theater — full-only, opt-in
+
+Runs only when chezmoi data has `home_theater: true`. The TV check runs only when `samsung_tv_host` is set. Setup guide: [home-theater.md](home-theater.md).
+
+| ID | What it checks | Auto-fix |
+|----|---------------|----------|
+| `tool.plex-media-server` | Plex Media Server installed | None (hint: `brew install --cask plex-media-server`) |
+| `home_theater.plex_running` | Plex answers on `127.0.0.1:32400/identity` (`PLEX_URL` overrides) | `open -a 'Plex Media Server'` |
+| `tool.vlc` | VLC installed | None (hint: `brew install --cask vlc`) |
+| `home_theater.vlc_default_mkv` | `.mkv` opens in VLC | `duti` sets VLC for `.mkv`, `.avi`, `.webm` |
+| `home_theater.no_sleep_on_ac` | No system sleep on power adapter (Plex stops when the Mac sleeps) | None (hint: `sudo pmset -c sleep 0`) |
+| `home_theater.tv_wired` | Samsung TV reports `networkType: wired` on `:8001/api/v2/` | None (plug in Ethernet) |
 
 ### vscode (dynamic)
 

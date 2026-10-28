@@ -156,6 +156,8 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | *(not prompted)* | `login_apps` | `Ghostty` | Single-word app names in `/Applications` (no spaces) that `macos-apps.sh` (full profile) adds as login items: `dotfiles config set login_apps Ghostty,Claude`. A leading `-` removes an app from login items: `dotfiles config set login_apps -Ghostty,Claude`. Other login items stay untouched. Empty = manage none. The `DOTFILES_LOGIN_APPS` env var (comma list) wins. |
 | *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install: `dotfiles config set brew_skip watchman,rancher`, or edit the file (example below). |
 | *(not prompted)* | `obsidian` | `false` | Install Obsidian (full profile) and run the `obsidian` doctor checks. Opt-in. |
+| *(not prompted)* | `home_theater` | `false` | Install Plex Media Server, VLC and `duti` (full profile) and run the `home-theater` checks for 4K movies from the Mac on a TV. Opt-in. See [home-theater.md](docs/home-theater.md). |
+| *(not prompted)* | `samsung_tv_host` | _(empty)_ | Samsung TV IP or hostname. The `home-theater` doctor checks the TV is on wired Ethernet. |
 
 Enterprise-only prompts (when `is_enterprise: true`):
 

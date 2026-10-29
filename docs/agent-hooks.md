@@ -78,6 +78,27 @@ force-delete; the strict parser then rejects every such form, so they block. An
 in-command alias (`git -c alias.b=branch b -D x`, `--config-env`) counts as a
 force-delete too and blocks.
 
+Three more commands that destroy a branch are checked with the same proof, in
+the repo the command acts on (a branch that does not exist yet has nothing to
+lose and passes):
+
+- `git update-ref [-d] refs/heads/<b> [<value>]`: `<b>` must be proven merged.
+  Other refs (tags, `refs/stash`, notes) pass. Any `refs/remotes/` ref blocks,
+  as does `--stdin`, a command with no `refs/` first word, or a value that is
+  not a plain revision.
+- `git push . :<b>` (or `:refs/heads/<b>`): `<b>` must be proven merged. Any
+  other refspec to `.` (such as `<src>:<b>`) blocks. A push to a remote is not
+  looked at.
+- `git branch -M <x> <b>` (or `-m` with `-f`): the old tip of `<b>`, the last
+  name, must be proven merged. `git branch -f <b> <x>` (or `--force`): the old
+  tip of `<b>`, the first name, must be proven merged.
+
+A command the shell rewrites before git runs (`$'git'`, `$'-D'`, `${x:--D}`,
+`$(echo git)`, backticks, or a glob in the path such as `/usr/bin/gi?`) that
+also names `branch` or `update-ref` and a delete-like flag counts as a match
+and then blocks, because the parser reads only plain words. A plain `$var` or
+`$(...)` in an ordinary `git branch` command is not a match.
+
 Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
 quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as
 `refs/heads/<name>` (checked with `git show-ref --verify`). The default branch
@@ -100,19 +121,18 @@ Known gaps (the same as before this change; none is newly allowed):
   blocked, because a `cd` could change the repo the proof must check. Run the
   delete as its own command.
 - Forged default ref: `git update-ref refs/remotes/origin/main <local branch>`
-  forges the default ref itself, and `git symbolic-ref refs/remotes/origin/HEAD
-  refs/remotes/origin/<x>` points it at a forged `refs/remotes/origin/<x>`. The
-  hook cannot detect either offline.
-- A shell alias, function or wrapper that runs `git branch` under another name
+  is blocked (the hook refuses any `refs/remotes/` write), but other ways to
+  forge it are not seen: `git symbolic-ref refs/remotes/origin/HEAD
+  refs/remotes/origin/<x>`, `git branch -r`, or editing `.git` files directly.
+- A shell alias, function or wrapper that runs the command under another name
   never shows the word `git` to the hook.
-- Spellings the shell rewrites before git runs are not seen as words: ANSI-C
-  quoting (`$'git'`, `$'-D'`), command substitution (`` `echo git` ``,
-  `$(echo git)`), globs in the git path (`/usr/bin/gi?`), and parameter
-  defaults as flags (`${x:--D}`). Tracked in the same task as below.
-- Other commands that delete or overwrite a branch are not checked at all:
-  `git update-ref -d refs/heads/<b>`, `git push . :<b>`, `git branch -M <x> <b>`,
-  and `git branch -f <b> <x>` over an unmerged branch. Tracked as
-  `git-ref-delete-other-commands` in `TASKS.md`.
+- Other ways to rewrite a branch are not checked: `git reset` on a checked-out
+  branch, `git checkout -B`, `git switch -C`, `git fetch <remote> +<src>:<b>`,
+  `git push <path> :<b>` to this repo by path, and `git update-ref --stdin`
+  (blocked, but only because it cannot be parsed).
+- The shell-rewrite check needs `branch` or `update-ref` and a delete-like flag
+  in the same command; a rewritten `push` (for example `$(echo git) push . :b`)
+  is not seen.
 
 Tests: `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.

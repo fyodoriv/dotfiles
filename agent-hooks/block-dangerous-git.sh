@@ -111,16 +111,22 @@ is_long_prefix() {
   return 1
 }
 
-# True when the command could force-delete a branch: the old literal text
-# anywhere, or a git word, then global options, then "branch" (or an alias
-# option that could rename a subcommand to it), then delete flags (-D, -d with
-# -f, --delete with --force or their prefixes, glued letters like -Dr or -fd).
+# True when the command could destroy or overwrite a local branch: the old
+# literal text anywhere, or a git word, then global options, then a subcommand
+# that can do it:
+#   branch   with -D, -d with -f, --delete with --force (or prefixes), -M, -m
+#            with -f, or a lone -f/--force (moves a branch);
+#   update-ref  with -d, --stdin, or a refs/heads/ word;
+#   push     with a "." word (push to this same repo, e.g. ". :<branch>").
 # Words are normalized first (quotes and backslashes dropped, path stripped),
-# so 'git', g''it, \git, /usr/bin/git and git \branch are all seen. The strict
-# parser below then rejects every such form, so they block.
+# so 'git', g''it, \git, /usr/bin/git and git \branch are all seen. A command
+# the shell rewrites before git runs ($'..', ${..}, $(..), backticks, a glob in
+# the git path) that also names branch or update-ref and a delete-like flag is
+# a match too. The strict parser below then rejects every such form, so they
+# block.
 looks_like_branch_delete() {
-  local -a w
-  local i n j k opt norm hasD hasd hasf unk
+  local -a w rw
+  local i n j k opt norm word base hasD hasd hasf hasM hasm unk dyn=0 sub=0 flagish=0
   case "$command" in
     *[gG][iI][tT]" "[bB][rR][aA][nN][cC][hH]" -D"*) return 0 ;;
   esac
@@ -129,13 +135,39 @@ looks_like_branch_delete() {
   norm="${norm//\\/}"
   # shellcheck disable=SC2206
   w=($norm)
+  # shellcheck disable=SC2206
+  rw=($command)
   n=${#w[@]}
+  # Shell-rewrite spellings: the words below cannot be read, so fail closed.
+  case "$command" in
+    *\$\'*|*\$\"*|*\$\{*|*\$\(*|*\`*) dyn=1 ;;
+  esac
+  for word in "${rw[@]}"; do
+    base="${word##*/}"
+    case "$base" in
+      *[\?\*\[]*) [ "${#base}" -le 4 ] && dyn=1 ;;
+    esac
+    case "$word" in
+      \$\'*|\$\{*|\`*) flagish=1 ;;
+    esac
+  done
+  if [ "$dyn" -eq 1 ]; then
+    for opt in "${w[@]}"; do
+      case "$opt" in update-ref) sub=1 ;; esac
+      is_branch_word "$opt" && sub=1
+      case "$opt" in
+        --*) if is_long_prefix "$opt" delete || is_long_prefix "$opt" force; then flagish=1; fi ;;
+        -?*) case "$opt" in *[DdfMm]*) flagish=1 ;; esac ;;
+      esac
+    done
+    if [ "$sub" -eq 1 ] && [ "$flagish" -eq 1 ]; then return 0; fi
+  fi
   for ((i = 0; i < n; i++)); do
     is_git_word "${w[i]##*/}" || continue
-    hasD=0 hasd=0 hasf=0 unk=0
+    hasD=0 hasd=0 hasf=0 hasM=0 hasm=0 unk=0
     j=$((i + 1))
     # Skip global options that may precede the subcommand. -c, --config-env and
-    # unknown options can define an alias for branch, so they count as a match.
+    # unknown options can define an alias for a subcommand, so they count.
     while [ "$j" -lt "$n" ]; do
       case "${w[j]}" in
         -C|--git-dir|--work-tree|--namespace) j=$((j + 2)) ;;
@@ -145,7 +177,18 @@ looks_like_branch_delete() {
         *) break ;;
       esac
     done
-    if [ "$j" -lt "$n" ] && { is_branch_word "${w[j]}" || [ "$unk" -eq 1 ]; }; then
+    [ "$j" -lt "$n" ] || continue
+    case "${w[j]}" in
+      update-ref)
+        for ((k = j + 1; k < n; k++)); do
+          case "${w[k]}" in -d|--stdin|refs/heads/*|refs/remotes/*) return 0 ;; esac
+        done ;;
+      push)
+        for ((k = j + 1; k < n; k++)); do
+          [ "${w[k]}" = "." ] && return 0
+        done ;;
+    esac
+    if is_branch_word "${w[j]}" || [ "$unk" -eq 1 ]; then
       for ((k = j + 1; k < n; k++)); do
         opt="${w[k]}"
         case "$opt" in
@@ -155,22 +198,36 @@ looks_like_branch_delete() {
           -?*)
             case "$opt" in *D*) hasD=1 ;; esac
             case "$opt" in *d*) hasd=1 ;; esac
-            case "$opt" in *f*) hasf=1 ;; esac ;;
+            case "$opt" in *f*) hasf=1 ;; esac
+            case "$opt" in *M*) hasM=1 ;; esac
+            case "$opt" in *m*) hasm=1 ;; esac ;;
         esac
       done
       if [ "$hasD" -eq 1 ] || { [ "$hasd" -eq 1 ] && [ "$hasf" -eq 1 ]; }; then return 0; fi
+      # Moving or renaming over a branch only counts for the branch subcommand.
+      if is_branch_word "${w[j]}"; then
+        if [ "$hasM" -eq 1 ] || [ "$hasf" -eq 1 ]; then return 0; fi
+      fi
     fi
   done
   return 1
 }
 
-# True when the command is one plain git call that force-deletes branches and
-# every branch named is proven merged, in the repo the command acts on.
-# Anything unusual fails closed.
+# A branch that does not exist yet has nothing to lose; an existing one needs
+# the merged proof.
+target_ok() {
+  git show-ref --verify --quiet "refs/heads/$1" || return 0
+  branch_is_merged "$1"
+}
+
+# True when the command is one plain git call that deletes or overwrites
+# branches and every branch it would lose is proven merged, in the repo the
+# command acts on. Anything unusual fails closed.
 branch_delete_allowed() {
   local rest word seen=0 name_re='^[A-Za-z0-9._/-]+$' dir_re='^[A-Za-z0-9._/-]+$'
-  local -a w
-  local i n opt dflag=0 Dflag=0 fflag=0 gitdir=""
+  local rev_re='^[A-Za-z0-9._/~^@-]+$' hex_re='^[0-9a-f]{7,64}$'
+  local -a w names
+  local i n opt dflag=0 Dflag=0 fflag=0 Mflag=0 mflag=0 gitdir="" sub name ref
   # A chained command (; & | newline) may hide a second delete, and a backslash
   # can continue the line. Fail closed on any of them, anywhere in the command.
   # A redirect to /dev/null or stderr-to-stdout never changes which branches go,
@@ -211,12 +268,60 @@ branch_delete_allowed() {
       *) break ;;
     esac
   done
-  { [ "$i" -lt "$n" ] && is_branch_word "${w[i]}"; } || return 1
+  [ "$i" -lt "$n" ] || return 1
   if [ -n "$gitdir" ]; then
     gitdir="$(cd "$gitdir" 2>/dev/null && pwd -P)" || return 1
     export GIT_DIR="$gitdir"
   fi
+  sub="${w[i]}"
   i=$((i + 1))
+  case "$sub" in
+    update-ref)
+      # update-ref [-d] [--no-deref] <refs/...> [<value>]
+      for ((; i < n; i++)); do
+        word="${w[i]}"
+        case "$word" in
+          -d|--no-deref) continue ;;
+          refs/remotes/*) return 1 ;;
+          refs/heads/*)
+            name="${word#refs/heads/}"
+            [[ "$name" =~ $name_re ]] || return 1
+            target_ok "$name" || return 1
+            seen=1 ;;
+          refs/*)
+            [[ "$word" =~ $name_re ]] || return 1
+            seen=1 ;;
+          *)
+            # A value (commit or revision) may follow the ref, never lead.
+            [ "$seen" -eq 1 ] || return 1
+            { [[ "$word" =~ $hex_re ]] || [[ "$word" =~ $rev_re ]]; } || return 1
+            case "$word" in -*) return 1 ;; esac ;;
+        esac
+      done
+      [ "$seen" -eq 1 ]
+      return ;;
+    push)
+      # push . :<branch> ...: only deletions into this same repo are understood.
+      [ "${w[i]}" = "." ] || return 1
+      i=$((i + 1))
+      for ((; i < n; i++)); do
+        word="${w[i]}"
+        case "$word" in
+          :refs/heads/*) name="${word#:refs/heads/}" ;;
+          :*) name="${word#:}" ;;
+          *) return 1 ;;
+        esac
+        [[ "$name" =~ $name_re ]] || return 1
+        case "$name" in -*) return 1 ;; esac
+        target_ok "$name" || return 1
+        seen=1
+      done
+      [ "$seen" -eq 1 ]
+      return ;;
+    *)
+      is_branch_word "$sub" || return 1 ;;
+  esac
+  names=()
   for ((; i < n; i++)); do
     word="${w[i]}"
     case "$word" in
@@ -231,6 +336,8 @@ branch_delete_allowed() {
       -D) Dflag=1; continue ;;
       -d) dflag=1; continue ;;
       -f) fflag=1; continue ;;
+      -M) Mflag=1; continue ;;
+      -m) mflag=1; continue ;;
       -df|-fd) dflag=1; fflag=1; continue ;;
       -Df|-fD) Dflag=1; fflag=1; continue ;;
     esac
@@ -238,11 +345,29 @@ branch_delete_allowed() {
     # (-Dr and -r would touch remote-tracking refs).
     [[ "$word" =~ $name_re ]] || return 1
     case "$word" in -*) return 1 ;; esac
-    seen=1
-    branch_is_merged "$word" || return 1
+    names+=("$word")
   done
-  { [ "$Dflag" -eq 1 ] || { [ "$dflag" -eq 1 ] && [ "$fflag" -eq 1 ]; }; } || return 1
-  [ "$seen" -eq 1 ]
+  [ "${#names[@]}" -ge 1 ] || return 1
+  if [ "$Dflag" -eq 1 ] || { [ "$dflag" -eq 1 ] && [ "$fflag" -eq 1 ]; }; then
+    # Delete: every branch named must exist and be proven merged.
+    [ "$Mflag" -eq 0 ] && [ "$mflag" -eq 0 ] || return 1
+    for name in "${names[@]}"; do
+      branch_is_merged "$name" || return 1
+    done
+    return 0
+  fi
+  [ "$dflag" -eq 0 ] || return 1
+  if [ "$Mflag" -eq 1 ] || { [ "$mflag" -eq 1 ] && [ "$fflag" -eq 1 ]; }; then
+    # Rename over the last name: its old tip must be proven merged.
+    target_ok "${names[${#names[@]} - 1]}"
+    return
+  fi
+  if [ "$fflag" -eq 1 ] && [ "$mflag" -eq 0 ]; then
+    # Move the first name to another commit: its old tip must be proven merged.
+    target_ok "${names[0]}"
+    return
+  fi
+  return 1
 }
 
 case "$command" in

@@ -515,3 +515,100 @@ run_hook_in() {
     [ "$status" -eq 0 ]
   done
 }
+
+# Task git-ref-delete-other-commands: the other commands that destroy a branch,
+# and the spellings the shell rewrites before git runs.
+
+@test "update-ref -d on a branch: unmerged blocks, merged passes" {
+  merged_and_unmerged
+  run_hook 'git update-ref -d refs/heads/feat/u'
+  [ "$status" -eq 2 ]
+  run_hook 'git update-ref -d refs/heads/feat/m'
+  [ "$status" -eq 0 ]
+  run_hook "git -C $REPO update-ref -d refs/heads/feat/u"
+  [ "$status" -eq 2 ]
+}
+
+@test "update-ref on other refs keeps working" {
+  merged_and_unmerged
+  git tag v1
+  run_hook 'git update-ref -d refs/tags/v1'
+  [ "$status" -eq 0 ]
+  run_hook 'git update-ref refs/stash HEAD'
+  [ "$status" -eq 0 ]
+  run_hook 'git update-ref -d refs/notes/x'
+  [ "$status" -eq 0 ]
+}
+
+@test "update-ref cannot forge a remote-tracking ref or hide refs in stdin" {
+  merged_and_unmerged
+  run_hook 'git update-ref refs/remotes/origin/main feat/u'
+  [ "$status" -eq 2 ]
+  run_hook 'git update-ref --stdin'
+  [ "$status" -eq 2 ]
+}
+
+@test "push to the local repo with an empty source deletes a branch" {
+  merged_and_unmerged
+  run_hook 'git push . :feat/u'
+  [ "$status" -eq 2 ]
+  run_hook 'git push . :refs/heads/feat/u'
+  [ "$status" -eq 2 ]
+  run_hook 'git push . :feat/m'
+  [ "$status" -eq 0 ]
+  run_hook 'git push . feat/m:feat/u'
+  [ "$status" -eq 2 ]
+}
+
+@test "ordinary pushes are not blocked" {
+  merged_and_unmerged
+  for c in 'git push origin main' 'git push -u origin feat/u' 'git push --force-with-lease origin feat/u'; do
+    run_hook "$c"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "branch -M over an unmerged branch blocks, over a merged one passes" {
+  merged_and_unmerged
+  run_hook 'git branch -M feat/m feat/u'
+  [ "$status" -eq 2 ]
+  run_hook 'git branch -M feat/u feat/m'
+  [ "$status" -eq 0 ]
+  run_hook 'git branch -M brand-new'
+  [ "$status" -eq 0 ]
+  run_hook 'git branch -m -f feat/m feat/u'
+  [ "$status" -eq 2 ]
+}
+
+@test "branch -f over an unmerged branch blocks, over a merged one passes" {
+  merged_and_unmerged
+  run_hook 'git branch -f feat/u main'
+  [ "$status" -eq 2 ]
+  run_hook 'git branch -f feat/m main'
+  [ "$status" -eq 0 ]
+  run_hook 'git branch -f does-not-exist main'
+  [ "$status" -eq 0 ]
+  run_hook 'git branch --force feat/u main'
+  [ "$status" -eq 2 ]
+}
+
+@test "spellings the shell rewrites before git runs block" {
+  merged_and_unmerged
+  for c in "\$'git' branch -D feat/u" "\$'\\x67it' branch -D feat/u" \
+           "git branch \$'-D' feat/u" '`echo git` branch -D feat/u' \
+           '$(echo git) branch -D feat/u' '/usr/bin/gi? branch -D feat/u' \
+           'git branch ${x:--D} feat/u' '$(echo git) update-ref -d refs/heads/feat/u' \
+           'git branch -f feat/u $(echo main)'; do
+    run_hook "$c"
+    [ "$status" -eq 2 ]
+  done
+}
+
+@test "command substitution that only reads a branch is not blocked" {
+  merged_and_unmerged
+  for c in 'echo $(git branch --show-current)' 'git branch --contains $(git rev-parse HEAD)' \
+           'git push origin "$B"' 'git branch -a'; do
+    run_hook "$c"
+    [ "$status" -eq 0 ]
+  done
+}

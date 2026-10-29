@@ -29,20 +29,6 @@ them. -->
 
 ## P2
 
-- [ ] Check the other git commands that delete or overwrite a local branch
-  - **ID**: git-ref-delete-other-commands
-  - **Tags**: safety, agents, hooks
-  - **Details**: `agent-hooks/block-dangerous-git.sh` checks `git branch` with a force-delete flag. Four other spellings destroy an unmerged branch with no proof: `git update-ref -d refs/heads/<b>`, `git push . :<b>`, `git branch -M <x> <b>` (rename over `<b>`), and `git branch -f <b> <x>` (move `<b>` to `<x>`). Add each to the parsed match and apply the same merged-branch proof to `<b>` (for `-M` and `-f`, the old tip of `<b>` must be proven merged). Shell aliases and functions that hide `git` stay a documented gap. Also close the spellings the shell rewrites before git runs, which the hook cannot see as words: ANSI-C quoting (`$'git'`, `$'\x67it'`, `git branch $'-D'`), command substitution (`` `echo git` ``, `$(echo git)`), globs in the git path (`/usr/bin/gi?`), and parameter defaults as flags (`${x:--D}`). Suggested fix: when the words after a git-like word contain `$`, a backtick, or `?*[`, treat the command as a match, so the allow check blocks it.
-  - **Files**: `agent-hooks/block-dangerous-git.sh`, `tests/agent-hooks-block-dangerous-git-merged.bats`, `docs/agent-hooks.md`
-  - **Output**: code
-  - **Acceptance**: each of the four commands exits 2 for an unmerged `<b>` and exits 0 for a branch proven merged; `git branch -f` on a branch that does not exist, and `git update-ref` on other refs (tags, `refs/stash`), keep exit 0; `$'git' branch -D <unmerged>`, `$'\x67it' branch -D <unmerged>`, `git branch $'-D' <unmerged>`, `` `echo git` branch -D <unmerged> ``, `$(echo git) branch -D <unmerged>`, `/usr/bin/gi? branch -D <unmerged>` and `git branch ${x:--D} <unmerged>` all exit 2; the existing cases keep their results; `docs/agent-hooks.md` drops the gap lines.
-  - **Hypothesis**: matching these four commands cuts the probe commands that destroy an unmerged branch without a block from 4 to 0, because the hook then sees every ref-deleting spelling.
-  - **Measurement**: `bats tests/agent-hooks-block-dangerous-git-merged.bats` with one probe per command; a probe passes when the unmerged branch exits 2.
-  - **Success**: 0 of the 4 probes destroy an unmerged branch, and all existing hook tests pass.
-  - **Pivot**: if the matcher blocks more than 2 legitimate `update-ref` or `push` commands in the test matrix, block only the `refs/heads/` forms and document the rest.
-  - **Anchor**: Saltzer and Schroeder 1975, "The Protection of Information in Computer Systems" (complete mediation); OWASP Command Injection Prevention (deny-list gaps).
-  - **Competitive-goal**: none — agent safety hardening, not a scorecard metric.
-
 - [ ] Record each real install run so the README can prove one-command setup
   - **ID**: proof-install-field-outcome
   - **Tags**: metrics, proof

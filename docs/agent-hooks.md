@@ -96,8 +96,13 @@ lose and passes):
 A command the shell rewrites before git runs (`$'git'`, `$'-D'`, `${x:--D}`,
 `$(echo git)`, backticks, or a glob in the path such as `/usr/bin/gi?`) that
 also names `branch` or `update-ref` and a delete-like flag counts as a match
-and then blocks, because the parser reads only plain words. A plain `$var` or
-`$(...)` in an ordinary `git branch` command is not a match.
+and then blocks, because the parser reads only plain words. A rewritten
+subcommand (`git $'branch' -D x`, `git $(echo branch) -D x`) with a delete-like
+flag after it is a match too. A rewritten word that could expand to a flag
+(`${x}`) counts only outside a read-only listing (`--list`, `-l`,
+`--show-current`, `--contains`, `--merged`, `--no-merged`, `--points-at`), so
+`git branch --list ${x}` passes. A plain `$var` or `$(...)` in an ordinary
+`git branch` command is not a match.
 
 Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
 quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as

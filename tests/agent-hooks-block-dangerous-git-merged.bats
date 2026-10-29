@@ -598,7 +598,9 @@ run_hook_in() {
            "git branch \$'-D' feat/u" '`echo git` branch -D feat/u' \
            '$(echo git) branch -D feat/u' '/usr/bin/gi? branch -D feat/u' \
            'git branch ${x:--D} feat/u' '$(echo git) update-ref -d refs/heads/feat/u' \
-           'git branch -f feat/u $(echo main)'; do
+           'git branch -f feat/u $(echo main)' \
+           "git \$'branch' -D feat/u" "git \$'update-ref' -d refs/heads/feat/u" \
+           'git $(echo branch) -D feat/u' 'git `echo branch` -D feat/u'; do
     run_hook "$c"
     [ "$status" -eq 2 ]
   done
@@ -607,7 +609,8 @@ run_hook_in() {
 @test "command substitution that only reads a branch is not blocked" {
   merged_and_unmerged
   for c in 'echo $(git branch --show-current)' 'git branch --contains $(git rev-parse HEAD)' \
-           'git push origin "$B"' 'git branch -a'; do
+           'git push origin "$B"' 'git branch -a' 'git branch --list ${x}' \
+           'git branch --contains ${x}' 'git $(echo log) --oneline'; do
     run_hook "$c"
     [ "$status" -eq 0 ]
   done

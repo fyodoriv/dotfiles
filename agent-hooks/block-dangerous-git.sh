@@ -126,7 +126,7 @@ is_long_prefix() {
 # block.
 looks_like_branch_delete() {
   local -a w rw
-  local i n j k opt norm word base hasD hasd hasf hasM hasm unk dyn=0 sub=0 flagish=0
+  local i n j k opt norm word base hasD hasd hasf hasM hasm unk dyn=0 sub=0 flagish=0 rwflag=0 ro=0
   case "$command" in
     *[gG][iI][tT]" "[bB][rR][aA][nN][cC][hH]" -D"*) return 0 ;;
   esac
@@ -148,18 +148,26 @@ looks_like_branch_delete() {
       *[\?\*\[]*) [ "${#base}" -le 4 ] && dyn=1 ;;
     esac
     case "$word" in
-      \$\'*|\$\{*|\`*) flagish=1 ;;
+      \$\'*|\$\{*|\`*) rwflag=1 ;;
     esac
   done
   if [ "$dyn" -eq 1 ]; then
     for opt in "${w[@]}"; do
-      case "$opt" in update-ref) sub=1 ;; esac
+      # A leading $ comes from $'branch' once its quotes are dropped.
+      opt="${opt#\$}"
+      case "$opt" in
+        update-ref) sub=1 ;;
+        --list|-l|--show-current|--contains|--merged|--no-merged|--points-at) ro=1 ;;
+      esac
       is_branch_word "$opt" && sub=1
       case "$opt" in
         --*) if is_long_prefix "$opt" delete || is_long_prefix "$opt" force; then flagish=1; fi ;;
         -?*) case "$opt" in *[DdfMm]*) flagish=1 ;; esac ;;
       esac
     done
+    # A rewritten word could expand to a flag, unless the command is in a
+    # read-only listing mode (git branch --list ${x}).
+    if [ "$rwflag" -eq 1 ] && [ "$ro" -eq 0 ]; then flagish=1; fi
     if [ "$sub" -eq 1 ] && [ "$flagish" -eq 1 ]; then return 0; fi
   fi
   for ((i = 0; i < n; i++)); do
@@ -178,6 +186,17 @@ looks_like_branch_delete() {
       esac
     done
     [ "$j" -lt "$n" ] || continue
+    # A rewritten subcommand ($'branch', $(..), a backtick) cannot be read: it
+    # is a match when a delete-like flag follows, and the parser then blocks.
+    case "${w[j]}" in
+      \$*|*\`*)
+        for ((k = j + 1; k < n; k++)); do
+          case "${w[k]}" in
+            --*) if is_long_prefix "${w[k]}" delete || is_long_prefix "${w[k]}" force; then return 0; fi ;;
+            -?*) case "${w[k]}" in *[DdfMm]*) return 0 ;; esac ;;
+          esac
+        done ;;
+    esac
     case "${w[j]}" in
       update-ref)
         for ((k = j + 1; k < n; k++)); do

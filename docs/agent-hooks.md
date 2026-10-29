@@ -70,7 +70,8 @@ Global options before the subcommand are understood: `-C <dir>` and
 other global option block. Only plain delete flags are allowed: a glued extra
 letter such as `-Dr` blocks, because `-r` would delete remote-tracking refs.
 Git reads any unambiguous prefix of a long option, so `--del` and `--forc` count
-as `--delete` and `--force` (3 letters or more). Before matching, the hook drops
+as `--delete` and `--force`: any prefix of `delete` (`--d`, `--de`), and 4 letters
+or more for `force` (`--fo` and `--for` clash with `--format`). Before matching, the hook drops
 quotes and backslashes and strips the path from the `git` word, so `'git'`,
 `g''it`, `\git`, `/usr/bin/git`, `git 'branch'` and `-d '-f'` are all seen as a
 force-delete; the strict parser then rejects every such form, so they block. An
@@ -104,6 +105,10 @@ Known gaps (the same as before this change; none is newly allowed):
   hook cannot detect either offline.
 - A shell alias, function or wrapper that runs `git branch` under another name
   never shows the word `git` to the hook.
+- Spellings the shell rewrites before git runs are not seen as words: ANSI-C
+  quoting (`$'git'`, `$'-D'`), command substitution (`` `echo git` ``,
+  `$(echo git)`), globs in the git path (`/usr/bin/gi?`), and parameter
+  defaults as flags (`${x:--D}`). Tracked in the same task as below.
 - Other commands that delete or overwrite a branch are not checked at all:
   `git update-ref -d refs/heads/<b>`, `git push . :<b>`, `git branch -M <x> <b>`,
   and `git branch -f <b> <x>` over an unmerged branch. Tracked as

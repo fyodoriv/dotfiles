@@ -484,10 +484,16 @@ run_hook_in() {
   [ "$status" -eq 2 ]
   run_hook "git branch -d --forc feat/u"
   [ "$status" -eq 2 ]
-  run_hook "git branch --del --for feat/u"
+  run_hook "git branch --de --force feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "git branch --d --force feat/u"
+  [ "$status" -eq 2 ]
+  run_hook "git branch --de --forc feat/u"
   [ "$status" -eq 2 ]
   # A merged branch is still allowed with the shortened spelling.
   run_hook "git branch --del --force feat/m"
+  [ "$status" -eq 0 ]
+  run_hook "git branch --de --forc feat/m"
   [ "$status" -eq 0 ]
 }
 

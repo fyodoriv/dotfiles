@@ -101,10 +101,12 @@ is_git_word() { case "$1" in [gG][iI][tT]) return 0 ;; esac; return 1; }
 is_branch_word() { case "$1" in [bB][rR][aA][nN][cC][hH]) return 0 ;; esac; return 1; }
 
 # True when the word is a long option that git would read as --delete (or
-# --force): git accepts any unambiguous prefix, so --del and --forc count.
+# --force): git accepts any unambiguous prefix. Every prefix of delete counts
+# (--d, --de); force needs 4 letters (--fo and --for clash with --format).
 is_long_prefix() {
-  local name="${1#--}"
-  [ "${#name}" -ge 3 ] || return 1
+  local name="${1#--}" min=1
+  [ "$2" = force ] && min=4
+  [ "${#name}" -ge "$min" ] || return 1
   case "$2" in "$name"*) return 0 ;; esac
   return 1
 }

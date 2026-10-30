@@ -18,15 +18,18 @@ hooks:
   - event: PreToolUse
     matcher: Shell
     command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
+    agents: [claude-code]
   - event: PreToolUse
     matcher: Bash
     command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
   - event: PreToolUse
     matcher: Task
     command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
+    agents: [claude-code]
   - event: SessionStart
     matcher: "*"
     command: "~/.config/dotfiles/hooks/session-endpoint-path.sh"
+    agents: [claude-code]
 
 # Default model for agents with a file-managed model setting (AGENTS.md §
 # Model Configuration). Keep equal to the pin in

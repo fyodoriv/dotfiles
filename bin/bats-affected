@@ -296,6 +296,7 @@ for file in "${changed_files[@]}"; do
       continue
       ;;
     Makefile)
+      affected+=("$TESTS_DIR/makefile-bats-jobs.bats")
       affected+=("$TESTS_DIR/coverage.bats")
       affected+=("$TESTS_DIR/tasks-lint.bats")
       affected+=("$TESTS_DIR/verify-counts.bats")

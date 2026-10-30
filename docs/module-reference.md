@@ -50,7 +50,7 @@ Every module declares one of four severity tiers in `modules/<name>/severity`. T
 | **critical** | Security & safety — failures need immediate attention | `security`, `ssh`, `workflow` |
 | **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `local-bin`, `memory`, `personal-machine`, `resilience`, `shell`, `sync`, `upgrade` |
 | **performance** | System performance — nice to have, not blocking | `macos`, `tools` |
-| **cosmetic** | Personal preference — ok to skip | `claude`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `home-theater`, `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
+| **cosmetic** | Personal preference — ok to skip | `claude`, `codex`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `home-theater`, `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
 
 Filter usage:
 
@@ -116,6 +116,10 @@ Spotlight check count varies based on which directories exist on your machine.
 ## Important
 
 ### git (dynamic)
+
+Read-only auth and scope checks share one lazy `gh auth status` result for
+that module run. Fix mode probes again after each possible change. The
+temporary output and exit code are cleared after the scope checks.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
@@ -436,6 +440,29 @@ checks apply to any user with Chrome.
 | `chrome.full_urls` | Full URLs shown in address bar | `defaults write` |
 | `chrome.swipe_nav` | Swipe navigation disabled | `defaults write` |
 
+### codex
+
+Checks the CLI executable path, the `~/.local/bin/codex` link used by
+GUI apps, valid
+TOML config, executable `CODEX_CLI_PATH` entries, writable hooks, and the
+ChatGPT.app GUI host. A core Mac without a Codex install or config skips this module. An explicit `use_ai_tools: false`
+also skips an absent CLI on a full profile; an existing broken link still gets
+diagnosed. Sign-in and
+the GUI app are advisory; config and hook files remain owned by agentbrew.
+
+Use `dotfiles doctor --full --module codex` to execute the version and
+sign-in probes (sign-in is bounded to two seconds). Routine audits use local
+file checks to stay within the module's 500 ms budget. `--list` includes the
+full-only check IDs, and overrides work for those IDs without `--full`.
+
+`--fix` runs `dotfiles-install-codex` for a missing CLI or link. The helper
+installs `@openai/codex` into the current npm prefix and preserves owner files
+at the link destination. `dotfiles apply` invokes it when `use_ai_tools` is
+true; `dotfiles-node-upgrade` invokes it on the selected Node when AI tools are
+enabled or the user already has a Codex link. Use
+`dotfiles-install-codex --upgrade` to update. Never link the terminal CLI to
+ChatGPT.app's bundled CLI. Install the GUI with `brew install --cask chatgpt`.
+
 ### claude — full-only · `ai-tools`
 
 | ID | What it checks | Auto-fix |
@@ -524,6 +551,11 @@ Runs only when chezmoi data has `home_theater: true`. The TV check runs only whe
 ### vscode (dynamic)
 
 VS Code settings, keybindings, and extensions from `vscode/`. On `profile: core`, the module runs only when the app is installed (`VSCODE_APP` overrides its path). Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
+
+Read-only audits list installed extensions once for that module run. Each
+extension keeps its own check. The snapshot is cleared at the end and refreshed
+on the next run; fix mode rereads the list so extension packs are visible to
+later checks in the same run.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

@@ -1,0 +1,14 @@
+#!/bin/bash
+# The terminal CLI uses npm; ChatGPT.app keeps its own bundled CLI.
+set -euo pipefail
+{{ if .use_ai_tools -}}
+# Resolve the default fnm Node even when chezmoi runs without an interactive shell.
+if [ -s "$HOME/.node-version" ]; then
+  codex_node_version="$(tr -d '[:space:]' < "$HOME/.node-version")"
+  codex_node_bin="$HOME/.local/share/fnm/node-versions/v${codex_node_version#v}/installation/bin"
+  [ ! -x "$codex_node_bin/npm" ] || export PATH="$codex_node_bin:$PATH"
+fi
+bash "{{ .chezmoi.sourceDir }}/bin/dotfiles-install-codex"
+{{ else -}}
+echo "○ Codex install skipped: use_ai_tools is false"
+{{ end -}}

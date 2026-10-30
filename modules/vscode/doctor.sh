@@ -117,6 +117,10 @@ _vc_desired_extensions() {
 }
 
 _vc_installed_extensions() {
+  if ${_VC_USE_EXTENSION_SNAPSHOT:-false}; then
+    printf '%s\n' "$_VC_EXTENSION_SNAPSHOT"
+    return 0
+  fi
   [ -x "$_VC_BIN" ] || return 0
   "$_VC_BIN" --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' | sort -u
 }
@@ -125,6 +129,10 @@ _vc_extension_installed() {
   local ext="$1"
   local ext_lc
   ext_lc="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
+  if ! ${FIX_MODE:-false} && ! ${_VC_USE_EXTENSION_SNAPSHOT:-false}; then
+    _VC_EXTENSION_SNAPSHOT="$(_vc_installed_extensions)"
+    _VC_USE_EXTENSION_SNAPSHOT=true
+  fi
   _vc_installed_extensions | grep -Fxq "$ext_lc"
 }
 
@@ -152,6 +160,8 @@ export FIX_TIMEOUT="${FIX_TIMEOUT:-180}"
 _vc_ext_tmp="$(mktemp)"
 _vc_desired_extensions > "$_vc_ext_tmp" 2>/dev/null || true
 
+# This snapshot belongs to this sourced module run; fix mode always rereads.
+_VC_USE_EXTENSION_SNAPSHOT=false
 if [ -s "$_vc_ext_tmp" ]; then
   while IFS= read -r _vc_ext; do
     [ -z "$_vc_ext" ] && continue
@@ -163,3 +173,4 @@ if [ -s "$_vc_ext_tmp" ]; then
   done < "$_vc_ext_tmp"
 fi
 rm -f "$_vc_ext_tmp"
+unset _VC_EXTENSION_SNAPSHOT _VC_USE_EXTENSION_SNAPSHOT

@@ -91,7 +91,7 @@ lint-tasks-rule9: ## Fail when P0/P1 tasks lack the 5 rule-9 fields
 # dotfiles-profile.bats) share chezmoi state and would corrupt each other
 # under concurrent execution. Slow files that ARE safe to parallelize opt
 # in by setting `unset BATS_NO_PARALLELIZE_WITHIN_FILE` in their setup_file().
-# Currently opted in: doctor.bats (was 826s serial), morning.bats (280s).
+# The doctor file runs alone after its peer files.
 JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # bats --jobs needs GNU parallel. The core Brewfile does not install it, so
 # without `parallel` on PATH the test targets run bats serially (slower, same
@@ -106,6 +106,19 @@ BATS_JOBS :=
 JOBS_LABEL := serial: GNU parallel not found
 TEST_FILE_JOBS :=
 endif
+# Keep Bats' non-recursive root/plugin selection, with doctor isolated last.
+BATS_ALL_FILES := $(wildcard tests/*.bats tests/plugin/*.bats)
+BATS_PEER_FILES = $(filter-out tests/doctor.bats,$(BATS_ALL_FILES))
+define BATS_FULL_RUN
+[ -n "$(BATS_ALL_FILES)" ] || exit 1; \
+result=0; \
+if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) -- $(BATS_PEER_FILES) || result=$$?; fi; \
+if [ -n "$(filter tests/doctor.bats,$(BATS_ALL_FILES))" ]; then \
+  bats -- tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
+fi; \
+exit "$$result"
+endef
+
 # make test skips an affected test file that already passed on this HEAD
 # with the same content of the changed files that select it
 # (bin/bats-affected --pairs feeds them to bin/cached-run --per-file --deps).
@@ -120,16 +133,27 @@ test: ## Run affected tests only (skips tests that passed with the same inputs)
 	else \
 	  count=$$(echo "$$affected" | wc -l | tr -d ' '); \
 	  echo "═══ Tests: $$count affected file(s) ($(JOBS_LABEL)) ═══"; \
-	  $(FULLPOWER) ./bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs" \
-	    --key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$affected; \
+	  peers=$$(printf '%s\n' "$$affected" | grep -vxF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" || true); \
+	  doctor=$$(printf '%s\n' "$$affected" | grep -xF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" || true); \
+	  result=0; \
+	  if [ -n "$$peers" ]; then \
+	    $(FULLPOWER) ./bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs" \
+	      --key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$peers || result=$$?; \
+	  fi; \
+	  if [ -n "$$doctor" ]; then \
+	    $(FULLPOWER) ./bin/cached-run --per-file --deps "$$pairs" \
+	      --key "head=$$(git rev-parse HEAD)" bats -- $$doctor \
+	      || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
+	  fi; \
+	  exit "$$result"; \
 	fi
 
 test-all: ## Run full test suite (cached)
-	@$(FULLPOWER) ./bin/cached-run bats $(BATS_JOBS) tests/ tests/plugin/
+	@$(FULLPOWER) ./bin/cached-run /bin/sh -c '$(BATS_FULL_RUN)'
 
 test-force: ## Run full test suite (no cache)
 	@echo "═══ Tests ($(JOBS_LABEL)) ═══"
-	@$(FULLPOWER) bats $(BATS_JOBS) tests/ tests/plugin/
+	@$(FULLPOWER) /bin/sh -c '$(BATS_FULL_RUN)'
 
 # ── Plugin suites on macOS /bin/bash 3.2 ─────────────────────────────
 # The plugin CLI's shebang is #!/bin/bash (3.2 on macOS), but the bats files

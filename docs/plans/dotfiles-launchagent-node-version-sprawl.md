@@ -20,6 +20,7 @@ Node path at the same time, so `agentbrew.launchagent_node_pinned` stays green.
   1. `fnm install`, `fnm default` (and `fnm alias lts-latest` for the LTS default).
   2. Write `~/.node-version`.
   3. Relink `~/.local/bin/{node,npm,npx}`. Never replace a regular file.
+     The managed Codex CLI is reinstalled and relinked on the selected Node.
   4. Run the agentbrew CLI on the new Node: `auto-sync install`, then
      `sync --no-recommended --agentfile ~/.config/agentbrew/Agentfile.yaml`.
   5. Kickstart `com.dotfiles.gui-path` (it reads `~/.node-version`).
@@ -31,7 +32,8 @@ Node path at the same time, so `agentbrew.launchagent_node_pinned` stays green.
 ## Scope (out)
 
 - No `fnm uninstall`. minsky pins an older Node in its repo.
-- No automatic npm global reinstall. Globals are per version and some need
+- No automatic reinstall of arbitrary npm globals. The managed Codex CLI is
+  the explicit exception. Other globals are per version and some need
   special flags (`@railway/cli`). The script lists the old version's globals.
 - No chezmoi template for `~/.node-version`: the version changes on upgrade,
   not on apply.

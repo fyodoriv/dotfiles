@@ -39,7 +39,7 @@ setup_file() {
               defaults-preview quickstart dotfiles-upgrade dotfiles-new-module \
               dotfiles-brew-add dotfiles-defaults-add dotfiles-profile \
               cached-run git-maintain gh-wrapper git-wrapper output chezmoi \
-              pre-commit brew-audit coverage tasks-lint verify-counts \
+              pre-commit brew-audit coverage tasks-lint verify-counts makefile-bats-jobs \
               agent-artifact-coverage update-tooling-skill tooling-checkup-skill; do
     echo "# $name tests" > "$TEST_REPO/tests/$name.bats"
   done
@@ -418,6 +418,10 @@ assert_affected_includes() {
   assert_affected_includes "Makefile" "verify-counts"
 }
 
+@test "Makefile changes trigger scheduler regression tests" {
+  assert_affected_includes "Makefile" "makefile-bats-jobs"
+}
+
 @test "README.md changes trigger verify-counts.bats" {
   echo "# readme" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
@@ -582,8 +586,16 @@ EOF
 }
 
 @test "make test-all and test-force also run tests/plugin" {
-  grep -qE '^test-all:' "$DOTFILES_DIR/Makefile"
-  [ "$(grep -cE 'bats \$\(BATS_JOBS\) tests/ tests/plugin/$' "$DOTFILES_DIR/Makefile")" -eq 2 ]
+  local make_fixture="$BATS_TEST_TMPDIR/make-plugin"
+  mkdir -p "$make_fixture/tests/plugin"
+  cp "$DOTFILES_DIR/Makefile" "$make_fixture/Makefile"
+  cp "$DOTFILES_DIR/.tasks-lint-version" "$make_fixture/.tasks-lint-version"
+  touch "$make_fixture/tests/doctor.bats" "$make_fixture/tests/plugin/example.bats"
+  for target in test-all test-force; do
+    run make -C "$make_fixture" -n --no-print-directory "$target"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *tests/plugin/example.bats* ]]
+  done
 }
 
 @test "a test that reads a changed file through any repo-root variable is selected" {

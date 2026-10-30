@@ -999,9 +999,11 @@ dotfiles doctor --skip chrome.devtools     # permanently skip this check
 dotfiles doctor --skip enterprise.aws      # skip if you don't use AWS
 ```
 
-Skips are stored in `~/apps/dotfiles/.overrides`. `--skip` rejects unknown IDs
+Skips are stored in the source checkout's `.overrides`. `--skip` rejects unknown IDs
 without changing that file; run `dotfiles doctor --list` to discover valid IDs.
 Remove a line to re-enable a skipped check.
+Each doctor process reads this file once. Edits apply on the next invocation;
+watch mode reloads it through each new child audit. No cache file is created.
 
 **Filter by severity (CI / fast feedback):**
 
@@ -1191,7 +1193,7 @@ dotfiles init [--yes]                             Initialize on new machine (che
 dotfiles diff                                     Show pending changes (chezmoi diff)
 dotfiles update [--dry-run] [--verbose] [--yes]   Whole-machine update (pull/apply/agentbrew/packages/doctor); asks first
 dotfiles upgrade [--dry-run] [--yes]              Upgrade all software (brew, casks, macOS, tools); asks first
-dotfiles doctor [--fix] [--fix-all] [--skip ID] [--list] [--quiet] [--report]
+dotfiles doctor [--fix] [--fix-all] [--skip ID] [--list] [--quiet] [--report] [--full]
                 [--module X] [--severity LEVEL] [--json] [--watch] [--validate-overrides] [--trends]
                                                               Audit configs, optionally auto-fix drift
 dotfiles audit [--report]                         Security audit (SSH, secrets, permissions, git)
@@ -1291,7 +1293,8 @@ scratch work.
 | `dotfiles-python-tls-relax` | Opt one Python venv (`<venv>`, `--remove` to undo) into clearing only OpenSSL `VERIFY_X509_STRICT`, for a TLS-inspection proxy whose root CA marks basicConstraints non-critical (Python 3.13 rejects it). Chain, hostname, and expiry checks stay on; it also patches urllib3 and points httplib2 at `SSL_CERT_FILE` |
 | `dotfiles-mcp-launch` | Start an MCP server with secrets read by reference (`--secret NAME=keychain:<item>`), an optional CA bundle and minimal PATH; refuses `@latest` and unpinned `npx -y`. Secrets never go into shell profiles |
 | `dotfiles-pnpm-global-update` | Update global pnpm packages; skip cleanly when none are installed (topgrade custom step) |
-| `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx}`, and the `com.agentbrew.*` plists. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
+| `dotfiles-install-codex` | Install the npm Codex CLI and restore `~/.local/bin/codex`; `--upgrade` updates it. ChatGPT.app keeps its separate bundled CLI. See [Codex health checks](docs/module-reference.md#codex) |
+| `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx,codex}`, and the `com.agentbrew.*` plists. Reinstalls the managed Codex CLI on the new Node. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
 
 **Build and test infrastructure**
 

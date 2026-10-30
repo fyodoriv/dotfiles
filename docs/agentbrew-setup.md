@@ -302,3 +302,16 @@ folder too: a sync also applies an `Agentfile.yaml` in the working folder.
 - Verify with `agentbrew status` and `dotfiles doctor --module agentbrew`.
 - Keep all shared agent changes in `Agentfile.yaml`; never copy generated files
   between machines.
+
+## Hook routing
+
+`Agentfile.yaml` keeps the Shell and Task PATH handlers and the SessionStart
+PATH helper scoped to `claude-code`. The session helper returns a legacy
+environment response and may sign local helper binaries. Native Codex uses
+the supported Bash handler instead. Its Bash policies remain available.
+
+Agentbrew filters these entries before writing each agent's hook file. Its
+module-run sync state retains all six dotfiles handlers for Claude Code and
+three Bash handlers for Codex. With the PR documentation policy enabled,
+Codex receives four supported handlers. The routing regression uses the real
+Agentbrew parser, filter, and sync into a scratch HOME. It does not run hooks.

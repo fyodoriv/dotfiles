@@ -90,6 +90,11 @@ cask "vlc"
 brew "duti"
 {{ end -}}
 
+{{ if .use_ai_tools -}}
+# ChatGPT hosts the Codex GUI; the terminal CLI is installed separately.
+cask "chatgpt"
+{{ end -}}
+
 # ── Full: Extras ─────────────────────────────────────────────────
 brew "difftastic"
 brew "dockutil"

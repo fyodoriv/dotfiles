@@ -104,6 +104,15 @@ core profile does not install it. Without it, `make test`, `make test-all`,
 and `make test-force` run the same tests in serial mode, which is slower;
 the header line says `serial: GNU parallel not found`. Run
 `brew install parallel` to get the faster runs.
+All three targets finish the selected peer files before running the entire
+`tests/doctor.bats` file alone, with no within-file parallelism. This keeps its
+real-machine timing budget separate from peer-suite I/O. Selected files still
+run once when a peer fails, and either phase can fail the target. Existing
+caches and the serial fallback remain active.
+
+Hook targets are explicit in `Agentfile.yaml`. The legacy Shell, Task, and
+SessionStart PATH handlers stay Claude-only. Codex receives the Bash PATH
+handler and its supported policies. See [hook routing](docs/agentbrew-setup.md#hook-routing).
 Timing tests (for example "doctor --quiet completes in under 90 seconds")
 skip instead of failing when the 1-minute load is above the CPU count
 (`host_is_saturated` in `tests/test_helper.bash`). Run that file alone to

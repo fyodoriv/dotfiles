@@ -64,7 +64,27 @@ a second installation, a wrong install method, or "issues found".
 
 A running session keeps its old binary. The new version starts in new sessions.
 
-## 4. Verify (report only)
+## 4. Codex
+
+The npm CLI is separate from ChatGPT.app's bundled CLI. Upgrade the terminal
+CLI and restore its GUI-safe link through the managed helper:
+
+```bash
+codex --version
+bash "$DOTFILES_APPLIED/bin/dotfiles-install-codex" --upgrade
+codex --version
+npm view @openai/codex version
+codex login status
+dotfiles doctor --full --module codex
+```
+
+The version numbers must match. Report a skipped install in endpoint Node safe
+mode as skipped, not upgraded. Never link to the app's bundled binary or
+install the discontinued `codex-app` cask. ChatGPT.app updates separately
+through the `chatgpt` Homebrew cask. Sign-in needs `codex login`; never read or
+print its auth file.
+
+## 5. Verify (report only)
 
 ```bash
 brew outdated --greedy

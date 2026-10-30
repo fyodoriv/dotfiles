@@ -3,7 +3,7 @@
 #
 # Agent Shell subshells can run in a sandbox with
 # PATH=/opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin). preToolUse
-# updated_input runs after the agent's PATH snapshot restore.
+# The input update runs after the agent's PATH snapshot restore.
 
 set -euo pipefail
 
@@ -32,13 +32,25 @@ _resolve_dotfiles_dir() {
 }
 
 input=$(cat)
+_is_codex=false
+_turn_id="$(printf '%s' "$input" \
+  | /usr/bin/plutil -extract turn_id raw -o - -- - 2>/dev/null || true)"
+[ -z "$_turn_id" ] || _is_codex=true
+
+_emit_allow() {
+  if $_is_codex; then
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
+  else
+    printf '%s\n' '{"permission": "allow"}'
+  fi
+}
 _dotfiles_dir="$(_resolve_dotfiles_dir || true)"
 _home="${HOME:-}"
 
 _lib_root="${_dotfiles_dir:-$(cd "$_hook_dir/.." && pwd)}"
 
 if [ -z "$_dotfiles_dir" ]; then
-  printf '%s\n' '{"permission": "allow"}'
+  _emit_allow
   exit 0
 fi
 
@@ -48,9 +60,17 @@ _emit_updated_input() {
   local command="$1" response_file response_json slash="/"
   response_file="$(/usr/bin/mktemp)"
   /usr/bin/plutil -create binary1 "$response_file"
-  /usr/bin/plutil -insert permission -string allow "$response_file"
-  /usr/bin/plutil -insert updated_input -dictionary "$response_file"
-  /usr/bin/plutil -insert updated_input.command -string "$command" "$response_file"
+  if $_is_codex; then
+    /usr/bin/plutil -insert hookSpecificOutput -dictionary "$response_file"
+    /usr/bin/plutil -insert hookSpecificOutput.hookEventName -string PreToolUse "$response_file"
+    /usr/bin/plutil -insert hookSpecificOutput.permissionDecision -string allow "$response_file"
+    /usr/bin/plutil -insert hookSpecificOutput.updatedInput -dictionary "$response_file"
+    /usr/bin/plutil -insert hookSpecificOutput.updatedInput.command -string "$command" "$response_file"
+  else
+    /usr/bin/plutil -insert permission -string allow "$response_file"
+    /usr/bin/plutil -insert updated_input -dictionary "$response_file"
+    /usr/bin/plutil -insert updated_input.command -string "$command" "$response_file"
+  fi
   response_json="$(/usr/bin/plutil -convert json -o - "$response_file")"
   /bin/rm -f "$response_file"
   # Foundation escapes "/" as "\/"; normalize it for stable hook output and
@@ -63,7 +83,7 @@ tool="$(printf '%s' "$input" \
 case "$tool" in
   Shell|Bash|Task) ;;
   *)
-    printf '%s\n' '{"permission": "allow"}'
+    _emit_allow
     exit 0
     ;;
 esac
@@ -71,7 +91,7 @@ esac
 cmd="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"
 if [ -z "${cmd//[[:space:]]/}" ]; then
-  printf '%s\n' '{"permission": "allow"}'
+  _emit_allow
   exit 0
 fi
 
@@ -102,7 +122,7 @@ if [[ "$cmd" == *dotfiles/bin* ]] \
   if [ "$cmd" != "$_original_cmd" ]; then
     _emit_updated_input "$cmd"
   else
-    printf '%s\n' '{"permission": "allow"}'
+    _emit_allow
   fi
   exit 0
 fi

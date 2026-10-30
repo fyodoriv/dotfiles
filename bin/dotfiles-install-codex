@@ -1,0 +1,33 @@
+#!/bin/bash
+# Install the terminal Codex CLI and link it for GUI apps and LaunchAgents.
+# Usage: dotfiles-install-codex [--upgrade]
+set -euo pipefail
+upgrade=false
+case "${1:-}" in
+  '') ;;
+  --upgrade) upgrade=true ;;
+  --help|-h) head -3 "$0"; exit 0 ;;
+  *) echo "usage: dotfiles-install-codex [--upgrade]" >&2; exit 64 ;;
+esac
+if [ -f "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
+    && [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != 1 ]; then
+  echo "○ Codex install skipped: Node publisher is blocked (endpoint-policy safe mode)"
+  exit 0
+fi
+command -v npm >/dev/null 2>&1 || { echo "Codex install needs npm; install Node with fnm first" >&2; exit 1; }
+prefix="$(npm prefix -g)"
+cli="$prefix/bin/codex"
+link="$HOME/.local/bin/codex"
+if [ -e "$link" ] && [ ! -L "$link" ] && [ "$link" != "$cli" ]; then
+  echo "Codex link is an owner file; preserved $link" >&2
+  exit 1
+fi
+# Package metadata can survive a lost executable. Probe the CLI itself.
+if $upgrade || ! "$cli" --version >/dev/null 2>&1; then
+  npm install -g @openai/codex@latest
+fi
+"$cli" --version
+mkdir -p "$HOME/.local/bin"
+if [ "$link" != "$cli" ]; then
+  ln -sfn "$cli" "$link"
+fi

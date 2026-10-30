@@ -32,6 +32,7 @@ import sys
 
 TOOLS = {
     "claude": ["claude", "--version"],
+    "codex": ["codex", "--version"],
     "node": ["node", "--version"],
     "npm": ["npm", "--version"],
     "pnpm": ["pnpm", "--version"],

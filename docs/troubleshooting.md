@@ -919,7 +919,9 @@ or `dotfiles-amphetamine-sync` warns `cannot read Amphetamine prefs (privacy
 prompt?)`, the read waited on the macOS "access data from other apps" prompt
 and was stopped after 5 seconds (set `AMPHETAMINE_DEFAULTS_TIMEOUT_SEC` to
 change it). The doctor skips the policy check instead of hanging. Run the
-command once in a normal terminal and answer the prompt. Leave generic Amphetamine Triggers,
+command once in a normal terminal and answer the prompt. The sync reads only
+the keys it manages, so a date Amphetamine saves elsewhere (such as the last
+time picked in its menu) does not count as drift. Leave generic Amphetamine Triggers,
 Start Session At Launch, Start Session On Wake, and AC-reconnect sessions off.
 In Amphetamine → Preferences → Sessions, toggle **Allow System to Sleep When
 Display is Closed** once and choose **Do Not Show This Message Again** in its

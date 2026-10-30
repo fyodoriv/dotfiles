@@ -75,7 +75,7 @@ The full repository gate is still required before delivery.
 
 ## Gate scheduling experiment
 
-The final parallel gate checked 71 files: 1,162 tests passed and only
+The final parallel gate passed its other checks; only
 `doctor.bats:607` failed its unchanged `<90`-second assertion. The identical
 fixture then passed alone without a skip. Peer-suite contention is supported
 by that comparison; keep fixture and threshold unchanged when testing it.

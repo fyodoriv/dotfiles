@@ -657,7 +657,10 @@ calls() {
   local mk="$BATS_TEST_DIRNAME/../Makefile"
   grep -qF './bin/bats-affected --pairs > "$$pairs"' "$mk"
   grep -qF './bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs"' "$mk"
-  grep -qF -- '--key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$affected' "$mk"
+  local recipe
+  recipe="$(awk '/^test:/{copy=1} copy{print} copy && /^test-all:/{exit}' "$mk" | tr '\n' ' ')"
+  [[ "$recipe" == *'./bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs"'*'--key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$peers'* ]]
+  [[ "$recipe" == *'./bin/cached-run --per-file --deps "$$pairs"'*'--key "head=$$(git rev-parse HEAD)" bats -- $$doctor'* ]]
 }
 
 @test "make e2e-if-needed reruns the e2e only when an input needs-e2e counts changed" {

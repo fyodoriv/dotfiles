@@ -15,7 +15,7 @@ names.
 
 | Task | Command (from the repo root) |
 |---|---|
-| Gate, once before a commit | `make check` (lint, TASKS.md lint, affected bats; skips unchanged) |
+| Commit gate | `make check` (lint + affected tests) |
 | Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
 | Tests affected by a committed branch | `make check` (it adds commits ahead of base) |
 | Full suite (background) | `heavy-run make test-all` |
@@ -97,6 +97,8 @@ agentbrew PreToolUse hooks enforce first; `bin/gh` and `git-hooks/commit-msg` ar
 Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew; never hand-edit `settings.json`. [docs/model-configuration.md](docs/model-configuration.md).
 
 ## Gotchas
+
+- [Test order and hook targets](CONTRIBUTING.md).
 
 - **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.

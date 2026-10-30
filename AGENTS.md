@@ -24,7 +24,7 @@ names.
 | TASKS.md only | `make lint-tasks` |
 | Review the task queue | `/review-tasks` |
 | Apply to this Mac | `dotfiles apply` (after `Agentfile.yaml` edits) |
-| Check one module | `dotfiles doctor --module <name>` |
+| Codex runtime | `dotfiles doctor --full --module codex` |
 
 ### Verification gates
 

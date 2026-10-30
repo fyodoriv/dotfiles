@@ -8,6 +8,7 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   export HOME="$TEST_DIR/home" DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
   export DOTFILES_CODEX_APP_DIR="$TEST_DIR/ChatGPT.app"
+  export DOTFILES_DOCTOR_FULL=true
   mkdir -p "$HOME/.local/bin" "$HOME/.codex" "$DOTFILES_CODEX_APP_DIR"
   printf '#!/bin/bash\ncase "$1" in --version) echo codex-cli 1.2.3;; login) exit 0;; esac\n' > "$HOME/.local/bin/codex"
   chmod +x "$HOME/.local/bin/codex"
@@ -88,4 +89,49 @@ STUB
   printf 'CODEX_CLI_PATH = "%s"\n' "$HOME/.codex" > "$HOME/.codex/config.toml"
   source "$MODULE"
   [[ "$failed_ids" == *codex.cli_paths* ]]
+}
+
+@test "routine Codex checks do not start the CLI" {
+  export DOTFILES_DOCTOR_FULL=false
+  printf '#!/bin/bash\necho called >> "%s/calls"\nexit 1\n' "$TEST_DIR" > "$HOME/.local/bin/codex"
+  source "$MODULE"
+  [ ! -e "$TEST_DIR/calls" ]
+  [ -z "$failed_ids" ]
+}
+
+@test "full doctor flag enables Codex runtime checks" {
+  cat > "$HOME/.local/bin/codex" <<STUB
+#!/bin/bash
+printf '%s\n' "\$*" >> "$TEST_DIR/calls"
+exit 0
+STUB
+  run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --full --module codex --json
+  rg -qx -- --version "$TEST_DIR/calls"
+  rg -qx 'login status' "$TEST_DIR/calls"
+  [[ "$output" == *codex.version* ]]
+  [[ "$output" == *codex.login* ]]
+}
+
+@test "doctor list includes full-only Codex checks without enabling probes" {
+  run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --module codex --list
+  [ "$status" -eq 0 ]
+  [[ "$output" == *codex.version* ]]
+  [[ "$output" == *codex.login* ]]
+}
+
+@test "full-only Codex check IDs can be skipped without the full flag" {
+  local repo="$TEST_DIR/repo"
+  mkdir -p "$repo/bin" "$repo/modules/codex"
+  cp -R "$DOTFILES_DIR/lib" "$repo/lib"
+  cp "$DOTFILES_DIR/bin/dotfiles-doctor" "$repo/bin/dotfiles-doctor"
+  cp "$MODULE" "$repo/modules/codex/doctor.sh"
+  run bash "$repo/bin/dotfiles-doctor" --skip codex.version
+  [ "$status" -eq 0 ]
+  rg -qx codex.version "$repo/.overrides"
+}
+
+@test "watch forwards full mode to each Codex audit" {
+  WATCH_MAX_ITERATIONS=1 run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --watch --full --module codex
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Codex CLI runs (codex --version)"* ]]
 }

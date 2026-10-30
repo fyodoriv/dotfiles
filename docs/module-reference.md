@@ -438,13 +438,18 @@ checks apply to any user with Chrome.
 
 ### codex
 
-Checks the CLI executable and version, the `~/.local/bin/codex` link used by
-GUI apps, sign-in (bounded to two seconds), valid
+Checks the CLI executable path, the `~/.local/bin/codex` link used by
+GUI apps, valid
 TOML config, executable `CODEX_CLI_PATH` entries, writable hooks, and the
 ChatGPT.app GUI host. A core Mac without a Codex install or config skips this module. An explicit `use_ai_tools: false`
 also skips an absent CLI on a full profile; an existing broken link still gets
 diagnosed. Sign-in and
 the GUI app are advisory; config and hook files remain owned by agentbrew.
+
+Use `dotfiles doctor --full --module codex` to execute the version and
+sign-in probes (sign-in is bounded to two seconds). Routine audits use local
+file checks to stay within the module's 500 ms budget. `--list` includes the
+full-only check IDs, and overrides work for those IDs without `--full`.
 
 `--fix` runs `dotfiles-install-codex` for a missing CLI or link. The helper
 installs `@openai/codex` into the current npm prefix and preserves owner files

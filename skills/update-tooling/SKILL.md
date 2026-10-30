@@ -321,7 +321,7 @@ software. Those operations have a wider and less reversible machine impact.
 ### Codex CLI
 
 Always run `codex --version`, `codex login status`, and
-`dotfiles doctor --module codex` after refresh. A synced `~/.codex` folder does
+`dotfiles doctor --full --module codex` after refresh. A synced `~/.codex` folder does
 not prove the executable works. Report sign-in failures without reading auth
 files. When package upgrades are explicitly requested, run
 `bash "$DOTFILES_APPLIED/bin/dotfiles-install-codex" --upgrade`, then compare

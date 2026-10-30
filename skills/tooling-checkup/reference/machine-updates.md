@@ -75,7 +75,7 @@ bash "$DOTFILES_APPLIED/bin/dotfiles-install-codex" --upgrade
 codex --version
 npm view @openai/codex version
 codex login status
-dotfiles doctor --module codex
+dotfiles doctor --full --module codex
 ```
 
 The version numbers must match. Report a skipped install in endpoint Node safe

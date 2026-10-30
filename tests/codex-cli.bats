@@ -65,8 +65,14 @@ STUB
 
 @test "upkeep checks the real Codex version and sign-in and uses one upgrade helper" {
   for skill in update-tooling tooling-checkup; do
-    grep -q 'codex --version' "$BATS_TEST_DIRNAME/../skills/$skill/SKILL.md"
-    grep -q 'codex login status' "$BATS_TEST_DIRNAME/../skills/$skill/SKILL.md"
-    grep -q 'dotfiles-install-codex.*--upgrade' "$BATS_TEST_DIRNAME/../skills/$skill/SKILL.md"
+    local main="$BATS_TEST_DIRNAME/../skills/$skill/SKILL.md"
+    local files=("$main")
+    if [ "$skill" = tooling-checkup ]; then
+      grep -q 'reference/machine-updates.md' "$main"
+      files+=("$BATS_TEST_DIRNAME/../skills/$skill/reference/machine-updates.md")
+    fi
+    grep -q 'codex --version' "${files[@]}"
+    grep -q 'codex login status' "${files[@]}"
+    grep -q 'dotfiles-install-codex.*--upgrade' "${files[@]}"
   done
 }

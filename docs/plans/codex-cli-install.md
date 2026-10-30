@@ -100,3 +100,8 @@ heavy-run /usr/bin/time -p bash -c '
 
 Full-check selection belongs to one doctor process and resets on each run.
 No persistent cache or new account state is introduced.
+
+The focused regression run passed all 13 cases after the split. The timed
+module command returned `real 0.19` (190 ms), below the 500 ms threshold.
+Independent review approved the flag lifecycle, watch forwarding, check-list
+discovery, saved overrides, and default execution behavior.

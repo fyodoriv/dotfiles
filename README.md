@@ -1191,7 +1191,7 @@ dotfiles init [--yes]                             Initialize on new machine (che
 dotfiles diff                                     Show pending changes (chezmoi diff)
 dotfiles update [--dry-run] [--verbose] [--yes]   Whole-machine update (pull/apply/agentbrew/packages/doctor); asks first
 dotfiles upgrade [--dry-run] [--yes]              Upgrade all software (brew, casks, macOS, tools); asks first
-dotfiles doctor [--fix] [--fix-all] [--skip ID] [--list] [--quiet] [--report]
+dotfiles doctor [--fix] [--fix-all] [--skip ID] [--list] [--quiet] [--report] [--full]
                 [--module X] [--severity LEVEL] [--json] [--watch] [--validate-overrides] [--trends]
                                                               Audit configs, optionally auto-fix drift
 dotfiles audit [--report]                         Security audit (SSH, secrets, permissions, git)

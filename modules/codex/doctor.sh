@@ -13,6 +13,10 @@ if ! command -v codex >/dev/null 2>&1 \
   unset _codex_enabled
 fi
 
+_codex_cli_available() {
+  local executable
+  executable="$(command -v codex)" && [ -f "$executable" ] && [ -x "$executable" ]
+}
 _codex_cli_works() {
   command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1
 }
@@ -58,12 +62,16 @@ if sys.argv[2] == "paths":
 PY
 }
 
-check "codex.installed" "Codex CLI runs (codex --version)" \
-  "_codex_cli_works" "bash '$DOTFILES_DIR/bin/dotfiles-install-codex'"
+check "codex.installed" "Codex CLI executable found" \
+  "_codex_cli_available" "bash '$DOTFILES_DIR/bin/dotfiles-install-codex'"
 check "codex.local_bin" "Codex CLI available in ~/.local/bin for GUI apps" \
   "[ -x \"\$HOME/.local/bin/codex\" ]" "bash '$DOTFILES_DIR/bin/dotfiles-install-codex'"
-check_advisory "codex.login" "Codex CLI signed in (codex login status)" \
-  "_codex_login_ok" "codex login"
+if [ "${DOTFILES_DOCTOR_FULL:-false}" = true ] || [ "${LIST_MODE:-false}" = true ]; then
+  check "codex.version" "Codex CLI runs (codex --version)" \
+    "_codex_cli_works" "bash '$DOTFILES_DIR/bin/dotfiles-install-codex'"
+  check_advisory "codex.login" "Codex CLI signed in (codex login status)" \
+    "_codex_login_ok" "codex login"
+fi
 check "codex.config_valid" "Codex config.toml parses (Python 3.11+ tomllib)" \
   "_codex_config_check parse" ""
 check "codex.cli_paths" "CODEX_CLI_PATH entries point to executable files" \

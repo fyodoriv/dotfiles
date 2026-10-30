@@ -103,7 +103,7 @@ dotfiles doctor --skip <CHECK_ID>
 ```
 
 `--skip` validates the ID first, so run `dotfiles doctor --list` to copy the
-exact check ID. Typos are rejected without changing `.overrides`.
+exact check ID. Typos are rejected without changing any overrides file.
 
 ### How do I check just one module?
 
@@ -124,8 +124,11 @@ dotfiles doctor --list
 dotfiles doctor --skip <CHECK_ID>
 ```
 
-Skips are stored in `.overrides` and persist across runs. `--skip` avoids
-duplicate entries and rejects unknown IDs; verify existing entries with
+`--skip` stores the skip for this machine only, in
+`~/.config/dotfiles/overrides` (set `DOTFILES_LOCAL_OVERRIDES` to move it).
+The tracked `.overrides` in the repo holds skips meant for every machine;
+edit it by hand in a PR. Doctor reads both files. `--skip` avoids duplicate
+entries and rejects unknown IDs; verify both files with
 `dotfiles doctor --validate-overrides`.
 
 ### Where are doctor logs?

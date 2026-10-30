@@ -30,6 +30,9 @@ unset BASH_ENV ENV
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OVERRIDES_FILE="$DOTFILES_DIR/.overrides"
+# Per-machine skips live outside the repo, so --skip never changes the
+# tracked .overrides that every machine and fork shares.
+LOCAL_OVERRIDES_FILE="${DOTFILES_LOCAL_OVERRIDES:-$HOME/.config/dotfiles/overrides}"
 
 # Home links point into chezmoi's source checkout, even when this doctor runs
 # from another checkout of the repo.
@@ -281,11 +284,12 @@ while [ $# -gt 0 ]; do
         echo "Unknown check ID: $2 — fix: run dotfiles-doctor --list and pass a listed ID"
         exit 1
       fi
-      if grep -qxF "$2" "$OVERRIDES_FILE" 2>/dev/null; then
+      if grep -qxF "$2" "$OVERRIDES_FILE" "$LOCAL_OVERRIDES_FILE" 2>/dev/null; then
         echo "Override already exists: $2"
       else
-        echo "$2" >> "$OVERRIDES_FILE"
-        echo "Added override: $2"
+        mkdir -p "$(dirname "$LOCAL_OVERRIDES_FILE")"
+        echo "$2" >> "$LOCAL_OVERRIDES_FILE"
+        echo "Added override: $2 (this machine only: $LOCAL_OVERRIDES_FILE)"
       fi
       exit 0
       ;;
@@ -401,7 +405,7 @@ fi
 
 # ── Validate overrides against known check IDs ───────────────────────
 if $VALIDATE_OVERRIDES_MODE; then
-  if [ ! -f "$OVERRIDES_FILE" ]; then
+  if [ ! -f "$OVERRIDES_FILE" ] && [ ! -f "$LOCAL_OVERRIDES_FILE" ]; then
     echo "No .overrides file found."
     exit 0
   fi
@@ -422,10 +426,10 @@ if $VALIDATE_OVERRIDES_MODE; then
     else
       _unknown+=("$line")
     fi
-  done < "$OVERRIDES_FILE"
+  done < <(cat "$OVERRIDES_FILE" "$LOCAL_OVERRIDES_FILE" 2>/dev/null)
 
   if [ ${#_unknown[@]} -gt 0 ]; then
-    echo "Unknown check IDs in .overrides — fix: remove each line below from $OVERRIDES_FILE (dotfiles doctor --list shows valid IDs):"
+    echo "Unknown check IDs in .overrides — fix: remove each line below from $OVERRIDES_FILE or $LOCAL_OVERRIDES_FILE (dotfiles doctor --list shows valid IDs):"
     for uid in "${_unknown[@]}"; do
       echo "  - $uid — fix: delete this line from .overrides"
     done
@@ -439,7 +443,7 @@ if $VALIDATE_OVERRIDES_MODE; then
 fi
 
 is_overridden() {
-  grep -qxF "$1" "$OVERRIDES_FILE" 2>/dev/null
+  grep -qxF "$1" "$OVERRIDES_FILE" "$LOCAL_OVERRIDES_FILE" 2>/dev/null
 }
 
 

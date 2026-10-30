@@ -181,4 +181,4 @@ In `~/.gitconfig.local`. This file is included by the managed `~/.gitconfig` and
 Yes. Put them in `~/.zshrc.local`. It's sourced at the end of `~/.zshrc`, so your aliases take precedence.
 
 **Q: What if `dotfiles doctor` reports failures?**
-Run `dotfiles doctor --fix` to auto-repair. For checks you want to skip permanently, use `dotfiles doctor --skip <check-id>` (stored in `~/apps/dotfiles/.overrides`).
+Run `dotfiles doctor --fix` to auto-repair. For checks you want to skip permanently, use `dotfiles doctor --skip <check-id>` (stored for this machine only in `~/.config/dotfiles/overrides`).

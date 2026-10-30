@@ -142,11 +142,41 @@ EOF
   [ "$(cat "$TEST_DOTFILES/.overrides")" = "fake.alpha" ]
 }
 
-@test "--skip accepts known check ID" {
+@test "--skip writes the per-machine file, not the tracked .overrides" {
+  echo "fake.alpha" > "$TEST_DOTFILES/.overrides"
   run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip fake.beta
   [ "$status" -eq 0 ]
   [[ "$output" == *"Added override: fake.beta"* ]]
-  grep -qx "fake.beta" "$TEST_DOTFILES/.overrides"
+  grep -qx "fake.beta" "$TEST_HOME/.config/dotfiles/overrides"
+  [ "$(cat "$TEST_DOTFILES/.overrides")" = "fake.alpha" ]
+}
+
+@test "--skip does not duplicate an override from the per-machine file" {
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "fake.beta" > "$TEST_HOME/.config/dotfiles/overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip fake.beta
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Override already exists: fake.beta"* ]]
+  [ "$(grep -cx "fake.beta" "$TEST_HOME/.config/dotfiles/overrides")" -eq 1 ]
+}
+
+@test "--validate-overrides also checks the per-machine file" {
+  touch "$TEST_DOTFILES/.overrides"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "typo.local" > "$TEST_HOME/.config/dotfiles/overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --validate-overrides
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"typo.local"* ]]
+}
+
+@test "a per-machine override skips its check in a doctor run" {
+  touch "$TEST_DOTFILES/.overrides"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "fake.alpha" > "$TEST_HOME/.config/dotfiles/overrides"
+  grep -q 'LOCAL_OVERRIDES_FILE' "$TEST_DOTFILES/bin/dotfiles-doctor"
+  run bash -c 'source <(sed -n "/^is_overridden() {/,/^}/p" "$1"); OVERRIDES_FILE="$2"; LOCAL_OVERRIDES_FILE="$3"; is_overridden fake.alpha' _ \
+    "$TEST_DOTFILES/bin/dotfiles-doctor" "$TEST_DOTFILES/.overrides" "$TEST_HOME/.config/dotfiles/overrides"
+  [ "$status" -eq 0 ]
 }
 
 @test "--skip does not duplicate existing override" {

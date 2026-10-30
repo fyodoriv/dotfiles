@@ -444,8 +444,21 @@ if $VALIDATE_OVERRIDES_MODE; then
   fi
 fi
 
+# This input snapshot lasts for one doctor process; watch children reload it.
+_doctor_override_ids=()
+if [ -r "$OVERRIDES_FILE" ]; then
+  while IFS= read -r _doctor_override_id || [ -n "$_doctor_override_id" ]; do
+    _doctor_override_ids+=("$_doctor_override_id")
+  done < "$OVERRIDES_FILE"
+fi
+unset _doctor_override_id
+
 is_overridden() {
-  grep -qxF "$1" "$OVERRIDES_FILE" 2>/dev/null
+  local override_id
+  for override_id in "${_doctor_override_ids[@]}"; do
+    [ "$override_id" = "$1" ] && return 0
+  done
+  return 1
 }
 
 

@@ -154,3 +154,71 @@ STUB
   grep -q -- '--list-extensions' "$calls"
   ! grep -q -- '--install-extension' "$calls"
 }
+
+_setup_extension_probe() {
+  _setup_vscode_installed
+  export VC_TEST_CALLS="$TEST_DIR/code-calls"
+  export VC_TEST_INSTALLED="$TEST_DIR/installed-extensions"
+  printf 'one.ext\ntwo.ext\nthree.ext\n' > "$TEST_DOTFILES/vscode/extensions.txt"
+  printf 'one.ext\ntwo.ext\n' > "$VC_TEST_INSTALLED"
+  cat > "$VC_BIN" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$VC_TEST_CALLS"
+case "$1" in
+  --list-extensions) cat "$VC_TEST_INSTALLED" ;;
+  --install-extension) printf 'one.ext\ntwo.ext\n' > "$VC_TEST_INSTALLED" ;;
+esac
+STUB
+}
+
+@test "vscode: one listing retains every extension result and refreshes each module run" {
+  _setup_extension_probe
+  extension_results=""
+  check() {
+    case "$1" in
+      vscode.extension.*)
+        if eval "$3" >/dev/null 2>&1; then
+          extension_results="$extension_results $1:pass"
+        else
+          extension_results="$extension_results $1:fail"
+        fi ;;
+    esac
+  }
+  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
+  printf "extension results: %s\n" "$extension_results"
+  [ "$extension_results" = " vscode.extension.one_ext:pass vscode.extension.three_ext:fail vscode.extension.two_ext:pass" ]
+  [ "$(grep -c '^--list-extensions$' "$VC_TEST_CALLS")" -eq 1 ]
+  printf 'one.ext\ntwo.ext\nthree.ext\n' > "$VC_TEST_INSTALLED"
+  extension_results=""
+  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
+  [ "$extension_results" = " vscode.extension.one_ext:pass vscode.extension.three_ext:pass vscode.extension.two_ext:pass" ]
+  [ "$(grep -c '^--list-extensions$' "$VC_TEST_CALLS")" -eq 2 ]
+}
+
+@test "vscode: fix mode sees extensions installed by an earlier extension pack" {
+  _setup_extension_probe
+  printf 'one.ext\ntwo.ext\n' > "$TEST_DOTFILES/vscode/extensions.txt"
+  : > "$VC_TEST_INSTALLED"
+  FIX_MODE=true
+  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
+  [ "$(grep -c '^--install-extension' "$VC_TEST_CALLS")" -eq 1 ]
+  [ "$(grep -c '^--list-extensions$' "$VC_TEST_CALLS")" -eq 2 ]
+}
+
+@test "vscode: override discovery does not launch the extension CLI" {
+  _setup_extension_probe
+  mkdir -p "$TEST_DOTFILES/bin"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/dotfiles-doctor"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip vscode.extension.one_ext
+  [ "$status" -eq 0 ]
+  [ ! -e "$VC_TEST_CALLS" ]
+  grep -qx vscode.extension.one_ext "$TEST_DOTFILES/.overrides"
+}
+
+@test "vscode: overridden extension checks do not launch the CLI" {
+  _setup_extension_probe
+  printf 'vscode.extension.one_ext\nvscode.extension.two_ext\nvscode.extension.three_ext\n' > "$OVERRIDES_FILE"
+  source "$TEST_DOTFILES/modules/vscode/doctor.sh"
+  [ ! -e "$VC_TEST_CALLS" ]
+}

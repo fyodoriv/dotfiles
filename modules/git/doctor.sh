@@ -170,9 +170,30 @@ done
 unset _lh_repo _lh_rp _lh_name _lh_local
 
 if command -v gh &>/dev/null; then
+  # This lazy snapshot belongs to one module run; clear its output after checks.
+  _git_gh_auth_snapshot_ready=false
+  _git_gh_auth_snapshot_output=""
+  _git_gh_auth_snapshot_status=1
+  _git_gh_capture_auth() {
+    if ${FIX_MODE:-false} || ! $_git_gh_auth_snapshot_ready; then
+      _git_gh_auth_snapshot_status=0
+      _git_gh_auth_snapshot_output="$(gh auth status -h github.com 2>&1)" \
+        || _git_gh_auth_snapshot_status=$?
+      _git_gh_auth_snapshot_ready=true
+    fi
+  }
+  _git_gh_authenticated() {
+    _git_gh_capture_auth
+    return "$_git_gh_auth_snapshot_status"
+  }
+  _git_gh_has_scope() {
+    _git_gh_capture_auth
+    # Preserve the original producer status when the caller enables pipefail.
+    (printf '%s\n' "$_git_gh_auth_snapshot_output"; exit "$_git_gh_auth_snapshot_status") | grep -q "$1"
+  }
   check "git.gh_protocol"       "gh CLI uses SSH protocol"    "[ \"\$(gh config get git_protocol 2>/dev/null)\" = 'ssh' ]"    "gh config set git_protocol ssh 2>/dev/null"
   check "git.gh_auth" "gh authenticated to github.com" \
-    "gh auth status -h github.com &>/dev/null"
+    "_git_gh_authenticated"
   # Required scopes: repo, gist, read:org; plus workflow, admin:public_key and
   # delete_repo when gh_admin_scopes is on (default: owner_machine).
   # Re-add a missing scope: gh auth refresh -h github.com -s <scope>
@@ -180,9 +201,9 @@ if command -v gh &>/dev/null; then
   [ "${GH_ADMIN_SCOPES:-false}" = "true" ] && _scopes="$_scopes workflow admin:public_key delete_repo"
   for _scope in $_scopes; do
     check "git.gh_scope.$_scope" "gh token has $_scope scope" \
-      "gh auth status -h github.com 2>&1 | grep -q '$_scope'"
+      "_git_gh_has_scope '$_scope'"
   done
-  unset _scope _scopes
+  unset _scope _scopes _git_gh_auth_snapshot_ready _git_gh_auth_snapshot_output _git_gh_auth_snapshot_status
 fi
 
 # ── Enterprise hooks ─────────────────────────────────────────────────

@@ -117,6 +117,10 @@ Spotlight check count varies based on which directories exist on your machine.
 
 ### git (dynamic)
 
+Read-only auth and scope checks share one lazy `gh auth status` result for
+that module run. Fix mode probes again after each possible change. The
+temporary output and exit code are cleared after the scope checks.
+
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `symlink.gitconfig` | `~/.gitconfig` symlinked to dotfiles | Create symlink |
@@ -547,6 +551,11 @@ Runs only when chezmoi data has `home_theater: true`. The TV check runs only whe
 ### vscode (dynamic)
 
 VS Code settings, keybindings, and extensions from `vscode/`. On `profile: core`, the module runs only when the app is installed (`VSCODE_APP` overrides its path). Adds one check per extension in `vscode/extensions.txt` (plus an overlay list when present).
+
+Read-only audits list installed extensions once for that module run. Each
+extension keeps its own check. The snapshot is cleared at the end and refreshed
+on the next run; fix mode rereads the list so extension packs are visible to
+later checks in the same run.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

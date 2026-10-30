@@ -999,9 +999,11 @@ dotfiles doctor --skip chrome.devtools     # permanently skip this check
 dotfiles doctor --skip enterprise.aws      # skip if you don't use AWS
 ```
 
-Skips are stored in `~/apps/dotfiles/.overrides`. `--skip` rejects unknown IDs
+Skips are stored in the source checkout's `.overrides`. `--skip` rejects unknown IDs
 without changing that file; run `dotfiles doctor --list` to discover valid IDs.
 Remove a line to re-enable a skipped check.
+Each doctor process reads this file once. Edits apply on the next invocation;
+watch mode reloads it through each new child audit. No cache file is created.
 
 **Filter by severity (CI / fast feedback):**
 

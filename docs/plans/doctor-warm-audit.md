@@ -62,3 +62,36 @@ profile the remaining cost before another approach. Anchor: Basili et al.
 (1994), Goal Question Metric.
 The snapshot lives in one doctor process and ends with that process. Watch
 mode's child doctor reloads it each iteration. It never changes the file.
+
+## Measured result before the full gate
+The final same-style scratch-user profile reports 76 seconds, down from the
+123-second baseline. The intermediate snapshot-only profile was 95 seconds.
+The final two profiles report the same 309 pass / 122 fail / 4 skip counts
+for their synthetic scratch users; this is timing evidence, not a claim
+that the real machine is unhealthy. All 49 targeted tests pass. The original
+isolated 90-second regression test also passes without a skip. Independent
+review accepted all three snapshots; the unsafe memory shortcut was rejected.
+The full repository gate is still required before delivery.
+
+## Gate scheduling experiment
+
+The final parallel gate checked 71 files: 1,162 tests passed and only
+`doctor.bats:607` failed its unchanged `<90`-second assertion. The identical
+fixture then passed alone without a skip. Peer-suite contention is supported
+by that comparison; keep fixture and threshold unchanged when testing it.
+
+- **Hypothesis (GQM):** run `doctor.bats` after the other selected files finish.
+  Full-gate timing failures fall from 1 to 0 because the real-machine budget
+  no longer competes with up to nine peer files. Scheduler state lasts for
+  one Make invocation; existing cache ownership does not change.
+- **Measurement:** `heavy-run bats tests/makefile-bats-jobs.bats`, the unchanged
+  filtered timing case in `tests/doctor.bats`, and `heavy-run make check`.
+- **Success:** 100% of selected files run exactly once, zero peer-file overlap
+  with the doctor file, failure exits propagate, the original timing case
+  passes without a skip, and zero required full-gate failures. Preserve
+  doctor-only selection, selection without doctor, and no-parallel fallback.
+- **Pivot:** if the isolated original case takes 90 seconds or more, or any
+  selected file is omitted or duplicated, abandon this scheduling approach
+  and profile the timed invocation again. Do not widen the time budget.
+- **Anchor:** Basili, Caldiera and Rombach (1994), Goal-Question-Metric; Kohavi,
+  Tang and Xu (2020), controlled experiment conditions.

@@ -370,3 +370,19 @@ _mk_ide() {
   grep -qx "plugin.a" "$ws/disabled_plugins.txt"
   ! grep -qx "plugin.b" "$ws/disabled_plugins.txt"
 }
+
+# dotfiles-doctor runs each fix in a new process (bash -c), so a fix that
+# calls a module function failed on every Mac while eval-based tests passed.
+@test "jetbrains: plugins.disabled fix works in a new bash process like dotfiles-doctor" {
+  FIX_MODE=true
+  local ws="$TEST_HOME/Library/Application Support/JetBrains/WebStorm2024.3"
+  _mk_ide "$ws"
+  check() {
+    [ "$1" = "plugins.disabled.webstorm" ] || return 0
+    bash -c "$4" >/dev/null 2>&1 && fixed "$2" || fail "$2"
+  }
+  source "$BATS_TEST_DIRNAME/../modules/jetbrains/doctor.sh"
+  [ "$fail_count" -eq 0 ]
+  grep -qx "plugin.a" "$ws/disabled_plugins.txt"
+  grep -qx "plugin.b" "$ws/disabled_plugins.txt"
+}

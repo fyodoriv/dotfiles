@@ -29,6 +29,7 @@ set +e
 unset BASH_ENV ENV
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+export DOTFILES_DIR
 OVERRIDES_FILE="$DOTFILES_DIR/.overrides"
 
 # Home links point into chezmoi's source checkout, even when this doctor runs

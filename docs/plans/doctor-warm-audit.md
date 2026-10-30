@@ -43,3 +43,22 @@ fix-mode cases, followed by the same whole-doctor profile. Success: exactly
 semantic difference or unchanged call count rejects this snapshot; a whole
 run at or above 90 seconds requires another measured lever before merge.
 Anchor: Basili, Caldiera, Rombach (1994), Goal Question Metric.
+
+## Remaining input-lookup cost
+The same manual profile is 95 seconds; the original isolated timing test now
+passes without a skip. The Git auth snapshot reduced calls but saved only
+about 1 second. Profiling 500 production-path override lookups took 8.918 s.
+The doctor performs roughly one such lookup for each of 435 check results.
+
+Hypothesis: one read-only override-ID snapshot per doctor process replaces
+hundreds of grep processes, retaining exact literal full-line matching and
+reducing the 95-second manual profile below 90 seconds. Measurement: new
+CLI fixtures compare skipped/evaluated IDs and count grep invocations on the
+overrides file, then rerun the same manual profile and original timing test.
+Success: identical check selection, zero per-check grep processes, new
+invocations see edited overrides, and manual wall time below 90 seconds.
+Pivot: any selection difference rejects the snapshot; at or above 90 seconds,
+profile the remaining cost before another approach. Anchor: Basili et al.
+(1994), Goal Question Metric.
+The snapshot lives in one doctor process and ends with that process. Watch
+mode's child doctor reloads it each iteration. It never changes the file.

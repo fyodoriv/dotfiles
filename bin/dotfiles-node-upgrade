@@ -4,7 +4,7 @@
 # A Node upgrade has pieces that must move together. This script moves them:
 #   1. fnm install + fnm default (old versions stay installed; minsky pins one)
 #   2. ~/.node-version (com.dotfiles.gui-path and agentbrew read it)
-#   3. ~/.local/bin/{node,npm,npx} symlinks
+#   3. ~/.local/bin/{node,npm,npx,codex} symlinks
 #   4. agentbrew plists: `agentbrew auto-sync install` and `agentbrew sync`
 #      run on the new Node, so com.agentbrew.* name the new path
 #   5. kickstart com.dotfiles.gui-path so launchd PATH uses the new Node
@@ -18,7 +18,7 @@
 #   dotfiles upgrade --node [VERSION]  Same, through the upgrade flow
 #
 # npm globals are per Node version. The script lists the old version's
-# globals at the end; reinstall the ones you need.
+# globals at the end; reinstall the ones you need. Codex is managed here.
 
 # shellcheck disable=SC2088  # ~ in messages is display text, not a path
 set -euo pipefail
@@ -110,6 +110,12 @@ for tool in node npm npx; do
   run ln -sfn "$NEW_BIN/$tool" "$link"
 done
 $DRY_RUN || ok "~/.local/bin/{node,npm,npx} → $VERSION"
+
+# Preserve an installed Codex CLI; install it anew only when AI tools are enabled.
+codex_enabled="$(chezmoi execute-template '{{ .use_ai_tools }}' 2>/dev/null || echo false)"
+if [ "$codex_enabled" = true ] || [ -e "$HOME/.local/bin/codex" ] || [ -L "$HOME/.local/bin/codex" ]; then
+  PATH="$NEW_BIN:$PATH" run bash "$DOTFILES_DIR/bin/dotfiles-install-codex"
+fi
 
 # 4. Rewrite agentbrew plists. They store process.execPath, so run the
 #    agentbrew CLI on the new Node.

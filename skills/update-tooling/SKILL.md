@@ -318,6 +318,17 @@ Do not run `dotfiles update`, `dotfiles-upgrade`, Homebrew upgrades, or package
 manager upgrades unless the user explicitly asks to upgrade third-party
 software. Those operations have a wider and less reversible machine impact.
 
+### Codex CLI
+
+Always run `codex --version`, `codex login status`, and
+`dotfiles doctor --module codex` after refresh. A synced `~/.codex` folder does
+not prove the executable works. Report sign-in failures without reading auth
+files. When package upgrades are explicitly requested, run
+`bash "$DOTFILES_APPLIED/bin/dotfiles-install-codex" --upgrade`, then compare
+`codex --version` with `npm view @openai/codex version`. The helper re-links
+`~/.local/bin/codex` to the selected npm prefix. Do not use ChatGPT.app's
+bundled CLI as the terminal CLI or install the discontinued `codex-app` cask.
+
 ## 4. Verify machine stability
 
 Run these checks after the apply. Capture actual output and separate owned

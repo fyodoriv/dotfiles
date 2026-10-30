@@ -3,7 +3,7 @@ name: tooling-checkup
 description: >
   One-command health pass for the tooling repositories and the whole Mac. Ships
   outstanding tooling work, refreshes the tooling checkouts and agent config,
-  upgrades Homebrew, npm, uv, pipx, mise, and Claude Code, runs `claude doctor`,
+  upgrades Homebrew, npm, uv, pipx, mise, Claude Code, and Codex, runs `claude doctor`,
   audits LaunchAgents and heavy processes, reads recent machine and tooling
   metrics (load, memory, swap, disk, upgrade failures, Claude Code lag signals),
   reviews where agent tool time went, lints skills, rules, and AGENTS.md files
@@ -204,11 +204,12 @@ Follow [reference/machine-updates.md](reference/machine-updates.md). In short:
    75 means "did not run" (a `[lock] Skipping` line and no Summary section),
    even though the upgrade exited 0: re-run it once the lock is free.
 2. Run `claude update`. Compare `claude --version` before and after.
-3. Run `claude doctor` again. Report every line that is not OK.
-4. Check what is still outdated. Report macOS updates; never install them.
+3. Codex: use the reference.
+4. Run `claude doctor` again. Report every line that is not OK.
+5. Check what is still outdated. Report macOS updates; never install them.
 
 **Done when:** each package manager is upgraded, skipped with a reason, or
-failed with its log lines, and the Claude Code version is verified.
+failed with its log lines, and both CLI versions are verified.
 
 ## Phase 5: Background processes
 

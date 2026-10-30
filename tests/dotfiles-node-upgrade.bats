@@ -28,7 +28,16 @@ if [ "\${2:-}" = "auto-sync" ] && [ "\${3:-}" = "install" ]; then
 EOF
 fi
 STUB
-    printf '#!/bin/bash\necho "npm[%s] $*" >> "%s"\n' "$1" "$CALL_LOG" > "$bin/npm"
+    cat > "$bin/npm" <<STUB
+#!/bin/bash
+echo "npm[$1] \$*" >> "$CALL_LOG"
+case "\$1" in
+  prefix) echo "${bin%/bin}" ;;
+  install)
+    printf '#!/bin/bash\necho codex-cli 1.2.3\n' > "$bin/codex"
+    chmod +x "$bin/codex" ;;
+esac
+STUB
     printf '#!/bin/bash\n' > "$bin/npx"
     chmod +x "$bin/node" "$bin/npm" "$bin/npx"
   }
@@ -44,7 +53,8 @@ case "$1" in
 esac
 STUB
   printf '#!/bin/bash\necho "launchctl $*" >> "%s"\n' "$CALL_LOG" > "$STUB_DIR/launchctl"
-  chmod +x "$STUB_DIR/fnm" "$STUB_DIR/launchctl"
+  printf '#!/bin/bash\necho "${TEST_AI_TOOLS:-true}"\n' > "$STUB_DIR/chezmoi"
+  chmod +x "$STUB_DIR/fnm" "$STUB_DIR/launchctl" "$STUB_DIR/chezmoi"
 
   # Current state: v24.21.0 everywhere, plus the pinned minsky Node.
   _make_version v24.21.0
@@ -84,7 +94,7 @@ teardown() {
   [ "$status" -eq 0 ] || { echo "$output"; false; }
 
   [ "$(cat "$TEST_HOME/.node-version")" = "v24.22.0" ]
-  for t in node npm npx; do
+  for t in node npm npx codex; do
     [ "$(readlink "$TEST_HOME/.local/bin/$t")" = "$VERSIONS/v24.22.0/installation/bin/$t" ]
   done
   grep -q "v24.22.0/installation/bin/node" "$TEST_HOME/Library/LaunchAgents/com.agentbrew.check.plist"
@@ -157,4 +167,20 @@ EOF
 @test "dotfiles-upgrade --node delegates to dotfiles-node-upgrade" {
   grep -q -- '--node' "$BATS_TEST_DIRNAME/../bin/dotfiles-upgrade"
   grep -q 'dotfiles-node-upgrade' "$BATS_TEST_DIRNAME/../bin/dotfiles-upgrade"
+}
+
+@test "Node upgrade does not add Codex when AI tools are off and it was never installed" {
+  export TEST_AI_TOOLS=false
+  run bash "$SCRIPT" 24.22.0
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.local/bin/codex" ]
+  ! grep -q 'install -g @openai/codex' "$CALL_LOG"
+}
+
+@test "Node upgrade preserves an existing Codex install when AI tools are off" {
+  export TEST_AI_TOOLS=false
+  ln -s "$VERSIONS/v24.21.0/installation/bin/codex" "$HOME/.local/bin/codex"
+  run bash "$SCRIPT" 24.22.0
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$HOME/.local/bin/codex")" = "$VERSIONS/v24.22.0/installation/bin/codex" ]
 }

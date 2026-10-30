@@ -110,3 +110,27 @@ load test_helper
   ! grep -vE '^[[:space:]]*#' agent-hooks/prepend-endpoint-path.sh \
     | grep -qE '(^|[[:space:]])python3([[:space:]]|$)'
 }
+
+@test "prepend-endpoint-path: Codex Bash input uses native updatedInput response" {
+  mkdir -p "$TEST_DOTFILES/bin"
+  local payload='{"turn_id":"turn-example","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo ready"}}'
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e --arg prefix "$TEST_DOTFILES/bin" '
+    .hookSpecificOutput.hookEventName == "PreToolUse" and
+    .hookSpecificOutput.permissionDecision == "allow" and
+    (.hookSpecificOutput.updatedInput.command | contains($prefix) and contains("echo ready")) and
+    (has("updated_input") | not)'
+}
+
+@test "prepend-endpoint-path: Codex non-shell input returns native allow without an update" {
+  local payload='{"turn_id":"turn-example","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{}}'
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '
+    .hookSpecificOutput.hookEventName == "PreToolUse" and
+    .hookSpecificOutput.permissionDecision == "allow" and
+    (.hookSpecificOutput | has("updatedInput") | not)'
+}

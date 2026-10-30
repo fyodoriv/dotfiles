@@ -256,3 +256,11 @@ The following files and data are explicitly preserved and never created, modifie
 | `~/Library/` (except LaunchAgents) | Application data, preferences not in `defaults write` scope |
 
 `dotfiles uninstall` only removes symlinks pointing into the dotfiles repo and unloads `com.dotfiles.*` LaunchAgents. It does not revert macOS defaults -- those persist until manually changed in System Settings.
+
+## Codex setup
+
+With `use_ai_tools: true`, apply installs the npm terminal CLI and links
+`~/.local/bin/codex` to that npm prefix. A full profile also installs the
+`chatgpt` cask, the GUI host. Node upgrades reinstall the CLI on the selected
+Node and move the link. This does not replace ChatGPT.app's bundled CLI or
+write agent config. See [Codex health checks](module-reference.md#codex).

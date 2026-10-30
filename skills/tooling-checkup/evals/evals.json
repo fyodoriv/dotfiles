@@ -261,6 +261,19 @@
         "Files shared across calls go to the scratchpad, not $TMPDIR"
       ],
       "id": 22
+    },
+    {
+      "id": 23,
+      "prompt": "The Mac has a synced ~/.codex folder but lost the npm Codex executable after a Node upgrade. Refresh the tooling and check Codex too.",
+      "expected_output": "Checks the executable and sign-in independently of synced files, uses the managed install helper when package upgrades are requested, and keeps the terminal CLI separate from ChatGPT.app.",
+      "expectations": [
+        "Runs codex --version and codex login status without reading auth files",
+        "Runs dotfiles doctor --module codex",
+        "Uses dotfiles-install-codex --upgrade only during an authorized package upgrade",
+        "Compares the terminal CLI version with npm view @openai/codex version after upgrade",
+        "Does not install the discontinued codex-app cask or link to the GUI bundled CLI",
+        "Reports endpoint safe mode as skipped rather than upgraded"
+      ]
     }
   ]
 }

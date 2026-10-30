@@ -1291,7 +1291,8 @@ scratch work.
 | `dotfiles-python-tls-relax` | Opt one Python venv (`<venv>`, `--remove` to undo) into clearing only OpenSSL `VERIFY_X509_STRICT`, for a TLS-inspection proxy whose root CA marks basicConstraints non-critical (Python 3.13 rejects it). Chain, hostname, and expiry checks stay on; it also patches urllib3 and points httplib2 at `SSL_CERT_FILE` |
 | `dotfiles-mcp-launch` | Start an MCP server with secrets read by reference (`--secret NAME=keychain:<item>`), an optional CA bundle and minimal PATH; refuses `@latest` and unpinned `npx -y`. Secrets never go into shell profiles |
 | `dotfiles-pnpm-global-update` | Update global pnpm packages; skip cleanly when none are installed (topgrade custom step) |
-| `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx}`, and the `com.agentbrew.*` plists. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
+| `dotfiles-install-codex` | Install the npm Codex CLI and restore `~/.local/bin/codex`; `--upgrade` updates it. ChatGPT.app keeps its separate bundled CLI. See [Codex health checks](docs/module-reference.md#codex) |
+| `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx,codex}`, and the `com.agentbrew.*` plists. Reinstalls the managed Codex CLI on the new Node. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
 
 **Build and test infrastructure**
 

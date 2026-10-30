@@ -184,3 +184,17 @@ shell flags with values (`bash -euo pipefail -c`) may come before `bash -c`.
 Still not seen by the hook: `yarn workspace <pkg> <script>`, a single spec run through `turbo`
 with `--filter` (it reads as a full run), a program started by a script (`node run.js`), and `eval`.
 The doctor check is the net for these.
+
+## Codex PATH hook output
+
+`prepend-endpoint-path.sh` recognizes Codex hook input by its nonempty
+`turn_id`. Native Codex `PreToolUse` calls for shell execution use `Bash` and
+`tool_input.command`. The hook returns `hookSpecificOutput` with
+`hookEventName: PreToolUse`, `permissionDecision: allow`, and an
+`updatedInput.command` when it adds PATH or rewrites a managed shim. Other
+agents keep the existing `permission` and `updated_input` response. Unchanged
+Codex input gets native allow without an input update.
+
+The response is based on the [Codex hooks protocol](https://learn.chatgpt.com/docs/hooks).
+Input detection and temporary output files are scoped to one hook process.
+The temporary plist is removed before the response is printed.

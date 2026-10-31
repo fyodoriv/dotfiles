@@ -1,5 +1,9 @@
 # User Story: Start the Day Ready to Code
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Everything is already pulled, healthy, and visible — one command or fully automatic.
 
 **Metric:** `morning` runs in the last 7 days — see [docs/metrics.md](../metrics.md#metrics).

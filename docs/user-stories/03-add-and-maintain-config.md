@@ -1,5 +1,9 @@
 # User Story: Add and Maintain Config
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > One command to add a config file, a Homebrew package, a macOS default, or a new health check module — each includes automatic verification.
 
 **Metric:** Managed files that drifted from the source (`chezmoi status` lines) — see [docs/metrics.md](../metrics.md#metrics).

@@ -1,5 +1,9 @@
 # User Story: Config Heals Itself Automatically
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > After setup, config stays in sync and self-heals — no manual maintenance needed.
 
 **Metric:** Doctor runs with no failure, last 30 runs (%) — see [docs/metrics.md](../metrics.md#metrics).

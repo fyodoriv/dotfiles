@@ -1,5 +1,9 @@
 # User Story: Set Up a New Mac in One Command
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Clone, run one command, answer the chezmoi init prompts — fully configured development environment.
 
 **Metric:** Commands a person types on a fresh Mac — see [docs/metrics.md](../metrics.md#metrics). Guard: the install e2e passes.

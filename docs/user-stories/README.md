@@ -43,3 +43,36 @@ a Tests line names a missing file, or when an e2e test has no story ID.
 | Shell, git, macOS, SSH, editor, terminal config | **dotfiles** |
 | Agent config (CLAUDE.md, MCP, skills, rules) | **agentbrew** |
 | Orchestrator, personas, pipelines | **minsky** |
+
+## Agent workflow acceptance
+
+Every story and source-owned workflow inherits these requirements. Claude
+Code and ChatGPT Work/Codex use the same CLI action handlers. Discover actions
+with `dotfiles actions --json`; do not keep another command list. A terminal-only
+action retains its reason and the command to run. Host-specific controls may
+differ, but the result, confirmation rules, and local data owner stay the same.
+
+Before context-dependent agent work, inspect the configured shared `memory`
+MCP. Use `get_bootstrap_profile` and semantic `memory_search` for the repo and
+task. When memory is configured but unavailable, name the failed tool and
+report **shared memory unavailable**. Do not silently skip recall or claim
+that a context-dependent workflow is ready. Restore it through
+`agentbrew memory doctor` and the fix it reports. Deterministic local CLI
+actions can still run; they do not require a model or upload business data.
+When memory is deliberately unconfigured, state that scope before proceeding.
+
+At completion, store only reusable, non-sensitive decisions through the
+configured memory session tool. Do not copy OAuth sessions, credentials,
+account privacy choices, schedules, or private records between hosts. Project
+memory ingestion is separate from live shared recall; an ingestion warning
+does not prove that recall is unavailable.
+
+Acceptance uses synthetic inputs: equivalent CLI results on both hosts, an
+explicit missing-memory result, and unchanged owner files. The existing
+`tests/user-stories.bats` checker enumerates numbered stories, command sources
+from `Agentfile.yaml`, and repo-owned skill sources. Missing host,
+memory, or regression acceptance fails the gate. Mutation fixtures add a new
+story and a new command source without acceptance and must be rejected.
+
+A command source may be a directory or one `.md` file. An individual file
+imports only that workflow; sibling files remain outside its acceptance scope.

@@ -3,6 +3,17 @@ description: Research a URL, product name, or text and file evidence-backed task
 argument-hint: "<url | product name | text>"
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+**Portable agent acceptance:** Use the same CLI handlers in Claude Code and
+ChatGPT Work/Codex. Before context-dependent work, use configured shared memory:
+`get_bootstrap_profile`, then semantic `memory_search`. If configured recall
+fails, report **shared memory unavailable** and the failed tool. Do not claim
+context-dependent readiness. If memory is unconfigured, state that scope.
+Deterministic CLI actions stay local and need no model. Do not copy OAuth,
+credentials, privacy choices, schedules, or private records between hosts.
+Save only non-sensitive reusable decisions through the memory session tool.
+
 # Research URL / Product to Tooling Tasks
 
 Take one raw input string. It may be:

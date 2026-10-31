@@ -7,6 +7,10 @@ description: >
   Don't use for general dotfiles development (use dotfiles-development).
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
+
 ## What a Module Is
 
 A doctor module is a directory in `modules/` that defines health checks. The doctor

@@ -53,3 +53,13 @@ why, the options, and what each option changes. "Shipped" lists only work that r
 feature work in separate lists, up to three each. Recommend from the refreshed
 `TASKS.md` queues of the tooling repositories. A gap with no task gets
 `new: <kebab-case-id>` and one line on why.
+
+## Run rules
+
+The user runs this by hand every 2 or 3 days. It must be safe to repeat, and
+fast when nothing changed. Run twelve phases in order. Each phase ends with a
+**Done when** check. Phases 10, 11, and 12 always run, even when an earlier
+phase is blocked.
+
+`<skill-dir>` below means this skill's base directory.
+`TOOLING_ROOT` defaults to `~/apps/tooling`.

@@ -1228,3 +1228,128 @@ MORNING="$REPO_ROOT/bin/morning"
   bad="$(grep -hE '^@test ' "$REPO_ROOT"/tests/e2e/*.bats | grep -vE '^@test "US[0-9]{2} e2e: ' || true)"
   [ -z "$bad" ] || { echo "e2e tests without a story ID: $bad"; return 1; }
 }
+
+
+# Story files and Agentfile command directories own this contract's inventory.
+agent_contract_files() {
+  local root="$1" dir dirs
+  dirs="$(/usr/bin/ruby -ryaml -e 'puts YAML.load_file(ARGV[0]).fetch("commands", [])' "$root/Agentfile.yaml")" || return 1
+  printf '%s\n' "$root"/docs/user-stories/[0-9][0-9]-*.md "$root"/skills/*/SKILL.md
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    if [ -d "$root/$dir" ]; then
+      printf '%s\n' "$root/$dir"/*.md
+    elif [ -f "$root/$dir" ] && [[ "$dir" == *.md ]]; then
+      printf '%s\n' "$root/$dir"
+    else
+      echo "missing command source: $dir" >&2
+      return 1
+    fi
+  done <<< "$dirs"
+}
+
+check_agent_contract() {
+  local root="$1" file files bad=0
+  files="$(agent_contract_files "$root")" || return 1
+  while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    if ! grep -qF '**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.' "$file"; then
+      echo "missing host, shared-memory, or regression acceptance: ${file#$root/}"
+      bad=1
+    fi
+    case "$file" in
+      "$root"/docs/user-stories/*|"$root"/skills/*/SKILL.md)
+        grep -qF '#agent-workflow-acceptance)' "$file" || { echo "missing source acceptance link: ${file#$root/}"; bad=1; } ;;
+      *)
+        for phrase in '**Portable agent acceptance:**' get_bootstrap_profile memory_search 'shared memory unavailable' 'Do not copy OAuth'; do
+          grep -qF "$phrase" "$file" || { echo "missing portable $phrase: ${file#$root/}"; bad=1; }
+        done ;;
+    esac
+  done <<< "$files"
+  return "$bad"
+}
+
+@test "every story and source workflow declares dual-host shared-memory regression acceptance" {
+  check_agent_contract "$REPO_ROOT"
+}
+
+@test "agent contract rejects a future story without host or shared-memory acceptance" {
+  local fixture="$BATS_TEST_TMPDIR/story-contract"
+  mkdir -p "$fixture/docs/user-stories" "$fixture/commands"
+  printf 'commands: [./commands]\n' > "$fixture/Agentfile.yaml"
+  printf '# New story\n' > "$fixture/docs/user-stories/99-future-story.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'99-future-story.md'* ]]
+}
+
+@test "agent contract discovers future Agentfile command directories and rejects missing acceptance" {
+  local fixture="$BATS_TEST_TMPDIR/workflow-contract"
+  mkdir -p "$fixture/docs/user-stories" "$fixture/new-commands"
+  printf 'commands: [./new-commands]\n' > "$fixture/Agentfile.yaml"
+  printf '# New workflow\n' > "$fixture/new-commands/new-workflow.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'new-workflow.md'* ]]
+}
+
+
+@test "agent contract rejects future skills and each missing acceptance dimension" {
+  local fixture="$BATS_TEST_TMPDIR/contract-dimensions" phrase
+  mkdir -p "$fixture/skills/future" "$fixture/commands"
+  printf 'commands: [./commands]\n' > "$fixture/Agentfile.yaml"
+  for phrase in 'Claude Code + ChatGPT Work/Codex' 'shared memory required when configured' 'regression: tests/user-stories.bats'; do
+    printf '**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.\n[acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance)\n' |
+      PHRASE="$phrase" perl -pe 's/\Q$ENV{PHRASE}\E/omitted/' > "$fixture/skills/future/SKILL.md"
+    run check_agent_contract "$fixture"
+    [ "$status" -eq 1 ] || { echo "accepted missing: $phrase"; return 1; }
+    [[ "$output" == *'skills/future/SKILL.md'* ]] || return 1
+  done
+}
+
+@test "shared acceptance names unavailable memory and keeps deterministic CLI data local" {
+  local contract="$REPO_ROOT/docs/user-stories/README.md"
+  grep -qF 'shared memory unavailable' "$contract"
+  grep -qF 'get_bootstrap_profile' "$contract"
+  grep -qF 'memory_search' "$contract"
+  grep -qF 'do not require a model or upload business data' "$contract"
+  grep -qF 'Do not copy OAuth sessions, credentials,' "$contract"
+  grep -qF 'dotfiles actions --json' "$contract"
+}
+
+
+@test "deployed command bodies carry portable host and memory acceptance on both hosts" {
+  local source deployed host
+  for source in "$REPO_ROOT"/commands/*.md; do
+    for host in claude codex; do
+      if [ "$host" = claude ]; then
+        deployed="$BATS_TEST_TMPDIR/home/.claude/commands/$(basename "$source")"
+      else
+        deployed="$BATS_TEST_TMPDIR/home/.codex/skills/source-command-$(basename "$source" .md)/references/command.md"
+      fi
+      mkdir -p "$(dirname "$deployed")"
+      cp "$source" "$deployed"
+      grep -qF '**Portable agent acceptance:**' "$deployed" || { echo "missing deployed acceptance: $host/$(basename "$source")"; return 1; }
+      for phrase in get_bootstrap_profile memory_search 'shared memory unavailable' 'Do not copy OAuth'; do
+        grep -qF "$phrase" "$deployed" || { echo "missing deployed $phrase: $host/$(basename "$source")"; return 1; }
+      done
+      ! grep -qF '../docs/user-stories/README.md#agent-workflow-acceptance' "$deployed" || return 1
+    done
+  done
+}
+
+
+@test "agent contract accepts an individual command file and ignores unselected siblings" {
+  local fixture="$BATS_TEST_TMPDIR/individual-source"
+  mkdir -p "$fixture/custom"
+  printf 'commands: [./custom/selected.md]\n' > "$fixture/Agentfile.yaml"
+  cp "$REPO_ROOT/commands/dotfiles.md" "$fixture/custom/selected.md"
+  printf '# Unselected sibling without acceptance\n' > "$fixture/custom/sibling.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  printf '# Selected file lost acceptance\n' > "$fixture/custom/selected.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'selected.md'* ]]
+  [[ "$output" != *'sibling.md'* ]]
+}

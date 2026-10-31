@@ -7,6 +7,10 @@ description: >
   Don't use for creating new modules (use dotfiles-new-module).
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
+
 ## Repo Structure
 
 ```

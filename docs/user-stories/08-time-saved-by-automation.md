@@ -1,5 +1,9 @@
 # User Story: See How Much Time Automation Saves
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Concrete numbers — not vibes — for how much time dotfiles automation has saved.
 
 **Metric:** Minutes saved by automation in the last 30 days — see [docs/metrics.md](../metrics.md#metrics).

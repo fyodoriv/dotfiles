@@ -713,6 +713,11 @@ Profile selection happens at `chezmoi init` time. Each module provides health ch
 
 ## AI agent config
 
+Claude Code and ChatGPT Work/Codex share source-managed workflows. Updates
+retain the merged per-machine Agentfile after apply. See the
+[multi-machine guide](docs/multi-machine.md#keep-agent-workflows-consistent)
+for deployment, required shared recall, and account ownership boundaries.
+
 AI agent configuration (MCP servers, skills, rules, commands) is managed by [agentbrew](https://www.npmjs.com/package/agentbrew), not dotfiles. The `Agentfile.yaml` in this repo is the declarative manifest — see [Agentfile.yaml](Agentfile.yaml) for the full config and [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for teammate setup and recovery. The no-argument `/learn-repos` command repairs its shared-memory connection before scanning and uses the `/ship-it` safety and ownership gates to deliver only source-backed repository healing.
 
 Personal cross-tooling commands that should appear in every agent live in [`commands/`](commands/) — including `dotfiles` (the start screen), `research-url`, `learn-repos`, and `ship-it`. `Agentfile.yaml` registers that directory so `agentbrew sync --agentfile ~/apps/dotfiles/Agentfile.yaml` deploys those commands to Claude Code, Codex, and other command-capable agents. `/ship-it` requires visual proof for every PR.

@@ -1,5 +1,9 @@
 # User Story: Git Workflow Helpers
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Create PRs, hotfixes, and code reviews — one command each, no ceremony.
 
 **Metric:** Git helper runs (`pr`, `hotfix`, `review`) in the last 30 days — see [docs/metrics.md](../metrics.md#metrics).

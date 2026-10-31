@@ -1,5 +1,9 @@
 # User Story: Switch Profiles and Customize Per Machine
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Switch between core and full profiles instantly, add enterprise tools, or override shared config — without changing the shared repo.
 
 **Metric:** `.overrides` entries that name no known check — see [docs/metrics.md](../metrics.md#metrics).

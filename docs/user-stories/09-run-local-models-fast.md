@@ -1,5 +1,9 @@
 # User Story: Run AI Coding Agents on a Local Model
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Drive an agentic coding loop against a local LLM on Apple Silicon — no internet, no per-token bill, ~85 tok/s on qwen3-coder:30b.
 
 **Metric:** Local-AI health checks that found an engine, last 2000 log lines (%) — see [docs/metrics.md](../metrics.md#metrics).

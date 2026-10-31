@@ -61,18 +61,20 @@ phase() {
 }
 
 agentbrew_phase() {
+  local agentfile="${HOME}/.config/agentbrew/Agentfile.yaml"
+  [ -f "$agentfile" ] || agentfile="$DOTFILES_DIR/Agentfile.yaml"
   if [ "$DRY_RUN" -eq 1 ]; then
-    phase agents agentbrew sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"
+    phase agents agentbrew sync --pull --agentfile "$agentfile"
     return 0
   fi
   local agentbrew_path
   if agentbrew_locate >/dev/null 2>&1 && [ -x "$DOTFILES_DIR/bin/agentbrew" ]; then
-    phase agents "$DOTFILES_DIR/bin/agentbrew" sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"
+    phase agents "$DOTFILES_DIR/bin/agentbrew" sync --pull --agentfile "$agentfile"
     return 0
   fi
   agentbrew_path="$(command -v agentbrew 2>/dev/null || true)"
   if [ -n "$agentbrew_path" ] && [ "$agentbrew_path" != "$DOTFILES_DIR/bin/agentbrew" ]; then
-    phase agents agentbrew sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"
+    phase agents agentbrew sync --pull --agentfile "$agentfile"
     return 0
   fi
   printf '○ agentbrew not available — skipping agent config refresh\n'

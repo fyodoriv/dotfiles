@@ -9,6 +9,10 @@ description: >
   feature work in one named repository; use ship-it for that.
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
+
 # Update tooling
 
 Refresh the machine without overwriting another person's work. A tooling

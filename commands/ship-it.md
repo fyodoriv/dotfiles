@@ -2,6 +2,13 @@
 description: Auto-ship owned session work; rebases and guarded pushes pre-approved.
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+**Portable agent acceptance:** Both hosts use configured `get_bootstrap_profile`,
+then semantic `memory_search`. On failure, name the tool, report **shared memory unavailable**,
+and block context readiness. Do not copy OAuth or private data.
+Follow the loaded memory lifecycle. Read `$(dotfiles cd)/docs/user-stories/README.md`.
+
 # Ship It
 
 ## Session activation
@@ -10,17 +17,12 @@ If the user has invoked `/ship-it` earlier in this conversation/session, approva
 
 ## Planning requests
 
-When the active request asks to create or revise an implementation, architecture,
-state-integration, or cross-platform plan, read `writing-plans` before
-authoring. For plans spanning a docs hub, hosts, repositories, Jira, or shared
-state, also read `task-command-center` →
-`references/implementation-plan-template.md`.
-
-Follow those skills for the plan shape, including the versioned
-`HostBootstrapPayload` contract for a host integration.
-
-It applies only to planning and adds no stop before an explicitly requested
-implementation or delivery.
+For implementation, architecture, state-integration or cross-platform plans,
+read `writing-plans` before drafting. For plans spanning a docs hub, hosts,
+repos, Jira or shared state, also read `task-command-center` →
+`references/implementation-plan-template.md`. Follow their plan shape,
+including the versioned `HostBootstrapPayload` for a host integration.
+Planning adds no stop before requested implementation or delivery.
 
 ## Session auto-ship (default)
 
@@ -28,17 +30,14 @@ implementation or delivery.
 
 ### Push early, let CI verify (IRON LAW)
 
-**While the PR has no review, push every commit as soon as it is committed.** CI
-is the verification loop. A local build, test suite, or browser run is not a gate
-that must go green first.
+**While the PR has no review, push every commit as soon as it is committed.**
+CI is the verification loop; local builds, tests and browser runs need not
+pass first.
 
-- Never hold a commit back for a local check. Commit, push, keep fixing — the
-  next push carries the fix. Red CI on an unreviewed PR costs nothing.
-- "Half finished" is not a reason to hold back. If it is committed, push it.
-- Push after every commit, not once per batch. Long local iteration on unpushed
-  commits is the failure mode this rule prevents.
-- Never go quiet on delivery. If a push has not happened, say so and why before
-  the user asks.
+- Never hold a commit for a local check. Commit, push, then fix; red CI on an
+  unreviewed PR costs nothing. "Half finished" commits still get pushed.
+- Push every commit, not one batch; avoid long unpushed local iteration.
+- Never go quiet: before the user asks, say whether a push happened and why.
 
 **Once the PR has a review or review comment**, stop pushing silently: a
 reviewer is reading a moving target. Batch changes and say what is coming.
@@ -48,13 +47,11 @@ post it only after the user says yes.
 
 ## PR description refresh
 
-After final verification and CI evidence are known, but before each PR is merged
-or handed off, update its description to reflect the delivered state. Start with
-`## Summary` and two or three plain-language sentences that explain why the PR
-is needed and what it delivers; follow immediately with `## Details` bullets.
-Put validation, rollout, checklist, and repository-required sections after that
-opening. Remove stale draft claims and do not replace the summary with a file
-inventory or CI-status checklist.
+After final verification and CI, refresh the description before merge or
+handoff. Open with `## Summary`: two or three plain-language sentences on why
+and what, then `## Details` bullets. Put validation, rollout, checklists and
+repo-required sections after them. Remove stale draft claims. Never replace
+the summary with a file inventory or CI-status checklist.
 
 ## Visual proof for every PR
 
@@ -81,7 +78,7 @@ For any repository explicitly named by the active request, `/ship-it` pre-approv
 - Never bypass a “Pushing source code … manually” guard; see **Push unblock**.
 - Verify PR author, head owner, and branch before rewriting. Never rewrite someone else’s branch.
 
-This does not permit admin/bypass merge or release in product repos; the allowlist below and repo-local rules govern those.
+Admin/bypass merge and product releases still follow the allowlist and repo-local rules.
 
 ## Approved repo families
 

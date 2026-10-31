@@ -17,15 +17,14 @@ description: >
 disable-model-invocation: true
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
+
 # Tooling checkup
 
-The user runs this by hand every 2 or 3 days. It must be safe to repeat, and
-fast when nothing changed. Run twelve phases in order. Each phase ends with a
-**Done when** check. Phases 10, 11, and 12 always run, even when an earlier
-phase is blocked.
+Follow the [run rules](reference/report-outline.md).
 
-`<skill-dir>` below means this skill's base directory.
-`TOOLING_ROOT` defaults to `~/apps/tooling`.
 
 **Scope.** `/tooling-checkup` alone runs all twelve phases. A request for one part
 runs Phase 1, that part, and Phases 10 to 12:

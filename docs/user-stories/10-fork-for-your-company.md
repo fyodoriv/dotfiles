@@ -1,5 +1,9 @@
 # User Story: Add Your organization's Config Without Forking Dotfiles
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Your company has internal tools, brewfile entries, doctor checks, or shell env that don't belong in the public dotfiles repo. Put them in a private, signed company plugin and install it with one command. Symmetric uninstall when you're done.
 
 **Metric:** Public forks of dotfiles — see [docs/metrics.md](../metrics.md#metrics).

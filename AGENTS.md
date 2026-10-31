@@ -1,7 +1,6 @@
 # AGENTS.md — dotfiles agent guide
 
-Always loaded: a router, not a manual. Open only the doc the routing table
-names.
+Always loaded: open only the doc the routing table names.
 
 ## Start here
 
@@ -98,7 +97,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 
 ## Gotchas
 
-- [Test order and hook targets](CONTRIBUTING.md).
+- [Host contract](docs/user-stories/README.md#agent-workflow-acceptance).
 
 - **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.

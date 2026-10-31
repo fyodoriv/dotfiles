@@ -40,7 +40,7 @@ setup_file() {
               dotfiles-brew-add dotfiles-defaults-add dotfiles-profile \
               cached-run git-maintain gh-wrapper git-wrapper output chezmoi \
               pre-commit brew-audit coverage tasks-lint verify-counts makefile-bats-jobs \
-              agent-artifact-coverage update-tooling-skill tooling-checkup-skill; do
+              agent-artifact-coverage update-tooling-skill tooling-checkup-skill user-stories; do
     echo "# $name tests" > "$TEST_REPO/tests/$name.bats"
   done
 
@@ -719,4 +719,44 @@ BATS
   result="$(affected_for notes.md | basenames)"
   printf '%s\n' "$result" | grep -qx reads-real-root
   ! printf '%s\n' "$result" | grep -qx reads-fixture-repo
+}
+
+
+@test "new stories and source workflows select the cross-host acceptance gate" {
+  local file
+  for file in docs/user-stories/99-fixture.md commands/new-workflow.md skills/new-workflow/SKILL.md Agentfile.yaml; do
+    mkdir -p "$(dirname "$TEST_REPO/$file")"
+    printf '# fixture\n' > "$TEST_REPO/$file"
+    git -C "$TEST_REPO" add "$file"
+    assert_affected_includes "$file" user-stories || return 1
+  done
+}
+
+
+@test "an added workflow in a previously committed Agentfile directory selects acceptance" {
+  mkdir -p "$TEST_REPO/new-commands"
+  printf 'commands: [./new-commands]\n' > "$TEST_REPO/Agentfile.yaml"
+  git -C "$TEST_REPO" add Agentfile.yaml
+  git -C "$TEST_REPO" commit -q --no-verify -m 'test: register command source'
+  printf '# New workflow without acceptance\n' > "$TEST_REPO/new-commands/future.md"
+  git -C "$TEST_REPO" add new-commands/future.md
+  [ "$(git -C "$TEST_REPO" diff --cached --name-only)" = new-commands/future.md ]
+  assert_affected_includes new-commands/future.md user-stories
+}
+
+
+@test "a committed individual command source selects acceptance only for that file" {
+  mkdir -p "$TEST_REPO/custom"
+  printf 'commands: [./custom/selected.md]\n' > "$TEST_REPO/Agentfile.yaml"
+  printf '# Initial selected workflow\n' > "$TEST_REPO/custom/selected.md"
+  git -C "$TEST_REPO" add Agentfile.yaml custom/selected.md
+  git -C "$TEST_REPO" commit -q --no-verify -m 'test: register individual command source'
+  printf '# Changed selected workflow\n' > "$TEST_REPO/custom/selected.md"
+  assert_affected_includes custom/selected.md user-stories
+  git -C "$TEST_REPO" restore custom/selected.md
+  printf '# Unselected sibling\n' > "$TEST_REPO/custom/sibling.md"
+  git -C "$TEST_REPO" add custom/sibling.md
+  run bash "$TEST_REPO/bin/bats-affected"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'/user-stories.bats'* ]]
 }

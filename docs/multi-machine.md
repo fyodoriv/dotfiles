@@ -293,3 +293,18 @@ their own accounts, so actions show under their name.
 - [Key rotation](key-rotation.md) — rotating age and SSH keys
 - [Troubleshooting](troubleshooting.md) — symptom-first fixes
 - [Security model](security-model.md) — how secrets and encryption work
+
+## Keep agent workflows consistent
+
+`dotfiles apply` merges shared, plugin, owner, local, and model layers into
+`~/.config/agentbrew/Agentfile.yaml`. `dotfiles update` selects that merged file
+after apply, including when apply creates it during the update. It uses the
+base `Agentfile.yaml` only when no merged file exists. The PATH command,
+checkout shim, and dry-run use the same rule. Owner settings stay local.
+
+Agentbrew deploys those sources to Claude Code and ChatGPT Work/Codex. Run
+`dotfiles actions --json` for the current CLI surface and follow the
+[agent workflow acceptance](user-stories/README.md#agent-workflow-acceptance)
+for shared recall and missing-memory behavior. Each host authenticates its
+own accounts. File sync does not copy login state, opt into memory privacy
+settings, transfer private records, or create account schedules.

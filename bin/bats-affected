@@ -129,6 +129,11 @@ pairs_note() {
   pairs_cur="${1:-}"
 }
 
+# Command source discovery is cached for one selector invocation.
+command_sources_checked=false
+command_sources_valid=true
+command_source_entries=()
+
 for file in "${changed_files[@]}"; do
   pairs_note "$file"
   # ── Run-all triggers ─────────────────────────────────────────────
@@ -153,6 +158,43 @@ for file in "${changed_files[@]}"; do
   if [[ "$file" == tests/*.bats ]]; then
     [ -f "$DOTFILES_DIR/$file" ] && affected+=("$DOTFILES_DIR/$file")
     continue
+  fi
+
+  # Every source-owned story/workflow inherits the dual-host memory contract.
+  case "$file" in
+    docs/user-stories/*|commands/*|skills/*|Agentfile.yaml)
+      affected+=("$TESTS_DIR/user-stories.bats") ;;
+  esac
+
+  if [[ "$file" == *.md ]]; then
+    if ! $command_sources_checked; then
+      command_sources_checked=true
+      if command_source_list="$(/usr/bin/ruby -ryaml -e '
+        data = File.file?(ARGV[0]) ? (YAML.load_file(ARGV[0]) || {}) : {}
+        dirs = data.fetch("commands", [])
+        raise "invalid command sources" unless dirs.is_a?(Array) && dirs.all? { |dir| dir.is_a?(String) }
+        puts dirs
+      ' "$DOTFILES_DIR/Agentfile.yaml" 2>/dev/null)"; then
+        while IFS= read -r command_source; do
+          [ -n "$command_source" ] || continue
+          command_source="${command_source#./}"
+          command_source_entries+=("${command_source%/}")
+        done <<< "$command_source_list"
+      else
+        command_sources_valid=false
+      fi
+    fi
+    if ! $command_sources_valid; then
+      affected+=("$TESTS_DIR/user-stories.bats")
+    else
+      for command_source in ${command_source_entries[@]+"${command_source_entries[@]}"}; do
+        if [[ "$file" == "$command_source" ]] \
+          || { [[ "$command_source" != *.md ]] && [[ "$file" == "$command_source/"* ]]; }; then
+          affected+=("$TESTS_DIR/user-stories.bats")
+          break
+        fi
+      done
+    fi
   fi
 
   # ── Source-owned agent skills ─────────────────────────────────────

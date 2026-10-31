@@ -3,6 +3,17 @@ description: Start dotfiles on this Mac (what is missing, what changed, what nee
 allowed-tools: Bash(dotfiles:*)
 ---
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+**Portable agent acceptance:** Use the same CLI handlers in Claude Code and
+ChatGPT Work/Codex. Before context-dependent work, use configured shared memory:
+`get_bootstrap_profile`, then semantic `memory_search`. If configured recall
+fails, report **shared memory unavailable** and the failed tool. Do not claim
+context-dependent readiness. If memory is unconfigured, state that scope.
+Deterministic CLI actions stay local and need no model. Do not copy OAuth,
+credentials, privacy choices, schedules, or private records between hosts.
+Save only non-sensitive reusable decisions through the memory session tool.
+
 Run `dotfiles` with no arguments. If `dotfiles` is not on PATH, run `bin/dotfiles` from the dotfiles checkout (`chezmoi source-path` prints it; a new Mac uses `~/apps/dotfiles`). It is safe and fast: no sudo, and it applies or installs nothing without a yes. It prints one line each for set up, applied, background jobs, health, and updates, then a numbered "Needs you" list and a `Next:` line.
 
 Then, answer first:

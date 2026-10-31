@@ -1,5 +1,9 @@
 # User Story: Stay Safe from Accidental Damage
 
+**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
+
+Follow the [agent workflow acceptance](README.md#agent-workflow-acceptance) before context-dependent work.
+
 > Multiple agents and automated scripts touch this repo. Safety nets prevent accidental deletions, secrets leaking, and destructive git operations.
 
 **Metric:** Private-reference matches on the public branch — see [docs/metrics.md](../metrics.md#metrics).

@@ -129,10 +129,11 @@ pairs_note() {
   pairs_cur="${1:-}"
 }
 
-# Command source discovery is cached for one selector invocation.
+# Workflow source discovery is cached for one selector invocation.
 command_sources_checked=false
 command_sources_valid=true
 command_source_entries=()
+skill_source_entries=()
 
 for file in "${changed_files[@]}"; do
   pairs_note "$file"
@@ -166,19 +167,36 @@ for file in "${changed_files[@]}"; do
       affected+=("$TESTS_DIR/user-stories.bats") ;;
   esac
 
-  if [[ "$file" == *.md ]]; then
+  if [ -n "$file" ]; then
     if ! $command_sources_checked; then
       command_sources_checked=true
       if command_source_list="$(/usr/bin/ruby -ryaml -e '
         data = File.file?(ARGV[0]) ? (YAML.load_file(ARGV[0]) || {}) : {}
         dirs = data.fetch("commands", [])
         raise "invalid command sources" unless dirs.is_a?(Array) && dirs.all? { |dir| dir.is_a?(String) }
-        puts dirs
+        skills = data.fetch("skillDirectories", [])
+        raise "invalid skill directories" unless skills.is_a?(Array) && skills.all? { |dir| dir.is_a?(String) }
+        dirs.each { |dir| puts "command\t#{dir}" }
+        root = File.realpath(File.dirname(ARGV[0]))
+        skills.each do |dir|
+          pointer = File.expand_path(dir, root)
+          path = pointer
+          path = File.realpath(path) if File.exist?(path)
+          next unless path == root || path.start_with?(root + "/")
+          [pointer, path].uniq.each do |owned|
+            next unless owned == root || owned.start_with?(root + "/")
+            puts "skill\t#{owned == root ? "." : owned.delete_prefix(root + "/")}"
+          end
+        end
       ' "$DOTFILES_DIR/Agentfile.yaml" 2>/dev/null)"; then
-        while IFS= read -r command_source; do
+        while IFS=$'\t' read -r source_kind command_source; do
           [ -n "$command_source" ] || continue
           command_source="${command_source#./}"
-          command_source_entries+=("${command_source%/}")
+          if [ "$source_kind" = skill ]; then
+            skill_source_entries+=("$command_source")
+          else
+            command_source_entries+=("${command_source%/}")
+          fi
         done <<< "$command_source_list"
       else
         command_sources_valid=false
@@ -190,6 +208,12 @@ for file in "${changed_files[@]}"; do
       for command_source in ${command_source_entries[@]+"${command_source_entries[@]}"}; do
         if [[ "$file" == "$command_source" ]] \
           || { [[ "$command_source" != *.md ]] && [[ "$file" == "$command_source/"* ]]; }; then
+          affected+=("$TESTS_DIR/user-stories.bats")
+          break
+        fi
+      done
+      for skill_source in ${skill_source_entries[@]+"${skill_source_entries[@]}"}; do
+        if [[ "$skill_source" == . || "$file" == "$skill_source" || "$file" == "$skill_source/"* ]]; then
           affected+=("$TESTS_DIR/user-stories.bats")
           break
         fi

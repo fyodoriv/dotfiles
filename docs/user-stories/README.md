@@ -70,9 +70,23 @@ does not prove that recall is unavailable.
 Acceptance uses synthetic inputs: equivalent CLI results on both hosts, an
 explicit missing-memory result, and unchanged owner files. The existing
 `tests/user-stories.bats` checker enumerates numbered stories, command sources
-from `Agentfile.yaml`, and repo-owned skill sources. Missing host,
+from `Agentfile.yaml`, and repo-owned skill sources, including declared
+`skillDirectories`. Missing host,
 memory, or regression acceptance fails the gate. Mutation fixtures add a new
-story and a new command source without acceptance and must be rejected.
+story and new workflow sources without acceptance and must be rejected.
+
+Declared skill folders are checked recursively for `SKILL.md`, even after the
+declaration was committed. This source contract conservatively covers nested
+skills; it does not claim that every nested file is deployed by the skill
+scanner. Only paths that resolve inside this repo are checked. External owner
+folders stay outside this repo's acceptance scope. Skill additions and edits
+select the existing story gate; missing folders can remain declared.
+Retargeting a declared internal symlink also selects that gate. Discovery keeps
+the repo-relative declaration pointer and its resolved owned folder. A pointer
+to an external folder does not add that folder to this repo's contract.
+Acceptance follows the declared role, not the filename: a command named
+`SKILL.md` needs the portable command protocol. A file selected as both a skill
+and a command must satisfy both contracts.
 
 A command source may be a directory or one `.md` file. An individual file
 imports only that workflow; sibling files remain outside its acceptance scope.

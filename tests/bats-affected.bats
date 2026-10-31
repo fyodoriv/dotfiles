@@ -760,3 +760,49 @@ BATS
   [ "$status" -eq 0 ]
   [[ "$output" != *'/user-stories.bats'* ]]
 }
+
+@test "custom skillDirectories select future skills after the declaration was committed" {
+  mkdir -p "$TEST_REPO/custom-skills/future"
+  printf 'skillDirectories: [./custom-skills]\n' > "$TEST_REPO/Agentfile.yaml"
+  git -C "$TEST_REPO" add Agentfile.yaml
+  git -C "$TEST_REPO" commit -q --no-verify -m 'test: register skill directory'
+  printf '# Future skill\n' > "$TEST_REPO/custom-skills/future/SKILL.md"
+  git -C "$TEST_REPO" add custom-skills/future/SKILL.md
+  [ "$(git -C "$TEST_REPO" diff --cached --name-only)" = custom-skills/future/SKILL.md ]
+  assert_affected_includes custom-skills/future/SKILL.md user-stories || return 1
+  git -C "$TEST_REPO" add custom-skills/future/SKILL.md
+  git -C "$TEST_REPO" commit -q --no-verify -m 'test: add declared skill'
+  assert_affected_includes custom-skills/future/SKILL.md user-stories || return 1
+  git -C "$TEST_REPO" restore custom-skills/future/SKILL.md
+  mkdir -p "$TEST_REPO/unselected/future"
+  printf '# Unselected skill\n' > "$TEST_REPO/unselected/future/SKILL.md"
+  git -C "$TEST_REPO" add unselected/future/SKILL.md
+  run bash "$TEST_REPO/bin/bats-affected"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'/user-stories.bats'* ]]
+}
+
+@test "custom skillDirectories select owned symlink retargets but exclude external targets" {
+  mkdir -p "$TEST_REPO/owned-a/future" "$TEST_REPO/owned-b/future"
+  printf '# First skill\n' > "$TEST_REPO/owned-a/future/SKILL.md"
+  printf '# Second skill\n' > "$TEST_REPO/owned-b/future/SKILL.md"
+  ln -s owned-a "$TEST_REPO/custom-skills"
+  printf 'skillDirectories: [./custom-skills]\n' > "$TEST_REPO/Agentfile.yaml"
+  git -C "$TEST_REPO" add Agentfile.yaml custom-skills owned-a owned-b
+  git -C "$TEST_REPO" commit -q --no-verify -m 'test: register owned skill pointer'
+  rm "$TEST_REPO/custom-skills"
+  ln -s owned-b "$TEST_REPO/custom-skills"
+  git -C "$TEST_REPO" add custom-skills
+  [ "$(git -C "$TEST_REPO" diff --cached --name-only)" = custom-skills ]
+  run bash "$TEST_REPO/bin/bats-affected"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'/user-stories.bats'* ]]
+  mkdir -p "$BATS_TEST_TMPDIR/external-skills/future"
+  printf '# External owner skill\n' > "$BATS_TEST_TMPDIR/external-skills/future/SKILL.md"
+  rm "$TEST_REPO/custom-skills"
+  ln -s "$BATS_TEST_TMPDIR/external-skills" "$TEST_REPO/custom-skills"
+  git -C "$TEST_REPO" add custom-skills
+  run bash "$TEST_REPO/bin/bats-affected"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'/user-stories.bats'* ]]
+}

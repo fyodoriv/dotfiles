@@ -1230,17 +1230,33 @@ MORNING="$REPO_ROOT/bin/morning"
 }
 
 
-# Story files and Agentfile command directories own this contract's inventory.
+# Story files and Agentfile workflow sources own this contract's inventory.
 agent_contract_files() {
-  local root="$1" dir dirs
+  local root="$1" dir dirs skill_files
   dirs="$(/usr/bin/ruby -ryaml -e 'puts YAML.load_file(ARGV[0]).fetch("commands", [])' "$root/Agentfile.yaml")" || return 1
-  printf '%s\n' "$root"/docs/user-stories/[0-9][0-9]-*.md "$root"/skills/*/SKILL.md
+  skill_files="$(/usr/bin/ruby -ryaml -e '
+    root = File.realpath(ARGV[0])
+    dirs = YAML.load_file(File.join(root, "Agentfile.yaml")).fetch("skillDirectories", [])
+    raise "invalid skill directories" unless dirs.is_a?(Array) && dirs.all? { |dir| dir.is_a?(String) }
+    dirs.each do |dir|
+      path = File.expand_path(dir, root)
+      next unless File.directory?(path)
+      path = File.realpath(path)
+      next unless path == root || path.start_with?(root + "/")
+      Dir.glob(File.join(path, "**", "SKILL.md")).each do |file|
+        puts "skill\t#{File.join(ARGV[0], file.delete_prefix(root + "/"))}" if File.realpath(file).start_with?(root + "/")
+      end
+    end
+  ' "$root")" || return 1
+  printf 'story\t%s\n' "$root"/docs/user-stories/[0-9][0-9]-*.md
+  printf 'skill\t%s\n' "$root"/skills/*/SKILL.md
+  [ -z "$skill_files" ] || printf '%s\n' "$skill_files"
   while IFS= read -r dir; do
     [ -n "$dir" ] || continue
     if [ -d "$root/$dir" ]; then
-      printf '%s\n' "$root/$dir"/*.md
+      printf 'command\t%s\n' "$root/$dir"/*.md
     elif [ -f "$root/$dir" ] && [[ "$dir" == *.md ]]; then
-      printf '%s\n' "$root/$dir"
+      printf 'command\t%s\n' "$root/$dir"
     else
       echo "missing command source: $dir" >&2
       return 1
@@ -1249,16 +1265,16 @@ agent_contract_files() {
 }
 
 check_agent_contract() {
-  local root="$1" file files bad=0
+  local root="$1" kind file files bad=0
   files="$(agent_contract_files "$root")" || return 1
-  while IFS= read -r file; do
+  while IFS=$'\t' read -r kind file; do
     [ -f "$file" ] || continue
     if ! grep -qF '**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.' "$file"; then
       echo "missing host, shared-memory, or regression acceptance: ${file#$root/}"
       bad=1
     fi
-    case "$file" in
-      "$root"/docs/user-stories/*|"$root"/skills/*/SKILL.md)
+    case "$kind" in
+      story|skill)
         grep -qF '#agent-workflow-acceptance)' "$file" || { echo "missing source acceptance link: ${file#$root/}"; bad=1; } ;;
       *)
         for phrase in '**Portable agent acceptance:**' get_bootstrap_profile memory_search 'shared memory unavailable' 'Do not copy OAuth'; do
@@ -1291,6 +1307,42 @@ check_agent_contract() {
   run check_agent_contract "$fixture"
   [ "$status" -eq 1 ]
   [[ "$output" == *'new-workflow.md'* ]]
+}
+
+@test "custom skillDirectories enforce skill acceptance for future additions" {
+  local fixture="$BATS_TEST_TMPDIR/custom-skill-contract"
+  mkdir -p "$fixture/docs/user-stories" "$fixture/custom-skills/future" "$BATS_TEST_TMPDIR/external-skills/private"
+  printf 'skillDirectories: [./custom-skills, "%s"]\n' "$BATS_TEST_TMPDIR/external-skills" > "$fixture/Agentfile.yaml"
+  printf '# External owner skill without this repo acceptance\n' > "$BATS_TEST_TMPDIR/external-skills/private/SKILL.md"
+  printf '# Future skill\n' > "$fixture/custom-skills/future/SKILL.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'custom-skills/future/SKILL.md'* ]]
+  printf '**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.\n[acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance)\n' > "$fixture/custom-skills/future/SKILL.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 0 ]
+  printf '**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.\n' > "$fixture/custom-skills/future/SKILL.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'missing source acceptance link: custom-skills/future/SKILL.md'* ]]
+}
+
+@test "custom skillDirectories preserve both roles for a selected command named SKILL.md" {
+  local fixture="$BATS_TEST_TMPDIR/skill-named-command"
+  mkdir -p "$fixture/docs/user-stories" "$fixture/custom/future"
+  printf 'commands: [./custom/future/SKILL.md]\nskillDirectories: [./custom]\n' > "$fixture/Agentfile.yaml"
+  printf '**Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.\n[acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance)\n' > "$fixture/custom/future/SKILL.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'missing portable'* ]]
+  cp "$REPO_ROOT/commands/dotfiles.md" "$fixture/custom/future/SKILL.md"
+  printf '\n[acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance)\n' >> "$fixture/custom/future/SKILL.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 0 ]
+  cp "$REPO_ROOT/commands/dotfiles.md" "$fixture/custom/future/SKILL.md"
+  run check_agent_contract "$fixture"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'missing source acceptance link'* ]]
 }
 
 

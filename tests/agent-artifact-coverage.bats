@@ -156,7 +156,8 @@ EOF
   grep -q "approved repo families" "$owner_rules"
   grep -q "never bypass-merge someone else's PR" "$owner_rules"
   grep -q "Every PR needs uncommitted visual proof" "$agentfile"
-  grep -q "as \`heavy-run <command>\`: one Mac-wide lock" "$agentfile"
+  grep -q "as \`heavy-run <command>\`: a few Mac-wide slots" "$agentfile"
+  grep -q "heavy-run --exclusive <command>" "$agentfile"
 }
 
 @test "Agentfile inline rules do not repeat the agentbrew bootstrap" {

@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
-# Tests for bin/heavy-run — one heavy command at a time, at low priority.
+# Tests for bin/heavy-run — heavy commands in a few parallel slots, at low priority.
+# Most tests pin one slot (the old single-lock behavior); the slot tests set more.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/heavy-run"
 
@@ -7,6 +8,10 @@ bats_require_minimum_version 1.5.0
 
 setup() {
   export HEAVY_RUN_DIR="$BATS_TEST_TMPDIR/hr"
+  # A scratch HOME keeps the real heavy_run_* settings out; a probe that
+  # prints nothing means memory is fine, so tests do not depend on this Mac.
+  export HOME="$BATS_TEST_TMPDIR/home" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
+  unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD
   unset HEAVY_RUN_HELD FIFO_RELEASE
 }
 
@@ -17,11 +22,11 @@ teardown() {
   fi
 }
 
-# Wait up to 5 s for the first run to hold the lock.
+# Wait up to 5 s until $1 runs (default 1) hold a slot.
 wait_held() {
   local i
   for i in $(seq 50); do
-    [ -s "$HEAVY_RUN_DIR/owner" ] && return 0
+    [ "$("$SCRIPT" --status | grep -c "^slot ")" -ge "${1:-1}" ] && return 0
     sleep 0.1
   done
   return 1
@@ -90,7 +95,7 @@ SH
   [[ "$output" == *"cannot raise priority"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
   run "$SCRIPT" --status
-  [ "$output" = free ]
+  [ "$output" = "free: 0/1 slots busy" ]
 }
 
 @test "heavy-run: absolute priority honors a configured target" {
@@ -144,10 +149,11 @@ SH
   "$SCRIPT" sleep 1 &
   wait_held
   run "$SCRIPT" --status
-  [[ "$output" == held:*"cmd=sleep 1"* ]]
+  [ "${lines[0]}" = "busy: 1/1 slots" ]
+  [[ "${lines[1]}" == "slot 1: "*"cmd=sleep 1"* ]]
   wait
   run "$SCRIPT" --status
-  [ "$output" = "free" ]
+  [ "$output" = "free: 0/1 slots busy" ]
 }
 
 @test "heavy-run: --status ignores an owner line whose pid is gone" {
@@ -156,14 +162,14 @@ SH
   wait "$dead"
   echo "10:00:00 pid=$dead cwd=/x cmd=old" >"$HEAVY_RUN_DIR/owner"
   run "$SCRIPT" --status
-  [ "$output" = "free" ]
+  [ "$output" = "free: 0/1 slots busy" ]
 }
 
 @test "heavy-run: a nested call runs at once and keeps the outer owner line" {
   run --separate-stderr "$SCRIPT" sh -c "'$SCRIPT' sh -c 'echo inner'; '$SCRIPT' --status"
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "inner" ]
-  [[ "${lines[1]}" == held:* ]]
+  [[ "${lines[1]}" == busy:* ]]
 }
 
 @test "heavy-run: rejects a bad HEAVY_RUN_NICE" {
@@ -186,7 +192,7 @@ SH
   "$SCRIPT" true
   [ $(( $(date +%s) - start )) -lt 3 ]
   run "$SCRIPT" --status
-  [ "$output" = "free" ]
+  [ "$output" = "free: 0/1 slots busy" ]
 }
 
 @test "heavy-run: a command that starts with a dash is not a nice option" {
@@ -201,7 +207,7 @@ SH
 @test "heavy-run: a stale HEAVY_RUN_HELD does not skip a free lock" {
   mkdir -p "$HEAVY_RUN_DIR"
   HEAVY_RUN_HELD="$HEAVY_RUN_DIR/lock" run "$SCRIPT" sh -c "'$SCRIPT' --status"
-  [[ "$output" == held:* ]]
+  [[ "$output" == busy:* ]]
 }
 
 # Wait up to 5 s until --status lists $1 live queue entries.
@@ -242,9 +248,9 @@ fake_live_ticket() {
     wait_queued $(( $(printf '%d' "'$n") - 64 ))
   done
   run "$SCRIPT" --status
-  [[ "${lines[1]}" == "queue 1: "*"echo A"* ]]
-  [[ "${lines[2]}" == "queue 2: "*"echo B"* ]]
-  [[ "${lines[3]}" == "queue 3: "*"echo C"* ]]
+  [[ "${lines[2]}" == "queue 1: "*"echo A"* ]]
+  [[ "${lines[3]}" == "queue 2: "*"echo B"* ]]
+  [[ "${lines[4]}" == "queue 3: "*"echo C"* ]]
   release_fifo_holder
   wait
   run cat "$log"
@@ -272,9 +278,9 @@ fake_live_ticket() {
   "$SCRIPT" sh -c "echo second" &
   wait_queued 2
   run "$SCRIPT" --status
-  [[ "${lines[0]}" == held:* ]]
-  [[ "${lines[1]}" == "queue 1: "*"echo first"* ]]
-  [[ "${lines[2]}" == "queue 2: "*"echo second"* ]]
+  [[ "${lines[0]}" == busy:* ]]
+  [[ "${lines[2]}" == "queue 1: "*"echo first"* ]]
+  [[ "${lines[3]}" == "queue 2: "*"echo second"* ]]
   release_fifo_holder
   wait
 }
@@ -350,14 +356,14 @@ fake_live_ticket() {
   fake_live_ticket 9999999999
   HEAVY_RUN_HELD="$HEAVY_RUN_DIR/lock" run "$SCRIPT" sh -c "'$SCRIPT' --status"
   kill "$FAKE_PID"
-  [[ "${lines[0]}" == held:* ]]
+  [[ "${lines[0]}" == busy:* ]]
 }
 
 @test "heavy-run: --status skips a ticket nobody holds" {
   mkdir -p "$HEAVY_RUN_DIR/queue"
   echo "pid=1 cwd=/x cmd=ghost" >"$HEAVY_RUN_DIR/queue/0000000000-1"
   run "$SCRIPT" --status
-  [ "$output" = "free" ]
+  [ "$output" = "free: 0/1 slots busy" ]
 }
 
 @test "heavy-run: an unusable queue folder warns once and falls back to the plain lock" {
@@ -395,4 +401,191 @@ fake_live_ticket() {
   touch -t 202001010000 "$HEAVY_RUN_DIR/queue/.new-424242"
   "$SCRIPT" true
   [ -z "$(ls -A "$HEAVY_RUN_DIR/queue")" ]
+}
+
+# --- Slots: several runs at once, exclusive runs, and machine checks ---
+
+RELEASE_ALL=""
+
+# Start a run that holds its slot until $BATS_TEST_TMPDIR/release exists.
+# Extra arguments go before the command (for example --exclusive).
+start_holder() {
+  RELEASE_ALL="$BATS_TEST_TMPDIR/release"
+  "$SCRIPT" "$@" perl -e 'alarm 60; until (-e $ARGV[0]) { select undef, undef, undef, 0.05 }' "$RELEASE_ALL" &
+}
+
+release_all() {
+  : > "$RELEASE_ALL"
+  wait
+}
+
+@test "heavy-run: slots: three runs share three slots at once, a fourth waits for a free slot" {
+  export HEAVY_RUN_SLOTS=3
+  start_holder; start_holder; start_holder
+  wait_held 3
+  marker="$BATS_TEST_TMPDIR/fourth"
+  "$SCRIPT" touch "$marker" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [ "${lines[0]}" = "busy: 3/3 slots" ]
+  [[ "${lines[4]}" == "queue 1: "*"(waiting: no free slot (3/3 busy))" ]]
+  [ ! -e "$marker" ]
+  release_all
+  [ -e "$marker" ]
+}
+
+@test "heavy-run: slots: each run sees its own HEAVY_RUN_SLOT" {
+  export HEAVY_RUN_SLOTS=2
+  start_holder
+  wait_held 1
+  run "$SCRIPT" sh -c 'echo "$HEAVY_RUN_SLOT"'
+  release_all
+  [ "$output" = 2 ]
+}
+
+@test "heavy-run: slots: --exclusive waits for running runs, then blocks later runs" {
+  export HEAVY_RUN_SLOTS=4
+  log="$BATS_TEST_TMPDIR/order"
+  start_holder
+  wait_held 1
+  "$SCRIPT" --exclusive sh -c "echo excl-start >>'$log'; sleep 1; echo excl-end >>'$log'" &
+  wait_queued 1
+  "$SCRIPT" sh -c "echo after >>'$log'" &
+  wait_queued 2
+  run "$SCRIPT" --status
+  [[ "${lines[2]}" == "queue 1: "*"[exclusive] (waiting: exclusive: waiting for 1 running run(s) to end)" ]]
+  [[ "${lines[3]}" == "queue 2: "*"(waiting: behind queue 1)" ]]
+  [ ! -e "$log" ]
+  : > "$RELEASE_ALL"
+  for i in $(seq 50); do grep -q excl-start "$log" 2>/dev/null && break; sleep 0.1; done
+  run "$SCRIPT" --status
+  [[ "${lines[0]}" == "exclusive: "*"echo excl-start"* ]]
+  wait
+  run cat "$log"
+  [ "${lines[0]}" = "excl-start" ]
+  [ "${lines[1]}" = "excl-end" ]
+  [ "${lines[2]}" = "after" ]
+}
+
+@test "heavy-run: slots: a normal run waits while an exclusive run is active" {
+  export HEAVY_RUN_SLOTS=4
+  start_holder --exclusive
+  for i in $(seq 50); do "$SCRIPT" --status | grep -q '^exclusive: ' && break; sleep 0.1; done
+  "$SCRIPT" true &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "queue 1: "*"(waiting: an exclusive run is active)" ]]
+  release_all
+  run "$SCRIPT" --status
+  [ "$output" = "free: 0/4 slots busy" ]
+}
+
+@test "heavy-run: slots: a SIGKILLed run frees its slot at once" {
+  export HEAVY_RUN_SLOTS=1
+  "$SCRIPT" sleep 30 &
+  victim=$!
+  wait_held 1
+  child=$(sed -n 's/.* pid=\([0-9]*\) .*/\1/p' "$HEAVY_RUN_DIR/slots/1.owner")
+  kill -KILL "$victim"
+  wait "$victim" 2>/dev/null || true
+  run timeout 10 "$SCRIPT" echo after
+  kill "$child" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$output" = "after" ]
+}
+
+@test "heavy-run: slots: a leftover slot owner line from a dead run reads as free" {
+  mkdir -p "$HEAVY_RUN_DIR/slots"
+  : >"$HEAVY_RUN_DIR/slots/1"
+  echo "10:00:00 pid=1 cwd=/x cmd=ghost" >"$HEAVY_RUN_DIR/slots/1.owner"
+  run "$SCRIPT" --status
+  [ "$output" = "free: 0/1 slots busy" ]
+  run "$SCRIPT" echo ran
+  [ "$output" = "ran" ]
+}
+
+@test "heavy-run: slots: memory pressure holds extra runs but never the first" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_PROBE="test -e '$BATS_TEST_TMPDIR/pressure' && echo memory pressure warn"
+  : >"$BATS_TEST_TMPDIR/pressure"
+  start_holder
+  wait_held 1
+  marker="$BATS_TEST_TMPDIR/second"
+  "$SCRIPT" touch "$marker" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "${lines[2]}" == "queue 1: "*"(waiting: memory pressure warn)" ]]
+  [ ! -e "$marker" ]
+  rm "$BATS_TEST_TMPDIR/pressure"
+  for i in $(seq 50); do [ -e "$marker" ] && break; sleep 0.1; done
+  [ -e "$marker" ]
+  release_all
+}
+
+@test "heavy-run: slots: the ramp spaces out run starts" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_RAMP=30
+  start_holder
+  wait_held 1
+  "$SCRIPT" true &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "${lines[2]}" == *"(waiting: ramp: last run started "*"s ago, next after 30s)" ]]
+  release_all
+}
+
+@test "heavy-run: slots: HEAVY_RUN_MAX_LOAD holds extra runs above the load" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_MAX_LOAD=0.0001
+  start_holder
+  wait_held 1
+  "$SCRIPT" true &
+  wait_queued 1
+  run "$SCRIPT" --status
+  release_all
+  # An idle CI box can show load 0.00; then no wait is a pass too.
+  [[ "${lines[2]}" == *"(waiting: load "*" above 0.0001)" ]] || [ "${#lines[@]}" -le 2 ]
+}
+
+@test "heavy-run: slots: the heavy_run_slots setting sets the count; env wins" {
+  unset HEAVY_RUN_SLOTS
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_slots: 3\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  run "$SCRIPT" --status
+  [ "$output" = "free: 0/3 slots busy" ]
+  HEAVY_RUN_SLOTS=2 run "$SCRIPT" --status
+  [ "$output" = "free: 0/2 slots busy" ]
+}
+
+@test "heavy-run: slots: the automatic count is at least 1" {
+  unset HEAVY_RUN_SLOTS
+  run "$SCRIPT" --status
+  [[ "$output" =~ ^free:\ 0/[1-9][0-9]*\ slots\ busy$ ]]
+}
+
+@test "heavy-run: slots: rejects a bad HEAVY_RUN_SLOTS, HEAVY_RUN_RAMP or HEAVY_RUN_MAX_LOAD" {
+  for v in 0 65 x -1; do
+    HEAVY_RUN_SLOTS=$v run "$SCRIPT" true
+    [ "$status" -eq 2 ]
+    [[ "$output" == *HEAVY_RUN_SLOTS* ]]
+  done
+  HEAVY_RUN_RAMP=x run "$SCRIPT" true
+  [ "$status" -eq 2 ]
+  HEAVY_RUN_MAX_LOAD=1.2.3 run "$SCRIPT" true
+  [ "$status" -eq 2 ]
+}
+
+@test "heavy-run: slots: --exclusive with no command prints usage and exits 2" {
+  run "$SCRIPT" --exclusive
+  [ "$status" -eq 2 ]
+  [[ "$output" == Usage:* ]]
+}
+
+@test "heavy-run: the state folder is private: folder 0700, files 0600" {
+  mkdir -p "$HEAVY_RUN_DIR"
+  chmod 755 "$HEAVY_RUN_DIR"
+  "$SCRIPT" true
+  mode() { perl -e 'printf "%o\n", (stat $ARGV[0])[2] & 07777' "$1"; }
+  [ "$(mode "$HEAVY_RUN_DIR")" = 700 ]
+  [ "$(mode "$HEAVY_RUN_DIR/lock")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/seq")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/slots/1")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/waits.log")" = 600 ]
 }

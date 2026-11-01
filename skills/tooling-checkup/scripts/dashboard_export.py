@@ -27,6 +27,7 @@ Usage: python3 dashboard_export.py [--out DIR] [--state-dir DIR]
 """
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -266,7 +267,11 @@ def load_rows(path: Path, now: float) -> list:
         epoch, load1, cpus, free, swap = (number(cols[i]) for i in (0, 2, 5, 6, 7))
         if None in (epoch, load1, cpus) or epoch < since or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}", cols[1][:13]):
             continue
-        h = hours.setdefault(cols[1][:13], {"load": [], "free": [], "swap": [], "over": 0})
+        try:
+            hour = datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y-%m-%dT%H:00Z")
+        except (ValueError, OverflowError, OSError):
+            continue
+        h = hours.setdefault(hour, {"load": [], "free": [], "swap": [], "over": 0})
         h["load"].append(load1)
         if free is not None:
             h["free"].append(free)
@@ -276,7 +281,7 @@ def load_rows(path: Path, now: float) -> list:
             h["over"] += 1
     return [
         {
-            "hour": hour + ":00",
+            "hour": hour,
             "samples": len(h["load"]),
             "peak_load1": number(max(h["load"])),
             "mean_load1": number(sum(h["load"]) / len(h["load"])),

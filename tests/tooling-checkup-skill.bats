@@ -1112,7 +1112,7 @@ JSON
   run run_dashboard_export --load-samples "$TEST_DIR/load.tsv" --perf-dir "$TEST_DIR/perf" --now "$now"
   [ "$status" -eq 0 ]
   run jq -c '.' "$TEST_DIR/out/load.json"
-  [ "$output" = '[{"hour":"2026-10-25T20:00","max_swap_mb":9,"mean_load1":20,"min_free_mem_pct":70,"overload_samples":1,"peak_load1":30,"samples":2}]' ]
+  [ "$output" = '[{"hour":"2026-10-26T00:00Z","max_swap_mb":9,"mean_load1":20,"min_free_mem_pct":70,"overload_samples":1,"peak_load1":30,"samples":2}]' ]
   run jq -c '.' "$TEST_DIR/out/agent_time.json"
   [ "$output" = '[{"calls":2,"day":"2026-10-25","failed_calls":1,"project":"dotfiles","tool_hours":1.5},{"calls":1,"day":"2026-10-25","failed_calls":0,"project":"other","tool_hours":0.1}]' ]
   ! grep -qi secretcorp "$TEST_DIR"/out/*.json

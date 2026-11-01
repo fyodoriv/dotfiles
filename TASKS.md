@@ -93,11 +93,17 @@ them. -->
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
   - **ID**: dashboard-chart-gate-hardening
+  - **Blocked**: needs-deployed-test-host — 2026-11-01: runtime and browser-gate changes are prepared together but excluded from ready delivery. The existing dashboard remained on a browser-verification page after more than 120 seconds, and no Dashboard writer capability is available. Synthetic-host screenshots are unit proof only. Unblock: use an accessible dedicated deployed test dashboard with fabricated datasets; capture labeled before/after proof for hourly binding and line contrast on phone/desktop in light/dark, then complete independent review and required local gates. Keep the UI branch as a draft until then.
   - **Tags**: ui, tooling-checkup
   - **Details**: Four leftovers from the round-2 review of the Hallmark dashboard redesign. (1) The load chart can show a duplicate or a missing local hour on a daylight-saving change, because the exporter keys rows by local time: key them by UTC and format in the page. (2) The gate's tap test uses a mouse click, not `touchscreen.tap`. (3) The gate presses ArrowLeft but never checks that the tooltip moved. (4) Chart line colours (non-text contrast, WCAG 1.4.11) are not gated.
   - **Files**: `skills/tooling-checkup/scripts/dashboard_export.py`, `skills/tooling-checkup/dashboard/index.html`, `skills/tooling-checkup/scripts/dashboard_comfort.cjs`, `tests/tooling-checkup-dashboard.bats`
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
+  - **Hypothesis**: Goal: reliable hourly charts and interaction evidence. Question: can UTC keys and direct browser checks prevent the four reported regressions? Metric: both DST fixture weeks retain 168 distinct hourly rows, touch and keyboard checks pass, and every chart line reaches 3:1 contrast in both themes.
+  - **Measurement**: `heavy-run bats tests/tooling-checkup-dashboard-hours.bats tests/tooling-checkup-dashboard.bats`.
+  - **Success**: 168 of 168 distinct hours in both fixtures, 0 interaction failures, and minimum chart contrast at least 3:1.
+  - **Pivot**: Any lost hour, interaction failure, or chart contrast below 3:1 abandons this implementation until the failing case has a reliable gate.
+  - **Anchor**: W3C WCAG 2.1, 1.4.11 Non-text Contrast; Basili, Caldiera, Rombach (1994), Goal Question Metric.
 
 - [ ] Tighten the perl alarm guard test
   - **ID**: perl-alarm-guard-gaps

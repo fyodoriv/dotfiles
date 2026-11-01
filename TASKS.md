@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Foreign-owned optional apps do not abort the rest of apply
+  - **ID**: optional-cask-adoption
+  - **Tags**: reliability, tooling
+  - **Details**: Resolve the reported public-tool behavior with isolated fixtures. Do not read organization payloads or install software on the test host.
+  - **Files**: .chezmoiscripts/run_onchange_brew.sh.tmpl, lib/, tests/, docs/what-gets-changed.md
+  - **Output**: code
+  - **Acceptance**: zero fixture failures; later apply steps are reached for the foreign-owned app case, and a genuine bundle error still fails.
+  - **Hypothesis**: headless apply aborts caused by adoption of an existing foreign-owned app fall from one to zero in the seeded Maccy-style fixture because only that uninstalled cask is omitted before the bundle; formula installation and unrelated genuine failures retain their existing behavior.
+  - **Measurement**: `bats tests/brew-cask-adoption.bats`
+  - **Success**: zero fixture failures; later apply steps are reached for the foreign-owned app case, and a genuine bundle error still fails.
+  - **Pivot**: any swallowed unrelated package failure or skipped same-owner/missing app -> abandon preflight filtering and split optional casks behind a separately measured boundary.
+  - **Anchor**: Basili, Caldiera, Rombach 1994, Goal Question Metric; Forsgren, Humble, Kim 2018, stability.
+  - **Competitive-goal**: none — correctness of existing tooling, not a scorecard metric.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

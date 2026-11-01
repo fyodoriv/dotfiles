@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Doctor distinguishes missing Power Protect readiness files
+  - **ID**: power-protect-readiness-instrumentation
+  - **Tags**: reliability, doctor
+  - **Details**: The upstream Power Protect guide documents a user script and an administrator configuration file. Instrument their presence without installing them or claiming actual closed-display agent continuity. The separate physical uptime experiment remains independent.
+  - **Files**: `modules/resilience/doctor.sh`, `tests/power-protect-readiness.bats`, `docs/module-reference.md`
+  - **Output**: code
+  - **Acceptance**: Apple Silicon with Amphetamine reports a readiness advisory when either file is absent and passes when both exist; other machines are not warned; list mode still exposes the ID.
+  - **Hypothesis**: missed readiness warnings on the missing-file fixture fall from one to zero because the doctor observes both upstream installation markers instead of inferring readiness from an app preference.
+  - **Measurement**: `bats tests/power-protect-readiness.bats`
+  - **Success**: zero failed assertions; each missing-file fixture warns, both-files-present passes, and non-applicable fixtures do not warn.
+  - **Pivot**: any false presence pass or unexpected host write -> abandon presence-only inference and report unknown readiness pending an upstream status interface.
+  - **Anchor**: https://github.com/x74353/Amphetamine-Power-Protect (installation paths); Basili, Caldiera, Rombach 1994, Goal Question Metric.
+  - **Competitive-goal**: none — readiness instrumentation, not a claim of measured uptime or a scorecard metric.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

@@ -282,3 +282,11 @@ them. -->
   - **Output**: decision
   - **Acceptance**: a current upstream probe records which checks can be delegated; delete wrappers only when the regression tests pass against the replacement.
   - **Competitive-goal**: none — upstream delegation for machine readiness, not a scorecard metric.
+
+- [ ] Git guard ignores inert quoted heredoc prose (issue #402)
+  - **ID**: git-guard-shell-text
+  - **Hypothesis**: Goal: safe command checks without prose false positives. Question: can quoted heredoc bodies be excluded without hiding executable commands? Metric: prose false-positive regressions fall from 1 to 0; existing destructive-command blocks remain unchanged.
+  - **Measurement**: `bats tests/agent-hooks-block-dangerous-git.bats tests/agent-hooks-block-dangerous-git-merged.bats`
+  - **Success**: 0 false-positive failures and 0 destructive-command regression failures.
+  - **Pivot**: Any destructive-command regression failure means abandon the sanitizer and retain conservative parsing until a reusable shell parser is available.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; existing destructive-command safety regression suite.

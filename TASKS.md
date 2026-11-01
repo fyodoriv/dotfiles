@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Slack draft count and delete reach the Drafts page
+  - **ID**: slack-draft-readiness
+  - **Tags**: reliability, tooling
+  - **Details**: Resolve the reported public-tool behavior with isolated fixtures. Do not read organization payloads or install software on the test host.
+  - **Files**: bin/slack-draft, tests/slack-draft.bats, tests/fixtures/fake-slack-page.mjs
+  - **Output**: code
+  - **Acceptance**: all existing safety cases and new navigation/timeout/confirm cases pass with zero failures; ready-view deadline is at most 30 seconds.
+  - **Hypothesis**: channel-start count/delete failures fall from one to zero in each fixture and dialog confirmation failures fall from one to zero because each command navigates before matching and the owned fresh dialog has a confirm fallback.
+  - **Measurement**: `bats tests/slack-draft.bats`
+  - **Success**: all existing safety cases and new navigation/timeout/confirm cases pass with zero failures; ready-view deadline is at most 30 seconds.
+  - **Pivot**: any wrong-recipient deletion, decoy-modal click, or deadline overrun -> abandon automatic action and keep fail-closed handling pending a verified selector contract.
+  - **Anchor**: Basili, Caldiera, Rombach 1994, Goal Question Metric; Forsgren, Humble, Kim 2018, stability.
+  - **Competitive-goal**: none — correctness of existing tooling, not a scorecard metric.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

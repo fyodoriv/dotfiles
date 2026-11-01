@@ -121,6 +121,7 @@ Installed via `run_onchange_brew.sh.tmpl`. Re-runs automatically when the Brewfi
 |---|---|
 | Terminal | `tmux`, `ghostty` (cask), `font-jetbrains-mono-nerd-font` (cask) |
 | Extras | `difftastic`, `dockutil`, `duf`, `dust`, `duti`, `git-trim`, `hyperfine`, `jrnl`, `lazygit`, `poppler`, `procs`, `tig`, `watchexec`, `yazi`, `hiddenbar` (cask), `maccy` (cask) |
+| Checked tools | `agent-browser`, `visual-studio-code` (cask): the agent-browser and vscode doctor modules run on full and need them |
 
 ### Enterprise additions (when `is_enterprise: true`)
 

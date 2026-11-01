@@ -54,7 +54,7 @@ To keep one of your own settings, list it in `~/.config/dotfiles/macos-defaults-
 |---|---|---|
 | Keyboard | 8 | Fast key repeat (1/15), disable autocorrect, auto-capitalization, smart quotes |
 | Finder | 12 | Show hidden files, path bar, status bar, all extensions; column view; folders first |
-| Dock performance | 9 | Zero autohide delay, fast animations, scale minimize, disable launch bounce |
+| Dock performance | 10 | Zero autohide delay, fast animations, scale minimize, disable launch bounce and automatic Space switching |
 | Dialogs & app behavior | 7 | Save to disk (not iCloud), expanded Save/Print dialogs, quit closes windows |
 | Activity Monitor | 6 | Show all processes, sort by CPU, 1s refresh, CPU history icon |
 | Screenshots | 4 | Save to Desktop as PNG, no shadow, no thumbnail |
@@ -81,7 +81,7 @@ To keep one of your own settings, list it in `~/.config/dotfiles/macos-defaults-
 
 | Category | Count | Key changes |
 |---|---|---|
-| Hot corners | 8 | Top-right: Mission Control, bottom-left: Start Screen Saver, bottom-right: Desktop |
+| Hot corners | 8 | Top-right: Mission Control, bottom-left: Start Screen Saver, bottom-right: no action |
 | Dock appearance | 6 | Auto-hide, 44px tiles, magnification to 56px, hide recents, hide indicators |
 | Trackpad | 5 | Speed 3.0, tap to click, three-finger drag (`trackpad_swipe_fingers: 3` turns drag off and moves desktop and Mission Control swipes to 3 fingers, on every profile) |
 | Finder sidebar | 3 | 180px sidebar, show desktop icons |

@@ -358,13 +358,15 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 
 ### macos
 
-46 `check_defaults` checks (all auto-fix via `defaults write`) plus 4-6 special checks.
+`check_defaults` checks auto-fix via `defaults write`; special checks cover other system settings.
+
+The macOS doctor checks `macos.dock_auto_swoosh` on every profile to keep background activation on the current Space. The full profile also checks `macos.dock_bottom_right_corner`, which keeps the bottom-right hot corner inactive.
 
 | Category | Check IDs | Count | What it verifies |
 |----------|-----------|-------|-----------------|
 | Animations | `macos.window_animations`, `scroll_animations`, `resize_time` | 3 | Window/scroll animations disabled |
 | Keyboard | `key_repeat`, `initial_key_repeat`, `press_and_hold`, `autocorrect`, `autocapitalize`, `smartquotes`, `smartdashes`, `period_substitution`, `text_completion` | 9 | Fastest key repeat, no auto-correct/smart-quotes |
-| Dock | `dock_autohide`, `dock_autohide_delay`, `dock_launch_anim`, `dock_minimize`, `dock_mru`, `dock_recents`, `dock_expose_speed` | 7 | Instant autohide, no animations |
+| Dock | `dock_autohide`, `dock_autohide_delay`, `dock_launch_anim`, `dock_minimize`, `dock_mru`, `dock_recents`, `dock_expose_speed`, `dock_auto_swoosh`, `dock_bottom_right_corner` (full only) | 8-9 | Instant autohide, no animations, current Space preserved |
 | Finder | `finder_hidden_files`, `finder_pathbar`, `finder_statusbar`, `finder_folders_first`, `finder_extensions`, `finder_no_anim`, `finder_ext_warning`, `finder_search_scope`, `finder_column_view`, `finder_desktop_icons` | 10 | Show hidden files, path bar, all extensions, desktop icons |
 | DS_Store | `no_ds_store_network`, `no_ds_store_usb` | 2 | No .DS_Store on external volumes |
 | Screenshots | `screenshot_type`, `screenshot_shadow` | 2 | PNG format, no shadow |

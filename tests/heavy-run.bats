@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for bin/heavy-run — heavy commands in a few parallel slots, at low priority.
+# Tests for bin/heavy-run — heavy commands in shared slots (one by default), at low priority.
 # Most tests pin one slot (the old single-lock behavior); the slot tests set more.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/heavy-run"
@@ -11,6 +11,8 @@ setup() {
   # A scratch HOME keeps the real heavy_run_* settings out; a probe that
   # prints nothing means memory is fine, so tests do not depend on this Mac.
   export HOME="$BATS_TEST_TMPDIR/home" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
+  # No real-time app holds the tests, even while one runs on this Mac.
+  export HEAVY_RUN_PAUSE_APPS=""
   unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD
   unset HEAVY_RUN_HELD FIFO_RELEASE
 }
@@ -554,10 +556,19 @@ release_all() {
   [ "$output" = "free: 0/2 slots busy" ]
 }
 
-@test "heavy-run: slots: the automatic count is at least 1" {
+@test "heavy-run: slots: the default is one slot, whatever the machine size" {
+  # 2026-11-01: an automatic 4 slots let several suites and builds run at once, and the owner's Mac froze twice.
   unset HEAVY_RUN_SLOTS
   run "$SCRIPT" --status
-  [[ "$output" =~ ^free:\ 0/[1-9][0-9]*\ slots\ busy$ ]]
+  [ "$output" = "free: 0/1 slots busy" ]
+}
+
+@test "heavy-run: slots: a setting with a trailing comment is still read" {
+  unset HEAVY_RUN_SLOTS
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_slots: 2  # two at once\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  run "$SCRIPT" --status
+  [ "$output" = "free: 0/2 slots busy" ]
 }
 
 @test "heavy-run: slots: rejects a bad HEAVY_RUN_SLOTS, HEAVY_RUN_RAMP or HEAVY_RUN_MAX_LOAD" {
@@ -576,6 +587,53 @@ release_all() {
   run "$SCRIPT" --exclusive
   [ "$status" -eq 2 ]
   [[ "$output" == Usage:* ]]
+}
+
+# A stand-in real-time app with its own process name (pgrep -x matches it).
+# Each test gets its own name, so a leftover app never holds another test.
+make_fake_app() {
+  command -v cc >/dev/null || skip "needs a C compiler"
+  APP="fake-game-$$-$BATS_TEST_NUMBER"
+  printf '#include <unistd.h>\nint main(void){sleep(%s);return 0;}\n' "$1" | cc -x c - -o "$BATS_TEST_TMPDIR/$APP"
+  export HEAVY_RUN_PAUSE_APPS="$APP"
+}
+
+@test "heavy-run: realtime: no run starts while a listed app runs" {
+  make_fake_app 30
+  "$BATS_TEST_TMPDIR/$APP" &
+  local app=$!
+  "$SCRIPT" sh -c "echo ran > '$BATS_TEST_TMPDIR/ran'" &
+  local run_pid=$!
+  sleep 1.5
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  run "$SCRIPT" --status
+  kill "$app"; wait "$app" 2>/dev/null || true
+  [[ "$output" == *"waiting: $APP is running (a real-time app)"* ]]
+  wait "$run_pid"
+  [ "$(cat "$BATS_TEST_TMPDIR/ran")" = ran ]
+}
+
+@test "heavy-run: realtime: a running run stops while a listed app runs, then goes on" {
+  make_fake_app 6
+  local out="$BATS_TEST_TMPDIR/out"
+  "$SCRIPT" sh -c "for i in 1 2 3 4 5 6 7 8; do echo \$i >> '$out'; sleep 0.5; done" 2>"$BATS_TEST_TMPDIR/err" &
+  local run_pid=$! i
+  for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.1; done  # the run has started
+  "$BATS_TEST_TMPDIR/$APP" &
+  local app=$!
+  sleep 3.5  # the app check runs every 1 s and is cached for 2 s
+  local a b
+  a=$(wc -l < "$out"); sleep 0.8; b=$(wc -l < "$out")
+  [ "$a" -eq "$b" ]
+  wait "$app"
+  wait "$run_pid"
+  [ "$(wc -l < "$out")" -eq 8 ]
+  grep -q "heavy-run: paused: $APP is running" "$BATS_TEST_TMPDIR/err"
+  grep -q "heavy-run: resumed" "$BATS_TEST_TMPDIR/err"
+}
+
+@test "heavy-run: realtime: GeForce NOW is listed by default" {
+  grep -q 'HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"' "$SCRIPT"
 }
 
 @test "heavy-run: the state folder is private: folder 0700, files 0600" {

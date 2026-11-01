@@ -1,14 +1,15 @@
 #!/bin/bash
-# heavy-run — run heavy commands on this Mac in a few parallel slots, at low priority.
+# heavy-run — run heavy commands on this Mac one at a time (more slots opt-in), at low priority.
 #
 # Every agent session and worker shares one state folder at a fixed path, so
 # full suites, e2e runs, and timing runs queue instead of piling up.
 # $TMPDIR is not used: sandboxed sessions can see different temp dirs.
 #
 # Slots: a run holds an flock on one slot file ($dir/slots/<n>) and a shared
-# flock on $dir/lock. The slot count comes from the machine (half the CPU
-# cores, one per 8 GB of memory, at least 1) unless HEAVY_RUN_SLOTS or the
-# heavy_run_slots setting says otherwise. A second or later run starts only
+# flock on $dir/lock. There is one slot unless HEAVY_RUN_SLOTS or the
+# heavy_run_slots setting asks for more: an automatic count of 4 froze a 32 GB
+# Mac twice on 2026-11-01, because several suites grew past memory after their
+# start check. A second or later run starts only
 # when a slot is free, memory pressure is normal, the last run started at
 # least HEAVY_RUN_RAMP seconds ago (a new gate needs time to show its memory),
 # and the 1-minute load is under HEAVY_RUN_MAX_LOAD (when set). The first run
@@ -45,11 +46,14 @@
 # Env (each wins over its setting in ~/.config/chezmoi/chezmoi.yaml):
 #   HEAVY_RUN_DIR       state folder (default ~/.local/state/heavy-run)
 #   HEAVY_RUN_NICE      absolute nice level (default 15); never raises priority
-#   HEAVY_RUN_SLOTS     parallel slots, 1-64 (setting heavy_run_slots; default auto)
+#   HEAVY_RUN_SLOTS     parallel slots, 1-64 (setting heavy_run_slots; default 1)
 #   HEAVY_RUN_RAMP      seconds between run starts while others run, 0-3600
 #                       (setting heavy_run_ramp_seconds; default 15)
 #   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
 #                       (setting heavy_run_max_load; default 0)
+#   HEAVY_RUN_PAUSE_APPS  real-time apps (process names, comma-separated) that
+#                       hold every run: none starts, and a running one is stopped
+#                       until they quit (default GeForceNOW; empty = off)
 #   HEAVY_RUN_PROBE     a command whose non-empty output is a reason to wait;
 #                       replaces the built-in memory pressure check
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
@@ -66,19 +70,21 @@ if [ -n "${HEAVY_RUN_WAIT_LOG:-}" ]; then waitlog="$HEAVY_RUN_WAIT_LOG"
 elif [ -n "${HEAVY_RUN_DIR:-}" ]; then waitlog="$dir/waits.log"
 else waitlog="$HOME/.local/state/dotfiles/heavy-run-waits.log"; fi
 level="${HEAVY_RUN_NICE:-15}"
+export HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"
 
 usage() {
   echo "Usage: heavy-run [--exclusive] <command...> | heavy-run --status"
 }
 
-# Settings: env first, then the chezmoi data, then the default ("" = auto).
+# Settings: env first, then the chezmoi data, then the default. A trailing
+# "# comment" after the value is allowed.
 setting() {
   local env="$1" key="$2" def="$3" cfg="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.yaml" v
   if [ -n "${!env:-}" ]; then printf '%s\n' "${!env}"; return; fi
-  v=$(sed -n "s/^  $key: *\"\{0,1\}\([0-9.]*\)\"\{0,1\} *$/\1/p" "$cfg" 2>/dev/null | head -n 1) || v=""
+  v=$(sed -n "s/^  $key: *\"\{0,1\}\([0-9.]*\)\"\{0,1\} *\(#.*\)\{0,1\}$/\1/p" "$cfg" 2>/dev/null | head -n 1) || v=""
   printf '%s\n' "${v:-$def}"
 }
-slots_set=$(setting HEAVY_RUN_SLOTS heavy_run_slots "")
+slots_set=$(setting HEAVY_RUN_SLOTS heavy_run_slots 1)
 ramp=$(setting HEAVY_RUN_RAMP heavy_run_ramp_seconds 15)
 maxload=$(setting HEAVY_RUN_MAX_LOAD heavy_run_max_load 0)
 
@@ -95,30 +101,12 @@ esac
 check_num HEAVY_RUN_RAMP "$ramp"
 check_num HEAVY_RUN_MAX_LOAD "$maxload"
 
-# Shared by the run and --status: machine size, slot count, and wait reasons.
+# Shared by the run and --status: slot count and wait reasons.
 common_code='
   use strict; use warnings;
   use Fcntl qw(:flock O_RDWR O_CREAT);
   sub cmd_out { my $o = `$_[0] 2>/dev/null`; $o //= ""; chomp $o; return $o; }
-  sub ncpu {
-    my $n = cmd_out("sysctl -n hw.ncpu");
-    $n = cmd_out("getconf _NPROCESSORS_ONLN") unless $n =~ /^\d+$/ && $n > 0;
-    return ($n =~ /^\d+$/ && $n > 0) ? $n : 1;
-  }
-  sub mem_gb {
-    my $b = cmd_out("sysctl -n hw.memsize");
-    return $b / 2**30 if $b =~ /^\d+$/ && $b > 0;
-    if (open(my $m, "<", "/proc/meminfo")) { while (<$m>) { return $1 / 2**20 if /^MemTotal:\s+(\d+)/; } }
-    return 0;
-  }
-  sub slot_count {
-    my ($set) = @_;
-    return $set if $set ne "";
-    my $by_cpu = int(ncpu() / 2);
-    my $gb = mem_gb();
-    my $n = $gb > 0 ? (sort { $a <=> $b } $by_cpu, int($gb / 8))[0] : $by_cpu;
-    return $n < 1 ? 1 : $n;
-  }
+  sub slot_count { my ($set) = @_; return $set ne "" ? $set : 1; }
   sub load1 {
     my $l = cmd_out("sysctl -n vm.loadavg");
     return $1 if $l =~ /([\d.]+)/;
@@ -144,6 +132,27 @@ common_code='
       return "low free memory" if $k{MemTotal} && defined $k{MemAvailable} && $k{MemAvailable} < $k{MemTotal} / 10;
     }
     return "";
+  }
+  # Empty when no real-time app runs, else why heavy runs wait. A real-time app
+  # (a game stream) froze the Mac when heavy runs shared it (5 restarts on
+  # 2026-11-01, GeForce NOW 2.0.90). Asked at most every 2 s: pgrep is a fork.
+  my ($rt_at, $rt_why) = (0, "");
+  sub realtime {
+    return $rt_why if time - $rt_at < 2;
+    $rt_at = time; $rt_why = "";
+    for my $app (grep { $_ ne "" } split /,/, $ENV{HEAVY_RUN_PAUSE_APPS} // "") {
+      if (cmd_out("pgrep -x " . quotemeta($app)) ne "") { $rt_why = "$app is running (a real-time app)"; last; }
+    }
+    return $rt_why;
+  }
+  # A process and all its descendants, for pausing a run as a whole.
+  sub tree {
+    my ($root) = @_;
+    my %kids;
+    for (split /\n/, cmd_out("ps -A -o pid= -o ppid=")) { push @{$kids{$2}}, $1 if /(\d+)\s+(\d+)/; }
+    my @all = ($root);
+    for (my $i = 0; $i < @all; $i++) { push @all, @{$kids{$all[$i]} // []}; }
+    return @all;
   }
   # Is someone holding an flock on this file? (We can not get it at once.)
   sub held { my ($p, $mode) = @_; open(my $f, "<", $p) or return 0; return flock($f, ($mode // LOCK_EX) | LOCK_NB) ? 0 : 1; }
@@ -269,6 +278,7 @@ exec perl -e "$common_code"'
   # file handle, or undef and the reason to wait.
   my $last_start = "$dir/last-start";
   sub try_start {
+    if ((my $r = realtime()) ne "") { return (undef, undef, $r); }
     if ($exclusive) {
       return ("exclusive", undef) if flock($lfh, LOCK_EX | LOCK_NB);
       my $k = grep { held("$slotdir/$_") } slot_files($slotdir);
@@ -357,14 +367,26 @@ exec perl -e "$common_code"'
     POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
     exec("perl", "-e", $priority_code, $level, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
   }
-  for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid }; }
+  my $stopped = 0;
+  for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid; kill "CONT", tree($pid) if $stopped; }; }
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
   my @t = localtime;
   if (open(my $o, ">", $ownerfile)) {
     printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd);
     close $o;
   }
-  while (waitpid($pid, 0) == -1) { last unless $!{EINTR}; }
+  # While a real-time app runs, the run is stopped (SIGSTOP), and it goes on
+  # (SIGCONT) when the app quits.
+  while (($ENV{HEAVY_RUN_PAUSE_APPS} // "") eq "") { last if waitpid($pid, 0) != -1 || !$!{EINTR}; }
+  while (($ENV{HEAVY_RUN_PAUSE_APPS} // "") ne "") {
+    my $r = waitpid($pid, POSIX::WNOHANG());
+    last if $r == $pid;
+    if ($r == -1) { next if $!{EINTR}; last; }
+    my $rt = realtime();
+    if ($rt ne "" && !$stopped) { kill "STOP", tree($pid); $stopped = 1; print STDERR "heavy-run: paused: $rt\n"; }
+    elsif ($rt eq "" && $stopped) { kill "CONT", tree($pid); $stopped = 0; print STDERR "heavy-run: resumed\n"; }
+    select(undef, undef, undef, 0.2);
+  }
   my $st = $?;
   truncate($ownerfile, 0);
   exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));

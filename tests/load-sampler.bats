@@ -96,6 +96,21 @@ MOCK
   [[ "$output" == *"peak CPU busy 87%"* ]]
 }
 
+@test "load-sampler --report flags kernel-stall rows: high load at low CPU busy" {
+  now=$(date +%s)
+  printf '%s\tt1\t120.00\t0\t0\t10\t60\t0\t900\tGeForceNOW:40 WindowServer:20\t14\n' "$((now - 120))" > "$DOTFILES_LOAD_SAMPLES"
+  printf '%s\tt2\t120.00\t0\t0\t10\t60\t0\t900\tnode:900\t95\n' "$((now - 90))" >> "$DOTFILES_LOAD_SAMPLES"
+  run "$SAMPLER_CMD" --report 24
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"kernel-stall rows (load1 > 80 at CPU busy < 35%): 1, last at t1 (top: GeForceNOW:40 WindowServer:20)"* ]]
+}
+
+@test "load-sampler --report says nothing about stalls when there are none" {
+  printf '%s\tt1\t3.00\t0\t0\t10\t60\t0\t300\tzsh:1\t5\n' "$(date +%s)" > "$DOTFILES_LOAD_SAMPLES"
+  run "$SAMPLER_CMD" --report 24
+  [[ "$output" != *"kernel-stall"* ]]
+}
+
 @test "load-sampler LaunchAgent runs the sampler every 30 seconds" {
   local plist="$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.load-sampler.plist.tmpl"
   [ -f "$plist" ]

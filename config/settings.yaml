@@ -178,7 +178,7 @@ settings:
     type: int:1-64
     default: ""
     optional: true
-    description: Parallel heavy-run slots on this Mac. Empty = automatic (half the CPU cores, one per 8 GB of memory, at least 1). HEAVY_RUN_SLOTS wins.
+    description: Parallel heavy-run slots on this Mac. Empty = 1, one heavy command at a time (more froze a 32 GB Mac twice on 2026-11-01). HEAVY_RUN_SLOTS wins.
   heavy_run_ramp_seconds:
     type: int:0-3600
     default: ""

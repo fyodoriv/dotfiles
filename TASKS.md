@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Separate missing-timeout security proof from host timing
+  - **ID**: final-hook-timing-01a1974b
+  - **Tags**: testing, security
+  - **Details**: The final gate's missing-timeout fixture failed its whole-hook elapsed bound before checking its no-GitHub-call canary. The production helper already returns without invoking GitHub when the timeout path is explicitly empty. Preserve that behavior and the existing ten-second limit; reuse the repository's saturated-host timing policy instead of reporting inconclusive scheduling as a security result.
+  - **Files**: `tests/agent-hooks-block-dangerous-git-merged.bats`, `docs/constitution.md`
+  - **Output**: code
+  - **Acceptance**: no-GitHub-call assertions run before timing classification; missing-timeout and existing fail-closed/local-proof controls pass; planted policy controls never mask a canary or an unsaturated ten-second violation.
+  - **Hypothesis**: Goal: truthful bounded security evidence. Question: can structural no-call checks and the existing host-load policy separate behavior from scheduling? Metric: zero GitHub canary writes at every load, zero accepted unsaturated runs at or above ten seconds, and an explicit inconclusive result only when elapsed is at least ten seconds and observed one-minute load exceeds CPU count.
+  - **Measurement**: `heavy-run bats --filter 'without a timeout binary|local proof never calls gh|a hung gh|missing-timeout timing policy' tests/agent-hooks-block-dangerous-git-merged.bats`.
+  - **Success**: all focused assertions pass; 100 percent of planted canary, unsaturated-bound, fast, and saturated-inconclusive controls return their specified classifications. A saturated skip is not a passing timing measurement.
+  - **Pivot**: any masked canary, accepted unsaturated violation, or false timing-pass claim abandons the fixture shortcut; inspect the helper and the proof boundary again. Do not change the production guard or increase its timing threshold.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; Forsgren, Humble, Kim (2018), stability; existing `tests/host-load.bash` timing policy.
+  - **Competitive-goal**: none — truthful security regression evidence (docs/metrics.md).
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Doctor regression gates use bounded isolated fixtures
+  - **ID**: doctor-gate-fixture-isolation
+  - **Tags**: reliability, tests
+  - **Details**: The current gate flags the heavy-run test timer's inherited ignored SIGALRM; the doctor brew-skip fixture runs with the owner's HOME and can share the doctor's fixed log-trim temporary file with other processes, contaminating captured JSON with file errors. Make fixture state private and reset the alarm handler.
+  - **Files**: `tests/heavy-run.bats`, `tests/doctor-brew-skip.bats`, `docs/constitution.md`
+  - **Output**: code
+  - **Acceptance**: the alarm guard passes and the brew-skip fixture uses private HOME and produces parseable JSON.
+  - **Hypothesis**: the known alarm-guard violation drops from one to zero and brew-skip JSON parse failures drop from one observed gate failure to zero in the isolated fixture because shared log-trim state and inherited signal handlers no longer reach these test fixtures.
+  - **Measurement**: `bats tests/perl-alarm.bats tests/heavy-run.bats tests/doctor-brew-skip.bats`
+  - **Success**: zero failed assertions across the named suites and the complete doctor gate.
+  - **Pivot**: any remaining failure -> abandon a fixture-only diagnosis and trace the child environment and log writers before editing production code.
+  - **Anchor**: Basili, Caldiera, Rombach 1994, Goal Question Metric; Forsgren, Humble, Kim 2018, stability.
+  - **Competitive-goal**: none — deterministic test evidence, not a scorecard metric.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

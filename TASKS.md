@@ -115,6 +115,11 @@ them. -->
 
 - [ ] Tighten the perl alarm guard test
   - **ID**: perl-alarm-guard-gaps
+  - **Hypothesis**: missed unsafe multiline wrappers and missed non-stub morning wrappers each fall from one to zero in seeded fixtures, because the guard reads complete Perl snippets and exempts only the known morning stub's own lines.
+  - **Measurement**: `bats tests/perl-alarm.bats tests/heavy-run.bats`
+  - **Success**: zero failed assertions; every seeded unsafe one-line or multiline wrapper is rejected, and the actual repository is clean.
+  - **Pivot**: any seeded unsafe wrapper is accepted -> abandon line-only grep and narrow the extraction/parser contract before delivery.
+  - **Anchor**: Basili, Caldiera, Rombach 1994, Goal Question Metric; Perl perldoc alarm/signal inheritance.
   - **Tags**: tests, reliability
   - **Details**: Two gaps in `tests/perl-alarm.bats`, found in review of the SIGALRM fix. (1) The guard greps one line at a time, so a multi-line `perl -e '...'` that calls `alarm` without resetting the handler is not caught. (2) The guard skips all of `tests/morning.bats`, but only its perl stub lines need to be skipped.
   - **Files**: `tests/perl-alarm.bats`

@@ -17,6 +17,7 @@ setup() {
   export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
   export JETBRAINS_LOCAL_DIR="$JB_LOCAL"
+  export JETBRAINS_APP_DIRS="$TEST_DIR/Applications"
 
   OVERRIDES_FILE="$TEST_DOTFILES/.overrides"
   touch "$OVERRIDES_FILE"
@@ -83,9 +84,12 @@ teardown() {
 }
 
 # ── Helper: create a minimal mock IDE directory ────────────────────────────
+# Also installs a fake app for it: a settings folder counts only with its app.
 _mk_ide() {
-  local dir="$1"
+  local dir="$1" name
   mkdir -p "$dir/options" "$dir/codestyles" "$dir/keymaps" "$dir/scopes"
+  name="$(basename "$dir" | sed 's/[0-9].*//')"
+  mkdir -p "$JETBRAINS_APP_DIRS/$name.app"
 }
 
 # ── IdeaVim ────────────────────────────────────────────────────────────────
@@ -369,4 +373,15 @@ _mk_ide() {
 
   grep -qx "plugin.a" "$ws/disabled_plugins.txt"
   ! grep -qx "plugin.b" "$ws/disabled_plugins.txt"
+}
+
+@test "jetbrains: a settings folder without its app gets no IDE checks on any profile" {
+  mkdir -p "$TEST_HOME/Library/Application Support/JetBrains/RubyMine2022.3/options"
+  printf 'Key Promoter X\n' > "$TEST_DOTFILES/jetbrains/recommended_plugins.txt"
+  for profile in full core; do
+    pass_count=0; fail_count=0
+    DOTFILES_PROFILE="$profile"
+    source "$BATS_TEST_DIRNAME/../modules/jetbrains/doctor.sh"
+    [ "$fail_count" -le 1 ]   # at most symlink.ideavimrc on full
+  done
 }

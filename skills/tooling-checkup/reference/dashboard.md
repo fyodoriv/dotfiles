@@ -22,7 +22,7 @@ JSON file that the checkup uploads. There are no live queries.
 | `latest` | one: newest checkup, every numeric metric | same | 72 |
 | `gate` | one per day: runs, failed runs, median `total` seconds | `~/.local/state/dotfiles/gate-timings.jsonl` | none |
 | `doctor` | one per day: last pass, fail, warn, skip | `~/.dotfiles-stats.jsonl` (`task: doctor`) | none |
-| `load` | one per hour, last 7 days (local time): samples, peak and mean load1, lowest free memory %, peak swap MB, overload samples (load1 > 2 x CPUs) | `~/.local/state/dotfiles/load-samples.tsv` | 24 |
+| `load` | one per UTC hour, last 7 days: samples, peak and mean load1, lowest free memory %, peak swap MB, overload samples (load1 > 2 x CPUs) | `~/.local/state/dotfiles/load-samples.tsv` | 24 |
 | `agent_time` | one per day and project, last 14 days: tool hours, calls, failed calls | agentbrew perf log `~/.local/state/agentbrew/perf/*.jsonl` | 48 |
 
 ## Update steps (Phase 10 step 4)
@@ -63,12 +63,43 @@ px, a touch target under 44 px, sideways overflow, a word split inside a table
 cell, a table part without its ARIA role (`table`, `row`, `columnheader`, `cell`), more than 5 run rows before "Show N more", a chart without `role="img"`,
 an `aria-label` with latest, min and max, a visible latest value, or a tooltip
 on focus and tap, or a missing dataset that stops other panels drawing.
+The gate sends a real `touchscreen.tap` on phones, checks that ArrowLeft
+changes the tooltip, and requires every chart line to reach 3:1 contrast
+against its panel in both themes. The page preserves the chart hue and
+adjusts lightness only when needed; it checks both the panel token and the
+nearest opaque ancestor background. The fixture gate measures the panel
+contrast. Real-host backgrounds still need separate validation.
 Overflow is measured with `scrollWidth > clientWidth` on the document and each
 panel, and by every element's right edge, so `overflow-x: clip` (which Hallmark
 requires on `html` and `body`) cannot hide it. The fixture holds a word wider
 than a phone cell. The `load` fixture matches the exporter: one row per hour
-over 7 days, `YYYY-MM-DDTHH:00`.
+over 168 consecutive hours, with UTC keys such as `2026-11-01T05:00Z`.
+The page keeps those instants for chart binding and formats labels locally.
+Both spring-forward and fall-back fixtures contain exactly 168 elapsed
+hours. They are not local calendar weeks, which can contain 167 or 169
+hours across a clock change.
 
 `tests/tooling-checkup-dashboard.bats` runs the gate, plants an overflow and a
-break-anywhere rule to prove it fails on each, and skips when Playwright,
+break-anywhere rule, broken ArrowLeft, ignored touch input, and a low-contrast
+line to prove it fails on each. It skips when Playwright,
 axe-core or d3 are missing, with a visible SKIPPED line. It looks in `DASHBOARD_NODE_PATH`, `NODE_PATH`, then the cache folder `~/.cache/dotfiles/dashboard-gate/node_modules`. Install once with `npm i --prefix ~/.cache/dotfiles/dashboard-gate playwright@1.64.1 axe-core@4.14.0 d3@7.9.0`.
+
+## Proof boundaries
+
+The comfort harness renders the actual dashboard fragment in a synthetic
+Dashboard host with fabricated data. Its HTML and screenshots are unit
+proof. They do not establish compatibility with the deployed Dashboard host
+or prove that a real dashboard was updated.
+
+After the fixture checks pass, inspect the existing dashboard through a
+task-owned browser tab, read-only. Real metrics and screenshots stay local.
+A UI change needs a labeled before/after pair from a deployed test dashboard
+for each changed part. Capture the hourly chart binding and chart line
+contrast in light and dark, on phone and desktop, with reduced motion.
+Use a dedicated test dashboard and fabricated datasets for any deployment;
+keep the owner's dashboard and attached data unchanged.
+
+If browser verification, sign-in, or missing Dashboard tools prevents that
+check, retain the UI work in a draft with a blocked validation task. Record
+the exact missing capability. Do not substitute fixture-host screenshots for
+real-host proof or claim that the deployed UI was fixed.

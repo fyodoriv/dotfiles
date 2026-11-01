@@ -106,7 +106,7 @@
     return d.getFullYear() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? d : null;
   };
   var tcTime = function (v) { return v ? new Date(String(v)) : null; };
-  var tcHour = function (v) { return v ? new Date(String(v).slice(0, 13) + ':00:00') : null; };
+  var tcHour = function (v) { return v ? new Date(String(v)) : null; };
   var tcWhen = function (v) {
     var d = tcIsDay(v) ? tcDay(v) : (v ? new Date(String(v)) : null);
     if (!d || isNaN(+d)) return tcShow(v);
@@ -119,11 +119,38 @@
     return d && d.status === 'ok' && Array.isArray(d.data) ? d.data : [];
   };
 
+  function tcChartColor(section, color) {
+    function luminance(c) {
+      var rgb = [c.r, c.g, c.b].map(function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    }
+    var panel = d3.color(getComputedStyle(section).getPropertyValue('--tc-panel').trim());
+    var base = d3.hsl(color);
+    if (!panel || isNaN(base.l)) return color;
+    var backgrounds = [luminance(panel.rgb())];
+    for (var parent = section; parent; parent = parent.parentElement) {
+      var behind = d3.color(getComputedStyle(parent).backgroundColor);
+      if (behind && behind.opacity === 1) { backgrounds.push(luminance(behind.rgb())); break; }
+    }
+    function legible(c) {
+      var light = luminance(d3.rgb(c));
+      return backgrounds.every(function (paper) { return (Math.max(light, paper) + 0.05) / (Math.min(light, paper) + 0.05) >= 3.05; });
+    }
+    if (legible(color)) return color;
+    var target = backgrounds[0] > 0.179 ? 0 : 1;
+    for (var step = 1; step <= 20; step++) {
+      var adjusted = d3.hsl(base.h, base.s, base.l + (target - base.l) * step / 20).formatRgb();
+      if (legible(adjusted)) return adjusted;
+    }
+    return color;
+  }
+
   function tcLine(id, rows, xKey, yKey, color, parseX) {
     var section = document.getElementById(id);
     var box = section.querySelector('.tc-plot');
     var tip = section.querySelector('.tc-tip');
     var now = section.querySelector('.tc-now');
+    color = tcChartColor(section, color);
     box.textContent = ''; now.textContent = ''; tip.style.display = 'none';
     var pts = rows.map(function (r) { return { x: parseX(r[xKey]), y: Number(r[yKey]), r: r }; })
       .filter(function (p) { return p.x && !isNaN(+p.x) && !isNaN(p.y); });

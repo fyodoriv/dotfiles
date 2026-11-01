@@ -134,3 +134,11 @@ PLIST
   [ -e "$AGENTS/com.dotfiles.debug-chrome.plist" ]
   [ -e "$AGENTS/com.dotfiles.tooling-chrome.plist" ]
 }
+
+# A same-name twin can be a different job (com.<user>.plan-day.morning vs
+# com.dotfiles.morning). The fix text must not say to delete it unchecked.
+@test "same-name twin advice compares the jobs before any delete" {
+  run grep -A2 '"launchagents.no_same_name_twins"' "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  [[ "$output" == *"only when both run the same job"* ]]
+  [[ "$output" == *"--skip launchagents.no_same_name_twins"* ]]
+}

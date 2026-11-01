@@ -13,7 +13,7 @@ if [ -f "$DOTFILES_DIR/lib/launchagent-duplicates.sh" ]; then
     "launchagent_remove_duplicates \"\$HOME/Library/LaunchAgents\" \"$DOTFILES_DIR\""
   check_advisory "launchagents.no_same_name_twins" "no other LaunchAgent shares a managed agent's name" \
     "[ -z \"\$(launchagent_suffix_twins \"\$HOME/Library/LaunchAgents\")\" ]" \
-    "launchctl bootout and delete the twin plist that launchagent_suffix_twins lists (keep the com.dotfiles one)"
+    "compare each twin that launchagent_suffix_twins lists with its com.dotfiles job; only when both run the same job, launchctl bootout and delete the twin. A different job that shares the name is fine: skip with dotfiles doctor --skip launchagents.no_same_name_twins"
 fi
 
 # LaunchAgents — check all deployed com.dotfiles.* agents

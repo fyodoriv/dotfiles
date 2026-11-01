@@ -33,6 +33,24 @@ if [ -n "${DEFAULTS_HANG:-}" ]; then
   sleep 30
   exit 0
 fi
+if [ "$1" = "export" ] && [ -n "${DEFAULTS_WITH_DATE:-}" ]; then
+  # Readable container whose plist holds a date in a key we do not sync.
+  cat > "$3" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+<key>Enable Triggers</key>
+<integer>0</integer>
+<key>Other Time Clock Last Selection</key>
+<date>2026-10-29T21:58:00Z</date>
+<key>Trigger Data</key>
+<array/>
+</dict>
+</plist>
+PLIST
+  exit 0
+fi
 if [ "$1" = "export" ]; then
   cat > "$3" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -108,4 +126,13 @@ teardown() {
   [ "$status" -eq 0 ]
   [ $((SECONDS - start)) -lt 10 ]
   [[ "$output" == *"cannot read Amphetamine prefs (privacy prompt?)"* ]]
+}
+
+# plutil cannot turn a plist with a date into JSON. Amphetamine writes a date
+# when you pick a time in its menu, and diff then failed on every run.
+@test "diff ignores a date in a key it does not sync" {
+  export DEFAULTS_WITH_DATE=1
+  run "$FAKE_DOTFILES/bin/dotfiles-amphetamine-sync" diff
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no drift"* ]]
 }

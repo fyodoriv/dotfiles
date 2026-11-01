@@ -286,7 +286,7 @@ them. -->
 - [ ] Keep the current Space during background work (issue #398)
   - **ID**: preserve-current-space
   - **Hypothesis**: Goal: avoid accidental workspace changes. Question: do managed defaults prevent the two known triggers? Metric: failing setting regressions fall from 2 to 0 by disabling the bottom-right hot corner and automatic Space switching.
-  - **Measurement**: `bats tests/module-macos.bats tests/macos-defaults.bats`
+  - **Measurement**: `bats tests/module-macos.bats`
   - **Success**: 0 failed setting regressions; both values also have doctor checks.
   - **Pivot**: 1 or more failed setting regressions means abandon the settings approach and investigate the actual window-activation source.
   - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric.

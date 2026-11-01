@@ -35,3 +35,12 @@ _bootstrap_checks() {
     [ -z "$output" ]
   done
 }
+
+# Endpoint-agent PATH and publisher checks warn only where an endpoint agent
+# runs; a Mac with endpoint_hardening off got about 10 warnings it never needs.
+@test "bash minimal-PATH and Homebrew-sandbox checks run only with endpoint_hardening on" {
+  DOCTOR="$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
+  grep -B3 '"security.bash_minimal_path_endpoint"' "$DOCTOR" | grep -q 'if \[ "$_endpoint_hardening_on" = "true" \]; then'
+  grep -q 'if \[ "$_endpoint_hardening_on" = "true" \] && \[ -d /opt/homebrew/bin \]; then' "$DOCTOR"
+  grep -B2 '"security.python3_publisher_authority"' "$DOCTOR" | grep -q 'case "${ENDPOINT_HARDENING:-true}" in true|1)'
+}

@@ -181,6 +181,8 @@ _amphetamine_apply_managed_session_policy() {
     defaults write com.if.Amphetamine 'Enable Triggers' -bool false &&
     defaults write com.if.Amphetamine 'Trigger Data' -array
 }
+# dotfiles-doctor runs each fix in a new process (bash -c).
+export -f _amphetamine_apply_managed_session_policy
 
 _AMPHETAMINE_PREFS=""
 _amphetamine_read_rc=0

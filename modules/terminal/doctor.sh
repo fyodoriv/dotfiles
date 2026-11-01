@@ -2,6 +2,8 @@
 # Doctor checks for terminal module
 # shellcheck source=../../lib/dotfiles-arch.sh
 source "$DOTFILES_DIR/lib/dotfiles-arch.sh"
+# dotfiles-doctor runs each fix in a new process (bash -c).
+export -f dotfiles_machine_arch dotfiles_is_apple_silicon dotfiles_is_rosetta dotfiles_brew_prefix dotfiles_expects_native_homebrew dotfiles_managed_app_entries dotfiles_app_bundle_id_for_name dotfiles_clear_app_ls_architecture_priority dotfiles_clear_managed_app_rosetta_overrides
 
 # tmux, Ghostty, and their configs come with the full profile only.
 _term_full=false

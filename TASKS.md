@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Doctor reports verified repairs and reaches optional module checks
+  - **ID**: doctor-verified-results-and-optional-modules
+  - **Tags**: reliability, doctor
+  - **Details**: Issues #412, #416, and #418 show that repair command exit codes, opted-out modules, and plugin dispatch can produce false results. Preserve cached process-scoped override reads while integrating per-machine skips from #415 and the opt-out from #414.
+  - **Files**: `bin/dotfiles-doctor`, `tests/`, `docs/module-reference.md`
+  - **Output**: code
+  - **Acceptance**: an ineffective repair is failed, an effective repair is fixed, opted-out check IDs validate, and a named plugin module runs only through the plugin runner.
+  - **Hypothesis**: false healthy results on the ineffective-repair fixture fall from 1 to 0; rejected valid opted-out IDs fall from 1 to 0; named plugin module dispatch successes rise from 0 to 1, because doctor verifies the actual check and distinguishes discovery from execution.
+  - **Measurement**: `bats tests/doctor-result-verification.bats tests/doctor-optional-modules.bats tests/doctor-validate-overrides.bats tests/doctor-overrides-snapshot.bats`
+  - **Success**: zero failing assertions across all named suites; ineffective repair has zero fixed results and one failed result.
+  - **Pivot**: any false fixed result or cross-plugin execution remains -> abandon generic fix success accounting and isolate each check kind before delivery.
+  - **Anchor**: Basili, Caldiera, Rombach 1994, Goal Question Metric; Forsgren, Humble, Kim 2018, stability and change failure rate.
+  - **Competitive-goal**: none — correctness of machine health results, not a scorecard metric.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

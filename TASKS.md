@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Align final doctor test contracts with registered checks
+  - **ID**: final-doctor-contracts-01a1974b
+  - **Tags**: testing, doctor
+  - **Details**: The final integration gate has three failing files. Claude tests omit an existing mods ID; a full-profile fixture expects an absent IDE; the export guard misreads three-argument check predicates as fourth-argument repairs. Preserve the production contracts and genuine missing-export detection.
+  - **Files**: `tests/module-claude.bats`, `tests/doctor-core-profile.bats`, `tests/doctor-fix-functions-exported.bats`, `docs/constitution.md`
+  - **Output**: code
+  - **Acceptance**: all three files pass; exact Claude IDs and full-profile installed/absent IDE controls remain explicit; non-exported repair helpers are still rejected while report-only predicates are accepted.
+  - **Hypothesis**: Goal: a truthful integration gate. Question: do exact module contracts and check-argument arity remove false failures without hiding real repair defects? Metric: failing files fall from three to zero, with every planted predicate/repair control producing its expected result.
+  - **Measurement**: `heavy-run bats tests/module-claude.bats tests/doctor-core-profile.bats tests/doctor-fix-functions-exported.bats`.
+  - **Success**: zero failed assertions across all three files, and 100 percent of planted controls retain the expected classification.
+  - **Pivot**: any focused failure or missed non-exported repair abandons the shortcut; inspect actual check arguments and helper scope before proceeding. Do not export read-only authentication snapshots to satisfy a false-positive guard.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; Forsgren, Humble, Kim (2018), stability; `bin/dotfiles-doctor` check argument contract.
+  - **Competitive-goal**: none — truthful regression evidence (docs/metrics.md).
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

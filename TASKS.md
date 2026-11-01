@@ -98,6 +98,11 @@ them. -->
   - **Files**: `skills/tooling-checkup/scripts/dashboard_export.py`, `skills/tooling-checkup/dashboard/index.html`, `skills/tooling-checkup/scripts/dashboard_comfort.cjs`, `tests/tooling-checkup-dashboard.bats`
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
+  - **Hypothesis**: Goal: reliable hourly charts and interaction evidence. Question: can UTC keys and direct browser checks prevent the four reported regressions? Metric: both DST fixture weeks retain 168 distinct hourly rows, touch and keyboard checks pass, and every chart line reaches 3:1 contrast in both themes.
+  - **Measurement**: `bats tests/tooling-checkup-dashboard.bats` and `heavy-run node skills/tooling-checkup/scripts/dashboard_comfort.cjs`.
+  - **Success**: 168 of 168 distinct hours in both fixtures, 0 interaction failures, and minimum chart contrast at least 3:1.
+  - **Pivot**: Any lost hour, interaction failure, or chart contrast below 3:1 abandons this implementation until the failing case has a reliable gate.
+  - **Anchor**: W3C WCAG 2.1, 1.4.11 Non-text Contrast; Basili, Caldiera, Rombach (1994), Goal Question Metric.
 
 - [ ] Tighten the perl alarm guard test
   - **ID**: perl-alarm-guard-gaps

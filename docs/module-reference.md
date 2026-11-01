@@ -497,7 +497,7 @@ Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`),
 
 ### local-llm
 
-Optional local LLM via `mlx-lm` on Apple Silicon. Tool checks are advisory when `use_local_ai` is `false`. See [docs/local-llm.md](local-llm.md).
+Optional local LLM via `mlx-lm` on Apple Silicon. When `use_local_ai` is `false`, doctor skips the whole module with one ⊘ line instead of warning about tools you chose not to install. See [docs/local-llm.md](local-llm.md).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

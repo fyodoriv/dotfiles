@@ -27,12 +27,26 @@ setup() {
 
 teardown() { rm -rf "$TEST_DIR"; }
 
-@test "by default it adds the agentbrew mods marketplace and installs work-pane" {
+@test "by default it installs no mod (agentbrew retired work-pane)" {
   run bash "$DOTFILES_DIR/$SCRIPT_REL"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"installed: work-pane"* ]]
+  [ ! -e "$LOG" ]
+}
+
+@test "a listed mod: adds the agentbrew mods marketplace and installs it" {
+  DOTFILES_CLAUDE_MODS="pane-two" run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"installed: pane-two"* ]]
   grep -qx "plugin marketplace add $AGENTBREW_DIR/mods" "$LOG"
-  grep -qx "plugin install work-pane@agentbrew-mods" "$LOG"
+  grep -qx "plugin install pane-two@agentbrew-mods" "$LOG"
+}
+
+@test "a saved work-pane from before its retirement is dropped" {
+  DOTFILES_CLAUDE_MODS="work-pane" run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  [ "$status" -eq 0 ]
+  [ ! -e "$LOG" ]
+  DOTFILES_CLAUDE_MODS="work-pane, other" run bash "$DOTFILES_DIR/$SCRIPT_REL" --print-list
+  [ "$output" = "other" ]
 }
 
 @test "an empty DOTFILES_CLAUDE_MODS installs nothing" {
@@ -44,7 +58,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 @test "with no agentbrew mods folder it skips with one line and calls nothing" {
   rm -rf "$AGENTBREW_DIR/mods"
   export DOTFILES_REPOS_DIR="$TEST_DIR/none"
-  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  DOTFILES_CLAUDE_MODS="pane-two" run bash "$DOTFILES_DIR/$SCRIPT_REL"
   [ "$status" -eq 0 ]
   [[ "$output" == *"skipped"* ]]
   [ ! -e "$LOG" ]
@@ -52,12 +66,12 @@ teardown() { rm -rf "$TEST_DIR"; }
 
 @test "a failed install is reported and does not fail the apply" {
   printf '#!/bin/sh\ncase "$*" in *install*) exit 1;; esac\n' > "$HOME/.local/bin/claude"
-  run bash "$DOTFILES_DIR/$SCRIPT_REL"
+  DOTFILES_CLAUDE_MODS="pane-two" run bash "$DOTFILES_DIR/$SCRIPT_REL"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"work-pane did not install"* ]]
+  [[ "$output" == *"pane-two did not install"* ]]
 }
 
 @test "--print-list prints the resolved list" {
-  DOTFILES_CLAUDE_MODS="work-pane, other" run bash "$DOTFILES_DIR/$SCRIPT_REL" --print-list
-  [ "$output" = "$(printf 'work-pane\nother')" ]
+  DOTFILES_CLAUDE_MODS="pane-two, other" run bash "$DOTFILES_DIR/$SCRIPT_REL" --print-list
+  [ "$output" = "$(printf 'pane-two\nother')" ]
 }

@@ -126,7 +126,7 @@ _claude_mods_on() {
   done < <(_claude_mods_list)
   return 0
 }
-check "claude.mods" "agentbrew mods in claude_mods (default work-pane) are installed in Claude Code" \
+check "claude.mods" "agentbrew mods listed in claude_mods are installed in Claude Code" \
   "_claude_mods_on" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-mods.sh'"
 

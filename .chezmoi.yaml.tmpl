@@ -59,7 +59,7 @@
 {{- end -}}
 {{/* claude_mods: agentbrew Claude Code mods installed on every apply
      (.chezmoiscripts/run_after_claude-mods.sh). */ -}}
-{{- $claudeMods := list "work-pane" -}}
+{{- $claudeMods := list -}}
 {{- if hasKey . "claude_mods" -}}
 {{-   $claudeMods = .claude_mods -}}
 {{- end -}}

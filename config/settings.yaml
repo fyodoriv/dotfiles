@@ -174,3 +174,18 @@ settings:
     type: list
     default: work-pane
     description: agentbrew Claude Code mods (from its mods/ folder) that dotfiles apply installs, comma-separated. work-pane shows /work progress beside the chat. Empty = none.
+  heavy_run_slots:
+    type: int:1-64
+    default: ""
+    optional: true
+    description: Parallel heavy-run slots on this Mac. Empty = automatic (half the CPU cores, one per 8 GB of memory, at least 1). HEAVY_RUN_SLOTS wins.
+  heavy_run_ramp_seconds:
+    type: int:0-3600
+    default: ""
+    optional: true
+    description: Seconds heavy-run waits between run starts while other runs are active, so a new gate can show its memory use first. Empty = 15. HEAVY_RUN_RAMP wins.
+  heavy_run_max_load:
+    type: int:0-1000
+    default: ""
+    optional: true
+    description: 1-minute load average above which heavy-run starts no extra run. Empty or 0 = off (memory pressure still applies). HEAVY_RUN_MAX_LOAD wins.

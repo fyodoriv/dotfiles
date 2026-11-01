@@ -168,6 +168,9 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Git personal email | `git_personal_email` | _(empty, only if split enabled)_ | Commit email for `github.com` remotes — consider `<username>@users.noreply.github.com` for privacy |
 | *(not prompted)* | `login_apps` | `Ghostty` | Single-word app names in `/Applications` (no spaces) that `macos-apps.sh` (full profile) adds as login items: `dotfiles config set login_apps Ghostty,Claude`. A leading `-` removes an app from login items: `dotfiles config set login_apps -Ghostty,Claude`. Other login items stay untouched. Empty = manage none. The `DOTFILES_LOGIN_APPS` env var (comma list) wins. |
 | *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install: `dotfiles config set brew_skip watchman,rancher`, or edit the file (example below). |
+| *(not prompted)* | `heavy_run_slots` | automatic | How many heavy commands `heavy-run` runs at once on this Mac. Automatic is half the CPU cores, one per 8 GB of memory, at least 1. `dotfiles config set heavy_run_slots 2`. The `HEAVY_RUN_SLOTS` env var wins. |
+| *(not prompted)* | `heavy_run_ramp_seconds` | `15` | Seconds between `heavy-run` starts while other runs are active, so each new gate shows its memory use before the next starts. The `HEAVY_RUN_RAMP` env var wins. |
+| *(not prompted)* | `heavy_run_max_load` | off | 1-minute load average above which `heavy-run` starts no extra run (memory pressure always applies). The `HEAVY_RUN_MAX_LOAD` env var wins. |
 | *(not prompted)* | `obsidian` | `false` | Install Obsidian (full profile) and run the `obsidian` doctor checks. Opt-in. |
 | *(not prompted)* | `home_theater` | `false` | Install Plex Media Server, VLC and `duti` (full profile) and run the `home-theater` checks for 4K movies from the Mac on a TV. Opt-in. See [home-theater.md](docs/home-theater.md). |
 | *(not prompted)* | `samsung_tv_host` | _(empty)_ | Samsung TV IP or hostname. The `home-theater` doctor checks the TV is on wired Ethernet. |
@@ -1165,7 +1168,8 @@ biome, bats) run at nice 10, so they yield CPU to the desktop. They stay off
 background QoS, which would confine them to efficiency cores and throttle
 their disk I/O even on an idle Mac.
 
-`heavy-run` shares one Mac-wide lock and sets an absolute nice level of 15.
+`heavy-run` runs heavy commands in a few shared slots (see the `heavy-run` row in
+[Standalone scripts](#standalone-scripts)) and sets an absolute nice level of 15.
 `HEAVY_RUN_NICE` selects another absolute level from 0 to 20, including for
 nested calls that reuse the lock. An inherited level above the target fails
 with status 2 before running the command; it never attempts a priority increase.
@@ -1314,7 +1318,7 @@ scratch work.
 | Script | Description |
 |--------|-------------|
 | `bats-affected` | Print bats test files affected by current git changes (`--pairs`: with the changed file behind each) |
-| `heavy-run` | Run one heavy command (full suite, e2e, timing) at a time on this Mac at `nice 15`, under one shared lock in `~/.local/state/heavy-run`. Waiters run in arrival order (numbered ticket files in `queue/`; a ticket nobody holds is dropped; known limits: a stopped Ctrl-Z waiter at the head blocks the queue until resumed, and callers on the fallback path or an old binary can overtake the head). `heavy-run --status` names the holder and lists the queue; each run appends `waited=<seconds>` to `~/.local/state/dotfiles/heavy-run-waits.log` (`HEAVY_RUN_WAIT_LOG` moves it). The agent hook `agent-hooks/require-heavy-run.sh` blocks unwrapped full suites and builds (single-file runs pass; `HEAVY_RUN_HOOK=off` turns it off). `headless-chrome-unlocked` counts headless Chrome runs outside the lock; the resilience doctor warns above 3 |
+| `heavy-run` | Run heavy commands (full suite, e2e, timing) on this Mac at `nice 15`, a few at once, in shared slots under `~/.local/state/heavy-run` (private to you: the folder is mode 0700). The slot count is automatic (half the CPU cores, one per 8 GB of memory, at least 1; set `heavy_run_slots` to change it). The first run always starts; another starts only when a slot is free, memory pressure is normal, and the last start was `heavy_run_ramp_seconds` ago (15). `heavy-run --exclusive <command>` waits until no run is active and runs alone (timing runs). A crashed run frees its slot at once (the kernel drops its flock). The command sees `HEAVY_RUN_SLOT`. Waiters run in arrival order (numbered ticket files in `queue/`; a ticket nobody holds is dropped; known limits: a stopped Ctrl-Z waiter at the head blocks the queue until resumed, and callers on the fallback path can overtake the head). `heavy-run --status` lists the running slots and the queue with why each run waits (no free slot, memory pressure, ramp, an exclusive run); `scripts/heavy-run-bench.sh` measures the median wait of 1 slot vs. N; each run appends `waited=<seconds>` to `~/.local/state/dotfiles/heavy-run-waits.log` (`HEAVY_RUN_WAIT_LOG` moves it). The agent hook `agent-hooks/require-heavy-run.sh` blocks unwrapped full suites and builds (single-file runs pass; `HEAVY_RUN_HOOK=off` turns it off). `headless-chrome-unlocked` counts headless Chrome runs outside the lock; the resilience doctor warns above 3 |
 | `cached-run` | Skip commands when the git working tree hasn't changed; `--per-file` skips each file that already passed unchanged (`make lint`, `make test`, the install e2e) |
 | `check-all` | Run cached lint and test across all `~/apps` repos |
 

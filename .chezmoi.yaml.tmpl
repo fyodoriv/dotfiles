@@ -45,6 +45,19 @@
 {{- if hasKey . "claude_effort" -}}
 {{-   $claudeEffort = .claude_effort -}}
 {{- end -}}
+{{/*  Optional heavy-run limits (bin/heavy-run reads them; empty = its built-in default) */ -}}
+{{- $heavyRunSlots := "" -}}
+{{- if hasKey . "heavy_run_slots" -}}
+{{-   $heavyRunSlots = .heavy_run_slots -}}
+{{- end -}}
+{{- $heavyRunRamp := "" -}}
+{{- if hasKey . "heavy_run_ramp_seconds" -}}
+{{-   $heavyRunRamp = .heavy_run_ramp_seconds -}}
+{{- end -}}
+{{- $heavyRunMaxLoad := "" -}}
+{{- if hasKey . "heavy_run_max_load" -}}
+{{-   $heavyRunMaxLoad = .heavy_run_max_load -}}
+{{- end -}}
 {{/* claude_permissions: manage (default) pins bypassPermissions in Claude
      Code and the ~/bin/claude wrapper; keep leaves the person's prompts on. */ -}}
 {{- $claudePermissions := "manage" -}}
@@ -235,6 +248,15 @@ data:
 {{- end }}
 {{- if $claudeEffort }}
   claude_effort: {{ $claudeEffort | quote }}
+{{- end }}
+{{- if $heavyRunSlots }}
+  heavy_run_slots: {{ $heavyRunSlots }}
+{{- end }}
+{{- if $heavyRunRamp }}
+  heavy_run_ramp_seconds: {{ $heavyRunRamp }}
+{{- end }}
+{{- if $heavyRunMaxLoad }}
+  heavy_run_max_load: {{ $heavyRunMaxLoad }}
 {{- end }}
 {{- if ne $claudePermissions "manage" }}
   claude_permissions: {{ $claudePermissions | quote }}

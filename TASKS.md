@@ -1,5 +1,6 @@
 # Tasks
 
+
 <!-- policy: do NOT bypass commit hooks (--no-verify) and do NOT push to a
 remote without explicit operator approval in the current session. -->
 
@@ -11,6 +12,15 @@ them. -->
 ## P0
 
 ## P1
+
+- [ ] Git guard distinguishes a plain document write from executable input
+  - **ID**: git-guard-shell-text
+  - **Details**: The custom heredoc scanner was abandoned after three executable-input cases evaded it. Use the established shfmt syntax parser and a narrow standalone cat-text boundary. Missing parsers and ambiguous commands keep the original conservative check.
+  - **Hypothesis**: Goal: safe checks without document false positives. Question: can syntax-based recognition distinguish a plain text write from shell execution? Metric: document false positives fall from 1 to 0 and all three executable-input cases remain blocked.
+  - **Measurement**: `bats tests/agent-hooks-block-dangerous-git.bats tests/agent-hooks-block-dangerous-git-merged.bats`
+  - **Success**: 0 document false positives, 3 of 3 executable-input blocks, and 0 existing safety regressions.
+  - **Pivot**: Any executable-input miss abandons the syntax-recognition approach and keeps the conservative hook until a safe replacement exists.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; mvdan/sh shell parser.
 
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
@@ -283,10 +293,3 @@ them. -->
   - **Acceptance**: a current upstream probe records which checks can be delegated; delete wrappers only when the regression tests pass against the replacement.
   - **Competitive-goal**: none — upstream delegation for machine readiness, not a scorecard metric.
 
-- [ ] Git guard ignores inert quoted heredoc prose (issue #402)
-  - **ID**: git-guard-shell-text
-  - **Hypothesis**: Goal: safe command checks without prose false positives. Question: can quoted heredoc bodies be excluded without hiding executable commands? Metric: prose false-positive regressions fall from 1 to 0; existing destructive-command blocks remain unchanged.
-  - **Measurement**: `bats tests/agent-hooks-block-dangerous-git.bats tests/agent-hooks-block-dangerous-git-merged.bats`
-  - **Success**: 0 false-positive failures and 0 destructive-command regression failures.
-  - **Pivot**: Any destructive-command regression failure means abandon the sanitizer and retain conservative parsing until a reusable shell parser is available.
-  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; existing destructive-command safety regression suite.

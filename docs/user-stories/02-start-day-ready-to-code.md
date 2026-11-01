@@ -68,7 +68,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `tooling-sync` | Pull agentbrew and minsky; push agentbrew TASKS.md edits | Every hour |
 | `dotfiles-doctor` | Health check + auto-fix | Weekly |
 | `git-maintain` | `git maintenance` on all repos | Daily |
-| `app-priority` | Keep Ghostty, WebStorm, and terminal-launched Claude Code interactive; background agent and model workers | Every 60s |
+| `app-priority` | Keep terminal/desktop Claude Code and Codex interactive; background agents without an interactive ancestor | Every 60s |
 | `morning` | Morning startup routine | 8:30 AM daily |
 | `capslock-control` | Caps Lock → Control remapping | At login |
 | `gui-path` | Sync shell PATH to GUI apps | At login |
@@ -90,6 +90,18 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `adhoc-sign-bottles` | Ad-hoc sign Homebrew bottles and uv Pythons so endpoint security does not flag unsigned binaries | At login + daily |
 | `load-sampler` | Append one system-load row to `~/.local/state/dotfiles/load-samples.tsv`, so a freeze leaves evidence | At login + every 30s |
 | `local-ai-warmup` | GET-only local-AI health check (never spawns model publishers) | At login + every 30 min |
+
+### Scheduling acceptance
+
+Claude Code and Codex follow the same interactive-ancestor policy. ChatGPT and
+Codex desktop sessions and terminal sessions stay off background QoS. Agents
+without an interactive ancestor still yield as background workers. Custom app
+lists keep their existing override behavior.
+
+Heavy commands share the `heavy-run` lock at absolute nice 15. Nested commands
+use the same priority contract. An inherited level above the configured target
+returns status 2 and runs no command. Regression: `tests/app-priority.bats` and
+`tests/heavy-run.bats`. [Priority limits](../../README.md#interactive-terminal-responsiveness).
 
 ## Files Involved
 

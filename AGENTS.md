@@ -104,7 +104,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **`make test` misses committed changes**: it tests uncommitted files only. On a branch: `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
-- **Parallel agents**: gates run one at a time via `heavy-run`; `dotfiles-load-sampler`.
+- FIFO tests hold through observations; teardown releases/waits; keep the queue guard.
 - **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: use a temp `DOTFILES_DIR` in tests.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.

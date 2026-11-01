@@ -81,7 +81,7 @@ is_descendant_of_interactive_app() {
     case "$command_path" in
       *"/WebStorm.app/"*|*"/Ghostty.app/"*|*"/Terminal.app/"*|*"/iTerm.app/"*|\
       *"/WezTerm.app/"*|*"/kitty.app/"*|*"/Alacritty.app/"*|*"/Warp.app/"*|\
-      *"/Claude.app/"*) return 0 ;;
+      *"/Claude.app/"*|*"/ChatGPT.app/"*|*"/Codex.app/"*) return 0 ;;
     esac
 
     parent_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null || true)
@@ -94,9 +94,10 @@ is_descendant_of_interactive_app() {
   return 1
 }
 
-set_claude_priority() {
+set_agent_priority() {
+  local process_name="$1"
   local process_ids
-  process_ids=$(pgrep -x "claude" 2>/dev/null || true)
+  process_ids=$(pgrep -x "$process_name" 2>/dev/null || true)
   [ -z "$process_ids" ] && return
 
   local process_id
@@ -138,11 +139,11 @@ else
   set_process_priority "WebStorm"
 
   # Agent/model workers must yield to interactive apps under CPU contention.
-  # Claude Code launched from a terminal app (Ghostty, WebStorm, ...) is an
-  # interactive session, so keep it responsive. Background the other Claude
+  # Claude Code and Codex launched from a terminal or desktop app are
+  # interactive sessions, so keep them responsive. Background the other agent
   # workers (launchd jobs, Remote Control, headless runs).
-  set_claude_priority
-  set_process_background "codex"
+  set_agent_priority "claude"
+  set_agent_priority "codex"
   set_process_background "ollama"
   set_process_background_pattern "mlx_lm.server"
   set_process_background_pattern "node.*minsky"

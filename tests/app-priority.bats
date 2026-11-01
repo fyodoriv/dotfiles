@@ -200,6 +200,60 @@ MOCK
 
 # ── taskpolicy invocation ────────────────────────────────────────
 
+codex_ancestry_fixture() {
+  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
+  cat > "$TEST_BIN/pgrep" <<'MOCK'
+#!/bin/bash
+[ "$*" != '-x codex' ] || echo 12345
+exit 0
+MOCK
+  cat > "$TEST_BIN/ps" <<'MOCK'
+#!/bin/bash
+case "$*" in
+  *"12345"*"comm="*) echo /fixture/codex ;;
+  *"12345"*"ppid="*) echo 23456 ;;
+  *"23456"*"comm="*) echo "$CODEX_ANCESTOR" ;;
+  *"23456"*"ppid="*) echo 1 ;;
+esac
+MOCK
+  chmod +x "$TEST_BIN/pgrep" "$TEST_BIN/ps"
+}
+
+assert_interactive_codex() {
+  codex_ancestry_fixture
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  grep -q -- '-B -t 0 -l 0 -p 12345' "$TASKPOLICY_LOG"
+  ! grep -q -- '-b -p 12345' "$TASKPOLICY_LOG"
+  grep -q -- '0 -p 12345' "$RENICE_LOG"
+  ! grep -q -- '10 -p 12345' "$RENICE_LOG"
+}
+
+@test "app-priority keeps interactive Codex in ChatGPT Desktop responsive" {
+  export CODEX_ANCESTOR=/Applications/ChatGPT.app/Contents/MacOS/ChatGPT
+  assert_interactive_codex
+}
+
+@test "app-priority keeps interactive Codex in Codex Desktop responsive" {
+  export CODEX_ANCESTOR=/Applications/Codex.app/Contents/MacOS/Codex
+  assert_interactive_codex
+}
+
+@test "app-priority keeps interactive Codex in a terminal responsive" {
+  export CODEX_ANCESTOR=/Applications/Ghostty.app/Contents/MacOS/ghostty
+  assert_interactive_codex
+}
+
+@test "app-priority keeps headless Codex without an interactive ancestor backgrounded" {
+  export CODEX_ANCESTOR=/sbin/launchd
+  codex_ancestry_fixture
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  grep -q -- '-b -p 12345' "$TASKPOLICY_LOG"
+  grep -q -- '10 -p 12345' "$RENICE_LOG"
+  ! grep -q -- '-B -t 0 -l 0 -p 12345' "$TASKPOLICY_LOG"
+}
+
 @test "app-priority calls taskpolicy when processes are found" {
   local config_dir="$HOME/.config/dotfiles"
   mkdir -p "$config_dir"

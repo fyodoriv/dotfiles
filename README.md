@@ -1154,16 +1154,24 @@ Measured on M3 Max, 64GB RAM, 300+ package JS/TS monorepo:
 Ghostty keeps scrollback in memory for every terminal surface. The managed
 config uses Ghostty's upstream 10 MB cap to prevent verbose commands from
 retaining 100 MB per tab. The `app-priority` LaunchAgent runs every minute:
-it keeps Ghostty, WebStorm, and Claude Code launched from a terminal app
+it keeps Ghostty, WebStorm, and Claude Code or Codex launched from a terminal app
 (Ghostty, WebStorm, Terminal, iTerm2, WezTerm, kitty, Alacritty, Warp) or from
-the Claude desktop app's Code tab interactive.
+the Claude, ChatGPT, or Codex desktop app interactive.
 
-Claude Code with no such
+Claude Code and Codex with no such
 ancestor (launchd jobs, Remote Control) and other agent and model workers
 yield under CPU contention. Test runners that agents start (vitest, tsc,
 biome, bats) run at nice 10, so they yield CPU to the desktop. They stay off
 background QoS, which would confine them to efficiency cores and throttle
 their disk I/O even on an idle Mac.
+
+`heavy-run` shares one Mac-wide lock and sets an absolute nice level of 15.
+`HEAVY_RUN_NICE` selects another absolute level from 0 to 20, including for
+nested calls that reuse the lock. An inherited level above the target fails
+with status 2 before running the command; it never attempts a priority increase.
+Existing processes may retain an earlier nice value until restarted. The
+interactive policy clears background QoS and requests nice 0; macOS may deny
+raising an existing process's priority without extra privileges.
 
 The `load-sampler` LaunchAgent writes load, free memory, swap, the top CPU
 processes, and CPU busy % to `~/.local/state/dotfiles/load-samples.tsv` every

@@ -7,7 +7,14 @@ bats_require_minimum_version 1.5.0
 
 setup() {
   export HEAVY_RUN_DIR="$BATS_TEST_TMPDIR/hr"
-  unset HEAVY_RUN_HELD
+  unset HEAVY_RUN_HELD FIFO_RELEASE
+}
+
+teardown() {
+  if [ -n "${FIFO_RELEASE:-}" ]; then
+    release_fifo_holder
+    wait
+  fi
 }
 
 # Wait up to 5 s for the first run to hold the lock.
@@ -26,12 +33,84 @@ wait_held() {
   [ "$output" = "hi" ]
 }
 
-@test "heavy-run: lowers priority by HEAVY_RUN_NICE" {
-  base=$(ps -o nice= -p $$ | tr -d ' ')
-  [ "$base" -le 15 ] || skip "caller already at nice $base"
-  HEAVY_RUN_NICE=4 run "$SCRIPT" sh -c 'ps -o nice= -p $$'
+priority_fixture() {
+  local fixture="$BATS_TEST_TMPDIR/priority"
+  mkdir -p "$fixture"
+  cat > "$fixture/HeavyPriorityFixture.pm" <<'PERL'
+package HeavyPriorityFixture;
+BEGIN {
+  *CORE::GLOBAL::getpriority = sub { return 0 + $ENV{FIXTURE_NICE} };
+  *CORE::GLOBAL::setpriority = sub {
+    die "priority increase attempted\n" if $_[2] < $ENV{FIXTURE_NICE};
+    $ENV{FIXTURE_NICE} = $_[2];
+    return 1;
+  };
+}
+1;
+PERL
+  cat > "$fixture/nice" <<'SH'
+#!/bin/sh
+[ "$1" = -n ] || exit 99
+FIXTURE_NICE=$((FIXTURE_NICE + $2))
+[ "$FIXTURE_NICE" -le 20 ] || FIXTURE_NICE=20
+export FIXTURE_NICE
+shift 2
+[ "$1" != -- ] || shift
+exec "$@"
+SH
+  chmod +x "$fixture/nice"
+  export PATH="$fixture:$PATH" PERL5LIB="$fixture" PERL5OPT=-MHeavyPriorityFixture
+}
+
+@test "heavy-run: absolute priority reaches 15 from inherited 0" {
+  priority_fixture
+  FIXTURE_NICE=0 run "$SCRIPT" sh -c 'echo "$FIXTURE_NICE"'
   [ "$status" -eq 0 ]
-  [ "$(echo "$output" | tr -d ' ')" = "$((base + 4))" ]
+  [ "$output" = 15 ]
+}
+
+@test "heavy-run: absolute priority reaches 15 from inherited 10" {
+  priority_fixture
+  FIXTURE_NICE=10 run "$SCRIPT" sh -c 'echo "$FIXTURE_NICE"'
+  [ "$status" -eq 0 ]
+  [ "$output" = 15 ]
+}
+
+@test "heavy-run: absolute priority stays 15 from inherited 15" {
+  priority_fixture
+  FIXTURE_NICE=15 run "$SCRIPT" sh -c 'echo "$FIXTURE_NICE"'
+  [ "$status" -eq 0 ]
+  [ "$output" = 15 ]
+}
+
+@test "heavy-run: absolute priority rejects inherited 20 without running command" {
+  priority_fixture
+  FIXTURE_NICE=20 run "$SCRIPT" touch "$BATS_TEST_TMPDIR/ran"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"cannot raise priority"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  run "$SCRIPT" --status
+  [ "$output" = free ]
+}
+
+@test "heavy-run: absolute priority honors a configured target" {
+  priority_fixture
+  FIXTURE_NICE=10 HEAVY_RUN_NICE=18 run "$SCRIPT" sh -c 'echo "$FIXTURE_NICE"'
+  [ "$status" -eq 0 ]
+  [ "$output" = 18 ]
+}
+
+@test "heavy-run: absolute priority applies configured nested targets without waiting" {
+  priority_fixture
+  FIXTURE_NICE=10 run "$SCRIPT" sh -c 'HEAVY_RUN_NICE=18 "$1" sh -c '\''echo "$FIXTURE_NICE"'\''; echo "$FIXTURE_NICE"' sh "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'18\n15' ]
+}
+
+@test "heavy-run: absolute priority is 15 for a real command" {
+  run "$SCRIPT" perl -e 'print getpriority(0, 0), "\n"'
+  [ "$status" -eq 0 ]
+  [ "$output" = 15 ]
 }
 
 @test "heavy-run: two runs never overlap" {
@@ -135,6 +214,16 @@ wait_queued() {
   return 1
 }
 
+# The 60-second alarm only bounds an abandoned fixture, not queue acceptance.
+start_fifo_holder() {
+  FIFO_RELEASE="$BATS_TEST_TMPDIR/release-holder"
+  "$SCRIPT" perl -e 'alarm 60; until (-e $ARGV[0]) { select undef, undef, undef, 0.1 }' "$FIFO_RELEASE" &
+}
+
+release_fifo_holder() {
+  : > "$FIFO_RELEASE"
+}
+
 # Hold a live ticket (an flock on its file) without taking the lock; the pid
 # is $FAKE_PID. $1 is the ticket number. Stop it with: kill "$FAKE_PID".
 fake_live_ticket() {
@@ -146,7 +235,7 @@ fake_live_ticket() {
 
 @test "heavy-run: three waiters run in arrival order behind a holder" {
   log="$BATS_TEST_TMPDIR/fifo"
-  "$SCRIPT" sleep 2 &
+  start_fifo_holder
   wait_held
   for n in A B C; do
     "$SCRIPT" sh -c "echo $n >>'$log'" &
@@ -156,6 +245,7 @@ fake_live_ticket() {
   [[ "${lines[1]}" == "queue 1: "*"echo A"* ]]
   [[ "${lines[2]}" == "queue 2: "*"echo B"* ]]
   [[ "${lines[3]}" == "queue 3: "*"echo C"* ]]
+  release_fifo_holder
   wait
   run cat "$log"
   [ "${lines[0]}" = "A" ]
@@ -175,7 +265,7 @@ fake_live_ticket() {
 }
 
 @test "heavy-run: --status lists the queue in order" {
-  "$SCRIPT" sleep 2 &
+  start_fifo_holder
   wait_held
   "$SCRIPT" sh -c "echo first" &
   wait_queued 1
@@ -185,6 +275,7 @@ fake_live_ticket() {
   [[ "${lines[0]}" == held:* ]]
   [[ "${lines[1]}" == "queue 1: "*"echo first"* ]]
   [[ "${lines[2]}" == "queue 2: "*"echo second"* ]]
+  release_fifo_holder
   wait
 }
 

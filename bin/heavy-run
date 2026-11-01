@@ -26,7 +26,7 @@
 #
 # Env:
 #   HEAVY_RUN_DIR   lock folder (default ~/.local/state/heavy-run)
-#   HEAVY_RUN_NICE  nice level (default 15)
+#   HEAVY_RUN_NICE  absolute nice level (default 15); never raises priority
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
 #                   or $HEAVY_RUN_DIR/waits.log when HEAVY_RUN_DIR is set)
 
@@ -75,10 +75,26 @@ case "$level" in
   '' | *[!0-9]* | 2[1-9] | [3-9][0-9] | [0-9][0-9][0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
 esac
 
+priority_code='
+  my ($level, @cmd) = @ARGV;
+  my $current = getpriority(0, 0);
+  if (!defined $current || $current > $level) {
+    print STDERR "heavy-run: cannot raise priority to nice $level\n";
+    exit 2;
+  }
+  if (($current < $level && !setpriority(0, 0, $level)) || getpriority(0, 0) != $level) {
+    print STDERR "heavy-run: cannot set absolute nice level $level\n";
+    exit 2;
+  }
+  exec {$cmd[0]} @cmd;
+  print STDERR "heavy-run: cannot run $cmd[0]: $!\n";
+  exit 127;
+'
+
 # Already inside a heavy-run that still holds the lock: run at once.
 # A leftover daemon keeps HEAVY_RUN_HELD after the run ends, so check the lock.
 if [ "${HEAVY_RUN_HELD:-}" = "$lock" ] && [ "$("$0" --status | sed -n 1p)" != "free" ]; then
-  exec "$@"
+  exec perl -e "$priority_code" "$level" "$@"
 fi
 
 mkdir -p "$dir"
@@ -89,7 +105,7 @@ exec perl -e '
   use Fcntl qw(:flock);
   use POSIX ();
   use Fcntl qw(O_RDWR O_CREAT);
-  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, @cmd) = @ARGV;
+  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, @cmd) = @ARGV;
   my $t0 = time;
   my ($ticket, $tfh, $name);
   # Take the next ticket number. The ticket is written and locked under a
@@ -161,7 +177,7 @@ exec perl -e '
   my $pid = fork() // die "heavy-run: cannot fork: $!\n";
   if ($pid == 0) {
     POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
-    exec("nice", "-n", $level, "--", @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
+    exec("perl", "-e", $priority_code, $level, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
   }
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid }; }
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
@@ -174,4 +190,4 @@ exec perl -e '
   my $st = $?;
   truncate($owner, 0);
   exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));
-' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$@"
+' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$@"

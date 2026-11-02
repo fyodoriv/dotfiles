@@ -200,3 +200,20 @@ heavy-run make check BATS_JOBS= TEST_FILE_JOBS=
 - **Concerns**: final source/frozen results still need root review before commit.
 - **Approval rationale**: the existing source/harness can retire the precise ID
   without a live configuration action or another implementation engine.
+
+## Recorded source evidence
+
+Prediction commit `fbca75f` preceded the fixture results. The first baseline
+had a single invalid quoted fixture, preserved separately; it had ten valid
+semantic failures. Correcting only that input quoting produced eleven semantic
+retirement failures and eleven passing controls on unchanged production.
+The candidate passed the same frozen twenty-two assertions. No expectation
+was weakened. Default and existing-entry retirement violations moved to zero.
+These are scratch-template results, not installed-agent or archive proof.
+
+R11 then reproduced five unsafe successful acceptances while the original
+twenty-two controls passed. Its guard passed all twenty-seven unchanged
+assertions. R12 reproduced three further unsafe acceptances/transformations
+while those twenty-seven passed. Its literal-root and comment-boundary guard
+passed the same thirty assertions. Each supplement was committed before its
+probes. All refusal cases require both a nonzero exit and no replacement output.

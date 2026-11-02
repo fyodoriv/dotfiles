@@ -1,7 +1,7 @@
 #!/bin/bash
 # Blocks full test suites and builds that do not run through heavy-run (#357).
 # Receives Claude Code PreToolUse tool input as JSON on stdin.
-# Single-file runs stay allowed, so fast iteration stays fast.
+# Supported single-test runners stay allowed for fast iteration.
 # HEAVY_RUN_HOOK=off turns the hook off.
 
 set -euo pipefail
@@ -44,7 +44,7 @@ _one_test_args() {
 
 # True when the script name is a test or build script.
 _heavy_script() {
-  case "$1" in test|test:*|test-*|t|build|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac
+  case "$1" in test|test:*|test-*|t|build|verify|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac
   return 1
 }
 
@@ -103,6 +103,22 @@ _is_heavy() {
     rest+=("${raw[$i]}"); i=$((i + 1))
   done
   case "$tool" in
+    cargo)
+      rest=(${raw[@]+"${raw[@]}"})
+      # Toolchain selection does not make compilation a light command.
+      case "${rest[0]:-}" in
+        +stable) rest=("${rest[@]:1}") ;;
+        +*) return 0 ;;
+      esac
+      case "${rest[*]-}" in
+        --version|-V|--help|help|"help build"|"build --help"|"test --help"|"metadata --no-deps --format-version 1"|"locate-project --message-format plain") return 1 ;;
+      esac
+      # Unknown subcommands, variable arguments and response files stay refused.
+      return 0 ;;
+    rustc)
+      rest=(${raw[@]+"${raw[@]}"})
+      case "${rest[*]-}" in --version|-V|--help|"--print sysroot") return 1 ;; esac
+      return 0 ;;
     npm|yarn|pnpm|bun|turbo)
       # npm exec / pnpm exec / pnpm dlx / bun x / yarn playwright test; turbo run <script>
       case "${rest[0]:-}" in
@@ -122,6 +138,7 @@ _is_heavy() {
         a="${rest[$i]}"
         case "$a" in -*|run|run-script) continue ;; esac
         _heavy_script "$a" || return 1
+        [ "$a" = verify ] && return 0
         _one_test_args "${rest[@]:$((i + 1))}" && return 1
         return 0
       done
@@ -166,6 +183,13 @@ _strip_text() {
         my $r = $in =~ m{^\.\*?$} ? $in : length($in) ? "Q" : "";
         if ($dq) {
           while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }
+        }
+        # Preserve only literal Rust executable identity at command position.
+        # Replace its path with the basename so spaces remain one safe token.
+        if ($pre =~ m{(?:^|[;&|(){}\n])[ \t]*$}
+            && (!$dq || $in !~ m{[\$`\\]})
+            && $in =~ m{(?:^|\x2f)(cargo|rustc)$}) {
+          $r = $1;
         }
         if ($pre =~ m{(?:^|[;&|(){}\n]|\b(?:then|do|else)\b)[ \t]*(?:[A-Za-z_]\w*=\S*[ \t]+)*(?:(?:sudo|env|time|nohup|exec|command|nice|caffeinate|timeout)[ \t]+(?:-\S+[ \t]+|\d\S*[ \t]+|[A-Z]+[ \t]+)*)*(?:\S*\/)?(?:ba|z|da|k)?sh[ \t]+(?:-\w+[ \t]+(?:[A-Za-z]\w*[ \t]+)?)*-\w*c\w*[ \t]+$}) {
           $in =~ s{\\(["\\$`])}{$1}g if $dq;

@@ -162,8 +162,20 @@ and `make e2e`, `make test-all`, or `make test-force` (`make -n` passes). It che
 Single-file and single-test runs (`npx vitest run one.test.ts`, `bats tests/x.bats`,
 `pnpm ui -g login`, `playwright test tests/one.spec.ts`) pass. It also reads
 `pnpm --filter <pkg> e2e`, `pnpm dlx`, and `bunx playwright test`.
+Rust compilation (`cargo build`, `test`, `check`, `clippy`, `bench`, `run`,
+`rustc`, and direct `rustc`) must queue, including filtered Cargo tests.
+Unknown Rust tool invocations also refuse. Only the bounded version, help,
+metadata, project-location and sysroot inspection forms in the
+[caller coverage contract](plans/queue-caller-coverage.md) pass unwrapped.
+The exact `verify` package script must queue even with a filename argument.
+Literal quoted Rust executable paths are recognized at a bare command boundary;
+inert documentation strings remain ignored. Each hook invocation owns only
+its input text and decision. This does not prove queue ownership or cover
+commands launched through other channels.
+
 Set `HEAVY_RUN_HOOK=off` to turn it off. Tests:
-`tests/agent-hooks-require-heavy-run.bats`.
+`tests/agent-hooks-require-heavy-run.bats` and
+`tests/agent-hooks-heavy-build-callers.bats`.
 
 The doctor check `resilience.headless_chrome_under_heavy_run` is the safety
 net for runs the hook cannot see (a plain `node script.js` that starts

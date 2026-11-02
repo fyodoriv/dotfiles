@@ -109,7 +109,7 @@ separate evidence; do not manufacture generated outputs to make it look done.
 From the repository root, after the prediction and before feature edits:
 
 ```sh
-JOBS=1 heavy-run bats -- tests/agent-artifact-coverage.bats tests/stranger-readiness.bats
+JOBS=1 heavy-run bats tests/agent-artifact-coverage.bats tests/stranger-readiness.bats
 ```
 
 Use that identical command for semantic red and green. Keep baseline and
@@ -128,6 +128,11 @@ single-worker defaults combined `--no-parallelize-across-files` with jobs=1.
 Its failed receipt remains preserved. The explicit empty Bats job arguments
 above use the existing supported serial gate. This setup correction changes
 no C1-C8 input, prediction, metric or acceptance threshold.
+
+The installed Bats also rejects a standalone `--` before test paths. The
+recorded focused command above omits that unsupported separator. This command
+erratum preserves registration commit `3ea961d6cc423f1ccc2ddb7185d4d37a6aa19c4e`
+and changes no C1-C8 control or outcome criterion. No feature baseline has run.
 
 ## Numbered work and rollout
 

@@ -13,20 +13,6 @@ them. -->
 
 ## P1
 
-- [ ] Keep the tracked trackpad setup helper out of the home directory
-  - **ID**: ignore-trackpad-setup-helper
-  - **Tags**: setup, testing, stability
-  - **Details**: The required check found `macos-trackpad.sh` missing from `.chezmoiignore`. The tracked root helper is operational code, not a chezmoi home entry. Existing case 15 in `tests/chezmoi.bats` reports the leaked filename. This blocks the separate usage-tip retirement gate. Fix only the missing ignore entry after the registered unchanged-source reproduction.
-  - **Files**: `.chezmoiignore`, existing `tests/chezmoi.bats`
-  - **Output**: code
-  - **Acceptance**: the existing home-deployment boundary case passes and no other ignore pattern changes.
-  - **Hypothesis**: the observed non-source home entry count falls from one to zero by listing this exact operational helper, with all other deployment decisions unchanged.
-  - **Measurement**: after this prediction commit, run `heavy-run env JOBS=1 bats --filter 'chezmoiignore excludes every non-source root entry from HOME' tests/chezmoi.bats` before and after the one-line change; require `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` before delivery.
-  - **Success**: zero leaked non-source entries; the existing case and required gate exit zero.
-  - **Pivot**: if the unchanged case does not reproduce the named leak, abandon this diagnosis; any remaining leak or changed unrelated ignore behavior rejects the fix.
-  - **Anchor**: Basili, Caldiera and Rombach (1994), Goal Question Metric; the existing chezmoi home-deployment contract.
-  - **Competitive-goal**: none — preserve machine setup boundaries, not a scorecard count.
-
 
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation

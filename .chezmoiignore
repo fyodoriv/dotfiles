@@ -40,6 +40,7 @@ jetbrains
 launchagents
 lib
 macos-apps.sh
+macos-trackpad.sh
 macos-visual.sh
 macos.sh
 modules

@@ -58,6 +58,14 @@
 {{- if hasKey . "heavy_run_max_load" -}}
 {{-   $heavyRunMaxLoad = .heavy_run_max_load -}}
 {{- end -}}
+{{- $heavyRunProjectSlots := "" -}}
+{{- if hasKey . "heavy_run_project_slots" -}}
+{{-   $heavyRunProjectSlots = .heavy_run_project_slots -}}
+{{- end -}}
+{{- $heavyRunMemoryGuard := "" -}}
+{{- if hasKey . "heavy_run_memory_guard" -}}
+{{-   $heavyRunMemoryGuard = .heavy_run_memory_guard -}}
+{{- end -}}
 {{/* claude_permissions: manage (default) pins bypassPermissions in Claude
      Code and the ~/bin/claude wrapper; keep leaves the person's prompts on. */ -}}
 {{- $claudePermissions := "manage" -}}
@@ -257,6 +265,12 @@ data:
 {{- end }}
 {{- if $heavyRunMaxLoad }}
   heavy_run_max_load: {{ $heavyRunMaxLoad }}
+{{- end }}
+{{- if $heavyRunProjectSlots }}
+  heavy_run_project_slots: {{ $heavyRunProjectSlots }}
+{{- end }}
+{{- if ne (toString $heavyRunMemoryGuard) "" }}
+  heavy_run_memory_guard: {{ $heavyRunMemoryGuard }}
 {{- end }}
 {{- if ne $claudePermissions "manage" }}
   claude_permissions: {{ $claudePermissions | quote }}

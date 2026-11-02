@@ -291,6 +291,29 @@ lookup() {
   [ "$(yq -r '.contributes.settings.vscode' "$o/dotfiles-plugin.yaml.draft")" = vscode/settings.json ]
 }
 
+@test "plugin migrate follows current-user execute access" {
+  local mode o hook draft actual
+  for mode in 0700 0711 0755 0600; do
+    o="$TEST_DIR/dotfiles-mode-$mode"
+    mkdir -p "$o/hooks"
+    hook="$o/hooks/pre-push"
+    printf '#!/bin/sh\nexit 93\n' > "$hook"
+    chmod "$mode" "$hook"
+    run bash "$CLI" migrate "$o"
+    [ "$status" -eq 0 ]
+    draft="$o/dotfiles-plugin.yaml.draft"
+    if [ "$mode" = 0600 ]; then
+      [ "$(yq -r '(.capabilities.hooks // []) | length' "$draft")" = 0 ]
+    else
+      actual="$(yq -r '.capabilities.hooks[0]' "$draft")"
+      echo "mode=$mode expected=pre-push actual=$actual"
+      [ "$actual" = pre-push ]
+      [ "$(yq -r '.capabilities.hooks | length' "$draft")" = 1 ]
+    fi
+    [ "$(stat -f %Lp "$hook")" = "${mode#0}" ]
+  done
+}
+
 @test "11: every core path docs/plugins.md cites exists" {
   cd "$REPO_ROOT"
   missing="$(grep -oE '`(lib|bin|config|modules|data|home)/[^` ]+`' docs/plugins.md | tr -d '`' | sort -u |

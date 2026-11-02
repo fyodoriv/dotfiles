@@ -212,11 +212,13 @@ SH
   [[ "$output" == busy:* ]]
 }
 
-# Wait up to 5 s until --status lists $1 live queue entries.
+# Wait up to 5 s until --status lists $1 live queue entries, each past its
+# first start check: a new ticket reads "(waiting: starting)" until then.
 wait_queued() {
-  local i
+  local i s
   for i in $(seq 50); do
-    [ "$("$SCRIPT" --status | grep -c '^queue ')" -ge "$1" ] && return 0
+    s=$("$SCRIPT" --status)
+    [ "$(grep -c '^queue ' <<<"$s")" -ge "$1" ] && ! grep -q '(waiting: starting)' <<<"$s" && return 0
     sleep 0.1
   done
   return 1
@@ -296,7 +298,8 @@ fake_live_ticket() {
   kill -TERM "$pid"
   rc=0; wait "$pid" || rc=$?
   [ "$rc" -eq 143 ]
-  [ -z "$(ls "$HEAVY_RUN_DIR/queue")" ]
+  # The gate ticket stays while the first run holds it.
+  [ -z "$(ls "$HEAVY_RUN_DIR/queue" | grep -v "^0000000000-0$")" ]
   wait
 }
 
@@ -487,7 +490,7 @@ release_all() {
   "$SCRIPT" sleep 30 &
   victim=$!
   wait_held 1
-  child=$(sed -n 's/.* pid=\([0-9]*\) .*/\1/p' "$HEAVY_RUN_DIR/slots/1.owner")
+  child=$(sed -n 's/.* pid=\([0-9]*\) .*/\1/p' "$HEAVY_RUN_DIR/slots/s1.owner")
   kill -KILL "$victim"
   wait "$victim" 2>/dev/null || true
   run timeout 10 "$SCRIPT" echo after
@@ -554,6 +557,23 @@ release_all() {
   [ "$output" = "free: 0/3 slots busy" ]
   HEAVY_RUN_SLOTS=2 run "$SCRIPT" --status
   [ "$output" = "free: 0/2 slots busy" ]
+}
+
+@test "heavy-run: slots: a raised heavy_run_slots reaches a run already waiting" {
+  unset HEAVY_RUN_SLOTS
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_slots: 1\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  start_holder
+  wait_held 1
+  marker="$BATS_TEST_TMPDIR/second"
+  "$SCRIPT" touch "$marker" &
+  wait_queued 1
+  sleep 0.5
+  [ ! -e "$marker" ]
+  printf 'data:\n  heavy_run_slots: 2\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  for i in $(seq 50); do [ -e "$marker" ] && break; sleep 0.1; done
+  [ -e "$marker" ]
+  release_all
 }
 
 @test "heavy-run: slots: the default is one slot, whatever the machine size" {
@@ -636,6 +656,88 @@ make_fake_app() {
   grep -q 'HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"' "$SCRIPT"
 }
 
+@test "heavy-run: project: a run waits at its project cap while another project's run starts" {
+  export HEAVY_RUN_SLOTS=10 HEAVY_RUN_PROJECT_SLOTS=2
+  HEAVY_RUN_PROJECT=/p/alpha start_holder
+  HEAVY_RUN_PROJECT=/p/alpha start_holder
+  wait_held 2
+  HEAVY_RUN_PROJECT=/p/alpha "$SCRIPT" touch "$BATS_TEST_TMPDIR/a3" &
+  wait_queued 1
+  HEAVY_RUN_PROJECT=/p/beta "$SCRIPT" touch "$BATS_TEST_TMPDIR/b1"
+  [ -e "$BATS_TEST_TMPDIR/b1" ]
+  [ ! -e "$BATS_TEST_TMPDIR/a3" ]
+  run "$SCRIPT" --status
+  [[ "$output" == *"(waiting: project cap: 2/2 runs of alpha)"* ]]
+  release_all
+  [ -e "$BATS_TEST_TMPDIR/a3" ]
+}
+
+@test "heavy-run: project: worktrees of one repo share its cap" {
+  command -v git >/dev/null || skip "needs git"
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_PROJECT_SLOTS=1
+  local repo="$BATS_TEST_TMPDIR/repo"
+  git init -q "$repo"
+  git -C "$repo" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+  git -C "$repo" worktree add -q "$BATS_TEST_TMPDIR/wt"
+  cd "$repo"
+  start_holder
+  wait_held 1
+  cd "$BATS_TEST_TMPDIR/wt"
+  "$SCRIPT" touch "$BATS_TEST_TMPDIR/second" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "$output" == *"(waiting: project cap: 1/1 runs of repo)"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/second" ]
+  release_all
+  [ -e "$BATS_TEST_TMPDIR/second" ]
+}
+
+@test "heavy-run: memory guard: under pressure a newer run stops while the oldest goes on" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_PROBE="test -e '$BATS_TEST_TMPDIR/pressure' && echo memory pressure warn"
+  local old="$BATS_TEST_TMPDIR/old" new="$BATS_TEST_TMPDIR/new" i
+  "$SCRIPT" sh -c "for i in \$(seq 40); do echo \$i >> '$old'; sleep 0.25; done" &
+  for i in $(seq 50); do [ -s "$old" ] && break; sleep 0.1; done
+  "$SCRIPT" sh -c "for i in \$(seq 12); do echo \$i >> '$new'; sleep 0.25; done" 2>"$BATS_TEST_TMPDIR/err" &
+  local new_pid=$!
+  for i in $(seq 50); do [ -s "$new" ] && break; sleep 0.1; done
+  : >"$BATS_TEST_TMPDIR/pressure"
+  sleep 2.5  # the guard asks at most every 2 s
+  local n1 o1 n2 o2
+  n1=$(wc -l < "$new"); o1=$(wc -l < "$old"); sleep 1; n2=$(wc -l < "$new"); o2=$(wc -l < "$old")
+  [ "$n1" -eq "$n2" ]
+  [ "$o2" -gt "$o1" ]
+  rm "$BATS_TEST_TMPDIR/pressure"
+  wait "$new_pid"
+  [ "$(wc -l < "$new")" -eq 12 ]
+  grep -q "heavy-run: paused: memory pressure warn (older runs go first)" "$BATS_TEST_TMPDIR/err"
+  grep -q "heavy-run: resumed" "$BATS_TEST_TMPDIR/err"
+  wait
+}
+
+@test "heavy-run: memory guard: HEAVY_RUN_MEMORY_GUARD=0 keeps a newer run going" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_MEMORY_GUARD=0 HEAVY_RUN_PROBE="test -e '$BATS_TEST_TMPDIR/pressure' && echo memory pressure warn"
+  start_holder
+  wait_held 1
+  local new="$BATS_TEST_TMPDIR/new"
+  "$SCRIPT" sh -c "for i in \$(seq 16); do echo \$i >> '$new'; sleep 0.25; done" &
+  local new_pid=$! i
+  for i in $(seq 50); do [ -s "$new" ] && break; sleep 0.1; done
+  : >"$BATS_TEST_TMPDIR/pressure"
+  sleep 2.5
+  local n1 n2
+  n1=$(wc -l < "$new"); sleep 0.8; n2=$(wc -l < "$new")
+  [ "$n2" -gt "$n1" ]
+  wait "$new_pid"
+  release_all
+}
+
+@test "heavy-run: project: rejects a bad HEAVY_RUN_PROJECT_SLOTS or HEAVY_RUN_MEMORY_GUARD" {
+  HEAVY_RUN_PROJECT_SLOTS=0 run "$SCRIPT" true
+  [ "$status" -eq 2 ] && [[ "$output" == *"HEAVY_RUN_PROJECT_SLOTS must be 1-64"* ]]
+  HEAVY_RUN_MEMORY_GUARD=yes run "$SCRIPT" true
+  [ "$status" -eq 2 ] && [[ "$output" == *"HEAVY_RUN_MEMORY_GUARD must be 0 or 1"* ]]
+}
+
 @test "heavy-run: the state folder is private: folder 0700, files 0600" {
   mkdir -p "$HEAVY_RUN_DIR"
   chmod 755 "$HEAVY_RUN_DIR"
@@ -644,6 +746,121 @@ make_fake_app() {
   [ "$(mode "$HEAVY_RUN_DIR")" = 700 ]
   [ "$(mode "$HEAVY_RUN_DIR/lock")" = 600 ]
   [ "$(mode "$HEAVY_RUN_DIR/seq")" = 600 ]
-  [ "$(mode "$HEAVY_RUN_DIR/slots/1")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/slots/s1")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/sched.lock")" = 600 ]
   [ "$(mode "$HEAVY_RUN_DIR/waits.log")" = 600 ]
+}
+
+# --- The scheduler: one process decides for the whole queue ---
+
+@test "heavy-run: scheduler: a waiter's ticket gets its reason from the scheduler" {
+  start_holder
+  wait_held 1
+  "$SCRIPT" true &
+  wait_queued 1
+  ls "$HEAVY_RUN_DIR/queue" | grep -q '\.why$'
+  [ "$(cat "$HEAVY_RUN_DIR"/queue/*.why)" = "no free slot (1/1 busy)" ]
+  release_all
+  [ -z "$(ls "$HEAVY_RUN_DIR/queue" | grep -v '^0000000000-0$')" ]
+}
+
+@test "heavy-run: scheduler: a lowered heavy_run_slots holds runs already waiting" {
+  unset HEAVY_RUN_SLOTS
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_slots: 1\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  start_holder
+  wait_held 1
+  marker="$BATS_TEST_TMPDIR/second"
+  printf 'data:\n  heavy_run_slots: 3\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  "$SCRIPT" touch "$marker" &
+  for i in $(seq 50); do [ -e "$marker" ] && break; sleep 0.1; done
+  [ -e "$marker" ]
+  printf 'data:\n  heavy_run_slots: 1\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  sleep 1.2
+  "$SCRIPT" touch "$marker.3" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "$output" == *"(waiting: no free slot (1/1 busy))"* ]]
+  release_all
+  [ -e "$marker.3" ]
+}
+
+@test "heavy-run: scheduler: an older heavy-run waiter keeps its place in line" {
+  OLD="$BATS_TEST_DIRNAME/fixtures/heavy-run-429"
+  log="$BATS_TEST_TMPDIR/order"
+  start_holder
+  wait_held 1
+  # The older code can not see the new slot; only the gate keeps it waiting.
+  "$OLD" sh -c "echo old >>'$log'" &
+  wait_queued 1
+  sleep 1
+  [ ! -e "$log" ]
+  "$SCRIPT" sh -c "echo new >>'$log'" &
+  wait_queued 2
+  run "$SCRIPT" --status
+  [[ "${lines[2]}" == "queue 1: "*"echo old"*"(waiting: no free slot (1/1 busy))" ]]
+  [[ "${lines[3]}" == "queue 2: "*"echo new"*"(waiting: behind queue 1)" ]]
+  release_all
+  run cat "$log"
+  [ "${lines[0]}" = old ]
+  [ "${lines[1]}" = new ]
+  [ ! -e "$HEAVY_RUN_DIR/gate-open" ]
+}
+
+# Start a waiter from a shell that exits at once, so the waiter is orphaned.
+# The shell lives 0.5 s, so the waiter starts with it as parent (a waiter
+# that starts under pid 1 is exempt). $1 is the output redirect; the rest is env.
+start_orphan() {
+  local redirect=$1; shift
+  env "$@" sh -c "'$SCRIPT' touch '$BATS_TEST_TMPDIR/ran' $redirect & echo \$! > '$BATS_TEST_TMPDIR/pid'; sleep 0.5"
+}
+
+@test "heavy-run: orphans: a waiter whose caller died leaves the queue" {
+  start_fifo_holder
+  wait_held
+  start_orphan '>/dev/null 2>&1'
+  local pid i
+  pid=$(cat "$BATS_TEST_TMPDIR/pid")
+  for i in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  ! kill -0 "$pid" 2>/dev/null || false
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 0 ]
+  release_fifo_holder
+  wait
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "heavy-run: orphans: a waiter that writes to a file keeps its place and runs" {
+  start_fifo_holder
+  wait_held
+  start_orphan ">'$BATS_TEST_TMPDIR/log' 2>&1"
+  wait_queued 1
+  sleep 0.6
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 1 ]
+  release_fifo_holder
+  local i
+  for i in $(seq 50); do [ -e "$BATS_TEST_TMPDIR/ran" ] && break; sleep 0.1; done
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "heavy-run: orphans: HEAVY_RUN_KEEP_ORPHAN=1 or nohup keeps the waiter" {
+  start_fifo_holder
+  wait_held
+  start_orphan '>/dev/null 2>&1' HEAVY_RUN_KEEP_ORPHAN=1
+  wait_queued 1
+  sleep 0.6
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 1 ]
+  sh -c "nohup '$SCRIPT' true >/dev/null 2>&1 & sleep 0.5"
+  wait_queued 2
+  sleep 0.6
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 2 ]
+  release_fifo_holder
+  local i
+  for i in $(seq 50); do [ -e "$BATS_TEST_TMPDIR/ran" ] && break; sleep 0.1; done
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "heavy-run: orphans: rejects a bad HEAVY_RUN_KEEP_ORPHAN" {
+  run env HEAVY_RUN_KEEP_ORPHAN=yes "$SCRIPT" true
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"HEAVY_RUN_KEEP_ORPHAN must be 0 or 1"* ]]
 }

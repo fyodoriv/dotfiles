@@ -638,7 +638,7 @@ cmd_migrate() {
   [ -d "$src" ] || die "usage: dotfiles plugin migrate <v1 overlay dir>"
   src="$(cd "$src" && pwd -P)"
   draft="$src/dotfiles-plugin.yaml.draft"
-  hooks="$(find "$src/hooks" -maxdepth 1 -type f -perm -111 -exec basename {} \; 2>/dev/null | sort | paste -sd, -)"
+  hooks="$(find "$src/hooks" -maxdepth 1 -type f -exec test -x {} \; -exec basename {} \; 2>/dev/null | sort | paste -sd, -)"
   {
     echo "schema: 1"
     echo "name: $(basename "$src" | sed 's/^dotfiles-//' | tr '[:upper:]_' '[:lower:]-')"

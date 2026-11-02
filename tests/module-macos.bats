@@ -141,6 +141,8 @@ teardown() {
   set_default com.apple.dock launchanim "0"
   set_default com.apple.dock minimize-to-application "1"
   set_default com.apple.dock mru-spaces "0"
+  set_default com.apple.dock workspaces-auto-swoosh "0"
+  set_default com.apple.dock wvous-br-corner "1"
   set_default com.apple.dock show-recents "0"
   set_default com.apple.dock expose-animation-duration "0.1"
   set_default NSGlobalDomain NSAppSleepDisabled "1"
@@ -264,4 +266,28 @@ teardown() {
   source "$BATS_TEST_DIRNAME/../modules/macos/doctor.sh"
   # At least the 9 keyboard checks should pass
   [ "$pass_count" -ge 9 ]
+}
+
+@test "macos: bottom-right hot corner stays inactive in managed defaults and doctor" {
+  run jq -e '.[] | select(.domain == "com.apple.dock" and .key == "wvous-br-corner") | .type == "int" and .value == 1' "$BATS_TEST_DIRNAME/../data/macos-defaults.json"
+  [ "$status" -eq 0 ]
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/macos/doctor.sh"
+  [ "$(cat "$MOCK_DEFAULTS/com.apple.dock/wvous-br-corner")" = "1" ]
+}
+
+@test "macos: automatic Space switching stays disabled in managed defaults and doctor" {
+  run jq -e '.[] | select(.domain == "com.apple.dock" and .key == "workspaces-auto-swoosh") | .type == "bool" and .value == false' "$BATS_TEST_DIRNAME/../data/macos-defaults.json"
+  [ "$status" -eq 0 ]
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/macos/doctor.sh"
+  [ "$(cat "$MOCK_DEFAULTS/com.apple.dock/workspaces-auto-swoosh")" = "0" ]
+}
+
+@test "macos: core profile preserves Space without changing visual hot corners" {
+  export DOTFILES_PROFILE=core
+  FIX_MODE=true
+  source "$BATS_TEST_DIRNAME/../modules/macos/doctor.sh"
+  [ "$(cat "$MOCK_DEFAULTS/com.apple.dock/workspaces-auto-swoosh")" = "0" ]
+  [ ! -e "$MOCK_DEFAULTS/com.apple.dock/wvous-br-corner" ]
 }

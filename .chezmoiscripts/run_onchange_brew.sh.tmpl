@@ -11,7 +11,9 @@ fi
 
 echo "→ Running brew bundle..."
 RENDERED="$(mktemp)"
-trap 'rm -f "$RENDERED"' EXIT
+DEFERRED_CASKS=""
+trap 'rm -f "$RENDERED" "$DEFERRED_CASKS"' EXIT
+DEFERRED_CASKS="$(mktemp)"
 cat > "$RENDERED" << 'BREWFILE_EOF'
 # NOTE: poetry, httpie, jrnl, awscli are intentionally NOT brew-managed. The brew
 # formulae pull python@3.x, whose binaries endpoint agents flag on every
@@ -63,6 +65,7 @@ brew "mas"               # App Store CLI — used by dotfiles-resilience-setup t
 brew "defaultbrowser"    # CLI to set the macOS default browser — used by bin/chromework-install
 brew "ripgrep"
 brew "shellcheck"
+brew "shfmt"             # syntax tree for inert document writes in the git guard
 brew "sleepwatcher"
 brew "terminal-notifier"
 brew "tealdeer"          # tldr-compatible client; avoids deprecated tldr formula/link conflicts
@@ -119,6 +122,11 @@ brew "yazi"
 cask "hiddenbar"
 cask "maccy"
 
+# ── Full: tools the full-profile doctor checks ───────────────────
+# modules/agent-browser and modules/vscode run on full and fail without these.
+brew "agent-browser"
+cask "visual-studio-code"
+
 # ── Full: Modern CLI replacements (2026 cohort) ──────────────────
 # Each fills a gap not covered by the core set above.
 brew "sd"            # sed replacement — intuitive regex syntax (Python/JS style, no escape hell)
@@ -168,8 +176,19 @@ if [ -f "{{ .chezmoi.sourceDir }}/lib/plugin-extensions.sh" ] && command -v yq >
   done < <(plugin_option brew.skip 2>/dev/null)
 fi
 
+# Defer only unregistered app casks with a real foreign-owned app conflict.
+# Keep formula errors, registered casks, and other install failures fatal.
+if [ -f "{{ .chezmoi.sourceDir }}/lib/brew-cask-adoption.sh" ]; then
+  # shellcheck source=../lib/brew-cask-adoption.sh
+  source "{{ .chezmoi.sourceDir }}/lib/brew-cask-adoption.sh"
+  brew_defer_foreign_apps "$RENDERED" "$DEFERRED_CASKS"
+fi
 brew bundle --no-upgrade --file="$RENDERED"
-echo "✓ Homebrew packages up to date"
+if [ -s "$DEFERRED_CASKS" ]; then
+  echo "⚠ Homebrew bundle applied; deferred app adoption needs a terminal"
+else
+  echo "✓ Homebrew packages up to date"
+fi
 
 {{ if dig "use_local_ai" false . -}}
 # ── Local-LLM stack: mlx-lm on Apple Silicon only ────────────────

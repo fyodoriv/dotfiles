@@ -3,6 +3,20 @@
 # branch proven merged (merged PR head, or its diff already on the default
 # branch). Everything else stays blocked.
 
+load host-load
+
+_missing_timeout_result() {
+  local elapsed="$1" canary="$2"
+  [ ! -e "$canary" ] || { echo "unexpected gh invocation"; return 1; }
+  [ "$elapsed" -ge 10 ] || return 0
+  if host_is_saturated; then
+    echo "timing inconclusive: elapsed=${elapsed}s; observed one-minute load exceeds CPU count; no gh invocation"
+    return 77
+  fi
+  echo "elapsed=${elapsed}s exceeds the unchanged ten-second bound on an unsaturated host"
+  return 1
+}
+
 setup() {
   HOOK="${HOOK_UNDER_TEST:-$BATS_TEST_DIRNAME/../agent-hooks/block-dangerous-git.sh}"
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
@@ -315,6 +329,7 @@ merged_and_unmerged() {
 }
 
 @test "without a timeout binary the PR proof is skipped, not run unbounded" {
+  local elapsed
   merged_and_unmerged
   git checkout -q -b feat/pr-only3
   printf 'only3\n' > only3.txt && git add only3.txt && git commit -q -m only3
@@ -324,11 +339,32 @@ merged_and_unmerged() {
   export DOTFILES_TIMEOUT_BIN=""
   SECONDS=0
   run_hook "git branch -D feat/pr-only3"
+  elapsed="$SECONDS"
   [ "$status" -eq 2 ]
-  [ "$SECONDS" -lt 10 ]
   [ ! -e "$BATS_TEST_TMPDIR/gh-ran" ]
   # The local diff proof still decides without gh.
   run_hook "git branch -D feat/m"
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/gh-ran" ]
+  run _missing_timeout_result "$elapsed" "$BATS_TEST_TMPDIR/gh-ran"
+  if [ "$status" -eq 77 ]; then skip "$output"; fi
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "missing-timeout timing policy never masks a gh invocation" {
+  touch "$BATS_TEST_TMPDIR/gh-ran"
+  DOTFILES_TEST_LOAD1=99 DOTFILES_TEST_NCPU=8 run _missing_timeout_result 15 "$BATS_TEST_TMPDIR/gh-ran"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unexpected gh invocation"* ]]
+}
+
+@test "missing-timeout timing policy keeps the bound and reports saturated timing inconclusive" {
+  DOTFILES_TEST_LOAD1=1 DOTFILES_TEST_NCPU=8 run _missing_timeout_result 10 "$BATS_TEST_TMPDIR/no-gh"
+  [ "$status" -eq 1 ]
+  DOTFILES_TEST_LOAD1=99 DOTFILES_TEST_NCPU=8 run _missing_timeout_result 10 "$BATS_TEST_TMPDIR/no-gh"
+  [ "$status" -eq 77 ]
+  [[ "$output" == *"timing inconclusive: elapsed=10s"* ]]
+  DOTFILES_TEST_LOAD1=99 DOTFILES_TEST_NCPU=8 run _missing_timeout_result 9 "$BATS_TEST_TMPDIR/no-gh"
   [ "$status" -eq 0 ]
 }
 

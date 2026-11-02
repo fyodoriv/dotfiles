@@ -158,5 +158,56 @@ directly.
   before committing.
 - For `Agentfile.yaml` edits, also run `dotfiles apply` or the lifecycle fallback
   so generated config drift is caught locally.
+- Doctor CLI fixtures load `test_helper` and use a per-test scratch HOME.
+  This keeps their log-trim files separate from the owner's logs and other
+  fixtures. Perl timer fixtures reset SIGALRM even for a safety deadline.
+- `tests/perl-alarm.bats` checks complete literal Perl snippets, including
+  line continuations. It ignores comment lines, not whole test files; its
+  own seeded negative cases are excluded. It does not interpret variable
+  Perl programs or prove control flow inside a snippet.
 - State any known pre-existing failure explicitly; do not claim completion
   without fresh command output.
+
+### Test command shims
+
+Host `BASH_ENV` puts live `bin/` shims first on `PATH`;
+`tests/setup_suite.bash` unsets it without removing the coverage trap.
+Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add those shims. Use a
+temporary `DOTFILES_DIR` in tests.
+
+Interpreter test wrappers must resolve and export the original interpreter
+before prefixing `PATH`. Check staged fixtures for rewritten machine paths.
+
+Ordinary Bats suites need Homebrew Bash 5. Keep owner security shims first;
+insert Homebrew tool directories before the OS fallback directories rather
+than appending them after `/bin`. The explicit plugin target still selects
+`tests/bash32/bash`. Check the resolved interpreter before treating harness
+syntax errors as product failures. Use a fresh cache after an interpreter
+correction when prior cache provenance is uncertain.
+
+Bats 1.14 rejects `--jobs 1` with its file-parallel flags. For a single-worker
+gate, `JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` selects plain
+serial Bats and retains every gate step. This invocation does not raise the
+shared heavy-job limit or prove that consumer worker budgeting is complete.
+
+### Doctor test contracts
+
+Module tests must pin the current registered IDs, not a stale aggregate
+count. Claude includes its mods check even when the configured list is
+empty. JetBrains settings folders do not prove an IDE is installed on
+either profile; create the app in a scratch fixture when its checks should
+run, and retain an absent-app control.
+
+The repair export guard reads the shell syntax tree with the already
+managed `shfmt` dependency. A three-argument `check` has no repair command;
+its predicate runs in the module process and needs no child-process
+export. Only the fourth argument is a repair. Planted controls keep both
+missing-export detection and report-only predicate acceptance covered.
+The scanner keeps a dynamic command suffix unknown; a literal helper name
+followed by an argument separator still needs export when its arguments
+are dynamic.
+
+The missing-timeout branch-proof fixture asserts no GitHub invocation
+before classifying timing. Its ten-second bound stays unchanged. If an
+overrun coincides with the existing saturated-host policy, report timing
+as inconclusive, not passed; deterministic security controls still run.

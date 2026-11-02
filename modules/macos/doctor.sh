@@ -33,6 +33,10 @@ check_defaults "macos.dock_autohide_delay" "Dock autohide delay = 0"     com.app
 check_defaults "macos.dock_launch_anim"   "Dock launch animation off"    com.apple.dock launchanim              "0" bool
 check_defaults "macos.dock_minimize"      "Minimize to app"              com.apple.dock minimize-to-application  "1" bool
 check_defaults "macos.dock_mru"           "Don't rearrange Spaces"       com.apple.dock mru-spaces              "0" bool
+check_defaults "macos.dock_auto_swoosh"   "Stay on the current Space"    com.apple.dock workspaces-auto-swoosh   "0" bool
+if [ "${DOTFILES_PROFILE:-full}" = "full" ]; then
+  check_defaults "macos.dock_bottom_right_corner" "Bottom-right hot corner off" com.apple.dock wvous-br-corner "1" int
+fi
 check_defaults "macos.dock_recents"       "Hide recent apps in Dock"     com.apple.dock show-recents            "0" bool
 check_defaults "macos.dock_expose_speed"  "Expose animation fast"        com.apple.dock expose-animation-duration "0.1" float
 

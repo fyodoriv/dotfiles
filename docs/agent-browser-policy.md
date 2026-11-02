@@ -113,4 +113,20 @@ slack-draft delete --owner "$AGENT_ID" "$tab" "weekly report" --to Alex --yes
 - Slack's list may be virtualized. When a delete cannot be confirmed (the row is still there, its delete dialog is still open, or `agent-tab` failed partway through `--all`), `delete` says "unknown", with the count it did confirm, and exits 1; it never reports a false "deleted 0". Check the tab then.
 - `attach` uses the file input of the main composer, not a thread pane. If the input is missing it clicks the attach button first (the menu opens; no file dialog does).
 - `delete` changes data. It asks first; `--yes` skips the question; with no terminal and no `--yes` it exits 4. Several matches exit 4 unless you pass `--all`.
+- `count` and `delete` navigate the owned tab to its workspace Drafts page
+  before matching. Readiness, reads, and confirmed deletions share one
+  command deadline under 30 seconds (29 seconds plus cleanup). A readiness
+  timeout deletes nothing. An interactive confirmation starts a fresh
+  execution deadline; `--yes` keeps the original one.
+- Delete confirmation stays inside a newly opened draft-delete dialog.
+  Known confirm selectors are tried first, then an enabled button whose
+  text is exactly `Delete` or `Delete draft`. Existing dialogs and unrelated
+  modals are not answered. Expired operations report an unknown outcome
+  instead of claiming success.
 - The Slack selectors sit in one block at the top of `bin/slack-draft`. `tests/slack-draft.bats` stubs `agent-tab`, so no test touches a real workspace. Check the selectors by hand in a throwaway workspace when Slack changes its markup.
+
+The Slack draft helper resolves its deployed command symlink before finding
+`agent-tab`. Each bounded browser call owns a process group; its deadline
+kills that group, including children that ignore TERM. Synthetic regressions
+prove the CLI handler contract. Slack markup compatibility still needs a
+dedicated throwaway-workspace check; issue #399 remains open for that check.

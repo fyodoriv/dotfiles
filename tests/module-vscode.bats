@@ -213,7 +213,7 @@ STUB
   run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip vscode.extension.one_ext
   [ "$status" -eq 0 ]
   [ ! -e "$VC_TEST_CALLS" ]
-  grep -qx vscode.extension.one_ext "$TEST_DOTFILES/.overrides"
+  grep -qx vscode.extension.one_ext "$TEST_HOME/.config/dotfiles/overrides"
 }
 
 @test "vscode: overridden extension checks do not launch the CLI" {

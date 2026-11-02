@@ -127,7 +127,7 @@ STUB
   cp "$MODULE" "$repo/modules/codex/doctor.sh"
   run bash "$repo/bin/dotfiles-doctor" --skip codex.version
   [ "$status" -eq 0 ]
-  rg -qx codex.version "$repo/.overrides"
+  rg -qx codex.version "$HOME/.config/dotfiles/overrides"
 }
 
 @test "watch forwards full mode to each Codex audit" {

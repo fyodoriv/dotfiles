@@ -9,7 +9,7 @@
 # local_ai_agents=false (chezmoi data): the stack is off on this Mac, so skip
 # the module. Its fixes would otherwise download opencode (curl | bash) and load
 # the opencode-serve, Ollama and warmup LaunchAgents. Unset means on.
-if [ "${LOCAL_AI_AGENTS:-true}" = "false" ]; then
+if [ "${LOCAL_AI_AGENTS:-true}" = "false" ] && [ "${LIST_MODE:-false}" != true ]; then
   return 0 2>/dev/null || exit 0
 fi
 
@@ -52,7 +52,7 @@ check "local-ai.opencode_serve_agent_loaded" "com.dotfiles.opencode-serve Launch
 # Ollama supervised LaunchAgent — only relevant when Ollama is installed.
 # When LM Studio is the chosen engine, this check is skipped (Ollama agent
 # is harmless to leave loaded but not required).
-if _ollama_installed; then
+if [ "${LIST_MODE:-false}" = true ] || _ollama_installed; then
   check "local-ai.ollama_agent_loaded" "Collision-safe com.dotfiles.ollama LaunchAgent registered" \
     "_launchagent_loaded com.dotfiles.ollama" \
     "launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.dotfiles.ollama.plist"
@@ -78,9 +78,16 @@ _local_ai_size_bucket() {
   fi
 }
 
-LOCAL_AI_BUCKET="${DOTFILES_LOCAL_AI_SIZE:-$(_local_ai_size_bucket)}"
+# Discovery lists both engine-specific ID sets without querying the host.
+_local_ai_lmstudio_responding=false
+if [ "${LIST_MODE:-false}" = true ]; then
+  LOCAL_AI_BUCKET="${DOTFILES_LOCAL_AI_SIZE:-14b}"
+else
+  LOCAL_AI_BUCKET="${DOTFILES_LOCAL_AI_SIZE:-$(_local_ai_size_bucket)}"
+  _lmstudio_up && _local_ai_lmstudio_responding=true
+fi
 
-if _lmstudio_up; then
+if [ "${LIST_MODE:-false}" = true ] || $_local_ai_lmstudio_responding; then
   EXPECTED_PRIMARY="qwen/qwen3-${LOCAL_AI_BUCKET}"
   EXPECTED_SMALL="qwen/qwen3-0.6b"
   check "local-ai.lmstudio_primary" "LM Studio: primary model ($EXPECTED_PRIMARY) on disk" \
@@ -89,7 +96,8 @@ if _lmstudio_up; then
   check "local-ai.lmstudio_small" "LM Studio: small_model ($EXPECTED_SMALL) on disk" \
     "\"\$HOME/.lmstudio/bin/lms\" ls 2>/dev/null | grep -q \"$EXPECTED_SMALL\"" \
     "lms get qwen3-0.6b --mlx -y"
-elif _ollama_up; then
+fi
+if [ "${LIST_MODE:-false}" = true ] || { ! $_local_ai_lmstudio_responding && _ollama_up; }; then
   # The Ollama library names qwen3 and qwen3-coder as separate entries —
   # a naive `qwen3:${bucket}` substitution produces invalid tags like
   # `qwen3:coder-30b`. Map the size bucket to the right entry/tag pair.

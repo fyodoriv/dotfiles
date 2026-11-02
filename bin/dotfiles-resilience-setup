@@ -183,6 +183,9 @@ if [ -d "$AMPHETAMINE_PATH" ]; then
   echo "  ${_DIM}  • Leave generic Triggers off. The process manager owns this lifecycle.${_RST}"
   echo "  ${_DIM}  • Start Claude Code. If macOS asks to allow osascript to control Amphetamine, choose Allow.${_RST}"
   echo "  ${_DIM}  • The manager protects AC and battery at or above 20%, then releases after both processes exit.${_RST}"
+  if [ "$(uname -m)" = "arm64" ]; then
+    echo "  ${_DIM}  • Apple Silicon: Power Protect addresses Closed-Display sessions after power changes (Amphetamine → start a Closed-Display session → Learn More). Test your agent's continuity before relying on lid-closed work.${_RST}"
+  fi
 fi
 
 # ── 5. agent-tmux ─────────────────────────────────────────────────────

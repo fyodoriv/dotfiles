@@ -19,6 +19,10 @@ setup() {
   export DOTFILES_DIR="$TEST_DOTFILES"
   export DOTFILES_CI=true
 
+  for lib in dotfiles-source-dir dotfiles-endpoint-paths weekly-metrics; do
+    cp "$BATS_TEST_DIRNAME/../lib/$lib.sh" "$TEST_DOTFILES/lib/$lib.sh"
+  done
+
   # Minimal lib/output.sh mock (counters + formatters)
   cat > "$TEST_DOTFILES/lib/output.sh" <<'LIBEOF'
 pass_count=0; fail_count=0; fix_count=0; skip_count=0; warn_count=0
@@ -142,11 +146,40 @@ EOF
   [ "$(cat "$TEST_DOTFILES/.overrides")" = "fake.alpha" ]
 }
 
-@test "--skip accepts known check ID" {
+@test "--skip writes the per-machine file, not the tracked .overrides" {
+  echo "fake.alpha" > "$TEST_DOTFILES/.overrides"
   run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip fake.beta
   [ "$status" -eq 0 ]
   [[ "$output" == *"Added override: fake.beta"* ]]
-  grep -qx "fake.beta" "$TEST_DOTFILES/.overrides"
+  grep -qx "fake.beta" "$TEST_HOME/.config/dotfiles/overrides"
+  [ "$(cat "$TEST_DOTFILES/.overrides")" = "fake.alpha" ]
+}
+
+@test "--skip does not duplicate an override from the per-machine file" {
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "fake.beta" > "$TEST_HOME/.config/dotfiles/overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip fake.beta
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Override already exists: fake.beta"* ]]
+  [ "$(grep -cx "fake.beta" "$TEST_HOME/.config/dotfiles/overrides")" -eq 1 ]
+}
+
+@test "--validate-overrides also checks the per-machine file" {
+  touch "$TEST_DOTFILES/.overrides"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "typo.local" > "$TEST_HOME/.config/dotfiles/overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --validate-overrides
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"typo.local"* ]]
+}
+
+@test "a per-machine override skips its check in a doctor run" {
+  touch "$TEST_DOTFILES/.overrides"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  echo "fake.alpha" > "$TEST_HOME/.config/dotfiles/overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --module fake --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.[] | select(.id == "fake.alpha") | .status')" = skip ]
 }
 
 @test "--skip does not duplicate existing override" {

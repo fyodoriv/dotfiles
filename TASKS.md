@@ -13,20 +13,6 @@ them. -->
 
 ## P1
 
-- [ ] Queue explicit Rust builds and verify runs at the agent hook boundary
-  - **ID**: queue-caller-coverage
-  - **Tags**: stability, performance, agents, testing
-  - **Details**: The current heavy-command hook has no Cargo/rustc case and excludes the npm verify script. Extend that classifier after the registered source-bound baseline, using the existing JSON-input Bats harness. Preserve safe inspection, inert text, wrapped dispatch and canonical queue identity checks. Do not change machine limits, stop other work or claim universal enforcement. Plan: [Queue caller coverage](docs/plans/queue-caller-coverage.md). The earlier live process snapshot is an observation, not the baseline.
-  - **Files**: `agent-hooks/require-heavy-run.sh`, proposed `tests/agent-hooks-heavy-build-callers.bats`, existing `tests/agent-hooks-require-heavy-run.bats`, `docs/agent-hooks.md`
-  - **Output**: code
-  - **Acceptance**: every frozen heavy/unknown Rust case refuses safely, every inspection/inert/wrapped positive passes, existing hook policies and selected actual queue identity controls remain green, and no raw input appears in diagnostics. Deliver source only; no installed hook or owner setting changes.
-  - **Hypothesis**: source review predicts 29 false permits in H01-H26/U01-U03; narrow caller classification reduces them to zero while false blocks in P01-P22 and retained-policy regressions stay zero. These are predictions, not observed baseline numbers.
-  - **Measurement**: after committing this prediction, add fixtures only, then baseline and repeat `heavy-run env JOBS=1 bats ./tests/agent-hooks-heavy-build-callers.bats ./tests/agent-hooks-require-heavy-run.bats`; retain the exact three lease controls and `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` from the plan. The new test path is proposed at registration, not an installed command or a passing result.
-  - **Success**: 100% expected decisions; zero false permits, false blocks, raw-input disclosures or weakened retained assertions; all required gates exit zero.
-  - **Pivot**: any valid mismatch rejects the classifier method; setup/hash failures are inconclusive. Preserve the counterexample and change the method rather than relaxing its expected outcome or treating a typed wrapper as proof of a live lease.
-  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration; official Cargo and rustc command references linked in the plan.
-  - **Competitive-goal**: none — safe machine admission for current build callers, not a scorecard count.
-
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents

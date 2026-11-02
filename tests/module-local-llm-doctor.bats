@@ -24,21 +24,39 @@ run_local_llm_doctor() {
   check_advisory() {
     printf 'advisory\t%s\n' "$1" >> "$CHECK_LOG"
   }
+  skipped() {
+    printf 'skipped\t%s\n' "$1" >> "$CHECK_LOG"
+  }
   # shellcheck disable=SC1091
   source "$DOTFILES_DIR/modules/local-llm/doctor.sh"
 }
 
-@test "use_local_ai false downgrades the huggingface CLI check to advisory" {
+@test "use_local_ai false skips the module instead of warning" {
   USE_LOCAL_AI=false run run_local_llm_doctor
   [ "$status" -eq 0 ]
-  grep -q $'advisory\tlocal-llm.huggingface_cli' "$CHECK_LOG"
-  ! grep -q $'check\tlocal-llm.huggingface_cli' "$CHECK_LOG"
+  grep -q $'^skipped\tlocal-llm checks (use_local_ai is off)' "$CHECK_LOG"
+  ! grep -q $'^check\t' "$CHECK_LOG"
+  ! grep -q $'^advisory\t' "$CHECK_LOG"
 }
 
-@test "use_local_ai false downgrades every installer-owned check" {
-  USE_LOCAL_AI=false run run_local_llm_doctor
+@test "use_local_ai false still lists check IDs in --list mode" {
+  LIST_MODE=true USE_LOCAL_AI=false run run_local_llm_doctor
   [ "$status" -eq 0 ]
-  ! grep -q $'^check\t' "$CHECK_LOG"
+  grep -q $'^check\tlocal-llm.huggingface_cli' "$CHECK_LOG"
+}
+
+@test "use_local_ai false still yields check IDs when skipped is undefined" {
+  run_without_skipped() {
+    check() { printf 'check\t%s\n' "$1" >> "$CHECK_LOG"; }
+    check_advisory() { printf 'advisory\t%s\n' "$1" >> "$CHECK_LOG"; }
+    unset -f skipped
+    # shellcheck disable=SC1091
+    source "$DOTFILES_DIR/modules/local-llm/doctor.sh"
+  }
+  USE_LOCAL_AI=false run run_without_skipped
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"command not found"* ]]
+  grep -q $'^check\tlocal-llm.huggingface_cli' "$CHECK_LOG"
 }
 
 @test "use_local_ai true keeps the huggingface CLI check as a hard check" {

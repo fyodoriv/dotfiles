@@ -116,12 +116,13 @@ _jb_ide_installed() {
   return 1
 }
 
-# The detected IDEs to check. The core profile does not install JetBrains
-# IDEs, so there a settings folder counts only when its app is installed.
+# The detected IDEs to check. No profile installs JetBrains IDEs, so a
+# settings folder counts only when its app is installed: folders left by an
+# uninstalled IDE or an older Mac can never pass the plugin checks.
 _jb_find_ides() {
   local slug dir
   _jb_find_ide_dirs | while IFS=$'\t' read -r slug dir; do
-    if [ "${DOTFILES_PROFILE:-full}" = "full" ] || _jb_ide_installed "$slug"; then
+    if _jb_ide_installed "$slug"; then
       printf '%s\t%s\n' "$slug" "$dir"
     fi
   done
@@ -231,8 +232,8 @@ done < <(_jb_find_ides)
 #      whether WebStorm is running.
 #   3. The operator can run `bin/jetbrains-install-plugins` on demand.
 _JB_RECOMMENDED="$DOTFILES_DIR/jetbrains/recommended_plugins.txt"
-# On core, recommend plugins only when a JetBrains IDE is installed.
-if [ -f "$_JB_RECOMMENDED" ] && { [ "${DOTFILES_PROFILE:-full}" = "full" ] || [ -n "$(_jb_find_ides)" ]; }; then
+# Recommend plugins only when a JetBrains IDE is installed.
+if [ -f "$_JB_RECOMMENDED" ] && [ -n "$(_jb_find_ides)" ]; then
   _jb_recommended_installed() {
     local plugin="$1"
     # Check each detected IDE's plugins dir for the plugin.

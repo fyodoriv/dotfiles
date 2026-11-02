@@ -182,14 +182,14 @@ them. -->
   - **ID**: rust-measurement-harness
   - **Tags**: migration, rust
   - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Thin pinned adapter to agentbrew's engine; fixture registry, sealed baselines, planted-fault controls. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
+  - **Details**: Thin pinned adapter to agentbrew's engine; fixture registry, sealed baselines, planted-fault controls. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). Register the queue domain before engine code: [probe measurement preparation](docs/plans/queue-probe-measurement-preparation.md), with a sealed 32-case policy/fault matrix and separate instrument/subject deadlines. Its commands remain proposed until the shared engine and pinned Rust adapter ship.
   - **Output**: code
   - **Blocked by**: rust-source-inventory
   - **Blocked**: needs-agentbrew-harness — the shared measuring engine in agentbrew task `rust-measurement-harness` must be delivered before this adapter. See the cross-repo dependency in the linked plan.
-  - **Acceptance**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged.
+  - **Acceptance**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged. Queue controls have zero false-safe verdicts and zero invalid timing samples reported green; preserve explicit first/exclusive resource allowances and disabled-check policies.
   - **Hypothesis**: The shared engine and thin adapter detect 100% of planted compatibility/safety/measurement faults before replacing production code.
   - **Measurement**: Preparation delivers and proves `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- harness-selftest` and `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- baseline --slice all --seal`; these commands do not exist yet. Production replacement starts only after this preparation is merged.
-  - **Success**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged.
+  - **Success**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged. Zero false-safe verdicts and zero invalid timing samples reported green in the sealed queue cohort.
   - **Pivot**: Any missed planted fault, accepted invalid baseline or private payload retention changes the measuring approach before porting production.
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
   - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.

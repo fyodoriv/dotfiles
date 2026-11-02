@@ -343,13 +343,18 @@ fake_live_ticket() {
 }
 
 @test "heavy-run: a SIGKILLed waiter does not block the queue" {
-  "$SCRIPT" sleep 2 &
+  start_fifo_holder
+  holder=$!
   wait_held
   "$SCRIPT" echo victim &
   victim=$!
   wait_queued 1
+  sleep "${BATS_HEAVY_RUN_WAITER_DELAY:-0}"
   kill -KILL "$victim"
-  wait "$victim" 2>/dev/null || true
+  rc=0; wait "$victim" 2>/dev/null || rc=$?
+  [ "$rc" -eq 137 ]
+  release_fifo_holder
+  wait "$holder"
   run timeout 15 "$SCRIPT" echo after
   [ "$status" -eq 0 ]
   [ "$output" = "after" ]

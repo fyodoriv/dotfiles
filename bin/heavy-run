@@ -37,6 +37,12 @@
 # starts on its old numbered slot file. Runs on old slot files count toward the
 # slot total. New runs use slots/s<n>, which older code does not see.
 #
+# Orphans: a waiter whose caller died (its parent pid changed) drops its
+# ticket and exits 129, so a killed session does not hold the queue. It keeps
+# waiting when its output goes to a file (someone may read it later), when it
+# runs under nohup, or with HEAVY_RUN_KEEP_ORPHAN=1. A running command is never
+# stopped this way.
+#
 # A ticket nobody holds is deleted by the scheduler. A crashed run frees its
 # slot because the kernel drops its flock; liveness never depends on a pid. If
 # the queue folder is unusable, heavy-run warns once and decides for itself.
@@ -76,6 +82,7 @@
 #   HEAVY_RUN_PAUSE_APPS  real-time apps (process names, comma-separated) that
 #                       hold every run: none starts, and a running one is stopped
 #                       until they quit (default GeForceNOW; empty = off)
+#   HEAVY_RUN_KEEP_ORPHAN  1 = a waiter keeps its place after its caller dies (default 0)
 #   HEAVY_RUN_PROBE     a command whose non-empty output is a reason to wait;
 #                       replaces the built-in memory pressure check
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
@@ -132,6 +139,10 @@ case "$memguard" in
 esac
 check_num HEAVY_RUN_RAMP "$ramp"
 check_num HEAVY_RUN_MAX_LOAD "$maxload"
+case "${HEAVY_RUN_KEEP_ORPHAN:-0}" in
+  0 | 1) ;;
+  *) echo "heavy-run: HEAVY_RUN_KEEP_ORPHAN must be 0 or 1, got '$HEAVY_RUN_KEEP_ORPHAN'" >&2; exit 2 ;;
+esac
 
 # Shared by the run and --status: slot files, owner files, wait reasons.
 common_code='
@@ -562,6 +573,10 @@ exec perl -e "$common_code"'
   }
 
   my ($slot, $sfh);
+  # Checked before the HUP handler below replaces an inherited nohup "ignore".
+  my $caller = getppid();
+  my $keep = ($ENV{HEAVY_RUN_KEEP_ORPHAN} // "") eq "1" || -f STDOUT || -f STDERR
+    || ($SIG{HUP} // "") eq "IGNORE" || $caller <= 1;
   if ($ticket) {
     # A waiter stopped before it starts takes its ticket with it.
     my %signo = (TERM => 15, INT => 2, HUP => 1);
@@ -569,6 +584,7 @@ exec perl -e "$common_code"'
   }
   my $hinted = 0;
   while (1) {
+    if (!$keep && getppid() != $caller) { unlink $ticket, "$ticket.grant", "$ticket.why" if $ticket; ungate(); exit 129; }
     if ($ticket) {
       step();
       # Until the scheduler gets to this ticket, show a first reason (it never grants).

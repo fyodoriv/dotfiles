@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Keep heavy-run metadata private without changing safe parallel admission
+  - **ID**: heavy-run-private-metadata
+  - **Tags**: stability, security, privacy, agents
+  - **Details**: The prediction in ad87838 registers seven synthetic disclosure cases. The preserved baseline disclosed its marker in all seven. Phase A reader preparation is an AFK engineering dependency, not completion: it still writes raw project fields. Complete the reader adapter first, then prepare a bounded cutover guard for strict 429 and 430 leaders, owners, pending grants, waiters and pre-ticket launchers. Only a verified supported-entrypoint replacement may enable opaque writers. Missing or unknown reader evidence refuses activation. Let unowned old work drain; restart only owned queued work. Do not rewrite live records, copy private data, change owner slot limits, or treat one empty-queue snapshot as proof. Keep this task open after Phase A.
+  - **Files**: `bin/heavy-run`, `tests/heavy-run-privacy.bats`, `tests/heavy-run-project-identity.bats`, `tests/helpers/`, `docs/plans/queue-project-reader-preparation.md`, `docs/agent-hooks.md`; the opaque cutover instrument is proposed and must be registered before use.
+  - **Output**: code
+  - **Acceptance**: new ticket, owner, wait and status records omit raw command arguments, working folders and project names in every frozen disclosure case; all raw/typed project-cap, FIFO, exclusive, priority, exit-status, orphan, memory and realtime contracts pass. Activation stays refused while any supported strict old reader can decide. Legacy live records remain owned by their controllers. Phase A alone does not meet this acceptance.
+  - **Hypothesis**: opaque job/project identity and bounded wait categories reduce synthetic-marker disclosures from seven of seven cases to zero of seven, while wrong admissions and scheduling regressions remain zero. Reader-first preparation prevents mixed-version project undercounting before opaque writers activate.
+  - **Measurement**: preserve the seven original fixtures byte-for-byte (Git blob `2f6036c88c979bc5aa5f2fe0bf3fe4f766710c7c`), then run `heavy-run env JOBS=1 bats ./tests/heavy-run-privacy.bats` plus the original ten and four duplicate-field controls, current scheduling suite, and `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=`. First implement and register the bounded cohort/atomic-entrypoint instrument; its missing, busy, partial-record, pre-ticket-old and interrupted-cutover controls must all refuse activation before an opaque-writer result is accepted. These future fixture/instrument paths are not installed commands at this task's registration.
+  - **Success**: zero disclosures in all seven frozen cases, zero wrong admissions or lost scheduling contracts, every negative cutover control refuses safely, and every required gate exits zero. Honor configured total/project slots and memory policy throughout.
+  - **Pivot**: any disclosure, wrong admission, unverified activation, old-file mutation or changed scheduling contract rejects the metadata boundary. Keep raw-writer preparation active and redesign the failing boundary; never bypass the guard or weaken a fixture.
+  - **Anchor**: OWASP Logging Cheat Sheet, Data to exclude; Basili, Caldiera, Rombach (1994), Goal Question Metric; original ad87838 prediction and the current project-cap protocol.
+  - **Competitive-goal**: none — queue metadata privacy and safe machine capacity, not a scorecard count.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

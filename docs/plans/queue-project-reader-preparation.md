@@ -9,9 +9,10 @@ through a record-format transition. Older queue readers must remain safe.
 This is Phase A: readers accept raw and typed project identities, while
 writers retain the current raw fields. It does not complete metadata privacy.
 The original seven privacy controls remain unchanged and are not claimed to
-pass. No baseline, candidate implementation or installation has run for this
-preparation. The commit introducing this plan registers the prediction before
-those results.
+pass. Commit `d01fd83` registered the prediction before its baseline and
+candidate. Commit `3288cf5` registered the fixture erratum before the corrected
+baseline. The ten-control candidate check passed, but its full gate failed.
+No installation is claimed.
 
 ## Decision and alternatives
 
@@ -66,6 +67,68 @@ Facts above refer to `2d313f4f101e9f9024f1f19b81d78db090c2f6c8`.
   Herlihy and Wing (1990), Linearizability, ACM TOPLAS 12(3), 463–492,
   <https://doi.org/10.1145/78969.78972>. Measure observable admission behavior
   under one project capacity, not counts of implementation activity.
+
+## Duplicate identity follow-up experiment
+
+The first candidate's ten-control run exited zero. Its required full gate
+exited two: the existing fake live-ticket fixture lost its fake process, and
+the documentation count guard misread inline Python commands. Separately,
+four frozen real-lock controls all reproduced unsafe behavior from duplicate
+identity fields: raw and typed keys in both owner and ticket records. The
+field parser kept the last value and discarded evidence of ambiguity.
+
+- **Hypothesis**: marking duplicate `project` or `project_id` keys while
+  parsing each record, then rejecting that record's identity, reduces unsafe
+  admissions or grants from four of four cases to zero of four. The duplicate
+  marker is parser-owned, set after parsing so record input cannot clear it.
+- **Measurement**: run the same four frozen controls before and after the
+  change. Preserve their owner/ticket payloads, kernel-lock handshakes and
+  assertions. Then run the original ten controls, the current scheduling
+  suite and the full required commit gate. Proposed repository commands after
+  integrating the four controls are below; this plan update precedes the fix.
+- **Success**: all four duplicate-field controls pass, with zero wrong
+  admissions or grants. All original ten controls and current scheduling
+  cases pass. The required full gate exits zero. Missing, invalid, partial or
+  duplicate identity still blocks new grants; no fallback weakens that rule.
+- **Pivot**: any wrong admission or grant, original-control failure, changed
+  grouping or scheduling regression rejects this parser change. Do not
+  discard ambiguous records, accept their final value, or relax readiness.
+- **Anchor**: the original GQM and linearizability anchors above; the existing
+  inconsistent-live-record refusal contract.
+
+The independent four-case baseline exited one, with four semantic assertion
+failures. Its frozen harness SHA-256 is
+`4230f95475182de5717cb3e0155a97ff60859ab92e1df4875cccba6e30ce578f`.
+The controls use the same synthetic queue helper as the original ten cases.
+When integrating the script, change only the helper import path needed by its
+repository filename; keep the four payloads, handshakes and assertions intact.
+
+```sh
+heavy-run python3 ./tests/helpers/duplicate_identity.py \
+  --candidate bin/heavy-run \
+  --legacy-429=tests/fixtures/heavy-run-429 \
+  --legacy-430=tests/fixtures/heavy-run-430
+heavy-run python3 ./tests/helpers/heavy-run-project-interop.py \
+  --candidate bin/heavy-run \
+  --legacy-429=tests/fixtures/heavy-run-429 \
+  --legacy-430=tests/fixtures/heavy-run-430
+heavy-run bats tests/heavy-run.bats
+heavy-run make check BATS_JOBS= TEST_FILE_JOBS=
+```
+
+### Existing fake-ticket fixture boundary
+
+The fake live-ticket helper writes only a header. Under the registered
+fail-closed rule, that is an incomplete record with no project identity; it
+must not authorize admission. Correct the positive fixture to publish one
+complete raw `kind=v2` ticket while preserving its held-lock handshake and
+fake-process lifecycle. Add a separate incomplete-record control that proves
+the queue holds new admissions until that record leaves. Do not weaken the
+production unknown-record hold or remove the original stale-held-lock case.
+
+The Python commands below are formatted as fenced blocks so the documentation
+count guard does not interpret interpreter commands as inventory claims.
+This changes no test count or success threshold.
 
 ## Boundary contract
 
@@ -133,7 +196,13 @@ not become empty runnable queues in a fallback.
   readiness matches the workload PID plus raw project and numeric start
   fields; a workload marker alone is insufficient.
 - **Verification**, after harness integration:
-  `heavy-run python3 tests/helpers/heavy-run-project-interop.py --candidate tests/fixtures/heavy-run-430 --legacy-429 tests/fixtures/heavy-run-429 --legacy-430 tests/fixtures/heavy-run-430`.
+
+```sh
+heavy-run python3 ./tests/helpers/heavy-run-project-interop.py \
+  --candidate tests/fixtures/heavy-run-430 \
+  --legacy-429=tests/fixtures/heavy-run-429 \
+  --legacy-430=tests/fixtures/heavy-run-430
+```
 
 | Frozen control | Required behavior |
 |---|---|
@@ -168,7 +237,13 @@ Strict fixtures are public `bin/heavy-run` blobs:
   control. A separate mutation bypassing ticket/grant normalization fails
   the typed-ticket or pending-grant control. A marker-only patch cannot pass.
 - **Verification**:
-  `heavy-run python3 tests/helpers/heavy-run-project-interop.py --candidate bin/heavy-run --legacy-429 tests/fixtures/heavy-run-429 --legacy-430 tests/fixtures/heavy-run-430`.
+
+```sh
+heavy-run python3 ./tests/helpers/heavy-run-project-interop.py \
+  --candidate bin/heavy-run \
+  --legacy-429=tests/fixtures/heavy-run-429 \
+  --legacy-430=tests/fixtures/heavy-run-430
+```
 
 ### 3. Verify and deliver preparation only
 

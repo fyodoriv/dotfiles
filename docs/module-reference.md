@@ -379,7 +379,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 
 ### jetbrains (conditional)
 
-On `profile: core`, an IDE settings folder counts only when its app is in `/Applications` or `~/Applications` (`JETBRAINS_APP_DIRS` overrides the list), and `symlink.ideavimrc` is skipped.
+On every profile, an IDE settings folder counts only when its app is in `/Applications` or `~/Applications` (`JETBRAINS_APP_DIRS` overrides the list): no profile installs JetBrains IDEs, and folders left by an uninstalled IDE can never pass the plugin checks. Recommended plugins are checked only when an IDE is installed. On `profile: core`, `symlink.ideavimrc` is skipped.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

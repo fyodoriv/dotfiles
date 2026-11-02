@@ -213,6 +213,14 @@ A game stream (GeForce NOW 2.0.90) next to heavy runs crashed it 5 times the sam
 `HEAVY_RUN_PAUSE_APPS` runs (default `GeForceNOW`): no new run starts, and a running one
 gets SIGSTOP until the app quits. Set `HEAVY_RUN_PAUSE_APPS=""` to turn it off.
 
+One scheduler decides for the whole queue. Every `heavy-run` process tries for the
+leader lock `sched.lock`; the holder reads the settings live and writes a grant or a wait
+reason per ticket, and the pause marks. So `dotfiles config set heavy_run_slots N` reaches
+every waiter within about a second. Waiters from an older `heavy-run` keep their place in
+line: new processes hold the gate ticket `queue/0000000000-0`, and the scheduler opens it
+for one older waiter at a time when its turn comes. Never kill waiters to make them pick up
+new code or settings: their callers get exit 143.
+
 To trace a freeze, read `~/.local/state/dotfiles/load-samples.tsv` first: it survives a forced
 power-off. `dotfiles-load-sampler report` counts kernel-stall rows (high load with a low CPU-busy
 column).

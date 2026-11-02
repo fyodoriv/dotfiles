@@ -4,6 +4,15 @@
 # appends them after the general rules in Agentfile.yaml.
 # See .chezmoiscripts/run_after_agentbrew-sync.sh.
 rules: |
+  Right before the Needed-from-you line, add one line listing every open item:
+  "**Pending:** <item>; <item>". Include running CI, background jobs,
+  linked chats, unfinished steps, cleanup left undone, and known follow-ups.
+  Check each item live before listing it. Never list one from memory.
+  If a live check is unavailable, state that verification is pending and the
+  current status is unknown. Do not infer "nothing" from an unavailable check.
+  If nothing is open, write "**Pending:** nothing".
+  The two lines are independent: needing no user action does not mean no
+  pending work remains.
   End every message with one last line that says exactly what you need from me,
   as a one-liner: "**Needed from you:** <action or exact command>". If you need
   nothing, write "**Needed from you:** nothing". Never put the request only

@@ -73,6 +73,36 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
+install_discovery_mode_module() {
+  export DOTFILES_USE_LOCAL_AI=false
+  mkdir -p "$TEST_DOTFILES/modules/conditional"
+  cat > "$TEST_DOTFILES/modules/conditional/doctor.sh" <<'MODEOF'
+if [ "${USE_LOCAL_AI:-true}" = false ] && [ "${LIST_MODE:-false}" != true ] \
+  && declare -F skipped >/dev/null; then
+  skipped "conditional module is off"
+  return 0
+fi
+check "conditional.retained" "conditional check" 'touch "$HOME/discovery-probe-ran"; false' ""
+MODEOF
+}
+
+@test "discovery mode: --skip accepts an opted-out module ID" {
+  install_discovery_mode_module
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --skip conditional.retained
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Added override: conditional.retained"* ]]
+  [ ! -e "$TEST_HOME/discovery-probe-ran" ]
+}
+
+@test "discovery mode: --validate-overrides accepts an opted-out module ID" {
+  install_discovery_mode_module
+  printf 'conditional.retained\n' > "$TEST_DOTFILES/.overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --validate-overrides
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"All overrides are valid"* ]]
+  [ ! -e "$TEST_HOME/discovery-probe-ran" ]
+}
+
 @test "--validate-overrides passes with empty overrides file" {
   touch "$TEST_DOTFILES/.overrides"
   run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --validate-overrides

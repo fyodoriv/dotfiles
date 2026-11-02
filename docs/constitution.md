@@ -211,3 +211,5 @@ The missing-timeout branch-proof fixture asserts no GitHub invocation
 before classifying timing. Its ten-second bound stays unchanged. If an
 overrun coincides with the existing saturated-host policy, report timing
 as inconclusive, not passed; deterministic security controls still run.
+Perl fixture safety alarms reset SIGALRM to `DEFAULT` before arming. Keep the
+existing safety deadlines and acceptance assertions unchanged.

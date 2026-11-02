@@ -27,15 +27,15 @@ them. -->
   - **Anchor**: tooling-checkup runs 2026-10-25 and 2026-10-27 (machine_metrics phase); Gunther 2007, *Guerrilla Capacity Planning* (load beyond core count); Forsgren, Humble, Kim 2018 (stability).
   - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
 
-- [ ] heavy-run.bats runs its 58 tests one by one
+- [ ] heavy-run.bats runs its tests one by one
   - **ID**: heavy-run-bats-parallel-within-file
   - **Tags**: performance, testing
-  - **Details**: `tests/heavy-run.bats` took 2m31s on 2026-11-01 (58 tests, run twice per heavy-run change). The gate passes `--no-parallelize-within-files`, so its tests run serially, though each test has its own `HEAVY_RUN_DIR` and scratch HOME. Let this file run its tests in parallel (a per-file opt-in read by the Makefile), keeping timing-sensitive tests (realtime, memory guard) serial if they flake.
+  - **Details**: `tests/heavy-run.bats` took 2m31s on 2026-11-01 (run twice per heavy-run change). The gate passes `--no-parallelize-within-files`, so its tests run serially, though each test has its own `HEAVY_RUN_DIR` and scratch HOME. Let this file run its tests in parallel (a per-file opt-in read by the Makefile), keeping timing-sensitive tests (realtime, memory guard) serial if they flake.
   - **Files**: `Makefile`, `tests/heavy-run.bats`
   - **Output**: code
   - **Acceptance**: `tests/heavy-run.bats` under the gate's settings finishes in under 60 s, 10 runs in a row with no flake.
   - **Hypothesis**: parallel tests within heavy-run.bats cut its wall time from 151 s to under 60 s, because most tests sleep on locks rather than use CPU.
-  - **Measurement**: `time bats --jobs 4 tests/heavy-run.bats` vs the serial run, 3 runs each, same machine.
+  - **Measurement**: `time bats --jobs "$(sysctl -n hw.ncpu)" tests/heavy-run.bats` against the serial run, three runs each, same machine.
   - **Success**: median under 60 s and 0 failures in 10 runs.
   - **Pivot**: any flake in 10 runs that does not go away by marking that test serial, or a median above 100 s -> keep the file serial.
   - **Anchor**: agent-perf report for session 2026-11-01 (bats 2m31s slowest step); Forsgren, Humble, Kim 2018 (lead time).

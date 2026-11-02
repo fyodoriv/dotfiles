@@ -68,15 +68,6 @@ SYNCED_KEYS=(
   "Enable Triggers"                  # bool — 0: generic trigger sessions are forbidden
   "Trigger Data"                     # array of dicts — empty: manager owns session lifecycle
 )
-# jq filter built from SYNCED_KEYS — used to slice the full plist down
-# to just the synced subset before writing to disk.
-# Result example: 'with_entries(select(.key == "Enable Triggers" or .key == "Trigger Data"))'
-JQ_SUBSET_FILTER='with_entries(select('
-for i in "${!SYNCED_KEYS[@]}"; do
-  [ "$i" -gt 0 ] && JQ_SUBSET_FILTER+=' or '
-  JQ_SUBSET_FILTER+=".key == \"${SYNCED_KEYS[$i]}\""
-done
-JQ_SUBSET_FILTER+='))'
 
 # ── ANSI helpers (work standalone — don't require lib/colors.sh) ─────
 _RED=$'\033[0;31m'; _GRN=$'\033[0;32m'; _YEL=$'\033[0;33m'; _DIM=$'\033[2m'; _RST=$'\033[0m'
@@ -119,8 +110,7 @@ capture_local_subset() {
   fi
   local tmp_plist
   tmp_plist=$(mktemp -t amphetamine-export.XXXXXX.plist)
-  # `defaults export <domain> -` writes the entire plist to stdout as XML.
-  # plutil converts to JSON, jq filters to the synced subset.
+  # `defaults export` writes the entire plist as XML.
   local export_rc=0
   run_with_timeout "$DEFAULTS_TIMEOUT_SEC" defaults export "$DOMAIN" "$tmp_plist" || export_rc=$?
   if [ "$export_rc" -ne 0 ]; then
@@ -128,9 +118,31 @@ capture_local_subset() {
     [ "$export_rc" -ne 124 ] || err "cannot read Amphetamine prefs (privacy prompt?): timed out after ${DEFAULTS_TIMEOUT_SEC}s"
     return 1
   fi
-  plutil -convert json -o - "$tmp_plist" | jq "$JQ_SUBSET_FILTER"
+  plist_subset_json "$tmp_plist"
   local rc=$?
   rm -f "$tmp_plist"
+  return $rc
+}
+
+# Print the synced keys of a plist as JSON. plutil cannot convert a plist
+# that holds a date to JSON, and Amphetamine stores dates in keys we do not
+# sync (for example "Other Time Clock Last Selection"). So copy each synced
+# key as XML into a new plist, and convert only that one.
+plist_subset_json() {
+  local src="$1" sub key value rc
+  sub=$(mktemp -t amphetamine-subset.XXXXXX.plist)
+  {
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
+    for key in "${SYNCED_KEYS[@]}"; do
+      value=$(plutil -extract "$key" xml1 -o - "$src" 2>/dev/null) || continue
+      printf '<key>%s</key>\n' "$key"
+      printf '%s\n' "$value" | sed '1,/<plist/d;/<\/plist>/d'
+    done
+    printf '</dict>\n</plist>\n'
+  } > "$sub"
+  plutil -convert json -o - "$sub"
+  rc=$?
+  rm -f "$sub"
   return $rc
 }
 

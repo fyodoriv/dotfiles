@@ -13,11 +13,40 @@ them. -->
 
 ## P1
 
+- [ ] Queue explicit Rust builds and verify runs at the agent hook boundary
+  - **ID**: queue-caller-coverage
+  - **Tags**: stability, performance, agents, testing
+  - **Details**: The current heavy-command hook has no Cargo/rustc case and excludes the npm verify script. Extend that classifier after the registered source-bound baseline, using the existing JSON-input Bats harness. Preserve safe inspection, inert text, wrapped dispatch and canonical queue identity checks. Do not change machine limits, stop other work or claim universal enforcement. Plan: [Queue caller coverage](docs/plans/queue-caller-coverage.md). The earlier live process snapshot is an observation, not the baseline.
+  - **Files**: `agent-hooks/require-heavy-run.sh`, proposed `tests/agent-hooks-heavy-build-callers.bats`, existing `tests/agent-hooks-require-heavy-run.bats`, `docs/agent-hooks.md`
+  - **Output**: code
+  - **Acceptance**: every frozen heavy/unknown Rust case refuses safely, every inspection/inert/wrapped positive passes, existing hook policies and selected actual queue identity controls remain green, and no raw input appears in diagnostics. Deliver source only; no installed hook or owner setting changes.
+  - **Hypothesis**: source review predicts 29 false permits in H01-H26/U01-U03; narrow caller classification reduces them to zero while false blocks in P01-P22 and retained-policy regressions stay zero. These are predictions, not observed baseline numbers.
+  - **Measurement**: after committing this prediction, add fixtures only, then baseline and repeat `heavy-run env JOBS=1 bats ./tests/agent-hooks-heavy-build-callers.bats ./tests/agent-hooks-require-heavy-run.bats`; retain the exact three lease controls and `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` from the plan. The new test path is proposed at registration, not an installed command or a passing result.
+  - **Success**: 100% expected decisions; zero false permits, false blocks, raw-input disclosures or weakened retained assertions; all required gates exit zero.
+  - **Pivot**: any valid mismatch rejects the classifier method; setup/hash failures are inconclusive. Preserve the counterexample and change the method rather than relaxing its expected outcome or treating a typed wrapper as proof of a live lease.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration; official Cargo and rustc command references linked in the plan.
+  - **Competitive-goal**: none — safe machine admission for current build callers, not a scorecard count.
+
+- [ ] Prepare private evidence for compiler runs outside queue ownership
+  - **ID**: compiler-queue-observation
+  - **Tags**: stability, privacy, instrumentation, agents
+  - **Details**: The current doctor observer recognizes headless Chrome ancestry only. Prepare a source-bound compiler observation contract and independent synthetic oracle before adding any observer. Process names, nice levels, working folders and an inherited lease marker do not prove reservation ownership. Keep unsupported or stale evidence explicitly unknown. This is separate from the immediate classifier fix and the future Rust queue port. Scope and registration prerequisites: [Queue caller coverage](docs/plans/queue-caller-coverage.md#rollout-security-and-regression-coverage).
+  - **Files**: proposed observer contract and synthetic fixtures; existing `bin/headless-chrome-unlocked` and `tests/headless-chrome-unlocked.bats` are references, not compiler acceptance tests.
+  - **Output**: instrumentation
+  - **Acceptance**: commit a reviewed evidence protocol, fixed safe output and independent synthetic decision matrix before observer code; prove zero false-owned verdicts and no private payload disclosure. Real ownership is asserted only from verified reservation identity, never a process-name or priority heuristic. No automatic process actions or setting changes.
+  - **Hypothesis**: a verified identity boundary yields zero false-owned and zero false-safe unknown verdicts across its preregistered synthetic controls, while known-valid controls pass; the existing browser-only harness cannot establish that result.
+  - **Measurement**: preparation first — commit the exact observer protocol, frozen inputs and runnable synthetic command before code or results. The proposed `heavy-run env JOBS=1 bats ./tests/compiler-queue-observer.bats` is not implemented or accepted at task creation. Preserve browser fixture results separately; do not use a live snapshot as a preregistered baseline.
+  - **Success**: 100% expected decisions in the later sealed oracle, zero false ownership/safe-unknown verdicts or disclosures; missing instrumentation stays non-green.
+  - **Pivot**: any false-owned verdict, stale identity accepted as current, unverified input marked safe or private diagnostic rejects the observer design. Change the evidence protocol rather than reducing the claim to a process-name match.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration; current heavy-run controller identity and held-marker contracts.
+  - **Competitive-goal**: none — private queue coverage evidence, not a scorecard count.
+
+
 - [ ] Keep heavy-run metadata private without changing safe parallel admission
   - **ID**: heavy-run-private-metadata
   - **Tags**: stability, security, privacy, agents
   - **Details**: The prediction in ad87838 registers seven synthetic disclosure cases. The preserved baseline disclosed its marker in all seven. Phase A reader preparation is an AFK engineering dependency, not completion: it still writes raw project fields. Complete the reader adapter first, then prepare a bounded cutover guard for strict 429 and 430 leaders, owners, pending grants, waiters and pre-ticket launchers. Only a verified supported-entrypoint replacement may enable opaque writers. Missing or unknown reader evidence refuses activation. Let unowned old work drain; restart only owned queued work. Do not rewrite live records, copy private data, change owner slot limits, or treat one empty-queue snapshot as proof. Keep this task open after Phase A.
-  - **Files**: `bin/heavy-run`, `tests/heavy-run-privacy.bats`, `tests/heavy-run-project-identity.bats`, `tests/helpers/`, `docs/plans/queue-project-reader-preparation.md`, `docs/agent-hooks.md`; the opaque cutover instrument is proposed and must be registered before use.
+  - **Files**: `bin/heavy-run`, `tests/heavy-run-privacy.bats`, `tests/heavy-run-project-identity.bats`, `tests/helpers/`, `docs/plans/queue-project-reader-preparation.md`, `docs/plans/heavy-run-private-metadata.md`, `docs/agent-hooks.md`; the bounded native cutover instrument and launch-before-load bootstrap are proposed and must be registered and verified before opaque writers.
   - **Output**: code
   - **Acceptance**: new ticket, owner, wait and status records omit raw command arguments, working folders and project names in every frozen disclosure case; all raw/typed project-cap, FIFO, exclusive, priority, exit-status, orphan, memory and realtime contracts pass. Activation stays refused while any supported strict old reader can decide. Legacy live records remain owned by their controllers. Phase A alone does not meet this acceptance.
   - **Hypothesis**: opaque job/project identity and bounded wait categories reduce synthetic-marker disclosures from seven of seven cases to zero of seven, while wrong admissions and scheduling regressions remain zero. Reader-first preparation prevents mixed-version project undercounting before opaque writers activate.
@@ -182,14 +211,14 @@ them. -->
   - **ID**: rust-measurement-harness
   - **Tags**: migration, rust
   - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Thin pinned adapter to agentbrew's engine; fixture registry, sealed baselines, planted-fault controls. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
+  - **Details**: Thin pinned adapter to agentbrew's engine; fixture registry, sealed baselines, planted-fault controls. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). Register the queue domain before engine code: [probe measurement preparation](docs/plans/queue-probe-measurement-preparation.md), with a sealed 32-case policy/fault matrix and separate instrument/subject deadlines. Its commands remain proposed until the shared engine and pinned Rust adapter ship.
   - **Output**: code
   - **Blocked by**: rust-source-inventory
   - **Blocked**: needs-agentbrew-harness — the shared measuring engine in agentbrew task `rust-measurement-harness` must be delivered before this adapter. See the cross-repo dependency in the linked plan.
-  - **Acceptance**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged.
+  - **Acceptance**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged. Queue controls have zero false-safe verdicts and zero invalid timing samples reported green; preserve explicit first/exclusive resource allowances and disabled-check policies.
   - **Hypothesis**: The shared engine and thin adapter detect 100% of planted compatibility/safety/measurement faults before replacing production code.
   - **Measurement**: Preparation delivers and proves `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- harness-selftest` and `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- baseline --slice all --seal`; these commands do not exist yet. Production replacement starts only after this preparation is merged.
-  - **Success**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged.
+  - **Success**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged. Zero false-safe verdicts and zero invalid timing samples reported green in the sealed queue cohort.
   - **Pivot**: Any missed planted fault, accepted invalid baseline or private payload retention changes the measuring approach before porting production.
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
   - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.

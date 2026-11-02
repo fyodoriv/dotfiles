@@ -13,6 +13,21 @@ them. -->
 
 ## P1
 
+- [ ] Keep large history privacy matches from becoming false passes
+  - **ID**: pre-push-history-pipe
+  - **Tags**: security, privacy, stability, testing
+  - **Details**: The current history scan pipes Git output into an early-exit matcher under pipefail. A matching large stream may produce a nonzero producer status and turn the condition false. The earlier broken-pipe observation is not a baseline. Register and reproduce through the real hook with synthetic repositories before changing it. Plan: [History pipe controls](docs/plans/pre-push-history-pipe.md).
+  - **Files**: `git-hooks/pre-push`, `tests/pre-push.bats`, `docs/security-model.md`
+  - **Output**: code
+  - **Acceptance**: all three large-stream history-only matches block, their three clean twins pass, all retained controls pass, and diagnostics never reveal the synthetic marker. No live push or owner pattern belongs to this experiment.
+  - **Hypothesis**: source review predicts three unsafe permits become zero when matching consumes each full producer stream; false blocks remain zero. This is a prediction before the registered fixtures.
+  - **Measurement**: commit this registration, add only the six frozen cases, then run and repeat `JOBS=1 heavy-run bats -- tests/pre-push.bats`; require actual semantic red before a fix, then the normal `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` gate.
+  - **Success**: at least one unchanged-source unsafe permit reproduces; final decisions match all 43 controls with zero disclosures and the required gate exits zero.
+  - **Pivot**: zero baseline unsafe permits abandons this diagnosis; setup failures are inconclusive. Any final unsafe permit, false block, disclosure or retained regression rejects the approach without relaxing an expected result.
+  - **Anchor**: Bash manual pipefail and GNU grep early-exit contract; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — preserve the existing public-push privacy boundary, not a scorecard count.
+
+
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents

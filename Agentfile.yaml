@@ -196,9 +196,10 @@ rules: |
   never a requirement. Drag and drop any image into the PR description.
   Run every heavy command (a full test suite, an e2e or browser run, a timing
   run) as `heavy-run <command>`: one Mac-wide queue at nice 15 that every agent
-  session shares. It runs one heavy job at a time (`heavy_run_slots: 1`; more
-  than one slot needs the owner's explicit yes), so heavy runs queue instead of
-  piling up. Start a run that may queue in the background and expect to wait;
+  session shares. Its slot count and per-project cap come from the owner's
+  settings (`heavy_run_slots`, `heavy_run_project_slots`); never raise them
+  without the owner's explicit yes. Under memory pressure it stops newer runs
+  until older ones end. Start a run that may queue in the background and expect to wait;
   never bypass heavy-run to go faster. Use `heavy-run --exclusive <command>`
   for timing runs. `heavy-run --status` shows the queue and why each run waits.
   Never drive AppleScript, keystrokes, or window activation to stage a terminal

@@ -556,6 +556,23 @@ release_all() {
   [ "$output" = "free: 0/2 slots busy" ]
 }
 
+@test "heavy-run: slots: a raised heavy_run_slots reaches a run already waiting" {
+  unset HEAVY_RUN_SLOTS
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_slots: 1\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  start_holder
+  wait_held 1
+  marker="$BATS_TEST_TMPDIR/second"
+  "$SCRIPT" touch "$marker" &
+  wait_queued 1
+  sleep 0.5
+  [ ! -e "$marker" ]
+  printf 'data:\n  heavy_run_slots: 2\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  for i in $(seq 50); do [ -e "$marker" ] && break; sleep 0.1; done
+  [ -e "$marker" ]
+  release_all
+}
+
 @test "heavy-run: slots: the default is one slot, whatever the machine size" {
   # 2026-11-01: an automatic 4 slots let several suites and builds run at once, and the owner's Mac froze twice.
   unset HEAVY_RUN_SLOTS
@@ -634,6 +651,88 @@ make_fake_app() {
 
 @test "heavy-run: realtime: GeForce NOW is listed by default" {
   grep -q 'HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"' "$SCRIPT"
+}
+
+@test "heavy-run: project: a run waits at its project cap while another project's run starts" {
+  export HEAVY_RUN_SLOTS=10 HEAVY_RUN_PROJECT_SLOTS=2
+  HEAVY_RUN_PROJECT=/p/alpha start_holder
+  HEAVY_RUN_PROJECT=/p/alpha start_holder
+  wait_held 2
+  HEAVY_RUN_PROJECT=/p/alpha "$SCRIPT" touch "$BATS_TEST_TMPDIR/a3" &
+  wait_queued 1
+  HEAVY_RUN_PROJECT=/p/beta "$SCRIPT" touch "$BATS_TEST_TMPDIR/b1"
+  [ -e "$BATS_TEST_TMPDIR/b1" ]
+  [ ! -e "$BATS_TEST_TMPDIR/a3" ]
+  run "$SCRIPT" --status
+  [[ "$output" == *"(waiting: project cap: 2/2 runs of alpha)"* ]]
+  release_all
+  [ -e "$BATS_TEST_TMPDIR/a3" ]
+}
+
+@test "heavy-run: project: worktrees of one repo share its cap" {
+  command -v git >/dev/null || skip "needs git"
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_PROJECT_SLOTS=1
+  local repo="$BATS_TEST_TMPDIR/repo"
+  git init -q "$repo"
+  git -C "$repo" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+  git -C "$repo" worktree add -q "$BATS_TEST_TMPDIR/wt"
+  cd "$repo"
+  start_holder
+  wait_held 1
+  cd "$BATS_TEST_TMPDIR/wt"
+  "$SCRIPT" touch "$BATS_TEST_TMPDIR/second" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "$output" == *"(waiting: project cap: 1/1 runs of repo)"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/second" ]
+  release_all
+  [ -e "$BATS_TEST_TMPDIR/second" ]
+}
+
+@test "heavy-run: memory guard: under pressure a newer run stops while the oldest goes on" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_PROBE="test -e '$BATS_TEST_TMPDIR/pressure' && echo memory pressure warn"
+  local old="$BATS_TEST_TMPDIR/old" new="$BATS_TEST_TMPDIR/new" i
+  "$SCRIPT" sh -c "for i in \$(seq 40); do echo \$i >> '$old'; sleep 0.25; done" &
+  for i in $(seq 50); do [ -s "$old" ] && break; sleep 0.1; done
+  "$SCRIPT" sh -c "for i in \$(seq 12); do echo \$i >> '$new'; sleep 0.25; done" 2>"$BATS_TEST_TMPDIR/err" &
+  local new_pid=$!
+  for i in $(seq 50); do [ -s "$new" ] && break; sleep 0.1; done
+  : >"$BATS_TEST_TMPDIR/pressure"
+  sleep 2.5  # the guard asks at most every 2 s
+  local n1 o1 n2 o2
+  n1=$(wc -l < "$new"); o1=$(wc -l < "$old"); sleep 1; n2=$(wc -l < "$new"); o2=$(wc -l < "$old")
+  [ "$n1" -eq "$n2" ]
+  [ "$o2" -gt "$o1" ]
+  rm "$BATS_TEST_TMPDIR/pressure"
+  wait "$new_pid"
+  [ "$(wc -l < "$new")" -eq 12 ]
+  grep -q "heavy-run: paused: memory pressure warn (older runs go first)" "$BATS_TEST_TMPDIR/err"
+  grep -q "heavy-run: resumed" "$BATS_TEST_TMPDIR/err"
+  wait
+}
+
+@test "heavy-run: memory guard: HEAVY_RUN_MEMORY_GUARD=0 keeps a newer run going" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_MEMORY_GUARD=0 HEAVY_RUN_PROBE="test -e '$BATS_TEST_TMPDIR/pressure' && echo memory pressure warn"
+  start_holder
+  wait_held 1
+  local new="$BATS_TEST_TMPDIR/new"
+  "$SCRIPT" sh -c "for i in \$(seq 16); do echo \$i >> '$new'; sleep 0.25; done" &
+  local new_pid=$! i
+  for i in $(seq 50); do [ -s "$new" ] && break; sleep 0.1; done
+  : >"$BATS_TEST_TMPDIR/pressure"
+  sleep 2.5
+  local n1 n2
+  n1=$(wc -l < "$new"); sleep 0.8; n2=$(wc -l < "$new")
+  [ "$n2" -gt "$n1" ]
+  wait "$new_pid"
+  release_all
+}
+
+@test "heavy-run: project: rejects a bad HEAVY_RUN_PROJECT_SLOTS or HEAVY_RUN_MEMORY_GUARD" {
+  HEAVY_RUN_PROJECT_SLOTS=0 run "$SCRIPT" true
+  [ "$status" -eq 2 ] && [[ "$output" == *"HEAVY_RUN_PROJECT_SLOTS must be 1-64"* ]]
+  HEAVY_RUN_MEMORY_GUARD=yes run "$SCRIPT" true
+  [ "$status" -eq 2 ] && [[ "$output" == *"HEAVY_RUN_MEMORY_GUARD must be 0 or 1"* ]]
 }
 
 @test "heavy-run: the state folder is private: folder 0700, files 0600" {

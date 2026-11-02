@@ -201,9 +201,12 @@ The temporary plist is removed before the response is printed.
 
 ## heavy-run and Mac freezes
 
-Keep `heavy-run` at its default of 1 slot. Four parallel slots froze the owner's Mac twice
+`heavy-run` defaults to 1 slot. Four parallel slots froze the owner's Mac twice
 (2026-11-01): suites pass the memory check at start, then grow together. A frozen Mac shows
-`force_off` in `/Library/Logs/DiagnosticReports/ResetCounter-*`.
+`force_off` in `/Library/Logs/DiagnosticReports/ResetCounter-*`. With more slots, two limits
+apply. One project (a repo and its worktrees) holds at most `heavy_run_project_slots` (3).
+The memory guard stops every run but the oldest while memory pressure is high, so the
+oldest finishes and frees memory; the rest go on when pressure clears.
 
 A game stream (GeForce NOW 2.0.90) next to heavy runs crashed it 5 times the same day
 (WindowServer watchdog panic). So `heavy-run` holds every run while an app in

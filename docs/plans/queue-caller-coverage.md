@@ -224,6 +224,37 @@ Keep generic single-test exemptions for supported test runners, but never use
 a filename to infer that the exact full-verify script became a filtered run.
 The original rows, commands and expected decisions remain unchanged.
 
+### Supplemental dynamic toolchain control
+
+Register S02 before its probe or selector-normalization fix. Independent source
+review found that the first candidate strips any Cargo argument starting with
+`+`. It can mistake a variable-bearing selector for a literal toolchain.
+Shell field splitting can then change the executable operation.
+
+| ID | Command text | Required decision |
+| --- | --- | --- |
+| S02 | `cargo +$MODE metadata --no-deps --format-version 1` | exit 2; fixed refusal |
+
+The command stays JSON data. Never set or expand MODE in a shell that executes
+this command. A possible synthetic MODE value `stable run --` explains the
+counterexample: real shell splitting would select `run`, with the remaining
+words as program arguments. No real Cargo invocation is part of this test.
+
+Prediction before probing: the first candidate at tree
+`fd42498ae06cf5821079f3793057a9b92db2e08e` falsely permits S02 once; the
+corrected candidate permits it zero times. This is a separate denominator
+from the original 51 rows and S01. Preserve their inputs and expectations.
+Use the same focused Bats command above. Success requires all 53 new and 17
+retained controls to pass, with no raw-input disclosure or dispatch. Any
+mismatch rejects acceptance. The GQM and preregistration anchors above apply.
+Only an explicitly recognized literal selector may precede an inspection
+allowance. A variable or unknown selector must refuse. Keep P13 `+stable`.
+
+The first 69-control candidate result is insufficient for acceptance even
+when green: it predates this independently found counterexample. Preserve
+that result and the first candidate's separate Perl syntax failure. Neither
+can replace this supplemental red/green proof.
+
 ## Numbered work breakdown
 
 ### 1. Register and freeze the baseline fixture

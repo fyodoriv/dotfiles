@@ -149,18 +149,23 @@ dotfiles doctor --fix    # resets all git config to expected values
 Some checks can be permanently skipped if they don't apply to your setup:
 
 ```bash
-dotfiles doctor --skip <check_id>    # adds to .overrides file
+dotfiles doctor --skip <check_id>    # saves a machine-local override
 ```
 
-The `.overrides` file (`$DOTFILES_DIR/.overrides`) is a list of check IDs to skip:
+`--skip` writes check IDs to `~/.config/dotfiles/overrides` for this machine
+(`DOTFILES_LOCAL_OVERRIDES` changes the path). The tracked
+`$DOTFILES_DIR/.overrides` remains a shared/legacy input. Both contain one
+check ID per line:
 
 ```
 macos.dock_autohide
 tools.rancher_installed
 ```
 
-Overrides are committed to the repo. Use them for intentional deviations, not to
-hide real problems.
+Commit shared overrides only when the skip should apply to every machine.
+Keep host-specific choices in the local file. To re-enable a check, remove
+its ID from every input that contains it. Use skips for intentional
+deviations, not to hide real problems.
 
 ## The Check Framework Internals
 

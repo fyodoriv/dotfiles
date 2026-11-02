@@ -119,6 +119,8 @@ check "agent-browser.restore_no_activate" "focus-restore helper never osascript-
 
 # shellcheck source=../../lib/focus-steal-audit.sh
 source "$DOTFILES_DIR/lib/focus-steal-audit.sh"
+# dotfiles-doctor runs each fix in a new process (bash -c).
+export -f focus_steal_audit_paths focus_steal_open_a_violations focus_steal_activate_violations
 
 check "focus.no_steal_open_flags" "open -a in bin/lib/launchagents uses -g, --gj, or --background only" \
   "[ -z \"\$(focus_steal_open_a_violations)\" ]" \

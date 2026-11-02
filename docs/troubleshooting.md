@@ -872,7 +872,21 @@ stops local work. Dotfiles cannot override that kernel behavior.
 4. **Lid-closed work** — while protection qualifies, the manager starts an
    Amphetamine session that it owns and verifies Closed-Display Mode.
    Amphetamine provides the supported closed-lid behavior; `caffeinate` alone
-   is not a lid-close guarantee.
+   is not a lid-close guarantee. `caffeinate -s` holds only on AC power
+   (`man caffeinate`).
+   **Apple Silicon laptops and power changes:** Amphetamine's
+   [Power Protect guide](https://github.com/x74353/Amphetamine-Power-Protect)
+   describes a script and configuration file for Closed-Display Mode after
+   power is connected or disconnected. Start a Closed-Display session and
+   choose **Learn More** for the separate installer. Installation requires
+   administrator authentication; later sessions do not need it. End an active
+   session and start a new one after installation.
+   One reported Mac slept on battery with an active session. That observation
+   does not prove Power Protect was the cause or that installing it fixes
+   every battery case. Check the power log for
+   `Entering Sleep state due to 'Clamshell Sleep' ... Using Batt` and verify
+   that the actual agent continues work during a controlled lid-close test.
+   A `DarkWake` entry alone does not prove the agent remained active.
 5. **Prompt release** — once Claude Code exits, the manager
    removes its recorded `caffeinate` children and owned Amphetamine session.
    A user-owned Amphetamine session that existed before the manager runs is

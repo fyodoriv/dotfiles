@@ -78,4 +78,5 @@ _FULL_ONLY_IDS='^(fail) (tool\.tmux|symlink\.tmux|tool\.ghostty|managed\.ghostty
   [[ "$output" == *" agent-browser.installed"* ]]
   [[ "$output" == *" macos.dock_downloads"* ]]
   [[ "$output" == *"symlink.editor.goland"* ]]
+  [[ "$output" != *"symlink.editor.webstorm"* ]]
 }

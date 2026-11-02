@@ -64,6 +64,7 @@ _fake_opencode() {
   mkdir -p "$TEST_HOME/.opencode/bin"
   printf '#!/bin/sh\n' > "$TEST_HOME/.opencode/bin/opencode"
   chmod +x "$TEST_HOME/.opencode/bin/opencode"
+  export PATH="$TEST_HOME/.opencode/bin:$PATH"
 }
 
 @test "local-ai: opencode signature check re-signs a broken binary in fix mode" {

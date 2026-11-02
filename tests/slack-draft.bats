@@ -10,7 +10,8 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   export CALLS="$TEST_DIR/calls.log"
   export DRAFTS_JSON="$TEST_DIR/drafts.json" INPUT_STATE="$TEST_DIR/input"
-  export PAGE MARK="$TEST_DIR/injected" DELCOUNT="$TEST_DIR/delcount"
+  export PAGE MARK="$TEST_DIR/injected" DELCOUNT="$TEST_DIR/delcount" PAGE_STATE="$TEST_DIR/page-state"
+  echo drafts > "$PAGE_STATE"
   echo '[]' > "$DRAFTS_JSON"
   echo 1 > "$INPUT_STATE"
   cat > "$TEST_DIR/agent-tab" <<'STUB'
@@ -34,6 +35,7 @@ case "$1" in
           esac
           mv "$DRAFTS_JSON.n" "$DRAFTS_JSON"
         fi ;;
+  nav) echo drafts > "$PAGE_STATE"; echo navigated ;;
   open) echo T1 ;;
   upload) echo "agent-tab: uploaded" ;;
 esac
@@ -299,10 +301,108 @@ left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
 }
 
 @test "no repo file holds a workspace URL default" {
-  ! grep -E 'slack\.com/(client|archives)|app\.slack\.com' "$SCRIPT"
+  ! workspace_url_default "$SCRIPT"
 }
 
 @test "unknown command exits 2" {
   run "$SCRIPT" frobnicate
   [ "$status" -eq 2 ]
+}
+
+@test "count navigates a channel tab to Drafts before reading matches" {
+  echo channel > "$PAGE_STATE"
+  drafts '[{"to":"Bob","body":"hello"}]'
+  run "$SCRIPT" count T1 hello --to Bob
+  [ "$status" -eq 0 ]
+  [ "$output" = 1 ]
+  grep -q '^nav --owner agent-a T1 https://app.slack.com/client/TFIXTURE/drafts' "$CALLS"
+}
+
+@test "delete navigates to Drafts then confirms the scoped Delete button" {
+  echo channel > "$PAGE_STATE"
+  drafts '[{"to":"Bob","body":"hello"},{"to":"Eve","body":"hello"}]'
+  FAKE_CONFIRM=1 FAKE_CONFIRM_VARIANT=button run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 0 ]
+  [ "$(left)" = Eve ]
+}
+
+@test "a Drafts readiness timeout fails without deleting a row" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  FAKE_DRAFTS_NEVER_READY=1 SLACK_DRAFT_TIMEOUT_SECONDS=0 run "$SCRIPT" delete T1 hello --to Bob --yes
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Drafts"*"limit"* ]]
+  [ "$(left)" = Bob ]
+  [ ! -e "$DELCOUNT" ]
+}
+
+@test "Drafts navigation refuses a tab outside Slack" {
+  FAKE_SLACK_URL=https://example.com/client/TFIXTURE/channel run "$SCRIPT" count T1 hello --to Bob
+  [ "$status" -eq 1 ]
+  ! grep -q '^nav ' "$CALLS"
+}
+
+@test "a stalled Drafts view stays within the command deadline" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  SECONDS=0
+  FAKE_DRAFTS_NEVER_READY=1 SLACK_DRAFT_TIMEOUT_SECONDS=1 run "$SCRIPT" count T1 hello --to Bob
+  [ "$status" -eq 1 ]
+  [ "$SECONDS" -lt 5 ]
+  [[ "$output" == *"30-second limit"* ]]
+  [ "$(left)" = Bob ]
+}
+
+workspace_url_default() {
+  grep -E 'https?://[^[:space:]"<>]*slack\.com/(client|archives)/|SLACK_DRAFT_URL[=:].*(https?://|slack\.com)' "$1"
+}
+
+@test "workspace URL guard rejects a planted default while allowing the public host pin" {
+  cp "$SCRIPT" "$TEST_DIR/planted"
+  printf '\nSLACK_DRAFT_URL=https://app.slack.com/client/TFIXTURE/drafts\n' >> "$TEST_DIR/planted"
+  run workspace_url_default "$TEST_DIR/planted"
+  [ "$status" -eq 0 ]
+  run workspace_url_default "$SCRIPT"
+  [ "$status" -eq 1 ]
+}
+
+@test "the deployed individual command symlink finds its repository tools" {
+  mkdir -p "$TEST_DIR/home/.local/bin"
+  ln -s "$SCRIPT" "$TEST_DIR/home/.local/bin/slack-draft"
+  drafts '[{"to":"Bob","body":"hello"}]'
+  run "$TEST_DIR/home/.local/bin/slack-draft" count T1 hello --to Bob
+  [ "$status" -eq 0 ]
+  [ "$output" = 1 ]
+}
+
+@test "a browser process that ignores TERM cannot overrun the deadline" {
+  cat > "$TEST_DIR/stalled-tab" <<'STUB'
+#!/usr/bin/env perl
+$SIG{TERM} = "IGNORE";
+sleep 4;
+STUB
+  chmod +x "$TEST_DIR/stalled-tab"
+  SECONDS=0
+  SLACK_DRAFT_AGENT_TAB="$TEST_DIR/stalled-tab" SLACK_DRAFT_TIMEOUT_SECONDS=1 run "$SCRIPT" count T1 hello --to Bob
+  [ "$status" -eq 1 ]
+  [ "$SECONDS" -lt 3 ]
+  [[ "$output" == *"30-second limit"* ]]
+}
+
+@test "deadline cleanup also kills a child delayed before process-group setup" {
+  export SLACK_TEST_REAL_PERL="$(command -v perl)"
+  mkdir -p "$TEST_DIR/delayed-perl"
+  cat > "$TEST_DIR/delayed-perl/perl" <<'STUB'
+#!/bin/bash
+if [ "$1" = -e ] && [[ "$2" == *'setpgrp(0, 0)'* ]]; then
+  program="${2/setpgrp(0, 0)/sleep 4; setpgrp(0, 0)}"
+  shift 2
+  exec "$SLACK_TEST_REAL_PERL" -e "$program" "$@"
+fi
+exec "$SLACK_TEST_REAL_PERL" "$@"
+STUB
+  chmod +x "$TEST_DIR/delayed-perl/perl"
+  SECONDS=0
+  PATH="$TEST_DIR/delayed-perl:$PATH" SLACK_DRAFT_TIMEOUT_SECONDS=1 run "$SCRIPT" count T1 hello --to Bob
+  [ "$status" -eq 1 ]
+  [ "$SECONDS" -lt 3 ]
+  [[ "$output" == *"30-second limit"* ]]
 }

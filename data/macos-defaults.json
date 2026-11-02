@@ -73,6 +73,14 @@
   },
   {
     "domain": "com.apple.dock",
+    "key": "workspaces-auto-swoosh",
+    "type": "bool",
+    "value": false,
+    "section": "Dock: performance (not appearance)",
+    "script": "core"
+  },
+  {
+    "domain": "com.apple.dock",
     "key": "mru-spaces",
     "type": "bool",
     "value": false,
@@ -949,7 +957,7 @@
     "domain": "com.apple.dock",
     "key": "wvous-br-corner",
     "type": "int",
-    "value": 4,
+    "value": 1,
     "section": "Hot corners",
     "script": "visual"
   },

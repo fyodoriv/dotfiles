@@ -45,6 +45,14 @@ migration architecture.
 
 ## block-dangerous-git (dotfiles hook)
 
+The guard uses `shfmt` to recognize one plain `cat` text write or display.
+Only its wholly quoted heredoc bodies are masked before command checks.
+Shell consumers, pipelines, arithmetic, unquoted substitutions, special-file
+outputs, and commands after a heredoc keep the conservative checks. The
+deployment script links the syntax filter beside the hook. A missing parser
+or failed proof also keeps the original command. Homebrew installs `shfmt`
+on both profiles.
+
 `agent-hooks/block-dangerous-git.sh` blocks `git reset --hard`,
 `git clean -f`, `git checkout .`, `git restore .`, and the force-delete of a
 local branch. A force-delete passes only when every named branch is proven

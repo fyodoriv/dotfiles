@@ -8,7 +8,7 @@
 #   dotfiles-doctor --list       List all check IDs
 #   dotfiles-doctor --quiet      One-line summary; names up to 5 failing check IDs
 #   dotfiles-doctor --full       Include Codex version and sign-in probes (slower)
-#   dotfiles-doctor --skip ID    Add a check to .overrides (skip it permanently)
+#   dotfiles-doctor --skip ID    Skip a check on this machine permanently
 #   dotfiles-doctor --validate-overrides  Verify all .overrides entries are valid check IDs
 #   dotfiles-doctor --severity LEVEL  Run only modules at or above LEVEL (critical|important|performance|cosmetic)
 #   dotfiles-doctor --json       Output JSON array of check results (for scripts)
@@ -30,7 +30,9 @@ set +e
 unset BASH_ENV ENV
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+export DOTFILES_DIR
 OVERRIDES_FILE="$DOTFILES_DIR/.overrides"
+LOCAL_OVERRIDES_FILE="${DOTFILES_LOCAL_OVERRIDES:-$HOME/.config/dotfiles/overrides}"
 
 # Home links point into chezmoi's source checkout, even when this doctor runs
 # from another checkout of the repo.
@@ -225,6 +227,9 @@ VALIDATE_OVERRIDES_MODE=false
 SEVERITY_FILTER=""
 MODULE_FILTER=""
 MODULE_FILTER_PATH=""
+# A selected plugin belongs to this doctor process and never runs in its shell.
+PLUGIN_FILTER_NAME=""
+PLUGIN_FILTER_ROOT=""
 
 # Track failing check IDs so the end-of-run notification can name them.
 # Populated by check() and check_advisory() on the FAIL branch.
@@ -261,12 +266,30 @@ while [ $# -gt 0 ]; do
       if [ -z "${2:-}" ]; then echo "Usage: dotfiles-doctor --module <name>"; exit 1; fi
       MODULE_FILTER="$2"
       MODULE_FILTER_PATH=""
+      PLUGIN_FILTER_NAME=""
+      PLUGIN_FILTER_ROOT=""
       for parent in "${MODULE_DIRS[@]}"; do
         if [ -d "$parent/$MODULE_FILTER" ]; then
           MODULE_FILTER_PATH="$parent/$MODULE_FILTER"
           break
         fi
       done
+      if [ -z "$MODULE_FILTER_PATH" ] && $_plugins_v2; then
+        _plugin_matches=()
+        while IFS=$'\t' read -r _pn _pr _pm; do
+          _module_name="$(basename "$_pm")"
+          if [ "$MODULE_FILTER" = "$_module_name" ] || [ "$MODULE_FILTER" = "$_pn/$_module_name" ]; then
+            _plugin_matches+=("$_pn/$_module_name")
+            PLUGIN_FILTER_NAME="$_pn"
+            PLUGIN_FILTER_ROOT="$_pr"
+            MODULE_FILTER_PATH="$_pm"
+          fi
+        done < <(plugin_doctor_modules all)
+        if [ "${#_plugin_matches[@]}" -gt 1 ]; then
+          echo "Ambiguous module: $MODULE_FILTER — fix: pass --module with one of: ${_plugin_matches[*]}"
+          exit 1
+        fi
+      fi
       if [ -z "$MODULE_FILTER_PATH" ]; then
         echo "Module not found: $MODULE_FILTER — fix: pick one of the modules below"
         _avail=()
@@ -286,11 +309,12 @@ while [ $# -gt 0 ]; do
         echo "Unknown check ID: $2 — fix: run dotfiles-doctor --list and pass a listed ID"
         exit 1
       fi
-      if grep -qxF "$2" "$OVERRIDES_FILE" 2>/dev/null; then
+      if grep -qxF "$2" "$OVERRIDES_FILE" "$LOCAL_OVERRIDES_FILE" 2>/dev/null; then
         echo "Override already exists: $2"
       else
-        echo "$2" >> "$OVERRIDES_FILE"
-        echo "Added override: $2"
+        mkdir -p "$(dirname "$LOCAL_OVERRIDES_FILE")" || exit 1
+        echo "$2" >> "$LOCAL_OVERRIDES_FILE" || exit 1
+        echo "Added override: $2 (this machine only: $LOCAL_OVERRIDES_FILE)"
       fi
       exit 0
       ;;
@@ -407,8 +431,8 @@ fi
 
 # ── Validate overrides against known check IDs ───────────────────────
 if $VALIDATE_OVERRIDES_MODE; then
-  if [ ! -f "$OVERRIDES_FILE" ]; then
-    echo "No .overrides file found."
+  if [ ! -f "$OVERRIDES_FILE" ] && [ ! -f "$LOCAL_OVERRIDES_FILE" ]; then
+    echo "No overrides file found."
     exit 0
   fi
 
@@ -428,10 +452,14 @@ if $VALIDATE_OVERRIDES_MODE; then
     else
       _unknown+=("$line")
     fi
-  done < "$OVERRIDES_FILE"
+  done < <(for _override_file in "$OVERRIDES_FILE" "$LOCAL_OVERRIDES_FILE"; do
+    [ -r "$_override_file" ] || continue
+    cat "$_override_file"
+    printf '\n'
+  done)
 
   if [ ${#_unknown[@]} -gt 0 ]; then
-    echo "Unknown check IDs in .overrides — fix: remove each line below from $OVERRIDES_FILE (dotfiles doctor --list shows valid IDs):"
+    echo "Unknown check IDs in .overrides — fix: remove each line below from $OVERRIDES_FILE or $LOCAL_OVERRIDES_FILE (dotfiles doctor --list shows valid IDs):"
     for uid in "${_unknown[@]}"; do
       echo "  - $uid — fix: delete this line from .overrides"
     done
@@ -446,12 +474,13 @@ fi
 
 # This input snapshot lasts for one doctor process; watch children reload it.
 _doctor_override_ids=()
-if [ -r "$OVERRIDES_FILE" ]; then
+for _doctor_override_file in "$OVERRIDES_FILE" "$LOCAL_OVERRIDES_FILE"; do
+  [ -r "$_doctor_override_file" ] || continue
   while IFS= read -r _doctor_override_id || [ -n "$_doctor_override_id" ]; do
     _doctor_override_ids+=("$_doctor_override_id")
-  done < "$OVERRIDES_FILE"
-fi
-unset _doctor_override_id
+  done < "$_doctor_override_file"
+done
+unset _doctor_override_id _doctor_override_file
 
 is_overridden() {
   local override_id
@@ -494,11 +523,18 @@ _timeout() {
 }
 
 _fix() {
-  local desc="$1" cmd="$2"
+  local desc="$1" cmd="$2" verify_cmd="$3"
   $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "  ${DIM}⟳ %s…${NC}\r" "$desc" >&2
   if _timeout "$FIX_TIMEOUT" bash -c "$cmd" >/dev/null 2>&1; then
     $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
-    fixed "$desc"
+    # Dynamic shell scope lasts only for this repair's verification call.
+    # shellcheck disable=SC2034 # sourced module helpers read this dynamic scope
+    local DOCTOR_VERIFY_REPAIR=true
+    if eval "$verify_cmd" >/dev/null 2>&1; then
+      fixed "$desc"
+    else
+      fail "$desc ${DIM}(fix ran but the check still fails)${NC}$(_fix_hint "$cmd")"
+    fi
   else
     $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
     fail "$desc ${DIM}(fix failed or timed out)${NC} — fix: run it by hand: dotfiles doctor --json --module ${_json_current_module:-<module>} names the command"
@@ -530,7 +566,7 @@ check() {
     pass "$desc"
   elif $FIX_MODE && [ -n "$fix_cmd" ]; then
     local _f0=$fix_count _x0=$fail_count
-    _fix "$desc" "$fix_cmd"
+    _fix "$desc" "$fix_cmd" "$test_cmd"
     if (( fix_count > _f0 )); then
       $JSON_MODE && _json_add "$id" "fixed" "$desc" "$fix_cmd"
       fixed_check_ids+=("$id")
@@ -596,7 +632,8 @@ check_symlink() {
     pass "$desc"
   elif $FIX_MODE; then
     local _f0=$fix_count _x0=$fail_count
-    _fix "$desc" "mkdir -p '$(dirname "$dst")'; [ -f '$dst' ] && [ ! -L '$dst' ] && mv '$dst' '${dst}.backup' 2>/dev/null; [ -L '$dst' ] && rm '$dst'; ln -s '$src' '$dst'"
+    _fix "$desc" "mkdir -p '$(dirname "$dst")'; [ -f '$dst' ] && [ ! -L '$dst' ] && mv '$dst' '${dst}.backup' 2>/dev/null; [ -L '$dst' ] && rm '$dst'; ln -s '$src' '$dst'" \
+      "[ -L '$dst' ] && [ \"\$(readlink '$dst')\" = '$src' ]"
     if (( fix_count > _f0 )); then
       $JSON_MODE && _json_add "$id" "fixed" "$desc"
       fixed_check_ids+=("$id")
@@ -614,7 +651,7 @@ check_symlink() {
 check_managed() {
   local id="$1" src="$2" dst="$3"
   local desc="$dst → dotfiles"
-  local link_dir="${DOTFILES_LINK_DIR:-$DOTFILES_DIR}"
+  local link_dir="${DOTFILES_LINK_DIR:-$DOTFILES_DIR}" managed_diff
   src="$(dotfiles_link_target "$DOTFILES_DIR" "$link_dir" "$src")"
 
   if $LIST_MODE; then
@@ -631,12 +668,13 @@ check_managed() {
   if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
     $JSON_MODE && _json_add "$id" "pass" "$desc (symlink)"
     pass "$desc (symlink)"
-  elif [ -f "$dst" ] && [ -z "$(chezmoi diff "$dst" --source "$link_dir" 2>/dev/null)" ]; then
+  elif [ -f "$dst" ] && managed_diff=$(chezmoi diff "$dst" --source "$link_dir" 2>/dev/null) && [ -z "$managed_diff" ]; then
     $JSON_MODE && _json_add "$id" "pass" "$desc (managed)"
     pass "$desc (managed)"
   elif $FIX_MODE; then
     local _f0=$fix_count _x0=$fail_count
-    _fix "$desc" "chezmoi apply '$dst' --source '$link_dir'"
+    _fix "$desc" "chezmoi apply '$dst' --source '$link_dir'" \
+      "{ [ -L '$dst' ] && [ \"\$(readlink '$dst')\" = '$src' ]; } || { [ -f '$dst' ] && managed_diff=\$(chezmoi diff '$dst' --source '$link_dir' 2>/dev/null) && [ -z \"\$managed_diff\" ]; }"
     if (( fix_count > _f0 )); then
       $JSON_MODE && _json_add "$id" "fixed" "$desc"
       fixed_check_ids+=("$id")
@@ -687,7 +725,7 @@ check_defaults() {
   elif $FIX_MODE; then
     local fix_cmd="defaults write '$domain' '$key' '-${type}' '$fix_value'"
     local _f0=$fix_count _x0=$fail_count
-    _fix "$desc" "$fix_cmd"
+    _fix "$desc" "$fix_cmd" "[ \"\$(defaults read '$domain' '$key' 2>/dev/null)\" = '$expected' ]"
     if (( fix_count > _f0 )); then
       $JSON_MODE && _json_add "$id" "fixed" "$desc" "$fix_cmd"
       fixed_check_ids+=("$id")
@@ -866,7 +904,14 @@ fi
 if [ -n "$MODULE_FILTER" ]; then
   # Single-module mode: run just the requested module (resolved from MODULE_DIRS
   # in the --module arg parser above).
-  run_module_doctor "$MODULE_FILTER_PATH"
+  if [ -n "$PLUGIN_FILTER_NAME" ]; then
+    _json_current_module="$PLUGIN_FILTER_NAME/$(basename "$MODULE_FILTER_PATH")"
+    _plugin_mode=run
+    $LIST_MODE && _plugin_mode=list
+    plugin_doctor_run "$PLUGIN_FILTER_NAME" "$PLUGIN_FILTER_ROOT" "$MODULE_FILTER_PATH" "$_plugin_mode"
+  else
+    run_module_doctor "$MODULE_FILTER_PATH"
+  fi
 elif $LIST_MODE; then
   echo "All check IDs (auto-discovered from modules/):"
   echo ""

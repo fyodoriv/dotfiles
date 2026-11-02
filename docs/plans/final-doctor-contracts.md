@@ -26,9 +26,10 @@ changed.
 
 ## Scope of this delivery
 
-This base fix adopts only the Claude registered-check fixture correction.
-The IDE fixture and export scanner remain in their separate reviewed work.
-A Claude-only pass does not complete the original three-file measurement.
+PR #431 delivered only the Claude fixture correction. This follow-up also
+adopts the IDE fixture and export scanner from the same original prediction.
+Run all three files and their planted controls before merging; a Claude-only
+receipt does not complete this measurement.
 
 ## Measurement
 

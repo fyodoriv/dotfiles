@@ -142,7 +142,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Local AI | `use_local_ai` | `false` | Installs the local-LLM fallback stack (`pipx`, `aider-chat`, `huggingface_hub[cli]`, and `mlx-lm` on native Apple Silicon). Local health checks never spawn models; the Ollama supervisor skips startup when another healthy owner already serves `:11434`. The ~30 GB model download still requires the sentinel in [docs/local-llm.md](docs/local-llm.md). |
 | *(not prompted)* | `auto_sync` | `owner_machine` | Scheduled `dotfiles-sync` (30 min, auto-commits this checkout; pushes to a public remote only when a person runs `dotfiles sync`) and `tooling-sync` (60 min) LaunchAgents. Off on a new user's Mac so a fork never gets unreviewed pushes. Set `true` or `false` in `~/.config/chezmoi/chezmoi.yaml` and run `dotfiles apply`. |
 | *(not prompted)* | `owner_machine` | `true` only for the repo owner's git email | Turns on owner-only parts: the `personal-machine` doctor module, the `minsky` module when no minsky clone exists, the owner-only agent rules (`config/agentfile-owner-rules.yaml`), and the `auto_sync` default. Derived from your git identity, so a new user gets `false`. Override it in `~/.config/chezmoi/chezmoi.yaml`. |
-| *(not prompted)* | `endpoint_hardening` | `owner_machine` | Runs the endpoint-hardening scripts (`run_after_endpoint-security.sh`, `run_at_login_endpoint-bootstrap.sh`) and the `com.dotfiles.endpoint-bootstrap` LaunchAgent. They ad-hoc sign Homebrew bottles and link shims into the Homebrew prefix for an endpoint-security agent. Off on a new user's Mac, so the install writes nothing outside `$HOME`. `DOTFILES_MANAGED_ENDPOINT=1` (endpoint-policy safe mode) turns the scripts on too. Set `true` in `~/.config/chezmoi/chezmoi.yaml` and run `chezmoi init` then `dotfiles apply` on a Mac with such an agent. |
+| *(not prompted)* | `endpoint_hardening` | `owner_machine` | Runs the endpoint-hardening scripts (`run_after_endpoint-security.sh`, `run_at_login_endpoint-bootstrap.sh`) and the `com.dotfiles.endpoint-bootstrap` LaunchAgent. They ad-hoc sign Homebrew bottles and link shims into the Homebrew prefix for an endpoint-security agent. Off on a new user's Mac, so the install writes nothing outside `$HOME`. `DOTFILES_MANAGED_ENDPOINT=1` (endpoint-policy safe mode) turns the scripts on too. Set `true` in `~/.config/chezmoi/chezmoi.yaml` and run `chezmoi init` then `dotfiles apply` on a Mac with such an agent. With it off, the security doctor skips the endpoint-only bash PATH, Homebrew-sandbox and python publisher checks. Common zsh PATH checks still run. |
 | *(not prompted)* | `capslock_control` | `owner_machine` | Maps Caps Lock to Control through the `com.dotfiles.capslock-control` LaunchAgent (and `macos-visual.sh` on full). Off on a new user's Mac, so Caps Lock stays Caps Lock. Set `true` in `~/.config/chezmoi/chezmoi.yaml`, then run `chezmoi init` and `dotfiles apply`, to opt in; set `false` to opt out. The apply unloads the agent and clears the live Caps Lock → Control mapping (only when it is the sole key remap). |
 | *(not prompted)* | `gh_admin_scopes` | `owner_machine` | Makes the git doctor require the `workflow`, `admin:public_key` and `delete_repo` gh scopes. Off on a new user's Mac, so agents never need power to delete repos or change SSH keys. Set it in `~/.config/chezmoi/chezmoi.yaml`, then run `chezmoi init`. |
 | *(not prompted)* | `keep_awake_tools` | `profile` is `full` | Loads the `com.dotfiles.sleepwatcher` and `com.dotfiles.agent-keepawake` LaunchAgents (the second keeps a closed-lid Mac awake on AC while Claude Code runs) and makes the doctor check it and Amphetamine (lid-close persistence). Set `true` on a core Mac to opt in, then run `chezmoi init`, `dotfiles apply` and `dotfiles-resilience-setup` (opens the App Store for Amphetamine). |
@@ -153,7 +153,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | *(not prompted)* | `weekly_metrics` | `false` | Each full `dotfiles-doctor` run writes a weekly numbers-only file to `~/.local/share/dotfiles/metrics/` in the agentbrew metrics provider format. It stays local; `agentbrew metrics share` (also opt-in) owns the exit. See [security-model.md](docs/security-model.md#weekly-metrics-file-opt-in). |
 | *(not prompted)* | `claude_permissions` | `manage` | `manage` pins Claude Code to `bypassPermissions` (settings.json, the `~/bin/claude` wrapper, and an `mcp__<server>__*` grant per MCP server). `keep` leaves your own permission settings and prompts alone. agentbrew has the same switch with the same meaning (`claudePermissions: keep` in `~/.config/agentbrew/state.yaml`). Both tools write these settings, so set both: if either one stays `manage`, it turns `bypassPermissions` back on. `keep` does not undo an earlier pin; remove `permissions.defaultMode` and `skipAutoPermissionPrompt` from `~/.claude/settings.json` yourself. The `DOTFILES_CLAUDE_PERMISSIONS` env var wins. |
 | *(not prompted)* | `claude_disabled_plugins` | `prisma@synced` | Claude Code plugins that `dotfiles apply` keeps off (`enabledPlugins[<id>] = false` in `~/.claude/settings.json`). The account plugin sync can turn a synced plugin back on; the next apply turns it off again. `dotfiles doctor` fails when a listed plugin is on, and when an agent config lists the declined `context7` MCP server. Claude Desktop keeps its own plugin list, which this setting does not reach. Set it empty to manage none. The `DOTFILES_CLAUDE_DISABLED_PLUGINS` env var (comma list) wins. |
-| *(not prompted)* | `claude_mods` | `work-pane` | agentbrew Claude Code mods that `dotfiles apply` installs from the agentbrew checkout's `mods/` folder, through the `claude` CLI (`plugin marketplace add`, then `plugin install <mod>@agentbrew-mods`). `work-pane` opens a pane beside the chat on every `/work`. The plugin reads from the checkout, so a `git pull` updates it. `dotfiles doctor` fails when a listed mod is not enabled. Set it empty to install none. The `DOTFILES_CLAUDE_MODS` env var (comma list) wins. |
+| *(not prompted)* | `claude_mods` | *(empty)* | agentbrew Claude Code mods that `dotfiles apply` installs from the agentbrew checkout's `mods/` folder, through the `claude` CLI (`plugin marketplace add`, then `plugin install <mod>@agentbrew-mods`). The plugin reads from the checkout, so a `git pull` updates it. `dotfiles doctor` fails when a listed mod is not enabled. Empty, the default, installs none (agentbrew retired its `work-pane` mod). The `DOTFILES_CLAUDE_MODS` env var (comma list) wins. |
 | *(not prompted)* | `claude_model` / `claude_effort` | `claude-opus-5-5` / `xhigh` | Override the Claude Code model and effort that `dotfiles apply` pins in `~/.claude/settings.json`. Use it for an org overlay or one Mac. The `DOTFILES_CLAUDE_MODEL` / `DOTFILES_CLAUDE_EFFORT` env vars win over these keys. See [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration). |
 | Auto-upgrade | `auto_upgrade` | `false` | Weekly Topgrade via LaunchAgent (Sunday 9 AM); managed-endpoint safe mode disables it while a required runtime publisher is blocked. |
 | Encryption | `use_encryption` | `false` | age encryption for secrets (requires key at `~/.config/chezmoi/key.txt`) |
@@ -450,8 +450,9 @@ dotfiles doctor --list       # show all check IDs
 dotfiles doctor --trends     # show pass/fail/fix trend over time
 ```
 
-`--skip` validates the ID before editing `.overrides`; run `dotfiles doctor --list`
-first to copy the exact check ID.
+`--skip` validates the ID before saving a machine-local choice; run
+`dotfiles doctor --list` first to copy the exact ID. See
+[override storage](docs/faq.md#how-do-i-permanently-skip-a-check).
 
 **What `--fix` does (and doesn't do):** creates missing symlinks, loads LaunchAgents, sets git config defaults, and installs missing Homebrew packages. It **never** deletes files, overwrites personal config (`~/.zshrc.local`, `~/.gitconfig.local`), or runs destructive commands. Safe to run repeatedly.
 
@@ -872,7 +873,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.dotfiles-sync` | `dotfiles-sync` | Every 30 min | Auto-commit tracked/staged changes + push/pull dotfiles repo; re-applies chezmoi only on new commits, a failed last apply, or drift |
 | `com.dotfiles.tooling-sync` | `tooling-sync` | Every hour | Pull agentbrew and minsky; push agentbrew TASKS.md edits |
 | `com.dotfiles.network-resilience` | `network-watchdog` | Every 5 min + after wake | Restore DNS/connectivity after sleep |
-| `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code (CLI or desktop app) runs on AC or battery ≥20%; releases when both exit, and quarantines rejected scripting commands |
+| `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code (CLI or desktop app) runs on AC or battery ≥20% (see [Power Protect and closed-display limits](docs/troubleshooting.md#claude-code-stops-when-the-laptop-sleeps-or-the-lid-closes) for Apple Silicon power changes); releases when both exit, and quarantines rejected scripting commands |
 | `com.dotfiles.git-maintain` | `git-maintain` | Daily 4:00 AM | git gc, prune branches in `~/apps` repos |
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
@@ -1011,11 +1012,13 @@ dotfiles doctor --skip chrome.devtools     # permanently skip this check
 dotfiles doctor --skip enterprise.aws      # skip if you don't use AWS
 ```
 
-Skips are stored in the source checkout's `.overrides`. `--skip` rejects unknown IDs
-without changing that file; run `dotfiles doctor --list` to discover valid IDs.
-Remove a line to re-enable a skipped check.
-Each doctor process reads this file once. Edits apply on the next invocation;
-watch mode reloads it through each new child audit. No cache file is created.
+`--skip` stores choices for this machine in `~/.config/dotfiles/overrides`
+(`DOTFILES_LOCAL_OVERRIDES` changes the path). The tracked source `.overrides`
+remains a shared/legacy input. Unknown IDs change neither file; run
+`dotfiles doctor --list` to discover valid IDs. To re-enable a check, remove its
+ID from every input that contains it. Each doctor process snapshots both
+inputs once. Edits apply on the next invocation; watch mode reloads them
+through each new child audit. No cache file is created.
 
 **Filter by severity (CI / fast feedback):**
 
@@ -1533,7 +1536,7 @@ dotfiles doctor --fix --module ssh   # fix SSH checks only
 dotfiles doctor --list               # all check IDs across all modules
 ```
 
-Each ID follows the pattern `<module>.<check>` (e.g., `tool.delta`, `ssh.agent_keychain`). Use these IDs with `--skip` to permanently dismiss individual checks; typos are rejected without changing `.overrides`.
+Each ID follows the pattern `<module>.<check>` (e.g., `tool.delta`, `ssh.agent_keychain`). Use these IDs with `--skip` to permanently dismiss individual checks; typos are rejected without changing either override input.
 
 ### What if I don't enable enterprise mode?
 
@@ -1545,9 +1548,8 @@ Everything works fine without it. Enterprise mode adds AWS CLI, Kubernetes tools
 dotfiles doctor --skip tool.delta     # skip the delta check forever
 ```
 
-Skips are stored in `~/apps/dotfiles/.overrides`. `--skip` validates the ID
-against `dotfiles doctor --list`, avoids duplicate entries, and leaves the file
-unchanged on typos. Remove a line to re-enable.
+See [override storage](docs/faq.md#how-do-i-permanently-skip-a-check) for the
+machine-local file, shared input, and steps to re-enable a check.
 
 ### Where are doctor logs?
 

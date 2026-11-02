@@ -80,6 +80,11 @@ _jb_apply_plugins() {
   rm -rf "$tmp"
 }
 
+# dotfiles-doctor runs each fix in a new process (bash -c), so the plugin fix
+# needs these functions and paths in its environment.
+export _JB_DISABLED_BASE _JB_DISABLED_EXTRA _JB_ENABLED_OVERRIDE
+export -f _jb_desired_disabled _jb_apply_plugins
+
 # ── IDE detection ─────────────────────────────────────────────────────────
 
 # Emit "<slug>\t<dir>" for the latest version of each detected IDE.

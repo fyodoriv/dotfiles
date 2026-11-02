@@ -1,5 +1,6 @@
 # Tasks
 
+
 <!-- policy: do NOT bypass commit hooks (--no-verify) and do NOT push to a
 remote without explicit operator approval in the current session. -->
 
@@ -56,6 +57,36 @@ them. -->
   - **Competitive-goal**: none — gate speed (docs/metrics.md).
 
 ## P2
+
+- [ ] Prove agent continuity through a battery lid close with Power Protect
+  - **ID**: keepawake-power-protect-physical-validation
+  - **Blocked**: physical-validation — needs a person on the test laptop to complete any missing Power Protect installation with administrator authentication, disconnect power, and close the lid for a controlled comparison while actual agent progress is recorded. Check readiness first; do not ask to repeat an installation that is already present.
+  - **Tags**: reliability, agents
+  - **Details**: The report in #400 describes battery Clamshell Sleep with an active Amphetamine session. An AC DarkWake entry did not capture application continuity. The upstream guide describes Power Protect for power-source transitions; its two file markers establish readiness, not uptime. The read-only marker advisory is separate instrumentation. This task is only the physical experiment and the resulting coverage decision.
+  - **Files**: private run evidence, `docs/troubleshooting.md`
+  - **Output**: decision
+  - **Acceptance**: a controlled two-minute battery lid-close comparison records both power-log sleep events and actual agent progress before and after Power Protect installation. Update the public coverage claim from the result; keep raw machine logs private.
+  - **Hypothesis**: after Power Protect is installed, battery Clamshell Sleep events drop from at least one to zero during the two-minute window and the actual agent keeps making progress.
+  - **Measurement**: `pmset -g log > "${LID_TEST_LOG:?}" && awk -v start="${LID_TEST_START:?}" -v end="${LID_TEST_END:?}" 'substr($0,1,19) >= start && substr($0,1,19) <= end && /Clamshell Sleep/ && /Using Batt/ {n++} END {print n+0}' "$LID_TEST_LOG"`; mandatory start/end use the power log's local `YYYY-MM-DD HH:MM:SS` format and the log path stays private. Compare the count with the actual agent's progress record for the same window.
+  - **Success**: zero battery Clamshell Sleep events and continued agent progress in the post-install window.
+  - **Pivot**: sleep or stalled agent progress remains -> abandon Power Protect as the sole remedy and diagnose the power/session transition; do not claim battery coverage or change system sleep policy without separate evidence.
+  - **Anchor**: [Amphetamine Power Protect install guide](https://github.com/x74353/Amphetamine-Power-Protect); [App Store release notes 5.3.1/5.3.2](https://apps.apple.com/us/app/amphetamine/id937984704).
+  - **Competitive-goal**: none — physical agent continuity, not a scorecard metric.
+
+- [ ] Validate the Slack draft helper in a throwaway workspace
+  - **ID**: slack-draft-live-compatibility
+  - **Blocked**: needs-authorized-test-workspace — no throwaway Slack workspace or real draft-delete action is authorized for this goal. Issue #399 remains open. Synthetic tests cover only the CLI handler and generated page scripts.
+  - **Tags**: browser, reliability
+  - **Details**: With separate permission, use a dedicated throwaway workspace and fabricated drafts only. Check that a channel tab navigates to Drafts, count returns the exact recipient/body matches, and a fresh delete dialog confirms only the selected fabricated draft. Keep organization payloads, tokens, screenshots, and workspace URLs out of the public repo. Do not reuse a signed-in organization workspace. Before a live mutation, add a runnable compatibility harness and commit its prediction; `bats tests/slack-draft.bats` is the local safety control, not live compatibility proof.
+  - **Files**: `bin/slack-draft`, `tests/slack-draft.bats`, `docs/agent-browser-policy.md`
+  - **Output**: evidence
+  - **Acceptance**: the authorized live harness passes all navigation, count, and scoped-confirm cases with zero wrong-row or wrong-dialog actions; issue #399 closes only after this evidence exists.
+  - **Hypothesis**: the tested selectors handle all three fabricated live cases with zero unsafe actions; synthetic DOM results alone cannot establish this.
+  - **Measurement**: preparation first — commit a runnable throwaway-workspace compatibility harness and its exact invocation before any live result is observed. Run `bats tests/slack-draft.bats` as the separate local safety control.
+  - **Success**: three of three live cases pass and zero unsafe actions occur.
+  - **Pivot**: any live mismatch or unsafe action abandons the selector contract until a safe replacement is measured.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), GQM; Forsgren, Humble, Kim (2018), stability.
+  - **Competitive-goal**: none — browser automation stability (docs/metrics.md).
 
 - [ ] Let a 1-file rerun pass a full-gate backlog in heavy-run (light lane)
   - **ID**: heavy-run-light-lane
@@ -558,20 +589,12 @@ them. -->
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
   - **ID**: dashboard-chart-gate-hardening
+  - **Blocked**: needs-deployed-test-host — 2026-11-01: runtime and browser-gate changes are prepared together but excluded from ready delivery. The existing dashboard remained on a browser-verification page after more than 120 seconds, and no Dashboard writer capability is available. Synthetic-host screenshots are unit proof only. Unblock: use an accessible dedicated deployed test dashboard with fabricated datasets; capture labeled before/after proof for hourly binding and line contrast on phone/desktop in light/dark, then complete independent review and required local gates. Keep [draft PR #423](https://github.com/fyodoriv/dotfiles/pull/423) as a draft until then. Its local full gate exited 0 and all 11 browser controls passed; these do not replace deployed-host proof.
   - **Tags**: ui, tooling-checkup
   - **Details**: Four leftovers from the round-2 review of the Hallmark dashboard redesign. (1) The load chart can show a duplicate or a missing local hour on a daylight-saving change, because the exporter keys rows by local time: key them by UTC and format in the page. (2) The gate's tap test uses a mouse click, not `touchscreen.tap`. (3) The gate presses ArrowLeft but never checks that the tooltip moved. (4) Chart line colours (non-text contrast, WCAG 1.4.11) are not gated.
   - **Files**: `skills/tooling-checkup/scripts/dashboard_export.py`, `skills/tooling-checkup/dashboard/index.html`, `skills/tooling-checkup/scripts/dashboard_comfort.cjs`, `tests/tooling-checkup-dashboard.bats`
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
-
-- [ ] Tighten the perl alarm guard test
-  - **ID**: perl-alarm-guard-gaps
-  - **Tags**: tests, reliability
-  - **Details**: Two gaps in `tests/perl-alarm.bats`, found in review of the SIGALRM fix. (1) The guard greps one line at a time, so a multi-line `perl -e '...'` that calls `alarm` without resetting the handler is not caught. (2) The guard skips all of `tests/morning.bats`, but only its perl stub lines need to be skipped.
-  - **Files**: `tests/perl-alarm.bats`
-  - **Output**: code
-  - **Acceptance**: a fixture with a multi-line `perl -e` that arms `alarm` and has no reset makes the guard fail; the guard still passes on the repo; the skip covers only the stub lines of `tests/morning.bats`, so a bad `alarm` line elsewhere in that file fails the guard.
-  - **Competitive-goal**: none — test hardening, not a scorecard metric.
 
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
@@ -738,12 +761,3 @@ them. -->
   - **Pivot**: If the success rate is below 80%, pause feature work and fix the top recurring failure in the run CSV.
   - **Measurement**: `docs/audits/local-ai-runs.csv` rows for the run.
   - **Anchor**: docs/local-ai-roadmap.md; docs/user-stories/09-run-local-models-fast.md.
-
-- [ ] Replace or relocate the Codex readiness wrapper when upstream covers it
-  - **ID**: replace-relocate-codex-readiness
-  - **Tags**: codex, reuse
-  - **Details**: `dotfiles-install-codex` wraps npm installation and a user-bin link; `modules/codex` checks machine readiness. Compare the existing `codex doctor --json` checks with the local-bin link, GUI host, and stale configured CLI path checks. Delegate matching checks upstream; retain only the machine-specific gaps. Recheck when upstream changes its doctor or installer.
-  - **Files**: `bin/dotfiles-install-codex`, `modules/codex/doctor.sh`
-  - **Output**: decision
-  - **Acceptance**: a current upstream probe records which checks can be delegated; delete wrappers only when the regression tests pass against the replacement.
-  - **Competitive-goal**: none — upstream delegation for machine readiness, not a scorecard metric.

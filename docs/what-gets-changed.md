@@ -54,7 +54,7 @@ To keep one of your own settings, list it in `~/.config/dotfiles/macos-defaults-
 |---|---|---|
 | Keyboard | 8 | Fast key repeat (1/15), disable autocorrect, auto-capitalization, smart quotes |
 | Finder | 12 | Show hidden files, path bar, status bar, all extensions; column view; folders first |
-| Dock performance | 9 | Zero autohide delay, fast animations, scale minimize, disable launch bounce |
+| Dock performance | 10 | Zero autohide delay, fast animations, scale minimize, disable launch bounce and automatic Space switching |
 | Dialogs & app behavior | 7 | Save to disk (not iCloud), expanded Save/Print dialogs, quit closes windows |
 | Activity Monitor | 6 | Show all processes, sort by CPU, 1s refresh, CPU history icon |
 | Screenshots | 4 | Save to Desktop as PNG, no shadow, no thumbnail |
@@ -81,7 +81,7 @@ To keep one of your own settings, list it in `~/.config/dotfiles/macos-defaults-
 
 | Category | Count | Key changes |
 |---|---|---|
-| Hot corners | 8 | Top-right: Mission Control, bottom-left: Start Screen Saver, bottom-right: Desktop |
+| Hot corners | 8 | Top-right: Mission Control, bottom-left: Start Screen Saver, bottom-right: no action |
 | Dock appearance | 6 | Auto-hide, 44px tiles, magnification to 56px, hide recents, hide indicators |
 | Trackpad | 5 | Speed 3.0, tap to click, three-finger drag (`trackpad_swipe_fingers: 3` turns drag off and moves desktop and Mission Control swipes to 3 fingers, on every profile) |
 | Finder sidebar | 3 | 180px sidebar, show desktop icons |
@@ -112,7 +112,7 @@ Installed via `run_onchange_brew.sh.tmpl`. Re-runs automatically when the Brewfi
 |---|---|
 | Git | `git-delta`, `gh` |
 | Shell | `atuin`, `direnv`, `fnm`, `fzf`, `poetry`, `pyenv`, `uv`, `yarn`, `zoxide`, `zsh-autosuggestions`, `zsh-fast-syntax-highlighting`, `zsh-history-substring-search`, `zsh-syntax-highlighting` |
-| Tools | `bat`, `bats-core`, `btop`, `coreutils`, `eza`, `fastfetch`, `fd`, `fswatch`, `gum`, `htop`, `httpie`, `jq`, `ripgrep`, `shellcheck`, `sleepwatcher`, `terminal-notifier`, `tealdeer`, `tree`, `yq` |
+| Tools | `bat`, `bats-core`, `btop`, `coreutils`, `eza`, `fastfetch`, `fd`, `fswatch`, `gum`, `htop`, `httpie`, `jq`, `ripgrep`, `shellcheck`, `shfmt`, `sleepwatcher`, `terminal-notifier`, `tealdeer`, `tree`, `yq` |
 | Prompt | `starship` |
 
 ### Full profile additions
@@ -121,6 +121,22 @@ Installed via `run_onchange_brew.sh.tmpl`. Re-runs automatically when the Brewfi
 |---|---|
 | Terminal | `tmux`, `ghostty` (cask), `font-jetbrains-mono-nerd-font` (cask) |
 | Extras | `difftastic`, `dockutil`, `duf`, `dust`, `duti`, `git-trim`, `hyperfine`, `jrnl`, `lazygit`, `poppler`, `procs`, `tig`, `watchexec`, `yazi`, `hiddenbar` (cask), `maccy` (cask) |
+| Checked tools | `agent-browser`, `visual-studio-code` (cask): the agent-browser and vscode doctor modules run on full and need them |
+
+Before the bundle, dotfiles checks unregistered app casks using Homebrew
+metadata. If an existing app belongs to another account, dotfiles defers
+only that cask and continues with the other packages. It prints the cask
+name and a terminal command for adoption, or you can add it to `brew_skip`
+if Homebrew should not manage it. The warning replaces the usual all-up-to-date
+message for that run.
+
+Registered casks, same-owner apps, and missing apps remain in the bundle.
+Other bundle errors still stop apply. If metadata or the core `jq` tool is
+unavailable, the bundle stays unchanged. This preflight changes only a
+temporary Brewfile; it changes no app ownership or saved settings. Use the
+printed terminal install command to retry adoption after the account issue
+is resolved; a successful `run_onchange` apply does not itself schedule a
+retry for the deferred cask.
 
 ### Enterprise additions (when `is_enterprise: true`)
 

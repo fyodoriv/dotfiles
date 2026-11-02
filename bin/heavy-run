@@ -414,12 +414,12 @@ exec perl -e "$common_code"'
   }
 
   # --- The scheduler: one pass over the queue, then the pause marks.
-  my ($lead, %said, %marked);
+  my ($lead, %marked);
   sub lead {
     return 1 if $lead;
     sysopen(my $f, "$dir/sched.lock", O_RDWR | O_CREAT, 0600) or return 0;
     return 0 unless flock($f, LOCK_EX | LOCK_NB);
-    $lead = $f; %said = (); %marked = ();
+    $lead = $f; %marked = ();
     return 1;
   }
   sub tick {
@@ -476,10 +476,10 @@ exec perl -e "$common_code"'
       $blocked = 1 if $what eq "wait";
     }
     for my $t (keys %why) {
-      next if ($said{$t} // "") eq $why{$t};
-      $said{$t} = $why{$t} if put("$queue/$t.why", "$why{$t}\n", "$queue/$t");
+      # Compare with the file, not memory: a waiter may have written its first reason.
+      next if read1("$queue/$t.why") eq $why{$t};
+      put("$queue/$t.why", "$why{$t}\n", "$queue/$t");
     }
-    delete @said{grep { !$live{$_} } keys %said};
 
     # Pause marks: a real-time app stops every run; memory pressure stops every
     # run but the oldest (an exclusive run is never stopped for memory).
@@ -567,9 +567,18 @@ exec perl -e "$common_code"'
     my %signo = (TERM => 15, INT => 2, HUP => 1);
     for my $sig (keys %signo) { $SIG{$sig} = sub { unlink $ticket, "$ticket.grant", "$ticket.why"; ungate(); exit(128 + $signo{$sig}) }; }
   }
+  my $hinted = 0;
   while (1) {
     if ($ticket) {
       step();
+      # Until the scheduler gets to this ticket, show a first reason (it never grants).
+      if (!$hinted++ && !$lead && !-e "$ticket.why" && !-e "$ticket.grant") {
+        my ($what, $arg) = decide(snapshot(), { project => $proj, exclusive => $exclusive }, [settings()]);
+        if (opendir(my $qd, $queue)) {
+          ($what, $arg) = ("wait", "behind") if grep { /^\d+-\d+$/ && $_ ne $GATE && $_ lt $name && held("$queue/$_") } readdir $qd;
+        }
+        put("$ticket.why", "$arg\n", $ticket) if $what ne "grant";
+      }
       my $g = read1("$ticket.grant");
       if ($g ne "") { ($slot, $sfh) = take($g); last if defined $slot; unlink "$ticket.grant"; }
     } else {

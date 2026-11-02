@@ -869,7 +869,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.dotfiles-sync` | `dotfiles-sync` | Every 30 min | Auto-commit tracked/staged changes + push/pull dotfiles repo; re-applies chezmoi only on new commits, a failed last apply, or drift |
 | `com.dotfiles.tooling-sync` | `tooling-sync` | Every hour | Pull agentbrew and minsky; push agentbrew TASKS.md edits |
 | `com.dotfiles.network-resilience` | `network-watchdog` | Every 5 min + after wake | Restore DNS/connectivity after sleep |
-| `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code (CLI or desktop app) runs on AC or battery ≥20%; releases when both exit, and quarantines rejected scripting commands |
+| `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code (CLI or desktop app) runs on AC or battery ≥20% (lid closed on battery needs Amphetamine Power Protect on Apple Silicon); releases when both exit, and quarantines rejected scripting commands |
 | `com.dotfiles.git-maintain` | `git-maintain` | Daily 4:00 AM | git gc, prune branches in `~/apps` repos |
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |

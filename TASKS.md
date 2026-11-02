@@ -29,6 +29,20 @@ them. -->
 
 ## P2
 
+- [ ] Doctor warns when Apple Silicon lacks Amphetamine Power Protect
+  - **ID**: keepawake-power-protect-check
+  - **Tags**: reliability, agents
+  - **Details**: On an M1 Pro laptop the pmset log showed `Clamshell Sleep ... Using Batt` three times in two days (at 63% and 100%) while the keep-awake manager's protection applied and Amphetamine's Closed-Display session was active. On AC the same lid close entered DarkWake (stayed awake). Amphetamine's own pref `Ask To Install Power Protect` was still 1, and no Amphetamine helper was installed. Power Protect is Amphetamine's add-on for Closed-Display sessions on Apple Silicon laptops when power is connected or removed. The docs and setup hint now name it; the doctor does not check it yet.
+  - **Files**: `modules/resilience/doctor.sh`, `docs/module-reference.md`, `tests/`
+  - **Output**: code
+  - **Acceptance**: on arm64 with Amphetamine installed, an advisory check fails when Power Protect is missing and passes after install; the check reads a real install marker (find its path on a Mac after install), not the `Ask To Install Power Protect` pref alone.
+  - **Hypothesis**: after Power Protect is installed, a 2-minute lid close on battery logs no `Clamshell Sleep` entry, so Remote Control stays connected.
+  - **Measurement**: `pmset -g log | grep "Clamshell Sleep"` during an unplugged lid-close test, before and after install.
+  - **Success**: no battery `Clamshell Sleep` line during the test window after install.
+  - **Pivot**: still sleeps with Power Protect installed -> lid-closed work on battery needs `pmset disablesleep`; document it as AC-only instead.
+  - **Anchor**: field pmset log 2026-10-27/28; Amphetamine App Store release notes 5.3 and 5.3.1 (Power Protect).
+  - **Competitive-goal**: none; agent uptime on a laptop (docs/metrics.md), not a scorecard metric.
+
 - [ ] Record each real install run so the README can prove one-command setup
   - **ID**: proof-install-field-outcome
   - **Tags**: metrics, proof

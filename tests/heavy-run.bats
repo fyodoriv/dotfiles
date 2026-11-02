@@ -18,6 +18,21 @@ setup() {
 }
 
 teardown() {
+  if [ -n "${INCOMPLETE_HOLDER:-}" ]; then
+    [ -z "${FIFO_RELEASE:-}" ] || release_fifo_holder
+    local child live
+    for child in "$INCOMPLETE_HOLDER" "${INCOMPLETE_WAITER:-}" "${FAKE_PID:-}"; do
+      [ -n "$child" ] || continue
+      for live in $(jobs -p); do
+        if [ "$live" = "$child" ]; then
+          kill -CONT "$child" 2>/dev/null || true
+          kill -TERM "$child" 2>/dev/null || true
+        fi
+      done
+      wait "$child" 2>/dev/null || true
+    done
+    FIFO_RELEASE=""
+  fi
   if [ -n "${FIFO_RELEASE:-}" ]; then
     release_fifo_holder
     wait
@@ -237,10 +252,12 @@ release_fifo_holder() {
 # Hold a live ticket (an flock on its file) without taking the lock; the pid
 # is $FAKE_PID. $1 is the ticket number. Stop it with: kill "$FAKE_PID".
 fake_live_ticket() {
+  local mode="${2:-complete}" ready="$BATS_TEST_TMPDIR/fake-ticket-ready" i
   mkdir -p "$HEAVY_RUN_DIR/queue"
-  perl -e 'use Fcntl ":flock"; open(F, ">>", "$ARGV[0]-$$") or die; flock(F, LOCK_EX) or die; print F "pid=$$ cwd=/x cmd=fake\n"; close STDOUT; sleep 30' "$HEAVY_RUN_DIR/queue/$1" &
+  perl -e 'use Fcntl ":flock"; use IO::Handle; open(F, ">>", "$ARGV[0]-$$") or die; flock(F, LOCK_EX) or die; print F "pid=$$ cwd=/x cmd=fake\n"; print F "wait=\nproject=fixture\nkind=v2\nexclusive=0\n" if $ARGV[1] eq "complete"; F->flush; close STDOUT; open(R, ">", $ARGV[2]) or die; close R; sleep 30' "$HEAVY_RUN_DIR/queue/$1" "$mode" "$ready" &
   FAKE_PID=$!
-  sleep 0.5
+  for i in $(seq 50); do [ -e "$ready" ] && return 0; sleep 0.1; done
+  return 1
 }
 
 @test "heavy-run: three waiters run in arrival order behind a holder" {
@@ -367,6 +384,41 @@ fake_live_ticket() {
   HEAVY_RUN_HELD="$HEAVY_RUN_DIR/lock" run "$SCRIPT" sh -c "'$SCRIPT' --status"
   kill "$FAKE_PID"
   [[ "${lines[0]}" == busy:* ]]
+}
+
+@test "heavy-run: an incomplete live identity holds new admissions" {
+  start_fifo_holder
+  holder=$!
+  INCOMPLETE_HOLDER="$holder"
+  wait_held
+  marker="$BATS_TEST_TMPDIR/ran"
+  "$SCRIPT" touch "$marker" &
+  waiter=$!
+  INCOMPLETE_WAITER="$waiter"
+  wait_queued 1
+  local ticket="" candidate number later why i
+  for candidate in "$HEAVY_RUN_DIR/queue/"*-"$waiter"; do
+    [ -f "$candidate" ] || continue
+    ticket="$candidate"
+    break
+  done
+  [ -n "$ticket" ]
+  number="${ticket##*/}"
+  number="${number%%-*}"
+  printf -v later '%010d' "$((10#$number + 1))"
+  fake_live_ticket "$later" incomplete
+  release_fifo_holder
+  wait "$holder"
+  why="$ticket.why"
+  for i in $(seq 50); do grep -q '^queue project metadata unavailable$' "$why" 2>/dev/null && break; sleep 0.1; done
+  [ -f "$why" ]
+  grep -q '^queue project metadata unavailable$' "$why"
+  [ ! -e "$marker" ]
+  kill "$FAKE_PID"
+  wait "$FAKE_PID" 2>/dev/null || true
+  FAKE_PID=""
+  wait "$waiter"
+  [ -e "$marker" ]
 }
 
 @test "heavy-run: --status skips a ticket nobody holds" {

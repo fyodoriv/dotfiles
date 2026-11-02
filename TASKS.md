@@ -13,20 +13,6 @@ them. -->
 
 ## P1
 
-- [ ] Owner agents separate verified pending work from user requests
-  - **ID**: owner-pending-line
-  - **Tags**: stability, agents, clarity
-  - **Mode**: AFK
-  - **Details**: [Issue 439](https://github.com/fyodoriv/dotfiles/issues/439) requests a Pending line immediately before the final Needed-from-you line. Register the [owner-only source/export experiment](docs/plans/owner-pending-line.md), preserve the independent ask judge, and keep the rule out of guest configuration. Source tests are not proof that every model response complies.
-  - **Files**: `config/agentfile-owner-rules.yaml`, `tests/agent-artifact-coverage.bats`, `tests/stranger-readiness.bats`, `docs/agentbrew-setup.md`
-  - **Output**: code
-  - **Acceptance**: The effective owner instruction export includes verified Pending work and independent nothing forms in the requested order; guest/base exports remain owner-rule-free, other rules are unchanged, and required gates pass. Qualified deployment/readback stays separate from source proof.
-  - **Hypothesis**: Five missing owner source/export requirements move to zero; all eight frozen control decisions are correct, with zero guest/base leakage or ask-judge regressions.
-  - **Measurement**: After registration, `JOBS=1 heavy-run bats tests/agent-artifact-coverage.bats tests/stranger-readiness.bats` on the unchanged and candidate source, then `JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=`; exact C1-C8 inputs and limits are frozen in the plan.
-  - **Success**: Zero missing owner requirements, all eight expected decisions, zero guest/base personal footer lines, unchanged unrelated rules and ask guard, and required gate exit zero.
-  - **Pivot**: Any missing requirement, guest leak, unrelated change or failed gate rejects the source approach; setup failure is inconclusive. Never turn source content checks into a claim of universal live agent compliance.
-  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (preregistration); issue 439 and existing owner-layer export contract.
-
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents

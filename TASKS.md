@@ -13,20 +13,6 @@ them. -->
 
 ## P1
 
-- [ ] Keep failed real-time app lookups from authorizing heavy work
-  - **ID**: heavy-run-realtime-probe-validity
-  - **Tags**: stability, security, agents
-  - **Details**: App lookup status is discarded, so empty failed output becomes no protected app. Register the scratch admission and pause controls before normalizing clear, present and unknown. See [the plan](docs/plans/queue-realtime-probe-validity.md). This step does not complete bounded probe execution, other resource probes or queue privacy.
-  - **Files**: `bin/heavy-run`, `tests/heavy-run.bats`, `docs/agent-hooks.md`, `docs/plans/queue-realtime-probe-validity.md`
-  - **Output**: code
-  - **Acceptance**: unknown lookup results hold first, exclusive and additional jobs, and retain an existing real-time pause until known clear. Known no-match, app-present, explicit-off and existing scheduling policies pass unchanged. Scratch receipts prove the tested probe ran; no owner workload is touched.
-  - **Hypothesis**: status normalization reduces twelve predicted seeded unsafe admissions to zero and one predicted incorrect resume to zero, without changing limits or known pressure allowances.
-  - **Measurement**: `heavy-run bats --filter 'realtime probe:' ./tests/heavy-run.bats`, then the scheduling suite and required gate in the plan. New controls are proposed until implemented after this prediction commit.
-  - **Success**: zero wrong admissions or resumes, every positive and retained scheduling control passes, and all required gates exit zero.
-  - **Pivot**: any wrong decision, unproved probe readiness, policy regression or changed owner limit rejects the approach; do not weaken the controls.
-  - **Anchor**: Basili, Caldiera, Rombach (1994), GQM; installed pgrep manual and existing real-time hold policy.
-  - **Competitive-goal**: none — safe shared machine capacity, not a scorecard count.
-
 - [ ] Keep heavy-run metadata private without changing safe parallel admission
   - **ID**: heavy-run-private-metadata
   - **Tags**: stability, security, privacy, agents

@@ -58,6 +58,20 @@ them. -->
   - **Anchor**: EASY backfilling (Lifka 1995; Mu'alem & Feitelson 2001); Harchol-Balter 2013, *Performance Modeling and Design of Computer Systems* (size-based scheduling).
   - **Competitive-goal**: none — machine stability and agent wait time (docs/metrics.md), not a scorecard metric.
 
+- [ ] Fix the flaky heavy-run max-load test
+  - **ID**: heavy-run-max-load-test-flake
+  - **Tags**: tests, reliability
+  - **Details**: `tests/heavy-run.bats` "HEAVY_RUN_MAX_LOAD holds extra runs above the load" failed once in `make check` on 2026-11-01 (fix/heavy-run-orphan-waiters) and passed 5 of 5 alone. It reads `--status` right after the waiter is queued, before the waiter writes its `wait=` reason, so `lines[2]` lacks "(waiting: load … above 0.0001)". Wait until `--status` shows a `(waiting:` reason (or the run ends) before checking, as other queue tests do.
+  - **Files**: `tests/heavy-run.bats`
+  - **Output**: code
+  - **Acceptance**: the test passes 50 of 50 runs in a loop under load.
+  - **Hypothesis**: waiting for the wait reason drops this test's failure rate from about 1 in 6 suite runs to 0 in 50, because the only race is the status read before `note_wait`.
+  - **Measurement**: `for i in $(seq 50); do bats -f 'HEAVY_RUN_MAX_LOAD holds' tests/heavy-run.bats; done | grep -c '^not ok'` while a full gate runs.
+  - **Success**: 0 failures in 50.
+  - **Pivot**: any failure in 50 -> the race is elsewhere (load reading); log `--status` output on failure and find it.
+  - **Anchor**: Luo et al. 2014, "An Empirical Analysis of Flaky Tests" (FSE): async wait is the top flaky-test cause.
+  - **Competitive-goal**: none — gate reliability (docs/metrics.md), not a scorecard metric.
+
 - [ ] Record each real install run so the README can prove one-command setup
   - **ID**: proof-install-field-outcome
   - **Tags**: metrics, proof

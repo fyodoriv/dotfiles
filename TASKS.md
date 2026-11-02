@@ -12,6 +12,20 @@ them. -->
 
 ## P1
 
+- [ ] Keep the waiter-death fixture held through its signal observation
+  - **ID**: heavy-run-waiter-observation
+  - **Tags**: stability, tests, agents
+  - **Details**: The current two-second holder can end after queue observation but before SIGKILL, so the victim completes and the kill fails. Register and run the controlled observation-gap experiment before replacing that timer with the existing release handshake. See [the plan](docs/plans/heavy-run-waiter-observation.md).
+  - **Files**: `tests/heavy-run.bats`, `docs/plans/heavy-run-waiter-observation.md`
+  - **Output**: code
+  - **Acceptance**: the seeded existing case kills a genuinely queued victim, observes exit 137, then runs the next command with exit 0 and an empty queue. Preserve existing bounds and assertions; production queue policy and owner limits stay unchanged.
+  - **Hypothesis**: the release handshake reduces premature victim completion from one controlled case to zero by retaining the holder until the kill is observed.
+  - **Measurement**: `heavy-run env BATS_HEAVY_RUN_WAITER_DELAY=3 bats --filter 'a SIGKILLed waiter does not block the queue' ./tests/heavy-run.bats`, followed by the full scheduling file and required gate in the plan. The delay seed is proposed until implemented after this prediction commit.
+  - **Success**: zero failed seeded outcomes, victim exit 137, following command exit 0, and every scheduling/required check passes.
+  - **Pivot**: any early completion, wrong exit, stale queue entry or failing required check rejects the fixture method; do not hide it with a longer sleep or skipped assertion.
+  - **Anchor**: Basili, Caldiera, Rombach (1994), GQM; Munafò et al. (2017), preregistration.
+  - **Competitive-goal**: none — trustworthy queue regression evidence, not a scorecard count.
+
 - [ ] Headless browser test runs bypass the heavy-run lock
   - **ID**: headless-browser-runs-bypass-heavy-run
   - **Blocked**: needs-time — 2026-10-28: shipped the hook extension (e2e/ui scripts, exec playwright, make e2e/test-all) and the doctor check `resilience.headless_chrome_under_heavy_run`; Acceptance part 1 is met. Part 2 needs data: read the unexplained-overload count in the tooling-checkup machine-metrics phase on the next two checkups after this lands, then close (under 40 rows, peak load1 under 100) or pivot (over 150 rows).

@@ -170,3 +170,6 @@ temporary `DOTFILES_DIR` in tests.
 
 Interpreter test wrappers must resolve and export the original interpreter
 before prefixing `PATH`. Check staged fixtures for rewritten machine paths.
+
+Perl fixture safety alarms reset SIGALRM to `DEFAULT` before arming. Keep the
+existing safety deadlines and acceptance assertions unchanged.

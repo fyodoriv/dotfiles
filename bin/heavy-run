@@ -148,6 +148,7 @@ esac
 common_code='
   use strict; use warnings;
   use Fcntl qw(:flock O_RDWR O_CREAT);
+  use Digest::SHA qw(sha256_hex);
   sub cmd_out { my $o = `$_[0] 2>/dev/null`; $o //= ""; chomp $o; return $o; }
   sub slot_count { my ($set) = @_; return $set ne "" ? $set : 1; }
   sub load1 {
@@ -208,8 +209,27 @@ common_code='
     open(my $f, "<", $p) or return ();
     my $first = <$f> // ""; chomp $first;
     my %f = (line => $first);
-    while (<$f>) { chomp; $f{$1} = $2 if /^(\w+)=(.*)$/; }
+    my (%identity_keys, $duplicate);
+    while (<$f>) {
+      chomp;
+      next unless /^(\w+)=(.*)$/;
+      my ($key, $value) = ($1, $2);
+      $duplicate = 1 if ($key eq "project" || $key eq "project_id") && $identity_keys{$key}++;
+      $f{$key} = $value;
+    }
+    $f{duplicate_project_identity} = $duplicate ? 1 : 0;
     return %f;
+  }
+  # Raw project fields and typed future fields share one controller identity.
+  sub project_identity {
+    my ($f) = @_;
+    return undef if $f->{duplicate_project_identity};
+    if (defined $f->{project_id}) {
+      return undef unless $f->{project_id} =~ /^sha256:[0-9a-f]{64}$/;
+      return undef if defined $f->{project} && "sha256:" . sha256_hex($f->{project}) ne $f->{project_id};
+      return $f->{project_id};
+    }
+    return defined $f->{project} ? "sha256:" . sha256_hex($f->{project}) : undef;
   }
   sub read1 { my ($p) = @_; open(my $f, "<", $p) or return ""; my $l = <$f> // ""; chomp $l; return $l; }
   our $GATE = "0000000000-0";
@@ -326,6 +346,7 @@ exec perl -e "$common_code"'
   my $gate_open = "$dir/gate-open";
   my ($ticket, $tfh, $name);
   my $proj = delete $ENV{HEAVY_RUN_PROJECT_KEY} // "";
+  my $proj_id = project_identity({ project => $proj });
 
   # --- Live settings: env first, then chezmoi.yaml (reread each second), then the default.
   my ($cfg_at, %cfg) = (-1);
@@ -375,14 +396,18 @@ exec perl -e "$common_code"'
       next unless held("$slotdir/s$k");
       my %f = fields("$slotdir/s$k.owner");
       $s{busy}++; $s{used}{$k} = 1;
-      $s{proj}{$f{project}}++ if defined $f{project};
+      my $id = project_identity(\%f);
+      if (defined $id) { $s{proj}{$id}++; }
+      else { $s{invalid_project} = 1; }
       push @{$s{runs}}, { id => "s$k", start => $f{start} // 9e9, mark => "$slotdir/s$k.paused" };
     }
     for my $k (slot_files($slotdir)) {
       next unless held("$slotdir/$k");
       my %f = fields("$slotdir/$k.owner");
       $s{busy}++;
-      $s{proj}{$f{project}}++ if defined $f{project};
+      my $id = project_identity(\%f);
+      if (defined $id) { $s{proj}{$id}++; }
+      else { $s{invalid_project} = 1; }
       # An older run pauses itself; it still counts when the oldest run is picked.
       push @{$s{runs}}, { id => $k, start => $f{start} // 0 };
     }
@@ -397,14 +422,18 @@ exec perl -e "$common_code"'
     my ($s, $t, $set) = @_;
     my ($n, $ramp, $maxload, $pcap) = @$set;
     if ((my $r = realtime()) ne "") { return ("wait", $r); }
+    return ("wait", "queue project metadata unavailable") if $s->{invalid_project};
     return ("wait", "an exclusive run is active") if $s->{excl};
     if ($t->{exclusive}) {
       return ("grant", "exclusive") if !$s->{active} && !$s->{busy};
       return ("wait", $s->{busy} ? "exclusive: waiting for $s->{busy} running run(s) to end" : "exclusive: waiting for an older heavy-run");
     }
-    my $p = $t->{project} // "";
-    (my $pn = $p) =~ s{.*/}{};
-    if ($pcap < $n && (my $k = $s->{proj}{$p} // 0) >= $pcap) { return ("skip", "project cap: $k/$pcap runs of $pn"); }
+    my $p = $t->{project_id};
+    return ("wait", "queue project metadata unavailable") unless defined $p;
+    (my $pn = $t->{project} // "") =~ s{.*/}{};
+    if ($pcap < $n && (my $k = $s->{proj}{$p} // 0) >= $pcap) {
+      return ("skip", "project cap: $k/$pcap runs" . ($pn ne "" ? " of $pn" : ""));
+    }
     return ("wait", "no free slot ($s->{busy}/$n busy)") if $s->{busy} >= $n;
     if ($s->{busy} > 0) {
       my $m = (stat $last_start)[9];
@@ -419,7 +448,7 @@ exec perl -e "$common_code"'
   sub took {
     my ($s, $t, $slot) = @_;
     $s->{busy}++;
-    $s->{proj}{$t->{project} // ""}++;
+    $s->{proj}{$t->{project_id}}++ if defined $t->{project_id};
     if ($slot eq "exclusive") { $s->{excl} = $s->{active} = 1; }
     elsif ($slot =~ /^s(\d+)$/) { $s->{used}{$1} = 1; $s->{active} = 1; }
   }
@@ -453,7 +482,9 @@ exec perl -e "$common_code"'
       my %f = fields("$queue/$t");
       $live{$t} = 1;
       my $kind = ($f{kind} // "") eq "v2" ? "v2" : exists $f{wait} ? "old" : "unknown";
-      push @tickets, { name => $t, kind => $kind, project => $f{project} // "",
+      my $id = project_identity(\%f);
+      $s->{invalid_project} = 1 unless defined $id;
+      push @tickets, { name => $t, kind => $kind, project => $f{project}, project_id => $id,
         exclusive => $kind eq "v2" ? ($f{exclusive} // 0) : ($f{line} =~ /\[exclusive\]$/ ? 1 : 0) };
     }
     for my $f (@all) { unlink "$queue/$f" if $f =~ /^(\d+-\d+)\.(grant|why)$/ && !$live{$1}; }
@@ -547,7 +578,7 @@ exec perl -e "$common_code"'
     open($tfh, ">", $tmp) or die "cannot create $tmp: $!\n";
     flock($tfh, LOCK_EX) or die "cannot lock $tmp: $!\n";
     # Lines 2 and 3 keep the layout older heavy-run code reads.
-    print $tfh "$info\nwait=\nproject=$proj\nkind=v2\nexclusive=$exclusive\n";
+    print $tfh "$info\nwait=\nproject=$proj\nkind=v2\nexclusive=$exclusive\nreader=project-id-v1\n";
     $tfh->flush;
     $name = sprintf("%010d-%d", $n, $$);
     rename($tmp, "$queue/$name") or do { unlink $tmp; die "cannot rename $tmp: $!\n" };
@@ -589,7 +620,7 @@ exec perl -e "$common_code"'
       step();
       # Until the scheduler gets to this ticket, show a first reason (it never grants).
       if (!$hinted++ && !$lead && !-e "$ticket.why" && !-e "$ticket.grant") {
-        my ($what, $arg) = decide(snapshot(), { project => $proj, exclusive => $exclusive }, [settings()]);
+        my ($what, $arg) = decide(snapshot(), { project => $proj, project_id => $proj_id, exclusive => $exclusive }, [settings()]);
         if (opendir(my $qd, $queue)) {
           ($what, $arg) = ("wait", "behind") if grep { /^\d+-\d+$/ && $_ ne $GATE && $_ lt $name && held("$queue/$_") } readdir $qd;
         }
@@ -599,7 +630,7 @@ exec perl -e "$common_code"'
       if ($g ne "") { ($slot, $sfh) = take($g); last if defined $slot; unlink "$ticket.grant"; }
     } else {
       # No queue: decide for this run alone.
-      my ($what, $arg) = decide(snapshot(), { project => $proj, exclusive => $exclusive }, [settings()]);
+      my ($what, $arg) = decide(snapshot(), { project => $proj, project_id => $proj_id, exclusive => $exclusive }, [settings()]);
       if ($what eq "grant") { ($slot, $sfh) = take($arg); last if defined $slot; }
     }
     select(undef, undef, undef, 0.2);
@@ -630,7 +661,7 @@ exec perl -e "$common_code"'
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
   my @t = localtime;
   if (open(my $o, ">", $ownerfile)) {
-    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\nproject=%s\nstart=%.3f\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $proj, Time::HiRes::time();
+    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\nproject=%s\nstart=%.3f\nreader=project-id-v1\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $proj, Time::HiRes::time();
     close $o;
   }
   # The run keeps the scheduler going while it leads, and stops (SIGSTOP) its

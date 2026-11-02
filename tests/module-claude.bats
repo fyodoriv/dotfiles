@@ -1,9 +1,8 @@
 #!/usr/bin/env bats
 # Functional tests for modules/claude/doctor.sh
 #
-# After the OSS split, the only check this module owns is the
-# `claude.model_wrapper` wrapper. Any company-specific branch lives in
-# a company plugin (docs/plugins.md).
+# Pin the public Claude CLI and configuration checks. Any company-specific
+# branch lives in a company plugin (docs/plugins.md).
 
 load test_helper
 
@@ -74,7 +73,7 @@ WRAPPER
 
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 6 ]
+  [ "$pass_count" -eq 7 ]
   [ "$fail_count" -eq 0 ]
 }
 
@@ -89,14 +88,14 @@ WRAPPER
 
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 3 ]
+  [ "$pass_count" -eq 4 ]
   [ "$fail_count" -eq 3 ]
 }
 
 @test "claude: wrapper check fails when unmanaged wrapper is missing" {
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
 
-  [ "$pass_count" -eq 3 ]
+  [ "$pass_count" -eq 4 ]
   [ "$fail_count" -eq 3 ]
 }
 
@@ -107,13 +106,14 @@ WRAPPER
   collected=()
   check() { collected+=("$1"); }
   source "$BATS_TEST_DIRNAME/../modules/claude/doctor.sh"
-  [ "${#collected[@]}" -eq 6 ]
+  [ "${#collected[@]}" -eq 7 ]
   [ "${collected[0]}" = "claude.model_wrapper" ]
   [ "${collected[1]}" = "claude.model_default" ]
   [ "${collected[2]}" = "claude.env_pins" ]
   [ "${collected[3]}" = "claude.observe_plugin_server" ]
   [ "${collected[4]}" = "claude.disabled_plugins" ]
-  [ "${collected[5]}" = "claude.no_context7_mcp" ]
+  [ "${collected[5]}" = "claude.mods" ]
+  [ "${collected[6]}" = "claude.no_context7_mcp" ]
 }
 
 @test "claude: observe check fails when the plugin is enabled and its server is down" {

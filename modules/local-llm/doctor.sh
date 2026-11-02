@@ -23,15 +23,20 @@ _LL_SENTINEL="${LOCAL_LLM_SENTINEL:-$HOME/.config/dotfiles/.local-llm-bootstrap-
 _LL_ENDPOINT="${LOCAL_LLM_ENDPOINT:-http://127.0.0.1:8080/v1/models}"
 _LL_MODEL_REPO="${LOCAL_LLM_MODEL_REPO:-Qwen/Qwen3-Coder-30B-A3B-Instruct-MLX-4bit}"
 
-# use_local_ai=false (chezmoi data) means the installer renders empty, so
-# apply cannot fix a missing tool. Report those checks as advisory, not fail.
+# use_local_ai=false (chezmoi data) is an explicit opt-out: the installer
+# renders empty, so every check below would only warn about tools the
+# person chose not to install. Skip the module once instead.
 # Unset means on (strict), matching a standalone run without chezmoi data.
+# --list and check-ID collection (--skip, --validate-overrides) still walk
+# the checks below, so these IDs stay known; `skipped` is not defined there.
+if [ "${USE_LOCAL_AI:-true}" = "false" ] && [ "${LIST_MODE:-false}" != true ] \
+  && declare -F skipped >/dev/null; then
+  skipped "local-llm checks (use_local_ai is off)"
+  return 0 2>/dev/null || exit 0
+fi
+
 _ll_check() {
-  if [ "${USE_LOCAL_AI:-true}" = "false" ]; then
-    check_advisory "$@"
-  else
-    check "$@"
-  fi
+  check "$@"
 }
 
 # ── Apple Silicon arch (advisory) ────────────────────────────────────

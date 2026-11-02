@@ -67,8 +67,9 @@ _FULL_ONLY_IDS='^(fail) (tool\.tmux|symlink\.tmux|tool\.ghostty|managed\.ghostty
   [[ "$output" != *"symlink.editor.goland"* ]]
 }
 
-@test "full profile: the full-only checks still run" {
+@test "full profile: installed IDE and full-only checks still run" {
   _fake_profile full
+  mkdir -p "$TEST_DIR/apps/GoLand.app"
   run _doctor_results
   [[ "$output" == *" tool.tmux"* ]]
   [[ "$output" == *" managed.lazygit"* ]]

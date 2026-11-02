@@ -17,6 +17,19 @@
 # blocks every other run until it ends (use it for timing runs). An old
 # heavy-run binary takes the same exclusive flock, so it mixes in safely.
 #
+# Weight: `--weight N` (or HEAVY_RUN_WEIGHT) makes a run hold N slots at once
+# (capped at the slot count), for a gate that runs several suites inside itself.
+# Light lane: `--light` is a small run (a 1-file rerun) that takes the single
+# lane slot ($dir/light/1), never a heavy slot. So at most one light run runs
+# beside the heavy runs, and a light run never lets an extra heavy run start.
+# Light runs and heavy runs keep arrival order each in their own line: a light
+# run waits only for the lights ahead of it and passes a heavy queue head
+# without taking anything the head needs, so the head cannot starve. A light
+# run starts when the lane is free and, while a heavy run is active, the ramp
+# has passed and memory pressure is normal. It never moves the heavy ramp. An
+# exclusive run waits for the lane too, and no light run starts while an
+# exclusive run is queued.
+#
 # Waiters are served in arrival order. Each caller takes a numbered ticket
 # file in $dir/queue (numbers come from $dir/seq under a short flock) and holds
 # an flock on that file while it waits. Only the lowest live ticket tries to
@@ -24,7 +37,10 @@
 # holds (its owner died, even by SIGKILL) is deleted by the next waiter. A
 # crashed run frees its slot because the kernel drops its flock; liveness never
 # depends on a pid. If the queue folder is unusable, heavy-run warns once and
-# waits without arrival order. Each run appends "waited=<seconds>" to the wait
+# waits without arrival order. A waiter whose caller died (getppid() changes:
+# the kernel reparents it) drops its ticket and exits 129; a waiter started
+# with no caller (parent pid 1) or with HEAVY_RUN_KEEP_ORPHAN=1 keeps waiting.
+# Each run appends "waited=<seconds> ... weight=<n> lane=<heavy|light>" to the wait
 # log (skipped if its folder cannot be made). Known limits: a stopped (Ctrl-Z)
 # waiter at the head blocks the queue until it resumes; callers on the fallback
 # path can overtake the head.
@@ -32,14 +48,17 @@
 # A perl parent holds the flocks (fds closed on exec, so no child or leftover
 # daemon inherits them), runs the command, forwards TERM/INT/HUP to it, and
 # exits with its status. A slot lasts exactly as long as the command. The
-# command sees HEAVY_RUN_SLOT (its slot number, or "exclusive"), so a gate can
-# pick ports or folders per slot. heavy-run itself shares no writable temp path
+# command sees HEAVY_RUN_SLOT (its first slot number, or "exclusive") and
+# HEAVY_RUN_SLOT_LIST (all its slots, comma-separated), so a gate can pick
+# ports or folders per slot. heavy-run itself shares no writable temp path
 # between runs. The folder is mode 0700 and its files 0600.
 #
 # Usage:
 #   heavy-run make check
 #   heavy-run npm run verify
 #   heavy-run --exclusive scripts/metrics.sh   # alone on the machine
+#   heavy-run --weight 3 scripts/check.sh      # a gate that runs 3 suites inside
+#   heavy-run --light npx playwright test one.spec.ts   # a 1-file rerun
 #   heavy-run --status          # running slots, the queue, and why each waits
 #
 # Env (each wins over its setting in ~/.config/chezmoi/chezmoi.yaml):
@@ -50,6 +69,9 @@
 #                       (setting heavy_run_ramp_seconds; default 15)
 #   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
 #                       (setting heavy_run_max_load; default 0)
+#   HEAVY_RUN_WEIGHT    slots a run holds, 1-64 (default 1); --weight wins
+#   HEAVY_RUN_LIGHT     1 = a light run, like --light (default 0)
+#   HEAVY_RUN_KEEP_ORPHAN  1 = keep waiting after the caller dies (default 0)
 #   HEAVY_RUN_PROBE     a command whose non-empty output is a reason to wait;
 #                       replaces the built-in memory pressure check
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
@@ -68,7 +90,7 @@ else waitlog="$HOME/.local/state/dotfiles/heavy-run-waits.log"; fi
 level="${HEAVY_RUN_NICE:-15}"
 
 usage() {
-  echo "Usage: heavy-run [--exclusive] <command...> | heavy-run --status"
+  echo "Usage: heavy-run [--exclusive | --weight N | --light] <command...> | heavy-run --status"
 }
 
 # Settings: env first, then the chezmoi data, then the default ("" = auto).
@@ -175,26 +197,59 @@ case "${1:-}" in
       if ($excl ne "") { print "exclusive: $excl\n"; }
       elsif (@busy) { printf "busy: %d/%d slots\n", scalar @busy, $n; print "$_\n" for @busy; }
       else { print "free: 0/$n slots busy\n"; }
+      if (held("$dir/light/1")) {
+        my $line = "";
+        if (open(my $o, "<", "$dir/light/1.owner")) { $line = <$o> // ""; chomp $line; }
+        print "light: $line\n";
+      }
       opendir(my $d, $queue) or exit 0;
-      my $i = 0;
+      # Heavy and light runs each keep their own order; a later entry waits
+      # behind the head of its own line.
+      my ($i, %head) = (0);
       for my $t (sort grep { /^\d+-\d+$/ } readdir $d) {
         open(my $h, "<", "$queue/$t") or next;
         next if flock($h, LOCK_EX | LOCK_NB);
         my $l = <$h> // ""; chomp $l;
         my $w = <$h> // ""; chomp $w; $w =~ s/^wait=//;
-        $w = "behind queue 1" if $i > 0;
+        my $lane = $l =~ /\[light\]$/ ? "light" : "heavy";
+        $i++;
+        if (defined $head{$lane}) { $w = "behind queue $head{$lane}"; } else { $head{$lane} = $i; }
         $w = "starting" if $w eq "";
-        printf "queue %d: %s (waiting: %s)\n", ++$i, $l, $w;
+        printf "queue %d: %s (waiting: %s)\n", $i, $l, $w;
       }' "$dir" "$lock" "$owner" "$queue" "$slots_set"
     ;;
 esac
 
 exclusive=0
-if [ "${1:-}" = --exclusive ]; then
-  exclusive=1
-  shift
-  [ $# -gt 0 ] || { usage >&2; exit 2; }
+weight="${HEAVY_RUN_WEIGHT:-1}"
+light="${HEAVY_RUN_LIGHT:-0}"
+sized=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --exclusive) exclusive=1; shift ;;
+    --light) light=1; weight=1; sized=1; shift ;;
+    --weight) [ $# -ge 2 ] || { usage >&2; exit 2; }; weight="$2"; sized=1; shift 2 ;;
+    --weight=*) weight="${1#--weight=}"; sized=1; shift ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+[ $# -gt 0 ] || { usage >&2; exit 2; }
+case "$weight" in
+  '' | *[!0-9]* | 0 | 0*) echo "heavy-run: the weight must be 1-64, got '$weight'" >&2; exit 2 ;;
+  *) [ "$weight" -le 64 ] || { echo "heavy-run: the weight must be 1-64, got '$weight'" >&2; exit 2; } ;;
+esac
+case "$light" in
+  0 | 1) ;;
+  *) echo "heavy-run: HEAVY_RUN_LIGHT must be 0 or 1, got '$light'" >&2; exit 2 ;;
+esac
+if [ "$exclusive" = 1 ]; then
+  [ "$sized" = 0 ] || { echo "heavy-run: --exclusive takes no --weight or --light" >&2; exit 2; }
+  weight=1 light=0
 fi
+[ "$light" = 0 ] || [ "$weight" = 1 ] || { echo "heavy-run: a light run has weight 1" >&2; exit 2; }
+keep_orphan=0
+[ "${HEAVY_RUN_KEEP_ORPHAN:-0}" = 0 ] || keep_orphan=1
 
 case "$level" in
   '' | *[!0-9]* | 2[1-9] | [3-9][0-9] | [0-9][0-9][0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
@@ -231,13 +286,18 @@ mkdir -p "$(dirname "$waitlog")" 2>/dev/null || true
 
 exec perl -e "$common_code"'
   use POSIX ();
-  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $set, $ramp, $maxload, $exclusive, @cmd) = @ARGV;
+  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $set, $ramp, $maxload, $exclusive, $weight, $light, $keep_orphan, @cmd) = @ARGV;
   my $t0 = time;
   my $slotdir = "$dir/slots";
+  my $lanedir = "$dir/light";
+  # When the caller dies, the kernel reparents this process: getppid() changes.
+  my $caller = getppid();
   my ($ticket, $tfh, $name);
+  # The tag at the end of the ticket line tells other waiters which line it is in.
+  my $tag = $exclusive ? " [exclusive]" : $light ? " [light]" : $weight > 1 ? " [weight $weight]" : "";
   # Take the next ticket number. The ticket is written and locked under a
   # temporary name, then renamed, so no sweeper sees it before it is locked.
-  my $info = sprintf("pid=%d cwd=%s cmd=%s%s", $$, $ENV{PWD} // "", join(" ", @cmd), $exclusive ? " [exclusive]" : "");
+  my $info = sprintf("pid=%d cwd=%s cmd=%s%s", $$, $ENV{PWD} // "", join(" ", @cmd), $tag);
   my $queued = eval {
     -d $queue or mkdir $queue or die "cannot create $queue: $!\n";
     sysopen(my $sf, $seqfile, O_RDWR | O_CREAT, 0600) or die "cannot open $seqfile: $!\n";
@@ -261,48 +321,72 @@ exec perl -e "$common_code"'
     1;
   };
   if (!$queued) { my $e = $@; chomp $e; print STDERR "heavy-run: queue unavailable ($e); waiting without arrival order\n"; }
-  -d $slotdir or mkdir $slotdir or die "heavy-run: cannot create $slotdir: $!\n";
+  for my $d ($slotdir, $lanedir) { -d $d or mkdir $d or die "heavy-run: cannot create $d: $!\n"; }
   open(my $lfh, ">>", $lock) or do { unlink $ticket if $ticket; die "heavy-run: cannot open $lock: $!\n"; };
   chmod 0600, $lock;
 
-  # One try to start. Returns the slot taken ("exclusive" or a number) and its
-  # file handle, or undef and the reason to wait.
   my $last_start = "$dir/last-start";
+  sub busy_in { my ($d) = @_; return scalar grep { held("$d/$_") } slot_files($d); }
+  # Empty when an extra run may start now, else why to wait. $ramped: heavy
+  # runs are active, so wait out the ramp after the last heavy start.
+  sub machine_why {
+    my ($ramped) = @_;
+    if ($ramped) {
+      my $age = -e $last_start ? time - (stat $last_start)[9] : 1e9;
+      return sprintf("ramp: last run started %ds ago, next after %ds", $age, $ramp) if $age < $ramp;
+    }
+    if ($maxload > 0) { my $l = load1(); return "load $l above $maxload" if $l > $maxload; }
+    return pressure();
+  }
+  # One try to start. Returns what it took ("exclusive", or a list of
+  # [slot, file handle]), or undef and the reason to wait.
   sub try_start {
     if ($exclusive) {
-      return ("exclusive", undef) if flock($lfh, LOCK_EX | LOCK_NB);
-      my $k = grep { held("$slotdir/$_") } slot_files($slotdir);
-      return (undef, undef, $k ? "exclusive: waiting for $k running run(s) to end" : "exclusive: waiting for an older heavy-run");
+      return ("exclusive") if flock($lfh, LOCK_EX | LOCK_NB);
+      my $k = busy_in($slotdir) + busy_in($lanedir);
+      return (undef, $k ? "exclusive: waiting for $k running run(s) to end" : "exclusive: waiting for an older heavy-run");
     }
-    return (undef, undef, "an exclusive run is active") unless flock($lfh, LOCK_SH | LOCK_NB);
-    my $n = slot_count($set);
-    my ($free, $ffh, $busy) = (undef, undef, 0);
-    my %seen = map { $_ => 1 } slot_files($slotdir);
-    $seen{$_} = 1 for 1 .. $n;
-    for my $s (sort { $a <=> $b } keys %seen) {
-      sysopen(my $fh, "$slotdir/$s", O_RDWR | O_CREAT, 0600) or next;
-      if (flock($fh, LOCK_EX | LOCK_NB)) {
-        if (!defined $free && $s <= $n) { ($free, $ffh) = ($s, $fh); }
-      } else { $busy++; }
+    return (undef, "an exclusive run is active") unless flock($lfh, LOCK_SH | LOCK_NB);
+    my (@take, $why);
+    if ($light) {
+      # The lane has one slot; a light run never takes a heavy slot.
+      my $fh;
+      if (sysopen($fh, "$lanedir/1", O_RDWR | O_CREAT, 0600) && flock($fh, LOCK_EX | LOCK_NB)) {
+        @take = ([1, $fh]);
+        my $heavy = busy_in($slotdir);
+        $why = machine_why($heavy > 0) if $heavy > 0;
+      } else { $why = "light lane busy"; }
+    } else {
+      my $n = slot_count($set);
+      my $need = $weight < $n ? $weight : $n;
+      my ($free, $busy) = (0, 0);
+      my %seen = map { $_ => 1 } slot_files($slotdir);
+      $seen{$_} = 1 for 1 .. $n;
+      for my $s (sort { $a <=> $b } keys %seen) {
+        sysopen(my $fh, "$slotdir/$s", O_RDWR | O_CREAT, 0600) or next;
+        if (flock($fh, LOCK_EX | LOCK_NB)) {
+          next unless $s <= $n;
+          $free++;
+          push @take, [$s, $fh] if @take < $need;
+        } else { $busy++; }
+      }
+      if ($free < $need) {
+        $why = $need == 1 ? "no free slot ($busy/$n busy)" : "needs $need slots, $free free ($busy/$n busy)";
+      } elsif ($busy > 0 || busy_in($lanedir) > 0) {
+        $why = machine_why($busy > 0);
+      }
     }
-    my $why;
-    if ($busy >= $n || !defined $free) { $why = "no free slot ($busy/$n busy)"; }
-    elsif ($busy > 0) {
-      my $age = -e $last_start ? time - (stat $last_start)[9] : 1e9;
-      if ($age < $ramp) { $why = sprintf("ramp: last run started %ds ago, next after %ds", $age, $ramp); }
-      elsif ($maxload > 0 && (my $l = load1()) > $maxload) { $why = "load $l above $maxload"; }
-      elsif ((my $p = pressure()) ne "") { $why = $p; }
-    }
-    if (defined $why) { flock($lfh, LOCK_UN); return (undef, undef, $why); }
-    return ($free, $ffh);
+    if (defined $why && $why ne "") { @take = (); flock($lfh, LOCK_UN); return (undef, $why); }
+    return (\@take);
   }
+  # Rewrite in place, then cut: a reader never sees an empty first line.
   sub note_wait {
     my ($why) = @_;
     return unless $tfh;
-    seek($tfh, 0, 0); truncate($tfh, 0); print $tfh "$info\nwait=$why\n"; $tfh->flush;
+    seek($tfh, 0, 0); print $tfh "$info\nwait=$why\n"; $tfh->flush; truncate($tfh, tell($tfh));
   }
 
-  my ($slot, $sfh, $why);
+  my ($got, $why);
   if ($ticket) {
     # A waiter stopped before it starts takes its ticket with it.
     my %signo = (TERM => 15, INT => 2, HUP => 1);
@@ -310,7 +394,15 @@ exec perl -e "$common_code"'
   }
   my $noted = "";
   while (1) {
-    my $first;
+    # Nobody waits for this run any more: give the place up.
+    if (!$keep_orphan && $caller > 1 && getppid() != $caller) {
+      print STDERR "heavy-run: the caller (pid $caller) is gone; dropping this waiting run\n";
+      unlink $ticket if $ticket;
+      exit 129;
+    }
+    # Heavy runs (exclusive ones too) and light runs each wait for the oldest
+    # live ticket of their own line. $heavy_head is the heavy line head.
+    my ($first, $heavy_head);
     if ($ticket && opendir(my $qd, $queue)) {
       my @all = readdir $qd;
       # A temp ticket nobody holds (and older than 5 s) is a leftover.
@@ -322,31 +414,44 @@ exec perl -e "$common_code"'
       }
       # A ticket nobody holds is stale.
       for my $t (sort grep { /^\d+-\d+$/ } @all) {
+        my $line = $info;
         if ($t ne $name) {
           open(my $xf, "<", "$queue/$t") or next;
           if (flock($xf, LOCK_EX | LOCK_NB)) { unlink "$queue/$t"; next; }
+          $line = <$xf> // ""; chomp $line;
         }
-        $first = $t; last;
+        my $lt = $line =~ /\[light\]$/ ? 1 : 0;
+        $heavy_head //= $line unless $lt;
+        $first //= $t if $lt == $light;
+        last if defined $first && (!$light || defined $heavy_head);
       }
       closedir $qd;
     }
     if (!$ticket || !defined $first || $first eq $name) {
-      ($slot, $sfh, $why) = try_start();
-      last if defined $slot;
+      # A light run must not keep a queued exclusive run from ever starting.
+      if ($light && defined $heavy_head && $heavy_head =~ /\[exclusive\]$/) { $why = "an exclusive run waits in the queue"; }
+      else { ($got, $why) = try_start(); last if defined $got; }
       if ($why ne $noted) { note_wait($why); $noted = $why; }
     }
     select(undef, undef, undef, 0.2);
   }
   if ($ticket) { unlink $ticket; close $tfh; }
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = "DEFAULT"; }
-  if (open(my $ls, ">", $last_start)) { close $ls; }
-  my $slotfile = $slot eq "exclusive" ? $lock : "$slotdir/$slot";
-  my $ownerfile = $slot eq "exclusive" ? $owner : "$slotdir/$slot.owner";
-  $ENV{HEAVY_RUN_HELD} = $slotfile;
+  my $excl = !ref $got;
+  # Only heavy starts space out later starts.
+  if (!$light && open(my $ls, ">", $last_start)) { close $ls; }
+  my $base = $light ? $lanedir : $slotdir;
+  my @slots = $excl ? () : map { $_->[0] } @$got;
+  my @slotfiles = $excl ? ($lock) : map { "$base/$_" } @slots;
+  my @ownerfiles = $excl ? ($owner) : map { "$base/$_.owner" } @slots;
+  my $slot = $excl ? "exclusive" : $light ? "light" : $slots[0];
+  $ENV{HEAVY_RUN_HELD} = $slotfiles[0];
   $ENV{HEAVY_RUN_SLOT} = $slot;
+  $ENV{HEAVY_RUN_SLOT_LIST} = $excl || $light ? $slot : join(",", @slots);
   if (open(my $wl, ">>", $waitlog)) {
     my @lt = localtime;
-    printf $wl "%04d-%02d-%02dT%02d:%02d:%02d waited=%d pid=%d slot=%s\n", $lt[5] + 1900, $lt[4] + 1, @lt[3,2,1,0], time - $t0, $$, $slot;
+    printf $wl "%04d-%02d-%02dT%02d:%02d:%02d waited=%d pid=%d slot=%s weight=%s lane=%s\n", $lt[5] + 1900, $lt[4] + 1, @lt[3,2,1,0], time - $t0, $$, $slot,
+      $excl ? "all" : scalar @slots, $light ? "light" : "heavy";
     close $wl;
   }
   # Block signals across fork so none can kill the parent before it forwards.
@@ -360,12 +465,15 @@ exec perl -e "$common_code"'
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid }; }
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
   my @t = localtime;
-  if (open(my $o, ">", $ownerfile)) {
-    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd);
-    close $o;
+  my $otag = $excl ? "" : $tag;
+  for my $of (@ownerfiles) {
+    if (open(my $o, ">", $of)) {
+      printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s%s\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $otag;
+      close $o;
+    }
   }
   while (waitpid($pid, 0) == -1) { last unless $!{EINTR}; }
   my $st = $?;
-  truncate($ownerfile, 0);
+  truncate($_, 0) for @ownerfiles;
   exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));
-' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$dir" "$slots_set" "$ramp" "$maxload" "$exclusive" "$@"
+' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$dir" "$slots_set" "$ramp" "$maxload" "$exclusive" "$weight" "$light" "$keep_orphan" "$@"

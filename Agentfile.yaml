@@ -195,11 +195,11 @@ rules: |
   it beats a picture of the same text; a terminal image is an equal alternative,
   never a requirement. Drag and drop any image into the PR description.
   Run every heavy command (a full test suite, an e2e or browser run, a timing
-  run) as `heavy-run <command>`: a few Mac-wide slots at nice 15 that every agent
-  session shares, sized from the CPU cores and memory, so heavy runs queue
-  instead of piling up. A run starts when a slot is free and memory pressure is
-  normal. Use `heavy-run --exclusive <command>` for timing runs. Start a run
-  that may queue in the background. `heavy-run --status` shows the slots and
-  why each run waits.
+  run) as `heavy-run <command>`: one Mac-wide queue at nice 15 that every agent
+  session shares. It runs one heavy job at a time (`heavy_run_slots: 1`; more
+  than one slot needs the owner's explicit yes), so heavy runs queue instead of
+  piling up. Start a run that may queue in the background and expect to wait;
+  never bypass heavy-run to go faster. Use `heavy-run --exclusive <command>`
+  for timing runs. `heavy-run --status` shows the queue and why each run waits.
   Never drive AppleScript, keystrokes, or window activation to stage a terminal
   image; that steals focus and can type into whatever is frontmost.

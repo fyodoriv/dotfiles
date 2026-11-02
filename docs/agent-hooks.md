@@ -229,6 +229,26 @@ line: new processes hold the gate ticket `queue/0000000000-0`, and the scheduler
 for one older waiter at a time when its turn comes. Never kill waiters to make them pick up
 new code or settings: their callers get exit 143.
 
+Project identity readers accept existing raw project fields and typed
+`project_id=sha256:...` fields. Each controller keeps its selected raw project
+and normalized identity for that invocation. Running owners, queued tickets
+and pending grants use the same normalized key when applying the project cap.
+Missing, invalid or duplicate identity in a live record holds new grants with
+`queue project metadata unavailable` until valid metadata can be read.
+
+This is reader preparation only. New owners and tickets still write the raw
+project in its existing field and append `reader=project-id-v1`. Owner line
+three stays the numeric `start=` used by memory ordering, and tickets keep
+`kind=v2` for the existing scheduler. Raw command and folder metadata remains;
+this release does not complete the privacy change.
+
+Do not enable opaque writers while strict older controllers can still make
+admission decisions or lead the scheduler. A source-file update does not
+replace code already loaded in those processes. The reader marker helps a
+future rollout guard identify compatibility; it does not itself authorize
+that rollout. Existing live records belong to the controller holding their
+kernel locks. Never rewrite another controller's live records.
+
 To trace a freeze, read `~/.local/state/dotfiles/load-samples.tsv` first: it survives a forced
 power-off. `dotfiles-load-sampler report` counts kernel-stall rows (high load with a low CPU-busy
 column).

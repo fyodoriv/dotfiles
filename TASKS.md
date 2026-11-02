@@ -13,6 +13,20 @@ them. -->
 
 ## P1
 
+- [ ] Stop restoring the retired usage-tips hook on every machine
+  - **ID**: retire-usage-tip-overlay
+  - **Tags**: security, agents, retirement
+  - **Details**: User retired the whole usage-tips feature and requested its tool repo archived. Remove the owner default and migrate an already-enabled usage-tip entry without replacing unrelated overlay text. Agentbrew owns the producer/renderer and root owns live retirement/archive. Plan: [retire usage-tips overlay](docs/plans/retire-usage-tip-overlay.md).
+  - **Files**: `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl`, `tests/agentbrew-hooks-overlay.bats`, `docs/agentbrew-setup.md`
+  - **Output**: code
+  - **Acceptance**: Fresh/default/custom and already-enabled manifests cannot enable usage-tip; unrelated lines and disabled choices survive; second apply is idempotent. This source task makes no live Codex/config/service or archive claim.
+  - **Hypothesis**: Default and already-enabled retirement violations each drop from predicted 1 to 0, while unrelated byte changes and second-apply changes stay zero across the frozen R01–R10 controls.
+  - **Measurement**: `heavy-run env JOBS=1 bats ./tests/agentbrew-hooks-overlay.bats`, then `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=`.
+  - **Success**: All frozen cases and required gates pass; retained/re-enabled IDs, unrelated text changes and non-idempotent output are zero.
+  - **Pivot**: Any retained/re-enabled retired hook, lost unrelated line, changed opt-out or unstable second apply rejects the migration rather than weakening the oracle.
+  - **Anchor**: User retirement request; Basili/Caldiera/Rombach 1994 GQM; Munafò et al. 2017 pre-registration; existing chezmoi modify ownership contract.
+  - **Competitive-goal**: none — user-requested tool retirement, not an inventory score.
+
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents

@@ -298,7 +298,8 @@ fake_live_ticket() {
   kill -TERM "$pid"
   rc=0; wait "$pid" || rc=$?
   [ "$rc" -eq 143 ]
-  [ -z "$(ls "$HEAVY_RUN_DIR/queue")" ]
+  # The gate ticket stays while the first run holds it.
+  [ -z "$(ls "$HEAVY_RUN_DIR/queue" | grep -v "^0000000000-0$")" ]
   wait
 }
 
@@ -489,7 +490,7 @@ release_all() {
   "$SCRIPT" sleep 30 &
   victim=$!
   wait_held 1
-  child=$(sed -n 's/.* pid=\([0-9]*\) .*/\1/p' "$HEAVY_RUN_DIR/slots/1.owner")
+  child=$(sed -n 's/.* pid=\([0-9]*\) .*/\1/p' "$HEAVY_RUN_DIR/slots/s1.owner")
   kill -KILL "$victim"
   wait "$victim" 2>/dev/null || true
   run timeout 10 "$SCRIPT" echo after
@@ -745,8 +746,65 @@ make_fake_app() {
   [ "$(mode "$HEAVY_RUN_DIR")" = 700 ]
   [ "$(mode "$HEAVY_RUN_DIR/lock")" = 600 ]
   [ "$(mode "$HEAVY_RUN_DIR/seq")" = 600 ]
-  [ "$(mode "$HEAVY_RUN_DIR/slots/1")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/slots/s1")" = 600 ]
+  [ "$(mode "$HEAVY_RUN_DIR/sched.lock")" = 600 ]
   [ "$(mode "$HEAVY_RUN_DIR/waits.log")" = 600 ]
+}
+
+# --- The scheduler: one process decides for the whole queue ---
+
+@test "heavy-run: scheduler: a waiter's ticket gets its reason from the scheduler" {
+  start_holder
+  wait_held 1
+  "$SCRIPT" true &
+  wait_queued 1
+  ls "$HEAVY_RUN_DIR/queue" | grep -q '\.why$'
+  [ "$(cat "$HEAVY_RUN_DIR"/queue/*.why)" = "no free slot (1/1 busy)" ]
+  release_all
+  [ -z "$(ls "$HEAVY_RUN_DIR/queue" | grep -v '^0000000000-0$')" ]
+}
+
+@test "heavy-run: scheduler: a lowered heavy_run_slots holds runs already waiting" {
+  unset HEAVY_RUN_SLOTS
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_slots: 1\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  start_holder
+  wait_held 1
+  marker="$BATS_TEST_TMPDIR/second"
+  printf 'data:\n  heavy_run_slots: 3\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  "$SCRIPT" touch "$marker" &
+  for i in $(seq 50); do [ -e "$marker" ] && break; sleep 0.1; done
+  [ -e "$marker" ]
+  printf 'data:\n  heavy_run_slots: 1\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  sleep 1.2
+  "$SCRIPT" touch "$marker.3" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "$output" == *"(waiting: no free slot (1/1 busy))"* ]]
+  release_all
+  [ -e "$marker.3" ]
+}
+
+@test "heavy-run: scheduler: an older heavy-run waiter keeps its place in line" {
+  OLD="$BATS_TEST_DIRNAME/fixtures/heavy-run-429"
+  log="$BATS_TEST_TMPDIR/order"
+  start_holder
+  wait_held 1
+  # The older code can not see the new slot; only the gate keeps it waiting.
+  "$OLD" sh -c "echo old >>'$log'" &
+  wait_queued 1
+  sleep 1
+  [ ! -e "$log" ]
+  "$SCRIPT" sh -c "echo new >>'$log'" &
+  wait_queued 2
+  run "$SCRIPT" --status
+  [[ "${lines[2]}" == "queue 1: "*"echo old"*"(waiting: no free slot (1/1 busy))" ]]
+  [[ "${lines[3]}" == "queue 2: "*"echo new"*"(waiting: behind queue 1)" ]]
+  release_all
+  run cat "$log"
+  [ "${lines[0]}" = old ]
+  [ "${lines[1]}" = new ]
+  [ ! -e "$HEAVY_RUN_DIR/gate-open" ]
 }
 
 # Start a waiter from a shell that exits at once, so the waiter is orphaned.

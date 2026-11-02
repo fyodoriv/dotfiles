@@ -212,11 +212,13 @@ SH
   [[ "$output" == busy:* ]]
 }
 
-# Wait up to 5 s until --status lists $1 live queue entries.
+# Wait up to 5 s until --status lists $1 live queue entries, each past its
+# first start check: a new ticket reads "(waiting: starting)" until then.
 wait_queued() {
-  local i
+  local i s
   for i in $(seq 50); do
-    [ "$("$SCRIPT" --status | grep -c '^queue ')" -ge "$1" ] && return 0
+    s=$("$SCRIPT" --status)
+    [ "$(grep -c '^queue ' <<<"$s")" -ge "$1" ] && ! grep -q '(waiting: starting)' <<<"$s" && return 0
     sleep 0.1
   done
   return 1
@@ -745,4 +747,62 @@ make_fake_app() {
   [ "$(mode "$HEAVY_RUN_DIR/seq")" = 600 ]
   [ "$(mode "$HEAVY_RUN_DIR/slots/1")" = 600 ]
   [ "$(mode "$HEAVY_RUN_DIR/waits.log")" = 600 ]
+}
+
+# Start a waiter from a shell that exits at once, so the waiter is orphaned.
+# The shell lives 0.5 s, so the waiter starts with it as parent (a waiter
+# that starts under pid 1 is exempt). $1 is the output redirect; the rest is env.
+start_orphan() {
+  local redirect=$1; shift
+  env "$@" sh -c "'$SCRIPT' touch '$BATS_TEST_TMPDIR/ran' $redirect & echo \$! > '$BATS_TEST_TMPDIR/pid'; sleep 0.5"
+}
+
+@test "heavy-run: orphans: a waiter whose caller died leaves the queue" {
+  start_fifo_holder
+  wait_held
+  start_orphan '>/dev/null 2>&1'
+  local pid i
+  pid=$(cat "$BATS_TEST_TMPDIR/pid")
+  for i in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  ! kill -0 "$pid" 2>/dev/null || false
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 0 ]
+  release_fifo_holder
+  wait
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "heavy-run: orphans: a waiter that writes to a file keeps its place and runs" {
+  start_fifo_holder
+  wait_held
+  start_orphan ">'$BATS_TEST_TMPDIR/log' 2>&1"
+  wait_queued 1
+  sleep 0.6
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 1 ]
+  release_fifo_holder
+  local i
+  for i in $(seq 50); do [ -e "$BATS_TEST_TMPDIR/ran" ] && break; sleep 0.1; done
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "heavy-run: orphans: HEAVY_RUN_KEEP_ORPHAN=1 or nohup keeps the waiter" {
+  start_fifo_holder
+  wait_held
+  start_orphan '>/dev/null 2>&1' HEAVY_RUN_KEEP_ORPHAN=1
+  wait_queued 1
+  sleep 0.6
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 1 ]
+  sh -c "nohup '$SCRIPT' true >/dev/null 2>&1 & sleep 0.5"
+  wait_queued 2
+  sleep 0.6
+  [ "$("$SCRIPT" --status | grep -c '^queue ')" -eq 2 ]
+  release_fifo_holder
+  local i
+  for i in $(seq 50); do [ -e "$BATS_TEST_TMPDIR/ran" ] && break; sleep 0.1; done
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "heavy-run: orphans: rejects a bad HEAVY_RUN_KEEP_ORPHAN" {
+  run env HEAVY_RUN_KEEP_ORPHAN=yes "$SCRIPT" true
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"HEAVY_RUN_KEEP_ORPHAN must be 0 or 1"* ]]
 }

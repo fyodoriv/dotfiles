@@ -201,6 +201,8 @@ rules: |
   without the owner's explicit yes. Under memory pressure it stops newer runs
   until older ones end. Start a run that may queue in the background and expect to wait;
   never bypass heavy-run to go faster. Use `heavy-run --exclusive <command>`
-  for timing runs. `heavy-run --status` shows the queue and why each run waits.
+  for timing runs. A waiting run whose caller dies leaves the queue; send its
+  output to a file to keep its place. `heavy-run --status` shows the queue and
+  why each run waits.
   Never drive AppleScript, keystrokes, or window activation to stage a terminal
   image; that steals focus and can type into whatever is frontmost.

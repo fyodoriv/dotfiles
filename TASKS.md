@@ -43,6 +43,21 @@ them. -->
 
 ## P2
 
+- [ ] Let a 1-file rerun pass a full-gate backlog in heavy-run (light lane)
+  - **ID**: heavy-run-light-lane
+  - **Blocked**: needs-owner — 2026-11-01: parked after Mac freezes. Unblock only when the owner says yes, after 24 h with no new freeze (no `force_off` in `/Library/Logs/DiagnosticReports/ResetCounter-*`, and `~/.local/state/dotfiles/heavy-run-waits.log` looks normal).
+  - **Tags**: performance, agents
+  - **Details**: A 1-file rerun waits behind every full gate in the one-slot queue. Draft code is on branch `park/heavy-run-light-lane` (untested; it predates #425 and must be merged with it). Design: `--light` takes one separate lane slot (`$dir/light/1`), never a heavy slot, so a light run never lets a second heavy run start. Light and heavy runs keep arrival order each in their own line. A light run waits for the ramp and normal memory pressure while a heavy run is active, never moves the ramp, and never starts while an exclusive run is queued. The draft's `--weight` option is out: at one slot it does nothing.
+  - **Files**: `bin/heavy-run`, `tests/heavy-run.bats`, `scripts/heavy-run-bench.sh`, `README.md`, `Agentfile.yaml`
+  - **Output**: code
+  - **Acceptance**: the bench shows the rerun median wait drop and the gate wait guard holds; no new freeze in the 24 h after it lands.
+  - **Hypothesis**: with `--light`, the median wait of 1-file reruns under a full-gate backlog drops 50 % or more, while the gate median wait rises at most 10 %, because a short run no longer waits behind long ones.
+  - **Measurement**: `scripts/heavy-run-bench.sh` extended with a lanes mode (1 slot, a backlog of full gates plus 1-file reruns, with and without `--light`).
+  - **Success**: rerun median wait down 50 % or more, gate median wait up 10 % or less, no freeze.
+  - **Pivot**: rerun drop under 25 %, gate wait up over 25 %, or any freeze -> drop the lane.
+  - **Anchor**: EASY backfilling (Lifka 1995; Mu'alem & Feitelson 2001); Harchol-Balter 2013, *Performance Modeling and Design of Computer Systems* (size-based scheduling).
+  - **Competitive-goal**: none — machine stability and agent wait time (docs/metrics.md), not a scorecard metric.
+
 - [ ] Record each real install run so the README can prove one-command setup
   - **ID**: proof-install-field-outcome
   - **Tags**: metrics, proof

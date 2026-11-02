@@ -30,6 +30,12 @@
 # waiter at the head blocks the queue until it resumes; callers on the fallback
 # path can overtake the head.
 #
+# Orphans: a waiter whose caller died (its parent pid changed) drops its
+# ticket and exits 129, so a killed session does not hold the queue. It keeps
+# waiting when its output goes to a file (someone may read it later), when it
+# runs under nohup, or with HEAVY_RUN_KEEP_ORPHAN=1. A running command is never
+# stopped this way.
+#
 # A perl parent holds the flocks (fds closed on exec, so no child or leftover
 # daemon inherits them), runs the command, forwards TERM/INT/HUP to it, and
 # exits with its status. A slot lasts exactly as long as the command. The
@@ -60,6 +66,7 @@
 #   HEAVY_RUN_PAUSE_APPS  real-time apps (process names, comma-separated) that
 #                       hold every run: none starts, and a running one is stopped
 #                       until they quit (default GeForceNOW; empty = off)
+#   HEAVY_RUN_KEEP_ORPHAN  1 = a waiter keeps its place after its caller dies (default 0)
 #   HEAVY_RUN_PROBE     a command whose non-empty output is a reason to wait;
 #                       replaces the built-in memory pressure check
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
@@ -116,6 +123,10 @@ case "$memguard" in
 esac
 check_num HEAVY_RUN_RAMP "$ramp"
 check_num HEAVY_RUN_MAX_LOAD "$maxload"
+case "${HEAVY_RUN_KEEP_ORPHAN:-0}" in
+  0 | 1) ;;
+  *) echo "heavy-run: HEAVY_RUN_KEEP_ORPHAN must be 0 or 1, got '$HEAVY_RUN_KEEP_ORPHAN'" >&2; exit 2 ;;
+esac
 
 # Shared by the run and --status: slot count and wait reasons.
 common_code='
@@ -371,6 +382,10 @@ exec perl -e "$common_code"'
   }
 
   my ($slot, $sfh, $why);
+  # Checked before the HUP handler below replaces an inherited nohup "ignore".
+  my $caller = getppid();
+  my $keep = ($ENV{HEAVY_RUN_KEEP_ORPHAN} // "") eq "1" || -f STDOUT || -f STDERR
+    || ($SIG{HUP} // "") eq "IGNORE" || $caller <= 1;
   if ($ticket) {
     # A waiter stopped before it starts takes its ticket with it.
     my %signo = (TERM => 15, INT => 2, HUP => 1);
@@ -378,6 +393,7 @@ exec perl -e "$common_code"'
   }
   my $noted = "";
   while (1) {
+    if (!$keep && getppid() != $caller) { unlink $ticket if $ticket; exit 129; }
     my ($first, $capped);
     # A waiter whose project is at its cap lets later projects go first.
     my %pb = $pcap < live_slots() ? proj_busy() : ();

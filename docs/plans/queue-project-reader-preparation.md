@@ -69,6 +69,29 @@ Facts above refer to `2d313f4f101e9f9024f1f19b81d78db090c2f6c8`.
 
 ## Boundary contract
 
+### Fixture erratum before corrected measurement
+
+The initial unchanged-430 run reached ten cases and reported eight failures.
+It is not a valid whole-matrix baseline. The synthetic Python `-c` argument
+contained a physical newline. Existing raw command metadata put that newline
+inside its first record line, shifting positional project and start fields.
+Three owner-readiness cases timed out, and the ticket position assertion saw
+`wait=` where it expected the project. These are fixture-format failures.
+
+The failure also exposes an existing queue limitation: physical CR/LF in raw
+command arguments can shift strict 429 positional project fields and break
+project-cap accounting. It is not only a test artifact. The corrected fixture
+isolates the planned identity adapter; it does not fix multiline arguments
+or prove old/A interoperability for those unsupported record inputs.
+
+Preserve that run and its frozen harness. Correct only the fixture command
+representation: encode the same Python loop with `repr` inside `exec`, so
+the argument has no physical CR/LF. Keep all workloads, handshakes, controls,
+thresholds and the original seven privacy fixtures unchanged. Commit this
+erratum before running the corrected baseline. Wrong-admission assertions
+remain evidence, but do not count the incomplete matrix as the registered
+six-control baseline or as a production result.
+
 The current shell owns project selection. The controller process owns its
 raw project bytes and normalized identity for that invocation. Held owner
 records, live tickets and pending grants provide scheduling evidence; a PID
@@ -175,11 +198,15 @@ launchers. A once-empty queue is insufficient. Never rewrite another
 controller's held records or kill unowned jobs. Arbitrary future obsolete
 copies against live state remain outside a managed-entrypoint rollout.
 
-Current raw project fields are line-oriented. Embedded CR/LF in explicit
-project names already makes their equality undefined. This preparation does
-not claim compatibility for every byte string or silently transform those
-names. A follow-up may reject unsupported names before writing records,
-with a separately registered negative test.
+Current raw project and command fields are line-oriented. Physical CR/LF in
+project names or command arguments can shift strict 429 positional fields;
+the initial fixture run demonstrated this for a command argument. This
+preparation does not fix that unsafe format, claim compatibility for those
+inputs, or silently transform them. Phase B's content-free first line will
+address command metadata. Rejecting unsupported raw project names before
+writing records needs a separately registered negative test. Until then,
+old/A compatibility claims apply only to record inputs without physical
+CR/LF in raw project names or command arguments.
 
 Scratch interoperability tests use synthetic content, private temporary
 folders, bounded handshakes and only their own child process groups. They

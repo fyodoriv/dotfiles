@@ -32,3 +32,17 @@ Success is zero failed seeded outcomes and zero failed scheduling or required ch
 The scratch test owns its holder, victim, release file and following command. Cleanup releases only those children. A sixty-second alarm bounds an abandoned holder; it does not replace the explicit release. Restore the default SIGALRM disposition when arming that existing guard, as required by the already registered alarm contract.
 
 Commit this plan before the delay seed or holder edit. Preserve all existing test assertions and the original privacy cases. A full gate failure remains a failure. This common fixture correction can land independently of the Phase A reader; Phase A remains blocked on its own complete green gate.
+
+## Observed results
+
+Prediction `9be5df5` preceded both the delay seed and the holder change.
+The seeded timer baseline failed at `kill -KILL`: the victim had already
+printed and exited. The same three-second seed passed with the explicit
+holder release and required victim status 137. The following command exited
+zero, and the queue was empty. All existing scheduling cases passed. The
+required full gate also passed on the same source tree. Its retained valid
+cache passes and fresh scheduling/docs checks are reported separately in
+the delivery evidence; no timing or field-failure rate is inferred.
+
+The completed task block is removed from the queue. This documentation-only
+result update still receives the required final gate before delivery.

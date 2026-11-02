@@ -227,7 +227,7 @@ wait_queued() {
 # The 60-second alarm only bounds an abandoned fixture, not queue acceptance.
 start_fifo_holder() {
   FIFO_RELEASE="$BATS_TEST_TMPDIR/release-holder"
-  "$SCRIPT" perl -e 'alarm 60; until (-e $ARGV[0]) { select undef, undef, undef, 0.1 }' "$FIFO_RELEASE" &
+  "$SCRIPT" perl -e '$SIG{ALRM} = "DEFAULT"; alarm 60; until (-e $ARGV[0]) { select undef, undef, undef, 0.1 }' "$FIFO_RELEASE" &
 }
 
 release_fifo_holder() {
@@ -416,7 +416,7 @@ RELEASE_ALL=""
 # Extra arguments go before the command (for example --exclusive).
 start_holder() {
   RELEASE_ALL="$BATS_TEST_TMPDIR/release"
-  "$SCRIPT" "$@" perl -e 'alarm 60; until (-e $ARGV[0]) { select undef, undef, undef, 0.05 }' "$RELEASE_ALL" &
+  "$SCRIPT" "$@" perl -e '$SIG{ALRM} = "DEFAULT"; alarm 60; until (-e $ARGV[0]) { select undef, undef, undef, 0.05 }' "$RELEASE_ALL" &
 }
 
 release_all() {

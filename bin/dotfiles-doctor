@@ -178,7 +178,7 @@ _fix_hint() {
 }
 
 collect_known_check_ids() {
-  local DOTFILES_DOCTOR_FULL=true
+  local DOTFILES_DOCTOR_FULL=true LIST_MODE=true
   _known_ids=()
   _collect_id() { _known_ids+=("$1"); }
   # Override check functions to just collect IDs.

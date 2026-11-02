@@ -212,11 +212,13 @@ SH
   [[ "$output" == busy:* ]]
 }
 
-# Wait up to 5 s until --status lists $1 live queue entries.
+# Wait up to 5 s until --status lists $1 live queue entries, each past its
+# first start check: a new ticket reads "(waiting: starting)" until then.
 wait_queued() {
-  local i
+  local i s
   for i in $(seq 50); do
-    [ "$("$SCRIPT" --status | grep -c '^queue ')" -ge "$1" ] && return 0
+    s=$("$SCRIPT" --status)
+    [ "$(grep -c '^queue ' <<<"$s")" -ge "$1" ] && ! grep -q '(waiting: starting)' <<<"$s" && return 0
     sleep 0.1
   done
   return 1

@@ -189,3 +189,13 @@ settings:
     default: ""
     optional: true
     description: 1-minute load average above which heavy-run starts no extra run. Empty or 0 = off (memory pressure still applies). HEAVY_RUN_MAX_LOAD wins.
+  heavy_run_project_slots:
+    type: int:1-64
+    default: ""
+    optional: true
+    description: Most heavy-run slots one project (a repo and all its worktrees) may hold at once. Empty = 3. Matters only with more than 3 slots. HEAVY_RUN_PROJECT_SLOTS wins.
+  heavy_run_memory_guard:
+    type: int:0-1
+    default: ""
+    optional: true
+    description: 1 (default) stops every heavy-run but the oldest while memory pressure is high, and goes on when it clears. 0 = off. HEAVY_RUN_MEMORY_GUARD wins.

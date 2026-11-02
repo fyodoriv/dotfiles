@@ -105,7 +105,9 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
 - FIFO tests hold through observations; teardown releases/waits; keep the queue guard.
-- **Test interpreters and shims**: [Bash 5, PATH order and serial Bats](docs/constitution.md#test-command-shims).
+- Tests: [Bash, PATH, serial Bats](docs/constitution.md#test-command-shims).
+- Hooks: [execute access](docs/plugins.md#migrating-from-the-v1-overlay).
+- Pin Claude fixture IDs.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.

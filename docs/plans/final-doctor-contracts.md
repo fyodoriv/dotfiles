@@ -24,6 +24,13 @@ changed.
   unknown, while `helper` followed by an argument separator remains a
   known helper call even when its arguments are dynamic.
 
+## Scope of this delivery
+
+PR #431 delivered only the Claude fixture correction. This follow-up also
+adopts the IDE fixture and export scanner from the same original prediction.
+Run all three files and their planted controls before merging; a Claude-only
+receipt does not complete this measurement.
+
 ## Measurement
 
 Run `heavy-run bats tests/module-claude.bats tests/doctor-core-profile.bats tests/doctor-fix-functions-exported.bats`.

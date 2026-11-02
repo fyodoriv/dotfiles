@@ -161,3 +161,42 @@ belong in fixtures or public text. Use generic work examples and scratch data.
 Only source preparation is authorized at this checkpoint. Root must approve
 the next source phase before controls or rule edits, and must keep source
 contract proof distinct from deployment and observed agent behavior.
+
+## Verified outcome
+
+The statements above record the registered preparation checkpoint. The source
+and deployment steps below are now complete for the owner-machine instruction
+contract; they do not establish universal model response compliance.
+
+- Source delivery: [PR 442](https://github.com/fyodoriv/dotfiles/pull/442),
+  default commit `7a0584bab5017805148406a5dacc59b98f908937`, tree
+  `88f04bcc27db8b1b0b4c371e2c48d798c309d617`. The fixed baseline had exactly
+  five missing-contract failures, three passing preservation guards and
+  twenty passing retained checks. Identical fixture bytes then passed all
+  twenty-eight checks. The required integrated gate exited zero.
+- Qualified real merge: the existing agentbrew `mergeAgentfiles` and
+  `parseAgentfile` APIs produced zero Pending prefixes for the base/guest
+  input and one for base plus the owner layer. This is additional evidence
+  beyond the source fixture's concatenating merge stub.
+- Scoped deployment: a fresh sealed preview ran under the existing dotfiles
+  lock. It changed exactly four text files: the canonical Agentfile, shared
+  rules, canonical instructions and the separate Claude instructions file.
+  It updated only three existing matching native instruction receipt hashes.
+  The Codex instruction symlink was preserved and resolves to the canonical
+  instructions. No new ownership or hash entry was invented.
+- Readback: the Pending prefix moved from zero to one in the current parsed
+  source, shared rules and native instruction text. Each successor kept
+  exactly one old footer anchor. Removing the new nine-line prefix recovers
+  all previous shared/native text. The folded source YAML preserves every
+  other byte and every unrelated parsed field. State, memory/privacy
+  settings, MCP configuration, services and helper scripts were unchanged.
+- Independent live readback confirmed the approved successor hashes, exact
+  reverse-insertion recovery, three native hash receipts, owned Codex alias,
+  matching preview/apply seals and five completed writes. State preservation
+  is established by the reviewed operator's final CAS guard and actual
+  receipt; the reviewer did not claim an independent preimage hash comparison.
+  This review approved closure of the source/export/deployment task.
+
+The task can close on the verified source/export/deployment contract. Future
+response behavior still depends on the active agent and its fresh evidence.
+No live response rewrite hook or model-compliance measurement was added.

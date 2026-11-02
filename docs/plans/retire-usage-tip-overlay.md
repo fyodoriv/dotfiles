@@ -64,6 +64,35 @@ ambiguous structure must refuse rather than claim successful retirement.
 Repeat rendering is idempotent. User overrides still control every other ID.
 No Codex file is opened or changed by the template.
 
+## Supplemental R11 refusal controls
+
+Independent source review found valid YAML forms outside the bounded literal
+migration. Register these controls before their first probe. Preserve all
+original twenty-two assertions and their results unchanged.
+
+| Variant | Supplied form | Required outcome |
+| --- | --- | --- |
+| R11-space-key | `enabled :` plus a retired entry | Nonzero exit, no stdout |
+| R11-quoted-key | `"enabled":` plus a retired entry | Nonzero exit, no stdout |
+| R11-item-anchor | `enabled:` with `- &tip usage-tip` | Nonzero exit, no stdout |
+| R11-item-alias | `tip: &tip usage-tip` then `enabled:` with `- *tip` | Nonzero exit, no stdout |
+| R11-indented-root | Uniformly indented root mapping including `enabled:` | Nonzero exit, no stdout |
+
+GQM hypothesis: unsafe successful acceptance of these five unsupported forms
+drops from predicted 5/5 to 0/5. Success: all five refuse without partial output,
+and the unchanged original twenty-two controls still pass. Pivot: any accepted
+unsupported form, partial replacement or original positive regression rejects
+the guard. Refuse unsupported literal syntax; do not interpret anchors/aliases
+or build a general YAML engine. The supported canonical live input remains
+eligible; actual deployment is a separate root-owned action.
+
+Measurement: the same registered `heavy-run env JOBS=1 bats
+./tests/agentbrew-hooks-overlay.bats`, with the five supplement results labeled
+separately from the original cohort, followed by the required gate after the
+independent base ignore correction is available. Preserve the pre-guard source
+and actual semantic red before implementation. Anchor: source review of YAML
+mapping/scalar identity; GQM and the existing fail-closed modify contract.
+
 ## Numbered work breakdown
 
 ### 1. Register and reproduce

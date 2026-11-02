@@ -207,6 +207,23 @@ opt-out policies stay unchanged. Never count a changed or omitted assertion as
 a retained pass. No real tool dispatch, scheduler operation or owner file is
 part of this cohort.
 
+### Supplemental full-verify argument control
+
+Register S01 before any caller-fixture result or classifier implementation.
+It is separate from the original 51-row denominator and its 29 predicted
+false permits. The source of agentbrew's `scripts/verify.sh` runs the full
+gate; a filename supplied to that script does not select one test.
+
+| ID | Command text | Required decision |
+| --- | --- | --- |
+| S01 | `npm run verify tests/fixture.ts` | exit 2; fixed refusal |
+
+Prediction: the unchanged classifier falsely permits this case once; the fix
+permits it zero times. Run it through the same new Bats file and command above.
+Keep generic single-test exemptions for supported test runners, but never use
+a filename to infer that the exact full-verify script became a filtered run.
+The original rows, commands and expected decisions remain unchanged.
+
 ## Numbered work breakdown
 
 ### 1. Register and freeze the baseline fixture

@@ -173,6 +173,107 @@ _commit_file() {
   git -C "$1" commit --quiet -m "docs: add $2"
 }
 
+_history_pipe_case() {
+  local case_id="$1" producer="$2" should_block="$3"
+  local repo="$TEST_DIR/history-$case_id" base planted bytes tip_status i name
+  local pattern="zz-history-fixture-match" marker="zz-history-fixture-clean"
+  [ "$should_block" -eq 0 ] || marker="$pattern"
+  _make_repo "$repo" "public@example.test"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  case "$producer" in
+    lines)
+      awk -v marker="$marker" 'BEGIN { print marker; for (i=0; i<65536; i++) printf "%063d\n", 0 }' > "$repo/stream.txt"
+      git -C "$repo" add stream.txt
+      git -C "$repo" commit --quiet -m "docs: synthetic stream"
+      planted="$(git -C "$repo" rev-parse HEAD)"
+      bytes="$(git -C "$repo" show --format= --no-color --no-ext-diff -m "$planted" | wc -c)"
+      _commit_file "$repo" stream.txt "clean"
+      ;;
+    names)
+      : > "$repo/0000-$marker"
+      for ((i=1; i<4096; i++)); do
+        printf -v name '%04d-%0115d' "$i" 0
+        : > "$repo/$name"
+      done
+      git -C "$repo" add --all
+      git -C "$repo" commit --quiet -m "docs: synthetic names"
+      planted="$(git -C "$repo" rev-parse HEAD)"
+      bytes="$(git -C "$repo" show --format= --name-only --diff-filter=ACR -m "$planted" | wc -c)"
+      git -C "$repo" rm --quiet -- ':(glob)[0-9][0-9][0-9][0-9]-*'
+      git -C "$repo" commit --quiet -m "docs: remove synthetic names"
+      ;;
+    message)
+      printf 'clean first\n' > "$repo/stream.txt"
+      git -C "$repo" add stream.txt
+      awk -v marker="$marker" 'BEGIN { print "docs: synthetic message\n"; print marker; for (i=0; i<65536; i++) printf "%063d\n", 0 }' > "$TEST_DIR/message"
+      git -C "$repo" commit --quiet -F "$TEST_DIR/message"
+      planted="$(git -C "$repo" rev-parse HEAD)"
+      bytes="$(git -C "$repo" log -1 --format=%B "$planted" | wc -c)"
+      _commit_file "$repo" stream.txt "clean final"
+      ;;
+    *) printf '%s: invalid fixture producer\n' "$case_id"; return 1 ;;
+  esac
+  [ "$bytes" -gt 262144 ] || {
+    printf '%s: fixture producer below registered size\n' "$case_id"
+    return 1
+  }
+  if git -C "$repo" grep -I -F -q -- "$pattern" HEAD --; then
+    printf '%s: fixture tip is not clean\n' "$case_id"
+    return 1
+  else
+    tip_status=$?
+    [ "$tip_status" -eq 1 ] || {
+      printf '%s: fixture tip inspection failed\n' "$case_id"
+      return 1
+    }
+  fi
+  _pattern_env "$pattern"
+  _push_range "$repo" origin "$(git -C "$repo" rev-parse HEAD)" "$base"
+  if [ "$should_block" -eq 1 ]; then
+    [ "$status" -ne 0 ] || {
+      printf '%s: expected history refusal; received exit 0\n' "$case_id"
+      return 1
+    }
+    [[ "$output" == *"commit(s) in the push add lines"* ]] || {
+      printf '%s: expected history diagnostic absent\n' "$case_id"
+      return 1
+    }
+  else
+    [ "$status" -eq 0 ] || {
+      printf '%s: clean control refused with exit %s\n' "$case_id" "$status"
+      return 1
+    }
+  fi
+  [[ "$output" != *"$pattern"* ]] || {
+    printf '%s: synthetic marker disclosure\n' "$case_id"
+    return 1
+  }
+}
+
+@test "pre-push history pipe H01: large added lines refuse" {
+  _history_pipe_case H01 lines 1
+}
+
+@test "pre-push history pipe H02: large changed-name list refuses" {
+  _history_pipe_case H02 names 1
+}
+
+@test "pre-push history pipe H03: large commit message refuses" {
+  _history_pipe_case H03 message 1
+}
+
+@test "pre-push history pipe H04: large clean added lines pass" {
+  _history_pipe_case H04 lines 0
+}
+
+@test "pre-push history pipe H05: large clean changed-name list passes" {
+  _history_pipe_case H05 names 0
+}
+
+@test "pre-push history pipe H06: large clean commit message passes" {
+  _history_pipe_case H06 message 0
+}
+
 @test "pre-push blocks when a pushed file matches the private pattern" {
   local repo="$TEST_DIR/repo" base
   _make_repo "$repo" "public@example.test"

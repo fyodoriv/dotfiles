@@ -117,3 +117,12 @@ tests. That attempt is inconclusive. Before the first valid baseline, correct
 only the invocation to `JOBS=1 heavy-run bats tests/pre-push.bats`. The six
 registered fixtures, their expected outcomes, the 37 retained controls and the
 unchanged hook hash stay fixed. No behavior result informed this correction.
+
+## Observed results
+
+The corrected unchanged-source run executed all 43 controls. Each of the three
+large matching streams was wrongly permitted; the other 40 controls passed.
+Replacing only the three early-exit matchers with fully consuming matchers
+made all 43 pass, including the three clean twins and all 37 retained cases.
+The original failed and passing transcripts remain local. Required repository
+validation remains a separate delivery gate.

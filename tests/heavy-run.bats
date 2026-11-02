@@ -3,6 +3,7 @@
 # Most tests pin one slot (the old single-lock behavior); the slot tests set more.
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/heavy-run"
+load helpers/realtime-probe
 
 bats_require_minimum_version 1.5.0
 
@@ -15,9 +16,11 @@ setup() {
   export HEAVY_RUN_PAUSE_APPS=""
   unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD
   unset HEAVY_RUN_HELD FIFO_RELEASE
+  unset BATS_RT_PROBE_ROOT BATS_RT_PROBE_CHILDREN
 }
 
 teardown() {
+  rt_probe_cleanup
   if [ -n "${INCOMPLETE_HOLDER:-}" ]; then
     [ -z "${FIFO_RELEASE:-}" ] || release_fifo_holder
     local child live
@@ -711,6 +714,75 @@ make_fake_app() {
 
 @test "heavy-run: realtime: GeForce NOW is listed by default" {
   grep -q 'HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"' "$SCRIPT"
+}
+
+@test "heavy-run: realtime probe: first normal holds status two" { rt_probe_unknown normal error2; }
+@test "heavy-run: realtime probe: exclusive holds status two" { rt_probe_unknown exclusive error2; }
+@test "heavy-run: realtime probe: additional holds status two" { rt_probe_unknown additional error2; }
+@test "heavy-run: realtime probe: first normal holds status three" { rt_probe_unknown normal error3; }
+@test "heavy-run: realtime probe: exclusive holds status three" { rt_probe_unknown exclusive error3; }
+@test "heavy-run: realtime probe: additional holds status three" { rt_probe_unknown additional error3; }
+@test "heavy-run: realtime probe: first normal holds an unavailable lookup" { rt_probe_unknown normal missing; }
+@test "heavy-run: realtime probe: exclusive holds an unavailable lookup" { rt_probe_unknown exclusive missing; }
+@test "heavy-run: realtime probe: additional holds an unavailable lookup" { rt_probe_unknown additional missing; }
+@test "heavy-run: realtime probe: first normal holds empty successful output" { rt_probe_unknown normal empty; }
+@test "heavy-run: realtime probe: exclusive holds empty successful output" { rt_probe_unknown exclusive empty; }
+@test "heavy-run: realtime probe: additional holds empty successful output" { rt_probe_unknown additional empty; }
+@test "heavy-run: realtime probe: malformed match remains unknown" { rt_probe_unknown normal malformed; }
+@test "heavy-run: realtime probe: contradictory no-match remains unknown" { rt_probe_unknown normal contradictory; }
+@test "heavy-run: realtime probe: blank no-match output remains unknown" { rt_probe_unknown normal blank_no_match; }
+@test "heavy-run: realtime probe: an extra match output line remains unknown" { rt_probe_unknown normal extra_line; }
+@test "heavy-run: realtime probe: verified no-match admits first normal" { rt_probe_clear normal; }
+@test "heavy-run: realtime probe: verified no-match admits exclusive" { rt_probe_clear exclusive; }
+@test "heavy-run: realtime probe: verified no-match admits additional" { rt_probe_clear additional; }
+@test "heavy-run: realtime probe: verified match holds first normal" { rt_probe_present normal; }
+@test "heavy-run: realtime probe: verified match holds exclusive" { rt_probe_present exclusive; }
+
+@test "heavy-run: realtime probe: an empty app list does not query the probe" {
+  rt_probe_setup
+  rt_probe_mode error3
+  export HEAVY_RUN_PAUSE_APPS=""
+  rt_probe_spawn normal
+  rt_probe_wait_path "$BATS_RT_PROBE_ROOT/admitted"
+  wait "$BATS_RT_PROBE_PID"
+  [ ! -e "$BATS_RT_PROBE_ROOT/seen/error3" ]
+}
+
+@test "heavy-run: realtime probe: unknown retains an existing pause until verified clear" {
+  rt_probe_setup
+  "$SCRIPT" perl -e '$SIG{ALRM}="DEFAULT"; alarm 35; open(my $p,">",$ARGV[0]) or die; print $p $$; close $p; until(-e $ARGV[1]) { select undef,undef,undef,0.05 } open(my $f,">",$ARGV[2]) or die; print $f "continued";' "$BATS_RT_PROBE_ROOT/workload-pid" "$BATS_RT_PROBE_ROOT/release-workload" "$BATS_RT_PROBE_ROOT/continued" > "$BATS_RT_PROBE_ROOT/controller.log" 2>&1 &
+  BATS_RT_PROBE_PID=$!
+  BATS_RT_PROBE_CHILDREN="$BATS_RT_PROBE_PID"
+  rt_probe_wait_path "$BATS_RT_PROBE_ROOT/workload-pid"
+  local workload i state mark="$HEAVY_RUN_DIR/slots/s1.paused"
+  workload=$(cat "$BATS_RT_PROBE_ROOT/workload-pid")
+  rt_probe_mode present
+  rt_probe_wait_path "$BATS_RT_PROBE_ROOT/seen/present"
+  for i in $(seq 100); do
+    state=$(ps -o state= -p "$workload")
+    case "$state" in *T*) break ;; esac
+    sleep 0.1
+  done
+  [[ "$state" == *T* ]]
+  [ -e "$mark" ]
+  rt_probe_mode error3
+  rt_probe_wait_path "$BATS_RT_PROBE_ROOT/seen/error3"
+  : > "$BATS_RT_PROBE_ROOT/release-workload"
+  local observed=false
+  for i in $(seq 100); do
+    if [ -e "$BATS_RT_PROBE_ROOT/continued" ]; then observed=true; break; fi
+    if [ -f "$mark" ] && [ "$(cat "$mark")" = 'real-time app probe unavailable' ]; then
+      state=$(ps -o state= -p "$workload")
+      case "$state" in *T*) observed=true; break ;; esac
+    fi
+    sleep 0.1
+  done
+  $observed
+  [ ! -e "$BATS_RT_PROBE_ROOT/continued" ]
+  [ "$(cat "$mark")" = 'real-time app probe unavailable' ]
+  rt_probe_mode clear
+  rt_probe_wait_path "$BATS_RT_PROBE_ROOT/continued"
+  wait "$BATS_RT_PROBE_PID"
 }
 
 @test "heavy-run: project: a run waits at its project cap while another project's run starts" {

@@ -221,6 +221,13 @@ A game stream (GeForce NOW 2.0.90) next to heavy runs crashed it 5 times the sam
 `HEAVY_RUN_PAUSE_APPS` runs (default `GeForceNOW`): no new run starts, and a running one
 gets SIGSTOP until the app quits. Set `HEAVY_RUN_PAUSE_APPS=""` to turn it off.
 
+Each controller caches the app check for at most two seconds. A successful
+check must return process IDs, or report no matches with no output. A failed,
+missing or invalid check holds new runs with `real-time app probe unavailable`.
+It also keeps existing real-time pause marks until a valid check reports no
+matching app. This applies to the first run, exclusive runs and added parallel
+runs. It does not change the configured slot limits.
+
 One scheduler decides for the whole queue. Every `heavy-run` process tries for the
 leader lock `sched.lock`; the holder reads the settings live and writes a grant or a wait
 reason per ticket, and the pause marks. So `dotfiles config set heavy_run_slots N` reaches

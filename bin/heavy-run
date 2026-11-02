@@ -181,11 +181,24 @@ common_code='
   # (a game stream) froze the Mac when heavy runs shared it (5 restarts in one
   # day, GeForce NOW 2.0.90). Asked at most every 2 s: pgrep is a fork.
   my ($rt_at, $rt_why) = (0, "");
+  sub app_presence {
+    my ($app) = @_;
+    my $command = "pgrep -x " . quotemeta($app) . " 2>/dev/null";
+    my $out = `$command`;
+    my $status = $?;
+    $out //= "";
+    return "clear" if $status == 256 && $out eq "";
+    chomp $out;
+    return "present" if $status == 0 && $out =~ /\A[1-9][0-9]*(?:\n[1-9][0-9]*)*\z/;
+    return "unknown";
+  }
   sub realtime {
     return $rt_why if time - $rt_at < 2;
     $rt_at = time; $rt_why = "";
     for my $app (grep { $_ ne "" } split /,/, $ENV{HEAVY_RUN_PAUSE_APPS} // "") {
-      if (cmd_out("pgrep -x " . quotemeta($app)) ne "") { $rt_why = "$app is running (a real-time app)"; last; }
+      my $presence = app_presence($app);
+      if ($presence eq "unknown") { $rt_why = "real-time app probe unavailable"; last; }
+      if ($presence eq "present") { $rt_why = "$app is running (a real-time app)"; last; }
     }
     return $rt_why;
   }

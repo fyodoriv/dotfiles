@@ -21,7 +21,7 @@ them. -->
   - **Output**: code
   - **Acceptance**: all three large-stream history-only matches block, their three clean twins pass, all retained controls pass, and diagnostics never reveal the synthetic marker. No live push or owner pattern belongs to this experiment.
   - **Hypothesis**: source review predicts three unsafe permits become zero when matching consumes each full producer stream; false blocks remain zero. This is a prediction before the registered fixtures.
-  - **Measurement**: commit this registration, add only the six frozen cases, then run and repeat `JOBS=1 heavy-run bats -- tests/pre-push.bats`; require actual semantic red before a fix, then the normal `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` gate.
+  - **Measurement**: commit this registration, add only the six frozen cases, then run and repeat `JOBS=1 heavy-run bats tests/pre-push.bats`; require actual semantic red before a fix, then the normal `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` gate.
   - **Success**: at least one unchanged-source unsafe permit reproduces; final decisions match all 43 controls with zero disclosures and the required gate exits zero.
   - **Pivot**: zero baseline unsafe permits abandons this diagnosis; setup failures are inconclusive. Any final unsafe permit, false block, disclosure or retained regression rejects the approach without relaxing an expected result.
   - **Anchor**: Bash manual pipefail and GNU grep early-exit contract; Basili, Caldiera and Rombach (1994), Goal Question Metric.

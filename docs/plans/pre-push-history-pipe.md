@@ -92,7 +92,7 @@ synthetic marker. Do not make runtime duration or SIGPIPE stderr a success metri
 Exact focused command, registered before fixtures/results:
 
 ```sh
-JOBS=1 heavy-run bats -- tests/pre-push.bats
+JOBS=1 heavy-run bats tests/pre-push.bats
 ```
 
 The current expected final count is 43 (37 retained plus six new), with zero
@@ -108,3 +108,12 @@ pattern is read, generated or copied. Keep all raw fixture evidence local and
 publish only synthetic counts and safe hook transcripts. Do not broaden the
 claim to every Git producer failure, every push range or a universal leak proof.
 The earlier broken-pipe observation is only the motivation, not baseline data.
+
+## Test-runner setup correction
+
+The first fixture-only attempt used a standalone `--` before the test path.
+The installed Bats rejected it as a bad command-line option and executed zero
+tests. That attempt is inconclusive. Before the first valid baseline, correct
+only the invocation to `JOBS=1 heavy-run bats tests/pre-push.bats`. The six
+registered fixtures, their expected outcomes, the 37 retained controls and the
+unchanged hook hash stay fixed. No behavior result informed this correction.

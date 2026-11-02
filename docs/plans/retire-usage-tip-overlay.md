@@ -93,6 +93,31 @@ independent base ignore correction is available. Preserve the pre-guard source
 and actual semantic red before implementation. Anchor: source review of YAML
 mapping/scalar identity; GQM and the existing fail-closed modify contract.
 
+## Supplemental R12 boundary controls
+
+Register three further source-review cases before probes. Preserve the original
+twenty-seven assertions and their sealed evidence unchanged.
+
+| Variant | Supplied form | Fixed required outcome |
+| --- | --- | --- |
+| R12-indentless-sequence | `enabled:` followed by `- usage-tip` at column zero | Nonzero exit, no stdout |
+| R12-flow-root | `{enabled: [usage-tip]}` | Nonzero exit, no stdout |
+| R12-hash-in-scalar | Enabled item `- usage-tip#custom` | Nonzero exit, no stdout; never delete it as the retired ID |
+
+The first form is a valid indentless YAML sequence; the second is a valid flow
+mapping. In the third, a hash without separating whitespace belongs to the
+scalar, so it is not the retired ID. The bounded script will refuse all three
+rather than interpret more YAML or risk modifying a distinct user hook.
+
+Hypothesis: unsafe acceptance or transformation falls from predicted three of
+three cases to zero. Success: all three refuse with no partial output and all
+original twenty-seven assertions still pass. Pivot: any successful unsupported
+form, wrong-ID deletion, partial output or original regression rejects the
+guard. Use the same registered focused command, retaining the new denominator
+separately, then the final required gate after normal base-fix integration.
+Anchor: independent source review of YAML sequence/flow/comment boundaries;
+GQM and fail-closed ownership. No general YAML engine or live action is added.
+
 ## Numbered work breakdown
 
 ### 1. Register and reproduce

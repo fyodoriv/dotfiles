@@ -13,6 +13,7 @@ them. -->
 
 ## P1
 
+
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents

@@ -1204,3 +1204,159 @@ make_flat_home() {
 @test "Phase 7 also looks for new-project in a flat ~/apps/agentbrew checkout" {
   grep -qF 'apps/{tooling/,}agentbrew -E' "$SKILL"
 }
+fetch692_receipt_class() {
+  local result
+  result="$(jq -rs '
+    if length == 0 then "missing"
+    elif length > 1 then "duplicate"
+    elif (.[0] | type != "object") then "malformed"
+    elif (.[0] | (keys == ["exit","fetches","id","offFixture","visits","warnings"]
+      and (.id | type == "string") and (.exit | type == "number")
+      and (.offFixture | type == "number") and (.fetches | type == "array")
+      and (.visits | type == "array") and (.warnings | type == "array"))) | not then "malformed"
+    elif .[0].offFixture != 0 then "off-fixture"
+    elif .[0].exit == 124 or .[0].exit == 137 then "timeout"
+    else "complete" end
+  ' "$1" 2>/dev/null)" || result=malformed
+  printf '%s\n' "$result"
+}
+
+@test "fetch caller recorder rejects four incomplete inventory receipts" {
+  local p="$TEST_DIR/sample.jsonl"
+  local good='{"id":"D01","exit":0,"fetches":[],"visits":[],"warnings":[],"offFixture":0}'
+  : > "$p"
+  [ "$(fetch692_receipt_class "$p")" = missing ]
+  printf '%s\n' "$good" "$good" > "$p"
+  [ "$(fetch692_receipt_class "$p")" = duplicate ]
+  printf '%s\n' '{broken' > "$p"
+  [ "$(fetch692_receipt_class "$p")" = malformed ]
+  jq '.offFixture = 1' <<< "$good" > "$p"
+  [ "$(fetch692_receipt_class "$p")" = off-fixture ]
+  printf '%s\n' "$good" > "$p"
+  [ "$(fetch692_receipt_class "$p")" = complete ]
+}
+
+fetch692_seed() {
+  local origin="$TEST_DIR/$1.git" repo="$TOOLING/$1"
+  /usr/bin/git init -q --bare --initial-branch=main "$origin"
+  /usr/bin/git clone -q "$origin" "$repo" 2>/dev/null
+  /usr/bin/git -C "$repo" -c user.name=Fixture -c user.email=fixture@example.com \
+    -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q --allow-empty -m fixture
+  /usr/bin/git -C "$repo" push -q origin HEAD:main
+  /usr/bin/git -C "$repo" remote set-head origin main
+}
+
+fetch692_inventory_case() {
+  local id="$1" no_fetch="$2" fail="$3" layout="$4"
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_ALLOW_PROTOCOL=file GIT_TERMINAL_PROMPT=0
+  TOOLING="$(cd "$TEST_DIR" && pwd -P)/tooling"
+  local bin="$TEST_DIR/port" trace="$TEST_DIR/fetch.jsonl" rejected="$TEST_DIR/rejected"
+  mkdir -p "$TOOLING" "$bin"
+  : > "$trace"
+  : > "$rejected"
+  fetch692_seed alpha
+  if [ "$layout" = two ]; then
+    fetch692_seed beta
+  else
+    /usr/bin/git -C "$TOOLING/alpha" worktree add -q -b feat/linked "$TOOLING/linked"
+    mkdir "$TOOLING/plain"
+  fi
+
+  cat > "$bin/git" <<'PY'
+#!/usr/bin/python3
+import json
+import os
+import sys
+from pathlib import Path
+
+root = Path(os.environ["TOOLING_ROOT"])
+argv = sys.argv[1:]
+primaries = ["alpha", "beta"] if os.environ["FETCH692_LAYOUT"] == "two" else ["alpha"]
+local = [
+    ["for-each-ref", "--count=1", "--format=%(ahead-behind:HEAD)", "refs/heads"],
+    ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+    ["status", "--porcelain"],
+    ["stash", "list"],
+    ["worktree", "list", "--porcelain"],
+]
+for ahead in ("%(ahead-behind:origin/main)", "-"):
+    local.append([
+        "for-each-ref", "--sort=refname",
+        "--format=%(refname)%09" + ahead +
+        "%09%(if)%(upstream)%(then)u:%(upstream:track,nobracket)%(else)-%(end)",
+        "refs/heads", "refs/remotes/origin",
+    ])
+for ref in ("refs/heads/main", "refs/remotes/origin/HEAD", "refs/remotes/origin/main", "refs/heads/feat/linked"):
+    local.append(["rev-list", "--count", "origin/main.." + ref])
+if len(argv) >= 3 and argv[0] == "-C":
+    name = Path(argv[1]).name
+    if argv[1] == str(root / name):
+        if name in primaries and argv[2:] == ["fetch", "--prune", "--quiet", "origin"]:
+            with open(os.environ["FETCH692_TRACE"], "a") as trace:
+                trace.write(json.dumps(["git", "-C", name, *argv[2:]]) + "\n")
+            sys.exit(1 if name == os.environ["FETCH692_FAIL"] else 0)
+        if (name in primaries and argv[2:] in local) or (
+            name == "linked" and os.environ["FETCH692_LAYOUT"] == "linked"
+            and argv[2:] in (["branch", "--show-current"], ["status", "--porcelain"])
+        ):
+            os.execv("/usr/bin/git", ["/usr/bin/git", *argv])
+with open(os.environ["FETCH692_REJECTED"], "a") as rejected:
+    rejected.write("rejected\n")
+sys.exit(126)
+PY
+  cat > "$bin/gh" <<'SH'
+#!/bin/bash
+printf '%s\n' rejected >> "$FETCH692_REJECTED"
+exit 126
+SH
+  chmod 700 "$bin/git" "$bin/gh"
+
+  run /opt/homebrew/bin/gtimeout --kill-after=1s 20s /usr/bin/env -i \
+    HOME="$TEST_HOME" PATH="$bin:/usr/bin:/bin" LC_ALL=C \
+    TOOLING_ROOT="$TOOLING" TOOLING_CHECKUP_NO_FETCH="$no_fetch" TOOLING_CHECKUP_NO_GH=1 \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_ALLOW_PROTOCOL=file GIT_TERMINAL_PROMPT=0 \
+    FETCH692_TRACE="$trace" FETCH692_REJECTED="$rejected" FETCH692_FAIL="$fail" FETCH692_LAYOUT="$layout" \
+    /bin/bash "$SCRIPTS/inventory.sh"
+
+  local receipt="$TEST_DIR/receipt.jsonl" visits warnings output_normalized
+  output_normalized="${output//"$TOOLING"/<fixture>}"
+  visits="$(awk '/^== / { print substr($0,4) }' <<< "$output_normalized" | jq -Rsc 'split("\n")[:-1]')"
+  warnings="$(awk '/^== / { repo=substr($0,4) }
+    /fetch from origin failed; results use the last fetched state$/ { print repo }' \
+    <<< "$output_normalized" | jq -Rsc 'split("\n")[:-1]')"
+  jq -nc --arg id "$id" --argjson exit "$status" --slurpfile fetches "$trace" \
+    --argjson visits "$visits" --argjson warnings "$warnings" \
+    --argjson offFixture "$(wc -l < "$rejected" | tr -d ' ')" \
+    '{$id,$exit,$fetches,$visits,$warnings,$offFixture}' > "$receipt"
+  if [ -n "${FETCH692_EVIDENCE_DIR:-}" ]; then
+    (set -C; cat "$receipt" > "$FETCH692_EVIDENCE_DIR/$id.jsonl")
+    (set -C; printf '%s\n' "$output_normalized" > "$FETCH692_EVIDENCE_DIR/$id.inventory")
+  fi
+  printf 'FETCH692_INVENTORY %s\n' "$(cat "$receipt")" >&3
+  [ "$(fetch692_receipt_class "$receipt")" = complete ]
+
+  local expected_visits='["alpha","beta"]' expected_fetches expected_warnings='[]'
+  [ "$layout" != linked ] || expected_visits='["alpha"]'
+  expected_fetches="$(jq -nc --argjson names "$expected_visits" --arg disabled "$no_fetch" '
+    if $disabled == "1" then [] else $names | map(["git","-C",.,"fetch","--prune","--quiet","origin"]) end')"
+  [ -z "$fail" ] || expected_warnings='["alpha"]'
+  jq -e --argjson visits "$expected_visits" --argjson fetches "$expected_fetches" \
+    --argjson warnings "$expected_warnings" \
+    '.exit == 0 and .visits == $visits and .fetches == $fetches and .warnings == $warnings' "$receipt"
+}
+
+@test "fetch caller D01 inventories two primary checkouts after two fetches" {
+  fetch692_inventory_case D01 0 "" two
+}
+
+@test "fetch caller D02 inventories both primary checkouts without fetching" {
+  fetch692_inventory_case D02 1 "" two
+}
+
+@test "fetch caller D03 warns under the failed checkout and continues" {
+  fetch692_inventory_case D03 0 alpha two
+}
+
+@test "fetch caller D04 fetches the primary and skips linked and plain checkouts" {
+  fetch692_inventory_case D04 0 "" linked
+}

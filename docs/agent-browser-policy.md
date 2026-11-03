@@ -63,6 +63,8 @@ tab="$(agent-tab open --owner "$AGENT_ID" --reason "check dashboard" https://exa
 agent-tab list                                   # id, owner, live/expired, expiry, reason, url
 agent-tab renew --owner "$AGENT_ID" --lease 1800 "$tab"
 agent-tab close --owner "$AGENT_ID" "$tab"
+# When the next step requires proof that this exact target is gone:
+agent-tab close-verified --owner "$AGENT_ID" "$tab"
 
 export AGENT_TAB_OWNER="$AGENT_ID"              # default for --owner
 agent-tab text "$tab"                            # page text
@@ -78,6 +80,10 @@ agent-tab clear-cookies example.com              # one site's cookies
 
 - Records live in `~/.local/state/agent-tab/tabs.json`. Writes take a `mkdir` lock and replace the file with `mv` (atomic).
 - If Chrome refuses a close, `agent-tab` keeps the lease unless Chrome's tab list confirms the target is gone. Retry the same tab ID when Chrome responds.
+- Use `close-verified` when a close acknowledgement is insufficient. Only the
+  recorded owner can use it, even after expiry. It removes the lease only when
+  a valid tab list confirms the exact target is absent. If verification fails,
+  the lease stays in place and the command exits nonzero. Retry the same ID.
 - A successful Chrome close reply acknowledges the request. A caller that needs proof of removal must also check that the target is absent from Chrome's tab list before reporting completion.
 - If opening a tab fails to save its lease, `agent-tab` tries to close that exact tab. If it cannot confirm closure, the error includes the tab ID and whether it could retain the lease. Treat this as an incomplete open.
 - Each successful `shot` prints its own PNG path. Later captures leave earlier files in place.

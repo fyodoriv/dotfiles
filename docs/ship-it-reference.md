@@ -9,6 +9,20 @@ Companion to the `/ship-it` slash command. When ship-it mode is active, execute 
 Mode remains active until the user says **stop ship-it** or applies a narrow exception (plan only, read only, no commit, no push, scoped file/repo). While mode is on, run Steps 1–13 without re-prompting for commit, push, PR, merge, or Steps 12–13.
 
 
+## Review fetches
+
+Review fetches use fully qualified source refs and `--no-prune`:
+
+```bash
+git fetch --no-prune origin refs/heads/<base>:refs/remotes/origin/<base> refs/pull/<number>/head:refs/remotes/origin/review-pr-<number>
+git show-ref --verify refs/remotes/origin/<base>
+```
+
+Substitute the actual base and PR number. Repository-scoped tracking refs
+are shared by every worktree. An abbreviated review refspec with pruning
+can remove the base tracking ref. Assert it still exists after the fetch;
+never change the user's global `fetch.prune` setting to work around this.
+
 ## Planning requests
 
 Use this section only when the active request is to create or revise a plan. It

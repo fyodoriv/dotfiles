@@ -37,6 +37,23 @@ Run just these: `dotfiles doctor --module git --module macos --module ssh --modu
 | `check_managed id src dst` | Verifies chezmoi manages the file | `chezmoi apply` on the target |
 | `check_defaults id desc domain key expected type` | Verifies macOS `defaults` value | `defaults write` with the expected value |
 
+`fix_cmd` runs in a new process (`bash -c`), so a fix that calls a function defined in its module needs `export -f <function>` (and `export` for the variables it reads; the doctor exports `DOTFILES_DIR`). `tests/doctor-fix-functions-exported.bats` fails when one is missing.
+
+After a repair command succeeds, doctor runs the check again. It reports
+`fixed` only when that check passes. A no-op command or a printed hint leaves
+the check failed with `fix ran but the check still fails`. This applies to
+command, symlink, managed-file, and macOS-default checks. The repair
+verification call has a scoped `DOCTOR_VERIFY_REPAIR=true` flag; the
+Amphetamine policy helper uses it to bypass its module-run preference
+snapshot after a child process writes the preferences.
+
+`--module <name>` also finds modules from verified plugins and runs only the
+selected module through the existing sandbox. Use `--module <plugin>/<name>`
+when plugins share a module name. Core module names take priority. The
+selection lives for one doctor process. `--list` lists selected plugin checks
+without running their test commands. ID discovery uses list mode even when a
+module is opted out, so existing override IDs remain valid.
+
 Modules are sorted by severity: **critical** → **important** → **performance** → **cosmetic**.
 
 **Dynamic checks**: some modules generate checks at runtime based on what's installed. For example, the git module creates one check per discovered repo in `$DOTFILES_REPOS_DIR`, and the workflow module creates one check per expected LaunchAgent. Modules marked "dynamic" add checks based on your environment.
@@ -356,15 +373,29 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 
 ## Performance
 
+Power Protect readiness is reported by `resilience.amphetamine_power_protect`.
+It warns on Apple Silicon when keep-awake tools and Amphetamine are in use
+but either upstream installation file is absent:
+`~/Library/Application Scripts/com.if.Amphetamine/powerProtect.scpt` or
+`/private/etc/sudoers.d/amphetamine_powerProtect`.
+`AMPHETAMINE_POWER_PROTECT_CONFIG` overrides the administrator-file path for
+an alternate installation or a test fixture. The check reads file presence
+only. It does not install files, read the administrator policy contents, or
+prove agent work continues with the lid closed. The
+[upstream installer guide](https://github.com/x74353/Amphetamine-Power-Protect)
+explains installation; physical uptime needs a separate controlled test.
+
 ### macos
 
-46 `check_defaults` checks (all auto-fix via `defaults write`) plus 4-6 special checks.
+`check_defaults` checks auto-fix via `defaults write`; special checks cover other system settings.
+
+The macOS doctor checks `macos.dock_auto_swoosh` on every profile to keep background activation on the current Space. The full profile also checks `macos.dock_bottom_right_corner`, which keeps the bottom-right hot corner inactive.
 
 | Category | Check IDs | Count | What it verifies |
 |----------|-----------|-------|-----------------|
 | Animations | `macos.window_animations`, `scroll_animations`, `resize_time` | 3 | Window/scroll animations disabled |
 | Keyboard | `key_repeat`, `initial_key_repeat`, `press_and_hold`, `autocorrect`, `autocapitalize`, `smartquotes`, `smartdashes`, `period_substitution`, `text_completion` | 9 | Fastest key repeat, no auto-correct/smart-quotes |
-| Dock | `dock_autohide`, `dock_autohide_delay`, `dock_launch_anim`, `dock_minimize`, `dock_mru`, `dock_recents`, `dock_expose_speed` | 7 | Instant autohide, no animations |
+| Dock | `dock_autohide`, `dock_autohide_delay`, `dock_launch_anim`, `dock_minimize`, `dock_mru`, `dock_recents`, `dock_expose_speed`, `dock_auto_swoosh`, `dock_bottom_right_corner` (full only) | 8-9 | Instant autohide, no animations, current Space preserved |
 | Finder | `finder_hidden_files`, `finder_pathbar`, `finder_statusbar`, `finder_folders_first`, `finder_extensions`, `finder_no_anim`, `finder_ext_warning`, `finder_search_scope`, `finder_column_view`, `finder_desktop_icons` | 10 | Show hidden files, path bar, all extensions, desktop icons |
 | DS_Store | `no_ds_store_network`, `no_ds_store_usb` | 2 | No .DS_Store on external volumes |
 | Screenshots | `screenshot_type`, `screenshot_shadow` | 2 | PNG format, no shadow |
@@ -379,7 +410,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 
 ### jetbrains (conditional)
 
-On `profile: core`, an IDE settings folder counts only when its app is in `/Applications` or `~/Applications` (`JETBRAINS_APP_DIRS` overrides the list), and `symlink.ideavimrc` is skipped.
+On every profile, an IDE settings folder counts only when its app is in `/Applications` or `~/Applications` (`JETBRAINS_APP_DIRS` overrides the list): no profile installs JetBrains IDEs, and folders left by an uninstalled IDE can never pass the plugin checks. Recommended plugins are checked only when an IDE is installed. On `profile: core`, `symlink.ideavimrc` is skipped.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
@@ -455,6 +486,10 @@ sign-in probes (sign-in is bounded to two seconds). Routine audits use local
 file checks to stay within the module's 500 ms budget. `--list` includes the
 full-only check IDs, and overrides work for those IDs without `--full`.
 
+For native runtime diagnosis, use `codex doctor --json`. The
+[upstream boundary decision](plans/replace-relocate-codex-readiness.md)
+records its current coverage and the machine checks that remain here.
+
 `--fix` runs `dotfiles-install-codex` for a missing CLI or link. The helper
 installs `@openai/codex` into the current npm prefix and preserves owner files
 at the link destination. `dotfiles apply` invokes it when `use_ai_tools` is
@@ -470,7 +505,7 @@ ChatGPT.app's bundled CLI. Install the GUI with `brew install --cask chatgpt`.
 | `claude.settings_mcp_allowed` | MCP server allowed in settings | `agentbrew sync` |
 | `claude.env_pins` | `~/.claude/settings.json` env has `AGENT_GUARD_DEPTH_MAX=2` (agent-usage-guard allows depth 2) and `CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000` (compact before the guard's 400k tool-budget line) | `.chezmoiscripts/run_after_claude-settings-env.sh` (also runs on every apply) |
 | `claude.disabled_plugins` | Plugins in `claude_disabled_plugins` (default `prisma@synced`) are `false` in `enabledPlugins` | `.chezmoiscripts/run_after_claude-disabled-plugins.sh` (also runs on every apply) |
-| `claude.mods` | Mods in `claude_mods` (default `work-pane`) are enabled as `<mod>@agentbrew-mods` | `.chezmoiscripts/run_after_claude-mods.sh` (also runs on every apply) |
+| `claude.mods` | Mods in `claude_mods` are enabled as `<mod>@agentbrew-mods` | `.chezmoiscripts/run_after_claude-mods.sh` (also runs on every apply) |
 | `claude.no_context7_mcp` | No `context7` MCP server key in `~/.claude.json`, the Claude Desktop config, `~/.codex/config.toml`, opencode, or the generated VS Code settings | No auto-fix: the line names the file; remove the entry, then `agentbrew sync` |
 
 Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in a company plugin's `contributes.doctor_modules` (see [plugins.md](plugins.md)).
@@ -497,7 +532,7 @@ Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`),
 
 ### local-llm
 
-Optional local LLM via `mlx-lm` on Apple Silicon. Tool checks are advisory when `use_local_ai` is `false`. See [docs/local-llm.md](local-llm.md).
+Optional local LLM via `mlx-lm` on Apple Silicon. When `use_local_ai` is `false`, doctor skips the whole module with one ⊘ line instead of warning about tools you chose not to install. See [docs/local-llm.md](local-llm.md).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

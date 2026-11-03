@@ -156,7 +156,29 @@ EOF
   grep -q "approved repo families" "$owner_rules"
   grep -q "never bypass-merge someone else's PR" "$owner_rules"
   grep -q "Every PR needs uncommitted visual proof" "$agentfile"
-  grep -q "as \`heavy-run <command>\`: one Mac-wide lock" "$agentfile"
+  grep -q "as \`heavy-run <command>\`: one Mac-wide queue" "$agentfile"
+  grep -q "never raise them" "$agentfile"
+  grep -q "without the owner's explicit yes" "$agentfile"
+  grep -q "heavy-run --exclusive <command>" "$agentfile"
+}
+
+@test "pending footer C1 canonical owner contract puts Pending before Needed" {
+  local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml"
+  grep -Fq 'Right before the Needed-from-you line' "$owner_rules"
+  grep -Fq '**Pending:**' "$owner_rules"
+}
+
+@test "pending footer C4 base Agentfile excludes both personal footer rules" {
+  run grep -E '\*\*(Pending|Needed from you):\*\*' "$(repo_root)/Agentfile.yaml"
+  [ "$status" -eq 1 ]
+}
+
+@test "pending footer C8 preserves the existing ask judge and other owner rules" {
+  local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml" tail_hash
+  grep -Fq 'Before the Needed-from-you line asks for anything, an independent judge' "$owner_rules"
+  # Preserve the existing rule suffix from registered base 893097f5 verbatim.
+  tail_hash="$(awk '/^  End every message with one last line/ { capture=1 } capture' "$owner_rules" | shasum -a 256 | awk '{print $1}')"
+  [ "$tail_hash" = "aa01a531f65f66640bf1cf1aa1750015a495f9530067ca9c3551216a7845aa82" ]
 }
 
 @test "Agentfile inline rules do not repeat the agentbrew bootstrap" {

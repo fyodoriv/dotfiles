@@ -226,18 +226,18 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
   # 1b. History scan: a commit in the range may add a private reference
   # that a later commit removed, so the pushed tip looks clean. Check the
   # lines, file names, and message of each pushed commit. Print commit ids
-  # only, never the text.
+  # only, never the text. Consume each stream so pipefail retains a match.
   if [ -n "${OSS_READINESS_INTERNAL_PATTERN:-}" ]; then
     history_hits=()
     while IFS= read -r commit; do
       [ -n "$commit" ] || continue
       if git -C "$CURRENT_REPO" show --format= --no-color --no-ext-diff -m "$commit" 2>/dev/null \
         | grep -E '^\+' | grep -Ev '^\+\+\+ ' \
-        | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN" ||
+        | grep -iE -- "$OSS_READINESS_INTERNAL_PATTERN" >/dev/null ||
         git -C "$CURRENT_REPO" show --format= --name-only --diff-filter=ACR -m "$commit" 2>/dev/null \
-        | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN" ||
+        | grep -iE -- "$OSS_READINESS_INTERNAL_PATTERN" >/dev/null ||
         git -C "$CURRENT_REPO" log -1 --format=%B "$commit" 2>/dev/null \
-        | grep -qiE -- "$OSS_READINESS_INTERNAL_PATTERN"; then
+        | grep -iE -- "$OSS_READINESS_INTERNAL_PATTERN" >/dev/null; then
         history_hits+=("$(git -C "$CURRENT_REPO" rev-parse --short "$commit")")
         [ "${#history_hits[@]}" -ge 20 ] && break
       fi

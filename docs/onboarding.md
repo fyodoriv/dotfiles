@@ -146,6 +146,8 @@ dotfiles doctor --skip jetbrains.settings_sync
 dotfiles doctor --validate-overrides
 ```
 
+Validation recognizes known IDs from disabled optional modules. It does not run their checks.
+
 The `.overrides` file is tracked in git, so your team fork can pre-configure which checks to skip for your group.
 
 ## Profiles

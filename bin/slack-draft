@@ -12,7 +12,7 @@
 #   slack-draft count  --owner <id> <tab> <text> --to <name>
 #   slack-draft delete --owner <id> <tab> <text> --to <name> [--all] [--yes]
 #
-# count and delete read the Drafts view of the open tab. A draft matches when
+# count and delete open the owned tab's Drafts view before reading it. A draft matches when
 # its recipient field equals <name> and its body contains <text> (both sides
 # normalized: case, spacing, leading @). delete removes exactly one match, or
 # every match with --all. It prints the matches and asks before it deletes;
@@ -30,13 +30,15 @@
 #
 # Env: SLACK_DRAFT_URL (workspace URL for `open`; no default, never stored in
 #      the repo), AGENT_TAB_OWNER (default --owner), SLACK_DRAFT_AGENT_TAB
-#      (agent-tab path override, used by tests).
+#      (agent-tab path override, used by tests), SLACK_DRAFT_TIMEOUT_SECONDS
+#      (0 to 29; default 29, with one second reserved for cleanup).
 #
 # Exit codes: 0 ok, 1 error or no match, 2 usage, 3 busy (from agent-tab),
 #             4 refused (several matches without --all, or no confirmation).
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$(env -u PERL5LIB -u PERL5OPT perl -MCwd=abs_path -e 'print abs_path(shift)' "${BASH_SOURCE[0]}")"
+HERE="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 AGENT_TAB="${SLACK_DRAFT_AGENT_TAB:-$HERE/agent-tab}"
 
 # Slack web markup the page scripts rely on. Slack changes it; fix it here.
@@ -48,8 +50,9 @@ SEL_DRAFT_ROW='[data-qa="drafts_list_item"], [data-qa="draft-item"]'
 SEL_DRAFT_TO='[data-qa="drafts_list_item_to"], [data-qa="draft-item-to"]'        # recipient field
 SEL_DRAFT_BODY='[data-qa="drafts_list_item_body"], [data-qa="draft-item-body"]'  # draft text
 SEL_DRAFT_DELETE='[data-qa="drafts_list_item_delete"], [data-qa="draft-item-delete"]'
+SEL_DRAFT_VIEW='[data-qa="drafts_page"], [data-qa="drafts_list"], .p-drafts_page, .p-drafts_view'
 SEL_DIALOG='[role="dialog"], [data-qa="delete_draft_modal"]'                        # the dialog that holds "Delete"
-SEL_CONFIRM='[data-qa="confirm_modal_go"], [data-qa="draft-delete-confirm"]'      # its confirm button, searched inside the dialog only
+SEL_CONFIRM='[data-qa="confirm_modal_go"], [data-qa="dialog_go"], [data-qa="draft-delete-confirm"]'      # its confirm button, searched inside the dialog only
 
 usage() {
   sed -n '/^# Usage:/,/^#   slack-draft delete/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -78,6 +81,62 @@ parse() {
 
 tab_eval() { "$AGENT_TAB" eval --owner "$OWNER" "$1" "$2"; }
 
+# The deadline belongs to one count/delete invocation. Reserve a second for
+# child cleanup within the 30-second command budget.
+command_deadline() {
+  local budget="${SLACK_DRAFT_TIMEOUT_SECONDS:-29}"
+  case "$budget" in 0|[1-9]|1[0-9]|2[0-9]) ;; *) die "SLACK_DRAFT_TIMEOUT_SECONDS must be 0 to 29" 2 ;; esac
+  echo "$(( $(date +%s) + budget ))"
+}
+
+# Reuse the plugin sandbox's process-group deadline. The group belongs to
+# one browser call; KILL also stops descendants that ignore TERM.
+# The direct child fallback covers a timeout before process-group setup.
+tab_call_with_timeout() {
+  # shellcheck disable=SC2016 # Perl variables belong to the child program.
+  env -u PERL5LIB -u PERL5OPT perl -e '
+    my $t = shift; my $pid = fork() // exit 1;
+    if (!$pid) { setpgrp(0, 0); exec @ARGV or exit 127; }
+    $SIG{ALRM} = sub { kill "KILL", -$pid; kill "KILL", $pid; waitpid($pid, 0); exit 124; };
+    alarm $t; waitpid($pid, 0);
+    alarm 0;
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "$@"
+}
+
+tab_eval_until() {
+  local deadline="$1" remaining
+  shift
+  remaining=$((deadline - $(date +%s)))
+  [ "$remaining" -gt 0 ] || return 124
+  tab_call_with_timeout "$remaining" "$AGENT_TAB" eval --owner "$OWNER" "$1" "$2"
+}
+
+drafts_failure() {
+  [ "$1" -ne 3 ] || die "the tab is busy or its lease expired" 3
+  die "Slack Drafts did not become ready within the 30-second limit"
+}
+
+ensure_drafts() {
+  local tab="$1" deadline="$2" target remaining ready rc
+  target="$(tab_eval_until "$deadline" "$tab" '(() => {
+    const u = new URL(location.href), team = u.pathname.match(/^\/client\/(T[A-Z0-9]+)(?:\/|$)/);
+    return u.hostname === "app.slack.com" && team ? u.origin + "/client/" + team[1] + "/drafts" : "";
+  })()')" || drafts_failure "$?"
+  [ -n "$target" ] || die "the owned tab is not a Slack workspace page"
+  remaining=$((deadline - $(date +%s)))
+  [ "$remaining" -gt 0 ] || drafts_failure 124
+  tab_call_with_timeout "$remaining" "$AGENT_TAB" nav --owner "$OWNER" "$tab" "$target" >/dev/null || drafts_failure "$?"
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    rc=0
+    ready="$(tab_eval_until "$deadline" "$tab" "document.querySelector('$SEL_DRAFT_VIEW') ? 1 : 0")" || rc=$?
+    [ "$rc" -ne 3 ] || drafts_failure 3
+    [ "$ready" != 1 ] || return 0
+    sleep 0.1
+  done
+  drafts_failure 124
+}
+
 # Page-script prelude. Name and text arrive as JSON strings, never spliced into
 # code. Both sides are normalized by the page (NFC, lower case, one space, no
 # leading @ or "To:"); NFKC is not used, so full-width and math-bold names stay
@@ -95,12 +154,12 @@ page_prelude() {
      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
      const DEL = \($del | @json), OK = \($ok | @json), DLG = \($dlg | @json);
      const dialogs = () => [...document.querySelectorAll(DLG)];
-     const isDelete = (d) => /delete/i.test(txt(d));"'
+     const isDelete = (d) => /\\bdelete\\s+(?:this\\s+)?draft\\b/i.test(txt(d));"'
 }
 
 # Prints a JSON array of {to, body} (full, exact field text) for the matches.
 matches() {
-  tab_eval "$1" "$(page_prelude "$TO" "$2")
+  tab_eval_until "$3" "$1" "$(page_prelude "$TO" "$2")
 (() => JSON.stringify(hits().map((r) => ({ to: r.rawTo, body: r.rawBody }))))()"
 }
 
@@ -140,7 +199,11 @@ cmd_count() {
   [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "count needs a tab, a text, and --to <name>" 2
   blank "$TO" && die "--to must not be blank" 2
   blank "${POS[1]}" && die "the text must not be blank: it would match every draft" 2
-  matches "${POS[0]}" "${POS[1]}" | jq 'length'
+  local deadline found
+  deadline="$(command_deadline)"
+  ensure_drafts "${POS[0]}" "$deadline"
+  found="$(matches "${POS[0]}" "${POS[1]}" "$deadline")" || drafts_failure "$?"
+  jq 'length' <<< "$found"
 }
 
 show_rows() { jq -r --argjson w "${2:-1000}" '.[:$w][] | "  - to \(.to): \(.body[:120])"' <<< "$1"; }
@@ -151,8 +214,10 @@ show_rows() { jq -r --argjson w "${2:-1000}" '.[:$w][] | "  - to \(.to): \(.body
 # clicks nothing and says "changed". It answers the delete dialog only, waits
 # for the row to go, and says "removed" or "unknown".
 delete_one() {
-  tab_eval "$1" "$(page_prelude "$TO" "$2")
+  tab_eval_until "$4" "$1" "$(page_prelude "$TO" "$2")
 (async () => {
+  const until = $4 * 1000;
+  if (Date.now() >= until) return JSON.stringify({ status: \"unknown\" });
   const conf = $3;
   const eq = (c, r) => c.to === r.rawTo && c.body === r.rawBody;
   const h = hits(), left = conf.slice();
@@ -173,11 +238,11 @@ delete_one() {
   const fresh = () => dialogs().find((d) => !pre.has(d) && isDelete(d));
   b.click();
   let gone = false;
-  for (let t = 0; t < 30 && !gone; t++) {
+  for (let t = 0; t < 30 && !gone && Date.now() < until; t++) {
     await sleep(100);
     const d = fresh();
-    const ok = d && d.querySelector(OK);
-    if (ok) ok.click();
+    const ok = d && (d.querySelector(OK) || [...(d.querySelectorAll?.('button') || [])].find((b) => /^\s*delete(?:\s+draft)?\s*$/i.test(txt(b))));
+    if (ok && !ok.disabled && Date.now() < until) ok.click();
     gone = count() < before && !fresh();
   }
   if (gone) {
@@ -193,8 +258,10 @@ cmd_delete() {
   [ "${#POS[@]}" -eq 2 ] && [ -n "$TO" ] || die "delete needs a tab, a text, and --to <name>" 2
   blank "$TO" && die "--to must not be blank" 2
   blank "${POS[1]}" && die "the text must not be blank: it would match every draft" 2
-  local tab="${POS[0]}" found n want answer rem res st deleted=0
-  found="$(matches "$tab" "${POS[1]}")"
+  local tab="${POS[0]}" found n want answer rem res st deleted=0 deadline
+  deadline="$(command_deadline)"
+  ensure_drafts "$tab" "$deadline"
+  found="$(matches "$tab" "${POS[1]}" "$deadline")" || drafts_failure "$?"
   n="$(jq 'length' <<< "$found")"
   [ "$n" -gt 0 ] || die "no draft to $TO matches that text"
   if [ "$n" -gt 1 ] && [ -z "$ALL" ]; then
@@ -209,9 +276,10 @@ cmd_delete() {
     [ -t 0 ] || die "delete changes data; pass --yes to confirm" 4
     read -r -p "slack-draft: delete $want draft(s) to $TO? [y/N] " answer
     case "$answer" in y|Y|yes) ;; *) die "not confirmed" 4 ;; esac
+    deadline="$(command_deadline)"
   fi
   while [ "$(jq 'length' <<< "$rem")" -gt 0 ]; do
-    res="$(delete_one "$tab" "${POS[1]}" "$rem")" ||
+    res="$(delete_one "$tab" "${POS[1]}" "$rem" "$deadline")" ||
       die "unknown: $deleted confirmed deleted, then agent-tab failed. Check the tab"
     st="$(jq -r '.status' <<< "$res")"
     case "$st" in

@@ -15,7 +15,8 @@
 # Non-fatal: a missing claude CLI or agentbrew checkout skips with one line.
 set -uo pipefail
 
-DEFAULT_LIST="work-pane"
+# agentbrew retired work-pane (agentbrew #638); it ships no default mod now.
+DEFAULT_LIST=""
 MARKETPLACE="agentbrew-mods"
 
 if [ -n "${DOTFILES_CLAUDE_MODS+x}" ]; then
@@ -30,6 +31,8 @@ fi
 
 # One mod name per line, blanks dropped.
 MODS="$(printf '%s' "$_list" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d')"
+# agentbrew retired work-pane (#638): drop it from lists saved before that.
+MODS="$(printf '%s\n' "$MODS" | grep -vx 'work-pane' | sed '/^$/d' || true)"
 
 if [ "${1:-}" = "--print-list" ]; then
   [ -z "$MODS" ] || printf '%s\n' "$MODS"

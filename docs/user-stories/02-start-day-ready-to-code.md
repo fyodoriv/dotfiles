@@ -98,7 +98,7 @@ Codex desktop sessions and terminal sessions stay off background QoS. Agents
 without an interactive ancestor still yield as background workers. Custom app
 lists keep their existing override behavior.
 
-Heavy commands share the `heavy-run` lock at absolute nice 15. Nested commands
+Heavy commands share the `heavy-run` slots at absolute nice 15. Nested commands
 use the same priority contract. An inherited level above the configured target
 returns status 2 and runs no command. Regression: `tests/app-priority.bats` and
 `tests/heavy-run.bats`. [Priority limits](../../README.md#interactive-terminal-responsiveness).

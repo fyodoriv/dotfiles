@@ -8,12 +8,14 @@
 if [ -f "$DOTFILES_DIR/lib/launchagent-duplicates.sh" ]; then
   # shellcheck source=../../lib/launchagent-duplicates.sh
   source "$DOTFILES_DIR/lib/launchagent-duplicates.sh"
+  # dotfiles-doctor runs each fix in a new process (bash -c).
+  export -f launchagent_argv launchagent_duplicates launchagent_remove_duplicates
   check "launchagents.no_duplicate_jobs" "no LaunchAgent duplicates a managed dotfiles job" \
     "[ -z \"\$(launchagent_duplicates \"\$HOME/Library/LaunchAgents\" \"$DOTFILES_DIR\")\" ]" \
     "launchagent_remove_duplicates \"\$HOME/Library/LaunchAgents\" \"$DOTFILES_DIR\""
   check_advisory "launchagents.no_same_name_twins" "no other LaunchAgent shares a managed agent's name" \
     "[ -z \"\$(launchagent_suffix_twins \"\$HOME/Library/LaunchAgents\")\" ]" \
-    "launchctl bootout and delete the twin plist that launchagent_suffix_twins lists (keep the com.dotfiles one)"
+    "compare each twin that launchagent_suffix_twins lists with its com.dotfiles job; only when both run the same job, launchctl bootout and delete the twin. A different job that shares the name is fine: skip with dotfiles doctor --skip launchagents.no_same_name_twins"
 fi
 
 # LaunchAgents — check all deployed com.dotfiles.* agents
@@ -78,6 +80,8 @@ done
 if [ -f "$DOTFILES_DIR/lib/agent-worktrees-noindex.sh" ]; then
   # shellcheck source=../../lib/agent-worktrees-noindex.sh
   source "$DOTFILES_DIR/lib/agent-worktrees-noindex.sh"
+  # dotfiles-doctor runs each fix in a new process (bash -c).
+  export -f agent_worktrees_dir agent_worktrees_noindexed agent_worktrees_noindex_fix
   # Core option spotlight.exclude_worktrees (default true; issue #145):
   # a company plugin may turn it off, for example when MDM owns Spotlight.
   _wf_exclude_worktrees=true

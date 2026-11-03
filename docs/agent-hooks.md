@@ -45,6 +45,14 @@ migration architecture.
 
 ## block-dangerous-git (dotfiles hook)
 
+The guard uses `shfmt` to recognize one plain `cat` text write or display.
+Only its wholly quoted heredoc bodies are masked before command checks.
+Shell consumers, pipelines, arithmetic, unquoted substitutions, special-file
+outputs, and commands after a heredoc keep the conservative checks. The
+deployment script links the syntax filter beside the hook. A missing parser
+or failed proof also keeps the original command. Homebrew installs `shfmt`
+on both profiles.
+
 `agent-hooks/block-dangerous-git.sh` blocks `git reset --hard`,
 `git clean -f`, `git checkout .`, `git restore .`, and the force-delete of a
 local branch. A force-delete passes only when every named branch is proven
@@ -154,8 +162,20 @@ and `make e2e`, `make test-all`, or `make test-force` (`make -n` passes). It che
 Single-file and single-test runs (`npx vitest run one.test.ts`, `bats tests/x.bats`,
 `pnpm ui -g login`, `playwright test tests/one.spec.ts`) pass. It also reads
 `pnpm --filter <pkg> e2e`, `pnpm dlx`, and `bunx playwright test`.
+Rust compilation (`cargo build`, `test`, `check`, `clippy`, `bench`, `run`,
+`rustc`, and direct `rustc`) must queue, including filtered Cargo tests.
+Unknown Rust tool invocations also refuse. Only the bounded version, help,
+metadata, project-location and sysroot inspection forms in the
+[caller coverage contract](plans/queue-caller-coverage.md) pass unwrapped.
+The exact `verify` package script must queue even with a filename argument.
+Literal quoted Rust executable paths are recognized at a bare command boundary;
+inert documentation strings remain ignored. Each hook invocation owns only
+its input text and decision. This does not prove queue ownership or cover
+commands launched through other channels.
+
 Set `HEAVY_RUN_HOOK=off` to turn it off. Tests:
-`tests/agent-hooks-require-heavy-run.bats`.
+`tests/agent-hooks-require-heavy-run.bats` and
+`tests/agent-hooks-heavy-build-callers.bats`.
 
 The doctor check `resilience.headless_chrome_under_heavy_run` is the safety
 net for runs the hook cannot see (a plain `node script.js` that starts
@@ -198,3 +218,56 @@ Codex input gets native allow without an input update.
 The response is based on the [Codex hooks protocol](https://learn.chatgpt.com/docs/hooks).
 Input detection and temporary output files are scoped to one hook process.
 The temporary plist is removed before the response is printed.
+
+## heavy-run and Mac freezes
+
+`heavy-run` defaults to 1 slot. Four parallel slots froze the owner's Mac twice
+(2026-11-01): suites pass the memory check at start, then grow together. A frozen Mac shows
+`force_off` in `/Library/Logs/DiagnosticReports/ResetCounter-*`. With more slots, two limits
+apply. One project (a repo and its worktrees) holds at most `heavy_run_project_slots` (3).
+The memory guard stops every run but the oldest while memory pressure is high, so the
+oldest finishes and frees memory; the rest go on when pressure clears.
+
+A game stream (GeForce NOW 2.0.90) next to heavy runs crashed it 5 times the same day
+(WindowServer watchdog panic). So `heavy-run` holds every run while an app in
+`HEAVY_RUN_PAUSE_APPS` runs (default `GeForceNOW`): no new run starts, and a running one
+gets SIGSTOP until the app quits. Set `HEAVY_RUN_PAUSE_APPS=""` to turn it off.
+
+Each controller caches the app check for at most two seconds. A successful
+check must return process IDs, or report no matches with no output. A failed,
+missing or invalid check holds new runs with `real-time app probe unavailable`.
+It also keeps existing real-time pause marks until a valid check reports no
+matching app. This applies to the first run, exclusive runs and added parallel
+runs. It does not change the configured slot limits.
+
+One scheduler decides for the whole queue. Every `heavy-run` process tries for the
+leader lock `sched.lock`; the holder reads the settings live and writes a grant or a wait
+reason per ticket, and the pause marks. So `dotfiles config set heavy_run_slots N` reaches
+every waiter within about a second. Waiters from an older `heavy-run` keep their place in
+line: new processes hold the gate ticket `queue/0000000000-0`, and the scheduler opens it
+for one older waiter at a time when its turn comes. Never kill waiters to make them pick up
+new code or settings: their callers get exit 143.
+
+Project identity readers accept existing raw project fields and typed
+`project_id=sha256:...` fields. Each controller keeps its selected raw project
+and normalized identity for that invocation. Running owners, queued tickets
+and pending grants use the same normalized key when applying the project cap.
+Missing, invalid or duplicate identity in a live record holds new grants with
+`queue project metadata unavailable` until valid metadata can be read.
+
+This is reader preparation only. New owners and tickets still write the raw
+project in its existing field and append `reader=project-id-v1`. Owner line
+three stays the numeric `start=` used by memory ordering, and tickets keep
+`kind=v2` for the existing scheduler. Raw command and folder metadata remains;
+this release does not complete the privacy change.
+
+Do not enable opaque writers while strict older controllers can still make
+admission decisions or lead the scheduler. A source-file update does not
+replace code already loaded in those processes. The reader marker helps a
+future rollout guard identify compatibility; it does not itself authorize
+that rollout. Existing live records belong to the controller holding their
+kernel locks. Never rewrite another controller's live records.
+
+To trace a freeze, read `~/.local/state/dotfiles/load-samples.tsv` first: it survives a forced
+power-off. `dotfiles-load-sampler report` counts kernel-stall rows (high load with a low CPU-busy
+column).

@@ -31,6 +31,15 @@ All `sudo` calls are wrapped in `2>/dev/null || true` and fail silently. No `sud
 
 ## Secrets Handling
 
+### Pushed-history privacy checks
+
+The pre-push hook checks added lines, file names and commit messages across
+the pushed range. History matchers consume the full Git stream, so an early
+match cannot close the pipe and hide that match under `pipefail`. Diagnostics
+identify commits without printing matching text. Regression controls use only
+synthetic markers and include large matching streams with clean pushed tips.
+This guard does not prove that every possible Git producer error fails closed.
+
 ### Two-layer strategy
 
 | Layer | File | Tracked? | Encryption | Purpose |

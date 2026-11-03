@@ -17,6 +17,30 @@ command="$(printf '%s' "$input" \
 hook_cwd="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract cwd raw -o - -- - 2>/dev/null || true)"
 
+# Invocation-scoped syntax proof: only a standalone cat text write is inert.
+# Parser failures, special files, shells and pipelines retain the original check.
+case "$command" in
+  *'<<'*)
+    if command -v shfmt >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 &&
+      _document_tree=$(printf '%s' "$command" | shfmt --to-json 2>/dev/null | jq -ce -f "$_hook_dir/plain-document-write.jq" 2>/dev/null); then
+      _document_path=$(printf '%s' "$_document_tree" | jq -r '.destination')
+      _document_safe=true
+      if [ -n "$_document_path" ]; then
+        case "$_document_path" in /*) ;; *) _document_path="${hook_cwd:-$PWD}/$_document_path" ;; esac
+        if [ -L "$_document_path" ] || { [ -e "$_document_path" ] && [ ! -f "$_document_path" ]; }; then
+          _document_safe=false
+        fi
+        _document_parent=$(cd "$(dirname "$_document_path")" 2>/dev/null && pwd -P) || _document_safe=false
+        case "${_document_parent:-}" in /dev|/dev/*|/proc|/proc/*|/sys|/sys/*) _document_safe=false ;; esac
+      fi
+      if $_document_safe && _command_code=$(printf '%s' "$_document_tree" | jq '.tree' | shfmt --from-json 2>/dev/null); then
+        command="$_command_code"
+      fi
+    fi
+    ;;
+esac
+unset _document_tree _document_path _document_safe _document_parent _command_code
+
 block() {
   echo "BLOCKED: '$1' is not permitted. Ask the user to run it manually." >&2
   exit 2

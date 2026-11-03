@@ -40,3 +40,144 @@
   ! grep -vE '^[[:space:]]*#' agent-hooks/block-dangerous-git.sh \
     | grep -qE '(^|[[:space:]])python3([[:space:]]|$)'
 }
+
+_check_command_text() {
+  local payload
+  payload=$(jq -n --arg command "$1" '{tool_input: {command: $command}}')
+  run bash -c 'printf "%s" "$1" | ./agent-hooks/block-dangerous-git.sh' _ "$payload"
+}
+
+@test "allows verbose branch listing" {
+  _check_command_text 'git branch -vv'
+  [ "$status" -eq 0 ]
+}
+
+@test "ignores inert quoted heredoc prose" {
+  local text
+  text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
+  _check_command_text "$text"
+  [ "$status" -eq 0 ]
+}
+
+@test "still blocks a destructive command after an inert heredoc" {
+  local text
+  text=$(printf "cat <<'NOTE'\nexample text\nNOTE\ngit reset --hard\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "a here-string must not hide following commands" {
+  local text
+  text=$(printf "cat <<<'NOTE'\ngit reset --hard\nNOTE\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "heredoc-like text in a quoted argument must not hide commands" {
+  local text
+  text=$(printf "echo \"<<'NOTE'\"\ngit reset --hard\nNOTE\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "unquoted heredoc substitutions remain visible to the guard" {
+  local text
+  text=$(printf 'cat <<NOTE\n$(git reset --hard)\nNOTE\n')
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "nested quotes in substitutions cannot hide a following command" {
+  local text
+  text=$(printf 'echo "$(printf "<<\047NOTE\047")"\ngit reset --hard\nNOTE\n')
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "a nested heredoc spelling inside an unquoted body cannot hide a command" {
+  local text
+  text=$(printf 'cat <<PLAIN\ncat <<\047NOTE\047\nPLAIN\ngit reset --hard\nNOTE\n')
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "comments cannot open a heredoc that hides a command" {
+  local text
+  text=$(printf '# cat <<\047NOTE\047\ngit reset --hard\nNOTE\n')
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "multiple quoted heredocs leave later executable commands visible" {
+  local text
+  text=$(printf 'cat <<\047FIRST\047 <<"SECOND"\ngit branch -D prose\nFIRST\ngit reset --hard\nSECOND\n')
+  _check_command_text "$text"
+  [ "$status" -eq 0 ]
+}
+
+@test "deployed git guard links its inert-text helper" {
+  local scratch="$BATS_TEST_TMPDIR/deployed-home" payload text
+  mkdir -p "$scratch"
+  run env HOME="$scratch" CHEZMOI_SOURCE_DIR="$BATS_TEST_DIRNAME/.." \
+    bash .chezmoiscripts/run_after_agent-hooks.sh
+  [ "$status" -eq 0 ]
+  [ -L "$scratch/.config/dotfiles/hooks/plain-document-write.jq" ]
+  text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
+  payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
+  run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
+  [ "$status" -eq 0 ]
+}
+
+@test "quoted heredoc input to a shell remains executable" {
+  local text
+  text=$(printf "bash <<'NOTE'\ngit reset --hard\nNOTE\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "quoted heredoc piped to a shell remains executable" {
+  local text
+  text=$(printf "cat <<'NOTE' | bash\ngit reset --hard\nNOTE\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "arithmetic shifts cannot masquerade as heredocs" {
+  local text
+  text=$(printf "(( 1 << 'NOTE' ))\ngit reset --hard\nNOTE\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "an emoji before a following executable command cannot shift the filter" {
+  local text
+  text=$(printf "cat <<'NOTE'\n📄 safe text\nNOTE\ngit reset --hard\n")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "plain document output may contain an otherwise blocked example" {
+  local text
+  text=$(printf "cat > %s/notes.md <<'NOTE'\ngit reset --hard\nNOTE\n" "$BATS_TEST_TMPDIR")
+  _check_command_text "$text"
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/notes.md" ]
+}
+
+@test "document output to a named pipe keeps the conservative check" {
+  local text
+  mkfifo "$BATS_TEST_TMPDIR/notes.md"
+  text=$(printf "cat > %s/notes.md <<'NOTE'\ngit reset --hard\nNOTE\n" "$BATS_TEST_TMPDIR")
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+}
+
+@test "an unavailable parser keeps the conservative check" {
+  local text
+  shfmt() { return 1; }
+  export -f shfmt
+  text=$(printf "cat <<'NOTE'\ngit reset --hard\nNOTE\n")
+  _check_command_text "$text"
+  unset -f shfmt
+  [ "$status" -eq 2 ]
+}

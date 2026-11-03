@@ -21,6 +21,8 @@ import vm from "node:vm";
 const file = process.env.DRAFTS_JSON;
 const load = () => (file ? JSON.parse(fs.readFileSync(file, "utf8")) : []);
 const save = (rows) => file && fs.writeFileSync(file, JSON.stringify(rows));
+const pageState = () => process.env.PAGE_STATE ? fs.readFileSync(process.env.PAGE_STATE, "utf8").trim() : "drafts";
+const location = new URL(process.env.FAKE_SLACK_URL || `https://app.slack.com/client/TFIXTURE/${pageState()}`);
 let pending = null;
 let openDialog = null;  // the delete dialog opened by a click (one object, so identity is stable)
 // FAKE_OLD_DELETE_DIALOG: a "Delete message?" dialog open before any click.
@@ -45,9 +47,14 @@ const rowEl = (r, i) => ({
         }
         if (process.env.FAKE_CONFIRM) {
           pending = i;
-          openDialog = { innerText: "Delete draft?", querySelector: () => el("", () => {
+          const confirm = () => {
             const cur = load(); cur.splice(pending, 1); save(cur); pending = null; openDialog = null;
-          }) };
+          };
+          openDialog = {
+            innerText: "Delete draft?",
+            querySelector: () => process.env.FAKE_CONFIRM_VARIANT === "button" ? null : el("Delete", confirm),
+            querySelectorAll: () => [el("Cancel"), el("Delete", confirm)],
+          };
           return;
         }
         const cur = load(); cur.splice(i, 1); save(cur);
@@ -71,9 +78,10 @@ const document = {
       if (openDialog) out.push(openDialog);
       return out;
     }
-    return load().map(rowEl);
+    return pageState() === "drafts" ? load().map(rowEl) : [];
   },
   querySelector(sel) {
+    if (sel.includes("drafts_page")) return pageState() === "drafts" && !process.env.FAKE_DRAFTS_NEVER_READY ? el("") : null;
     const state = () => fs.existsSync(process.env.INPUT_STATE || "") && fs.readFileSync(process.env.INPUT_STATE, "utf8").trim() === "1";
     if (sel.includes("type=file")) return state() ? el("") : null;
     if (sel.includes("attach")) {
@@ -83,5 +91,5 @@ const document = {
   },
 };
 
-const value = await vm.runInNewContext(process.argv[2], { document, setTimeout, Promise, JSON, String, RegExp });
+const value = await vm.runInNewContext(process.argv[2], { document, location, URL, setTimeout, Promise, JSON, String, RegExp });
 console.log(typeof value === "string" ? value : JSON.stringify(value));

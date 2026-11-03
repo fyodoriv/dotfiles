@@ -45,6 +45,27 @@
 {{- if hasKey . "claude_effort" -}}
 {{-   $claudeEffort = .claude_effort -}}
 {{- end -}}
+{{/*  Optional heavy-run limits (bin/heavy-run reads them; empty = its built-in default) */ -}}
+{{- $heavyRunSlots := "" -}}
+{{- if hasKey . "heavy_run_slots" -}}
+{{-   $heavyRunSlots = .heavy_run_slots -}}
+{{- end -}}
+{{- $heavyRunRamp := "" -}}
+{{- if hasKey . "heavy_run_ramp_seconds" -}}
+{{-   $heavyRunRamp = .heavy_run_ramp_seconds -}}
+{{- end -}}
+{{- $heavyRunMaxLoad := "" -}}
+{{- if hasKey . "heavy_run_max_load" -}}
+{{-   $heavyRunMaxLoad = .heavy_run_max_load -}}
+{{- end -}}
+{{- $heavyRunProjectSlots := "" -}}
+{{- if hasKey . "heavy_run_project_slots" -}}
+{{-   $heavyRunProjectSlots = .heavy_run_project_slots -}}
+{{- end -}}
+{{- $heavyRunMemoryGuard := "" -}}
+{{- if hasKey . "heavy_run_memory_guard" -}}
+{{-   $heavyRunMemoryGuard = .heavy_run_memory_guard -}}
+{{- end -}}
 {{/* claude_permissions: manage (default) pins bypassPermissions in Claude
      Code and the ~/bin/claude wrapper; keep leaves the person's prompts on. */ -}}
 {{- $claudePermissions := "manage" -}}
@@ -59,7 +80,7 @@
 {{- end -}}
 {{/* claude_mods: agentbrew Claude Code mods installed on every apply
      (.chezmoiscripts/run_after_claude-mods.sh). */ -}}
-{{- $claudeMods := list "work-pane" -}}
+{{- $claudeMods := list -}}
 {{- if hasKey . "claude_mods" -}}
 {{-   $claudeMods = .claude_mods -}}
 {{- end -}}
@@ -235,6 +256,21 @@ data:
 {{- end }}
 {{- if $claudeEffort }}
   claude_effort: {{ $claudeEffort | quote }}
+{{- end }}
+{{- if $heavyRunSlots }}
+  heavy_run_slots: {{ $heavyRunSlots }}
+{{- end }}
+{{- if $heavyRunRamp }}
+  heavy_run_ramp_seconds: {{ $heavyRunRamp }}
+{{- end }}
+{{- if $heavyRunMaxLoad }}
+  heavy_run_max_load: {{ $heavyRunMaxLoad }}
+{{- end }}
+{{- if $heavyRunProjectSlots }}
+  heavy_run_project_slots: {{ $heavyRunProjectSlots }}
+{{- end }}
+{{- if ne (toString $heavyRunMemoryGuard) "" }}
+  heavy_run_memory_guard: {{ $heavyRunMemoryGuard }}
 {{- end }}
 {{- if ne $claudePermissions "manage" }}
   claude_permissions: {{ $claudePermissions | quote }}

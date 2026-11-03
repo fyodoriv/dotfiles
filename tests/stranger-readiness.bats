@@ -128,6 +128,63 @@ STUB
 
 OWNER_RULE_PATTERN='Needed from you|get_bootstrap_profile|commit_session_legacy|search memory|Augment|Windsurf|Devin|Approved-family|approved repo families'
 
+_pending_footer_export() {
+  cp "$REPO/Agentfile.yaml" "$SRC/"
+  cp -R "$REPO/config/." "$SRC/config/"
+  cp "$REPO/.chezmoiscripts/run_after_agentbrew-sync.sh" "$SRC/.chezmoiscripts/"
+  _merged_agentfile "$1"
+}
+
+@test "pending footer C2 owner selection exports the ordered footer contract" {
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lifecycle scope"* ]]
+  [[ "$output" == *"Right before the Needed-from-you line"* ]]
+  [[ "$output" == *"**Pending:**"* ]]
+  [[ "$output" == *"**Needed from you:**"* ]]
+}
+
+@test "pending footer C3 guest selection excludes both personal footer rules" {
+  local merged
+  run _pending_footer_export alex@example.com
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lifecycle scope"* ]]
+  merged="$output"
+  run grep -E '\*\*(Pending|Needed from you):\*\*' <<<"$merged"
+  [ "$status" -eq 1 ]
+}
+
+@test "pending footer C5 owner export covers each registered open-work category" {
+  local merged category
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  merged="$output"
+  [[ "$merged" == *"**Pending:**"* ]]
+  for category in 'CI' 'background jobs' 'linked (chats|sessions)' 'unfinished steps' 'cleanup' 'follow-ups'; do
+    grep -Ei "$category" <<<"$merged" >/dev/null
+  done
+}
+
+@test "pending footer C6 owner export requires live verification and explicit unknowns" {
+  local merged
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  merged="$output"
+  [[ "$merged" == *"**Pending:**"* ]]
+  grep -Ei 'each (item|one)' <<<"$merged" >/dev/null
+  grep -Ei 'check.*live|live.*check' <<<"$merged" >/dev/null
+  grep -Ei 'never.*memory|not.*memory' <<<"$merged" >/dev/null
+  grep -Ei 'unknown' <<<"$merged" >/dev/null
+}
+
+@test "pending footer C7 owner export permits independent nothing forms" {
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"**Pending:** nothing"* ]]
+  [[ "$output" == *"**Needed from you:** nothing"* ]]
+  grep -Ei '(lines|forms).*independent|independent.*(lines|forms)' <<<"$output" >/dev/null
+}
+
 @test "base Agentfile.yaml rules carry no owner-only lines" {
   run grep -nE "$OWNER_RULE_PATTERN" "$REPO/Agentfile.yaml"
   [ "$status" -ne 0 ] || { echo "owner-only rule in Agentfile.yaml: $output"; return 1; }

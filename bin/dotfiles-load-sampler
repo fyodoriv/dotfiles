@@ -9,7 +9,7 @@
 # Load counts threads blocked in the kernel too, so a high load with a low
 # CPU busy % means a kernel or I/O stall, not CPU saturation.
 # Usage: dotfiles-load-sampler            # append one row
-#        dotfiles-load-sampler --report [hours]  # peak, overload rows, gaps (default 24h)
+#        dotfiles-load-sampler --report [hours]  # peak, overload rows, kernel-stall rows, gaps (default 24h)
 
 set -euo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
@@ -28,6 +28,9 @@ report() {
       if ($3 + 0 > peak + 0) { peak = $3; peak_at = $2; peak_top = $10 }
       if ($11 != "" && $11 + 0 > busy + 0) { busy = $11; busy_at = $2 }
       if ($3 + 0 > 2 * $6) { over++ }
+      # High load with a low CPU-busy % is threads stuck in the kernel: the
+      # pattern before each crash on 2026-11-01 (WindowServer watchdog).
+      if ($11 != "" && $3 + 0 > 8 * $6 && $11 + 0 < 35) { stall++; stall_at = $2; stall_top = $10 }
       limit = 2 * $6
       # A gap over 5 minutes means the sampler did not run: sleep, freeze, or reboot.
       if (prev_epoch && $1 - prev_epoch > 300) {
@@ -39,6 +42,7 @@ report() {
       printf "last %sh: %d rows\n", hours, rows
       printf "peak load1 %s at %s (top: %s)\n", peak, peak_at, peak_top
       printf "overload rows (load1 > %d): %d\n", limit, over
+      if (stall) printf "kernel-stall rows (load1 > %d at CPU busy < 35%%): %d, last at %s (top: %s)\n", 4 * limit, stall, stall_at, stall_top
       if (busy_at != "") printf "peak CPU busy %s%% at %s\n", busy, busy_at
       printf "%s", gaps
     }' "$SAMPLES"

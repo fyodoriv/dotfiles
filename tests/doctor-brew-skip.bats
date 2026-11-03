@@ -3,11 +3,16 @@
 # (chezmoi data, or the brew.skip core option). DOTFILES_BREW_SKIP overrides
 # both, like the other DOTFILES_* doctor seams.
 
+load test_helper
+
 REPO_ROOT="$BATS_TEST_DIRNAME/.."
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-  mkdir -p "$TEST_DIR/extra/brewskipmod"
+  export HOME="$TEST_DIR/home"
+  export XDG_CONFIG_HOME="$HOME/.config" XDG_STATE_HOME="$HOME/.local/state" XDG_DATA_HOME="$HOME/.local/share"
+  unset DOTFILES_PLUGINS_LOCK DOTFILES_PLUGINS_HOME
+  mkdir -p "$HOME" "$TEST_DIR/extra/brewskipmod"
   cat > "$TEST_DIR/extra/brewskipmod/doctor.sh" <<'DOCTOR'
 check "tool.fakecask" "fakecask installed" "false" ""
 check "brewskipmod.other" "other check" "false" ""

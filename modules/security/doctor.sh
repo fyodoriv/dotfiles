@@ -523,9 +523,12 @@ if [ -L "$DOTFILES_DIR/bin/python3" ] && command -v codesign >/dev/null 2>&1; th
     check_advisory "security.python3_shim_target_signed" "python3 symlink target is ad-hoc signed (still lacks publisher authority)" \
       "codesign -dvv \"\$_py_real\" 2>&1 | grep -q 'Signature=adhoc'" \
       "dotfiles-adhoc-sign-uv-pythons  # then dotfiles-link-python-shim"
-    check_advisory "security.python3_publisher_authority" "python3 has publisher authority required by endpoint policy" \
-      "codesign -dvv \"\$_py_real\" 2>&1 | grep -q '^Authority='" \
-      "file the machine-scoped endpoint-policy exception for uv python-build-standalone; keep recurring automation in safe mode"
+    # Publisher authority matters only where an endpoint agent enforces it.
+    case "${ENDPOINT_HARDENING:-true}" in true|1)
+      check_advisory "security.python3_publisher_authority" "python3 has publisher authority required by endpoint policy" \
+        "codesign -dvv \"\$_py_real\" 2>&1 | grep -q '^Authority='" \
+        "file the machine-scoped endpoint-policy exception for uv python-build-standalone; keep recurring automation in safe mode" ;;
+    esac
   fi
   unset _py_real
 fi
@@ -958,40 +961,53 @@ check_advisory "security.zsh_minimal_path_endpoint" "zsh -c with minimal PATH re
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v jq' 2>/dev/null | grep -q 'dotfiles/bin/jq'" \
   "chezmoi apply  # ~/.config/dotfiles/env.sh sourced from ~/.zshenv"
 
+# bash -c bypassing dotfiles/bin matters only where an endpoint agent blocks
+# system or unsigned binaries (endpoint_hardening on).
+if [ "$_endpoint_hardening_on" = "true" ]; then
 check_advisory "security.bash_minimal_path_endpoint" "bash -c with PATH=/usr/bin:/bin must not be used for jq/python (hits /usr/bin/*)" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v jq' 2>/dev/null | grep -q '/usr/bin/jq'" \
   "Use zsh for non-login agent subshells; bash -c ignores BASH_ENV on macOS. See docs/troubleshooting.md § endpoint-security"
+
+fi
 
 check_advisory "security.zsh_minimal_path_ggrep" "zsh -c with minimal PATH resolves ggrep via dotfiles/bin (~/.zshenv)" \
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v ggrep' 2>/dev/null | grep -q 'dotfiles/bin/ggrep'" \
   "chezmoi apply  # ~/.config/dotfiles/env.sh sourced from ~/.zshenv"
 
+if [ "$_endpoint_hardening_on" = "true" ]; then
 check_advisory "security.bash_minimal_path_ggrep" "bash -c with PATH=/usr/bin:/bin must not resolve ggrep to bare Homebrew" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v ggrep' 2>/dev/null | grep -q '/opt/homebrew/bin/ggrep'" \
   "Use zsh for non-login agent subshells; chezmoi apply installs the preToolUse prepend-endpoint-path hook"
+
+fi
 
 check_advisory "security.zsh_minimal_path_perl" "zsh -c with minimal PATH resolves perl via dotfiles/bin (~/.zshenv)" \
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v perl' 2>/dev/null | grep -q 'dotfiles/bin/perl'" \
   "chezmoi apply  # ~/.config/dotfiles/env.sh sourced from ~/.zshenv"
 
+if [ "$_endpoint_hardening_on" = "true" ]; then
 check_advisory "security.bash_minimal_path_perl" "bash -c with PATH=/usr/bin:/bin must not resolve perl to /usr/bin/perl (endpoint agents may block Apple perl)" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v perl' 2>/dev/null | grep -q '/usr/bin/perl'" \
   "Use zsh for non-login agent subshells; chezmoi apply installs the preToolUse prepend-endpoint-path hook"
+
+fi
 
 check_advisory "security.zsh_minimal_path_curl" "zsh -c with minimal PATH resolves curl via dotfiles/bin (~/.zshenv)" \
   "env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" /bin/zsh -c 'command -v curl' 2>/dev/null | grep -q 'dotfiles/bin/curl'" \
   "chezmoi apply  # ~/.config/dotfiles/env.sh sourced from ~/.zshenv"
 
+if [ "$_endpoint_hardening_on" = "true" ]; then
 check_advisory "security.bash_minimal_path_curl" "bash -c with PATH=/usr/bin:/bin must not resolve curl to /usr/bin/curl (endpoint agents may block system curl)" \
   "! env -i PATH=/usr/bin:/bin HOME=\"\$HOME\" bash -c 'command -v curl' 2>/dev/null | grep -q '/usr/bin/curl'" \
   "Use zsh for non-login agent subshells; chezmoi apply installs the preToolUse prepend-endpoint-path hook"
+fi
 
 # Agent tool shells often use PATH=/opt/homebrew/bin:/usr/bin:/bin (Homebrew
 # sandbox) which omits dotfiles/bin — ggrep/perl hit bare Homebrew binaries
 # (unsigned when unsigned); curl is keg-only and falls through to /usr/bin/curl
 # on that PATH unless dotfiles/bin is prepended. LaunchAgent PATH was fixed in PR #241;
 # this is the remaining invoker for recurring endpoint agent popups.
-if [ -d /opt/homebrew/bin ]; then
+if [ "$_endpoint_hardening_on" = "true" ] && [ -d /opt/homebrew/bin ]; then
   _sandbox_hb_path="/opt/homebrew/bin:/usr/bin:/bin"
   _sandbox_ggrep="$(PATH="$_sandbox_hb_path" command -v ggrep 2>/dev/null || true)"
   if [ -n "$_sandbox_ggrep" ] && [ "$_sandbox_ggrep" != "$DOTFILES_DIR/bin/ggrep" ]; then

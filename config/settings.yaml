@@ -172,5 +172,30 @@ settings:
     description: Claude Code plugins that dotfiles apply keeps off in ~/.claude/settings.json, comma-separated. Empty = none.
   claude_mods:
     type: list
-    default: work-pane
-    description: agentbrew Claude Code mods (from its mods/ folder) that dotfiles apply installs, comma-separated. work-pane shows /work progress beside the chat. Empty = none.
+    default: ""
+    description: agentbrew Claude Code mods (from its mods/ folder) that dotfiles apply installs, comma-separated. Empty (the default) = none.
+  heavy_run_slots:
+    type: int:1-64
+    default: ""
+    optional: true
+    description: Parallel heavy-run slots on this Mac. Empty = 1, one heavy command at a time (more froze a 32 GB Mac twice on 2026-11-01). HEAVY_RUN_SLOTS wins.
+  heavy_run_ramp_seconds:
+    type: int:0-3600
+    default: ""
+    optional: true
+    description: Seconds heavy-run waits between run starts while other runs are active, so a new gate can show its memory use first. Empty = 15. HEAVY_RUN_RAMP wins.
+  heavy_run_max_load:
+    type: int:0-1000
+    default: ""
+    optional: true
+    description: 1-minute load average above which heavy-run starts no extra run. Empty or 0 = off (memory pressure still applies). HEAVY_RUN_MAX_LOAD wins.
+  heavy_run_project_slots:
+    type: int:1-64
+    default: ""
+    optional: true
+    description: Most heavy-run slots one project (a repo and all its worktrees) may hold at once. Empty = 3. Matters only with more than 3 slots. HEAVY_RUN_PROJECT_SLOTS wins.
+  heavy_run_memory_guard:
+    type: int:0-1
+    default: ""
+    optional: true
+    description: 1 (default) stops every heavy-run but the oldest while memory pressure is high, and goes on when it clears. 0 = off. HEAVY_RUN_MEMORY_GUARD wins.

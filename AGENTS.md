@@ -97,6 +97,8 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 
 ## Gotchas
 
+- Root helpers need .chezmoiignore entries.
+
 - [Declared skills](docs/user-stories/README.md#agent-workflow-acceptance).
 
 - **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
@@ -105,7 +107,9 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
 - FIFO tests hold through observations; teardown releases/waits; keep the queue guard.
-- **Host `BASH_ENV`** puts live `bin/` shims first on `PATH`; `tests/setup_suite.bash` unsets it (not the coverage trap). Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add them: use a temp `DOTFILES_DIR` in tests.
+- Tests: [Bash, PATH, serial Bats](docs/constitution.md#test-command-shims).
+- Hooks: [execute access](docs/plugins.md#migrating-from-the-v1-overlay).
+- Pin Claude fixture IDs.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.

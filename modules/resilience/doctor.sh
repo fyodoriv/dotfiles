@@ -15,6 +15,8 @@
 source "$DOTFILES_DIR/lib/agent-keepawake.sh"
 # shellcheck source=../../lib/run-with-timeout.sh
 source "$DOTFILES_DIR/lib/run-with-timeout.sh"
+# shellcheck source=../../lib/dotfiles-arch.sh
+source "$DOTFILES_DIR/lib/dotfiles-arch.sh"
 
 # ── tmux ──────────────────────────────────────────────────────────────
 check "resilience.tmux_installed" "tmux installed (session persistence for agents)" \
@@ -73,6 +75,20 @@ if [ "${KEEP_AWAKE_TOOLS:-true}" = "true" ]; then
     "[ -d /Applications/Amphetamine.app ]" \
     "echo 'Run: dotfiles-resilience-setup (will open App Store + print config steps)'"
 fi
+
+# The upstream installer places a user script and an administrator config.
+# File presence is readiness evidence, not proof of agent continuity.
+_amphetamine_power_protect_ready() {
+  [ "${KEEP_AWAKE_TOOLS:-true}" = true ] || return 0
+  dotfiles_is_apple_silicon || return 0
+  [ -d "${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}" ] || return 0
+  [ -f "$HOME/Library/Application Scripts/com.if.Amphetamine/powerProtect.scpt" ] \
+    && [ -f "${AMPHETAMINE_POWER_PROTECT_CONFIG:-/private/etc/sudoers.d/amphetamine_powerProtect}" ]
+}
+
+check_advisory "resilience.amphetamine_power_protect" "Power Protect readiness files present when Apple Silicon keep-awake tools need them" \
+  "_amphetamine_power_protect_ready" \
+  "Start an Amphetamine Closed-Display session and choose Learn More for the separate Power Protect installer (administrator authentication required); file presence does not prove agent uptime"
 
 # A stale manual Single-Use session can survive for days, continuously
 # preventing system sleep (and, depending on its setting, display sleep).
@@ -144,12 +160,13 @@ _amphetamine_prefs_value() {
 # Amphetamine must not own generic automatic sessions. The process manager
 # starts one only for live Claude Code work, then ends its own session.
 # Uses $_AMPHETAMINE_PREFS when the module already read the domain
-# (module-run scope: set once per doctor run of this module).
+# (module-run scope: set once per doctor run of this module). A repair's
+# verification scope bypasses it: the write ran in a separate bash process.
 _amphetamine_managed_session_policy() {
   local app_path="${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}"
   local dump trigger_count triggers_enabled at_launch on_wake on_ac_reconnect
   [ -d "$app_path" ] || return 0
-  if [ "${_AMPHETAMINE_PREFS_READ:-0}" = "1" ]; then
+  if [ "${_AMPHETAMINE_PREFS_READ:-0}" = "1" ] && [ "${DOCTOR_VERIFY_REPAIR:-false}" != true ]; then
     dump="${_AMPHETAMINE_PREFS-}"
   else
     # A missing domain exits non-zero: treat it as "no keys set".
@@ -181,6 +198,8 @@ _amphetamine_apply_managed_session_policy() {
     defaults write com.if.Amphetamine 'Enable Triggers' -bool false &&
     defaults write com.if.Amphetamine 'Trigger Data' -array
 }
+# dotfiles-doctor runs each fix in a new process (bash -c).
+export -f _amphetamine_apply_managed_session_policy
 
 _AMPHETAMINE_PREFS=""
 _amphetamine_read_rc=0

@@ -338,6 +338,10 @@ commands always work now). A leftover setting stops `dotfiles doctor`,
 
 On the machine that has the old overlay:
 
+Migration includes regular hook files executable by the current user,
+including private `0700` hooks. It does not execute hooks or change their
+permissions. Non-executable files are not listed as hook capabilities.
+
 1. `dotfiles plugin migrate <overlay dir>` writes `dotfiles-plugin.yaml.draft`
    (doctor `modules/`, `validate/`, `brewfile/Brewfile`, `hooks/`,
    `vscode/settings.json`, and `Agentfile.yaml` as `agentbrew: .`) and lists

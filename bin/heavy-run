@@ -1,36 +1,95 @@
 #!/bin/bash
-# heavy-run — run one heavy command at a time on this Mac, at low priority.
+# heavy-run — run heavy commands on this Mac one at a time (more slots opt-in), at low priority.
 #
-# Every agent session and worker shares one lock file at a fixed path, so
+# Every agent session and worker shares one state folder at a fixed path, so
 # full suites, e2e runs, and timing runs queue instead of piling up.
 # $TMPDIR is not used: sandboxed sessions can see different temp dirs.
 #
-# Waiters are served in arrival order. Each caller takes a numbered ticket
-# file in $dir/queue (numbers come from $dir/seq under a short flock) and holds
-# an flock on that file while it waits. Only the lowest live ticket tries for
-# the lock. A ticket nobody holds (its owner died, even by SIGKILL) is deleted
-# by the next waiter; liveness never depends on a pid. If the queue folder is
-# unusable, heavy-run warns once and uses the plain lock. Each run appends
-# "waited=<seconds>" to the wait log (skipped if its folder cannot be made).
-# Known limits: a stopped (Ctrl-Z) waiter at the head blocks the queue until it
-# resumes; callers on the fallback path or an old binary can overtake the head.
+# One scheduler decides for the whole queue. Each caller takes a numbered
+# ticket file in $dir/queue (numbers come from $dir/seq under a short flock)
+# and holds an flock on it while it waits. Every heavy-run process (waiting or
+# running) tries for the leader lock $dir/sched.lock each 0.2 s; the one that
+# holds it is the scheduler until it exits, and the kernel hands the role on
+# when it dies (even by SIGKILL). The scheduler reads the settings live, walks
+# the tickets in arrival order, and writes either a grant ($queue/<t>.grant: a
+# slot name) or why the ticket waits ($queue/<t>.why). So a changed setting
+# reaches every waiter within about a second, and no waiter decides alone.
 #
-# A perl parent holds an flock (fd closed on exec, so no child or leftover
-# daemon inherits it), runs the command, forwards TERM/INT/HUP to it, and
-# exits with its status. The lock lasts exactly as long as the command.
+# Rules, in order: a real-time app holds every run; an exclusive run (active
+# or next) holds the rest; a project at its cap lets later projects go first;
+# then a free slot, and, while other runs are going, the ramp
+# (HEAVY_RUN_RAMP seconds since the last start), the 1-minute load, and memory
+# pressure. The first run always starts. There is one slot unless
+# HEAVY_RUN_SLOTS or heavy_run_slots asks for more: an automatic count of 4
+# froze a 32 GB Mac twice. `heavy-run --exclusive` takes an
+# exclusive flock on $dir/lock (normal runs take it shared): it starts when no
+# run is active and blocks every other run until it ends (use it for timing).
+#
+# Pausing is central too: while a real-time app runs, the scheduler marks every
+# run paused ($dir/slots/s<n>.paused); under memory pressure (memory guard on)
+# it marks every run but the oldest. Each run stops (SIGSTOP) its own process
+# tree while its mark exists and goes on (SIGCONT) when it is gone.
+#
+# Older heavy-run waiters (tickets without "kind=v2") keep their place: every
+# new process holds a shared flock on the gate ticket $queue/0000000000-0, so an
+# older waiter never sees itself first. When its turn comes, the scheduler
+# writes $dir/gate-open, the new processes let go of the gate, and that waiter
+# starts on its old numbered slot file. Runs on old slot files count toward the
+# slot total. New runs use slots/s<n>, which older code does not see.
+#
+# Orphans: a waiter whose caller died (its parent pid changed) drops its
+# ticket and exits 129, so a killed session does not hold the queue. It keeps
+# waiting when its output goes to a file (someone may read it later), when it
+# runs under nohup, or with HEAVY_RUN_KEEP_ORPHAN=1. A running command is never
+# stopped this way.
+#
+# A ticket nobody holds is deleted by the scheduler. A crashed run frees its
+# slot because the kernel drops its flock; liveness never depends on a pid. If
+# the queue folder is unusable, heavy-run warns once and decides for itself.
+# Each run appends "waited=<seconds>" to the wait log (skipped if its folder
+# cannot be made). Known limits: a stopped (Ctrl-Z) scheduler or granted waiter
+# holds the queue until it resumes; a scheduler keeps its code until it exits.
+#
+# A perl parent holds the flocks (fds closed on exec, so no child or leftover
+# daemon inherits them), runs the command, forwards TERM/INT/HUP to it, and
+# exits with its status. A slot lasts exactly as long as the command. The
+# command sees HEAVY_RUN_SLOT (its slot number, or "exclusive"), so a gate can
+# pick ports or folders per slot. heavy-run itself shares no writable temp path
+# between runs. The folder is mode 0700 and its files 0600.
 #
 # Usage:
 #   heavy-run make check
 #   heavy-run npm run verify
-#   heavy-run --status          # print who holds the lock, if anyone
+#   heavy-run --exclusive scripts/metrics.sh   # alone on the machine
+#   heavy-run --status          # running slots, the queue, and why each waits
 #
-# Env:
-#   HEAVY_RUN_DIR   lock folder (default ~/.local/state/heavy-run)
-#   HEAVY_RUN_NICE  absolute nice level (default 15); never raises priority
+# Env (each wins over its setting in ~/.config/chezmoi/chezmoi.yaml; the
+# scheduler reads them live, so an env value in the scheduler's caller applies
+# to the whole queue while it leads — prefer the settings):
+#   HEAVY_RUN_DIR       state folder (default ~/.local/state/heavy-run)
+#   HEAVY_RUN_NICE      absolute nice level (default 15); never raises priority
+#   HEAVY_RUN_SLOTS     parallel slots, 1-64 (setting heavy_run_slots; default 1)
+#   HEAVY_RUN_RAMP      seconds between run starts while others run, 0-3600
+#                       (setting heavy_run_ramp_seconds; default 15)
+#   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
+#                       (setting heavy_run_max_load; default 0)
+#   HEAVY_RUN_PROJECT_SLOTS  most slots one project (a repo and its worktrees,
+#                       by git common dir) holds at once; its next run lets later
+#                       projects go first (setting heavy_run_project_slots; default 3)
+#   HEAVY_RUN_PROJECT   project name to use instead of the git common dir
+#   HEAVY_RUN_MEMORY_GUARD  1 = under memory pressure stop every run but the
+#                       oldest until it clears; 0 = off (setting heavy_run_memory_guard)
+#   HEAVY_RUN_PAUSE_APPS  real-time apps (process names, comma-separated) that
+#                       hold every run: none starts, and a running one is stopped
+#                       until they quit (default GeForceNOW; empty = off)
+#   HEAVY_RUN_KEEP_ORPHAN  1 = a waiter keeps its place after its caller dies (default 0)
+#   HEAVY_RUN_PROBE     a command whose non-empty output is a reason to wait;
+#                       replaces the built-in memory pressure check
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
-#                   or $HEAVY_RUN_DIR/waits.log when HEAVY_RUN_DIR is set)
+#                       or $HEAVY_RUN_DIR/waits.log when HEAVY_RUN_DIR is set)
 
 set -euo pipefail
+umask 077
 
 dir="${HEAVY_RUN_DIR:-$HOME/.local/state/heavy-run}"
 lock="$dir/lock"
@@ -40,10 +99,154 @@ if [ -n "${HEAVY_RUN_WAIT_LOG:-}" ]; then waitlog="$HEAVY_RUN_WAIT_LOG"
 elif [ -n "${HEAVY_RUN_DIR:-}" ]; then waitlog="$dir/waits.log"
 else waitlog="$HOME/.local/state/dotfiles/heavy-run-waits.log"; fi
 level="${HEAVY_RUN_NICE:-15}"
+export HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"
 
 usage() {
-  echo "Usage: heavy-run <command...> | heavy-run --status"
+  echo "Usage: heavy-run [--exclusive] <command...> | heavy-run --status"
 }
+
+# Settings: env first, then the chezmoi data, then the default. A trailing
+# "# comment" after the value is allowed.
+setting() {
+  local env="$1" key="$2" def="$3" cfg="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.yaml" v
+  if [ -n "${!env:-}" ]; then printf '%s\n' "${!env}"; return; fi
+  v=$(sed -n "s/^  $key: *\"\{0,1\}\([0-9.]*\)\"\{0,1\} *\(#.*\)\{0,1\}$/\1/p" "$cfg" 2>/dev/null | head -n 1) || v=""
+  printf '%s\n' "${v:-$def}"
+}
+slots_set=$(setting HEAVY_RUN_SLOTS heavy_run_slots 1)
+ramp=$(setting HEAVY_RUN_RAMP heavy_run_ramp_seconds 15)
+maxload=$(setting HEAVY_RUN_MAX_LOAD heavy_run_max_load 0)
+projslots=$(setting HEAVY_RUN_PROJECT_SLOTS heavy_run_project_slots 3)
+memguard=$(setting HEAVY_RUN_MEMORY_GUARD heavy_run_memory_guard 1)
+
+check_num() {
+  case "$2" in
+    '' | *[!0-9.]* | *.*.*) echo "heavy-run: $1 must be a number, got '$2'" >&2; exit 2 ;;
+  esac
+}
+case "$slots_set" in
+  '') ;;
+  *[!0-9]* | 0 | 0*) echo "heavy-run: HEAVY_RUN_SLOTS must be 1-64, got '$slots_set'" >&2; exit 2 ;;
+  *) [ "$slots_set" -le 64 ] || { echo "heavy-run: HEAVY_RUN_SLOTS must be 1-64, got '$slots_set'" >&2; exit 2; } ;;
+esac
+case "$projslots" in
+  *[!0-9]* | '' | 0 | 0*) echo "heavy-run: HEAVY_RUN_PROJECT_SLOTS must be 1-64, got '$projslots'" >&2; exit 2 ;;
+  *) [ "$projslots" -le 64 ] || { echo "heavy-run: HEAVY_RUN_PROJECT_SLOTS must be 1-64, got '$projslots'" >&2; exit 2; } ;;
+esac
+case "$memguard" in
+  0 | 1) ;;
+  *) echo "heavy-run: HEAVY_RUN_MEMORY_GUARD must be 0 or 1, got '$memguard'" >&2; exit 2 ;;
+esac
+check_num HEAVY_RUN_RAMP "$ramp"
+check_num HEAVY_RUN_MAX_LOAD "$maxload"
+case "${HEAVY_RUN_KEEP_ORPHAN:-0}" in
+  0 | 1) ;;
+  *) echo "heavy-run: HEAVY_RUN_KEEP_ORPHAN must be 0 or 1, got '$HEAVY_RUN_KEEP_ORPHAN'" >&2; exit 2 ;;
+esac
+
+# Shared by the run and --status: slot files, owner files, wait reasons.
+common_code='
+  use strict; use warnings;
+  use Fcntl qw(:flock O_RDWR O_CREAT);
+  use Digest::SHA qw(sha256_hex);
+  sub cmd_out { my $o = `$_[0] 2>/dev/null`; $o //= ""; chomp $o; return $o; }
+  sub slot_count { my ($set) = @_; return $set ne "" ? $set : 1; }
+  sub load1 {
+    my $l = cmd_out("sysctl -n vm.loadavg");
+    return $1 if $l =~ /([\d.]+)/;
+    if (open(my $f, "<", "/proc/loadavg")) { my $x = <$f> // ""; return $1 if $x =~ /^([\d.]+)/; }
+    return 0;
+  }
+  # Empty when memory looks fine (or cannot be read), else why to wait.
+  sub pressure {
+    if (defined $ENV{HEAVY_RUN_PROBE} && $ENV{HEAVY_RUN_PROBE} ne "") {
+      my $r = cmd_out($ENV{HEAVY_RUN_PROBE}); $r =~ s/\s+/ /g; return $r;
+    }
+    my $lvl = cmd_out("sysctl -n kern.memorystatus_vm_pressure_level");
+    if ($lvl =~ /^\d+$/) {
+      return "" if $lvl <= 1;
+      return $lvl >= 4 ? "memory pressure critical" : "memory pressure warn";
+    }
+    if (open(my $p, "<", "/proc/pressure/memory")) {
+      my $x = <$p> // "";
+      return "memory pressure some avg10=$1" if $x =~ /avg10=([\d.]+)/ && $1 > 10;
+    }
+    if (open(my $m, "<", "/proc/meminfo")) {
+      my %k; while (<$m>) { $k{$1} = $2 if /^(\w+):\s+(\d+)/; }
+      return "low free memory" if $k{MemTotal} && defined $k{MemAvailable} && $k{MemAvailable} < $k{MemTotal} / 10;
+    }
+    return "";
+  }
+  # Empty when no real-time app runs, else why heavy runs wait. A real-time app
+  # (a game stream) froze the Mac when heavy runs shared it (5 restarts in one
+  # day, GeForce NOW 2.0.90). Asked at most every 2 s: pgrep is a fork.
+  my ($rt_at, $rt_why) = (0, "");
+  sub app_presence {
+    my ($app) = @_;
+    my $command = "pgrep -x " . quotemeta($app) . " 2>/dev/null";
+    my $out = `$command`;
+    my $status = $?;
+    $out //= "";
+    return "clear" if $status == 256 && $out eq "";
+    chomp $out;
+    return "present" if $status == 0 && $out =~ /\A[1-9][0-9]*(?:\n[1-9][0-9]*)*\z/;
+    return "unknown";
+  }
+  sub realtime {
+    return $rt_why if time - $rt_at < 2;
+    $rt_at = time; $rt_why = "";
+    for my $app (grep { $_ ne "" } split /,/, $ENV{HEAVY_RUN_PAUSE_APPS} // "") {
+      my $presence = app_presence($app);
+      if ($presence eq "unknown") { $rt_why = "real-time app probe unavailable"; last; }
+      if ($presence eq "present") { $rt_why = "$app is running (a real-time app)"; last; }
+    }
+    return $rt_why;
+  }
+  # A process and all its descendants, for pausing a run as a whole.
+  sub tree {
+    my ($root) = @_;
+    my %kids;
+    for (split /\n/, cmd_out("ps -A -o pid= -o ppid=")) { push @{$kids{$2}}, $1 if /(\d+)\s+(\d+)/; }
+    my @all = ($root);
+    for (my $i = 0; $i < @all; $i++) { push @all, @{$kids{$all[$i]} // []}; }
+    return @all;
+  }
+  # Is someone holding an flock on this file? (We can not get it at once.)
+  sub held { my ($p, $mode) = @_; open(my $f, "<", $p) or return 0; return flock($f, ($mode // LOCK_EX) | LOCK_NB) ? 0 : 1; }
+  # Slot files of older heavy-run code ("1", "2") and of this code ("s1", "s2").
+  sub slot_files { my ($d) = @_; opendir(my $h, $d) or return (); return sort { $a <=> $b } grep { /^\d+$/ } readdir $h; }
+  sub new_slots { my ($d) = @_; opendir(my $h, $d) or return (); return sort { $a <=> $b } map { /^s(\d+)$/ ? $1 : () } readdir $h; }
+  # The first line, then key=value fields of an owner or ticket file.
+  sub fields {
+    my ($p) = @_;
+    open(my $f, "<", $p) or return ();
+    my $first = <$f> // ""; chomp $first;
+    my %f = (line => $first);
+    my (%identity_keys, $duplicate);
+    while (<$f>) {
+      chomp;
+      next unless /^(\w+)=(.*)$/;
+      my ($key, $value) = ($1, $2);
+      $duplicate = 1 if ($key eq "project" || $key eq "project_id") && $identity_keys{$key}++;
+      $f{$key} = $value;
+    }
+    $f{duplicate_project_identity} = $duplicate ? 1 : 0;
+    return %f;
+  }
+  # Raw project fields and typed future fields share one controller identity.
+  sub project_identity {
+    my ($f) = @_;
+    return undef if $f->{duplicate_project_identity};
+    if (defined $f->{project_id}) {
+      return undef unless $f->{project_id} =~ /^sha256:[0-9a-f]{64}$/;
+      return undef if defined $f->{project} && "sha256:" . sha256_hex($f->{project}) ne $f->{project_id};
+      return $f->{project_id};
+    }
+    return defined $f->{project} ? "sha256:" . sha256_hex($f->{project}) : undef;
+  }
+  sub read1 { my ($p) = @_; open(my $f, "<", $p) or return ""; my $l = <$f> // ""; chomp $l; return $l; }
+  our $GATE = "0000000000-0";
+'
 
 case "${1:-}" in
   "" | -h | --help)
@@ -52,24 +255,57 @@ case "${1:-}" in
     exit 2
     ;;
   --status)
-    if [ ! -e "$lock" ] || perl -e 'use Fcntl qw(:flock); open(my $f, "<", $ARGV[0]) or exit 0; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1)' "$lock"; then
-      echo "free"
-    else
-      echo "held: $(cat "$owner" 2>/dev/null)"
-    fi
-    perl -e '
-      use Fcntl qw(:flock);
-      opendir(my $d, $ARGV[0]) or exit 0;
-      my $n = 0;
-      for my $t (sort grep { /^\d+-\d+$/ } readdir $d) {
-        open(my $h, "<", "$ARGV[0]/$t") or next;
+    exec perl -e "$common_code"'
+      my ($dir, $lock, $owner, $queue, $set) = @ARGV;
+      my $n = slot_count($set);
+      my @busy;
+      for my $s (new_slots("$dir/slots")) {
+        next unless held("$dir/slots/s$s");
+        my %f = fields("$dir/slots/s$s.owner");
+        my $p = read1("$dir/slots/s$s.paused");
+        push @busy, "slot $s: " . ($f{line} // "") . ($p ne "" ? " (paused: $p)" : "");
+      }
+      for my $s (slot_files("$dir/slots")) {
+        next unless held("$dir/slots/$s");
+        push @busy, "slot $s (older heavy-run): " . read1("$dir/slots/$s.owner");
+      }
+      my $excl = "";
+      if (!@busy && -e $lock && held($lock, LOCK_SH)) {
+        $excl = read1($owner) || "an older heavy-run";
+        my $p = read1("$dir/exclusive.paused");
+        $excl .= " (paused: $p)" if $p ne "";
+      }
+      if ($excl ne "") { print "exclusive: $excl\n"; }
+      elsif (@busy) { printf "busy: %d/%d slots\n", scalar @busy, $n; print "$_\n" for @busy; }
+      else { print "free: 0/$n slots busy\n"; }
+      opendir(my $d, $queue) or exit 0;
+      my ($i, $head) = (0, 0);
+      for my $t (sort grep { /^\d+-\d+$/ && $_ ne $GATE } readdir $d) {
+        open(my $h, "<", "$queue/$t") or next;
         next if flock($h, LOCK_EX | LOCK_NB);
-        my $l = <$h> // ""; chomp $l;
-        printf "queue %d: %s\n", ++$n, $l;
-      }' "$queue"
-    exit 0
+        my %f = fields("$queue/$t");
+        my $w;
+        if (-e "$queue/$t.grant") { $w = "starting"; }
+        elsif (-e "$queue/$t.why") { $w = read1("$queue/$t.why"); }
+        elsif (($f{kind} // "") eq "v2") {
+          # The scheduler decides within a tick; until then the ticket is not shown.
+          next if time - (stat $h)[9] < 2;
+          $w = "starting";
+        } else { $w = $f{wait} // ""; $w = "starting" if $w eq ""; }
+        $i++;
+        if ($w eq "behind") { $w = "behind queue " . ($head || 1); }
+        elsif ($w !~ /^(project cap|starting)/) { $head = $i; }
+        printf "queue %d: %s (waiting: %s)\n", $i, $f{line}, $w;
+      }' "$dir" "$lock" "$owner" "$queue" "$slots_set"
     ;;
 esac
+
+exclusive=0
+if [ "${1:-}" = --exclusive ]; then
+  exclusive=1
+  shift
+  [ $# -gt 0 ] || { usage >&2; exit 2; }
+fi
 
 case "$level" in
   '' | *[!0-9]* | 2[1-9] | [3-9][0-9] | [0-9][0-9][0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
@@ -91,28 +327,258 @@ priority_code='
   exit 127;
 '
 
-# Already inside a heavy-run that still holds the lock: run at once.
-# A leftover daemon keeps HEAVY_RUN_HELD after the run ends, so check the lock.
-if [ "${HEAVY_RUN_HELD:-}" = "$lock" ] && [ "$("$0" --status | sed -n 1p)" != "free" ]; then
+# Already inside a heavy-run that still holds its slot: run at once.
+# A leftover daemon keeps HEAVY_RUN_HELD after the run ends, so check the flock.
+if [ -n "${HEAVY_RUN_HELD:-}" ] && [ -e "$HEAVY_RUN_HELD" ] &&
+  ! perl -e 'use Fcntl qw(:flock); open(my $f, "<", $ARGV[0]) or exit 0; exit(flock($f, LOCK_SH | LOCK_NB) ? 0 : 1)' "$HEAVY_RUN_HELD"; then
   exec perl -e "$priority_code" "$level" "$@"
 fi
 
-mkdir -p "$dir"
-mkdir -p "$(dirname "$waitlog")" 2>/dev/null || true
-export HEAVY_RUN_HELD="$lock"
+# The project is the repo (all its worktrees share one git common dir), else the folder.
+if [ -n "${HEAVY_RUN_PROJECT:-}" ]; then project="$HEAVY_RUN_PROJECT"
+else
+  project=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || project=""
+  project="${project%/.git}"
+  project="${project:-$PWD}"
+fi
+export HEAVY_RUN_PROJECT_KEY="$project"
 
-exec perl -e '
-  use Fcntl qw(:flock);
+mkdir -p "$dir"
+# The folder holds who runs what: keep it private to this user.
+[ -O "$dir" ] || { echo "heavy-run: $dir is not owned by you" >&2; exit 2; }
+chmod 700 "$dir"
+mkdir -p "$(dirname "$waitlog")" 2>/dev/null || true
+
+exec perl -e "$common_code"'
   use POSIX ();
-  use Fcntl qw(O_RDWR O_CREAT);
-  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, @cmd) = @ARGV;
+  use Time::HiRes ();
+  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $exclusive, @cmd) = @ARGV;
   my $t0 = time;
+  my $slotdir = "$dir/slots";
+  my $last_start = "$dir/last-start";
+  my $gate_open = "$dir/gate-open";
   my ($ticket, $tfh, $name);
+  my $proj = delete $ENV{HEAVY_RUN_PROJECT_KEY} // "";
+  my $proj_id = project_identity({ project => $proj });
+
+  # --- Live settings: env first, then chezmoi.yaml (reread each second), then the default.
+  my ($cfg_at, %cfg) = (-1);
+  my $is_slots = sub { $_[0] =~ /^\d+$/ && $_[0] >= 1 && $_[0] <= 64 };
+  my $is_num = sub { $_[0] =~ /^(\d+\.?\d*|\.\d+)$/ };
+  my $is_bit = sub { $_[0] =~ /^[01]$/ };
+  sub setting {
+    my ($env, $key, $def, $ok) = @_;
+    if (time != $cfg_at) {
+      $cfg_at = time; %cfg = ();
+      my $file = ($ENV{XDG_CONFIG_HOME} || "$ENV{HOME}/.config") . "/chezmoi/chezmoi.yaml";
+      if (open(my $c, "<", $file)) {
+        while (<$c>) { $cfg{$1} //= $2 if /^  (heavy_run_\w+): *"?([0-9.]*)"? *(#.*)?$/; }
+      }
+    }
+    for my $v ($ENV{$env}, $cfg{$key}) { return $v if defined $v && $v ne "" && $ok->($v); }
+    return $def;
+  }
+  sub settings {
+    return (setting("HEAVY_RUN_SLOTS", "heavy_run_slots", 1, $is_slots),
+            setting("HEAVY_RUN_RAMP", "heavy_run_ramp_seconds", 15, $is_num),
+            setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, $is_num),
+            setting("HEAVY_RUN_PROJECT_SLOTS", "heavy_run_project_slots", 3, $is_slots),
+            setting("HEAVY_RUN_MEMORY_GUARD", "heavy_run_memory_guard", 1, $is_bit));
+  }
+  # Machine checks asked at most once a second: each one is a fork.
+  my %memo;
+  sub memo { my ($k, $f) = @_; my $now = Time::HiRes::time(); my $m = $memo{$k};
+    return $m->[1] if $m && $now - $m->[0] < 1; $memo{$k} = [$now, my $v = $f->()]; return $v; }
+
+  # Write a file whole (a reader sees the old or the new text), only while
+  # $alive exists, so nothing is left behind for a ticket that just went away.
+  sub put {
+    my ($p, $text, $alive) = @_;
+    my $tmp = "$p.tmp$$";
+    open(my $f, ">", $tmp) or return 0;
+    print $f $text; close $f;
+    if (defined $alive && !-e $alive) { unlink $tmp; return 0; }
+    rename($tmp, $p) or do { unlink $tmp; return 0 };
+    return 1;
+  }
+
+  # Running runs: slots held now, with project and start time from the owner file.
+  sub snapshot {
+    my %s = (busy => 0, used => {}, proj => {}, runs => []);
+    for my $k (new_slots($slotdir)) {
+      next unless held("$slotdir/s$k");
+      my %f = fields("$slotdir/s$k.owner");
+      $s{busy}++; $s{used}{$k} = 1;
+      my $id = project_identity(\%f);
+      if (defined $id) { $s{proj}{$id}++; }
+      else { $s{invalid_project} = 1; }
+      push @{$s{runs}}, { id => "s$k", start => $f{start} // 9e9, mark => "$slotdir/s$k.paused" };
+    }
+    for my $k (slot_files($slotdir)) {
+      next unless held("$slotdir/$k");
+      my %f = fields("$slotdir/$k.owner");
+      $s{busy}++;
+      my $id = project_identity(\%f);
+      if (defined $id) { $s{proj}{$id}++; }
+      else { $s{invalid_project} = 1; }
+      # An older run pauses itself; it still counts when the oldest run is picked.
+      push @{$s{runs}}, { id => $k, start => $f{start} // 0 };
+    }
+    $s{excl} = -e $lock && held($lock, LOCK_SH);   # someone holds it exclusively
+    $s{active} = -e $lock && held($lock, LOCK_EX); # someone holds it at all
+    return \%s;
+  }
+
+  # The decision for one ticket: ("grant", slot), ("wait", why) that holds the
+  # tickets behind it too, or ("skip", why) that lets later tickets go first.
+  sub decide {
+    my ($s, $t, $set) = @_;
+    my ($n, $ramp, $maxload, $pcap) = @$set;
+    if ((my $r = realtime()) ne "") { return ("wait", $r); }
+    return ("wait", "queue project metadata unavailable") if $s->{invalid_project};
+    return ("wait", "an exclusive run is active") if $s->{excl};
+    if ($t->{exclusive}) {
+      return ("grant", "exclusive") if !$s->{active} && !$s->{busy};
+      return ("wait", $s->{busy} ? "exclusive: waiting for $s->{busy} running run(s) to end" : "exclusive: waiting for an older heavy-run");
+    }
+    my $p = $t->{project_id};
+    return ("wait", "queue project metadata unavailable") unless defined $p;
+    (my $pn = $t->{project} // "") =~ s{.*/}{};
+    if ($pcap < $n && (my $k = $s->{proj}{$p} // 0) >= $pcap) {
+      return ("skip", "project cap: $k/$pcap runs" . ($pn ne "" ? " of $pn" : ""));
+    }
+    return ("wait", "no free slot ($s->{busy}/$n busy)") if $s->{busy} >= $n;
+    if ($s->{busy} > 0) {
+      my $m = (stat $last_start)[9];
+      my $age = defined $m ? time - $m : 1e9;
+      return ("wait", sprintf("ramp: last run started %ds ago, next after %ds", $age, $ramp)) if $age < $ramp;
+      if ($maxload > 0 && (my $l = memo("load", \&load1)) > $maxload) { return ("wait", "load $l above $maxload"); }
+      if ((my $pr = memo("pressure", \&pressure)) ne "") { return ("wait", $pr); }
+    }
+    my ($free) = grep { !$s->{used}{$_} } 1 .. $n;
+    return ("grant", "s$free");
+  }
+  sub took {
+    my ($s, $t, $slot) = @_;
+    $s->{busy}++;
+    $s->{proj}{$t->{project_id}}++ if defined $t->{project_id};
+    if ($slot eq "exclusive") { $s->{excl} = $s->{active} = 1; }
+    elsif ($slot =~ /^s(\d+)$/) { $s->{used}{$1} = 1; $s->{active} = 1; }
+  }
+
+  # --- The scheduler: one pass over the queue, then the pause marks.
+  my ($lead, %marked);
+  sub lead {
+    return 1 if $lead;
+    sysopen(my $f, "$dir/sched.lock", O_RDWR | O_CREAT, 0600) or return 0;
+    return 0 unless flock($f, LOCK_EX | LOCK_NB);
+    $lead = $f; %marked = ();
+    return 1;
+  }
+  sub tick {
+    my @set = settings();
+    my $guard = $set[4];
+    my $s = snapshot();
+    opendir(my $qd, $queue) or return;
+    my @all = readdir $qd;
+    closedir $qd;
+    # A temp ticket nobody holds (and older than 5 s) is a leftover.
+    for my $t (grep { /^\.new-\d+$/ } @all) {
+      next unless open(my $xf, "<", "$queue/$t");
+      next if time - (stat $xf)[9] < 5;
+      unlink "$queue/$t" if flock($xf, LOCK_EX | LOCK_NB);
+    }
+    my (@tickets, %live);
+    for my $t (sort grep { /^\d+-\d+$/ && $_ ne $GATE } @all) {
+      open(my $xf, "<", "$queue/$t") or next;
+      if (flock($xf, LOCK_EX | LOCK_NB)) { unlink "$queue/$t", "$queue/$t.grant", "$queue/$t.why"; next; }
+      my %f = fields("$queue/$t");
+      $live{$t} = 1;
+      my $kind = ($f{kind} // "") eq "v2" ? "v2" : exists $f{wait} ? "old" : "unknown";
+      my $id = project_identity(\%f);
+      $s->{invalid_project} = 1 unless defined $id;
+      push @tickets, { name => $t, kind => $kind, project => $f{project}, project_id => $id,
+        exclusive => $kind eq "v2" ? ($f{exclusive} // 0) : ($f{line} =~ /\[exclusive\]$/ ? 1 : 0) };
+    }
+    for my $f (@all) { unlink "$queue/$f" if $f =~ /^(\d+-\d+)\.(grant|why)$/ && !$live{$1}; }
+    # A grant not yet taken holds its slot.
+    for my $t (@tickets) {
+      my $g = read1("$queue/$t->{name}.grant");
+      took($s, $t, $g) if $g ne "";
+    }
+    my $gate = read1($gate_open);
+    if ($gate ne "" && !$live{$gate}) { unlink $gate_open; $gate = ""; }
+    my ($blocked, %why) = (0);
+    for my $t (@tickets) {
+      next if -e "$queue/$t->{name}.grant";
+      if ($t->{kind} eq "old" && $t->{name} eq $gate) { took($s, $t, "old"); next; }
+      if ($t->{kind} eq "unknown") { $blocked = 1; next; }
+      if ($blocked) { $why{$t->{name}} = "behind"; next; }
+      my ($what, $arg) = decide($s, $t, \@set);
+      if ($what eq "grant" && $t->{kind} eq "old") {
+        # An older waiter starts by itself once the gate opens for it alone.
+        if ($gate eq "" && put($gate_open, "$t->{name}\n")) { $gate = $t->{name}; took($s, $t, "old"); next; }
+        ($what, $arg) = ("skip", "older heavy-run: waiting for the one before it to start");
+      }
+      if ($what eq "grant") {
+        if (put("$queue/$t->{name}.grant", "$arg\n", "$queue/$t->{name}")) {
+          took($s, $t, $arg);
+          if (open(my $ls, ">", $last_start)) { close $ls; }
+        }
+        next;
+      }
+      $why{$t->{name}} = $arg;
+      $blocked = 1 if $what eq "wait";
+    }
+    for my $t (keys %why) {
+      # Compare with the file, not memory: a waiter may have written its first reason.
+      next if read1("$queue/$t.why") eq $why{$t};
+      put("$queue/$t.why", "$why{$t}\n", "$queue/$t");
+    }
+
+    # Pause marks: a real-time app stops every run; memory pressure stops every
+    # run but the oldest (an exclusive run is never stopped for memory).
+    my @runs = @{$s->{runs}};
+    push @runs, { id => "exclusive", start => 0, mark => "$dir/exclusive.paused", excl => 1 }
+      if $s->{excl} && !@{$s->{runs}} && -e $owner;
+    my %pause;
+    if ((my $r = realtime()) ne "") { $pause{$_->{mark}} = $r for grep { $_->{mark} } @runs; }
+    elsif ($guard) {
+      my @mem = sort { $a->{start} <=> $b->{start} || $a->{id} cmp $b->{id} } grep { !$_->{excl} } @runs;
+      if (@mem > 1 && (my $pr = memo("pressure", \&pressure)) ne "") {
+        $pause{$_->{mark}} = "$pr (older runs go first)" for grep { $_->{mark} } @mem[1 .. $#mem];
+      }
+    }
+    for my $m (keys %pause) { $marked{$m} = $pause{$m} if ($marked{$m} // "") ne $pause{$m} && put($m, "$pause{$m}\n"); }
+    my @marks = ("$dir/exclusive.paused");
+    if (opendir(my $sd, $slotdir)) { push @marks, map { "$slotdir/$_" } grep { /^s\d+\.paused$/ } readdir $sd; }
+    for my $m (@marks) { next if $pause{$m}; unlink $m if -e $m; delete $marked{$m}; }
+  }
+
+  # --- The gate: while every new process holds it shared, an older waiter is never first.
+  my $gfh;
+  sub gate {
+    return unless -d $queue;
+    if (-e $gate_open) { if ($gfh) { close $gfh; undef $gfh; } return; }
+    # An older waiter may have deleted the file between our open and flock.
+    if ($gfh) { my @p = stat "$queue/$GATE"; return if @p && $p[1] == (stat $gfh)[1]; close $gfh; undef $gfh; }
+    sysopen(my $f, "$queue/$GATE", O_RDWR | O_CREAT, 0600) or return;
+    $gfh = $f if flock($f, LOCK_SH | LOCK_NB);
+  }
+  sub step { gate(); tick() if lead(); gate(); }
+  # The last process out deletes the gate, so an idle queue folder is empty.
+  sub ungate {
+    if ($gfh) { close $gfh; undef $gfh; }
+    my $p = "$queue/$GATE";
+    if (open(my $f, "<", $p)) { unlink $p if flock($f, LOCK_EX | LOCK_NB); }
+  }
+
   # Take the next ticket number. The ticket is written and locked under a
   # temporary name, then renamed, so no sweeper sees it before it is locked.
+  my $info = sprintf("pid=%d cwd=%s cmd=%s%s", $$, $ENV{PWD} // "", join(" ", @cmd), $exclusive ? " [exclusive]" : "");
   my $queued = eval {
     -d $queue or mkdir $queue or die "cannot create $queue: $!\n";
-    sysopen(my $sf, $seqfile, O_RDWR | O_CREAT) or die "cannot open $seqfile: $!\n";
+    sysopen(my $sf, $seqfile, O_RDWR | O_CREAT, 0600) or die "cannot open $seqfile: $!\n";
     flock($sf, LOCK_EX) or die "cannot lock $seqfile: $!\n";
     my $max = scalar <$sf> // 0; $max = 0 unless $max =~ /^\d+/;
     if (opendir(my $qd, $queue)) {
@@ -124,7 +590,8 @@ exec perl -e '
     my $tmp = "$queue/.new-$$";
     open($tfh, ">", $tmp) or die "cannot create $tmp: $!\n";
     flock($tfh, LOCK_EX) or die "cannot lock $tmp: $!\n";
-    printf $tfh "pid=%d cwd=%s cmd=%s\n", $$, $ENV{PWD} // "", join(" ", @cmd);
+    # Lines 2 and 3 keep the layout older heavy-run code reads.
+    print $tfh "$info\nwait=\nproject=$proj\nkind=v2\nexclusive=$exclusive\nreader=project-id-v1\n";
     $tfh->flush;
     $name = sprintf("%010d-%d", $n, $$);
     rename($tmp, "$queue/$name") or do { unlink $tmp; die "cannot rename $tmp: $!\n" };
@@ -132,62 +599,99 @@ exec perl -e '
     close $sf;
     1;
   };
-  if (!$queued) { my $e = $@; chomp $e; print STDERR "heavy-run: queue unavailable ($e); using the plain lock\n"; }
-  if ($ticket) {
-    # A waiter stopped before it holds the lock takes its ticket with it.
-    my %signo = (TERM => 15, INT => 2, HUP => 1);
-    for my $sig (keys %signo) { $SIG{$sig} = sub { unlink $ticket; exit(128 + $signo{$sig}) }; }
-    # Wait until our ticket is the lowest live one. A ticket nobody holds is stale.
-    while (1) {
-      my $first;
-      if (opendir(my $qd, $queue)) {
-        my @all = readdir $qd;
-        # A temp ticket nobody holds (and older than 5 s) is a leftover.
-        for my $t (grep { /^\.new-\d+$/ } @all) {
-          next if $t eq ".new-$$";
-          next unless open(my $xf, "<", "$queue/$t");
-          next if time - (stat $xf)[9] < 5;
-          unlink "$queue/$t" if flock($xf, LOCK_EX | LOCK_NB);
-        }
-        for my $t (sort grep { /^\d+-\d+$/ } @all) {
-          if ($t ne $name) {
-            open(my $xf, "<", "$queue/$t") or next;
-            if (flock($xf, LOCK_EX | LOCK_NB)) { unlink "$queue/$t"; next; }
-          }
-          $first = $t; last;
-        }
-        closedir $qd;
-      }
-      last if !defined $first || $first eq $name;
-      select(undef, undef, undef, 0.2);
-    }
+  if (!$queued) { my $e = $@; chomp $e; print STDERR "heavy-run: queue unavailable ($e); waiting without arrival order\n"; }
+  -d $slotdir or mkdir $slotdir or die "heavy-run: cannot create $slotdir: $!\n";
+  open(my $lfh, ">>", $lock) or do { unlink $ticket if $ticket; die "heavy-run: cannot open $lock: $!\n"; };
+  chmod 0600, $lock;
+
+  # Take a granted slot; on failure the grant goes back to the scheduler.
+  sub take {
+    my ($want) = @_;
+    if ($want eq "exclusive") { return flock($lfh, LOCK_EX | LOCK_NB) ? ("exclusive", undef) : (); }
+    return () unless $want =~ /^s(\d+)$/;
+    my $k = $1;
+    return () unless flock($lfh, LOCK_SH | LOCK_NB);
+    if (sysopen(my $fh, "$slotdir/s$k", O_RDWR | O_CREAT, 0600)) { return ($k, $fh) if flock($fh, LOCK_EX | LOCK_NB); }
+    flock($lfh, LOCK_UN);
+    return ();
   }
-  open(my $fh, ">>", $lock) or do { unlink $ticket if $ticket; die "heavy-run: cannot open $lock: $!\n"; };
-  flock($fh, LOCK_EX) or do { unlink $ticket if $ticket; die "heavy-run: cannot lock $lock: $!\n"; };
-  if ($ticket) { unlink $ticket; close $tfh; }
+
+  my ($slot, $sfh);
+  # Checked before the HUP handler below replaces an inherited nohup "ignore".
+  my $caller = getppid();
+  my $keep = ($ENV{HEAVY_RUN_KEEP_ORPHAN} // "") eq "1" || -f STDOUT || -f STDERR
+    || ($SIG{HUP} // "") eq "IGNORE" || $caller <= 1;
+  if ($ticket) {
+    # A waiter stopped before it starts takes its ticket with it.
+    my %signo = (TERM => 15, INT => 2, HUP => 1);
+    for my $sig (keys %signo) { $SIG{$sig} = sub { unlink $ticket, "$ticket.grant", "$ticket.why"; ungate(); exit(128 + $signo{$sig}) }; }
+  }
+  my $hinted = 0;
+  while (1) {
+    if (!$keep && getppid() != $caller) { unlink $ticket, "$ticket.grant", "$ticket.why" if $ticket; ungate(); exit 129; }
+    if ($ticket) {
+      step();
+      # Until the scheduler gets to this ticket, show a first reason (it never grants).
+      if (!$hinted++ && !$lead && !-e "$ticket.why" && !-e "$ticket.grant") {
+        my ($what, $arg) = decide(snapshot(), { project => $proj, project_id => $proj_id, exclusive => $exclusive }, [settings()]);
+        if (opendir(my $qd, $queue)) {
+          ($what, $arg) = ("wait", "behind") if grep { /^\d+-\d+$/ && $_ ne $GATE && $_ lt $name && held("$queue/$_") } readdir $qd;
+        }
+        put("$ticket.why", "$arg\n", $ticket) if $what ne "grant";
+      }
+      my $g = read1("$ticket.grant");
+      if ($g ne "") { ($slot, $sfh) = take($g); last if defined $slot; unlink "$ticket.grant"; }
+    } else {
+      # No queue: decide for this run alone.
+      my ($what, $arg) = decide(snapshot(), { project => $proj, project_id => $proj_id, exclusive => $exclusive }, [settings()]);
+      if ($what eq "grant") { ($slot, $sfh) = take($arg); last if defined $slot; }
+    }
+    select(undef, undef, undef, 0.2);
+  }
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = "DEFAULT"; }
+  if ($ticket) { unlink "$ticket.grant", "$ticket.why", $ticket; close $tfh; }
+  if (open(my $ls, ">", $last_start)) { close $ls; }
+  my $slotfile = $slot eq "exclusive" ? $lock : "$slotdir/s$slot";
+  my $ownerfile = $slot eq "exclusive" ? $owner : "$slotdir/s$slot.owner";
+  my $mark = $slot eq "exclusive" ? "$dir/exclusive.paused" : "$slotdir/s$slot.paused";
+  $ENV{HEAVY_RUN_HELD} = $slotfile;
+  $ENV{HEAVY_RUN_SLOT} = $slot;
   if (open(my $wl, ">>", $waitlog)) {
     my @lt = localtime;
-    printf $wl "%04d-%02d-%02dT%02d:%02d:%02d waited=%d pid=%d\n", $lt[5] + 1900, $lt[4] + 1, @lt[3,2,1,0], time - $t0, $$;
+    printf $wl "%04d-%02d-%02dT%02d:%02d:%02d waited=%d pid=%d slot=%s\n", $lt[5] + 1900, $lt[4] + 1, @lt[3,2,1,0], time - $t0, $$, $slot;
     close $wl;
   }
   # Block signals across fork so none can kill the parent before it forwards.
-  my $set = POSIX::SigSet->new(POSIX::SIGTERM(), POSIX::SIGINT(), POSIX::SIGHUP());
-  POSIX::sigprocmask(POSIX::SIG_BLOCK(), $set);
+  my $set_sig = POSIX::SigSet->new(POSIX::SIGTERM(), POSIX::SIGINT(), POSIX::SIGHUP());
+  POSIX::sigprocmask(POSIX::SIG_BLOCK(), $set_sig);
   my $pid = fork() // die "heavy-run: cannot fork: $!\n";
   if ($pid == 0) {
-    POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
+    POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
     exec("perl", "-e", $priority_code, $level, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
   }
-  for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid }; }
-  POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set);
+  my $stopped = 0;
+  for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid; kill "CONT", tree($pid) if $stopped; }; }
+  POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
   my @t = localtime;
-  if (open(my $o, ">", $owner)) {
-    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd);
+  if (open(my $o, ">", $ownerfile)) {
+    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\nproject=%s\nstart=%.3f\nreader=project-id-v1\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $proj, Time::HiRes::time();
     close $o;
   }
-  while (waitpid($pid, 0) == -1) { last unless $!{EINTR}; }
+  # The run keeps the scheduler going while it leads, and stops (SIGSTOP) its
+  # process tree while the scheduler marks it paused; it goes on (SIGCONT) after.
+  while (1) {
+    my $r = waitpid($pid, POSIX::WNOHANG());
+    last if $r == $pid;
+    if ($r == -1) { next if $!{EINTR}; last; }
+    step() if $ticket;
+    my $why = $ticket ? read1($mark) : "";
+    if ($why ne "" && !$stopped) { kill "STOP", tree($pid); $stopped = 1; print STDERR "heavy-run: paused: $why\n"; }
+    elsif ($why eq "" && $stopped) { kill "CONT", tree($pid); $stopped = 0; print STDERR "heavy-run: resumed\n"; }
+    select(undef, undef, undef, 0.2);
+  }
   my $st = $?;
-  truncate($owner, 0);
+  truncate($ownerfile, 0);
+  unlink $mark;
+  ungate() if $ticket;
   exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));
-' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$@"
+' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$dir" "$exclusive" "$@"

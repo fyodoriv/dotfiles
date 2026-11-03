@@ -6,11 +6,11 @@
 # The overlay is machine state. Each Mac keeps its own `disabled:` list (for
 # example verifier hooks that hang on one machine), so a plain managed file
 # would erase it. A `modify_` script reads the current file on stdin and writes
-# the result to stdout: every existing line survives, and only a missing hook
-# ID is added under `enabled:`.
+# the result to stdout: unrelated lines survive, retired enabled IDs are
+# removed, and missing supported hook IDs are added under `enabled:`.
 #
-# An ID that already appears anywhere (in `enabled:` or `disabled:`) is left
-# alone, so a machine can still opt out by listing it under `disabled:`.
+# A supported ID already present is left alone, so a machine can still opt
+# out under `disabled:`. The retired usage-tip ID cannot be re-enabled.
 set -eu
 
 # Owner-only hooks: they hold agents to the repo owner's workflow (PR body
@@ -18,11 +18,66 @@ set -eu
 # agentbrew ships them off by default; only the owner's Macs
 # (owner_machine) turn them on. A new user gets none of them.
 # DOTFILES_OVERLAY_HOOKS replaces the list (tests use it).
-HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs async-human-comms-blocks jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint usage-tip no-home-crawl{{ end }}}"
+HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs async-human-comms-blocks jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint no-home-crawl{{ end }}}"
 
 input=$(cat)
 
+# Retire only this enabled scalar. Buffer output so ambiguous YAML cannot
+# produce a partial replacement. Disabled choices and unrelated lines stay.
+input=$(printf '%s\n' "$input" | awk '
+  function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+  function retired(s) { return s == "usage-tip" || s == "\"usage-tip\"" || s == "\047usage-tip\047" }
+  function literal(s) { return s ~ /^[A-Za-z0-9_.:-]+$/ || s ~ /^"[A-Za-z0-9_.:-]+"$/ || s ~ /^\047[A-Za-z0-9_.:-]+\047$/ }
+  !root_seen && $0 !~ /^[[:space:]]*(#|$)/ {
+    root_seen = 1
+    if ($0 !~ /^[A-Za-z0-9_.-]+:/) { bad = 1; next }
+  }
+  /^[^[:space:]#]/ && $0 !~ /^[A-Za-z0-9_.-]+:/ { bad = 1; next }
+  /^[[:space:]]*(enabled[[:space:]]*:|"enabled"[[:space:]]*:|\047enabled\047[[:space:]]*:)/ && $0 !~ /^enabled:/ { bad = 1; next }
+  /^enabled:/ {
+    in_enabled = 0
+    if ($0 ~ /^enabled:[[:space:]]*(#.*)?$/) {
+      in_enabled = 1
+    } else if ($0 ~ /^enabled:[[:space:]]*\[/) {
+      open = index($0, "["); rest = substr($0, open + 1); closing = index(rest, "]")
+      if (!closing || substr(rest, closing + 1) !~ /^[[:space:]]*(#.*)?$/) { bad = 1; next }
+      inside = substr(rest, 1, closing - 1); count = split(inside, items, ",")
+      kept = ""; removed = 0
+      for (j = 1; j <= count; j++) {
+        item = trim(items[j])
+        if (retired(item)) { removed = 1; continue }
+        if (item == "" && count == 1) continue
+        if (!literal(item)) { bad = 1; break }
+        kept = kept (kept == "" ? "" : ", ") item
+      }
+      if (removed) $0 = substr($0, 1, open) kept substr(rest, closing)
+    } else { bad = 1; next }
+    lines[++n] = $0; next
+  }
+  /^[^[:space:]#]/ { in_enabled = 0 }
+  {
+    if (in_enabled && $0 ~ /^[[:space:]]*-[[:space:]]*/) {
+      entry = $0; sub(/^[[:space:]]*-[[:space:]]*/, "", entry)
+      scalar = entry; sub(/[[:space:]]+#.*/, "", scalar); scalar = trim(scalar)
+      if (!literal(scalar)) { bad = 1; next }
+      if (retired(scalar)) {
+        comment = index(entry, "#")
+        if (comment) {
+          indent = $0; sub(/[^[:space:]].*$/, "", indent)
+          lines[++n] = indent substr(entry, comment)
+        }
+        next
+      }
+    } else if (in_enabled && $0 ~ /^[[:space:]]+[^[:space:]#]/) {
+      bad = 1; next
+    }
+    lines[++n] = $0
+  }
+  END { if (bad) exit 2; for (i = 1; i <= n; i++) print lines[i] }
+')
+
 for hook in $HOOKS; do
+  [ "$hook" = usage-tip ] && continue
   if [ -z "$(printf '%s' "$input" | tr -d '[:space:]')" ]; then
     input=$(printf 'version: 1\n\n# Opt-in agentbrew hooks that dotfiles turns on for every machine.\nenabled:\n  - %s' "$hook")
     continue

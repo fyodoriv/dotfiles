@@ -161,10 +161,26 @@ _is_heavy() {
       fi
       return 1 ;;
     bats)
-      for a in ${rest[@]+"${rest[@]}"}; do
-        case "$a" in *.bats) return 1 ;; esac
+      rest=(${raw[@]+"${raw[@]}"})
+      local filtered=0
+      case "${rest[0]:-}" in
+        -f|--filter)
+          case "${rest[1]:-}" in
+            ""|-*|.|".*") return 0 ;;
+          esac
+          filtered=1
+          rest=("${rest[@]:2}") ;;
+      esac
+      [ "${#rest[@]}" -gt 0 ] || return 0
+      [ "$filtered" -eq 1 ] || [ "${#rest[@]}" -eq 1 ] || return 0
+      for a in "${rest[@]}"; do
+        case "$a" in
+          -*|*[!a-zA-Z0-9_./-]*) return 0 ;;
+          *.bats) ;;
+          *) return 0 ;;
+        esac
       done
-      return 0 ;;
+      return 1 ;;
   esac
   return 1
 }

@@ -156,7 +156,8 @@ Tests: `tests/agent-hooks-block-dangerous-git.bats`,
 dotfiles Agentfile. It blocks full test suites and builds that do not start
 with `heavy-run`: `npm test`, `npm run test*`, `yarn`/`pnpm` test or build
 scripts, `vitest`/`jest` with no file argument, `playwright test`, and `bats`
-on a folder. It also blocks the other headless-browser entry points:
+on a folder or wildcard. Bats can run one named file or use `-f` or
+`--filter` with named files. It also blocks the other headless-browser entry points:
 `e2e*` and `ui*` package scripts, `npm exec`/`pnpm exec`/`yarn playwright test`,
 and `make e2e`, `make test-all`, or `make test-force` (`make -n` passes). It checks each part of a `&&`, `||`, `;`, or `|` chain.
 Single-file and single-test runs (`npx vitest run one.test.ts`, `bats tests/x.bats`,

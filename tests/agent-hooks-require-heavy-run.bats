@@ -189,3 +189,17 @@ run_hook() {
   grep -q 'require-heavy-run.sh' Agentfile.yaml
   grep -q 'require-heavy-run.sh' .chezmoiscripts/run_after_agent-hooks.sh
 }
+
+@test "Bats exemptions require explicit test scope" {
+  local c failures=0
+  for c in 'bats -f "one test" tests/one.bats' 'bats tests/one.bats' \
+           'bats -f "one test" tests/one.bats tests/two.bats'; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
+  done
+  for c in 'bats tests/' 'bats tests/ tests/one.bats' 'bats tests/*.bats'; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "allowed: $c ($status)"; failures=$((failures + 1)); }
+  done
+  [ "$failures" -eq 0 ]
+}

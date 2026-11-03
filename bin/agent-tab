@@ -14,6 +14,7 @@
 #   agent-tab open --owner <id> --reason <text> [--lease <s>] <url>  # prints tab id
 #   agent-tab list
 #   agent-tab close --owner <id> <tab>
+#   agent-tab close-verified --owner <id> <tab>  # require census proof
 #   agent-tab renew --owner <id> [--lease <s>] <tab>
 #   agent-tab text|shot --owner <id> <tab>
 #   agent-tab eval --owner <id> <tab> <js>     # or - to read the js from stdin
@@ -47,6 +48,7 @@ usage() {
 Usage: agent-tab open --owner <id> --reason <text> [--lease <seconds>] <url>
        agent-tab list
        agent-tab close --owner <id> <tab>
+       agent-tab close-verified --owner <id> <tab>  # prove the owned target is gone
        agent-tab renew --owner <id> [--lease <seconds>] <tab>
        agent-tab text --owner <id> <tab>          # page text
        agent-tab eval --owner <id> <tab> <js>     # evaluate, print the value;
@@ -177,12 +179,22 @@ target_absent() {
 }
 
 cmd_close() {
+  local action="$1" holder acknowledged=0
+  shift
   parse_opts "$@"
-  [ -n "$OWNER" ] && [ -n "$ARG" ] || die "close needs --owner and a tab id" 2
+  [ -n "$OWNER" ] && [ -n "$ARG" ] || die "$action needs --owner and a tab id" 2
   lock
-  [ -n "$(rec "$ARG" owner)" ] || die "tab $ARG is not tracked"
-  check_holder "$ARG"
-  if ! curl -sf --max-time 5 "$CDP/json/close/$ARG" >/dev/null && ! target_absent "$ARG"; then
+  holder="$(rec "$ARG" owner)"
+  [ -n "$holder" ] || die "tab $ARG is not tracked"
+  if [ "$action" = close-verified ]; then
+    [ "$holder" = "$OWNER" ] || die "busy, tab $ARG belongs to another owner" 3
+  else
+    check_holder "$ARG"
+  fi
+  if curl -sf --max-time 5 "$CDP/json/close/$ARG" >/dev/null; then
+    acknowledged=1
+  fi
+  if { [ "$action" = close-verified ] || [ "$acknowledged" = 0 ]; } && ! target_absent "$ARG"; then
     die "could not confirm close for tab $ARG, lease retained"
   fi
   write_state --arg id "$ARG" 'del(.[$id])'
@@ -459,7 +471,7 @@ case "${1:-}" in
   clear-cookies) shift; cmd_clear_cookies "$@" ;;
   open) shift; cmd_open "$@" ;;
   list) shift; cmd_list ;;
-  close) shift; cmd_close "$@" ;;
+  close|close-verified) cmd_close "$@" ;;
   renew) shift; cmd_renew "$@" ;;
   -h|--help) usage ;;
   *) usage >&2; exit 2 ;;

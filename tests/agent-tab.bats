@@ -671,3 +671,139 @@ gdoc_open() {
   gdoc_registry_has "$other"
   jq -e --arg id "$id" --arg other "$other" '(.[$id] == null) and (.[$other].owner == "agent-a")' "$AGENT_TAB_STATE_DIR/tabs.json"
 }
+
+gdoc_verified_setup() {
+  gdoc_owner_setup
+  mv "$TEST_DIR/bin/curl" "$TEST_DIR/bin/curl-fixture"
+  cat > "$TEST_DIR/bin/curl" <<'STUB'
+#!/bin/bash
+set -eu
+url="${*: -1}"
+case "$url" in
+  http://127.0.0.1:0/json/close/*)
+    if [ -f "$OWNER_EVENT.held" ]; then
+      printf '%s\n' "$url" >> "$CDP_LOG"
+      echo 'Target is closing'
+      exit 0
+    fi ;;
+  http://127.0.0.1:0/json/list)
+    if [ -f "$OWNER_EVENT.malformed" ]; then
+      printf '%s\n' "$url" >> "$CDP_LOG"
+      printf '%s\n' '{"unexpected":"fixture"}'
+      exit 0
+    fi
+    if [ -f "$OWNER_EVENT.unavailable" ]; then
+      printf '%s\n' "$url" >> "$CDP_LOG"
+      exit 7
+    fi ;;
+esac
+exec "${0%/*}/curl-fixture" "$@"
+STUB
+  chmod 700 "$TEST_DIR/bin/curl"
+  [ "$(/bin/bash -c 'type -P curl')" = "$TEST_DIR/bin/curl" ]
+  export VERIFIED_STATE="$AGENT_TAB_STATE_DIR/tabs.json"
+}
+
+gdoc_verified_lease_present() {
+  jq -e --arg id "$1" 'has($id)' "$VERIFIED_STATE" >/dev/null
+}
+
+gdoc_verified_receipt() {
+  local id="$1" variant="$2" lease=0 target=0 calls=0
+  if gdoc_verified_lease_present "$3"; then lease=1; fi
+  if gdoc_registry_has "$3"; then target=1; fi
+  calls="$(wc -l < "$CDP_LOG" | tr -d ' ')"
+  printf 'VERIFIED_CLOSE_OBSERVATION %s %s exit=%s lease=%s target=%s calls=%s\n' \
+    "$id" "$variant" "$status" "$lease" "$target" "$calls" >&3
+}
+
+@test "gdoc-561 V01 accepted close while target remains" {
+  gdoc_verified_setup
+  local legacy strict legacy_status legacy_lease
+  legacy="$(gdoc_open agent-a legacy)"
+  touch "$OWNER_EVENT.held"
+  : > "$CDP_LOG"
+  run "$SCRIPT" close --owner agent-a "$legacy"
+  gdoc_verified_receipt V01 legacy "$legacy"
+  legacy_status="$status"
+  legacy_lease=0
+  if gdoc_verified_lease_present "$legacy"; then legacy_lease=1; fi
+  [ "$legacy_status" -eq 0 ] && [ "$legacy_lease" -eq 0 ]
+  gdoc_registry_has "$legacy"
+  [ "$(cat "$CDP_LOG")" = "http://127.0.0.1:0/json/close/$legacy" ]
+
+  strict="$(gdoc_open agent-a strict)"
+  cp "$VERIFIED_STATE" "$TEST_DIR/prior"
+  : > "$CDP_LOG"
+  run "$SCRIPT" close-verified --owner agent-a "$strict"
+  gdoc_verified_receipt V01 strict "$strict"
+  [ "$status" -eq 1 ]
+  cmp -s "$VERIFIED_STATE" "$TEST_DIR/prior"
+  gdoc_registry_has "$strict"
+  [ "$(cat "$CDP_LOG")" = "$(printf 'http://127.0.0.1:0/json/close/%s\nhttp://127.0.0.1:0/json/list' "$strict")" ]
+}
+
+@test "gdoc-561 V02 valid census proves exact target absent" {
+  gdoc_verified_setup
+  local owned other
+  owned="$(gdoc_open agent-a owned)"
+  other="$(gdoc_open agent-b other)"
+  jq --arg id "$owned" 'del(.[$id])' "$VERIFIED_STATE" > "$TEST_DIR/expected"
+  : > "$CDP_LOG"
+  run "$SCRIPT" close-verified --owner agent-a "$owned"
+  gdoc_verified_receipt V02 strict "$owned"
+  [ "$status" -eq 0 ]
+  ! gdoc_registry_has "$owned"
+  gdoc_registry_has "$other"
+  [ "$(jq -cS . "$VERIFIED_STATE")" = "$(jq -cS . "$TEST_DIR/expected")" ]
+  [ "$(cat "$CDP_LOG")" = "$(printf 'http://127.0.0.1:0/json/close/%s\nhttp://127.0.0.1:0/json/list' "$owned")" ]
+}
+
+@test "gdoc-561 V03 malformed and unavailable census retain the lease" {
+  gdoc_verified_setup
+  local variant owned malformed unavailable failures=0
+  malformed="$(gdoc_open agent-a malformed)"
+  unavailable="$(gdoc_open agent-a unavailable)"
+  [ "$malformed" != "$unavailable" ]
+  for variant in malformed unavailable; do
+    owned="$malformed"
+    if [ "$variant" = unavailable ]; then owned="$unavailable"; fi
+    cp "$VERIFIED_STATE" "$TEST_DIR/prior"
+    touch "$OWNER_EVENT.held" "$OWNER_EVENT.$variant"
+    : > "$CDP_LOG"
+    run "$SCRIPT" close-verified --owner agent-a "$owned"
+    gdoc_verified_receipt V03 "$variant" "$owned"
+    if ! { [ "$status" -eq 1 ] &&
+      cmp -s "$VERIFIED_STATE" "$TEST_DIR/prior" &&
+      gdoc_registry_has "$owned" &&
+      [ "$(cat "$CDP_LOG")" = "$(printf 'http://127.0.0.1:0/json/close/%s\nhttp://127.0.0.1:0/json/list' "$owned")" ]; }; then
+      failures=$((failures + 1))
+    fi
+    rm "$OWNER_EVENT.$variant"
+  done
+  [ "$failures" -eq 0 ]
+}
+
+@test "gdoc-561 V04 wrong owner refuses before transport even for expired lease" {
+  gdoc_verified_setup
+  local foreign variant failures=0
+  foreign="$(gdoc_open agent-b foreign)"
+  for variant in live expired; do
+    if [ "$variant" = expired ]; then
+      jq --arg id "$foreign" '.[$id].expires = 1' "$VERIFIED_STATE" > "$TEST_DIR/expired"
+      mv "$TEST_DIR/expired" "$VERIFIED_STATE"
+    fi
+    cp "$VERIFIED_STATE" "$TEST_DIR/prior"
+    cp "$TABS_JSON" "$TEST_DIR/registry"
+    : > "$CDP_LOG"
+    run "$SCRIPT" close-verified --owner agent-a "$foreign"
+    gdoc_verified_receipt V04 "$variant" "$foreign"
+    if ! { [ "$status" -eq 3 ] &&
+      [ ! -s "$CDP_LOG" ] &&
+      cmp -s "$VERIFIED_STATE" "$TEST_DIR/prior" &&
+      cmp -s "$TABS_JSON" "$TEST_DIR/registry"; }; then
+      failures=$((failures + 1))
+    fi
+  done
+  [ "$failures" -eq 0 ]
+}

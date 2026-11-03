@@ -77,6 +77,10 @@ agent-tab clear-cookies example.com              # one site's cookies
 ```
 
 - Records live in `~/.local/state/agent-tab/tabs.json`. Writes take a `mkdir` lock and replace the file with `mv` (atomic).
+- If Chrome refuses a close, `agent-tab` keeps the lease unless Chrome's tab list confirms the target is gone. Retry the same tab ID when Chrome responds.
+- A successful Chrome close reply acknowledges the request. A caller that needs proof of removal must also check that the target is absent from Chrome's tab list before reporting completion.
+- If opening a tab fails to save its lease, `agent-tab` tries to close that exact tab. If it cannot confirm closure, the error includes the tab ID and whether it could retain the lease. Treat this as an incomplete open.
+- Each successful `shot` prints its own PNG path. Later captures leave earlier files in place.
 - `open` uses CDP `PUT /json/new`; `close` uses `/json/close/<id>`. Neither raises a window.
 - Default lease is 1 hour (`--lease`, `AGENT_TAB_LEASE_SECONDS`).
 - Closing or renewing another owner's tab with a live lease exits 3 and prints the holder and the reason. After the lease expires, anyone can close it.

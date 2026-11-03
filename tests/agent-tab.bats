@@ -507,3 +507,167 @@ STUB
   [ "$status" -eq 0 ]
   grep -q DOM.setFileInputFiles "$CDP_CALLS"
 }
+
+# #561: the real shell owner runs against a disposable browser target table.
+gdoc_owner_setup() {
+  unset BASH_ENV ENV
+  cdp_setup
+  export AGENT_TAB_PORT=0
+  [ -z "${BASH_ENV+x}${ENV+x}" ]
+  export OWNER_EVENT="$TEST_DIR/owner-event"
+  export CDP_SAMPLE="$TEST_DIR/png-sample"
+  export OWNER_REAL_MV="$(command -v mv)"
+  export OWNER_REAL_DATE="$(command -v date)"
+  cat > "$TEST_DIR/bin/curl" <<'STUB'
+#!/bin/bash
+set -eu
+url="${*: -1}"
+case "$url" in http://127.0.0.1:0/json/*) ;; *) exit 91 ;; esac
+printf '%s\n' "$url" >> "$CDP_LOG"
+case "$url" in
+  */json/new*)
+    id="T$(wc -l < "$CDP_LOG" | tr -d ' ')"
+    jq --arg id "$id" '. + [{id:$id,type:"page",url:"https://example.com",webSocketDebuggerUrl:("ws://x/"+$id)}]' "$TABS_JSON" > "$TABS_JSON.next"
+    "$OWNER_REAL_MV" "$TABS_JSON.next" "$TABS_JSON"
+    jq -nc --arg id "$id" '{id:$id}'
+    ;;
+  */json/close/*)
+    [ ! -e "$OWNER_EVENT.close" ] || exit 22
+    id="${url##*/}"
+    jq --arg id "$id" 'map(select(.id != $id))' "$TABS_JSON" > "$TABS_JSON.next"
+    "$OWNER_REAL_MV" "$TABS_JSON.next" "$TABS_JSON"
+    echo 'Target is closing'
+    ;;
+  */json/list) cat "$TABS_JSON" ;;
+  *) exit 7 ;;
+esac
+STUB
+  cat > "$TEST_DIR/bin/date" <<'STUB'
+#!/bin/bash
+if [ "$*" = '+%Y%m%d-%H%M%S' ]; then
+  echo '20261103-120000'
+else
+  exec "$OWNER_REAL_DATE" "$@"
+fi
+STUB
+  cat > "$TEST_DIR/bin/mv" <<'STUB'
+#!/bin/bash
+if [ "${*: -1}" = "$AGENT_TAB_STATE_DIR/tabs.json" ] && [ -e "$OWNER_EVENT.commit" ]; then
+  rm "$OWNER_EVENT.commit"
+  touch "$OWNER_EVENT.commit-failed"
+  exit 1
+fi
+exec "$OWNER_REAL_MV" "$@"
+STUB
+  cat > "$AGENT_TAB_CDP" <<'STUB'
+#!/bin/bash
+case "$1" in ws://x/T[0-9]*) ;; *) exit 92 ;; esac
+printf '%s %s\n' "$1" "$2" >> "$CDP_CALLS"
+case "$2" in
+  Runtime.evaluate) echo '{"result":{"type":"string","value":"fixture page"}}' ;;
+  Page.captureScreenshot) jq -Rn --arg png "$(cat "$CDP_SAMPLE")" '{data:$png}' ;;
+  *) exit 1 ;;
+esac
+STUB
+  chmod +x "$TEST_DIR/bin/curl" "$TEST_DIR/bin/date" "$TEST_DIR/bin/mv"
+  [ "$(/bin/bash -c 'type -P curl')" = "$TEST_DIR/bin/curl" ]
+  [ "$AGENT_TAB_CDP" = "$TEST_DIR/cdp" ] && [ -x "$AGENT_TAB_CDP" ]
+  export PNG_BLACK='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg=='
+  export PNG_WHITE='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP4DwABAQEAsTj2FAAAAABJRU5ErkJggg=='
+  printf '%s\n' "$PNG_BLACK" > "$CDP_SAMPLE"
+}
+
+gdoc_registry_has() {
+  jq -e --arg id "$1" 'any(.[]; .id == $id)' "$TABS_JSON" >/dev/null
+}
+
+gdoc_open() {
+  local id
+  id="$(open_tab "$@")" || return 1
+  gdoc_registry_has "$id" || return 1
+  grep -Fq 'http://127.0.0.1:0/json/new?' "$CDP_LOG" || return 1
+  printf '%s\n' "$id"
+}
+
+@test "gdoc-561 T01 same-second shots preserve both images" {
+  gdoc_owner_setup
+  id="$(gdoc_open agent-a capture)"
+  first="$("$SCRIPT" shot --owner agent-a "$id")"
+  printf '%s\n' "$PNG_WHITE" > "$CDP_SAMPLE"
+  second="$("$SCRIPT" shot --owner agent-a "$id")"
+  [ "$(wc -l < "$CDP_CALLS" | tr -d ' ')" = 2 ]
+  if [ "$first" = "$second" ]; then
+    echo 'T01: two successful capture replies reused one screenshot path'
+    return 1
+  fi
+  [ "$(base64 < "$first" | tr -d '\n')" = "$PNG_BLACK" ]
+  [ "$(base64 < "$second" | tr -d '\n')" = "$PNG_WHITE" ]
+}
+
+@test "gdoc-561 T02 close failure keeps the lease for retry" {
+  gdoc_owner_setup
+  id="$(gdoc_open agent-a capture)"
+  touch "$OWNER_EVENT.close"
+  run "$SCRIPT" close --owner agent-a "$id"
+  gdoc_registry_has "$id"
+  grep -F "/json/close/$id" "$CDP_LOG"
+  if [ "$status" -eq 0 ] || ! jq -e --arg id "$id" '.[$id].owner == "agent-a"' "$AGENT_TAB_STATE_DIR/tabs.json"; then
+    owner="$(jq -r --arg id "$id" '.[$id].owner // "missing"' "$AGENT_TAB_STATE_DIR/tabs.json")"
+    echo "T02: target still present, close exit=$status, lease owner=$owner"
+    return 1
+  fi
+  rm "$OWNER_EVENT.close"
+  run "$SCRIPT" close --owner agent-a "$id"
+  [ "$status" -eq 0 ]
+  if gdoc_registry_has "$id"; then return 1; fi
+  jq -e --arg id "$id" 'has($id) | not' "$AGENT_TAB_STATE_DIR/tabs.json"
+}
+
+@test "gdoc-561 T03 failed lease commit leaves no unowned target" {
+  gdoc_owner_setup
+  touch "$OWNER_EVENT.commit"
+  run open_tab agent-a capture
+  [ -e "$OWNER_EVENT.commit-failed" ]
+  grep -F '/json/new?' "$CDP_LOG"
+  [ "$status" -ne 0 ]
+  id="$(jq -r '.[0].id // empty' "$TABS_JSON")"
+  if [ -n "$id" ] && ! jq -e --arg id "$id" '.[$id].owner == "agent-a"' "$AGENT_TAB_STATE_DIR/tabs.json"; then
+    echo 'T03: lease commit failed, open refused, browser still has untracked target'
+    return 1
+  fi
+}
+
+@test "gdoc-561 T04 foreign live target refuses close eval and shot" {
+  gdoc_owner_setup
+  id="$(gdoc_open agent-a capture)"
+  cp "$TABS_JSON" "$TEST_DIR/targets.before"
+  cp "$AGENT_TAB_STATE_DIR/tabs.json" "$TEST_DIR/leases.before"
+  run "$SCRIPT" close --owner agent-b "$id"
+  [ "$status" -eq 3 ]
+  run "$SCRIPT" eval --owner agent-b "$id" 'document.title'
+  [ "$status" -eq 3 ]
+  run "$SCRIPT" shot --owner agent-b "$id"
+  [ "$status" -eq 3 ]
+  [ ! -e "$CDP_CALLS" ]
+  [ ! -e "$AGENT_TAB_SHOT_DIR" ]
+  if grep -F '/json/close/' "$CDP_LOG"; then return 1; fi
+  cmp "$TABS_JSON" "$TEST_DIR/targets.before"
+  cmp "$AGENT_TAB_STATE_DIR/tabs.json" "$TEST_DIR/leases.before"
+}
+
+@test "gdoc-561 T05 own open eval shot and close preserve a second target" {
+  gdoc_owner_setup
+  id="$(gdoc_open agent-a capture)"
+  other="$(gdoc_open agent-a sentinel)"
+  run "$SCRIPT" eval --owner agent-a "$id" 'document.title'
+  [ "$status" -eq 0 ]
+  [ "$output" = 'fixture page' ]
+  run "$SCRIPT" shot --owner agent-a "$id"
+  [ "$status" -eq 0 ]
+  [ "$(base64 < "$output" | tr -d '\n')" = "$PNG_BLACK" ]
+  run "$SCRIPT" close --owner agent-a "$id"
+  [ "$status" -eq 0 ]
+  if gdoc_registry_has "$id"; then return 1; fi
+  gdoc_registry_has "$other"
+  jq -e --arg id "$id" --arg other "$other" '(.[$id] == null) and (.[$other].owner == "agent-a")' "$AGENT_TAB_STATE_DIR/tabs.json"
+}

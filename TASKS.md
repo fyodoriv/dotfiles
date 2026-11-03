@@ -182,7 +182,7 @@ them. -->
   - **ID**: rust-source-inventory
   - **Tags**: migration, rust
   - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Deliver the component manifest and a thin pinned Rust adapter to agentbrew's inventory validator. Account for every owned executable, embedded interpreter, generated mapping, test and caller without duplicating the shared engine. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
+  - **Details**: Deliver the component manifest and a thin pinned Rust adapter to agentbrew's inventory validator. Account for every owned executable, embedded interpreter, generated mapping, test and caller without duplicating the shared engine. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). The [reviewed source collection](docs/plans/rust-source-inventory.md) records the completed families and remaining coverage.
   - **Output**: code
   - **Blocked**: needs-agentbrew-inventory — the reusable validator in agentbrew task `rust-source-inventory` must be delivered before this adapter can pass. Source collection can proceed independently.
   - **Acceptance**: Unclassified owned executable components 0; unexplained exceptions 0; every component has one owner and a measured slice or a precise permitted exception. The runnable validator rejects every planted embedded, extensionless and generated-code omission before any production replacement.

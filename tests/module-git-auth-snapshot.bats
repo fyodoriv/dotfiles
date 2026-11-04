@@ -129,3 +129,41 @@ setup() {
   [ "$(wc -l < "$CHECK_RESULTS" | tr -d ' ')" -eq 3 ]
   ! grep -v ':0$' "$CHECK_RESULTS"
 }
+
+stale_token_check() {
+  # Fixture: the keyring login is valid; only the token "good" is valid.
+  gh() {
+    [ "$*" = 'auth status -h github.com' ] || return 0
+    [ -z "${GITHUB_TOKEN:-}" ] || [ "$GITHUB_TOKEN" = good ]
+  }
+  check() {
+    local id="$1" test_cmd="$3" result
+    case "$id" in git.gh_env_token|git.gh_launchctl_token) ;; *) return 0 ;; esac
+    if eval "$test_cmd" >/dev/null 2>&1; then result=0; else result=1; fi
+    printf '%s:%s\n' "$id" "$result" >> "$CHECK_RESULTS"
+  }
+  source "$MODULE"
+}
+
+@test "stale GITHUB_TOKEN fails the env token check" {
+  export GITHUB_TOKEN=stale
+  stale_token_check
+  grep -qx 'git.gh_env_token:1' "$CHECK_RESULTS"
+}
+
+@test "valid or unset GITHUB_TOKEN passes the env token check" {
+  export GITHUB_TOKEN=good
+  stale_token_check
+  grep -qx 'git.gh_env_token:0' "$CHECK_RESULTS"
+  : > "$CHECK_RESULTS"
+  unset GITHUB_TOKEN
+  stale_token_check
+  grep -qx 'git.gh_env_token:0' "$CHECK_RESULTS"
+}
+
+@test "stale launchctl GITHUB_TOKEN fails the GUI token check" {
+  launchctl() { [ "$*" = 'getenv GITHUB_TOKEN' ] && printf 'stale\n'; }
+  unset GITHUB_TOKEN
+  stale_token_check
+  grep -qx 'git.gh_launchctl_token:1' "$CHECK_RESULTS"
+}

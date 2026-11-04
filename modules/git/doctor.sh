@@ -204,6 +204,20 @@ if command -v gh &>/dev/null; then
       "_git_gh_has_scope '$_scope'"
   done
   unset _scope _scopes _git_gh_auth_snapshot_ready _git_gh_auth_snapshot_output _git_gh_auth_snapshot_status
+  # A stored GITHUB_TOKEN overrides the keyring, so a stale one breaks gh with
+  # HTTP 401. Stale means: the token fails while the keyring login works.
+  _git_gh_env_token_stale() {
+    [ -n "$1" ] || return 1
+    ( unset GH_TOKEN; export GITHUB_TOKEN="$1"; gh auth status -h github.com ) >/dev/null 2>&1 && return 1
+    ( unset GITHUB_TOKEN GH_TOKEN; gh auth status -h github.com ) >/dev/null 2>&1
+  }
+  check "git.gh_env_token" "GITHUB_TOKEN is unset or valid (replace a static export in ~/.zshenv.secrets with gh auth token)" \
+    "! _git_gh_env_token_stale \"\${GITHUB_TOKEN:-}\""
+  if command -v launchctl &>/dev/null; then
+    check "git.gh_launchctl_token" "launchctl GITHUB_TOKEN is unset or valid (GUI apps inherit it)" \
+      "! _git_gh_env_token_stale \"\$(launchctl getenv GITHUB_TOKEN 2>/dev/null)\"" \
+      "launchctl unsetenv GITHUB_TOKEN"
+  fi
 fi
 
 # ── Enterprise hooks ─────────────────────────────────────────────────

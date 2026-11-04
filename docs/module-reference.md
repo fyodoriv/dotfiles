@@ -161,6 +161,8 @@ temporary output and exit code are cleared after the scope checks.
 | `git.hooks_path` | `core.hooksPath` points to dotfiles | `git config --global` |
 | `git.worktree_fsmon.*` | Per-repo fsmonitor off (repos with worktrees) | `git config` per repo |
 | `git.gh_protocol` | `gh` uses SSH protocol (if `gh` installed) | `gh config set` |
+| `git.gh_env_token` | Shell `GITHUB_TOKEN` is unset or valid; fails when it gets HTTP 401 while the `gh` keyring login works | Manual: replace the static export in `~/.zshenv.secrets` with `gh auth token` |
+| `git.gh_launchctl_token` | `launchctl` `GITHUB_TOKEN` (inherited by GUI apps) is unset or valid | `launchctl unsetenv GITHUB_TOKEN` |
 
 ### shell — full-only
 

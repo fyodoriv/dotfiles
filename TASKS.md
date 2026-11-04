@@ -513,7 +513,7 @@ them. -->
   - **ID**: rust-metrics-checkup
   - **Tags**: migration, rust
   - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Checkup Python processors/exporter, stats/proof/scorecard/telemetry; UI unchanged. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
+  - **Details**: Checkup Python processors/exporter, stats/proof/scorecard/telemetry; UI unchanged. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). The [checkup recorder consumer](docs/plans/checkup-read-consumer.md) tests the pinned native read guard before publisher integration.
   - **Output**: code
   - **Blocked by**: rust-cli-core, rust-process-primitives
   - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.

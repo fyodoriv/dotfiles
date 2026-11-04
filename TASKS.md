@@ -26,7 +26,7 @@ them. -->
   - **Pivot**: Any unrelated-token override, unknown-as-absent decision, unsafe mutation, false repair or secret disclosure rejects the boundary; preserve the oracle and redesign the adapter.
   - **Anchor**: agentbrew issue #693 and user ownership clarification; Basili/Caldiera/Rombach 1994 GQM; Munafò et al. 2017 pre-registration; OWASP Logging Cheat Sheet.
   - **Competitive-goal**: none — machine credential correctness and privacy, not a scorecard count.
-  - **Evidence**: Original prediction `7d6006d`; the private reducer passed the sealed corpus. Standalone transfer awaits its gate. Native work needs an owned installed callback, the qualified shared bounded worker and a secret-safe GUI writer or covered removal policy. See the plan.
+  - **Evidence**: Original prediction `7d6006d`; transfer prediction `05cc929`. The standalone fixture retains the sealed corpus and passes its focused gate. Native work needs an owned installed callback, the qualified shared bounded worker and a secret-safe GUI writer or covered removal policy. See the plan.
 
 
 - [ ] Prepare private evidence for compiler runs outside queue ownership

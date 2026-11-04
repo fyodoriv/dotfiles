@@ -1,0 +1,1541 @@
+{
+  "schema_version": 1,
+  "prediction_commit": "7d6006d",
+  "owner": "dotfiles-machine",
+  "shared_source_tree": "187687c9aa6c674fc47fc71b5cfc02b456e8a6f3",
+  "native_qualification": "unavailable-not-run",
+  "limits": {
+    "token_visible_ascii_bytes": 4096,
+    "future_child_stream_bytes": 8192
+  },
+  "caps_scope": "Synthetic validation only; no native process/total-RSS proof.",
+  "secret_fixture_marker_prefix": "CONNECTOR_FIXTURE_SECRET_",
+  "cases": [
+    {
+      "id": "c01_stale_github_token",
+      "group": "C01",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin",
+          "GITHUB_TOKEN": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "header-prepared",
+        "token_source": "keyring",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": true,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c02_stale_gh_token",
+      "group": "C02",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin",
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "header-prepared",
+        "token_source": "keyring",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": true,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c02_both_conflicting",
+      "group": "C02",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin",
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OLD",
+          "GITHUB_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "header-prepared",
+        "token_source": "keyring",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": true,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c03_no_environment_tokens",
+      "group": "C03",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "header-prepared",
+        "token_source": "keyring",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": true,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c04_ordinary_gh_token",
+      "group": "C04",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "ordinary",
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OLD"
+        }
+      },
+      "expected": {
+        "decision": "unchanged",
+        "token_source": "gh-token",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c04_ordinary_github_token",
+      "group": "C04",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "ordinary",
+        "env": {
+          "GITHUB_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "unchanged",
+        "token_source": "github-token",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c04_ordinary_both_precedence",
+      "group": "C04",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "ordinary",
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OLD",
+          "GITHUB_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "unchanged",
+        "token_source": "gh-token",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c05_missing_executable",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "missing",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "keyring-unavailable"
+        ]
+      }
+    },
+    {
+      "id": "c05_failed_lookup",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "failed",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "keyring-unavailable"
+        ]
+      }
+    },
+    {
+      "id": "c05_timeout_lookup",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "timeout",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "keyring-unavailable"
+        ]
+      }
+    },
+    {
+      "id": "c05_empty_token",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "invalid-keyring-token"
+        ]
+      }
+    },
+    {
+      "id": "c05_multiline_token",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING\nCONNECTOR_FIXTURE_SECRET_OTHER",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "invalid-keyring-token"
+        ]
+      }
+    },
+    {
+      "id": "c05_control_token",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING\u0001",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "invalid-keyring-token"
+        ]
+      }
+    },
+    {
+      "id": "c05_oversized_token",
+      "group": "C05",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "invalid-keyring-token"
+        ]
+      }
+    },
+    {
+      "id": "c06_absent_readonly",
+      "group": "C06",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": false,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "absent"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "absent",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "repair-needed"
+        ]
+      }
+    },
+    {
+      "id": "c06_absent_refresh",
+      "group": "C06",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "absent"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "fixed",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 1,
+        "fixed": true,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c06_repeat_matching",
+      "group": "C06",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "matching",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c07_stale_readonly",
+      "group": "C07",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": false,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "stale",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "repair-needed"
+        ]
+      }
+    },
+    {
+      "id": "c07_stale_refresh",
+      "group": "C07",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "fixed",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 1,
+        "fixed": true,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c08_matching",
+      "group": "C08",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": false,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "matching",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c09_gui_unknown",
+      "group": "C09",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "unknown"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "unknown",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "gui-unavailable"
+        ]
+      }
+    },
+    {
+      "id": "c09_keyring_unknown",
+      "group": "C09",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "unknown"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "unknown",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "keyring-unavailable"
+        ]
+      }
+    },
+    {
+      "id": "c10_fixture_covered_remove",
+      "group": "C10",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "remove-when-covered",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "fixture-qualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "absent"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "fixed",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 1,
+        "fixed": true,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c10_unqualified_coverage",
+      "group": "C10",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "remove-when-covered",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "unknown",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "coverage-unqualified"
+        ]
+      }
+    },
+    {
+      "id": "c10_remove_readonly",
+      "group": "C10",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "remove-when-covered",
+        "consumer": "managed-keyring-gui",
+        "fix": false,
+        "coverage": "fixture-qualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "stale",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "repair-needed"
+        ]
+      }
+    },
+    {
+      "id": "c11_explicit_env_consumer",
+      "group": "C11",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "explicit-environment",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "skipped",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c11_unrelated_gh_token_preserved",
+      "group": "C11",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "fixed",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 1,
+        "fixed": true,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c12_rejected_write",
+      "group": "C12",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": false,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "repair-failed",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": [
+          "write-failed"
+        ]
+      }
+    },
+    {
+      "id": "c12_mismatching_recheck",
+      "group": "C12",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "repair-unverified",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 1,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": [
+          "postcheck-failed"
+        ]
+      }
+    },
+    {
+      "id": "c12_unknown_recheck",
+      "group": "C12",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "unknown"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "repair-unverified",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 1,
+        "proposals": 1,
+        "writes": 1,
+        "rechecks": 1,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": "GITHUB_TOKEN",
+        "diagnostics": [
+          "postcheck-failed"
+        ]
+      }
+    },
+    {
+      "id": "c13_failure_marker_discarded",
+      "group": "C13",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin"
+        },
+        "keyring": {
+          "status": "failed",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "unavailable",
+        "token_source": "none",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "keyring-unavailable"
+        ]
+      }
+    },
+    {
+      "id": "c13_success_fixture_sink_only",
+      "group": "C13",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "callback",
+        "env": {
+          "HOME": "/fixture/home",
+          "PATH": "/fixture/bin:/usr/bin",
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OLD",
+          "GITHUB_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        },
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING",
+          "stderr": ""
+        },
+        "fixture_expected_header": "Bearer CONNECTOR_FIXTURE_SECRET_KEYRING"
+      },
+      "expected": {
+        "decision": "header-prepared",
+        "token_source": "keyring",
+        "keyring_reads": 1,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": true,
+        "both_vars_removed": true,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c14_list_mode",
+      "group": "C14",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "list",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "skipped",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c14_override_discovery",
+      "group": "C14",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "override",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "skipped",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c14_non_macos",
+      "group": "C14",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "other",
+        "discovery": "run",
+        "selection": "refresh-managed-gui",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "skipped",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c14_unconfigured",
+      "group": "C14",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "unconfigured",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "skipped",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "c14_unknown_policy",
+      "group": "C14",
+      "layer": "pure-contract",
+      "input": {
+        "operation": "doctor",
+        "platform": "macos",
+        "discovery": "run",
+        "selection": "unknown",
+        "consumer": "managed-keyring-gui",
+        "fix": true,
+        "coverage": "unqualified",
+        "keyring": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "gui": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_OLD"
+        },
+        "write_ok": true,
+        "recheck": {
+          "status": "value",
+          "value": "CONNECTOR_FIXTURE_SECRET_KEYRING"
+        },
+        "env": {
+          "GH_TOKEN": "CONNECTOR_FIXTURE_SECRET_OTHER"
+        }
+      },
+      "expected": {
+        "decision": "unknown",
+        "token_source": "none",
+        "keyring_reads": 0,
+        "gui_reads": 0,
+        "proposals": 0,
+        "writes": 0,
+        "rechecks": 0,
+        "fixed": false,
+        "callback_fixture_matches": false,
+        "both_vars_removed": false,
+        "owner_context_retained": true,
+        "unrelated_gh_token_preserved": true,
+        "write_variable": null,
+        "diagnostics": [
+          "policy-unknown"
+        ]
+      }
+    }
+  ]
+}

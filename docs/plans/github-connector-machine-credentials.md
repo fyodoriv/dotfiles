@@ -250,3 +250,10 @@ transport depends on the shared bounded Darwin worker. The installed
 `launchctl(1)` contract takes the value in `setenv key value`. A native refresh
 requires a secret-safe writer. Selected removal requires exact callback
 coverage and verified readback. Production issue #693 stays open.
+
+Observed after transfer prediction `05cc929` on 2026-11-04. All three
+input hashes matched the original sealed bytes. The generated standalone
+lock retained each selected registry version and checksum from the source
+lock. The offline, network-denied test exited zero with 38 passes, zero
+ignored and zero filtered cases. The authority-separation control still
+refused native operation and callback coverage.

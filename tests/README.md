@@ -108,3 +108,6 @@ The `setup()` function creates isolated temp directories:
 - `run` captures stdout in `$output` and exit code in `$status`
 - Use `[[ ]]` for pattern matching, `[ ]` for strict equality
 - A git fixture repo shared through `setup_file` needs `git reset -q --hard` and `git clean -fdq` in `setup`. `git checkout .` leaves staged files behind, so one test's changes leak into every later test and can hide a missing mapping (see `bats-affected.bats`)
+
+The docs link check keeps one anchor hyphen per space around removed heading
+punctuation, as GitHub does for `Fork & customize`.

@@ -133,12 +133,18 @@ test: ## Run affected tests only (skips tests that passed with the same inputs)
 	else \
 	  count=$$(echo "$$affected" | wc -l | tr -d ' '); \
 	  echo "═══ Tests: $$count affected file(s) ($(JOBS_LABEL)) ═══"; \
-	  peers=$$(printf '%s\n' "$$affected" | grep -vxF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" || true); \
+	  peers=$$(printf '%s\n' "$$affected" | grep -vxF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" -e tests/heavy-run.bats -e "$(CURDIR)/tests/heavy-run.bats" || true); \
+	  queue_test=$$(printf '%s\n' "$$affected" | grep -xF -e tests/heavy-run.bats -e "$(CURDIR)/tests/heavy-run.bats" || true); \
 	  doctor=$$(printf '%s\n' "$$affected" | grep -xF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" || true); \
 	  result=0; \
 	  if [ -n "$$peers" ]; then \
 	    $(FULLPOWER) ./bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs" \
 	      --key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$peers || result=$$?; \
+	  fi; \
+	  if [ -n "$$queue_test" ]; then \
+	    $(FULLPOWER) ./bin/cached-run --per-file --deps "$$pairs" \
+	      --key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$queue_test \
+	      || { queue_result=$$?; [ "$$result" -ne 0 ] || result=$$queue_result; }; \
 	  fi; \
 	  if [ -n "$$doctor" ]; then \
 	    $(FULLPOWER) ./bin/cached-run --per-file --deps "$$pairs" \

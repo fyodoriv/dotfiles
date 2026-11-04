@@ -1,0 +1,9 @@
+[package]
+name = "checkup-read-consumer"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97"
+publish = false
+
+[dependencies]
+checkup-run = { git = "https://github.com/fyodoriv/agentbrew", rev = "d3ed7b9b183e10cd62f9a900e7a03b6f0811540f" }

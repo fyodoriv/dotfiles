@@ -1,0 +1,865 @@
+{
+  "embedded_boundaries": [
+    {
+      "call_lines": [
+        258
+      ],
+      "definition_lines": [
+        148
+      ],
+      "interpreter": "perl",
+      "name": "status snapshot",
+      "path": "bin/heavy-run"
+    },
+    {
+      "call_lines": [
+        352
+      ],
+      "definition_lines": [
+        148
+      ],
+      "interpreter": "perl",
+      "name": "admission controller",
+      "path": "bin/heavy-run"
+    },
+    {
+      "call_lines": [
+        334,
+        670
+      ],
+      "definition_lines": [
+        314
+      ],
+      "interpreter": "perl",
+      "name": "payload priority",
+      "path": "bin/heavy-run"
+    },
+    {
+      "call_lines": [
+        333
+      ],
+      "definition_lines": [
+        333
+      ],
+      "interpreter": "perl",
+      "name": "nested admission lock probe",
+      "path": "bin/heavy-run"
+    },
+    {
+      "call_lines": [
+        331
+      ],
+      "definition_lines": [
+        172
+      ],
+      "interpreter": "awk",
+      "name": "test source edges",
+      "path": "bin/cached-run"
+    },
+    {
+      "call_lines": [
+        345
+      ],
+      "definition_lines": [
+        223
+      ],
+      "interpreter": "awk",
+      "name": "test cache keys",
+      "path": "bin/cached-run"
+    },
+    {
+      "call_lines": [
+        448
+      ],
+      "definition_lines": [
+        405
+      ],
+      "interpreter": "awk",
+      "name": "test source roots",
+      "path": "bin/bats-affected"
+    }
+  ],
+  "files": [
+    {
+      "blob": "bec9562d1f3fcededb3d4d64f8a8753a4e0312fe",
+      "mode": "100755",
+      "path": "bin/add-task",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "ecf81ee49d0be51bcc78983d818e65f78ab54a97",
+      "mode": "100755",
+      "path": "bin/agent-browser-reap-strays",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e20b739e9c383a7305b80c320cd03c6931d6d7b8",
+      "mode": "100755",
+      "path": "bin/agent-browser-singleton-preflight",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "5d017b1a2ef52234bb3b7cca02fbaed52d893cef",
+      "mode": "100755",
+      "path": "bin/agent-browser-temp-route",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "eb9ca287bc3ec9c3766d643d799975d20c20e20e",
+      "mode": "100755",
+      "path": "bin/agent-tab",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "9b7007fcd4fe8b9a474c99a22257a2eb4fc6ba78",
+      "mode": "100755",
+      "path": "bin/agent-tmux",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e8c0e76a616e157140906f94d8acaf97bfadc24b",
+      "mode": "100755",
+      "path": "bin/agentbrew",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e3773f89477f20ade278866384ee7fb724ed9f62",
+      "mode": "100755",
+      "path": "bin/app-priority",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "589dd1200e1294e28bee5d1d9a0c4e2bd293e7de",
+      "mode": "100755",
+      "path": "bin/bats-affected",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "75c24f963e9d8bf7bf24592210e85355ff1ee131",
+      "mode": "100755",
+      "path": "bin/cached-run",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "6b0daa3a0ed16f3198788895a44fc0d7c7db0c5b",
+      "mode": "100755",
+      "path": "bin/cascade-caffeinate",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "8bb1ec07501fdfb8b155907dbaaab1b937b5e183",
+      "mode": "100755",
+      "path": "bin/cheat",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "a54e5433e2709be51dd9a32b1a9cbc86970dde7d",
+      "mode": "100755",
+      "path": "bin/check-all",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "52b5a1139948fb2d55996b9a7ff3dbadce7ef392",
+      "mode": "100755",
+      "path": "bin/chrome-enforce-profile",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2ae77a8486f96638b4a041e3da81a8505fe9e3eb",
+      "mode": "100755",
+      "path": "bin/chrome-heal",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "71497c5aa74f1984fe8b898441e6428cc758fd99",
+      "mode": "100755",
+      "path": "bin/chromework-activate",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "bbb7adc526db749de715b051869bcca2cc580a78",
+      "mode": "100755",
+      "path": "bin/chromework-fix-http-routing",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "998b5a2cfb3756d13fe3468a85891397019be1b1",
+      "mode": "100755",
+      "path": "bin/chromework-install",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "9e99e957f9034a0615373e4d46d902f843abe9e6",
+      "mode": "100755",
+      "path": "bin/chromework-open-url",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "4dadb6920f0b97d720da0a6f6c82cc4dc768e63d",
+      "mode": "100755",
+      "path": "bin/cleanup",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "c03ff7146d7af0c45b7afdf75416e3a0a50a1fa2",
+      "mode": "100755",
+      "path": "bin/dotfiles",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2753a23ab4d3b91789ddcb10b8af271c32c1d103",
+      "mode": "100755",
+      "path": "bin/dotfiles-actions",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "cba5f318dc55df16c123d24417ef846e7a009502",
+      "mode": "100755",
+      "path": "bin/dotfiles-add",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2fff5dcb039c140ef3ac8877589e817dc23aa1e2",
+      "mode": "100755",
+      "path": "bin/dotfiles-adhoc-sign-bottles",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "7f649b60194d657ebc804b3d549e595958b5057d",
+      "mode": "100755",
+      "path": "bin/dotfiles-adhoc-sign-curl",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "1c1aa98481ff95c6d9e1616ee3d62842a38eb1f3",
+      "mode": "100755",
+      "path": "bin/dotfiles-adhoc-sign-endpoint-shims",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "5efd0800cb092b8d09ff01f847774d084607d3b2",
+      "mode": "100755",
+      "path": "bin/dotfiles-adhoc-sign-ggrep",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2b5d2279c5ebd3f5965f1a6d97f2f96f6b1446b9",
+      "mode": "100755",
+      "path": "bin/dotfiles-adhoc-sign-jq",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2a8116aad151fe84f30ca1cb7be04a2f29d16d2e",
+      "mode": "100755",
+      "path": "bin/dotfiles-adhoc-sign-uv-pythons",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "8ca720a467c8f78e2c33dc7b57b8604d9af44a99",
+      "mode": "100755",
+      "path": "bin/dotfiles-agent-keepawake",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "59c8c6817e2f42b55a873d43d7927226cc2e4b6b",
+      "mode": "100755",
+      "path": "bin/dotfiles-agent-wake-recover",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "606e15b7fe68eaa504fa3c76577338cc6dbd2356",
+      "mode": "100755",
+      "path": "bin/dotfiles-agentfile-resync",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "6303ced88d85ca7d96a9cd572fc6fc1b60ff02b6",
+      "mode": "100755",
+      "path": "bin/dotfiles-amphetamine-sync",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "de8d6b11458d11cf0f8228cdbc23b777b13ff701",
+      "mode": "100755",
+      "path": "bin/dotfiles-audit",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "70cf31f2c4cb425e3fef109dc00286ab739dda68",
+      "mode": "100755",
+      "path": "bin/dotfiles-brew-add",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "42f2352e8b2ff6add3f02d90a87f61336816ad62",
+      "mode": "100755",
+      "path": "bin/dotfiles-chrome-dock-guard",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2e84f65b8f3c2ce4f3dee2fb5fe801e9d2585cc4",
+      "mode": "100755",
+      "path": "bin/dotfiles-config",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "4540f80f742de2fe68ad1122eaaf60aa9dcd464b",
+      "mode": "100755",
+      "path": "bin/dotfiles-contribute",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "8114e57182bf76bfcf676f15815d718329b311b0",
+      "mode": "100755",
+      "path": "bin/dotfiles-coverage",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e45adc12095e6e800088ee9215730b4fc18cf044",
+      "mode": "100755",
+      "path": "bin/dotfiles-defaults-add",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "291b47f8254cf2a1d7c2e538d2b94bc959a4c002",
+      "mode": "100755",
+      "path": "bin/dotfiles-defaults-preview",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "0d74e8fbef8f99afc187286cf855cfc2c51bd763",
+      "mode": "100755",
+      "path": "bin/dotfiles-disable-blocked-node-automation",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "748d6785509376f1af31b731be01c6f60db7cc2e",
+      "mode": "100755",
+      "path": "bin/dotfiles-doctor",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "215b12e611cebc7fd57da176b8362387894a5a6b",
+      "mode": "100755",
+      "path": "bin/dotfiles-ensure-gui-path",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "d38b88278089a1d5259f43b0010e27ea858e36e4",
+      "mode": "100755",
+      "path": "bin/dotfiles-enterprise",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "3e63d0006aeaef91c7e1bb7fdb8fd64f9a85fb53",
+      "mode": "100755",
+      "path": "bin/dotfiles-fix-launchagent-endpoint-path",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "ee68ee5d76eb69e8b7bb509201d3b3368c6f855c",
+      "mode": "100755",
+      "path": "bin/dotfiles-heal-stuck-agents",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "84ee446a0bb3047a6bcfeae66f512e8bf1790a1f",
+      "mode": "100755",
+      "path": "bin/dotfiles-install",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "72d4efc571ea230eac119b93b85d6365e1eaddc4",
+      "mode": "100755",
+      "path": "bin/dotfiles-install-aws-gcloud",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "84affda764870277a50f704e0c9599fd77ba23ed",
+      "mode": "100755",
+      "path": "bin/dotfiles-install-codex",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "106b877f23c16871c7da2ebbe6af6f1c7e0291d9",
+      "mode": "100755",
+      "path": "bin/dotfiles-launchagent-drift",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "6c664de4c68209290de5f621b292461ac302c8f0",
+      "mode": "100755",
+      "path": "bin/dotfiles-launchd-maxfiles",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "ab6bf760983b66439f4b3e56e2e2d61bb8ab81cd",
+      "mode": "100755",
+      "path": "bin/dotfiles-leak",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "48466680bd50c6975181a55b353773020e87477a",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-awk-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "6bfbc208bec01e2862476eae68ae19a43ee99078",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-curl-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "c46428d02fa221740a3670640becdf37243b2d92",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-find-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "0c3b4f9460a21aa231a89c7acf2cf620ee9124c1",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-git-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "9ede160a9b10add68aea552a2de10fbd23089026",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-grep-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "94ea383c7d490cf6f5418944f7b68662138987e9",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-jq-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "a223a0305770b261c52859c837740edbded11f53",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-otool-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "aa36bf762ed139b2a3e21386802ebe678816256e",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-perl-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "b789a277540d163f2ffd99f2492253106febec08",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-python-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "d39f01dace803780ef629f75fb9a90c903029b85",
+      "mode": "100755",
+      "path": "bin/dotfiles-link-sed-shim",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "0bd7dd5d7c27e772a16dcfa7de45f86bf79c646b",
+      "mode": "100755",
+      "path": "bin/dotfiles-load-sampler",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "ef320c491e12ac5c26e6f71846348b05e3438269",
+      "mode": "100755",
+      "path": "bin/dotfiles-lock-checked",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "6438fe3c8631df9d054dc5966aaa5e8c931bc04c",
+      "mode": "100755",
+      "path": "bin/dotfiles-mas-upgrade",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "26d8bd56cf9237bc470d0f181ad2059dbc6d089f",
+      "mode": "100755",
+      "path": "bin/dotfiles-mcp-launch",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "915a95cf787a29a8e73fad431c9ce9fbde060151",
+      "mode": "100755",
+      "path": "bin/dotfiles-memory",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "4179617c8cbfe2d04543ac921a5da00f68ff5a07",
+      "mode": "100755",
+      "path": "bin/dotfiles-memory-sync-projects",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "3c7cf49c5011a334ea0c4df79bc4504704c64556",
+      "mode": "100755",
+      "path": "bin/dotfiles-metrics",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "ac80f5a9f837fe8d1eebc875141f9eb18e9d856f",
+      "mode": "100755",
+      "path": "bin/dotfiles-new-module",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "55d5b94ec104ac1d1abf7b2c2e800d7bc995bf34",
+      "mode": "100755",
+      "path": "bin/dotfiles-node-upgrade",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "3a04d6155791fc7b2ca406dcbb27e8d9b0ba7a71",
+      "mode": "100755",
+      "path": "bin/dotfiles-npm-global-scripts",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "mode": "100755",
+      "path": "bin/dotfiles-plugin",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "975785a2eb2c43d8c38d1cbc21e9a36fe1cccbb3",
+      "mode": "100755",
+      "path": "bin/dotfiles-pmset-drift-watch",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "036308a6da8f0acb391f092ed8fbaf526b9b079c",
+      "mode": "100755",
+      "path": "bin/dotfiles-pnpm-global-update",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "759d3c22b2222aa59972b1fa11315756dc24593d",
+      "mode": "100755",
+      "path": "bin/dotfiles-profile",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "0139fd25bcc3c1beb826ef56ec28e4833b0929ae",
+      "mode": "100755",
+      "path": "bin/dotfiles-python-tls-relax",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "c6e270b4020259e4b4ee50482801bacdd371d75c",
+      "mode": "100755",
+      "path": "bin/dotfiles-quickstart",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e87d17a7763c3c4a5177aecc29271e7bbf78e3f8",
+      "mode": "100755",
+      "path": "bin/dotfiles-quit-relay",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "0184024d314608961073be0d5f04aba1859a7929",
+      "mode": "100755",
+      "path": "bin/dotfiles-reload-launchagents",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "b8d48258642fba1d06c15b62832cb55477d6072f",
+      "mode": "100755",
+      "path": "bin/dotfiles-remove-framework-python",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "dfed0f2bf09188dc8145c4fb92e3f3c903a8076c",
+      "mode": "100755",
+      "path": "bin/dotfiles-resilience-setup",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "b20b9e2f6d8d72c82f6e7d193936cca770508712",
+      "mode": "100755",
+      "path": "bin/dotfiles-restore-focus-after-chrome",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "a73d3eac5b3c2657c86ae06d05487ceb26bb51d8",
+      "mode": "100755",
+      "path": "bin/dotfiles-set-persistent-chrome-themes",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "f1c867c7343803ac8c813aba8c1a02fc943a25de",
+      "mode": "100755",
+      "path": "bin/dotfiles-start",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "3ba0070542e3cc5c2d009a0992c61865f470b73b",
+      "mode": "100755",
+      "path": "bin/dotfiles-stats",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "a0162edcba524ba3a994effa1d4671b9b867dc57",
+      "mode": "100755",
+      "path": "bin/dotfiles-sync",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "74002720317992cb848c005b5087a94d6663a7ab",
+      "mode": "100755",
+      "path": "bin/dotfiles-telemetry",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "de2d50a177b854e7ad3a8c6e86f08808db361a18",
+      "mode": "100755",
+      "path": "bin/dotfiles-uninstall",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "3c1bb3a58c31d69039737a83ad7b36d3715269d2",
+      "mode": "100755",
+      "path": "bin/dotfiles-unmanage",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "bb59408f9220b1223853f3faefdbfc827701c1fb",
+      "mode": "100755",
+      "path": "bin/dotfiles-update",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "2c113cc97bd47d2c8b0e3499f4e0cb37372f2ab6",
+      "mode": "100755",
+      "path": "bin/dotfiles-updates-landed",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "mode": "100755",
+      "path": "bin/dotfiles-upgrade",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "19eac1cdd93f24cb28ecb6d99e40da7391d207ee",
+      "mode": "100755",
+      "path": "bin/dotfiles-validate",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "da306ddebff0cd69e7af1203d55d469d3869f1d0",
+      "mode": "100755",
+      "path": "bin/dotfiles-workspace",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "bc7397d9e0ccc19aa49bbad1f5fb84e6dfcda7ce",
+      "mode": "100755",
+      "path": "bin/gh",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "f3313c8d521a68116378640bd799c5a23d762501",
+      "mode": "100755",
+      "path": "bin/git",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "09df9f32f91b0ae339a770d08a6ad9a9e9a3aa89",
+      "mode": "100755",
+      "path": "bin/git-maintain",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e6f465ffd9c91be3c9cfad58b1429071bac5f0f9",
+      "mode": "100755",
+      "path": "bin/git-safe",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "7cd31b951eb5f6f6ffd1e637cdc8056605256751",
+      "mode": "100755",
+      "path": "bin/graceful-restart",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "af051e10d1091eb59179da02910e7b9f4abaac3b",
+      "mode": "100755",
+      "path": "bin/headless-chrome-unlocked",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "mode": "100755",
+      "path": "bin/heavy-run",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "90695163f820b20acbab72b2b62a2f7fe51f69a5",
+      "mode": "100755",
+      "path": "bin/hotfix",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "ba37d0b1862391862edf158afcbd6016b03e4f7b",
+      "mode": "100755",
+      "path": "bin/jetbrains-install-plugins",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "cde564d91db3351a16f543a7dd0c905efe2aaf3d",
+      "mode": "100755",
+      "path": "bin/land",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "90b8cad1c49f429193e8ff57e4067f11b441eb00",
+      "mode": "100755",
+      "path": "bin/learn-repos-inventory",
+      "shebang": "#!/bin/sh"
+    },
+    {
+      "blob": "1db6787e482dbe0bd1f32e3266dfa5161eede1ae",
+      "mode": "100755",
+      "path": "bin/learn-repos-source-fingerprint",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "c48412629935417172e91f43e9ff1a17e8eaa21e",
+      "mode": "100755",
+      "path": "bin/local-ai-agent",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "bfdee822a043d6ed86050e750139b60f88115c57",
+      "mode": "100755",
+      "path": "bin/local-ai-bench",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e669bca5bed90e797852a9040155e4256abefdb1",
+      "mode": "100755",
+      "path": "bin/local-ai-loop",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e927df2ef1a200f505f4842f6234b1c1ec2a3013",
+      "mode": "100755",
+      "path": "bin/local-ai-readiness-check",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "76f353cb8f60f6b49847528eae636d44696df3be",
+      "mode": "100755",
+      "path": "bin/local-ai-record-lesson",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "4d19b4c784d8541af69945010cd959d3ff5ab9c9",
+      "mode": "100755",
+      "path": "bin/local-ai-warmup",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "88850f846b2a084261abea7a40ec3e4eac68fc03",
+      "mode": "100755",
+      "path": "bin/mcp-memory-launchagent",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "55011ac3762306570b0af702911923d234943f64",
+      "mode": "100755",
+      "path": "bin/morning",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "c39bbee73a28ce21d48482abf10de27b48a87a86",
+      "mode": "100755",
+      "path": "bin/network-watchdog",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "7e62d7e18fb1fd442ce6de77e38ac6954acdd4f7",
+      "mode": "100755",
+      "path": "bin/new-project",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "dd6019338ba66c7fb9bd499462c1c12609ae64d3",
+      "mode": "100755",
+      "path": "bin/note",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "4e89ccb3882415bc6910082a5d979e8bc59d4a61",
+      "mode": "100755",
+      "path": "bin/ollama-launchagent",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e7e37fac1d59d0b412065d6cace1a49966038340",
+      "mode": "100755",
+      "path": "bin/pr",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "d50ee0efabea3742de433390189207746d271b88",
+      "mode": "100755",
+      "path": "bin/rancher-desktop",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "7f0b1e3078c90f8b89abdcfadbcb385ed368984e",
+      "mode": "100755",
+      "path": "bin/review",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "e77b8e940c1124f3b253d13f7af03da2f264c2c4",
+      "mode": "100755",
+      "path": "bin/setup-chrome",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "71772e3b4dac98c41f7bd81cdea4133a0d090d95",
+      "mode": "100755",
+      "path": "bin/setup-dock",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "3af2264cee760c86d8be2ad41b18c26a20e1f51e",
+      "mode": "100755",
+      "path": "bin/slack-draft",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "0e07475d9e25cc479c1a0b26f7fd886372019ea6",
+      "mode": "100755",
+      "path": "bin/status",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "d5f30152c87b082fb7b310c720824a5fb4cc03ec",
+      "mode": "100755",
+      "path": "bin/temp-browser",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "846d680070af697a37c87eebc7a41e807e3d8ea3",
+      "mode": "100755",
+      "path": "bin/timer",
+      "shebang": "#!/bin/bash"
+    },
+    {
+      "blob": "4a2ba82725addff1c69af0778d4e92ab3aadc625",
+      "mode": "100755",
+      "path": "bin/tooling-sync",
+      "shebang": "#!/bin/bash"
+    }
+  ],
+  "revision": "a1928495a953055ff7db3d8f525d504faef2dc3a"
+}

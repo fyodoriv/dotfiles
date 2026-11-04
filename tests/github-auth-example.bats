@@ -4,7 +4,7 @@ setup() {
   local example="$BATS_TEST_DIRNAME/../home/zshenv.secrets.example"
   mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/home"
   awk '/^# Option 1 / { selected=1; next }
-       /^# Option 2/ { exit }
+       /^# Never hardcode/ { exit }
        selected { sub(/^# ?/, ""); print }' "$example" > "$BATS_TEST_TMPDIR/example.sh"
   test -s "$BATS_TEST_TMPDIR/example.sh"
   cat > "$BATS_TEST_TMPDIR/bin/gh" <<'FAKE'

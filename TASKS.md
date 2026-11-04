@@ -13,6 +13,22 @@ them. -->
 
 ## P1
 
+- [ ] Keep selected machine connector credentials fresh without leaks
+  - **ID**: github-connector-machine-credentials
+  - **Tags**: security, git, machine, rust, preparation
+  - **Details**: User assigns the GitHub header helper and stale GUI credential doctor to dotfiles; request is agentbrew issue #693. Register C01–C14, then land runnable Rust instrumentation before native wiring. Clear both token variables only for the keyring-backed callback. Preserve ordinary gh and explicit-token users. Plan: [machine credential controls](docs/plans/github-connector-machine-credentials.md).
+  - **Files**: `tests/fixtures/connector-credentials/`, `docs/plans/github-connector-machine-credentials.md`; future native adapter and existing doctor check/fix/recheck boundary.
+  - **Output**: instrumentation
+  - **Acceptance**: Exact absent/matching/stale/unknown decisions; selected repair handles stale nonempty GUI values and verifies the result. Unknown/unconfigured policy performs no lookup/write. No secret values or digests in diagnostics. Native callback/coverage stays unavailable until source qualification.
+  - **Hypothesis**: A callback-scoped keyring boundary and typed repair state make every sealed pure decision correct with zero wrong token selections, unauthorized mutation proposals, false fixed results or synthetic-marker disclosures.
+  - **Measurement**: `heavy-run cargo test --offline --locked --manifest-path tests/fixtures/connector-credentials/Cargo.toml --test connector_credentials_contracts -- --test-threads=1`, then `heavy-run make check BATS_JOBS= TEST_FILE_JOBS=`. The fixture target qualifies preparation; native activation requires its own registered measurements.
+  - **Success**: All pure assertions and positive controls pass; unsafe proposals, false fixed results and diagnostic marker disclosures are zero. Qualify native behavior separately before activation.
+  - **Pivot**: Any unrelated-token override, unknown-as-absent decision, unsafe mutation, false repair or secret disclosure rejects the boundary; preserve the oracle and redesign the adapter.
+  - **Anchor**: agentbrew issue #693 and user ownership clarification; Basili/Caldiera/Rombach 1994 GQM; Munafò et al. 2017 pre-registration; OWASP Logging Cheat Sheet.
+  - **Competitive-goal**: none — machine credential correctness and privacy, not a scorecard count.
+  - **Evidence**: Original prediction `7d6006d`; the private reducer passed the sealed corpus. Standalone transfer awaits its gate. Native work needs an owned installed callback, the qualified shared bounded worker and a secret-safe GUI writer or covered removal policy. See the plan.
+
+
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents

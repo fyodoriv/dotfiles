@@ -37,7 +37,39 @@ a filename cannot authorize deletion. These alternatives are rejected.
 | Repairs recheck and a dev checkout is report-only | `bin/dotfiles-doctor:334-345,525-580` | Existing fix/recheck path | fact |
 | No matching helper source was found | Tracked source search at `3955d331`; bounded installed code-helper metadata search | Chat/log/auth stores excluded | bounded non-discovery |
 | Shared Rust source/measurement boundary | [Rust migration](rust-migration.md), source tree `187687c9aa6c674fc47fc71b5cfc02b456e8a6f3` | Pinned private preparation input; not an installed release | proposed reuse |
-| Actual callback output format, endpoint and owned helper | Matching installed consumer and source | No verified ownership record yet | unqualified |
+| Installed Codex can invoke a fixed HTTP header callback | Disposable installed-client probe below | No selected GitHub configuration or installed helper | partial |
+
+## Native lookup and consumer evidence
+
+The installed GitHub CLI 2.103.3 can return a token from its config when
+both token environment variables are absent. In a disposable config, a
+read with `--no-refresh` returned the fake config token. Adding
+`--secure-storage` refused it with empty stdout. The test denied network,
+Keychain access and writes. This is a plaintext rejection control. A
+successful Keychain read remains unqualified.
+[GitHub CLI lookup source](https://github.com/cli/cli/blob/v2.103.3/pkg/cmd/auth/token/token.go)
+
+For native qualification, pin the GitHub CLI binary and select a release
+that supports both flags. The candidate command is
+`gh auth token -h github.com --secure-storage --no-refresh` with both
+token overrides removed. Keep the existing replay fixtures as historical
+evidence. Missing secure-mode support or an unavailable token must refuse
+the callback. Ordinary GitHub CLI commands retain their configured behavior.
+
+The installed Codex 0.166.0 client invoked a fixed
+`http_headers_helper` once in each disposable case during OAuth metadata
+discovery through `mcp login --no-browser`. It rejected malformed
+JSON before dispatch. Valid JSON reached the HTTP send stage under a
+network-denied sandbox. The strict comparison scored 1 of 2 because the
+valid case returned a generic send error without the required socket cause.
+This confirms invocation and the parser distinction. A successful authenticated
+request remains unqualified.
+[Codex callback source](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/rmcp-client/src/http_headers.rs)
+
+Agentbrew must select the helper for the intended consumer without competing
+explicit bearer or OAuth credentials. Before any launchd repair, verify the
+installed consumer, origin, helper and bounded process cleanup. The
+disposable probes did not read a real token or change a service.
 
 ## Scope (in)
 
@@ -70,10 +102,10 @@ The selection is a typed machine policy: unconfigured, refresh-managed-GUI or
 remove-when-covered. Unknown/unconfigured selection performs zero lookups and
 zero mutations. The default is not permission to repair arbitrary GUI tokens.
 
-Only the selected keyring header callback's child removes BOTH GH_TOKEN and
-GITHUB_TOKEN before fixed `gh auth token -h github.com`. Preserve other owner
-context. Do not alter general gh precedence or other hosts. Native execution
-remains unavailable during this preparation; tests use a synthetic adapter.
+Only the selected keyring header callback's child removes both token overrides
+before the pinned secure-storage and no-refresh lookup above. Preserve other
+owner context and ordinary gh precedence for every other command. The original
+bare lookup arguments describe historical replay only.
 
 Secret values have invocation scope. Their type has no Debug, Serialize,
 receipt, stable digest or persistent representation. No token travels in a
@@ -245,7 +277,7 @@ original sealed C01–C14, Basili/Caldiera/Rombach (1994) and Munafò et al. (20
 The Careerbrew `1b2b5415` reference in `src/careerbrew/workday/mcp_check.py`
 and `tests/unit/test_mcp_fix.py` qualifies a command-string `headersHelper`
 with one JSON Authorization object in a synthetic client configuration.
-Installed consumer ownership and native invocation still need proof. Native
+The selected deployment still needs proof of consumer ownership and invocation. Native
 transport depends on the shared bounded Darwin worker. The installed
 `launchctl(1)` contract takes the value in `setenv key value`. A native refresh
 requires a secret-safe writer. Selected removal requires exact callback

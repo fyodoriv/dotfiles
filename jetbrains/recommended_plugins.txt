@@ -16,7 +16,7 @@
 #
 # Operator preference: NO in-IDE AI plugins (Junie, Copilot, Codeium, Continue.dev,
 # Augment) — these are in disabled_plugins.txt by design. External AI agents
-# (Claude Code / Cursor / Windsurf / Devin / Codex) own the AI integration.
+# (Claude Code / Codex) own the AI integration.
 # Don't add AI plugins here without re-checking that preference.
 
 Key Promoter X                       # Key Promoter X — surfaces keyboard shortcuts when you click a button

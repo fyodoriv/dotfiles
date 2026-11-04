@@ -24,7 +24,7 @@ Desktop.ini
 .idea/sonarlint/
 *.iml
 
-# ── VS Code / Cursor / Windsurf ─────────────────────────────────────
+# ── VS Code / Windsurf ─────────────────────────────────────
 .vscode/settings.json
 .vscode/launch.json
 .history/
@@ -76,7 +76,7 @@ yalc.lock
 # ── AI agent artifacts ───────────────────────────────────────────────
 .orchestrator/
 .worktrees/
-.cursor/
+.cursor
 .windsurf/
 .claude/
 .cursorignore

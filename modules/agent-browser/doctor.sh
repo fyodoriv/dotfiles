@@ -159,7 +159,7 @@ check "agent-browser.launchagent_runatload" "agent-browser-chrome launchagent ha
 # Outside an agent context this check is a no-op — operators may use the
 # "default" session intentionally to get the --cdp 9223 fast path.
 check "agent-browser.agent_session_isolation" "AGENT_BROWSER_SESSION set when in agent context" \
-  "[ -z \"\${DEVIN_SESSION_ID:-\${CLAUDE_CODE_SSE_PORT:-\${CURSOR_AGENT:-\${WINDSURF_AGENT:-\${CODEX_AGENT:-}}}}}\" ] || { [ -n \"\${AGENT_BROWSER_SESSION:-}\" ] && [ \"\${AGENT_BROWSER_SESSION:-default}\" != default ]; }" \
+  "[ -z \"\${DEVIN_SESSION_ID:-\${CLAUDE_CODE_SSE_PORT:-\${WINDSURF_AGENT:-\${CODEX_AGENT:-}}}}\" ] || { [ -n \"\${AGENT_BROWSER_SESSION:-}\" ] && [ \"\${AGENT_BROWSER_SESSION:-default}\" != default ]; }" \
   ""
 
 # Source-of-truth check: lib/agent-browser-session-env.sh must stay wired from

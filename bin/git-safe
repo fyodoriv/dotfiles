@@ -1,7 +1,7 @@
 #!/bin/bash
 # git-safe — guard against destructive git commands in multi-agent repos.
 #
-# Detects when multiple agents (Windsurf, Cursor, Claude Code, minsky pipelines)
+# Detects when multiple agents (Claude Code, Codex, minsky pipelines)
 # may be working in the same repo and blocks commands that could wipe their work:
 #   - git reset --hard (wipes uncommitted changes)
 #   - git checkout . / git checkout -- <path> (reverts working tree)

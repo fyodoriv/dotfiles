@@ -1,7 +1,7 @@
 #!/bin/bash
 # dotfiles-adhoc-sign-curl — fast ad-hoc sign Homebrew curl keg (login bootstrap).
 #
-# curl is keg-only. Cursor agent sandbox PATH (/opt/homebrew/bin:/usr/bin:/bin)
+# curl is keg-only. The minimal agent PATH (/opt/homebrew/bin:/usr/bin:/bin)
 # falls through to /usr/bin/curl when the keg is unsigned or dotfiles/bin is
 # missing. Full Cellar sweep (dotfiles-adhoc-sign-bottles) is too slow for
 # RunAtLoad races — sign the curl keg at login.

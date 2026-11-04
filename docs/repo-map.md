@@ -16,7 +16,9 @@ Owner decision 2026-10-08: **Windsurf and Devin support was removed** from dotfi
 
 > Cursor and Grok support was removed on purpose on 2026-10-19, because the author is certain that the companies behind these tools support war crimes in Ukraine. This is the author’s position. Please do not add support for these tools back. Slava Ukraini!
 
-`tests/no-cursor-grok.bats` fails if a Cursor LaunchAgent, a `~/.cursor` write path, a `use_cursor` switch, a Cursor Topgrade step, or Grok/xAI support comes back. Defensive Cursor detection stays: agent-attribution stripping, the `CURSOR_AGENT` guard in `bin/gh` and `bin/git`, and `.cursor/` in the global gitignore.
+Claude Code and Codex are the supported agents. `tests/no-cursor-grok.bats`
+guards the retirement. Keep the legacy safety checks and keep the retired
+updater disabled.
 
 **Augment (Auggie) stays deprecated and frozen** in every tooling repo (dotfiles, agentbrew, minsky, tasks.md, and the org overlays).
 

@@ -33,7 +33,7 @@ This implements `TASKS.md` P0 `attach-first-browser-policy-wrapper` and traces t
 
 ## Implementation steps
 1. Add failing Bats coverage in `tests/zshrc-ai-tools-agent-browser.bats` for agent-context attach-first behavior:
-   - Mock a responsive `127.0.0.1:9223` probe and prove a Devin/Claude/Cursor/Windsurf/Codex context with no explicit profile calls `agent-browser --cdp 9223 ...`.
+   - Mock a responsive `127.0.0.1:9223` probe and prove a Claude Code or Codex context with no explicit profile calls `agent-browser --cdp 9223 ...`.
    - Prove explicitly supplied `AGENT_BROWSER_SESSION` remains an isolated-session escape hatch and calls plain `agent-browser ...`.
    - Prove `AGENT_BROWSER_NO_AUTO_CDP=1` still opts out of auto-attach but does not bypass singleton preflight for managed profiles.
 2. Update `home/zshrc.ai-tools` minimally:

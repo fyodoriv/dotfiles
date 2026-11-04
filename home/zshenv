@@ -41,9 +41,8 @@ export UV_PYTHON_PREFERENCE=only-managed
 
 # Corporate CA for Node-based tools.
 #
-# A TLS-inspecting proxy may present certs signed by a corporate root CA. Node's bundled Mozilla root store doesn't include it, so npm / cursor / windsurf CLIs fail with "self
-# signed certificate in certificate chain" on any HTTPS call (e.g. `cursor
-# --update-extensions` during `dotfiles upgrade`). NODE_EXTRA_CA_CERTS only
+# A TLS-inspecting proxy may present certs signed by a corporate root CA. Node's bundled Mozilla root store doesn't include it, so Node-based tools can reject HTTPS calls with "self
+# signed certificate in certificate chain". NODE_EXTRA_CA_CERTS only
 # APPENDS this CA to Node's built-in roots — it never replaces them, so it
 # can only add trust. Guarded so a missing bundle doesn't point Node
 # at a missing file (Node warns on every spawn if the path is absent), and so

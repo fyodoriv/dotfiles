@@ -300,9 +300,9 @@ semantic red even if it differs from the source prediction. A mismatch with
 that prediction must be explained before implementation, not edited away.
 
 Only the agent-hook command channel covered by the input contract is in scope.
-Native commands launched elsewhere can bypass it. The optional compiler
-observer needs a separately committed instrument contract before implementation;
-the browser observer cannot be renamed and treated as lease proof.
+Native commands launched elsewhere can bypass it. The [compiler observation protocol](compiler-queue-observation.md) defines
+the evidence and test-only receipt checks before implementation.
+The browser observer cannot be renamed and treated as lease proof.
 
 Do not log raw argv, real paths, environment values, owner queue records or
 other workspace identities. Synthetic markers may be checked in RAM, but test

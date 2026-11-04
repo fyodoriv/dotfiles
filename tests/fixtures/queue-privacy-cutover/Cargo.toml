@@ -1,0 +1,13 @@
+[package]
+name = "queue-privacy-cutover-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT"
+autolib = false
+autobins = false
+autotests = false
+
+[[test]]
+name = "activation"
+path = "activation.rs"

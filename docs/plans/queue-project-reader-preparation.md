@@ -269,7 +269,7 @@ not teach an old scheduler how to read a typed project identity.
 
 Later Phase B needs a separately verified guard for strict 429 and 430
 leaders, running owners, pending grants, queued readers and pre-ticket
-launchers. A once-empty queue is insufficient. Never rewrite another
+launchers. A once-empty queue is insufficient. See the [cutover admission fixture](queue-privacy-cutover.md) for the registered refusal controls. Never rewrite another
 controller's held records or kill unowned jobs. Arbitrary future obsolete
 copies against live state remain outside a managed-entrypoint rollout.
 

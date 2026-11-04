@@ -35,12 +35,12 @@ URL_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
 
 def slugify(text: str) -> str:
     """GitHub-flavored-Markdown slug: lowercase, strip non-word chars,
-    collapse whitespace into hyphens. `&` and `?` drop out, hyphen
+    replace each whitespace character with a hyphen. `&` and `?` drop out. Hyphen
     sequences from punctuation runs are preserved (`Fork & customize`
     → `fork--customize`)."""
     s = text.lower()
     s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
-    s = re.sub(r"\s+", "-", s.strip())
+    s = re.sub(r"\s", "-", s.strip())
     return s
 
 def collect_slugs(path: Path) -> set[str]:
@@ -165,6 +165,23 @@ MD
   [[ "$output" == *"missing anchor #setup-2"* ]]
   [[ "$output" != *"missing anchor #setup\""* ]]
   [[ "$output" != *"missing anchor #setup-1"* ]]
+}
+
+@test "heading punctuation keeps both GitHub anchor hyphens" {
+  mkdir -p "$TEST_DIR/docs"
+  cat > "$TEST_DIR/README.md" <<'MD'
+[valid](docs/example.md#home-theater--full-only-opt-in)
+[invalid](docs/example.md#home-theater-full-only-opt-in)
+MD
+  cat > "$TEST_DIR/docs/example.md" <<'MD'
+## home-theater — full-only, opt-in
+MD
+
+  run run_link_check "$TEST_DIR"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"missing anchor #home-theater-full-only-opt-in"* ]]
+  [[ "$output" != *"missing anchor #home-theater--full-only-opt-in"* ]]
 }
 
 @test "anchor validator flags missing heading fragments" {

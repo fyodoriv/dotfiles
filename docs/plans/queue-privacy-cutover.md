@@ -7,6 +7,24 @@ A disposable check with the unmodified strict 429 and 430 launchers let each
 publish a held ticket after both conditions were true. Each payload then
 exited successfully and removed its ticket.
 
+## Open lock handles can outlive the path
+
+A scratch Darwin control held the old lock while the strict 429 and 430
+launchers opened it. A directory at the sequence-file path forced each
+launcher to wait without a ticket. The control verified the open lock
+descriptor for each owned process and found no payload tickets.
+
+An atomic path swap replaced the lock file with a directory. Both fresh
+launches refused before their payloads ran. Both pre-open waiters started
+exactly once after the fixture released its original lock. The path swap
+rejected fresh opens after that release. An open handle survived the swap.
+An empty ticket scan cannot establish that the old lock is unused.
+
+Require independent evidence that old handles are gone before new admission.
+Use the boot and launch-route checks below to cover that gap. These controls
+used disposable directories and unmodified fixtures. The live queue was
+outside the test.
+
 ## Required evidence
 
 Bind the staged receipt to the authoritative boot identity on this host.

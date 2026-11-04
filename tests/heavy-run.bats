@@ -7,6 +7,12 @@ load helpers/realtime-probe
 
 bats_require_minimum_version 1.5.0
 
+# Each test owns its queue and scratch home. The affected gate runs this
+# file separately so its workers share one job budget.
+setup_file() {
+  unset BATS_NO_PARALLELIZE_WITHIN_FILE
+}
+
 setup() {
   export HEAVY_RUN_DIR="$BATS_TEST_TMPDIR/hr"
   # A scratch HOME keeps the real heavy_run_* settings out; a probe that

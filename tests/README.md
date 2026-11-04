@@ -111,3 +111,8 @@ The `setup()` function creates isolated temp directories:
 
 The docs link check keeps one anchor hyphen per space around removed heading
 punctuation, as GitHub does for `Fork & customize`.
+
+The affected test gate runs `heavy-run.bats` after its peer files and before
+the doctor tests. It uses the configured jobs for one Bats invocation.
+Without GNU Parallel, it runs serially. The full suite shares its Bats
+worker pool across peer files.

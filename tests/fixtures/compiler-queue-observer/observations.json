@@ -1,0 +1,2728 @@
+{
+  "version": 2,
+  "cases": [
+    {
+      "id": "C01",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C02",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [],
+        "reservations_after": [],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          },
+          {
+            "process": [
+              1,
+              1
+            ],
+            "parent": null
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          },
+          {
+            "process": [
+              1,
+              1
+            ],
+            "parent": null
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C03",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              99
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C04",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              99
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C05",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              99
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C06",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 4
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C07",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": false,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "waiting",
+            "controller": [
+              100,
+              1
+            ]
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "waiting",
+            "controller": [
+              100,
+              1
+            ]
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C08",
+      "observation": {
+        "host_qualified": false,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C09",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": false,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [],
+        "reservations_after": [],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": true
+      }
+    },
+    {
+      "id": "C10",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": false,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1"
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C11",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          }
+        ],
+        "chain_complete": false,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C12",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 11,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C13",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false,
+        "private_context": {
+          "path": "FIXTURE_PRIVATE_PATH",
+          "project": "FIXTURE_PRIVATE_PROJECT",
+          "argv": "FIXTURE_PRIVATE_ARGV"
+        }
+      }
+    },
+    {
+      "id": "C14",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:2",
+            "controller": [
+              400,
+              6
+            ],
+            "payload": [
+              500,
+              7
+            ],
+            "generation": 8
+          },
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:2",
+            "controller": [
+              400,
+              6
+            ],
+            "payload": [
+              500,
+              7
+            ],
+            "generation": 8
+          },
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C15",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          },
+          {
+            "slot": "normal:2",
+            "controller": [
+              400,
+              6
+            ],
+            "payload": [
+              500,
+              7
+            ],
+            "generation": 8
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          },
+          {
+            "slot": "normal:2",
+            "controller": [
+              400,
+              6
+            ],
+            "payload": [
+              500,
+              7
+            ],
+            "generation": 8
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          },
+          {
+            "process": [
+              1,
+              1
+            ],
+            "parent": null
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          },
+          {
+            "process": [
+              1,
+              1
+            ],
+            "parent": null
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C16",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 11,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          },
+          {
+            "slot": "normal:2",
+            "controller": [
+              400,
+              6
+            ],
+            "payload": [
+              500,
+              7
+            ],
+            "generation": 8
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C17",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 12,
+        "reservations_before": [],
+        "reservations_after": [],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          },
+          {
+            "process": [
+              1,
+              1
+            ],
+            "parent": null
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          },
+          {
+            "process": [
+              1,
+              1
+            ],
+            "parent": null
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C18",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": false,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          },
+          {
+            "slot": "legacy:2",
+            "locked": true
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          },
+          {
+            "slot": "legacy:2",
+            "locked": true
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C19",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              400,
+              6
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C20",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              300,
+              4
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              300,
+              4
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C21",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": null
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": null
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C22",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "noncanonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "normal:1",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C23",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": true,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "exclusive",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "exclusive",
+            "controller": [
+              100,
+              1
+            ],
+            "payload": [
+              200,
+              2
+            ],
+            "generation": 3
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    },
+    {
+      "id": "C24",
+      "observation": {
+        "host_qualified": true,
+        "queue_descriptor": "canonical",
+        "boot_identity": "fixture-boot",
+        "view_complete": false,
+        "epoch_before": 10,
+        "epoch_after": 10,
+        "reservations_before": [
+          {
+            "slot": "fallback",
+            "locked": true
+          }
+        ],
+        "reservations_after": [
+          {
+            "slot": "fallback",
+            "locked": true
+          }
+        ],
+        "ancestry_before": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "ancestry_after": [
+          {
+            "process": [
+              300,
+              4
+            ],
+            "parent": [
+              250,
+              5
+            ]
+          },
+          {
+            "process": [
+              250,
+              5
+            ],
+            "parent": [
+              200,
+              2
+            ]
+          },
+          {
+            "process": [
+              200,
+              2
+            ],
+            "parent": [
+              100,
+              1
+            ]
+          },
+          {
+            "process": [
+              100,
+              1
+            ],
+            "parent": [
+              1,
+              1
+            ]
+          }
+        ],
+        "chain_complete": true,
+        "inherited_marker": false
+      }
+    }
+  ]
+}

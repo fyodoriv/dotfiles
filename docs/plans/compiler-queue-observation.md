@@ -44,6 +44,23 @@ Darwin probe confirmed an owned child's OS birth time survived exec.
 Live observation still needs a qualified capture wrapper, trusted
 reservation records and a coherent queue epoch.
 
+## Admission epoch fixture
+
+Two identical idle snapshots hid one observed admission in a disposable
+queue. The ticket sequence advanced for a normal admission. It stayed
+unchanged when the launcher admitted work through its ticketless fallback.
+An epoch must cover both paths.
+
+A scratch writer published the next epoch after acquiring a slot and before
+starting its payload. The normal and ticketless paths each held two active
+slots at epoch two. A third payload waited, then observed epoch three. An
+unwritable epoch path refused admission before its payload started.
+
+The Rust fixture tests concurrent epoch updates, recovery from the committed
+value and refusal of malformed state or an unexpected staging path. It
+operates on a disposable directory. It does not install a writer or qualify
+the live queue, boot identity, legacy route retirement or filesystem trust.
+
 ## Keep and pivot
 
 Require every registered decision, zero false ownership or outside

@@ -5,7 +5,6 @@
 # Allowed on purpose (defensive, not support):
 # - lib/strip-agent-attribution.sh strips Cursor attribution trailers.
 # - CURSOR_AGENT detection in the gh/git wrappers and shell guards.
-# - home/gitignore_global keeps .cursor/ files out of commits.
 # - lib/local-ai-agent.py and the tooling-checkup audit treat ~/.cursor as a
 #   protected or generated path; they never write there.
 
@@ -31,9 +30,24 @@ _code_paths() {
 
 @test "no ~/.cursor write path comes back" {
   run grep -rIn -E '(~|\$HOME|\$\{HOME\}|homeDir \}\})/\.cursor' $(_code_paths) \
-    --exclude=strip-agent-attribution.sh --exclude=gitignore_global \
+    --exclude=strip-agent-attribution.sh \
     --exclude=local-ai-agent.py --exclude=audit_agent_config.py
   [ "$status" -ne 0 ] || { echo "~/.cursor path found: $output"; return 1; }
+}
+
+@test "no tracked Cursor output paths outside the guard and removal note" {
+  run git -C "$REPO" grep -in '\.cursor/' -- . \
+    ':(exclude)tests/no-cursor-grok.bats' ':(exclude)docs/repo-map.md'
+  [ "$status" -eq 1 ] || { echo "$output"; return 1; }
+}
+
+@test "retired Cursor context gets no dedicated browser session" {
+  run env -i PATH=/usr/bin:/bin CURSOR_AGENT=1 TERM_SESSION_ID=fixture bash -c '
+    source "$1"
+    printf "%s" "${AGENT_BROWSER_SESSION:-}"
+  ' _ "$REPO/lib/agent-browser-session-env.sh"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 @test "no use_cursor switch or no-Cursor Agentfile layer comes back" {

@@ -82,7 +82,7 @@ dotfiles_prepend_endpoint_tool_paths() {
 }
 
 # fnm default Node bin (same layout as launchagents/com.dotfiles.gui-path.plist).
-# Claude/Cursor SessionStart hooks must prepend this or npx-based MCP servers fail
+# SessionStart hooks must prepend this or npx-based MCP servers fail
 # doctor health checks (npx lives under fnm, not ~/.local/bin).
 dotfiles_resolve_fnm_node_bin() {
   local home="${1:-${HOME:-}}"

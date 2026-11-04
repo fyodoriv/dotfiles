@@ -11,7 +11,7 @@
 #
 # Idempotent: rebuilds only when the rendered AppleScript drifts from what's
 # already inside the .app. Every successful install reasserts ChromeWork as the
-# system default http(s) handler on enterprise Macs (Slack/Mail/Cursor links).
+# system default http(s) handler on enterprise Macs (links from other apps).
 #
 # Exit codes: 0 = installed or already correct, 1 = error, 2 = skipped
 # (Chrome not installed locally; harmless on machines without Chrome).
@@ -109,7 +109,7 @@ else
 fi
 
 # Reassert ChromeWork as the system default http(s) handler on enterprise Macs.
-# Links from Slack, Mail, Messages, and Cursor must hit ChromeWork.app directly —
+# Links from Slack, Mail, and Messages must hit ChromeWork.app directly —
 # no Finicky/Velja/manual browser-chooser setup required.
 _reassert_chromework_default() {
   command -v defaultbrowser &>/dev/null || return 0
@@ -150,13 +150,13 @@ end open
 
 on run
 	-- Applet must not show the Script Editor Run/Quit startup screen when
-	-- launched headlessly (e.g. Cursor workbench.externalBrowser, open -a URL).
+	-- launched headlessly (for example, open -a URL).
 end run
 
 on routeURL(this_URL)
 	-- Inline AppleScript activate runs in user-click context (Space switch).
 	-- chromework-activate --survive-handoff keeps Chrome frontmost after this
-	-- applet exits and macOS restores Slack/Cursor.
+	-- applet exits and macOS restores the calling app.
 	my activateWorkChrome()
 	do shell script quoted form of "$OPEN_URL_HELPER" & " --no-activate " & quoted form of this_URL
 	repeat 12 times

@@ -92,7 +92,7 @@ setopt HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS HIST_SAVE_NO_DUPS
 setopt SHARE_HISTORY APPEND_HISTORY INC_APPEND_HISTORY HIST_REDUCE_BLANKS
 
 # ── Agent-context detection ─────────────────────────────────────────
-# IDE agent terminals (Windsurf, Cursor, Claude Code, Devin, Codex) are
+# IDE agent terminals are
 # real TTYs that source ~/.zshrc, but no human is present to answer
 # interactive prompts. Any blocking prompt (sudo password, zsh [nyae]?,
 # ssh host key, git credential) hangs the agent terminal indefinitely.
@@ -100,7 +100,7 @@ setopt SHARE_HISTORY APPEND_HISTORY INC_APPEND_HISTORY HIST_REDUCE_BLANKS
 #
 # Detection signals (verified empirically):
 #   Windsurf Cascade: WINDSURF_CASCADE_TERMINAL_KIND=inherit
-#   Cursor Agent:     CURSOR_AGENT=1  (or TERM_PROGRAM=cursor)
+#   Retired agent:    CURSOR_AGENT=1 (prompt guard only)
 #   Claude Code:      CLAUDE_CODE_SSE_PORT=<port>
 #   Devin CLI:        DEVIN_SESSION_ID=<uuid>
 #   Codex CLI:        CODEX_AGENT=1
@@ -125,7 +125,7 @@ setopt GLOB_DOTS
 setopt AUTO_PUSHD PUSHD_IGNORE_DUPS PUSHD_SILENT
 
 # ── Non-TTY interactive bail-out ─────────────────────────────────────
-# IDEs (Windsurf, VS Code, Cursor) source ~/.zshrc via `zsh -i -c "..."`
+# IDEs source ~/.zshrc via `zsh -i -c "..."`
 # piped without a TTY to inherit the operator's PATH and env vars at
 # startup. The "interactive" flag is set, but stdout isn't a TTY, so
 # every line-editor-touching block below (compinit, bindkey, zle, the

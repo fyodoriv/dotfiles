@@ -3,8 +3,7 @@
 # ~/.zshrc.ai-tools so non-interactive agent subprocesses inherit a stable
 # per-agent daemon name without loading the full ai-tools wrapper block.
 #
-# Detection mirrors `bin/gh`'s `_gh_wrapper_is_agent_context` and
-# modules/agent-browser/doctor.sh agent_session_isolation.
+# Keep this in step with the agent_session_isolation doctor check.
 
 _dotfiles_assign_agent_browser_session() {
   [ -n "${AGENT_BROWSER_SESSION:-}" ] && return 0
@@ -13,8 +12,6 @@ _dotfiles_assign_agent_browser_session() {
     AGENT_BROWSER_SESSION="devin-${DEVIN_SESSION_ID:0:8}"
   elif [ -n "${CLAUDE_CODE_SSE_PORT:-}" ]; then
     AGENT_BROWSER_SESSION="claude-${CLAUDE_CODE_SSE_PORT}"
-  elif [ -n "${CURSOR_AGENT:-}" ]; then
-    AGENT_BROWSER_SESSION="cursor-${TERM_SESSION_ID:-$$}"
   elif [ -n "${WINDSURF_AGENT:-}" ]; then
     AGENT_BROWSER_SESSION="windsurf-${TERM_SESSION_ID:-$$}"
   elif [ -n "${CODEX_AGENT:-}" ]; then

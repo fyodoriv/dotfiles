@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Sandbox PATH regression matrix — simulates Cursor agent subshell PATH
+# Sandbox PATH regression matrix — simulates a minimal agent subshell PATH
 # (/opt/homebrew/bin:/usr/bin:/bin) and asserts shims resolve after bootstrap.
 
 load test_helper

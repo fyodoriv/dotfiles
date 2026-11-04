@@ -36,7 +36,7 @@ ln -sfn "$BREW_JQ" "$SHIM"
 chmod +x "$SHIM" 2>/dev/null || true
 
 # ~/.local/bin is in dotfiles_agent_path_prefix and bash-env.sh — gives codeassist
-# hooks (audit-logger, verify-before-completion) a signed Mach-O jq when Cursor
+# hooks (audit-logger, verify-before-completion) a signed Mach-O jq when
 # hook subprocesses omit launchctl PATH and only see sandbox /opt/homebrew/bin.
 LOCAL_JQ="${HOME:-}/.local/bin/jq"
 if [ -n "${HOME:-}" ]; then

@@ -76,6 +76,10 @@ _dotfiles_agent_browser_should_restore_focus() {
 }
 
 agent-browser() {
+  if [ -n "${CURSOR_AGENT:-}" ] && [ -z "${DEVIN_SESSION_ID:-}${CLAUDE_CODE_SSE_PORT:-}${WINDSURF_AGENT:-}${CODEX_AGENT:-}" ]; then
+    echo "Browser access is disabled for the retired Cursor agent context." >&2
+    return 2
+  fi
   local _ab_session="${AGENT_BROWSER_SESSION:-default}"
   local _ab_cdp_ready=0
   local _ab_dotfiles_dir="${DOTFILES_DIR:-$HOME/apps/tooling/dotfiles}"

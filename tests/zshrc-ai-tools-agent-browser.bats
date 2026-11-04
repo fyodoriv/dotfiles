@@ -37,7 +37,12 @@ teardown() {
 
 source_agent_browser_function() {
   local fn_text
-  fn_text="$(awk 'flag && /^# ── PATH/{exit} /^_dotfiles_agent_browser_should_restore_focus\(\) \{/{flag=1} flag{print}' "$ZSHRC_AI_TOOLS")"
+  fn_text="$(awk '
+    /^_dotfiles_agent_browser_should_restore_focus\(\) \{/{flag=1}
+    /^agent-browser\(\) \{/{wrapper=1}
+    flag{print}
+    wrapper && /^}/{exit}
+  ' "$ZSHRC_AI_TOOLS")"
   [ -n "$fn_text" ] || return 1
   eval "$fn_text"
 }
@@ -95,7 +100,7 @@ source_agent_session_block() {
 
 @test "agent-browser wrapper attaches known agent contexts to managed CDP by default" {
   local envvar
-  for envvar in DEVIN_SESSION_ID CLAUDE_CODE_SSE_PORT CURSOR_AGENT WINDSURF_AGENT CODEX_AGENT; do
+  for envvar in DEVIN_SESSION_ID CLAUDE_CODE_SSE_PORT WINDSURF_AGENT CODEX_AGENT; do
     unset DEVIN_SESSION_ID CLAUDE_CODE_SSE_PORT CURSOR_AGENT WINDSURF_AGENT CODEX_AGENT
     unset AGENT_BROWSER_PROFILE AGENT_BROWSER_SESSION AGENT_BROWSER_NO_AUTO_CDP _DOTFILES_AGENT_BROWSER_IMPLICIT_SESSION
     export "$envvar=agent-context"
@@ -110,6 +115,18 @@ source_agent_session_block() {
   done
   unset DEVIN_SESSION_ID CLAUDE_CODE_SSE_PORT CURSOR_AGENT WINDSURF_AGENT CODEX_AGENT
   unset AGENT_BROWSER_SESSION _DOTFILES_AGENT_BROWSER_IMPLICIT_SESSION
+}
+
+@test "agent-browser refuses the retired-only context before dispatch" {
+  export CURSOR_AGENT=1
+  source_agent_session_block
+  source_agent_browser_function
+
+  run agent-browser open https://example.com
+
+  [ "$status" -eq 2 ]
+  [ "$output" = "Browser access is disabled for the retired Cursor agent context." ]
+  [ ! -e "$PREFLIGHT_LOG" ]
 }
 
 @test "agent-browser session block does not classify DEVIN_MODEL-only operator shells as agent sessions" {

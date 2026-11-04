@@ -1,16 +1,14 @@
 # Plan: Local Memory Reliability
 
 - **Repo**: `tooling/dotfiles`
-- **Author**: Cursor agent session 2026-08-07
 - **Status**: implemented
-- **Validated-by**: Cursor reviewer subagent on 2026-08-07
 
 ## Goal
 
 Keep the shared local memory service easy to inspect and recover while making
 AgentBrew the only runtime owner. Dotfiles declares `memory.enabled`, removes
-retired duplicate LaunchAgents, and gates Cursor startup on AgentBrew's
-stateful MCP readiness contract. Repository memories must not be treated as
+retired duplicate LaunchAgents, and relies on the AgentBrew MCP readiness
+contract. Repository memories must not be treated as
 authoritative when their source is stale.
 
 ## Why
@@ -44,7 +42,7 @@ through exact or tag-only recall paths.
 - Bulk-rewriting all existing memory records in one run.
 - Adding a second memory database, transcript archive, or hosted service.
 - Forwarding or remotely exposing the browser dashboard.
-- Having dotfiles own `~/.cursor/mcp.json` or `com.agentbrew.*` LaunchAgents.
+- Having dotfiles own generated agent MCP config or `com.agentbrew.*` LaunchAgents.
 
 ## GET before IMPLEMENT
 
@@ -60,7 +58,7 @@ through exact or tag-only recall paths.
 ### Step 1: Keep the ownership boundary explicit
 
 Keep `Agentfile.yaml` as declarative intent and `dotfiles memory` as a thin
-compatibility shim. Document that AgentBrew owns `~/.cursor/mcp.json`, the
+compatibility shim. Document that AgentBrew owns generated agent MCP config, the
 canonical memory endpoint, and `com.agentbrew.*` LaunchAgents. Verify the shim
 with `bats tests/dotfiles-memory.bats`.
 
@@ -82,7 +80,7 @@ Verify with `bats tests/agentbrew-command-sources.bats`.
 Add stale-revision, fingerprint-drift, supersession, isolation, citation, and
 recovery evals plus an inherited-default 20-question golden set. Update
 README, architecture, module reference, setup guide, troubleshooting, and
-changelog so the AgentBrew/dotfiles ownership and Cursor reload boundary are
+changelog so the AgentBrew/dotfiles ownership boundary are
 consistent. Verify with `make check`.
 
 ## Risks and mitigations
@@ -121,7 +119,6 @@ consistent. Verify with `make check`.
 ## Reviewer verdict
 
 - **Verdict**: approved
-- **Reviewer**: Cursor reviewer subagent
 - **Date**: 2026-08-07
 - **Concerns**:
   - None.

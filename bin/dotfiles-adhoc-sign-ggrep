@@ -1,7 +1,7 @@
 #!/bin/bash
 # dotfiles-adhoc-sign-ggrep — fast ad-hoc sign Homebrew ggrep only (login bootstrap).
 #
-# Cursor agent sandbox PATH is /opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin).
+# The minimal agent PATH is /opt/homebrew/bin:/usr/bin:/bin (no dotfiles/bin).
 # grep/ggrep on that PATH exec bare Homebrew ggrep (unsigned when unsigned
 # after brew upgrade grep). Full Cellar sweep (dotfiles-adhoc-sign-bottles) is too
 # slow for RunAtLoad / post-brew races with high-churn agent subshells.

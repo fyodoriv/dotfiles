@@ -51,12 +51,12 @@ teardown() {
 }
 
 @test "minsky module: skill-sync checks deferred to agentbrew (rule #8)" {
-  # The module must NOT probe ~/.claude/skills/, ~/.cursor/skills/, etc.
+  # The module must NOT probe generated skill directories.
   # — skill sync is agentbrew-owned per dotfiles AGENTS.md rule #8.
   # Allow the strings to appear in comments explaining the boundary,
   # but the module must contain no `check` or filesystem-probe lines
   # that target those paths.
-  ! grep -E '^\s*(check|check_advisory)\s.*\.claude/skills|\.cursor/skills' "$MODULE"
+  ! grep -E '^\s*(check|check_advisory)\s.*\.claude/skills' "$MODULE"
   ! grep -E '\[\s+-(d|f|e)\s+["'\''$\{][^"#]*\.claude/skills' "$MODULE"
 }
 

@@ -20,7 +20,7 @@ This implements `TASKS.md` P0 `one-command-whole-machine-update` and traces to:
   3. delegate the agent-config source refresh to agentbrew with `agentbrew sync --pull --agentfile "$DOTFILES_DIR/Agentfile.yaml"`, when agentbrew is available,
   4. run `dotfiles-upgrade` so topgrade handles package managers and language toolchains instead of reimplementing them,
   5. run `dotfiles-doctor --fix` as the final self-healing gate.
-- Preserve the ownership boundary: the new script never edits `~/.claude/`, `~/.cursor/`, `~/.config/devin/`, or other generated mirrors directly. It only invokes the existing owner CLI (`agentbrew`) in the same way `run_after_agentbrew-sync.sh` already does, adding `--pull` because the task explicitly requires agentbrew source/skill/MCP/rule/command refresh and the current agentbrew CLI exposes that evergreen source-refresh path.
+- Preserve the ownership boundary: agentbrew owns generated agent config. Invoke the owner CLI the same way `run_after_agentbrew-sync.sh` does, with `--pull` to refresh agentbrew sources.
 - Keep phase failures actionable: stop at the failing phase, print the phase name and exit code, and leave later phases unrun.
 - Add focused Bats coverage in `tests/bin-dotfiles-update.bats` for phase ordering, dry-run behavior, and failure reporting.
 - Update README, AGENTS.md, CLAUDE.md, and CLI help so “update this machine” names exactly one command and documents the agentbrew delegation boundary.
@@ -28,7 +28,7 @@ This implements `TASKS.md` P0 `one-command-whole-machine-update` and traces to:
 
 ## Scope (out)
 - Do not reimplement Homebrew, npm, pipx, uv, fnm, gh extension, JetBrains, VS Code, or Ollama upgrade logic. `bin/dotfiles-upgrade` already delegates that to topgrade.
-- Do not edit generated agent config under `~/.claude`, `~/.cursor`, `~/.config/devin`, or other agent mirrors.
+- Do not edit generated agent config directly.
 - Do not add org-specific update phases or internal endpoints to the base repo. Overlay-owned work stays in the overlay Agentfile/scripts.
 - Do not make the command silently ignore failed phases. Nonzero actionable failures should stop the run.
 - Do not add destructive cleanup, branch resets, or protected-branch pushes.

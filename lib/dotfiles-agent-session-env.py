@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build SessionStart env JSON for Claude/Cursor agent hooks (PATH + NODE_EXTRA_CA_CERTS)."""
+"""Build SessionStart env JSON for agent hooks (PATH + NODE_EXTRA_CA_CERTS)."""
 
 from __future__ import annotations
 

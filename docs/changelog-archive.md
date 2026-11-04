@@ -48,9 +48,6 @@ These notes were written by hand before `CHANGELOG.md` became generated
   are quarantined instead of replayed every five seconds.
 - **Agent sleep protection is process-scoped** — Cursor and Claude Code each
   get a manager-owned `caffeinate -ims` child only while they run.
-- **Cursor audit hooks run once** — `chezmoi apply` no longer piles up copies
-  of the audit hooks in `~/.cursor/hooks.json`. `dotfiles doctor` flags
-  duplicates.
 - **Doctor warm-run performance** — successful Homebrew bottle signature audits
   are cached for 24 hours. Auto-discovery ignores base repository worktrees.
 

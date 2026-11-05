@@ -27,7 +27,7 @@ browser fixture passes. Keep the same fake executable controls before and
 after. The required repository gate must also pass:
 
 ```sh
-PATH="/opt/homebrew/opt/rust/bin:$PATH" JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=
+PATH="/opt/homebrew/opt/bash/bin:/opt/homebrew/opt/rust/bin:$PATH:/opt/homebrew/bin" JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=
 ```
 
 **Pivot:** any missing flag, profile/port regression, visibility change, real
@@ -52,3 +52,25 @@ Agent artifact test exemption: this initial commit records the experiment
 only; it changes no launcher or deployed instruction. Whitespace validation
 is the existing gate for this registration. Source validation follows the
 registered failing fixture, then the fixed fixture and required gate.
+
+## Fixture environment qualification
+
+The initial invocation could not locate Bats. Appending the existing Homebrew
+bin directory found it. Under the resulting macOS Bash runner, an unchanged
+launch-hook fixture failed on its existing negative array index. That result
+is not a complete passing cohort.
+
+The coordinator qualified the existing installed modern Bash with a Bash-only
+PATH prefix. Git keeps its normal owner PATH selection; no new tool is
+installed. The registered Bats command is unchanged. Use this environment for
+both frozen-source baseline and candidate:
+
+```sh
+PATH="/opt/homebrew/opt/bash/bin:/opt/homebrew/opt/rust/bin:$PATH:/opt/homebrew/bin" JOBS=1 heavy-run bats tests/temp-browser.bats
+```
+
+The qualified unchanged launcher produced only the two predicted failures;
+each reported `missing-required-flags=2`. The identical fixture then passed
+with the shared-array change. The launch-hook assertion is unchanged. These
+are fake executable controls, not real keychain or sign-in evidence. The normal
+repository gate still runs its explicit macOS system-shell controls.

@@ -33,6 +33,7 @@ temp-browser release --owner "$AGENT_BROWSER_SESSION"  # stops the browser, dele
 - The same owner can acquire again; that renews the lease and prints the port.
 - The browser runs `--headless=new` in the background. It never raises or focuses a window.
 - `TEMP_BROWSER_HEADED=1` starts a headed window, for passkey, hardware-key, or visible sign-ins. It launches with `open -g -n -a`: a new instance, kept in the background. It never activates or raises a window; you bring it forward yourself.
+- Built-in headed and headless launches pass `--use-mock-keychain` and `--password-store=basic`. A fresh profile must not open the owner's macOS keychain or show a missing-keychain prompt. Custom launch hooks must supply the same isolation.
 - `TEMP_BROWSER_LAUNCH=<cmd>` replaces the launch. temp-browser runs `<cmd> <profile> <port>`. The command must start a browser with that profile and CDP port and print its pid on the last stdout line. temp-browser records that pid in the lock and stops it on release. The hook must not raise or focus a window.
 - Calls that need isolation (`--session-name`, `--profile`, `--extension`) go to the temporary browser through this lock. The `home/zshrc.ai-tools` wrapper hands them to `bin/agent-browser-temp-route`. It takes the lock and runs `agent-browser --cdp <temp port> ...`.
   - Owner: the `--session-name` value, else `$AGENT_ID`, else `$AGENT_BROWSER_SESSION`. With none, the call fails (exit 2).

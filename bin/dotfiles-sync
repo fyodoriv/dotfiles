@@ -212,7 +212,11 @@ if _is_applied_checkout; then
   case "$_apply_rc" in
     0) ok "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi re-applied." ;;
     2) ok "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); no new commits or drift, skipped chezmoi apply." ;;
-    *) warn "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi was not re-applied." ;;
+    *)
+      warn "[sync] Applied checkout at $APPLIED_UPSTREAM ($_head); chezmoi was not re-applied."
+      log_run sync 1 error
+      exit "$_apply_rc"
+      ;;
   esac
   log_run sync
   exit 0
@@ -246,7 +250,11 @@ else
     if command -v chezmoi &>/dev/null; then
       _apply_rc=0
       _chezmoi_apply_if_needed "$_head_before" || _apply_rc=$?
-      [ "$_apply_rc" -ne 2 ] || info "[sync] No new commits and no drift since the last apply; skipped chezmoi apply."
+      case "$_apply_rc" in
+        0) ;;
+        2) info "[sync] No new commits and no drift since the last apply; skipped chezmoi apply." ;;
+        *) log_run sync 1 error; exit "$_apply_rc" ;;
+      esac
     fi
   else
     warn "[sync] Pull failed: $(_classify_push_error "$_pull_err")"

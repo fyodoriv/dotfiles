@@ -66,6 +66,9 @@ setup() {
   # Isolate HOME
   export HOME="$TEST_DIR/home"
   mkdir -p "$HOME"
+  export XDG_STATE_HOME="$HOME/.local/state"
+  export XDG_CONFIG_HOME="$HOME/.config"
+  export DOTFILES_LOCK="$TEST_DIR/dotfiles.lock"
   unset DOTFILES_REPOS_DIR
   git config --global user.email "test@test.com"
   git config --global user.name "Test"
@@ -617,9 +620,13 @@ push_remote_commit() {
   setup_applied_worktree
   push_remote_commit >/dev/null
   FAKE_CHEZMOI_APPLY_ERROR="could not open a new TTY" run "$APPLIED/bin/dotfiles-sync"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [[ "$output" == *"chezmoi apply failed: chezmoi: could not open a new TTY"* ]]
   [[ "$output" != *"chezmoi re-applied"* ]]
+  [[ "$output" != *"skipped chezmoi apply"* ]]
+  [ "$(wc -l < "$DOTFILES_STATS_FILE")" -eq 1 ]
+  grep -q '"ok":false' "$DOTFILES_STATS_FILE"
+  [ ! -e "$DOTFILES_LOCK" ]
 }
 
 @test "a successful sync re-apply records the source for dotfiles apply --if-changed" {
@@ -636,8 +643,30 @@ push_remote_commit() {
   mkdir -p "$HOME/.local/state/dotfiles"
   echo "head stale" > "$HOME/.local/state/dotfiles/last-apply"
   FAKE_CHEZMOI_APPLY_ERROR="could not open a new TTY" run "$APPLIED/bin/dotfiles-sync"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ ! -e "$HOME/.local/state/dotfiles/last-apply" ]
+}
+
+@test "canonical sync stops before commit and push when chezmoi apply fails" {
+  write_fake_chezmoi "$TEST_DIR/elsewhere"
+  local head_before; head_before="$(git -C "$TEST_DOTFILES" rev-parse HEAD)"
+  echo "keep local change" > "$TEST_DOTFILES/pending.conf"
+  git -C "$TEST_DOTFILES" add pending.conf
+
+  FAKE_CHEZMOI_APPLY_ERROR="synthetic apply failure" run "$TEST_DOTFILES/bin/dotfiles-sync"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"chezmoi apply failed: chezmoi: synthetic apply failure"* ]]
+  [[ "$output" != *"No changes"* ]]
+  [[ "$output" != *"Synced and pushed"* ]]
+  [[ "$output" != *"skipped chezmoi apply"* ]]
+  [ "$(git -C "$TEST_DOTFILES" rev-parse HEAD)" = "$head_before" ]
+  [ "$(git -C "$REMOTE_REPO" rev-parse HEAD)" = "$head_before" ]
+  [ "$(git -C "$TEST_DOTFILES" diff --cached --name-only)" = "pending.conf" ]
+  [ "$(wc -l < "$DOTFILES_STATS_FILE")" -eq 1 ]
+  grep -q '"ok":false' "$DOTFILES_STATS_FILE"
+  [ ! -e "$HOME/.local/state/dotfiles/last-apply" ]
+  [ ! -e "$DOTFILES_LOCK" ]
 }
 
 @test "sync with no new commits skips chezmoi apply after a recorded apply" {
@@ -674,7 +703,9 @@ push_remote_commit() {
 @test "sync applies again after a failed apply with no new commits" {
   write_fake_chezmoi "$TEST_DIR/elsewhere"
   FAKE_CHEZMOI_APPLY_ERROR="could not open a new TTY" run "$TEST_DOTFILES/bin/dotfiles-sync"
+  [ "$status" -eq 1 ]
   [[ "$output" == *"chezmoi apply failed"* ]]
+  [[ "$output" != *"No changes"* ]]
   run "$TEST_DOTFILES/bin/dotfiles-sync"
   [ "$status" -eq 0 ]
   [ "$(wc -l < "$TEST_DIR/chezmoi-apply.log")" -eq 1 ]

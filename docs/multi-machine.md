@@ -11,6 +11,8 @@ The `dotfiles-sync` LaunchAgent runs every 30 minutes on each machine:
 3. **Commit** local changes (additions and modifications — never deletions)
 4. **Push** to all configured remotes
 
+If `chezmoi apply` fails, sync logs the apply error, records a failed run and exits nonzero before committing or pushing. The next run retries the apply. A clean skip still exits successfully.
+
 This means changes made on Machine A appear on Machine B within ~30 minutes, without manual intervention. Deletions are excluded from auto-sync as a safety measure and require manual commits.
 
 When chezmoi's source is a separate applied checkout (a linked worktree on its own branch that tracks the canonical branch), sync only fast-forwards that checkout and re-runs `chezmoi apply` under the same rule. It never commits or pushes from it, and it leaves the checkout untouched when it has local changes or has diverged.

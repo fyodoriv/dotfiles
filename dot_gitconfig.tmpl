@@ -109,5 +109,11 @@
 [credential "https://gist.github.com"]
 	helper =
 	helper = !/bin/bash -c 'command -v gh >/dev/null && gh auth git-credential "$@"' --
+# github.com goes over HTTPS with the gh login above, also for SSH-style
+# URLs (git@github.com:...). A machine whose SSH key GitHub does not know
+# could not push or fetch those, while gh was signed in all along.
+[url "https://github.com/"]
+	insteadOf = git@github.com:
+	insteadOf = ssh://git@github.com/
 [http]
 	postBuffer = 524288000

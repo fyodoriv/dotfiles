@@ -144,7 +144,7 @@ render() {
       "| The Mac stays in step with the source by itself | A sync that runs every 30 minutes keeps drift small | background syncs, last 30 days | \($f | res("sync_runs_30d")) | \($f | src("sync_runs_30d")) |",
       "| The morning routine gets used | A habit tool only helps when it runs most days | days with a `morning` run, last 7 days | \($f | res("morning_runs_7d")) | \($f | src("morning_runs_7d")) |",
       "| One command sets up a Mac | Time to a clean doctor is the outcome a one-step install promises | install runs and their minutes to a clean doctor | \($f | res("install_clean_minutes")) | \($f | src("install_clean_minutes")) |",
-      "| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | \($f | res("shell_start_field_ms")) | \($f | src("shell_start_field_ms")) |",
+      "| Interactive shell startup | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | \($f | res("shell_start_field_ms")) | \($f | src("shell_start_field_ms")) |",
       "",
       "Field data comes from \($f.machines | length) machine(s), each named by a salted hash: \([$f.machines | to_entries[] | "`\(.key)` (\(fmt(.value.runs_30d)) runs in 30 days, \(.value.doctor_runs) doctor runs, log since \(.value.first_event), as of \(.value.date))"] | join("; "))." ,
       "",

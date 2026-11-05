@@ -1,6 +1,6 @@
 # dotfiles
 
-![shell startup < 200ms](https://img.shields.io/badge/shell_startup-%3C200ms-brightgreen)
+![shell startup budget 200 ms](https://img.shields.io/badge/shell_startup_budget-200ms-blue)
 
 Give this prompt to your AI agent to install or update dotfiles:
 
@@ -87,7 +87,7 @@ Settings drift. Scripts break. Nobody notices until something is slow again.
 - **Two profiles** — `core` (7 baseline modules, team-friendly) and `full`
   (all 35 discovered modules, subject to feature gates). Selected at init time.
 - **149 macOS defaults** applied via lifecycle scripts — key repeat, Spotlight pruning/exclusions, 15-minute idle lock, Finder, animations, analytics, power management. See [notable changes](docs/onboarding.md#step-2-initialize-chezmoi).
-- **~30ms shell startup** (200ms CI budget) — fnm replaces NVM, tool inits cached to disk, lazy loading everywhere.
+- **298 ms median shell startup** across seven daily samples on one Mac. The CI budget is 200 ms.
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
@@ -648,7 +648,7 @@ Each machine aggregates its own log here. Opt-in telemetry (`dotfiles telemetry`
 | The Mac stays in step with the source by itself | A sync that runs every 30 minutes keeps drift small | background syncs, last 30 days | 1,066 runs (background syncs, 2026-09-27 to 2026-10-26) | `docs/proof/metrics.json`, real use |
 | The morning routine gets used | A habit tool only helps when it runs most days | days with a `morning` run, last 7 days | 7 days (days with a morning run, 2026-10-20 to 2026-10-26) | `docs/proof/metrics.json`, real use |
 | One command sets up a Mac | Time to a clean doctor is the outcome a one-step install promises | install runs and their minutes to a clean doctor | not measured yet | not measured yet |
-| The shell starts fast | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | not measured yet | not measured yet |
+| Interactive shell startup | Under 100 ms feels instant (Nielsen 1993, response-time limits) | shell start time on real machines | 298 ms (median of 7 daily samples, ~/.zshrc start to first prompt, last 30 days, 1 machine) | `docs/proof/metrics.json`, real use |
 
 Field data comes from 1 machine(s), each named by a salted hash: `m-f72c0c4501` (36,349 runs in 30 days, 30 doctor runs, log since 2026-05-06, as of 2026-10-26).
 
@@ -1152,7 +1152,6 @@ Measured on M3 Max, 64GB RAM, 300+ package JS/TS monorepo:
 
 | Operation | Before | After | What changed |
 |---|---|---|---|
-| Shell startup | ~300ms | ~30ms | fnm replaces NVM, tool inits cached |
 | `git status` (monorepo) | ~500ms | ~80ms | histogram diff, parallel index, maintenance strategy |
 | TypeScript incremental build | ~15s | ~3s | FSEvents watch, Babel cache, UV_THREADPOOL=16 |
 | `npm install` (warm cache) | ~45s | ~20s | maxsockets=50, IPv4-first DNS |

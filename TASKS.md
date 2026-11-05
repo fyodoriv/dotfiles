@@ -130,16 +130,6 @@ them. -->
   - **Competitive-goal**: `manual_bootstrap_steps` (docs/competition/scorecard.md).
   - **Blocked**: needs-time — 2026-10-27: shipped the recording part. `bin/dotfiles-install run` writes one `install` stats line (ok, `duration_ms`, the heal doctor's `fail` count) and `scripts/proof.sh` fills the row from `install_clean_minutes`. No real install has run since. Unblock: after the next real install on any Mac, run `scripts/proof.sh` there and check the row says `real use`; then close.
 
-- [ ] Record shell start time on real machines for the README Proof section
-  - **ID**: proof-shell-start-field
-  - **Tags**: metrics, proof, performance
-  - **Details**: The Proof row "The shell starts fast" says `not measured yet`; only a local run is shown (230 ms on 2026-10-26, above the 200 ms budget and the "~30ms" Highlights line). Sample the start time of real interactive shells (for example, once a day from the existing zsh startup timer) into the stats log, then add a `real use` row.
-  - **Files**: `home/zshrc`, `lib/stats.sh`, `scripts/proof.sh`
-  - **Output**: code
-  - **Acceptance**: the row shows a median of real shell starts with its machine count; the Highlights line matches the measured number.
-  - **Competitive-goal**: none; shell start is the "Interactive shell startup" row of docs/metrics.md, not a scorecard metric.
-  - **Blocked**: needs-time — 2026-10-27: shipped the recording part. `home/zshrc` logs one `shell-start` stats line a day (first prompt, `duration_ms`), and `scripts/proof.sh` fills the row from `shell_start_field_ms`. Unblock: on or after 2026-11-03 (7 daily samples after `dotfiles apply`), run `scripts/proof.sh`, then set the Highlights line to the measured median and close.
-
 - [ ] Skip unchanged chezmoi scripts inside a full apply
   - **ID**: apply-skip-unchanged-scripts
   - **Tags**: performance

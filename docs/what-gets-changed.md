@@ -28,7 +28,7 @@ These files in the repo's `home/` directory are symlinked into `~/`:
 |---|---|---|
 | `home/zshrc` | `~/.zshrc` | Shell config: aliases, PATH, completions, fzf, plugins |
 | `home/zshenv` | `~/.zshenv` | Pre-shell env: fnm (Node), dotfiles env, secrets loading |
-| `home/gitconfig` | `~/.gitconfig` | Git config: delta pager, aliases, performance, LFS, credential helpers |
+| `home/gitconfig` | `~/.gitconfig` | Git config: delta pager, aliases, performance, LFS, credential helpers, github.com SSH URLs over HTTPS (gh login) |
 | `home/gitignore_global` | `~/.gitignore_global` | Global gitignore: macOS, Node, Python, IDE artifacts |
 | `home/git-editor` | `~/.git-editor` | Smart git editor: detects VS Code/nano, skips in non-interactive |
 | `home/gitcommit_template` | `~/.gitcommit_template` | Conventional commit template |

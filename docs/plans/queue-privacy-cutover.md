@@ -56,3 +56,23 @@ verified. Any false activation rejects the approach.
 
 Anchor: the strict 429/430 queue reader controls and Basili, Caldiera and
 Rombach (1994), Goal Question Metric.
+
+## Native boot identity experiment
+
+Goal: qualify the boot-identity input to the existing cutover decision.
+Question: can a bounded Darwin reader get the current boot identity without
+writing queue state or invoking another process? Measure with
+`heavy-run cargo test --offline --locked --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test activation`.
+
+Keep the approach only if two reads match on the same boot, match the local
+system utility in the test, and malformed, nil, or unterminated inputs yield
+zero accepted identities. A mismatch, unavailable host read, or a malformed
+identity accepted by the parser rejects the probe. The fixture must leave
+all existing cutover decisions intact. It does not authorize activation or
+establish that an earlier boot ended. Measurement framing: Basili, Caldiera,
+and Rombach (1994), Goal Question Metric.
+
+On macOS, the activation suite went from 17 of 19 passing with the empty
+reader to 19 of 19 passing with the bounded native read. Both reads matched
+the system utility, and the five malformed inputs returned no identity.
+The test compares the value in memory and does not print it.

@@ -136,7 +136,8 @@ JSON
 launch_browser() {
   local profile="$1" out pid
   local flags=(--remote-debugging-port="$PORT" --user-data-dir="$profile"
-    --no-first-run --no-default-browser-check)
+    --no-first-run --no-default-browser-check
+    --use-mock-keychain --password-store=basic)
   if [ -n "$LAUNCH_HOOK" ]; then
     out="$("$LAUNCH_HOOK" "$profile" "$PORT" </dev/null)" || return 1
     pid="$(printf '%s\n' "$out" | tail -n 1 | tr -d '[:space:]')"

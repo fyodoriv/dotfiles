@@ -4,6 +4,17 @@
 
 SCRIPT="$BATS_TEST_DIRNAME/../bin/temp-browser"
 
+assert_keychain_isolation_flags() {
+  local args="$1" flag missing=0
+  for flag in --use-mock-keychain --password-store=basic; do
+    if ! grep -qx -- "$flag" "$args"; then
+      missing=$((missing + 1))
+    fi
+  done
+  printf 'missing-required-flags=%s\n' "$missing"
+  [ "$missing" -eq 0 ]
+}
+
 setup() {
   TEST_DIR="$(mktemp -d)"
   export TEMP_BROWSER_STATE_DIR="$TEST_DIR/state"
@@ -42,6 +53,7 @@ teardown() {
   [ -d "$profile" ]
   for _ in 1 2 3 4 5 6 7 8 9 10; do [ -f "$TEMP_BROWSER_STATE_DIR/launch-args" ] && break; sleep 0.1; done
   grep -qx -- '--headless=new' "$TEMP_BROWSER_STATE_DIR/launch-args"
+  assert_keychain_isolation_flags "$TEMP_BROWSER_STATE_DIR/launch-args"
   grep -qx -- '--remote-debugging-port=9399' "$TEMP_BROWSER_STATE_DIR/launch-args"
   grep -qx -- "--user-data-dir=$profile" "$TEMP_BROWSER_STATE_DIR/launch-args"
 }
@@ -217,6 +229,7 @@ STUB
   grep -qx -- '-g' "$args"
   grep -qx -- '-n' "$args"
   ! grep -q -- '--headless' "$args"
+  assert_keychain_isolation_flags "$args"
   grep -qx -- '--remote-debugging-port=9399' "$args"
   profile="$(cat "$TEMP_BROWSER_STATE_DIR/lock/profile")"
   pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"

@@ -71,3 +71,8 @@ identity accepted by the parser rejects the probe. The fixture must leave
 all existing cutover decisions intact. It does not authorize activation or
 establish that an earlier boot ended. Measurement framing: Basili, Caldiera,
 and Rombach (1994), Goal Question Metric.
+
+On macOS, the activation suite went from 17 of 19 passing with the empty
+reader to 19 of 19 passing with the bounded native read. Both reads matched
+the system utility, and the five malformed inputs returned no identity.
+The test compares the value in memory and does not print it.

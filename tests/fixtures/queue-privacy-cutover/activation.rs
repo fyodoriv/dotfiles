@@ -271,3 +271,83 @@ fn q17_refuses_an_old_controller_without_owner_record() {
         ..VALID
     }));
 }
+
+fn parse_darwin_boot_bytes(bytes: &[u8]) -> Option<[u8; 36]> {
+    let uuid = bytes.strip_suffix(b"\0")?;
+    boot_identity(std::str::from_utf8(uuid).ok()?)
+}
+
+#[cfg(target_os = "macos")]
+fn read_darwin_boot_identity() -> Option<[u8; 36]> {
+    use std::ffi::{c_char, c_int, c_void};
+
+    unsafe extern "C" {
+        fn sysctlbyname(
+            name: *const c_char,
+            old_value: *mut c_void,
+            old_len: *mut usize,
+            new_value: *mut c_void,
+            new_len: usize,
+        ) -> c_int;
+    }
+
+    let mut bytes = [0_u8; 37];
+    let mut length = bytes.len();
+    // SAFETY: The name is NUL-terminated, length describes the writable
+    // buffer, and the null new value requests a read without changing state.
+    let result = unsafe {
+        sysctlbyname(
+            c"kern.bootsessionuuid".as_ptr(),
+            bytes.as_mut_ptr().cast(),
+            &mut length,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if result != 0 {
+        return None;
+    }
+    parse_darwin_boot_bytes(bytes.get(..length)?)
+}
+
+#[test]
+fn darwin_boot_parser_requires_one_canonical_identity_and_terminator() {
+    let valid = b"10000000-0000-0000-0000-00000000000A\0";
+    assert_eq!(
+        parse_darwin_boot_bytes(valid),
+        Some(*b"10000000-0000-0000-0000-00000000000a")
+    );
+    for malformed in [
+        &valid[..36],
+        b"10000000-0000-0000-0000-00000000000A\0\0",
+        b"10000000-0000-0000-0000-00000000000Z\0",
+        b"00000000-0000-0000-0000-000000000000\0",
+        b"10000000-0000-0000-0000-00000000000A\n",
+    ] {
+        assert!(parse_darwin_boot_bytes(malformed).is_none());
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn darwin_boot_reader_agrees_with_system_utility_without_exposing_identity() {
+    let reference = std::process::Command::new("/usr/sbin/sysctl")
+        .args(["-n", "kern.bootsessionuuid"])
+        .output()
+        .expect("system utility is available");
+    assert!(
+        reference.status.success(),
+        "system utility refused boot identity"
+    );
+    let reference = std::str::from_utf8(&reference.stdout)
+        .ok()
+        .and_then(|text| text.strip_suffix('\n'))
+        .and_then(boot_identity)
+        .expect("system utility returned a valid boot identity");
+    let first = read_darwin_boot_identity().expect("native boot identity is available");
+    let second = read_darwin_boot_identity().expect("repeated boot identity is available");
+    assert!(
+        first == reference && second == reference,
+        "boot identities disagree"
+    );
+}

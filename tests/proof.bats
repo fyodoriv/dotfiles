@@ -91,6 +91,6 @@ REPO="$BATS_TEST_DIRNAME/.."
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   [ "$(jq -r '.metrics.shell_start_field_ms.value' "$TEST_DIR/out.json")" = "180" ]
   [[ "$(jq -r '.metrics.shell_start_field_ms.detail' "$TEST_DIR/out.json")" == *"3 daily samples"*"1 machine"* ]]
-  row="$(PROOF_METRICS="$TEST_DIR/out.json" bash "$REPO/scripts/proof.sh" --render | grep '^| The shell starts fast')"
+  row="$(PROOF_METRICS="$TEST_DIR/out.json" bash "$REPO/scripts/proof.sh" --render | grep '^| Interactive shell startup')"
   [[ "$row" == *"180 ms"* && "$row" == *"real use"* ]] || { echo "$row"; return 1; }
 }

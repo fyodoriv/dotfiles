@@ -83,6 +83,20 @@
           "value": 90
         }
       ]
+    },
+    "shell_start_field_ms": {
+      "value": 298,
+      "unit": "ms",
+      "date": "2026-11-05",
+      "kind": "real use",
+      "command": "scripts/proof.sh",
+      "detail": "median of 7 daily samples, ~/.zshrc start to first prompt, last 30 days, 1 machine",
+      "history": [
+        {
+          "date": "2026-11-05",
+          "value": 298
+        }
+      ]
     }
   },
   "charts": {

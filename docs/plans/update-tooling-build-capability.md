@@ -38,3 +38,19 @@ coverage, not measured model behavior. Anchor: Basili, Caldiera and Rombach
 Git guard regression commands are strings sent to the guard, never executed
 as Git mutations. If current-source controls already pass, retain the guard
 and report that evidence rather than loosening its safety policy.
+
+## Observed evidence
+
+The frozen baseline failed the three primary workflow checks and the
+positive prebuilt probe-observation assertion. Five controls passed. The
+same nine assertions pass after the fix, and the existing skill checks also
+pass. Both refusal fixtures retain the exact old distribution bytes. The
+required dotfiles gate exits zero. This is synthetic workflow evidence, not
+a real prebuilt qualification or a successful machine apply.
+
+Current-source guard controls already allow the old branch read, the new
+symbolic-ref read and quoted literal prose, while refusing a real
+force-delete. No guard policy change is justified by those controls. The
+source-writing shell command itself met the existing conservative text
+check; the purpose-built edit tool wrote the fixture instead. No destructive
+command was executed and no hook was disabled.

@@ -101,7 +101,7 @@ fi
 [ -n "$PULL_REMOTE" ] || { echo "no remote: $repo"; continue; }
 remote_ref="$(git -C "$repo" symbolic-ref --quiet --short "refs/remotes/$PULL_REMOTE/HEAD" 2>/dev/null || true)"
 canonical_branch="${remote_ref#"$PULL_REMOTE/"}"
-current_branch="$(git -C "$repo" branch --show-current)"
+current_branch="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
 ```
 
@@ -160,6 +160,15 @@ elif ! git -C "$AGENTBREW_APPLIED" diff --quiet HEAD origin/main; then
   git -C "$AGENTBREW_APPLIED" merge --ff-only origin/main
   if $ENDPOINT_NODE_SAFE_MODE; then
     echo "deferred applied AgentBrew build: endpoint Node safe mode is active"
+  elif [ "$(uname -s)-$(uname -m)" = Darwin-arm64 ] && ! (
+    cd "$AGENTBREW_APPLIED" || exit 1
+    if [ -f scripts/native-build-tools.mjs ]; then
+      node scripts/native-build-tools.mjs available
+    else
+      command -v cargo >/dev/null 2>&1
+    fi
+  ); then
+    echo "deferred applied AgentBrew build: native build capability unavailable; old dist preserved"
   else
     (cd "$AGENTBREW_APPLIED" && heavy-run npm run build)
   fi
@@ -167,6 +176,15 @@ else
   echo "applied AgentBrew checkout is current"
 fi
 ```
+
+On Apple Silicon, check the advanced checkout's native build capability before
+building. Its source-bound verifier accepts an existing toolchain or a verified
+prebuilt pair when that release supports one. For older releases without that
+verifier, Cargo must be on PATH. If the check fails, preserve the old `dist/`,
+report the build as blocked, and continue independent checks. Do not install
+Rust implicitly or claim the preserved build matches the advanced source.
+Endpoint safe mode skips both the Node probe and the build. Other hosts keep
+their existing build path.
 
 Do not force, reset, rebase, or check out the detached applied checkout. If its
 state is not a clean fast-forward, report it and leave it unchanged. Record

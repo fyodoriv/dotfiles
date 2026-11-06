@@ -1020,6 +1020,12 @@ ID from every input that contains it. Each doctor process snapshots both
 inputs once. Edits apply on the next invocation; watch mode reloads them
 through each new child audit. No cache file is created.
 
+If a work identity intentionally matches your private-email pattern, you can
+run `dotfiles doctor --skip git.user_email_is_public_safe` on that machine.
+This skips the doctor check for all future identities there, not only the
+current email. The separate public push guard still rejects private commit
+emails. Remove the override to restore the check.
+
 **Filter by severity (CI / fast feedback):**
 
 ```bash

@@ -35,9 +35,18 @@ check "resilience.sleepwatcher_binary" "sleepwatcher binary present" \
 # keep_awake_tools (default: full profile) decides whether apply loads the
 # agent, so the doctor expects it only then.
 if [ "${KEEP_AWAKE_TOOLS:-true}" = "true" ]; then
+  _sleepwatcher_load='launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.dotfiles.sleepwatcher.plist"'
+  if [ -e "$HOME/Library/LaunchAgents/com.dotfiles.sleepwatcher.plist" ]; then
+    _sleepwatcher_help="You: open Terminal and run $_sleepwatcher_load"
+  else
+    printf -v _sleepwatcher_repo '%q' "$DOTFILES_DIR"
+    _sleepwatcher_create='(mkdir -p "$HOME/Library/LaunchAgents" && tmp=$(mktemp "$HOME/Library/LaunchAgents/.sleepwatcher.XXXXXX") && trap '\''rm -f "$tmp"'\'' EXIT && chezmoi execute-template --source '"$_sleepwatcher_repo"' < '"$_sleepwatcher_repo"'/launchagents/com.dotfiles.sleepwatcher.plist.tmpl > "$tmp" && ln "$tmp" "$HOME/Library/LaunchAgents/com.dotfiles.sleepwatcher.plist")'
+    _sleepwatcher_help="You: the sleepwatcher plist is missing. In Terminal, run $_sleepwatcher_create, then run $_sleepwatcher_load"
+  fi
   check "resilience.sleepwatcher_loaded" "sleepwatcher LaunchAgent loaded" \
     "launchctl list 2>/dev/null | grep -q com.dotfiles.sleepwatcher" \
-    "echo 'Load: launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.sleepwatcher.plist'"
+    "" "$_sleepwatcher_help"
+  unset _sleepwatcher_load _sleepwatcher_repo _sleepwatcher_create _sleepwatcher_help
 fi
 
 check "resilience.wakeup_hook_exists" '$HOME/.wakeup hook fires network-watchdog' \

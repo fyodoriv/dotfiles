@@ -63,7 +63,7 @@ the earlier failed experiment is in [the prior plan](git-wrapper-read-fast-path-
 On 2026-11-06, the single baseline was invalid. Hyperfine 2.0.0 wrote its
 measurements under a newer JSON schema, but the frozen helper expected the
 older `times` and `median` fields. The helper rejected the output before it
-saved the post-run load check. The safety harness passed 32 tests before the
+saved the post-run load check. The safety harness passed before the
 benchmark; no wrapper implementation was changed or measured after a fix.
 
 The registered rule rejects an invalid measurement, so this approach is

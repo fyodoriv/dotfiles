@@ -24,3 +24,18 @@ not claim a speedup for other calls or the reported application workload.
 
 Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et
 al. (2017), preregistration; issue #483's measured wrapper overhead.
+
+## Result — 2026-11-06
+
+The ten-run medians gave added wrapper times of 15.650 ms before and
+10.080 ms after for the version call (35.59% less), and 17.651 ms before
+and 12.463 ms after for the directory lookup (29.39% less). The second
+result missed the registered 30% threshold, so this approach was abandoned.
+The timing was not exclusive; these values are exploratory and do not prove
+a general workload speedup.
+
+Independent review also found that the candidate retried ordinary failures
+and signal exits, and that buffering changed output ordering. The candidate
+was not kept or shipped. Future work must preserve failure and streaming
+semantics, register its own exclusive measurement before testing, and avoid
+treating fetch as read-only. Issue #483 stays open.

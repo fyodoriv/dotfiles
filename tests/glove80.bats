@@ -121,7 +121,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   printf '#!/bin/bash\necho "$*" >> "$OPEN_LOG"\n' > "$TEST_DIR/bin/open"
   run "$SCRIPT" pair --profile 2 --yes
   [ "$status" -eq 4 ]
-  [[ "$output" == *"did not connect"* ]]
+  [[ "$output" == *"connection was not confirmed"* ]]
 }
 
 @test "pair --verbose logs Bluetooth snapshots to the log file" {
@@ -165,6 +165,43 @@ MOCK
   run "$SCRIPT" pair --profile 2 --yes
   [ "$(yq -r '.data.glove80_profile // "unset"' "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml")" = "unset" ]
   [[ "$output" == *"unverified"* ]]
+}
+
+@test "an unknown prior state allows settings but never saves a profile automatically" {
+  export PROBE_COUNT="$TEST_DIR/probe-count" GLOVE80_WAIT_SECONDS=10
+  cat > "$TEST_DIR/bin/system_profiler" <<'MOCK'
+#!/bin/bash
+if [ "$(cat "$SP_STATE")" = connected ]; then
+  count=0
+  [ ! -f "$PROBE_COUNT" ] || count="$(cat "$PROBE_COUNT")"
+  count=$((count + 1))
+  printf '%s\n' "$count" > "$PROBE_COUNT"
+  if [ "$count" -ge 3 ]; then
+    printf 'Bluetooth:\n      State: On\n      Connected:\n          Glove80:\n              Address: AA\n'
+  else
+    printf 'Bluetooth:\n      State: On\n      Not Connected:\n'
+  fi
+else
+  printf 'Bluetooth:\n      State: On\n      Not Connected:\n'
+fi
+MOCK
+  for method in unattended interactive; do
+    : > "$SP_STATE"
+    : > "$OPEN_LOG"
+    rm -f "$PROBE_COUNT"
+    printf 'data:\n  profile: core\n' > "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml"
+    if [ "$method" = unattended ]; then
+      run "$SCRIPT" pair --profile 2 --yes
+    else
+      run confirm_pair y
+    fi
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"prior Bluetooth state is unknown"* ]]
+    [ "$(printf '%s\n' "$output" | grep -ic 'Bluetooth state is unknown')" = 1 ]
+    [[ "$output" == *"unverified"* ]]
+    [ "$(wc -l < "$OPEN_LOG" | tr -d ' ')" = 1 ]
+    [ "$(yq -r '.data.glove80_profile // "unset"' "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml")" = unset ]
+  done
 }
 
 @test "a failed Bluetooth probe is unknown, not unpaired" {

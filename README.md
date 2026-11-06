@@ -1287,8 +1287,9 @@ pairing and needs separate approval.
 
 The connection wait is best effort. A stalled system operation may add
 shutdown time. A connection does not prove which profile was selected. An
-interactive confirmation records the user's assertion after a new connection;
-`--yes` opens settings without recording an unverified profile. Diagnostics
+interactive confirmation records the user's assertion after a new connection
+only when prior state was known. If state is unknown, or `--yes` is used,
+settings can open but the profile is not saved automatically. Diagnostics
 record only the Glove80 state in a private local log.
 
 ### Standalone scripts

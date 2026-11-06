@@ -71,14 +71,17 @@ cp -n "$(chezmoi source-path)/gitconfig.local.example" "$HOME/.gitconfig.local"
 ```
 
 If the file already exists, inspect it before changing anything. Edit
-`~/.gitconfig.local` and fill in your own details. Make sure your Git
-configuration includes this file:
+`~/.gitconfig.local` and fill in your own details:
 
 ```ini
 [user]
     name = Your Name
     email = your@email.com
 ```
+
+The managed `~/.gitconfig` includes this file. If you use another Git
+configuration, check its include paths with `git config --global --get-all
+include.path` and ensure it includes `~/.gitconfig.local`.
 
 Running `dotfiles doctor` will warn you if this file is missing.
 

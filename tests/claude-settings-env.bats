@@ -122,3 +122,9 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
   [ "$(jq -r '.env.AGENT_GUARD_AGENT_MAX' "$HOME/.claude/settings.json")" = "10" ]
 }
+
+@test "success message lists every pinned key" {
+  rm -f "$HOME/.claude/settings.json"
+  run bash "$SCRIPT"
+  [[ "$output" == *"AGENT_GUARD_AGENT_MAX=10"* ]]
+}

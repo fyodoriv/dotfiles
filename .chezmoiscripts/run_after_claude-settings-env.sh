@@ -72,4 +72,4 @@ else
   chmod 600 "$TMP"
 fi
 mv "$TMP" "$TARGET"
-echo "✓ Claude Code settings.json env pinned: AGENT_GUARD_DEPTH_MAX=2, CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000"
+echo "✓ Claude Code settings.json env pinned: $(printf '%s' "$DESIRED_ENV" | jq -r 'to_entries | map("\(.key)=\(.value)") | join(", ")')"

@@ -523,7 +523,7 @@ _timeout() {
 }
 
 _fix() {
-  local desc="$1" cmd="$2" verify_cmd="$3"
+  local desc="$1" cmd="$2" verify_cmd="$3" failure_desc="${4:-$1}"
   $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "  ${DIM}⟳ %s…${NC}\r" "$desc" >&2
   if _timeout "$FIX_TIMEOUT" bash -c "$cmd" >/dev/null 2>&1; then
     $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
@@ -533,16 +533,18 @@ _fix() {
     if eval "$verify_cmd" >/dev/null 2>&1; then
       fixed "$desc"
     else
-      fail "$desc ${DIM}(fix ran but the check still fails)${NC}$(_fix_hint "$cmd")"
+      fail "$failure_desc ${DIM}(fix ran but the check still fails)${NC}$(_fix_hint "$cmd")"
     fi
   else
     $FIX_MODE && ! $QUIET_MODE && ! $REPORT_MODE && printf "\033[2K\r" >&2
-    fail "$desc ${DIM}(fix failed or timed out)${NC} — fix: run it by hand: dotfiles doctor --json --module ${_json_current_module:-<module>} names the command"
+    fail "$failure_desc ${DIM}(fix failed or timed out)${NC} — fix: run it by hand: dotfiles doctor --json --module ${_json_current_module:-<module>} names the command"
   fi
 }
 
+# An optional fifth argument supplies guidance only when the check fails.
 check() {
   local id="$1" desc="$2" test_cmd="$3" fix_cmd="$4"
+  local fail_desc="${5:-$desc}"
 
   if $LIST_MODE; then
     printf "  %-45s %s\n" "$id" "$desc"
@@ -566,17 +568,17 @@ check() {
     pass "$desc"
   elif $FIX_MODE && [ -n "$fix_cmd" ]; then
     local _f0=$fix_count _x0=$fail_count
-    _fix "$desc" "$fix_cmd" "$test_cmd"
+    _fix "$desc" "$fix_cmd" "$test_cmd" "$fail_desc"
     if (( fix_count > _f0 )); then
       $JSON_MODE && _json_add "$id" "fixed" "$desc" "$fix_cmd"
       fixed_check_ids+=("$id")
     elif (( fail_count > _x0 )); then
-      $JSON_MODE && _json_add "$id" "fail" "$desc" "$fix_cmd"
+      $JSON_MODE && _json_add "$id" "fail" "$fail_desc" "$fix_cmd"
       failed_check_ids+=("$id")
     fi
   else
-    $JSON_MODE && _json_add "$id" "fail" "$desc" "$fix_cmd"
-    fail "$desc$(_fix_hint "$fix_cmd")"
+    $JSON_MODE && _json_add "$id" "fail" "$fail_desc" "$fix_cmd"
+    fail "$fail_desc$(_fix_hint "$fix_cmd")"
     failed_check_ids+=("$id")
   fi
 }

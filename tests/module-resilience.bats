@@ -100,6 +100,75 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -e "$TEST_DIR/launched" ]
 }
 
+@test "preference failures retain failure and give conditional privacy and drift steps" {
+  export AMPHETAMINE_APP_PATH="$TEST_DIR/installed.app"
+  mkdir -p "$AMPHETAMINE_APP_PATH" "$TEST_DOTFILES/data"
+  printf '{"setting":true}\n' > "$TEST_DOTFILES/data/amphetamine-prefs.json"
+  printf '#!/bin/sh\necho "$DIFF_REASON"\nexit 1\n' > "$TEST_DOTFILES/bin/dotfiles-amphetamine-sync"
+  chmod +x "$TEST_DOTFILES/bin/dotfiles-amphetamine-sync"
+  check() {
+    [ "$1" = resilience.amphetamine_sync_in_sync ] || return 0
+    if eval "$3"; then printf 'pass\n' >> "$TEST_DIR/result"
+    else printf 'fail %s\n' "$5" >> "$TEST_DIR/result"; fi
+  }
+  check_advisory() { :; }
+  for DIFF_REASON in blocked drift; do
+    export DIFF_REASON
+    source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  done
+  [ "$(grep -c '^fail ' "$TEST_DIR/result")" -eq 2 ]
+  [ "$(grep -c 'dotfiles-amphetamine-sync diff' "$TEST_DIR/result")" -eq 2 ]
+  [ "$(grep -c 'If.*blocked.*Full Disk Access' "$TEST_DIR/result")" -eq 2 ]
+  [ "$(grep -c 'dotfiles-amphetamine-sync export' "$TEST_DIR/result")" -eq 2 ]
+  [ "$(grep -c 'dotfiles-amphetamine-sync apply' "$TEST_DIR/result")" -eq 2 ]
+}
+
+@test "real doctor shows preference guidance for blocked access and drift" {
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '/^check "resilience\.amphetamine_sync_in_sync"/ { print; remaining=3; next }
+       remaining > 0 { print; remaining-- }' "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" > "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  [ "$(grep -c 'resilience.amphetamine_sync_in_sync' "$TEST_DOTFILES/modules/resilience/doctor.sh")" -eq 1 ]
+  mkdir -p "$TEST_DOTFILES/data" "$TEST_DIR/installed.app"
+  printf '{"setting":true}\n' > "$TEST_DOTFILES/data/amphetamine-prefs.json"
+  printf '#!/bin/sh\necho "$DIFF_REASON"\n[ "$DIFF_REASON" = clean ]\n' > "$TEST_DOTFILES/bin/dotfiles-amphetamine-sync"
+  printf '#!/bin/sh\n[ "$1" = source-path ] && printf "%%s\\n" "%s"\nexit 0\n' "$TEST_DOTFILES" > "$TEST_DOTFILES/bin/chezmoi"
+  chmod +x "$TEST_DOTFILES/bin/dotfiles-amphetamine-sync" "$TEST_DOTFILES/bin/chezmoi"
+  export AMPHETAMINE_APP_PATH="$TEST_DIR/installed.app" DOTFILES_LOCAL_OVERRIDES="$TEST_DIR/overrides"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_DOCTOR_NOTIFY=0 PATH="$TEST_DOTFILES/bin:$PATH"
+  for DIFF_REASON in blocked drift clean; do
+    export DIFF_REASON
+    for mode in audit fix text; do
+      if [ "$mode" = fix ]; then
+        run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience
+      elif [ "$mode" = audit ]; then
+        run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --json --module resilience
+      else
+        run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --module resilience
+      fi
+      if [ "$DIFF_REASON" = clean ]; then
+        [ "$status" -eq 0 ]
+        [[ "$output" != *"Full Disk Access"* ]]
+        if [ "$mode" != text ]; then
+          printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.amphetamine_sync_in_sync")] | length == 1 and .[0].status == "pass"' >/dev/null
+        fi
+      else
+        [ "$status" -eq 1 ]
+        if [ "$mode" = text ]; then
+          [[ "$output" == *"If access is blocked"* && "$output" == *"Full Disk Access"* ]]
+        else
+          printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.amphetamine_sync_in_sync")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("dotfiles-amphetamine-sync diff") and contains("If access is blocked") and contains("Full Disk Access") and contains("dotfiles-amphetamine-sync export") and contains("dotfiles-amphetamine-sync apply"))' >/dev/null
+        fi
+      fi
+    done
+  done
+  printf 'check "test.failure_hint" "short success" "[ -e %s/fixed ]" "touch %s/fixed" "failure-only guidance"\n' "$TEST_DIR" "$TEST_DIR" >> "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "test.failure_hint")] | length == 1 and .[0].status == "fixed" and .[0].message == "short success"' >/dev/null
+}
+
 @test "resilience: fails when tmux is not installed" {
   mkdir -p "$TEST_DIR/empty_bin"
   export PATH="$TEST_DIR/empty_bin:/usr/bin:/bin:/usr/sbin:/sbin"

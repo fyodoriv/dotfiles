@@ -228,7 +228,7 @@ feature-specific gates.
 | sync | core | Auto-sync LaunchAgent, repo health |
 | tools | core | Homebrew packages, CLI tools |
 | workflow | core | LaunchAgents loaded, automation health |
-| agent-browser | full | Chrome profile for headless browser automation |
+| agent-browser | full | Chrome profile for headless browser automation; on core, the theme check skips if its LaunchAgent is absent |
 | agentbrew | full | Agent config sync health |
 | chrome | full | Chrome default profile, work profile detection, ChromeWork URL router |
 | claude | full | Claude config, MCP servers, GitHub Enterprise integration |

@@ -141,6 +141,43 @@ teardown() {
   ! grep -q "themed" "$FAIL_MESSAGES"
 }
 
+@test "core skips the theme when the managed Chrome agent is not installed" {
+  export DOTFILES_PROFILE=core
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  ! grep -qx "agents Chrome themed ORANGE (port 9223)" "$FAIL_MESSAGES"
+}
+
+@test "core still checks the theme when the managed Chrome agent is installed" {
+  export DOTFILES_PROFILE=core
+  mkdir -p "$HOME/Library/LaunchAgents"
+  touch "$HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -qx "agents Chrome themed ORANGE (port 9223)" "$FAIL_MESSAGES"
+}
+
+@test "core keeps checking the theme for a broken managed agent link" {
+  export DOTFILES_PROFILE=core
+  mkdir -p "$HOME/Library/LaunchAgents"
+  ln -s "$TEST_DIR/missing-agent" "$HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist"
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -qx "agents Chrome themed ORANGE (port 9223)" "$FAIL_MESSAGES"
+}
+
+@test "full profile checks a missing theme without a deployed agent" {
+  export DOTFILES_PROFILE=full
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -qx "agents Chrome themed ORANGE (port 9223)" "$FAIL_MESSAGES"
+}
+
+@test "core keeps the theme check discoverable" {
+  export DOTFILES_PROFILE=core
+  LIST_MODE=true
+  CHECKED="$TEST_DIR/listed"
+  check() { printf '%s\n' "$1" >> "$CHECKED"; }
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -qx 'agent-browser.dashboard_theme' "$CHECKED"
+}
+
 @test "agent-browser: fails when env patterns missing from zshrc" {
   echo "# empty" > "$TEST_DOTFILES/home/zshrc"
   rm -rf "$TEST_HOME/.agent-browser"
@@ -409,4 +446,21 @@ SCRIPT
   fail_count=0
   source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
   grep -q "managed Chromes use --headless=new" "$FAIL_MESSAGES"
+}
+
+@test "core theme skip is present exactly once in doctor JSON" {
+  printf '#!/bin/bash\ncase "$*" in *".profile"*) echo core ;; *) exit 1 ;; esac\n' > "$TEST_DIR/bin/chezmoi"
+  chmod +x "$TEST_DIR/bin/chezmoi"
+  export DOTFILES_DOCTOR_NOTIFY=0
+  run bash "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --module agent-browser --json
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "agent-browser.dashboard_theme")] | length == 1 and .[0].status == "skip"'
+}
+
+@test "core theme check stays a valid doctor override" {
+  printf '#!/bin/bash\ncase "$*" in *".profile"*) echo core ;; *) exit 1 ;; esac\n' > "$TEST_DIR/bin/chezmoi"
+  chmod +x "$TEST_DIR/bin/chezmoi"
+  export DOTFILES_DOCTOR_NOTIFY=0 DOTFILES_LOCAL_OVERRIDES="$TEST_DIR/overrides"
+  printf '%s\n' agent-browser.dashboard_theme > "$DOTFILES_LOCAL_OVERRIDES"
+  run bash "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --validate-overrides
+  [ "$status" -eq 0 ]
 }

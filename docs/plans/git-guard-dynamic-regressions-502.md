@@ -48,3 +48,22 @@ The report's expanded heredoc destination remains out of scope until its path
 safety can be established; this experiment alone cannot close #502.
 
 Anchor: [Goal Question Metric](https://doi.org/10.1002/9780470172669.ch12).
+
+## Result and pivot
+
+On 2026-11-06, the first test run failed in scratch setup because its commit
+messages did not follow the installed convention. After fixing the fixture,
+both safe examples failed and all seven destructive controls passed. An
+initial parser candidate passed all nine focused checks, but did not complete
+the full suite. Independent review found that the candidate could erase the
+search text while an expanded operand became a ripgrep preprocessor option.
+Glob expansion, a failed substitution with a suffix, and a relative temporary
+directory can each affect option parsing. The candidate is abandoned and is
+not part of this change. The review was static; no exploit was executed.
+
+The 9/9 examples were not enough to establish safety. A future approach needs
+to prove the runtime operand cannot become an option, retain conservative
+fallback and test the extra cases before changing the hook. The expanded
+heredoc destination in #502 also remains unresolved. Private local evidence
+retains the failed fixture run, the corrected baseline, the candidate and its
+focused result.

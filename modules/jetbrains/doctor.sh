@@ -108,14 +108,20 @@ _jb_find_ide_dirs() {
 # case ("IntelliJ IDEA CE.app" -> "intellijideace"); a name that starts with
 # the slug matches. JETBRAINS_APP_DIRS is a colon-separated list.
 _jb_ide_installed() {
-  local slug="$1" dir app name
+  local slug="$1" dir app name bin
   [ "$slug" = "ideaic" ] && slug="intellijideace"
   local IFS=:
   for dir in ${JETBRAINS_APP_DIRS:-/Applications:$HOME/Applications}; do
     for app in "$dir"/*.app; do
       [ -d "$app" ] || continue
       name="$(basename "$app" .app | tr -d ' ' | tr '[:upper:]' '[:lower:]')"
-      case "$name" in "$slug"*) return 0 ;; esac
+      case "$name" in
+        "$slug"*)
+          for bin in "$app"/Contents/MacOS/*; do
+            [ -f "$bin" ] && [ -x "$bin" ] && return 0
+          done
+          ;;
+      esac
     done
   done
   return 1

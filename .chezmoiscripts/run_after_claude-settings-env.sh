@@ -5,6 +5,9 @@
 # agentbrew) allow nested subagents up to depth 2 instead of its default
 # depth 1. Owner choice 2026-10-25.
 #
+# AGENT_GUARD_AGENT_MAX=10 lets the guard run 10 agents at once on this
+# machine instead of its default 4. Owner choice 2026-11-06.
+#
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000 makes Claude Code compact a
 # conversation near 350k tokens. The guard refuses tool calls above 400k
 # (AGENT_GUARD_TOOL_CONTEXT) when nobody can answer, which stopped day-long
@@ -19,7 +22,7 @@
 set -euo pipefail
 
 SETTINGS="$HOME/.claude/settings.json"
-DESIRED_ENV='{"AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
+DESIRED_ENV='{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
 
 if [ "${1:-}" = "--print-desired" ]; then
   printf '%s\n' "$DESIRED_ENV"

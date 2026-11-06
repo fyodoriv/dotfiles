@@ -31,7 +31,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 }
 
 @test "is a no-op when the value is already set" {
-  echo '{"env":{"AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}}' > "$HOME/.claude/settings.json"
+  echo '{"env":{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}}' > "$HOME/.claude/settings.json"
   run bash "$SCRIPT"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -97,7 +97,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 
 @test "--print-desired prints the pinned env" {
   run bash "$SCRIPT" --print-desired
-  [ "$output" = '{"AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}' ]
+  [ "$output" = '{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}' ]
 }
 
 @test "writes the auto-compact window" {
@@ -114,4 +114,11 @@ teardown() { rm -rf "$TEST_DIR"; }
   guard="$(printf '%s' "$want" | jq -r '.AGENT_GUARD_TOOL_CONTEXT // "400000" | tonumber')"
   [ "$window" -ge 100000 ]
   [ $((guard - window)) -ge 30000 ]
+}
+
+@test "pins AGENT_GUARD_AGENT_MAX=10 so 10 agents can run at once (owner 2026-11-06)" {
+  rm -f "$HOME/.claude/settings.json"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.env.AGENT_GUARD_AGENT_MAX' "$HOME/.claude/settings.json")" = "10" ]
 }

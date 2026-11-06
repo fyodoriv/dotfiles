@@ -7,6 +7,8 @@
 #
 # AGENT_GUARD_AGENT_MAX=10 lets the guard run 10 agents at once on this
 # machine instead of its default 4. Owner choice 2026-11-06.
+# AGENT_GUARD_AGENT_TOKENS_MAX=25000000 raises the subagent token budget per
+# 10-minute window from 10M, in step with the agent limit. Owner 2026-11-06.
 #
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000 makes Claude Code compact a
 # conversation near 350k tokens. The guard refuses tool calls above 400k
@@ -22,7 +24,7 @@
 set -euo pipefail
 
 SETTINGS="$HOME/.claude/settings.json"
-DESIRED_ENV='{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
+DESIRED_ENV='{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
 
 if [ "${1:-}" = "--print-desired" ]; then
   printf '%s\n' "$DESIRED_ENV"

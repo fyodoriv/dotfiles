@@ -7,11 +7,11 @@
 # (for example 2 on the work Mac, 0 on the personal Mac).
 #
 # Usage:
-#   dotfiles-glove80 pair [--profile N] [--yes]   Ask, then pair and connect
+#   dotfiles-glove80 pair [--profile N] [--keymap FILE] [--yes] [--verbose]   Ask, then pair and connect
 #   dotfiles-glove80 keys [--keymap FILE]         Show the exact key for each profile
-#   dotfiles-glove80 status                       Show state and this Mac's profile key
-#   dotfiles-glove80 profile [N]                  Show or save this Mac's profile (0-3)
-#   dotfiles-glove80 switch [N]                   Print the keys that switch to this Mac
+#   dotfiles-glove80 status [--keymap FILE]       Show state and this Mac's profile key
+#   dotfiles-glove80 profile [N] [--keymap FILE]   Show or save this Mac's profile (0-3)
+#   dotfiles-glove80 switch [N] [--keymap FILE]   Print the keys that switch to this Mac
 #   dotfiles-glove80 log [N]                      Show the last N debug log lines
 #   dotfiles-glove80 --help                       Show this message
 #
@@ -47,26 +47,7 @@ log() {
     ms="$(remaining_ms)" || return 1
     timeout="$(seconds_for_ms "$ms")"
   fi
-  gtimeout --kill-after=1s "$timeout" perl -MFcntl=O_WRONLY,O_APPEND,O_CREAT,O_NOFOLLOW -MFile::Basename=dirname -MFile::Path=make_path -e '
-    my ($path, $line) = @ARGV;
-    my $dir = dirname($path);
-    my $home = $ENV{HOME} // die "home unavailable\n";
-    die "log must be inside home\n" unless index($dir, "$home/") == 0;
-    my $relative = substr($dir, length($home) + 1);
-    my $current = $home;
-    for my $part (split m{/}, $relative) {
-      die "invalid log path\n" if $part eq "" || $part eq "." || $part eq "..";
-      $current .= "/$part";
-      mkdir($current, 0700) unless -e $current || -l $current;
-      my @dir = lstat($current);
-      die "log directory unavailable\n" unless @dir && -d _ && !-l _ && $dir[4] == $> && !($dir[2] & 022);
-    }
-    sysopen(my $fh, $path, O_WRONLY|O_APPEND|O_CREAT|O_NOFOLLOW, 0600) or die "log unavailable\n";
-    my @st = stat($fh);
-    die "log is not a private owned file\n" unless @st && -f $fh && !($st[2] & 077) && $st[3] == 1 && $st[4] == $>;
-    print $fh "$line\n" or die "log write failed\n";
-    close($fh) or die "log close failed\n";
-  ' "$GLOVE80_LOG" "$line" || return 1
+  gtimeout --kill-after=1s "$timeout" ruby "$DOTFILES_DIR/lib/glove80-private-log.rb" "$HOME" "$GLOVE80_LOG" "$line" || return 1
   [ "$GLOVE80_DEBUG" = "1" ] && printf '[debug] %s\n' "$line" >&2
   return 0
 }
@@ -164,13 +145,23 @@ glove80_state() {
   snapshot="$(LC_ALL=C gtimeout --kill-after=1s "$(seconds_for_ms "$ms")" system_profiler SPBluetoothDataType 2>/dev/null)" || return 1
   printf '%s\n' "$snapshot" | awk '/^ *Bluetooth:/{root=1} root && /^ *State: On[[:space:]]*$/{on=1} root && /^ *(Connected|Not Connected):[[:space:]]*$/{section=1} END{exit !(on && section)}' || return 1
   printf '%s\n' "$snapshot" | awk '
-    function flush() { if (dev && (tolower(dev) ~ /glove80/ || (vid == "0x16C0" && pid == "0x27DB"))) { print sec "|" dev; found = 1; exit } }
-    /^ *Connected:/ { flush(); sec = "connected"; dev = ""; next }
-    /^ *Not Connected:/ { flush(); sec = "paired"; dev = ""; next }
-    sec && /^          [^ ].*:$/ { flush(); dev = $0; sub(/^ +/, "", dev); sub(/:$/, "", dev); vid = ""; pid = ""; next }
+    function capture() {
+      if (dev && (tolower(dev) ~ /glove80/ || (vid == "0x16C0" && pid == "0x27DB")) && !found) {
+        result = sec "|" dev; found = 1
+      }
+    }
+    /^ *Connected:/ { capture(); sec = "connected"; seen_connected = 1; dev = ""; next }
+    /^ *Not Connected:/ { capture(); sec = "paired"; seen_paired = 1; dev = ""; next }
+    sec && /^          [^ ].*:$/ { capture(); dev = $0; sub(/^ +/, "", dev); sub(/:$/, "", dev); vid = ""; pid = ""; next }
     /^ *Vendor ID:/ { vid = $3 }
     /^ *Product ID:/ { pid = $3 }
-    END { if (!found) flush() }' | head -1
+    END {
+      capture()
+      if (found) print result
+      else if (seen_connected && seen_paired) print "absent|"
+      else exit 3
+    }'
+
 }
 
 saved_profile() {
@@ -180,17 +171,30 @@ saved_profile() {
 }
 
 cmd_status() {
-  local st name p key
+  local st name p key keymap=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --keymap) [ $# -ge 2 ] || return 2; keymap="$2"; shift 2 ;;
+      --verbose) shift ;;
+      *) echo "Unknown option: $1" >&2; return 2 ;;
+    esac
+  done
   if ! st="$(glove80_state)"; then echo "Glove80: unknown (Bluetooth probe failed)" >&2; return 3; fi
   name="${st#*|}"
   p="$(saved_profile)"
+  case "$p" in
+    custom-*)
+      [ -n "$keymap" ] || keymap="${GLOVE80_KEYMAP:-}"
+      [ -n "$keymap" ] || { echo "A custom keymap is required for this profile." >&2; return 5; }
+      p="${p#custom-}" ;;
+  esac
   case "${st%%|*}" in
     connected) echo "Glove80: connected as \"$name\"" ;;
     paired) echo "Glove80: paired as \"$name\", not connected" ;;
     *) echo "Glove80: not paired" ;;
   esac
   if [ -n "$p" ]; then
-    key="$(profile_key "$p" "${GLOVE80_KEYMAP:-}")" || { echo "Unknown keymap." >&2; return 5; }
+    key="$(profile_key "$p" "$keymap")" || { echo "Unknown keymap." >&2; return 5; }
     echo "This Mac uses user-asserted BT Profile $p: $key"
   else echo "No profile saved for this Mac. Run: dotfiles-glove80 profile <0-3>"; fi
   [ "${st%%|*}" = "connected" ]
@@ -203,14 +207,32 @@ cmd_profile() {
     return 0
   fi
   case "$1" in 0|1|2|3) ;; *) echo "Profile must be 0-3, got: $1" >&2; exit 2 ;; esac
-  local key timeout=30s ms
-  key="$(profile_key "$1" "${2:-${GLOVE80_KEYMAP:-}}")" || { echo "Unknown keymap." >&2; return 5; }
+  local key timeout=30s ms chosen mode current number="$1"
+  shift
+  chosen=""
+  if [ "$#" -gt 0 ]; then
+    [ "$#" -eq 2 ] && [ "$1" = --keymap ] && [ -n "$2" ] || { echo "Use profile N [--keymap FILE]." >&2; return 2; }
+    chosen="$2"
+  fi
+  [ -n "$chosen" ] || chosen="${GLOVE80_KEYMAP:-}"
+  set -- "$number"
+  current="$(saved_profile)" || return 1
+  case "$current" in
+    custom-*)
+      if [ -z "$chosen" ] || [ "$chosen" = "$DOTFILES_DIR/config/glove80/factory.keymap" ]; then
+        echo "A custom keymap is required to change this profile." >&2
+        return 5
+      fi ;;
+  esac
+  key="$(profile_key "$1" "$chosen")" || { echo "Unknown keymap." >&2; return 5; }
   log "recording user-asserted profile=$1" || return 1
   if [ -n "${GLOVE80_DEADLINE_MS:-}" ]; then
     ms="$(remaining_ms)" || return 4
     timeout="$(seconds_for_ms "$ms")"
   fi
-  if ! gtimeout --kill-after=1s "$timeout" bash "$DOTFILES_DIR/bin/dotfiles-config" set glove80_profile "$1" >/dev/null; then
+  mode="$1"
+  if [ -n "$chosen" ] && [ "$chosen" != "$DOTFILES_DIR/config/glove80/factory.keymap" ]; then mode="custom-$1"; fi
+  if ! gtimeout --kill-after=1s "$timeout" bash "$DOTFILES_DIR/bin/dotfiles-config" set glove80_profile "$mode" >/dev/null; then
     echo "Profile save may have completed; check dotfiles config glove80_profile." >&2
     return 1
   fi
@@ -219,16 +241,30 @@ cmd_profile() {
 
 # Print the keys to switch the keyboard to this Mac (or to profile N).
 cmd_switch() {
-  local p="${1:-$(saved_profile)}"
-  [ -n "$p" ] || { echo "No profile saved for this Mac. Run: dotfiles-glove80 profile <0-3>" >&2; exit 2; }
-  local key
-  key="$(profile_key "$p" "${GLOVE80_KEYMAP:-}")" || { echo "Unknown keymap." >&2; return 5; }
+  local p saved key keymap="" explicit=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --keymap) [ $# -ge 2 ] || return 2; keymap="$2"; shift 2 ;;
+      0|1|2|3) [ -z "$explicit" ] || return 2; explicit="$1"; shift ;;
+      *) echo "Unknown option: $1" >&2; return 2 ;;
+    esac
+  done
+  saved="$(saved_profile)"
+  case "$saved" in
+    custom-*)
+      [ -n "$keymap" ] || keymap="${GLOVE80_KEYMAP:-}"
+      [ -n "$keymap" ] || { echo "A custom keymap is required for this profile." >&2; return 5; }
+      saved="${saved#custom-}" ;;
+  esac
+  p="${explicit:-$saved}"
+  [ -n "$p" ] || { echo "No profile saved for this Mac. Run: dotfiles-glove80 profile <0-3>" >&2; return 2; }
+  key="$(profile_key "$p" "$keymap")" || { echo "Unknown keymap." >&2; return 5; }
   echo "Switch the Glove80 to BT Profile $p: hold Magic (MoErgo logo key) and tap ${key#Magic + }."
 }
 
 cmd_pair() {
-  local profile yes=0 keymap="" key clear state limit asserted=1 start ms timeout
-  profile="$(saved_profile)"; profile="${profile:-0}"
+  local profile saved yes=0 keymap="" key clear state limit asserted=1 start ms timeout
+  saved="$(saved_profile)"; profile="${saved#custom-}"; profile="${profile:-0}"
   while [ $# -gt 0 ]; do
     case "$1" in
       --profile) profile="${2:-}"; [ $# -ge 2 ] || return 2; shift 2 ;;
@@ -238,6 +274,7 @@ cmd_pair() {
       *) echo "Unknown option: $1" >&2; return 2 ;;
     esac
   done
+  case "$saved" in custom-*) [ -n "$keymap" ] || keymap="${GLOVE80_KEYMAP:-}"; [ -n "$keymap" ] || { echo "A custom keymap is required for this profile." >&2; return 5; } ;; esac
   case "$profile" in 0|1|2|3) ;; *) echo "Profile must be 0-3, got: $profile" >&2; return 2 ;; esac
   limit="${GLOVE80_WAIT_SECONDS:-120}"
   case "$limit" in *[!0-9]*|""|0*) echo "Invalid wait limit" >&2; return 2 ;; esac
@@ -274,7 +311,11 @@ EOF
     [ "${state%%|*}" = connected ] && break
     sleep 0.1
   done
-  if [ "$asserted" -eq 1 ]; then cmd_profile "$profile" "$keymap"; else echo "Connected; profile is unverified and was not saved."; fi
+  if [ "$asserted" -eq 1 ]; then
+    if [ -n "$keymap" ]; then cmd_profile "$profile" --keymap "$keymap"; else cmd_profile "$profile"; fi
+  else
+    echo "Connected; profile is unverified and was not saved."
+  fi
   echo "Glove80: connected"
 
 }
@@ -282,7 +323,7 @@ EOF
 case "$1" in
   pair) shift; cmd_pair "$@" ;;
   keys) shift; cmd_keys "$@" ;;
-  status) log "status: $(bt_snapshot)"; cmd_status ;;
+  status) shift; log "status: $(bt_snapshot)"; cmd_status "$@" ;;
   profile) shift; cmd_profile "$@" ;;
   switch) shift; cmd_switch "$@" ;;
   log) tail -n "${2:-50}" "$GLOVE80_LOG" ;;

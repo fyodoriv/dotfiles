@@ -29,7 +29,7 @@ echo connected > "$SP_STATE"
 MOCK
   chmod +x "$TEST_DIR/bin/system_profiler" "$TEST_DIR/bin/open"
   PATH="$TEST_DIR/bin:$PATH"
-  export GLOVE80_KEYMAP="$BATS_TEST_DIRNAME/../config/glove80/factory.keymap"
+  export GLOVE80_KEYMAP="$(cd "$BATS_TEST_DIRNAME/.." && pwd)/config/glove80/factory.keymap"
   export GLOVE80_WAIT_SECONDS=4
   export GLOVE80_LOG="$HOME/Library/Logs/dotfiles/glove80.log"
   mkdir -p "$XDG_CONFIG_HOME/chezmoi"
@@ -265,7 +265,9 @@ MOCK
   start="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
   run gtimeout --kill-after=1s 8s "$SCRIPT" pair --profile 2 --yes
   finish="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
-  [ "$status" -ne 0 ] && [ "$status" -ne 124 ] && [ "$status" -lt 128 ]
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 124 ]
+  [ "$status" -lt 128 ]
   [ "$((finish - start))" -lt 6000 ]
 }
 
@@ -284,6 +286,60 @@ MOCK
   run confirm_pair y
   [ "$status" -eq 0 ]
   [[ "$output" == *"Saved user-asserted BT Profile 2 (Magic + TAB"* ]]
+}
+
+@test "a saved custom layout never silently falls back to factory keys" {
+  export TEST_KEYMAP="$TEST_DIR/custom.keymap"
+  sed 's/\&kp LSHFT/\&kp TAB/' "$GLOVE80_KEYMAP" > "$TEST_KEYMAP"
+  local custom="$TEST_KEYMAP"
+  run confirm_pair y
+  [ "$status" -eq 0 ]
+  [ "$(yq -r '.data.glove80_profile' "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml")" = custom-2 ]
+  unset GLOVE80_KEYMAP TEST_KEYMAP
+  run "$SCRIPT" switch
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"custom keymap"* ]]
+  run "$SCRIPT" status
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"custom keymap"* ]]
+  run "$SCRIPT" switch --keymap "$custom"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tap TAB"* ]]
+  run "$SCRIPT" status --keymap "$custom"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Magic + TAB"* ]]
+}
+
+@test "changing a profile cannot silently erase a saved custom layout" {
+  export TEST_KEYMAP="$TEST_DIR/custom.keymap"
+  sed 's/\&kp LSHFT/\&kp TAB/' "$GLOVE80_KEYMAP" > "$TEST_KEYMAP"
+  run confirm_pair y
+  [ "$status" -eq 0 ]
+  unset GLOVE80_KEYMAP TEST_KEYMAP
+  run "$SCRIPT" profile 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"custom keymap"* ]]
+  [ "$(yq -r '.data.glove80_profile' "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml")" = custom-2 ]
+  run "$SCRIPT" switch
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"custom keymap"* ]]
+}
+
+@test "profile accepts an explicit custom keymap and rejects malformed arguments" {
+  export TEST_KEYMAP="$TEST_DIR/custom.keymap"
+  sed 's/\&kp LSHFT/\&kp TAB/' "$GLOVE80_KEYMAP" > "$TEST_KEYMAP"
+  local custom="$TEST_KEYMAP"
+  run confirm_pair y
+  [ "$status" -eq 0 ]
+  unset GLOVE80_KEYMAP TEST_KEYMAP
+  run "$SCRIPT" profile 1 --keymap "$custom"
+  [ "$status" -eq 0 ]
+  [ "$(yq -r '.data.glove80_profile' "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml")" = custom-1 ]
+  run "$SCRIPT" profile 2 --keymap
+  [ "$status" -ne 0 ]
+  run "$SCRIPT" profile 2 --keymap "$custom" extra
+  [ "$status" -ne 0 ]
+  [ "$(yq -r '.data.glove80_profile' "$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml")" = custom-1 ]
 }
 
 @test "a symlinked log parent never changes its target" {
@@ -319,7 +375,9 @@ MOCK
   start="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
   run gtimeout --kill-after=1s 9s "$SCRIPT" pair --profile 2 --yes
   finish="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
-  [ "$status" -ne 0 ] && [ "$status" -ne 124 ] && [ "$status" -lt 128 ]
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 124 ]
+  [ "$status" -lt 128 ]
   [ "$((finish - start))" -lt 6000 ]
 }
 
@@ -335,8 +393,31 @@ MOCK
   start="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
   run gtimeout --kill-after=1s 9s "$SCRIPT" pair --profile 2 --yes
   finish="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
-  [ "$status" -ne 0 ] && [ "$status" -ne 124 ] && [ "$status" -lt 128 ]
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 124 ]
+  [ "$status" -lt 128 ]
   [ "$((finish - start))" -lt 6000 ]
+}
+
+@test "a slow config save is bounded and reports an uncertain outcome" {
+  export REAL_YQ="$(command -v yq)"
+  cat > "$TEST_DIR/bin/yq" <<'MOCK'
+#!/bin/bash
+case "$*" in *'strenv(DOTFILES_CONFIG_KEY)'*) sleep 7 ;; esac
+exec "$REAL_YQ" "$@"
+MOCK
+  chmod +x "$TEST_DIR/bin/yq"
+  export GLOVE80_WAIT_SECONDS=2
+  export -f confirm_pair
+  local start finish
+  start="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
+  run gtimeout --kill-after=1s 9s bash -c 'confirm_pair y'
+  finish="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 124 ]
+  [ "$status" -lt 128 ]
+  [ "$((finish - start))" -lt 6000 ]
+  [[ "$output" == *"may have completed"* ]]
 }
 
 @test "truncated enabled Bluetooth report is unknown" {
@@ -349,7 +430,9 @@ MOCK
 @test "a FIFO keymap is rejected without waiting for a writer" {
   mkfifo "$TEST_DIR/map.fifo"
   run gtimeout --kill-after=1s 5s "$SCRIPT" pair --profile 2 --keymap "$TEST_DIR/map.fifo" --yes
-  [ "$status" -ne 0 ] && [ "$status" -ne 124 ] && [ "$status" -lt 128 ]
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 124 ]
+  [ "$status" -lt 128 ]
   [ ! -s "$OPEN_LOG" ]
   [[ "$output" == *"Unknown keymap"* ]]
 }
@@ -368,4 +451,18 @@ MOCK
   export GLOVE80_LOG="$HOME/writable/log"
   run "$SCRIPT" status
   [ ! -e "$GLOVE80_LOG" ]
+}
+
+@test "a report with only one device section cannot establish absence" {
+  cat > "$TEST_DIR/bin/system_profiler" <<'MOCK'
+#!/bin/bash
+printf 'Bluetooth:\n      State: On\n      %s:\n' "$FIXTURE_SECTION"
+MOCK
+  for FIXTURE_SECTION in Connected 'Not Connected'; do
+    export FIXTURE_SECTION
+    run "$SCRIPT" status
+    [ "$status" -ne 0 ]
+    [[ "$output" == *unknown* ]]
+    [[ "$output" != *"not paired"* ]]
+  done
 }

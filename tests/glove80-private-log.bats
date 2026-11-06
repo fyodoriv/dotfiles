@@ -56,3 +56,72 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$(cat "$HOME/swap-complete")" = yes ]
   [ "$(cat "$TEST_DIR/sentinel/log")" = untouched ]
 }
+
+@test "private log restores the working directory after success and failure" {
+  run gtimeout --kill-after=1s 10s ruby -e '
+    require ENV.fetch("LOG_HELPER")
+    home = ENV.fetch("HOME")
+    before = Dir.pwd
+    Glove80PrivateLog.append(home: home, path: home + "/logs/log", text: "ok\n")
+    raise "cwd changed" unless Dir.pwd == before
+    File.symlink(home + "/logs/log", home + "/logs/link")
+    begin
+      Glove80PrivateLog.append(home: home, path: home + "/logs/link", text: "bad\n")
+      raise "symlink accepted"
+    rescue SecurityError, SystemCallError
+      raise "cwd changed after refusal" unless Dir.pwd == before
+    end
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "private log refuses a multi-threaded caller" {
+  run gtimeout --kill-after=1s 10s ruby -e '
+    require ENV.fetch("LOG_HELPER")
+    ready = Queue.new
+    thread = Thread.new { ready << true; sleep 10 }
+    ready.pop
+    begin
+      Glove80PrivateLog.append(home: ENV.fetch("HOME"), path: ENV.fetch("HOME") + "/logs/log", text: "bad\n")
+      raise "multi-threaded caller accepted"
+    rescue SecurityError
+      exit 0
+    ensure
+      thread.kill
+      thread.join
+    end
+  '
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/logs/log" ]
+}
+
+@test "private log refuses a FIFO without blocking" {
+  mkdir -p "$HOME/logs"
+  chmod 700 "$HOME/logs"
+  mkfifo "$HOME/logs/log"
+  run gtimeout --kill-after=1s 10s ruby -e '
+    require ENV.fetch("LOG_HELPER")
+    begin
+      Glove80PrivateLog.append(home: ENV.fetch("HOME"), path: ENV.fetch("HOME") + "/logs/log", text: "bad\n")
+      raise "FIFO accepted"
+    rescue SecurityError, SystemCallError
+      exit 0
+    end
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "a failed directory change never falls back to pathname writes" {
+  run gtimeout --kill-after=1s 10s ruby -e '
+    require ENV.fetch("LOG_HELPER")
+    Glove80PrivateLog::Native.define_singleton_method(:fchdir) { |_| -1 }
+    begin
+      Glove80PrivateLog.append(home: ENV.fetch("HOME"), path: ENV.fetch("HOME") + "/logs/log", text: "bad\n")
+      raise "failed directory change accepted"
+    rescue SecurityError, SystemCallError
+      exit 0
+    end
+  '
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/logs/log" ]
+}

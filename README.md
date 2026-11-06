@@ -235,7 +235,7 @@ feature-specific gates.
 | editor | full | editorconfig, global editor settings |
 | enterprise | full | AWS CLI, kubectl, Gradle, Java, enterprise SSH |
 | extras | full | Fastfetch config, misc tools |
-| jetbrains | full | IdeaVim config |
+| jetbrains | full | IdeaVim config; IDE checks require an app executable |
 | local-llm | full | Local-LLM stack detection (pipx, aider, huggingface-cli, mlx-lm) for Minsky's claude-exhaustion fallback |
 | memory | full | Shared MCP daemon, maintenance job, schema/embedding health, and backup freshness/integrity |
 | prompt | full | Starship config symlink and theme |

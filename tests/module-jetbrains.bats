@@ -89,7 +89,9 @@ _mk_ide() {
   local dir="$1" name
   mkdir -p "$dir/options" "$dir/codestyles" "$dir/keymaps" "$dir/scopes"
   name="$(basename "$dir" | sed 's/[0-9].*//')"
-  mkdir -p "$JETBRAINS_APP_DIRS/$name.app"
+  mkdir -p "$JETBRAINS_APP_DIRS/$name.app/Contents/MacOS"
+  printf '#!/bin/sh\nexit 0\n' > "$JETBRAINS_APP_DIRS/$name.app/Contents/MacOS/ide"
+  chmod +x "$JETBRAINS_APP_DIRS/$name.app/Contents/MacOS/ide"
 }
 
 # ── IdeaVim ────────────────────────────────────────────────────────────────
@@ -116,6 +118,26 @@ _mk_ide() {
 
 @test "jetbrains: skips ide-specific checks when no IDE is installed" {
   # No IDE directories — only ideavimrc check should run
+  source "$BATS_TEST_DIRNAME/../modules/jetbrains/doctor.sh"
+  local total=$((pass_count + fail_count + fix_count + skip_count))
+  [ "$total" -eq 1 ]
+}
+
+@test "jetbrains: skips an app stub without an executable" {
+  local ws="$TEST_HOME/Library/Application Support/JetBrains/WebStorm2024.3"
+  _mk_ide "$ws"
+  rm "$JETBRAINS_APP_DIRS/WebStorm.app/Contents/MacOS/ide"
+  ln -s "$TEST_DOTFILES/home/ideavimrc" "$TEST_HOME/.ideavimrc"
+  source "$BATS_TEST_DIRNAME/../modules/jetbrains/doctor.sh"
+  local total=$((pass_count + fail_count + fix_count + skip_count))
+  [ "$total" -eq 1 ]
+}
+
+@test "jetbrains: skips an app whose launcher is not executable" {
+  local ws="$TEST_HOME/Library/Application Support/JetBrains/WebStorm2024.3"
+  _mk_ide "$ws"
+  chmod -x "$JETBRAINS_APP_DIRS/WebStorm.app/Contents/MacOS/ide"
+  ln -s "$TEST_DOTFILES/home/ideavimrc" "$TEST_HOME/.ideavimrc"
   source "$BATS_TEST_DIRNAME/../modules/jetbrains/doctor.sh"
   local total=$((pass_count + fail_count + fix_count + skip_count))
   [ "$total" -eq 1 ]

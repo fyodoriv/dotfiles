@@ -57,3 +57,18 @@ or claim a speedup for the whole application workload.
 
 Anchor: [Goal Question Metric](https://doi.org/10.1002/9780470172669.ch12);
 the earlier failed experiment is in [the prior plan](git-wrapper-read-fast-path-483.md).
+
+## Baseline result and pivot
+
+On 2026-11-06, the single baseline was invalid. Hyperfine 2.0.0 wrote its
+measurements under a newer JSON schema, but the frozen helper expected the
+older `times` and `median` fields. The helper rejected the output before it
+saved the post-run load check. The safety harness passed 32 tests before the
+benchmark; no wrapper implementation was changed or measured after a fix.
+
+The registered rule rejects an invalid measurement, so this approach is
+abandoned without an after benchmark. Do not change the evaluator and repeat
+this measurement to seek a pass. Private local evidence retains the raw
+Hyperfine output, the frozen helper, evaluator and tests, and the safety-test
+log. Those temporary scripts are not in this tree, so the registered commands
+cannot be reproduced from this branch alone. Issue #483 remains open.

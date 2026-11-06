@@ -27,3 +27,9 @@ connection occurred. The timeout control will assert that revised wording.
 Success requires delayed discovery to complete, no automatic save after any
 unknown observation, and the bounded timeout and prior safety controls to
 pass. A premature stop, false absence claim or automatic save rejects it.
+
+Before changing warning handling, add a multi-failure control: after the
+initial unknown warning, repeated unknown polls must not repeat that warning.
+A later connection remains unverified and must not save the profile. Success
+is exactly one warning per unknown interval and all prior controls passing;
+repeated warnings or an automatic save rejects the approach.

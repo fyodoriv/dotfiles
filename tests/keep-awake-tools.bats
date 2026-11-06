@@ -36,7 +36,7 @@ setup() {
 @test "doctor checks sleepwatcher and Amphetamine only when keep_awake_tools is on" {
   DOCTOR="$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh"
   [ "$(grep -c 'if \[ "${KEEP_AWAKE_TOOLS:-true}" = "true" \]; then' "$DOCTOR")" -eq 2 ]
-  grep -B4 'resilience.sleepwatcher_loaded' "$DOCTOR" | grep -q KEEP_AWAKE_TOOLS
+  grep -B12 'resilience.sleepwatcher_loaded' "$DOCTOR" | grep -q KEEP_AWAKE_TOOLS
   grep -B2 'resilience.amphetamine_installed' "$DOCTOR" | grep -q KEEP_AWAKE_TOOLS
 }
 

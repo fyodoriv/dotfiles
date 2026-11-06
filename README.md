@@ -239,9 +239,19 @@ feature-specific gates.
 | local-llm | full | Local-LLM stack detection (pipx, aider, huggingface-cli, mlx-lm) for Minsky's claude-exhaustion fallback |
 | memory | full | Shared MCP daemon, maintenance job, schema/embedding health, and backup freshness/integrity |
 | prompt | full | Starship config symlink and theme |
-| shell | full | zshrc/zshenv symlinks, PATH, tool caches (fnm, fzf, zoxide), history |
+| shell | full | zshrc/zshenv symlinks, PATH, tool caches, history, default completion path audit |
 | terminal | full | Ghostty config, terminal defaults |
 | upgrade | full | Auto-upgrade agent, brew outdated |
+
+The shell doctor audits zsh's default inherited completion paths. To audit
+paths added by your own startup files, run this in that interactive shell and
+review any listed ownership and permissions:
+
+```zsh
+FPATH="${(j.:.)fpath}" /bin/zsh -df "$(chezmoi source-path)/lib/zsh-completion-audit.zsh"
+```
+
+The startup change does not verify where zsh loads `compinit` itself from.
 
 Switch profiles at any time: `dotfiles profile core` or `dotfiles profile full`, then `dotfiles apply`.
 

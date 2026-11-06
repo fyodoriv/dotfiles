@@ -22,5 +22,11 @@ Before changing that path, predict that a current-dump control rejects the
 same insecure fixture while retaining safe completion. Both old and current
 dump controls must pass; an insecure path in either rejects the approach.
 
+The startup fixture checks registered completion entries after the existing
+`compinit` lookup. It does not qualify that bootstrap lookup itself: an
+untrusted earlier function path can supply `compinit` before its audit. Keep
+that separate boundary unverified; do not claim all startup code is trusted.
+The doctor's own audit loads the system `compaudit` before inspecting paths.
+
 Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et
 al. (2017), preregistration; the reported first-key loss in #479.

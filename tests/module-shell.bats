@@ -79,6 +79,8 @@ setup() {
     fi
   }
 
+  check_advisory() { :; }
+
   # Create source files
   echo "# zshenv" > "$TEST_DOTFILES/home/zshenv"
   # Create zshrc with all expected patterns

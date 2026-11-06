@@ -71,9 +71,9 @@ check "resilience.mas_installed" "mas (App Store CLI) installed" \
 # (dotfiles-resilience-setup) opens the App Store page and prints
 # trigger config instructions on first run.
 if [ "${KEEP_AWAKE_TOOLS:-true}" = "true" ]; then
-  check "resilience.amphetamine_installed" "Amphetamine.app installed (lid-close persistence)" \
-    "[ -d /Applications/Amphetamine.app ]" \
-    "echo 'Run: dotfiles-resilience-setup (will open App Store + print config steps)'"
+  check_advisory "resilience.amphetamine_installed" "Amphetamine.app installed (lid-close persistence)" \
+    "[ -d \"\${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}\" ]" \
+    "You: open the App Store, sign in, search for Amphetamine and install it; then run dotfiles-resilience-setup in a terminal to configure it."
 fi
 
 # The upstream installer places a user script and an administrator config.

@@ -66,4 +66,6 @@ to prove the runtime operand cannot become an option, retain conservative
 fallback and test the extra cases before changing the hook. The expanded
 heredoc destination in #502 also remains unresolved. Private local evidence
 retains the failed fixture run, the corrected baseline, the candidate and its
-focused result.
+focused result. The temporary focused test harness is retained in that private
+evidence, not in this tree, so the registered focused command cannot reproduce
+the result from this branch alone.

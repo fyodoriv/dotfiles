@@ -33,3 +33,13 @@ file `tests/agent-hooks-block-dangerous-git-merged.bats` in qualification.
 
 Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et
 al. (2017), preregistration; issue #470's before/after observation.
+
+Before adding further controls, register three false-success cases: a root
+`disableAllHooks: true`, a substituted executable guard, and a substituted
+readable parser must each report warn. A recognized enabled registration with
+source-identical deployed files must report pass. Also reject explicit hook
+conditions or disable markers as unverified. Measure with `heavy-run bats
+tests/agent-guard-doctor.bats`: success is 3/3 warnings and the existing
+healthy control passing; any false pass rejects the approach. Compare bytes
+with the local managed source without executing configured commands. This
+does not establish effective policy for every agent or project override.

@@ -141,7 +141,11 @@ PLIST
   failed_descs=()
   fail() { fail_count=$((fail_count + 1)); failed_descs+=("$1"); }
   source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
-  printf '%s\n' "${failed_descs[@]}" | grep -F "$TEST_HOME/apps out of the Spotlight index" | grep -qF "Search Privacy"
+  guidance="$(printf '%s\n' "${failed_descs[@]}" | grep -F "$TEST_HOME/apps out of the Spotlight index")"
+  [[ "$guidance" == *"you:"* ]]
+  [[ "$guidance" == *"System Settings"* ]]
+  [[ "$guidance" == *"Search Privacy"* ]]
+  [[ "$guidance" == *"add this folder"* ]]
 }
 
 @test "workflow: spotlight check passes when the marker exists and the probe finds nothing indexed" {

@@ -21,3 +21,9 @@ the approach.
 
 Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et
 al. (2017), preregistration; issue #487's observed doctor output.
+
+Before changing skip reporting, add a JSON control: core without the agent
+must emit exactly one `agent-browser.dashboard_theme` record with status
+`skip`. The check must remain a valid override ID. Measure with the focused
+Bats suite above; success requires both controls. A missing, duplicate or
+non-skip record, or a rejected valid override, rejects this approach.

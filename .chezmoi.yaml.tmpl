@@ -213,6 +213,7 @@ age:
   recipient: {{ $ageRecipient }}
 
 data:
+  glove80_profile: {{ dig "glove80_profile" "unset" . | quote }}
   profile: {{ $profile | quote }}
   is_enterprise: {{ $enterprise }}
   work_email_domain: {{ $workEmailDomain | quote }}

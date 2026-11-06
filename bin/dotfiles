@@ -69,6 +69,7 @@ Start:
                               Safe and fast: no sudo, applies only with a yes
                               (--yes, or y at the prompt). --health also runs
                               a fresh doctor check. Same as \`dotfiles start\`.
+  glove80 [<command>] [--yes]  Check or pair a Glove80 keyboard
   config [<key>]              Show every setting (value, source, allowed) or one
   config set <key> <value>    Check a value against config/settings.yaml and save it
   actions [<name>] [--json]   Every command for agents: usage, arguments, notes
@@ -183,6 +184,14 @@ case "$cmd" in
     # agent: run it bare first; it changes nothing. Add --yes only after the user says yes: it applies, or installs on a new Mac.
     [ "$cmd" = "start" ] && shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-start" "$@"
+    ;;
+
+  glove80)
+    # confirm: opens Bluetooth settings and may save a user-asserted profile.
+    # yes-for: pair
+    # agent: explain the factory-layout assumption and ask before pairing; use --yes only after approval.
+    shift
+    exec bash "$DOTFILES_DIR/bin/dotfiles-glove80" "$@"
     ;;
 
   config)

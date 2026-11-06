@@ -335,7 +335,7 @@ Guards the one-time setup of a personal Mac.
 
 ### resilience
 
-Keeps agents alive through lid close, network drops, and terminal close: tmux, sleepwatcher, network-watchdog, Amphetamine, and the agent keepawake manager. Setup wizard: `dotfiles-resilience-setup` (`--lid-close` only reports whether closing the lid sleeps the Mac).
+Keeps agents alive through lid close, network drops, and terminal close: tmux, sleepwatcher, network-watchdog, Amphetamine, and the agent keepawake manager. Setup wizard: `dotfiles-resilience-setup` (`--lid-close` only reports whether closing the lid sleeps the Mac). Without a terminal, the wizard skips the App Store and package installation steps and reports what you can do by hand.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|

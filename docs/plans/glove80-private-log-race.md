@@ -11,7 +11,9 @@ Measurement: `heavy-run bats tests/glove80-private-log.bats`. First land this
 test harness without a writer. Its default run reports skips; setting
 `GLOVE80_REQUIRE_LOG_HELPER=1` makes the missing helper fail. After a separate
 implementation, success requires both the ordinary private append and the
-directory-replacement control to pass without skips. Any sentinel change,
+directory-replacement control to pass without skips. The swap callback checks
+the opened directory descriptor's device and inode first. The test requires
+coreutils `gtimeout` and fails on a watchdog termination. Any sentinel change,
 incorrect mode, or missing control rejects the approach. Existing Glove80
 tests and a fresh full gate remain required. This test proves only the fixed
 scratch scenario, not safety against every filesystem or attacker.

@@ -27,3 +27,9 @@ must emit exactly one `agent-browser.dashboard_theme` record with status
 `skip`. The check must remain a valid override ID. Measure with the focused
 Bats suite above; success requires both controls. A missing, duplicate or
 non-skip record, or a rejected valid override, rejects this approach.
+
+Before changing the absent-path predicate, register a broken-symlink control:
+on core, an existing broken LaunchAgent link must keep the missing-theme
+failure visible. The focused suite must pass this control; skipping it rejects
+the approach. The check concerns managed LaunchAgent paths and does not prove
+whether a manually started Chrome process exists.

@@ -61,7 +61,9 @@ _FULL_ONLY_IDS='^(fail) (tool\.tmux|symlink\.tmux|tool\.ghostty|managed\.ghostty
 
 @test "core profile: an installed JetBrains IDE is still checked" {
   _fake_profile core
-  mkdir -p "$TEST_DIR/apps/WebStorm.app"
+  mkdir -p "$TEST_DIR/apps/WebStorm.app/Contents/MacOS"
+  printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/apps/WebStorm.app/Contents/MacOS/ide"
+  chmod +x "$TEST_DIR/apps/WebStorm.app/Contents/MacOS/ide"
   run _doctor_results
   [[ "$output" == *"symlink.editor.webstorm"* ]]
   [[ "$output" != *"symlink.editor.goland"* ]]
@@ -69,7 +71,9 @@ _FULL_ONLY_IDS='^(fail) (tool\.tmux|symlink\.tmux|tool\.ghostty|managed\.ghostty
 
 @test "full profile: installed IDE and full-only checks still run" {
   _fake_profile full
-  mkdir -p "$TEST_DIR/apps/GoLand.app"
+  mkdir -p "$TEST_DIR/apps/GoLand.app/Contents/MacOS"
+  printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/apps/GoLand.app/Contents/MacOS/ide"
+  chmod +x "$TEST_DIR/apps/GoLand.app/Contents/MacOS/ide"
   run _doctor_results
   [[ "$output" == *" tool.tmux"* ]]
   [[ "$output" == *" managed.lazygit"* ]]

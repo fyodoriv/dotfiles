@@ -13,8 +13,11 @@ Measurement: `heavy-run bats tests/gh-admin-scopes.bats
 tests/dotfiles-config.bats`. Capture a failing default control before changing
 the template, setting table and doctor fallback. Success requires both default
 and opt-in controls and the configuration parity suite. Any admin scope in the
-default, lost explicit opt-in or unrelated scope change rejects the approach.
-Existing explicit machine settings are not changed.
+default, lost explicit opt-in or change to `repo`, `gist`, or `read:org`
+rejects the approach. The existing opt-in also contains `workflow`; it will
+no longer be checked by default on a newly configured owner machine. Users
+who need that check can opt in. Existing saved values are not changed, even
+when a saved true value came from the former default.
 
 Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et
 al. (2017), preregistration; issue #475's scope report.

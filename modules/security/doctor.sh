@@ -546,7 +546,7 @@ _security_agent_git_guard_ready() {
   command -v jq >/dev/null 2>&1 || return 1
   for config in "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json"; do
     [ -f "$config" ] && [ -r "$config" ] || continue
-    if jq -e --arg relative '~/.config/dotfiles/hooks/block-dangerous-git.sh' \
+    if jq -e --arg relative \~/.config/dotfiles/hooks/block-dangerous-git.sh \
       --arg absolute "$dir/block-dangerous-git.sh" \
       '(.disableAllHooks == null or .disableAllHooks == false) and any(.hooks.PreToolUse[]?; .matcher == "Bash" and .if == null and (.disabled == null or .disabled == false) and any(.hooks[]?; .type == "command" and .if == null and (.disabled == null or .disabled == false) and (.command == $relative or .command == $absolute)))' \
       "$config" >/dev/null 2>&1; then

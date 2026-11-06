@@ -505,7 +505,7 @@ ChatGPT.app's bundled CLI. Install the GUI with `brew install --cask chatgpt`.
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `claude.settings_mcp_allowed` | MCP server allowed in settings | `agentbrew sync` |
-| `claude.env_pins` | `~/.claude/settings.json` env has `AGENT_GUARD_DEPTH_MAX=2` (agent-usage-guard allows depth 2) and `CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000` (compact before the guard's 400k tool-budget line) | `.chezmoiscripts/run_after_claude-settings-env.sh` (also runs on every apply) |
+| `claude.env_pins` | `~/.claude/settings.json` env has `AGENT_GUARD_AGENT_MAX=10` (agent-usage-guard runs 10 agents at once), `AGENT_GUARD_DEPTH_MAX=2` (agent-usage-guard allows depth 2) and `CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000` (compact before the guard's 400k tool-budget line) | `.chezmoiscripts/run_after_claude-settings-env.sh` (also runs on every apply) |
 | `claude.disabled_plugins` | Plugins in `claude_disabled_plugins` (default `prisma@synced`) are `false` in `enabledPlugins` | `.chezmoiscripts/run_after_claude-disabled-plugins.sh` (also runs on every apply) |
 | `claude.mods` | Mods in `claude_mods` are enabled as `<mod>@agentbrew-mods` | `.chezmoiscripts/run_after_claude-mods.sh` (also runs on every apply) |
 | `claude.no_context7_mcp` | No `context7` MCP server key in `~/.claude.json`, the Claude Desktop config, `~/.codex/config.toml`, opencode, or the generated VS Code settings | No auto-fix: the line names the file; remove the entry, then `agentbrew sync` |

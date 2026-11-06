@@ -353,7 +353,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `resilience.amphetamine_stale_single_use` | advisory — no stale Amphetamine Single-Use assertion | — (hint: end the Amphetamine session) |
 | `resilience.amphetamine_managed_session_policy` | Amphetamine has no generic trigger or automatic session | Applies the managed session policy |
 | `resilience.amphetamine_sync_tool` | `dotfiles-amphetamine-sync` executable | `chmod +x` |
-| `resilience.amphetamine_sync_in_sync` | Amphetamine preferences match `data/amphetamine-prefs.json` | None (hint: `dotfiles-amphetamine-sync`) |
+| `resilience.amphetamine_sync_in_sync` | Amphetamine preferences match `data/amphetamine-prefs.json` | Run `dotfiles-amphetamine-sync diff`. If macOS blocks access, you can grant Full Disk Access to the app running the command in System Settings → Privacy & Security → Full Disk Access, then retry. For drift, use `export` to save local settings or `apply` to restore saved settings. |
 | `resilience.agent_keepawake_script` | `dotfiles-agent-keepawake` executable | `chmod +x` |
 | `resilience.agent_wake_recover_script` | `dotfiles-agent-wake-recover` executable | `chmod +x` |
 | `resilience.agent_keepawake_loaded` | agent-keepawake LaunchAgent loaded (full profile with the Claude Code CLI or desktop app) | `launchctl bootstrap` or `dotfiles apply` |

@@ -232,8 +232,9 @@ check "resilience.amphetamine_sync_tool" "dotfiles-amphetamine-sync executable" 
 # repo's synced JSON is empty (initial state before first export).
 # Returns 0 when local == repo, non-zero when they drift.
 check "resilience.amphetamine_sync_in_sync" "Amphetamine preferences match dotfiles/data/amphetamine-prefs.json" \
-  "! [ -d /Applications/Amphetamine.app ] || ! [ -s \"\$DOTFILES_DIR/data/amphetamine-prefs.json\" ] || [ \"\$(jq 'keys | length' \"\$DOTFILES_DIR/data/amphetamine-prefs.json\")\" = '0' ] || \"\$DOTFILES_DIR/bin/dotfiles-amphetamine-sync\" diff >/dev/null 2>&1" \
-  "echo 'Run dotfiles-amphetamine-sync diff to see the cause: drift, or macOS blocking the app container. To capture local -> dotfiles: dotfiles-amphetamine-sync export. To restore dotfiles -> local: dotfiles-amphetamine-sync apply'"
+  "! [ -d \"\${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}\" ] || ! [ -s \"\$DOTFILES_DIR/data/amphetamine-prefs.json\" ] || [ \"\$(jq 'keys | length' \"\$DOTFILES_DIR/data/amphetamine-prefs.json\")\" = '0' ] || \"\$DOTFILES_DIR/bin/dotfiles-amphetamine-sync\" diff >/dev/null 2>&1" \
+  "echo 'Run dotfiles-amphetamine-sync diff to see the cause: drift, or macOS blocking the app container. To capture local -> dotfiles: dotfiles-amphetamine-sync export. To restore dotfiles -> local: dotfiles-amphetamine-sync apply'" \
+  "Amphetamine preferences could not be verified. Run dotfiles-amphetamine-sync diff to see the cause. If access is blocked, you can grant Full Disk Access to the app running this command in System Settings → Privacy & Security → Full Disk Access, then retry. For drift: dotfiles-amphetamine-sync export captures local settings; dotfiles-amphetamine-sync apply restores the saved settings."
 
 # ── Process-scoped agent keepawake (Claude Code) ─────────────
 _agent_keepawake_battery_policy_configured() {

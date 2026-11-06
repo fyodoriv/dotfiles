@@ -109,7 +109,7 @@ settings:
     description: Load the local-AI LaunchAgents (opencode serve, Ollama, model warmup).
   gh_admin_scopes:
     type: bool
-    default: "@owner_machine"
+    default: false
     description: Require the workflow, admin:public_key and delete_repo gh scopes in the git doctor.
   keep_awake_tools:
     type: bool

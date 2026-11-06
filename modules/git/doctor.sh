@@ -195,7 +195,7 @@ if command -v gh &>/dev/null; then
   check "git.gh_auth" "gh authenticated to github.com" \
     "_git_gh_authenticated"
   # Required scopes: repo, gist, read:org; plus workflow, admin:public_key and
-  # delete_repo when gh_admin_scopes is on (default: owner_machine).
+  # delete_repo when gh_admin_scopes is on (default: false).
   # Re-add a missing scope: gh auth refresh -h github.com -s <scope>
   _scopes="repo gist read:org"
   [ "${GH_ADMIN_SCOPES:-false}" = "true" ] && _scopes="$_scopes workflow admin:public_key delete_repo"

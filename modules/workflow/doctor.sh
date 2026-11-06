@@ -70,7 +70,7 @@ source "$DOTFILES_DIR/lib/spotlight-probe.sh"
 for dir in "${DOTFILES_REPOS_DIR:-$HOME/apps}" "$HOME/.nvm" "$HOME/.gradle" "$HOME/.cache" "$HOME/.npm" "$HOME/.yarn" "$HOME/.docker" "$HOME/.pyenv" "$HOME/.local" "$HOME/.config" "$HOME/Library/Caches"; do
   [ ! -d "$dir" ] && continue
   local_name="$(basename "$dir")"
-  check "spotlight.$local_name" "$dir out of the Spotlight index (if still indexed: System Settings → Spotlight → Search Privacy)" \
+  check "spotlight.$local_name" "$dir out of the Spotlight index (if still indexed, you: System Settings → Spotlight → Search Privacy → add this folder)" \
     "[ -f '$dir/.metadata_never_index' ] && spotlight_dir_unindexed '$dir'" \
     "touch '$dir/.metadata_never_index' 2>/dev/null && source '$DOTFILES_DIR/lib/spotlight-probe.sh' && spotlight_dir_unindexed '$dir'"
 done

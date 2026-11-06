@@ -263,7 +263,7 @@ cmd_switch() {
 }
 
 cmd_pair() {
-  local profile saved yes=0 keymap="" key clear state limit asserted=1 start ms timeout
+  local profile saved yes=0 keymap="" key clear state previous limit asserted=1 start ms timeout
   saved="$(saved_profile)"; profile="${saved#custom-}"; profile="${profile:-0}"
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -291,7 +291,11 @@ EOF
   start="$(clock_ms)" || return 1
   export GLOVE80_DEADLINE_MS="$((start + limit * 1000))"
   ms="$(remaining_ms)" || return 4
-  if ! state="$(glove80_state "$ms")"; then echo "Glove80: unknown (Bluetooth probe failed)" >&2; return 3; fi
+  if ! state="$(glove80_state "$ms")"; then
+    state="unknown|"
+    asserted=0
+    echo "The prior Bluetooth state is unknown; the profile will remain unverified." >&2
+  fi
   if [ "${state%%|*}" = connected ]; then echo "Glove80 already connected; profile is unverified." >&2; return 3; fi
   log "pair start profile=$profile"
   log "before: bt_state=${state%%|*}"
@@ -303,13 +307,18 @@ EOF
     if ! ms="$(remaining_ms)"; then
       unset GLOVE80_DEADLINE_MS
       GLOVE80_LOG_GRACE=1 log "timeout after ${limit}s: bt_state=${state%%|*}" || true
-      echo "Glove80 did not connect." >&2
+      echo "Glove80 connection was not confirmed." >&2
       echo "Debug log: $GLOVE80_LOG" >&2
       return 4
     fi
-    if ! state="$(glove80_state "$ms")"; then echo "Glove80: unknown (Bluetooth probe failed)" >&2; return 3; fi
+    previous="${state%%|*}"
+    if ! state="$(glove80_state "$ms")"; then
+      if [ "$previous" != unknown ]; then echo "Bluetooth state is unknown; the profile will remain unverified." >&2; fi
+      state="unknown|"
+      asserted=0
+    fi
     [ "${state%%|*}" = connected ] && break
-    sleep 0.1
+    sleep 1
   done
   if [ "$asserted" -eq 1 ]; then
     if [ -n "$keymap" ]; then cmd_profile "$profile" --keymap "$keymap"; else cmd_profile "$profile"; fi

@@ -349,7 +349,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `resilience.headless_chrome_under_heavy_run` | Headless Chrome main processes outside a `heavy-run` parent stay at or under `HEADLESS_UNLOCKED_MAX` (default 3), counted by `bin/headless-chrome-unlocked` (advisory) | None (hint: start browser test runs as `heavy-run <command>`) |
 | `resilience.network_watchdog_loaded` | network-resilience LaunchAgent loaded | None (hint: `launchctl bootstrap`) |
 | `resilience.mas_installed` | `mas` (App Store CLI) installed | None (hint: `brew install mas`) |
-| `resilience.amphetamine_installed` | Amphetamine.app installed | None (hint: `dotfiles-resilience-setup`) |
+| `resilience.amphetamine_installed` | Amphetamine.app installed (advisory) | You: install it from the App Store, then run `dotfiles-resilience-setup` in a terminal |
 | `resilience.amphetamine_stale_single_use` | advisory — no stale Amphetamine Single-Use assertion | — (hint: end the Amphetamine session) |
 | `resilience.amphetamine_managed_session_policy` | Amphetamine has no generic trigger or automatic session | Applies the managed session policy |
 | `resilience.amphetamine_sync_tool` | `dotfiles-amphetamine-sync` executable | `chmod +x` |

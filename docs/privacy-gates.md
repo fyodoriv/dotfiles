@@ -1,6 +1,6 @@
 # Privacy and security gates (full text)
 
-This text moved here from `AGENTS.md` so the always-loaded file stays short. `AGENTS.md` keeps a summary and links here. The text is unchanged.
+This text moved here from `AGENTS.md` so the always-loaded file stays short. `AGENTS.md` keeps a summary and links here.
 
 ## Privacy & security gates
 
@@ -11,11 +11,12 @@ github.com.** Nothing rewrites history, so every gate runs before a commit
 leaves the machine. The full design lives in [`SECURITY.md`](../SECURITY.md). The
 short version every contributor needs:
 
-1. **Set a public-safe `user.email` in this repo:**
+1. **Choose a public-safe `user.email` and set it from this repo:**
    ```
-   git -C ~/apps/tooling/dotfiles config user.email <your-public@email>
+   git config --local user.email "YOUR PUBLIC EMAIL"
    ```
-   The `git` doctor check verifies this. Never commit under an
+   Replace the placeholder with your chosen email. The `git` doctor check
+   verifies it and does not change it for you. Never commit under an
    @company.example identity. `ALLOW_PRIVATE_EMAIL=1` skips the pre-commit
    email check for one commit, but the pre-push gate still blocks that
    commit. No mapping can make a private email safe, because nothing

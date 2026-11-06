@@ -253,11 +253,12 @@ fi
 
 if [ -n "${OSS_READINESS_PRIVATE_EMAIL_PATTERN:-}" ]; then
   _git_email=$(git -C "$DOTFILES_DIR" config user.email 2>/dev/null || echo "")
+  printf -v _git_public_repo '%q' "$DOTFILES_DIR"
   check "git.user_email_is_public_safe" \
     "git user.email does not match the configured private-email pattern" \
-    "oss_readiness_email_is_safe \"$_git_email\"" \
-    "git -C \"$DOTFILES_DIR\" config user.email <your-public@email>  # see SECURITY.md"
-  unset _git_email
+    "oss_readiness_email_is_safe \"$_git_email\"" "" \
+    "You: inspect this checkout's Git identity and choose a public-safe email, then run git -C $_git_public_repo config --local user.email \"YOUR PUBLIC EMAIL\". See SECURITY.md."
+  unset _git_email _git_public_repo
 fi
 
 # ── Xcode CLT license (needs user action) ────────────────────────────

@@ -79,9 +79,17 @@ check "agent-browser.profile_dir" "agent-browser Chrome profile exists" \
 # Color encoding is signed-int32 of ARGB uint32 (alpha 0xFF). The fix path
 # (`bin/dotfiles-set-persistent-chrome-themes`) is idempotent and a no-op
 # when the profile is already themed correctly.
-check "agent-browser.dashboard_theme" "agents Chrome themed ORANGE (port 9223)" \
-  "jq -e '.browser.theme.user_color2 == -37632' \"\$HOME/.agent-browser/chrome-profile/Default/Preferences\" >/dev/null 2>&1" \
-  "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9223"
+if [ "${DOTFILES_PROFILE:-full}" != full ] &&
+  [ ! -e "$HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist" ] &&
+  [ ! -L "$HOME/Library/LaunchAgents/com.dotfiles.agent-browser-chrome.plist" ] &&
+  [ -z "${_known_ids+x}" ] && ! $LIST_MODE; then
+  ${JSON_MODE:-false} && _json_add "agent-browser.dashboard_theme" "skip" "agents Chrome theme not required without the core-profile LaunchAgent"
+  skipped "agents Chrome theme not required without the core-profile LaunchAgent"
+else
+  check "agent-browser.dashboard_theme" "agents Chrome themed ORANGE (port 9223)" \
+    "jq -e '.browser.theme.user_color2 == -37632' \"\$HOME/.agent-browser/chrome-profile/Default/Preferences\" >/dev/null 2>&1" \
+    "\"\$DOTFILES_DIR/bin/dotfiles-set-persistent-chrome-themes\" 9223"
+fi
 
 # The marker alone proves nothing; also probe the index (lib/spotlight-probe.sh).
 # shellcheck source=../../lib/spotlight-probe.sh

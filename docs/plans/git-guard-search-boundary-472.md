@@ -5,13 +5,14 @@ command text before the execution shell interprets it. Its current matching
 normalizes quoted words, so literal search data can be mistaken for a Git
 operation. No change to that conservative matching is made here.
 
-On 2026-11-06, isolated zsh probes showed that a shell alias or function can
-replace an absolute command name. In the commands below the replacement only
-prints a synthetic marker; no file or remote is changed:
+On 2026-11-06, an independent review reproduced two zsh probes with an empty
+environment and disabled startup files. A shell alias or function replaced an
+absolute command name. The replacement only prints a synthetic marker; no
+file or remote is changed:
 
 ```sh
-zsh -c 'alias /usr/bin/env="printf unsafe"; eval "/usr/bin/env printf safe"'
-zsh -c 'function /usr/bin/env { printf unsafe; }; eval "\\/usr/bin/env printf safe"'
+env -i HOME=/tmp PATH=/usr/bin:/bin /bin/zsh -dfc 'alias /usr/bin/env="printf unsafe"; eval "/usr/bin/env printf safe"'
+env -i HOME=/tmp PATH=/usr/bin:/bin /bin/zsh -dfc 'function /usr/bin/env { printf unsafe; }; eval "\\/usr/bin/env printf safe"'
 ```
 
 Both printed `unsafe`. This establishes only the shown zsh cases. It does not

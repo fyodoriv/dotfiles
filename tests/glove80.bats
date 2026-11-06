@@ -188,12 +188,16 @@ MOCK
   export PROBE_PID="$TEST_DIR/probe.pid"
   printf '#!/bin/bash\necho $$ > "$PROBE_PID"\nexec sleep 11\n' > "$TEST_DIR/bin/system_profiler"
   export GLOVE80_PROBE_TIMEOUT_SECONDS=1
+  start="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
   run gtimeout --kill-after=1s 10s "$SCRIPT" status
+  finish="$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000')"
   if [ -f "$PROBE_PID" ] && kill -0 "$(cat "$PROBE_PID")" 2>/dev/null; then
     return 1
   fi
   [ "$status" -ne 124 ]
+  [ "$status" -lt 128 ]
   [ "$status" -ne 0 ]
+  [ "$((finish - start))" -lt 9000 ]
   [[ "$output" == *"unknown"* ]]
 }
 

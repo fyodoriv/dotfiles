@@ -1,0 +1,331 @@
+#!/bin/bash
+# dotfiles-glove80 — pair a MoErgo Glove80 keyboard with this Mac over Bluetooth.
+#
+# Magic is the MoErgo logo key in the bottom-left corner of the left half.
+# The Glove80 has 4 Bluetooth profiles, numbered 0-3. Each Mac uses its own
+# profile, so one keyboard switches between Macs. Pick a profile per Mac
+# (for example 2 on the work Mac, 0 on the personal Mac).
+#
+# Usage:
+#   dotfiles-glove80 pair [--profile N] [--keymap FILE] [--yes] [--verbose]   Ask, then pair and connect
+#   dotfiles-glove80 keys [--keymap FILE]         Show the exact key for each profile
+#   dotfiles-glove80 status [--keymap FILE]       Show state and this Mac's profile key
+#   dotfiles-glove80 profile [N] [--keymap FILE]   Show or save this Mac's profile (0-3)
+#   dotfiles-glove80 switch [N] [--keymap FILE]   Print the keys that switch to this Mac
+#   dotfiles-glove80 log [N]                      Show the last N debug log lines
+#   dotfiles-glove80 --help                       Show this message
+#
+# Logs contain only the Glove80 state and user-asserted profile, not other
+# Bluetooth devices. The file is private. Use --verbose to print diagnostics.
+# Profile choices live in dotfiles config under glove80_profile. A supplied
+# --keymap or GLOVE80_KEYMAP describes a custom layout; otherwise the bundled
+# factory layout is an assumption, not proof of the keyboard's current layout.
+set -euo pipefail
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/confirm.sh
+source "$DOTFILES_DIR/lib/confirm.sh"
+GLOVE80_LOG="${GLOVE80_LOG:-$HOME/Library/Logs/dotfiles/glove80.log}"
+GLOVE80_DEBUG="${GLOVE80_DEBUG:-0}"
+for _arg in "$@"; do [ "$_arg" = "--verbose" ] && GLOVE80_DEBUG=1; done
+
+clock_ms() { perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000'; }
+
+remaining_ms() {
+  local now
+  now="$(clock_ms)" || return 1
+  [ "$now" -lt "$GLOVE80_DEADLINE_MS" ] || return 1
+  printf '%s\n' "$((GLOVE80_DEADLINE_MS - now))"
+}
+
+seconds_for_ms() { printf '%d.%03ds' "$(( $1 / 1000 ))" "$(( $1 % 1000 ))"; }
+
+log() {
+  local line timeout=5s ms
+  [ "${GLOVE80_LOG_GRACE:-0}" = 1 ] && timeout=0.5s
+  line="$(date '+%Y-%m-%dT%H:%M:%S') $*"
+  if [ -n "${GLOVE80_DEADLINE_MS:-}" ]; then
+    ms="$(remaining_ms)" || return 1
+    timeout="$(seconds_for_ms "$ms")"
+  fi
+  gtimeout --kill-after=1s "$timeout" ruby "$DOTFILES_DIR/lib/glove80-private-log.rb" "$HOME" "$GLOVE80_LOG" "$line" || return 1
+  [ "$GLOVE80_DEBUG" = "1" ] && printf '[debug] %s\n' "$line" >&2
+  return 0
+}
+
+bt_snapshot() {
+  local state
+  if state="$(glove80_state)"; then printf 'bt_state=%s\n' "${state%%|*}"; else printf 'bt_state=unknown\n'; fi
+}
+{ [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] || [ -z "${1:-}" ]; } && {
+  sed -n '/^#!/d; /^$/q; /^[^#]/q; s/^# \{0,1\}//p' "$0"
+  exit 0
+}
+
+load_keymap() {
+  local file="${1:-${GLOVE80_KEYMAP:-$DOTFILES_DIR/config/glove80/factory.keymap}}"
+  [ -f "$file" ] && [ -r "$file" ] || return 1
+  gtimeout --kill-after=1s 3s cat "$file"
+}
+
+# Print "<profile>|<base key>|<where>" for BT profiles, plus "clear|..." for
+# BT_CLR, by matching Magic-layer positions to the base layer.
+keymap_keys() {
+  awk '
+    function where(i,  r, c) {
+      split("10 12 12 12 18 16", n, " ")
+      for (r = 1; r <= 6; r++) { if (i <= n[r]) break; i -= n[r] }
+      if (r == 5 && i >= 7 && i <= 12) return (i <= 9 ? "left" : "right") " thumb, upper row, key " (i <= 9 ? i - 6 : i - 9) " from the left"
+      if (r == 6 && i >= 6 && i <= 11) return (i <= 8 ? "left" : "right") " thumb, lower row, key " (i <= 8 ? i - 5 : i - 8) " from the left"
+      return "row " r ", key " i " from the left"
+    }
+    /^[ \t]*[A-Za-z0-9_]+[ \t]*\{/ { name = $1 }
+    /bindings = <[ \t]*$/ { grab = 1; buf = ""; next }
+    grab && />;/ { grab = 0; layers++; lname[layers] = name; text[layers] = buf; next }
+    grab { buf = buf " " $0 }
+    END {
+      nb = split(text[1], base, "&")
+      for (l = 1; l <= layers; l++) if (lname[l] ~ /magic/) m = l
+      if (!m) exit 3
+      nm = split(text[m], mag, "&")
+      for (i = 2; i <= nm; i++) {
+        t = mag[i]; gsub(/^[ \t]+|[ \t]+$/, "", t); gsub(/[ \t]+/, " ", t)
+        k = base[i]; gsub(/^[ \t]+|[ \t]+$/, "", k); gsub(/[ \t]+/, " ", k); sub(/^kp /, "", k)
+        if (t ~ /^bt_[0-3]$/) p = substr(t, 4)
+        else if (t ~ /^bt BT_SEL [0-3]$/) p = substr(t, 12)
+        else if (t == "bt BT_CLR") p = "clear"
+        else continue
+        print p "|" k "|" where(i - 1)
+      }
+    }'
+}
+
+key_label() {
+  case "$1" in
+    LSHFT) echo "Left Shift" ;; RSHFT) echo "Right Shift" ;;
+    LCTRL) echo "Left Ctrl" ;; RCTRL) echo "Right Ctrl" ;;
+    LALT) echo "Left Alt" ;; RALT) echo "Right Alt" ;;
+    BSPC) echo "Backspace" ;; DEL) echo "Delete" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# profile_key N [keymap] -> "Magic + <key> (<where>)"
+profile_key() {
+  local line
+  line="$(load_keymap "${2:-}" | keymap_keys | awk -F'|' -v p="$1" '$1 == p' | head -1)" || return 1
+  [ -n "$line" ] || return 1
+  echo "Magic + $(key_label "$(cut -d'|' -f2 <<<"$line")") ($(cut -d'|' -f3 <<<"$line"))"
+}
+
+cmd_keys() {
+  local keymap=""
+  [ "${1:-}" = "--keymap" ] && keymap="${2:-}"
+  local rows
+  rows="$(load_keymap "$keymap" | keymap_keys)" || { echo "Could not read the keymap." >&2; exit 5; }
+  [ -n "$rows" ] || { echo "No Bluetooth keys in the Magic layer." >&2; exit 5; }
+  while IFS='|' read -r p k w; do
+    if [ "$p" = "clear" ]; then echo "Clear current profile: Magic + $(key_label "$k") ($w)"
+    else echo "BT Profile $p: Magic + $(key_label "$k") ($w)"; fi
+  done <<<"$rows"
+}
+
+# A Glove80 is matched by name or by MoErgo's IDs (Vendor 0x16C0, Product
+# 0x27DB), so a renamed keyboard is still found.
+# Glove80 uses Bluetooth Low Energy. CLI scans (blueutil --inquiry) only see
+# classic Bluetooth, so pairing goes through System Settings, and the state
+# comes from system_profiler, which lists BLE devices too.
+# Prints "connected|<name>", "paired|<name>", or nothing.
+glove80_state() {
+  local snapshot limit="${GLOVE80_PROBE_TIMEOUT_SECONDS:-5}" remaining="${1:-}" ms
+  case "$limit" in *[!0-9]*|""|0*) return 1 ;; esac
+  [ "$limit" -le 120 ] || return 1
+  ms=$((limit * 1000))
+  if [ -n "$remaining" ] && [ "$remaining" -lt "$ms" ]; then ms="$remaining"; fi
+  [ "$ms" -gt 0 ] || return 1
+  snapshot="$(LC_ALL=C gtimeout --kill-after=1s "$(seconds_for_ms "$ms")" system_profiler SPBluetoothDataType 2>/dev/null)" || return 1
+  printf '%s\n' "$snapshot" | awk '/^ *Bluetooth:/{root=1} root && /^ *State: On[[:space:]]*$/{on=1} root && /^ *(Connected|Not Connected):[[:space:]]*$/{section=1} END{exit !(on && section)}' || return 1
+  printf '%s\n' "$snapshot" | awk '
+    function capture() {
+      if (dev && (tolower(dev) ~ /glove80/ || (vid == "0x16C0" && pid == "0x27DB")) && !found) {
+        result = sec "|" dev; found = 1
+      }
+    }
+    /^ *Connected:/ { capture(); sec = "connected"; seen_connected = 1; dev = ""; next }
+    /^ *Not Connected:/ { capture(); sec = "paired"; seen_paired = 1; dev = ""; next }
+    sec && /^          [^ ].*:$/ { capture(); dev = $0; sub(/^ +/, "", dev); sub(/:$/, "", dev); vid = ""; pid = ""; next }
+    /^ *Vendor ID:/ { vid = $3 }
+    /^ *Product ID:/ { pid = $3 }
+    END {
+      capture()
+      if (found) print result
+      else if (seen_connected && seen_paired) print "absent|"
+      else exit 3
+    }'
+
+}
+
+saved_profile() {
+  local profile
+  profile="$(bash "$DOTFILES_DIR/bin/dotfiles-config" get glove80_profile)" || return 1
+  [ "$profile" = unset ] || printf '%s\n' "$profile"
+}
+
+cmd_status() {
+  local st name p key keymap=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --keymap) [ $# -ge 2 ] || return 2; keymap="$2"; shift 2 ;;
+      --verbose) shift ;;
+      *) echo "Unknown option: $1" >&2; return 2 ;;
+    esac
+  done
+  if ! st="$(glove80_state)"; then echo "Glove80: unknown (Bluetooth probe failed)" >&2; return 3; fi
+  name="${st#*|}"
+  p="$(saved_profile)"
+  case "$p" in
+    custom-*)
+      [ -n "$keymap" ] || keymap="${GLOVE80_KEYMAP:-}"
+      [ -n "$keymap" ] || { echo "A custom keymap is required for this profile." >&2; return 5; }
+      p="${p#custom-}" ;;
+  esac
+  case "${st%%|*}" in
+    connected) echo "Glove80: connected as \"$name\"" ;;
+    paired) echo "Glove80: paired as \"$name\", not connected" ;;
+    *) echo "Glove80: not paired" ;;
+  esac
+  if [ -n "$p" ]; then
+    key="$(profile_key "$p" "$keymap")" || { echo "Unknown keymap." >&2; return 5; }
+    echo "This Mac uses user-asserted BT Profile $p: $key"
+  else echo "No profile saved for this Mac. Run: dotfiles-glove80 profile <0-3>"; fi
+  [ "${st%%|*}" = "connected" ]
+}
+
+cmd_profile() {
+  if [ -z "${1:-}" ]; then
+    local p; p="$(saved_profile)"
+    if [ -n "$p" ]; then echo "$p"; else echo "No profile saved for this Mac." >&2; return 1; fi
+    return 0
+  fi
+  case "$1" in 0|1|2|3) ;; *) echo "Profile must be 0-3, got: $1" >&2; exit 2 ;; esac
+  local key timeout=30s ms chosen mode current number="$1"
+  shift
+  chosen=""
+  if [ "$#" -gt 0 ]; then
+    [ "$#" -eq 2 ] && [ "$1" = --keymap ] && [ -n "$2" ] || { echo "Use profile N [--keymap FILE]." >&2; return 2; }
+    chosen="$2"
+  fi
+  [ -n "$chosen" ] || chosen="${GLOVE80_KEYMAP:-}"
+  set -- "$number"
+  current="$(saved_profile)" || return 1
+  case "$current" in
+    custom-*)
+      if [ -z "$chosen" ] || [ "$chosen" = "$DOTFILES_DIR/config/glove80/factory.keymap" ]; then
+        echo "A custom keymap is required to change this profile." >&2
+        return 5
+      fi ;;
+  esac
+  key="$(profile_key "$1" "$chosen")" || { echo "Unknown keymap." >&2; return 5; }
+  log "recording user-asserted profile=$1" || return 1
+  if [ -n "${GLOVE80_DEADLINE_MS:-}" ]; then
+    ms="$(remaining_ms)" || return 4
+    timeout="$(seconds_for_ms "$ms")"
+  fi
+  mode="$1"
+  if [ -n "$chosen" ] && [ "$chosen" != "$DOTFILES_DIR/config/glove80/factory.keymap" ]; then mode="custom-$1"; fi
+  if ! gtimeout --kill-after=1s "$timeout" bash "$DOTFILES_DIR/bin/dotfiles-config" set glove80_profile "$mode" >/dev/null; then
+    echo "Profile save may have completed; check dotfiles config glove80_profile." >&2
+    return 1
+  fi
+  echo "Saved user-asserted BT Profile $1 ($key)."
+}
+
+# Print the keys to switch the keyboard to this Mac (or to profile N).
+cmd_switch() {
+  local p saved key keymap="" explicit=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --keymap) [ $# -ge 2 ] || return 2; keymap="$2"; shift 2 ;;
+      0|1|2|3) [ -z "$explicit" ] || return 2; explicit="$1"; shift ;;
+      *) echo "Unknown option: $1" >&2; return 2 ;;
+    esac
+  done
+  saved="$(saved_profile)"
+  case "$saved" in
+    custom-*)
+      [ -n "$keymap" ] || keymap="${GLOVE80_KEYMAP:-}"
+      [ -n "$keymap" ] || { echo "A custom keymap is required for this profile." >&2; return 5; }
+      saved="${saved#custom-}" ;;
+  esac
+  p="${explicit:-$saved}"
+  [ -n "$p" ] || { echo "No profile saved for this Mac. Run: dotfiles-glove80 profile <0-3>" >&2; return 2; }
+  key="$(profile_key "$p" "$keymap")" || { echo "Unknown keymap." >&2; return 5; }
+  echo "Switch the Glove80 to BT Profile $p: hold Magic (MoErgo logo key) and tap ${key#Magic + }."
+}
+
+cmd_pair() {
+  local profile saved yes=0 keymap="" key clear state limit asserted=1 start ms timeout
+  saved="$(saved_profile)"; profile="${saved#custom-}"; profile="${profile:-0}"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --profile) profile="${2:-}"; [ $# -ge 2 ] || return 2; shift 2 ;;
+      --yes|-y) yes=1; asserted=0; shift ;;
+      --keymap) keymap="${2:-}"; [ $# -ge 2 ] || return 2; shift 2 ;;
+      --verbose) shift ;;
+      *) echo "Unknown option: $1" >&2; return 2 ;;
+    esac
+  done
+  case "$saved" in custom-*) [ -n "$keymap" ] || keymap="${GLOVE80_KEYMAP:-}"; [ -n "$keymap" ] || { echo "A custom keymap is required for this profile." >&2; return 5; } ;; esac
+  case "$profile" in 0|1|2|3) ;; *) echo "Profile must be 0-3, got: $profile" >&2; return 2 ;; esac
+  limit="${GLOVE80_WAIT_SECONDS:-120}"
+  case "$limit" in *[!0-9]*|""|0*) echo "Invalid wait limit" >&2; return 2 ;; esac
+  [ "$limit" -le 120 ] || { echo "Invalid wait limit" >&2; return 2; }
+  key="$(profile_key "$profile" "$keymap")" || { echo "Unknown keymap; pairing cannot proceed." >&2; return 5; }
+  clear="$(profile_key clear "$keymap")" || { echo "Unknown keymap; pairing cannot proceed." >&2; return 5; }
+  cat <<EOF
+Glove80 pairing on BT Profile $profile:
+  1. Select ${key/Magic + /Magic and tap }. The bundled layout is a factory-layout assumption; check your keyboard's actual layout.
+  2. The clear key is $clear. Clearing removes a pairing; do it only with separate approval.
+  3. Bluetooth settings will open. Connect the keyboard there.
+EOF
+  confirm_yes "$yes" "opens Bluetooth settings and records your asserted profile after a new connection"
+  start="$(clock_ms)" || return 1
+  export GLOVE80_DEADLINE_MS="$((start + limit * 1000))"
+  ms="$(remaining_ms)" || return 4
+  if ! state="$(glove80_state "$ms")"; then echo "Glove80: unknown (Bluetooth probe failed)" >&2; return 3; fi
+  if [ "${state%%|*}" = connected ]; then echo "Glove80 already connected; profile is unverified." >&2; return 3; fi
+  log "pair start profile=$profile"
+  log "before: bt_state=${state%%|*}"
+  ms="$(remaining_ms)" || return 4
+  timeout="$(seconds_for_ms "$ms")"
+  gtimeout --kill-after=1s "$timeout" open "x-apple.systempreferences:com.apple.BluetoothSettings" || return 4
+  echo "Waiting up to ${limit}s for the Glove80 to connect..."
+  while :; do
+    if ! ms="$(remaining_ms)"; then
+      unset GLOVE80_DEADLINE_MS
+      GLOVE80_LOG_GRACE=1 log "timeout after ${limit}s: bt_state=${state%%|*}" || true
+      echo "Glove80 did not connect." >&2
+      echo "Debug log: $GLOVE80_LOG" >&2
+      return 4
+    fi
+    if ! state="$(glove80_state "$ms")"; then echo "Glove80: unknown (Bluetooth probe failed)" >&2; return 3; fi
+    [ "${state%%|*}" = connected ] && break
+    sleep 0.1
+  done
+  if [ "$asserted" -eq 1 ]; then
+    if [ -n "$keymap" ]; then cmd_profile "$profile" --keymap "$keymap"; else cmd_profile "$profile"; fi
+  else
+    echo "Connected; profile is unverified and was not saved."
+  fi
+  echo "Glove80: connected"
+
+}
+
+case "$1" in
+  pair) shift; cmd_pair "$@" ;;
+  keys) shift; cmd_keys "$@" ;;
+  status) shift; log "status: $(bt_snapshot)"; cmd_status "$@" ;;
+  profile) shift; cmd_profile "$@" ;;
+  switch) shift; cmd_switch "$@" ;;
+  log) tail -n "${2:-50}" "$GLOVE80_LOG" ;;
+  *) echo "Unknown command: $1 (try --help)" >&2; exit 2 ;;
+esac

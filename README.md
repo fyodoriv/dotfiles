@@ -136,6 +136,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 
 | Prompt | Variable | Default | What it does |
 |--------|----------|---------|-------------|
+| Glove80 profile | `glove80_profile` | `unset` | User-asserted profile (0–3); `custom-0` through `custom-3` also record that a custom layout is needed. |
 | Profile | `profile` | `core` | `core` = 7 baseline modules, team-friendly (the default for a new Mac). `full` = all 35 discovered modules, subject to feature gates. |
 | Enterprise mode | `is_enterprise` | `false` | Adds generic enterprise tools (AWS CLI, K8s, Gradle, Java 21, enterprise SSH). Organization-specific tools belong in the org overlay repo, not the base repo. |
 | AI tooling | `use_ai_tools` | `false` | Deploys `~/.zshrc.ai-tools` (tmux agent launchers, agent-browser tuning) — see [`AGENTS.md` § Model Configuration](AGENTS.md#model-configuration) for the default-model policy |
@@ -1227,6 +1228,7 @@ default app list; include `ghostty` and `WebStorm` to keep this policy.
 
 ```
 dotfiles [--yes] [--health]                       Start screen: set up, applied, jobs, health, updates, Next
+dotfiles glove80 [<command>] [--yes]              Check or pair a Glove80 keyboard
 dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
 dotfiles config get <key>                         Print one value
 dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it
@@ -1273,6 +1275,21 @@ dotfiles quickstart [--check]                     Interactive first-run wizard (
 dotfiles uninstall [--dry-run] [--yes]            Remove dotfiles from this machine; asks first
 dotfiles cd                                       Print dotfiles directory (use: cd $(dotfiles cd))
 ```
+
+### Glove80 keyboard
+
+Use `dotfiles glove80 keys`, `status`, or `switch` for guidance. The bundled
+factory keymap is an assumption; pass `--keymap FILE` for a custom layout.
+For a saved custom layout, pass `--keymap FILE` to later `status` and `switch`
+calls. They refuse to guess without it. `dotfiles glove80 pair` asks before
+opening Bluetooth settings. Clearing an existing keyboard profile removes its
+pairing and needs separate approval.
+
+The connection wait is best effort. A stalled system operation may add
+shutdown time. A connection does not prove which profile was selected. An
+interactive confirmation records the user's assertion after a new connection;
+`--yes` opens settings without recording an unverified profile. Diagnostics
+record only the Glove80 state in a private local log.
 
 ### Standalone scripts
 

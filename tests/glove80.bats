@@ -9,14 +9,17 @@ SCRIPT="$BATS_TEST_DIRNAME/../bin/dotfiles-glove80"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-  if [ ! -x "$SCRIPT" ]; then
+  # Preparation only: remove this guard in the implementation change.
+  if [ ! -e "$SCRIPT" ] && [ ! -L "$SCRIPT" ]; then
     if [ "${GLOVE80_REQUIRE_IMPLEMENTATION:-0}" = 1 ]; then
       echo "Glove80 command is not implemented" >&2
       return 1
     fi
     skip "Glove80 command is not implemented yet"
   fi
-  mkdir -p "$TEST_DIR/bin"
+  export HOME="$TEST_DIR/home" XDG_CONFIG_HOME="$TEST_DIR/home/.config" XDG_CACHE_HOME="$TEST_DIR/home/.cache" XDG_STATE_HOME="$TEST_DIR/home/.local/state"
+  mkdir -p "$HOME" "$TEST_DIR/bin"
+  unset GLOVE80_KEYMAP GLOVE80_WAIT_SECONDS GLOVE80_LOG GLOVE80_PROFILE_FILE GLOVE80_BT_PROFILE GLOVE80_DEBUG GLOVE80_PROBE_TIMEOUT_SECONDS
   export SP_STATE="$TEST_DIR/sp-state" OPEN_LOG="$TEST_DIR/open.log"
   : > "$SP_STATE"
   cat > "$TEST_DIR/bin/system_profiler" <<'MOCK'
@@ -143,4 +146,64 @@ MOCK
 @test "profile rejects a value outside 0-3" {
   run "$SCRIPT" profile 7
   [ "$status" -eq 2 ]
+}
+
+@test "an existing connection does not save an unverified requested profile" {
+  echo connected > "$SP_STATE"
+  run "$SCRIPT" pair --profile 2 --yes
+  [ ! -e "$GLOVE80_PROFILE_FILE" ]
+  [[ "$output" == *"unverified"* ]]
+}
+
+@test "a failed Bluetooth probe is unknown, not unpaired" {
+  printf '#!/bin/bash\nexit 1\n' > "$TEST_DIR/bin/system_profiler"
+  run "$SCRIPT" status
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown"* ]]
+}
+
+@test "logs do not contain unrelated device names and are private" {
+  cat > "$TEST_DIR/bin/system_profiler" <<'MOCK'
+#!/bin/bash
+printf 'Bluetooth:\n      Connected:\n          Glove80:\n              Address: AA\n          PrivateFixtureDevice:\n              Address: BB\n'
+MOCK
+  run "$SCRIPT" status --verbose
+  [[ "$output" != *PrivateFixtureDevice* ]]
+  [ -f "$GLOVE80_LOG" ]
+  ! grep -q PrivateFixtureDevice "$GLOVE80_LOG"
+  [ "$(stat -f '%Lp' "$GLOVE80_LOG")" = 600 ]
+}
+
+@test "unknown keymap never suggests clearing or opens Bluetooth" {
+  printf 'invalid keymap\n' > "$TEST_DIR/unknown.keymap"
+  run "$SCRIPT" pair --profile 2 --keymap "$TEST_DIR/unknown.keymap" --yes
+  [ "$status" -ne 0 ]
+  ! printf '%s\n' "$output" | grep -qiE 'clear|unpair|forget'
+  [ ! -s "$OPEN_LOG" ]
+  [ ! -e "$GLOVE80_PROFILE_FILE" ]
+}
+
+@test "hung Bluetooth probe is bounded and does not report unpaired" {
+  command -v gtimeout >/dev/null
+  export PROBE_PID="$TEST_DIR/probe.pid"
+  printf '#!/bin/bash\necho $$ > "$PROBE_PID"\nexec sleep 11\n' > "$TEST_DIR/bin/system_profiler"
+  export GLOVE80_PROBE_TIMEOUT_SECONDS=1
+  run gtimeout --kill-after=1s 10s "$SCRIPT" status
+  if [ -f "$PROBE_PID" ] && kill -0 "$(cat "$PROBE_PID")" 2>/dev/null; then
+    return 1
+  fi
+  [ "$status" -ne 124 ]
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown"* ]]
+}
+
+@test "Glove80 is discoverable in the shared actions registry" {
+  run bash "$BATS_TEST_DIRNAME/../bin/dotfiles" actions --json
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.name == "glove80") | select(.agent and any(.subforms[]; (.usage | contains("pair")) and .needs_yes and .gated))] | length == 1'
+  grep -q 'dotfiles glove80' "$BATS_TEST_DIRNAME/../commands/dotfiles.md"
+  run bash "$BATS_TEST_DIRNAME/../bin/dotfiles" actions --check
+  [ "$status" -eq 0 ]
+  run bash "$BATS_TEST_DIRNAME/../bin/dotfiles" glove80 status
+  [[ "$output" == *"not paired"* ]]
 }

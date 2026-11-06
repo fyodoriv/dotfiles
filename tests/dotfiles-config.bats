@@ -44,6 +44,22 @@ cfg() { run bash "$REPO_ROOT/bin/dotfiles" config "$@"; }
 table_keys() { yq -r '.settings | keys | .[]' "$TABLE"; }
 cfg_hash() { shasum -a 256 "$CFG" | awk '{ print $1 }'; }
 
+@test "owner-machine scope default is off and explicit choices survive init" {
+  [ -n "$REAL_CHEZMOI" ] || skip "chezmoi is unavailable"
+  local choice dir config actual
+  for choice in absent true false; do
+    dir="$TEST_DIR/owner-$choice"
+    config="$dir/chezmoi.yaml"
+    mkdir -p "$dir/home"
+    printf 'sourceDir: "%s"\ndata:\n  owner_machine: true\n' "$REPO_ROOT" > "$config"
+    [ "$choice" = absent ] || printf '  gh_admin_scopes: %s\n' "$choice" >> "$config"
+    HOME="$dir/home" "$REAL_CHEZMOI" init --source "$REPO_ROOT" --config "$config" --config-path "$config" --promptDefaults >/dev/null 2>&1
+    actual="$(yq -r '.data.gh_admin_scopes' "$config")"
+    echo "choice=$choice actual=$actual"
+    if [ "$choice" = absent ]; then [ "$actual" = false ]; else [ "$actual" = "$choice" ]; fi
+  done
+}
+
 @test "config lists every setting in the table with its value, source, and allowed values" {
   cfg
   [ "$status" -eq 0 ]

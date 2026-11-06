@@ -20,15 +20,15 @@ scopes_for() {
   [ "$(scopes_for true)" = "repo gist read:org workflow admin:public_key delete_repo" ]
 }
 
-@test "doctor and chezmoi config default gh_admin_scopes to owner_machine" {
-  grep -q '{{ dig "gh_admin_scopes" (dig "owner_machine" true .) . }}' "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor"
-  grep -q '{{- $ghAdminScopes := $ownerMachine -}}' "$BATS_TEST_DIRNAME/../.chezmoi.yaml.tmpl"
+@test "doctor and chezmoi config default gh_admin_scopes to false" {
+  grep -q '{{ dig "gh_admin_scopes" false . }}' "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor"
+  grep -q '{{- $ghAdminScopes := false -}}' "$BATS_TEST_DIRNAME/../.chezmoi.yaml.tmpl"
   grep -q 'hasKey . "gh_admin_scopes"' "$BATS_TEST_DIRNAME/../.chezmoi.yaml.tmpl"
   grep -q '^  gh_admin_scopes: {{ \$ghAdminScopes }}' "$BATS_TEST_DIRNAME/../.chezmoi.yaml.tmpl"
 }
 
 @test "doctor fails closed: unknown gh_admin_scopes means no admin scopes" {
-  grep -q "(dig \"owner_machine\" true .) . }}' 2>/dev/null || echo \"false\")" "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor"
+  grep -q "dig \"gh_admin_scopes\" false . }}' 2>/dev/null || echo \"false\")" "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor"
   [ "$(scopes_for "")" = "repo gist read:org" ]
   ! grep -q 'gh auth refresh -h github.com -s delete_repo' "$DOCTOR"
 }

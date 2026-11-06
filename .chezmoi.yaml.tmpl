@@ -166,9 +166,9 @@
 {{-   $capslockControl = .capslock_control -}}
 {{- end -}}
 {{/* gh_admin_scopes makes the git doctor require the workflow,
-     admin:public_key and delete_repo gh scopes. Default: owner_machine, so a
-     new user's agents never need power to delete repos or change SSH keys. */ -}}
-{{- $ghAdminScopes := $ownerMachine -}}
+     admin:public_key and delete_repo gh scopes. Default: false, so agents do
+     not need power to delete repos or change SSH keys unless opted in. */ -}}
+{{- $ghAdminScopes := false -}}
 {{- if hasKey . "gh_admin_scopes" -}}
 {{-   $ghAdminScopes = .gh_admin_scopes -}}
 {{- end -}}

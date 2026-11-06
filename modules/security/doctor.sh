@@ -537,6 +537,28 @@ check "security.recurring_automation_no_publisher_na_python" "Recurring apply an
   "grep -q 'AGENTBREW_MCPM_BIN=/nonexistent/' '$DOTFILES_DIR/.chezmoiscripts/run_after_agentbrew-sync.sh' && grep -q 'endpoint-policy safe mode' '$DOTFILES_DIR/.chezmoiscripts/run_after_install_local_llm.sh.tmpl' && grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' '$DOTFILES_DIR/.chezmoiscripts/run_after_uv-tools.sh' && grep -q 'local-llm' '$DOTFILES_DIR/bin/dotfiles-doctor' && grep -q 'DOTFILES_ALLOW_PUBLISHER_NA_PYTHON' '$DOTFILES_DIR/bin/dotfiles-doctor'" \
   "upgrade dotfiles; recurring JSON edits must use /usr/bin/plutil and Python-dependent doctors must stay gated"
 
+_security_agent_git_guard_ready() {
+  local dir="$HOME/.config/dotfiles/hooks" config
+  [ -f "$dir/block-dangerous-git.sh" ] && [ -x "$dir/block-dangerous-git.sh" ] || return 1
+  [ -f "$dir/plain-document-write.jq" ] && [ -r "$dir/plain-document-write.jq" ] || return 1
+  cmp -s "$dir/block-dangerous-git.sh" "$DOTFILES_LINK_DIR/agent-hooks/block-dangerous-git.sh" || return 1
+  cmp -s "$dir/plain-document-write.jq" "$DOTFILES_LINK_DIR/agent-hooks/plain-document-write.jq" || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  for config in "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json"; do
+    [ -f "$config" ] && [ -r "$config" ] || continue
+    if jq -e --arg relative \~/.config/dotfiles/hooks/block-dangerous-git.sh \
+      --arg absolute "$dir/block-dangerous-git.sh" \
+      '(.disableAllHooks == null or .disableAllHooks == false) and any(.hooks.PreToolUse[]?; .matcher == "Bash" and .if == null and (.disabled == null or .disabled == false) and any(.hooks[]?; .type == "command" and .if == null and (.disabled == null or .disabled == false) and (.command == $relative or .command == $absolute)))' \
+      "$config" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  return 1
+}
+check_advisory "security.agent_git_guard_parser" "a recognized managed Git guard and its parser are available" \
+  "_security_agent_git_guard_ready" \
+  'review the managed hook registration and links; after review run bash "$(chezmoi source-path)/.chezmoiscripts/run_after_agent-hooks.sh"'
+
 check "security.agent_hooks_no_publisher_na_python" "High-frequency agent hooks parse JSON with Apple plutil, not unsigned Python" \
   "grep -q '/usr/bin/plutil' '$DOTFILES_DIR/agent-hooks/prepend-endpoint-path.sh' && grep -q '/usr/bin/plutil' '$DOTFILES_DIR/agent-hooks/block-dangerous-git.sh' && ! grep -vE '^[[:space:]]*#' '$DOTFILES_DIR/agent-hooks/prepend-endpoint-path.sh' '$DOTFILES_DIR/agent-hooks/block-dangerous-git.sh' | grep -qE '(^|[[:space:]])python3([[:space:]]|$)'" \
   "upgrade dotfiles; pre-tool hooks must not execute Python before every agent command"

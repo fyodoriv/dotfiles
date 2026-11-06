@@ -223,7 +223,7 @@ feature-specific gates.
 |--------|---------|----------------|
 | git | core | gitconfig symlink, local identity, delta pager, performance settings |
 | macos | core | Finder, Dock, Spotlight, keyboard, trackpad defaults |
-| security | core | SSH key permissions, secrets file, age encryption |
+| security | core | SSH permissions, secrets, age encryption, managed Git guard parser |
 | ssh | core | SSH config, known_hosts, agent forwarding |
 | sync | core | Auto-sync LaunchAgent, repo health |
 | tools | core | Homebrew packages, CLI tools |
@@ -254,6 +254,11 @@ FPATH="${(j.:.)fpath}" /bin/zsh -df "$(chezmoi source-path)/lib/zsh-completion-a
 The startup change does not verify where zsh loads `compinit` itself from.
 
 Switch profiles at any time: `dotfiles profile core` or `dotfiles profile full`, then `dotfiles apply`.
+
+The Git guard advisory recognizes a direct Bash hook in Claude Code or Codex
+at the managed path and checks both deployed files against the local managed
+source. Disabled, conditional, and other command forms remain unverified. A
+passing check does not prove every agent or project uses the hook.
 
 Full-only prompts (when `profile: full`):
 

@@ -144,7 +144,7 @@ temporary output and exit code are cleared after the scope checks.
 | `symlink.gitignore` | `~/.gitignore_global` symlinked | Create symlink |
 | `symlink.gitcommit` | `~/.gitcommit_template` symlinked | Create symlink |
 | `symlink.git_editor` | `~/.git-editor` symlinked | Create symlink |
-| `git.local_config` | `~/.gitconfig.local` exists (user name/email) | None (user must create) |
+| `git.local_config` | `~/.gitconfig.local` exists (user name/email) | You create it without overwriting an existing file; see [onboarding](onboarding.md#step-3-set-up-personal-git-config). |
 | `git.xcode_license` | Xcode CLT license accepted (an unaccepted one breaks git, python3, clang, make) | None (run `sudo xcodebuild -license accept` yourself) |
 | `git.pull_rebase` | `pull.rebase = true` | `git config --global` |
 | `git.push_autosetup` | `push.autoSetupRemote = true` | `git config --global` |

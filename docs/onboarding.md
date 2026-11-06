@@ -67,10 +67,12 @@ This single command:
 Your name and email live in `~/.gitconfig.local` -- never tracked in git:
 
 ```bash
-cp ~/apps/dotfiles/gitconfig.local.example ~/.gitconfig.local
+cp -n "$(chezmoi source-path)/gitconfig.local.example" "$HOME/.gitconfig.local"
 ```
 
-Edit `~/.gitconfig.local` and fill in your details:
+If the file already exists, inspect it before changing anything. Edit
+`~/.gitconfig.local` and fill in your own details. Make sure your Git
+configuration includes this file:
 
 ```ini
 [user]

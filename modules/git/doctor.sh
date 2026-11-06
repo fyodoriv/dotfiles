@@ -9,7 +9,8 @@ check_symlink "symlink.git_editor"     "$DOTFILES_DIR/home/git-editor"         "
 
 # ── Personal config bootstrap ────────────────────────────────────────
 check "git.local_config" "\$HOME/.gitconfig.local exists (name + email)" \
-  "[ -f \"\$HOME/.gitconfig.local\" ]"
+  "[ -f \"\$HOME/.gitconfig.local\" ]" "" \
+  'You: run cp -n "$(chezmoi source-path)/gitconfig.local.example" "$HOME/.gitconfig.local", then edit the example name and email.'
 # no auto-fix — user must set their own name/email; instructions in gitconfig.local.example
 
 # ~/.gitconfig is chezmoi-managed and holds no identity. A [user] section there
@@ -20,9 +21,11 @@ check "git.gitconfig_no_user" "managed ~/.gitconfig has no [user] section (ident
   "source \"$DOTFILES_DIR/lib/gitconfig-user-migrate.sh\" && gitconfig_user_migrate \"\$HOME/.gitconfig\" \"\$HOME/.gitconfig.local\""
 
 check "git.user_name" "git user.name is set" \
-  "[ -n \"\$(git -C /tmp config user.name 2>/dev/null)\" ]"
+  "[ -n \"\$(git -C /tmp config user.name 2>/dev/null)\" ]" "" \
+  'You: inspect your Git configuration and $HOME/.gitconfig.local; if user.name is absent there, run git config --file "$HOME/.gitconfig.local" --add user.name "YOUR NAME"; otherwise correct the existing value yourself. Then ensure Git includes that file.'
 check "git.user_email" "git user.email is set" \
-  "[ -n \"\$(git -C /tmp config user.email 2>/dev/null)\" ]"
+  "[ -n \"\$(git -C /tmp config user.email 2>/dev/null)\" ]" "" \
+  'You: inspect your Git configuration and $HOME/.gitconfig.local; if user.email is absent there, run git config --file "$HOME/.gitconfig.local" --add user.email "YOUR EMAIL"; otherwise correct the existing value yourself. Then ensure Git includes that file.'
 
 # ── Split identity (work default + personal for github.com) ─────────
 # Driven by the git_personal_enabled chezmoi prompt. When enabled,

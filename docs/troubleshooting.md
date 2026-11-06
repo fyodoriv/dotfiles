@@ -380,17 +380,9 @@ see [agentbrew-setup.md#generated-config-keeps-drifting](agentbrew-setup.md#gene
 
 ## `dotfiles doctor` shows "git.local_config" failure
 
-`~/.gitconfig.local` doesn't exist. This file holds your git identity (name, email) and is not tracked by the repo.
-
-**Fix:**
-
-```bash
-cat > ~/.gitconfig.local << 'EOF'
-[user]
-    name = Your Name
-    email = your.email@example.com
-EOF
-```
+`~/.gitconfig.local` holds your Git identity and is not tracked by the repo.
+Follow [Set up personal git config](onboarding.md#step-3-set-up-personal-git-config)
+to create it without overwriting an existing file and add your own details.
 
 ---
 

@@ -36,7 +36,7 @@ hint() { printf "  ${_DIM}→ %s${_RST}\n" "$1"; }
 section() { printf "\n${_DIM}── %s${_RST}\n" "$1"; }
 
 AMPHETAMINE_APP_ID=937984704
-AMPHETAMINE_PATH=/Applications/Amphetamine.app
+AMPHETAMINE_PATH="${AMPHETAMINE_APP_PATH:-/Applications/Amphetamine.app}"
 
 # Read-only: never runs sudo, never changes pmset, never sends AppleScript.
 report_lid_close() {
@@ -116,6 +116,7 @@ else
 fi
 
 # ── 3. mas (App Store CLI) ────────────────────────────────────────────
+if [ -t 0 ]; then
 section "mas (App Store CLI — for Amphetamine install)"
 if command -v mas >/dev/null 2>&1; then
   ok "mas $(mas version) installed"
@@ -149,6 +150,15 @@ else
   else
     hint "opening App Store page for manual install..."
     open "macappstore://apps.apple.com/app/amphetamine/id${AMPHETAMINE_APP_ID}" 2>/dev/null || true
+  fi
+fi
+else
+  section "App Store setup"
+  if [ ! -d "$AMPHETAMINE_PATH" ]; then
+    warn "Amphetamine.app not installed"
+    hint "You: install Amphetamine from the App Store, then run dotfiles-resilience-setup in a terminal."
+  else
+    ok "Amphetamine.app installed"
   fi
 fi
 

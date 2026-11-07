@@ -46,6 +46,17 @@ shebang alone cannot classify the code it launches. The native wrapper paths
 can overlap the earlier ledger. Reconcile overlapping paths before counting
 repository-wide coverage.
 
+## Agent hook sources
+
+The [agent-hook source receipt](agent-hook-source-receipt.json) pins the
+tracked `agent-hooks/` family at the revision in its
+[registered measurement](agent-hook-source-receipt.md). It records file
+identities and selected exact source anchors. The selected boundaries include
+the Perl body in the heavy-run hook and the jq filter used by the Git guard.
+The endpoint-path scripts also source shared helpers or invoke managed shim
+helpers. Independent review checked the source family; the receipt does not
+claim every dynamic caller or semantic boundary is covered.
+
 ## Continue the inventory
 
 Use the pinned Git blob IDs to compare the ledger with the current tree.

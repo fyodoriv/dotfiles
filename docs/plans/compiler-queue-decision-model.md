@@ -27,6 +27,21 @@ the candidate source is committed. Reject a hash mismatch; do not change the
 holdout after the first candidate result. This is an independent-review
 boundary, not a claim of operating-system isolation from the same user.
 
+## Pre-measurement review finding
+
+An independent source review rejected the first candidate before its measured
+run. The observation does not name or qualify the defined root. A null parent
+alone cannot prove a complete chain to that root. The candidate also failed to
+reject simultaneous reservation identities that reuse a PID with different
+birth identities. No candidate decision result or holdout result was measured.
+
+Do not run or ship that candidate. First register and review an evidence
+contract that identifies the root without encoding fixture process identities,
+and that refuses inconsistent PID generations. Keep the original fixture,
+holdout hash and pre-disclosure ordering intact. A new prediction must define
+how the frozen observations can supply the qualified root before a new model
+is measured. The live observer remains unqualified.
+
 ## Prediction and decision
 
 Goal: determine whether the proposed pure decision boundary handles its

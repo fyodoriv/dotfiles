@@ -339,11 +339,11 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
-| `resilience.tmux_installed` | tmux installed | None (hint: `brew install tmux`) |
+| `resilience.tmux_installed` | tmux installed | You: run `brew install tmux` |
 | `resilience.agent_tmux_executable` | `agent-tmux` wrapper is executable | `chmod +x` |
 | `resilience.sleepwatcher_binary` | sleepwatcher binary present | You: run `brew install sleepwatcher` in Terminal, then run `dotfiles apply` |
 | `resilience.sleepwatcher_loaded` | sleepwatcher LaunchAgent loaded | You: follow the Terminal steps shown by doctor. If the plist is missing, the steps create it without replacing an existing file before loading it. |
-| `resilience.wakeup_hook_exists` | `~/.wakeup` hook fires network-watchdog | None (hint: `dotfiles apply`) |
+| `resilience.wakeup_hook_exists` | `~/.wakeup` hook fires network-watchdog | You: run `dotfiles apply` to restore the hook |
 | `resilience.network_watchdog_exec` | network-watchdog is executable | `chmod +x` |
 | `resilience.network_watchdog_clean` | network-resilience LaunchAgent last exit is not 127 | None (hint: reload the LaunchAgent) |
 | `resilience.headless_chrome_under_heavy_run` | Headless Chrome main processes outside a `heavy-run` parent stay at or under `HEADLESS_UNLOCKED_MAX` (default 3), counted by `bin/headless-chrome-unlocked` (advisory) | None (hint: start browser test runs as `heavy-run <command>`) |

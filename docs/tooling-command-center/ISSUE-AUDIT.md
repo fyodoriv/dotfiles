@@ -16,7 +16,7 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#829](https://github.com/fyodoriv/agentbrew/issues/829) | Check | The prior context-limit route was abandoned; register a distinct proof. |
 | [#828](https://github.com/fyodoriv/agentbrew/issues/828) | Check | The prior recording control was invalid. PR #844 proved only a saved-frame VP9 codec path; live capture, timing, cleanup and agent use remain unproved. |
 | [#827](https://github.com/fyodoriv/agentbrew/issues/827) | Check | Qualify a decision eval and a separate sync-cost baseline. |
-| [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | The scoped candidate duplicated a rule across two modeled hooks. Its first dispatcher model also accepted sparse malformed arrays; both approaches are rejected and preserved. |
+| [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Earlier scoped and sparse-array models were rejected and preserved. The distinct JSON-bound model passed 11 synthetic cases; discovery and full gate remain. |
 | [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | #851 shipped a synthetic classifier. The event-gate oracle failed; a distinct gate and real-event qualification remain. |
 | [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | The first baseline failed; #853's synthetic approach met its rejection threshold. Register a distinct approach before measurement. |
 | [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | PR #849 shipped busy-lease identification; safe release remains unproved. |

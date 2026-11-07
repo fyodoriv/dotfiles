@@ -128,6 +128,33 @@ teardown() {
   [ "$pass_count" -ge 4 ]
 }
 
+@test "agent-browser: indexed Spotlight guidance" {
+  export INDEXED_CHILD="$TEST_HOME/.agent-browser/chrome-profile"
+  export MDLS_LOG="$TEST_DIR/mdls-log"
+  cat > "$TEST_DIR/mdls-indexed" <<'STUB'
+#!/bin/bash
+path="${!#}"
+printf '%s\n' "$path" >> "$MDLS_LOG"
+if [ "$path" = "$INDEXED_CHILD" ]; then printf 'chrome-profile'; else printf '(null)'; fi
+STUB
+  chmod +x "$TEST_DIR/mdls-indexed"
+  export DOTFILES_MDLS_BIN="$TEST_DIR/mdls-indexed"
+  check() {
+    [ "$1" = "agent-browser.spotlight_excluded" ] || return 0
+    printf '%s\n' "$1" > "$TEST_DIR/spotlight-check"
+    if ! eval "$3"; then printf '%s\n' "$2" > "$TEST_DIR/spotlight-failure"; fi
+  }
+  source "$BATS_TEST_DIRNAME/../modules/agent-browser/doctor.sh"
+  grep -Fxq "$INDEXED_CHILD" "$MDLS_LOG"
+  grep -Fxq 'agent-browser.spotlight_excluded' "$TEST_DIR/spotlight-check"
+  [ -s "$TEST_DIR/spotlight-failure" ]
+  guidance="$(<"$TEST_DIR/spotlight-failure")"
+  if [[ "$guidance" != *'you:'* || "$guidance" != *'System Settings'* || "$guidance" != *'Spotlight'* || "$guidance" != *'Search Privacy'* || "$guidance" != *'add ~/.agent-browser'* ]]; then
+    echo 'spotlight guidance missing' >&2
+    return 1
+  fi
+}
+
 @test "agent-browser: theme check wants the orange agents Chrome" {
   prefs="$TEST_HOME/.agent-browser/chrome-profile/Default/Preferences"
   mkdir -p "$(dirname "$prefs")"

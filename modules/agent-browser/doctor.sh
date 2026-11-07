@@ -97,7 +97,9 @@ fi
 # The marker alone proves nothing; also probe the index (lib/spotlight-probe.sh).
 # shellcheck source=../../lib/spotlight-probe.sh
 source "$DOTFILES_DIR/lib/spotlight-probe.sh"
-check "agent-browser.spotlight_excluded" "agent-browser dir out of the Spotlight index (marker + index probe)" \
+# The displayed tilde is literal user guidance.
+# shellcheck disable=SC2088
+check "agent-browser.spotlight_excluded" "~/.agent-browser out of the Spotlight index (if still indexed, you: System Settings → Spotlight → Search Privacy → add ~/.agent-browser)" \
   "[ -f \"\$HOME/.agent-browser/.metadata_never_index\" ] && spotlight_dir_unindexed \"\$HOME/.agent-browser\"" \
   "touch \"\$HOME/.agent-browser/.metadata_never_index\" 2>/dev/null && source '$DOTFILES_DIR/lib/spotlight-probe.sh' && spotlight_dir_unindexed \"\$HOME/.agent-browser\""
 

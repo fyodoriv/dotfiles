@@ -136,7 +136,97 @@ print('seven controls passed; private receipt:', root, flush=True)
 PY
 ```
 
-The build is a separate admission. Its launcher must revalidate the control
-receipt and log, exact names, runner and test hashes, and pinned Python before
-setting `JUDGE_READER_BUILD_ADMITTED`. The exact launcher must be committed and
-reviewed before the build. No build is authorized by this control command.
+The seven controls passed and their private evidence passed independent
+review. The build is a separate admission. Run this exact build command once
+only after its prediction and launcher are independently reviewed and
+committed. It revalidates the receipt and log, exact names, runner and test
+hashes, and pinned Python before admitting the build. An exclusive private
+admission marker permits only one invocation. If interruption or startup
+failure leaves it without a completed result, retain it as inconclusive; do
+not retry automatically. The containers have no
+network; the local Docker socket may still proxy, and Docker is not a complete
+hostile-code boundary. Each build gets a 600-second start deadline, one CPU,
+2 GiB memory, 128 processes and a 1 GiB temporary filesystem. A timeout can
+leave daemon-side activity. Repeated signals, SIGKILL, host failure or failed
+cleanup can leave an owned container; its record is not proof of removal.
+
+```sh
+set -eu
+py="$HOME/.local/share/uv/python/cpython-3.13.18-macos-aarch64-none/bin/python3.13"
+[ -f "$py" ]
+[ ! -L "$py" ]
+[ "$(stat -f '%u %Lp %z' "$py")" = '501 755 17593392' ]
+[ "$(shasum -a 256 "$py" | cut -d ' ' -f 1)" = 747ca8797fea0949368e9e39d0f75b1eeadbae6c24edadda792ae22299e47a01 ]
+JOBS=1 heavy-run /usr/bin/env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR=/private/tmp LANG=C "$py" -I -S -B - <<'PY'
+import hashlib, json, os, re, stat, sys
+from pathlib import Path
+home = Path.home()
+plan = home / 'apps/tooling/wt.noindex/git-doctor-email-allowance-478/docs/tooling-command-center/plans'
+runner = plan / 'judge-reader-build-runner.py'
+test = plan / 'test_judge_reader_elf.py'
+runner_hash = 'dff226d811d9b2703da88e0e7ff5bb2161941dca976f0ca7c799b21849849494'
+test_hash = '0d93961089bc3144ab49485406310b2c2c95ae143a3ab9ad4064eb4e33899b65'
+def read(path, limit, private=False):
+    if path.resolve(strict=True) != path:
+        raise RuntimeError('input path alias')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size > limit
+            or (private and (before.st_uid != os.getuid() or stat.S_IMODE(before.st_mode) != 0o600))):
+            raise RuntimeError('input file invalid')
+        data = os.read(fd, limit + 1)
+        after = os.fstat(fd)
+        current = path.lstat()
+        identity = lambda x: (x.st_dev, x.st_ino, x.st_size, x.st_mtime_ns, x.st_ctime_ns)
+        if len(data) > limit or identity(before) != identity(after) or identity(after) != identity(current):
+            raise RuntimeError('input file changed')
+        return data
+    finally:
+        os.close(fd)
+for path, digest in ((runner, runner_hash), (test, test_hash)):
+    if hashlib.sha256(read(path, 1024 * 1024)).hexdigest() != digest:
+        raise SystemExit('registered input changed')
+root = home / '.local/state/agentbrew/experiments/judge-reader-controls-dff226d811d9'
+info = root.lstat()
+if (root.resolve(strict=True) != root or not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+    or stat.S_IMODE(info.st_mode) != 0o700):
+    raise SystemExit('control directory invalid')
+receipt = json.loads(read(root / 'control.json', 8192, True))
+log = read(root / 'controls.log', 65536, True)
+names = {'test_valid_headers_for_both_machines', 'test_wrong_machine_is_refused',
+         'test_interpreter_segment_is_refused', 'test_bad_header_is_refused',
+         'test_truncated_program_table_is_refused', 'test_publishes_complete_record',
+         'test_existing_record_is_not_replaced'}
+lines = log.decode('utf-8', 'strict').splitlines()
+passed = [m.group(1) for line in lines if (m := re.fullmatch(r'(test_[a-z_]+) \([^)]+\) \.\.\. ok', line))]
+if (receipt != {'runner_sha256': runner_hash, 'test_sha256': test_hash,
+                'log_sha256': hashlib.sha256(log).hexdigest(), 'passed': sorted(names)}
+    or len(passed) != 7 or set(passed) != names
+    or not any(re.fullmatch(r'Ran 7 tests in .*', line) for line in lines) or lines[-1:] != ['OK']):
+    raise SystemExit('control evidence invalid')
+after = root.lstat()
+if (after.st_dev, after.st_ino, after.st_mode, after.st_uid) != (info.st_dev, info.st_ino, info.st_mode, info.st_uid):
+    raise SystemExit('control directory changed')
+directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+try:
+    opened = os.fstat(directory)
+    if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+        raise SystemExit('control directory changed')
+    data = (json.dumps({'runner_sha256': runner_hash, 'control_log_sha256': hashlib.sha256(log).hexdigest(),
+                        'state': 'admitted'}, sort_keys=True) + '\n').encode()
+    fd = os.open('build-admission.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+    try:
+        if os.write(fd, data) != len(data):
+            raise SystemExit('build admission incomplete')
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.fsync(directory)
+finally:
+    os.close(directory)
+env = {'HOME': str(home), 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'TMPDIR': '/private/tmp',
+       'LANG': 'C', 'JUDGE_READER_BUILD_ADMITTED': 'registered-control-passed'}
+os.execve(sys.executable, [sys.executable, '-I', '-S', '-B', str(runner)], env)
+PY
+```

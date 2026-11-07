@@ -75,6 +75,21 @@ them. -->
 
 ## P2
 
+- [ ] Make one-job test runs work with GNU parallel installed
+  - **ID**: make-check-one-job-bats
+  - **Tags**: tests, reliability, tooling
+  - **Details**: On Nov 7, `JOBS=1 heavy-run make check` failed before running Bats tests because Bats rejects `--no-parallelize-within-files` with `--jobs 1`. The Makefile currently supplies both whenever GNU parallel is available. Select the serial route for one job, and preserve the existing parallel route for more than one job. Do not weaken test selection or doctor isolation.
+  - **Files**: `Makefile`, `tests/makefile-bats-jobs.bats`, contributor test guidance.
+  - **Output**: code
+  - **Acceptance**: With GNU parallel available, one-job `test`, `test-all`, and `test-force` run serially without the rejected Bats flags. Multiple-job runs retain their current parallel options. The affected-test and doctor ordering contracts remain intact.
+  - **Hypothesis**: Selecting a serial Bats invocation at one job reduces rejected one-job recipes from a predicted 3/3 to 0/3, while preserving 3/3 multiple-job controls and all selected test results.
+  - **Measurement**: Add named reproduction and controls to `tests/makefile-bats-jobs.bats`; run `JOBS=1 heavy-run bats tests/makefile-bats-jobs.bats` and `env -u BATS_JOBS -u TEST_FILE_JOBS JOBS=1 CACHED_RUN_DIR="$cache" heavy-run make check` with GNU parallel available and a fresh private `cache`. Record the red reproduction before the fix and preserve the parallel and doctor-order tests.
+  - **Success**: All three one-job targets run without the rejected flags, all three multiple-job controls retain parallel options, and the fresh full repository gate passes without suppressing selected tests.
+  - **Pivot**: Any rejected one-job recipe, lost multiple-job option, changed selected-test or doctor-order behavior, or gate failure rejects this approach; preserve the evidence and redesign the selection.
+  - **Anchor**: Bats parallel execution documentation, https://bats-core.readthedocs.io/en/stable/usage.html#parallel-execution; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.
+  - **Competitive-goal**: none — reliability of the existing test gate, not a scorecard count.
+
+
 - [ ] Prove agent continuity through a battery lid close with Power Protect
   - **ID**: keepawake-power-protect-physical-validation
   - **Blocked**: physical-validation — needs a person on the test laptop to complete any missing Power Protect installation with administrator authentication, disconnect power, and close the lid for a controlled comparison while actual agent progress is recorded. Check readiness first; do not ask to repeat an installation that is already present.

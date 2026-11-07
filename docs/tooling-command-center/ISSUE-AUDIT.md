@@ -37,9 +37,9 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#502](https://github.com/fyodoriv/dotfiles/issues/502) | Check | The prior parser was abandoned; a distinct method must prove operand and expanded-heredoc-destination safety with conservative fallback. |
 | [#501](https://github.com/fyodoriv/dotfiles/issues/501) | Check | The prior inert-text replacement missed executable inputs; do not retry it. |
 | [#488](https://github.com/fyodoriv/dotfiles/issues/488) | Blocked | The command and synthetic controls exist; real pairing needs the device. |
-| [#487](https://github.com/fyodoriv/dotfiles/issues/487) | Check | The core-theme slice shipped; verify the remaining Dock-guard owner setting. |
+| [#487](https://github.com/fyodoriv/dotfiles/issues/487) | Check | The core-theme slice shipped; disabling the job alone does not supply the two options needed for the Dock-guard skip. Verify the reported overlay or qualify a safe integration path. |
 | [#483](https://github.com/fyodoriv/dotfiles/issues/483) | Check | Both prior fast-path approaches were abandoned; a distinct registered method is needed. |
 | [#480](https://github.com/fyodoriv/dotfiles/issues/480) | Prepare | Design safe draft controls; live acceptance needs a throwaway Slack workspace. |
-| [#475](https://github.com/fyodoriv/dotfiles/issues/475) | Prepare | Inspect remaining doctor lines; do not repeat already shipped guidance slices. |
+| [#475](https://github.com/fyodoriv/dotfiles/issues/475) | Prepare | Stray-tab read-only guidance shipped in #521; inspect remaining doctor lines without repeating shipped slices. |
 | [#472](https://github.com/fyodoriv/dotfiles/issues/472) | Check | A quoted-search method still needs trusted executable and operand evidence. |
 | [#399](https://github.com/fyodoriv/dotfiles/issues/399) | Prepare | Prepare navigation controls; live acceptance needs a throwaway Slack workspace. |

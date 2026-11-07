@@ -48,3 +48,11 @@ The gate attribution experiment was registered in
 [PR #518](https://github.com/fyodoriv/dotfiles/pull/518). Its fourteen
 synthetic controls passed in [PR #519](https://github.com/fyodoriv/dotfiles/pull/519).
 Real-agent receipt delivery and the original speed outcome remain unproved.
+
+The managed-browser stray-tab doctor guidance shipped in
+[PR #521](https://github.com/fyodoriv/dotfiles/pull/521), after registration in
+[PR #520](https://github.com/fyodoriv/dotfiles/pull/520). It is one slice of
+issue #475, which remains open. The Dock-guard issue #487 remains unverified:
+a disabled job alone does not establish the options used by its doctor skip.
+The compiler holdout author confirmed that its platform was unspecified; it
+cannot be retrospectively claimed as a Darwin-specific fixture.

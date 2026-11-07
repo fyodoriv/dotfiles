@@ -19,5 +19,6 @@ the speed task remains open. Existing step timings lack a run identifier and
 cannot yet be tied to the measured tool calls.
 
 The Dotfiles Rust inventory task permits source collection before its shared
-validator is available. A pinned agent-hook source receipt is being registered
-as a partial collection; it cannot close the repository-wide inventory task.
+validator is available. The pinned agent-hook source receipt shipped in
+[PR #511](https://github.com/fyodoriv/dotfiles/pull/511) as a partial
+collection; it does not close the repository-wide inventory task.

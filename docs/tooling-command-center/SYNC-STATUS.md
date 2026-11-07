@@ -215,3 +215,10 @@ matched its prediction: both digest lookups failed and both pinned image IDs
 resolved with the expected architecture and repository digest. Independent
 review confirmed all four records. This does not establish the underlying
 cause or admit a reader build.
+
+The [image-ID admission](plans/judge-reader-build-id-v3.md) completed four
+offline reader builds. Independent review verified the pinned inputs, image
+and container configuration, private output bytes, same-architecture byte
+comparisons, limited ELF checks and cleanup. This does not establish reader
+behavior, complete static-link properties, network egress isolation or release
+readiness. The outputs remain private.

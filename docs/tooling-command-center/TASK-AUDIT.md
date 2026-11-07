@@ -15,7 +15,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | source-lease-real-failure-classification | Blocked | The natural cohort is closed without a classified failure. |
 | source-lease-release-window-research | Blocked | The controlled cohort is exhausted; qualification failed. |
 | plugin-lifecycle-timeout-observation | Check | Nine pure recorder-health controls pass in draft #819; process-group ownership remains unqualified. |
-| locked-install-evidence | Prepare | Land the registered instrumentation before repair. |
+| locked-install-evidence | Prepare | Instrumentation and baseline shipped in #704 and #707. Five negative families were unsafe; qualify a maintained-tool projection for the remaining guard, donor and stamp repair. |
 | dependency-alert-remediation | Prepare | Freeze and prepare the registered negative controls; full graph remains constrained. |
 | dependency-alerts-172-175 | Check | Refresh published-parent compatibility evidence. |
 | dependency-peer-compatibility | Check | Refresh published peer and parent compatibility. |

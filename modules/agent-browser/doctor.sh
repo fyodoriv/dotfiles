@@ -53,9 +53,12 @@ else
   [ "${DOTFILES_CHROME_KEEP_BLANK_WINDOW:-false}" = true ] && _ab_keep_one=" --keep-one"
 fi
 
+printf -v _ab_reap_path '%q' "$DOTFILES_DIR/bin/agent-browser-reap-strays"
 check "agent-browser.no_stray_newtab_targets" "managed Chromes expose no stray blank/newtab targets" \
   "[ ! -x \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" ] || \"\$DOTFILES_DIR/bin/agent-browser-reap-strays\" --dry-run --quiet$_ab_keep_one" \
-  ""
+  "" \
+  "Agent: run $_ab_reap_path --dry-run$_ab_keep_one to review blank tabs; obtain authorization before closing a page"
+unset _ab_reap_path
 
 check "agent-browser.remote_debugging_process_count" "Managed Chrome process count stays at one per port" \
   "ok=1; for port in 9223; do count=\$(ps -axo command | awk -v port=\"\$port\" '\$0 ~ \"^[^ ]*Google Chrome\\\\.app/Contents/MacOS/Google Chrome --remote-debugging-port[= ]\" port \"( |\$)\" {count++} END{print count+0}'); [ \"\$count\" -le 1 ] || ok=0; done; [ \"\$ok\" -eq 1 ]" \

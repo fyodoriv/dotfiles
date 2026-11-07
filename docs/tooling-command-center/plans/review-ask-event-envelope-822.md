@@ -45,7 +45,7 @@ log=$(mktemp) || exit 2
 trap 'rm -f "$log"' EXIT
 python3 hooks/lib/review_ask_event_test.py ReviewAskEventTest.test_matching_event_reminds -v >"$log" 2>&1
 result=$?
-[ "$result" -eq 1 ] && grep -Fq 'test_matching_event_reminds (__main__.ReviewAskEventTest.test_matching_event_reminds) ... FAIL' "$log" && grep -Fq 'Verify the reviewer request, then draft the chat review ask.' "$log"
+[ "$result" -eq 1 ] && [ "$(grep -Ec '^test_matching_event_reminds \(__main__\.ReviewAskEventTest(\.test_matching_event_reminds)?\) \.\.\. FAIL$' "$log")" -eq 1 ] && grep -Fq 'Verify the reviewer request, then draft the chat review ask.' "$log"
 BASH
 ```
 
@@ -57,7 +57,7 @@ log=$(mktemp) || exit 2
 trap 'rm -f "$log"' EXIT
 JOBS=1 heavy-run python3 hooks/lib/review_ask_event_test.py -v >"$log" 2>&1 || exit 1
 for name in test_matching_event_reminds test_failure_event_silent test_interrupted_event_silent test_unrelated_command_silent test_malformed_event_silent test_input_is_not_disclosed; do
-  [ "$(grep -Fxc "$name (__main__.ReviewAskEventTest.$name) ... ok" "$log")" -eq 1 ] || exit 2
+  [ "$(grep -Ec "^$name \\(__main__\\.ReviewAskEventTest(\\.$name)?\\) \\.\\.\\. ok$" "$log")" -eq 1 ] || exit 2
 done
 [ "$(grep -Ec '^test_.* \.\.\. (ok|FAIL|ERROR|skipped)' "$log")" -eq 6 ] || exit 2
 grep -Eq '^Ran 6 tests in [0-9.]+s$' "$log" && grep -Fxq OK "$log" && ! grep -Eq '^(FAILED|ERROR)| \.\.\. (FAIL|ERROR|skipped)' "$log"

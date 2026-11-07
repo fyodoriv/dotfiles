@@ -247,3 +247,12 @@ one-job gate failed on Bats option parsing; the separately registered serial
 gate passed 12 selected files and plugin checks with a fresh cache. Independent
 review confirmed the selector, log and final commit. Local Dotfiles advanced to
 `bd830443`; issue #475 remains open.
+
+[Dotfiles #525](https://github.com/fyodoriv/dotfiles/pull/525) replaced the
+misleading sleepwatcher auto-fix with manual steps. Three focused controls and
+the 15-test resilience suite passed. The first gate failed on a copied plan
+that matched the volatile-count guard. The separately registered packaging
+pivot passed 12 fresh selected files and plugin checks; install e2e was skipped
+under the existing no-installer-change rule. Independent review verified the
+final commit and gate evidence. Local Dotfiles advanced to `10d0ec8`; issue
+#475 remains open.

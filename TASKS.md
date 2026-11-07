@@ -13,6 +13,20 @@ them. -->
 
 ## P1
 
+- [ ] Verify guard decisions against later hook rewrites
+  - **ID**: guard-final-command-hook-order
+  - **Tags**: hooks, security, reliability
+  - **Details**: The Agentfile registers the heavy-run guard and a path hook for Bash. The path hook can return updated command input. The public hook contract documents updated input, but the effect of hook ordering on the final executed command has not been established for the configured agents. This is a verification gap, not a demonstrated bypass. Use only synthetic commands, a scratch agent configuration and canaries; never run a destructive command. The hooks emit different response formats for Claude and Codex; qualify each host and version separately.
+  - **Files**: `Agentfile.yaml`, `agent-hooks/require-heavy-run.sh`, `agent-hooks/prepend-endpoint-path.sh`, their tests and hook guidance as needed.
+  - **Output**: code
+  - **Acceptance**: A qualified scratch invocation records each guard input and proves the final command was delivered to a harmless canary executor, including benign path rewrites and synthetic attempted rewrites. A guard decision cannot be used as proof for an unguarded final command. Untested hosts and missing ordering evidence remain unqualified.
+  - **Hypothesis**: A qualified ordering contract or enforcement change yields zero unguarded final synthetic commands across a preregistered positive and negative matrix, without losing existing safe allowances or treating benign path rewrites as failures.
+  - **Measurement**: First commit exact cases, each host and version, non-destructive canaries and a safe scratch invocation command. Record each guard input and final executor input, run the existing hook suites and the new focused matrix, then run the repository gate.
+  - **Success**: All registered cases are observed exactly once; unsafe synthetic rewrites yield zero unguarded final commands; benign path rewrites retain their behavior; all required tests and the gate pass.
+  - **Pivot**: Any unobserved final command, unsafe unguarded rewrite, false safety claim, unexpected execution or failed gate rejects the candidate; retain evidence and redesign.
+  - **Anchor**: Agentfile hook declarations; Claude Code hook reference at https://code.claude.com/docs/en/hooks; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — correctness of existing command guards, not a scorecard metric.
+
 - [ ] Keep selected machine connector credentials fresh without leaks
   - **ID**: github-connector-machine-credentials
   - **Tags**: security, git, machine, rust, preparation

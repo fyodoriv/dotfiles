@@ -196,3 +196,10 @@ The [locked crate probe](plans/judge-locked-crate-probe.md) acquired the one
 missing Linux archive. Its size, checksum, receipt and private file metadata
 passed independent review. It remains unextracted; this is not a reader build
 or a qualification of the registry metadata.
+
+The [reader build admission](plans/judge-reader-build-draft.md) first passed
+seven independently checked synthetic controls. Its one permitted attempt
+stopped before container creation: Docker returned `No such image` for the
+pinned ARM image. The registered result is inconclusive. The same image was
+visible in a later read-only check; the reason for the earlier response is
+unknown. The admission marker is consumed, and no reader build was attempted.

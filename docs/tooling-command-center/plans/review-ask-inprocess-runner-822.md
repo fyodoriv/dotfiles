@@ -79,9 +79,14 @@ unfiltered gate must be separately registered before merging.
 
 ```sh
 bash <<'BASH'
-log=$(mktemp) || exit 2
-trap 'rm -f "$log"' EXIT
-python3 hooks/lib/review_ask_event_runner_test.py RunnerTest.test_actual_event_suite -v >"$log" 2>&1
+scratch=$(mktemp -d) || exit 2
+trap 'rm -f "$scratch/report"; rmdir "$scratch"' EXIT
+log="$scratch/report"
+interpreter=/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9
+[ -f "$interpreter" ] && [ ! -L "$interpreter" ] && [ "$(stat -f '%u:%Lp:%z' "$interpreter")" = '0:755:102352' ] || exit 2
+[ "$(shasum -a 256 "$interpreter" | awk '{print $1}')" = 'c5a13e37785524fbc0384539d3c99aa4f888cb7c89e13e0bf0018436378b13bc' ] || exit 2
+printf '%s\n' '20cd19b406d367b17b98916b40ad06bd4854f11df4b77879497db0642160c249  hooks/lib/review_ask_report.py' '1983e66e2a040fe9b4d246e44dc44577a5095513cf4b9ef58f815238cafb45ee  hooks/lib/review_ask_imported_report_test.py' '40d849a8da4af2c9921928a8007674266becf1c4c1e3006b4fdfe6e4742321f8  hooks/lib/review_ask_event.py' 'd5ecfa9900449c59ef3ea0e9814249a5d12b328b57fe7e98ee96c6a4df11dc84  hooks/lib/review_ask_event_test.py' | shasum -a 256 -c >/dev/null || exit 2
+env -i HOME="$scratch" PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 "$interpreter" hooks/lib/review_ask_event_runner_test.py RunnerTest.test_actual_event_suite -v >"$log" 2>&1
 result=$?
 [ "$result" -eq 1 ] && [ "$(grep -Ec '^test_actual_event_suite \(__main__\.RunnerTest(\.test_actual_event_suite)?\) \.\.\. FAIL$' "$log")" -eq 1 ] && grep -Fq 'runner placeholder' "$log"
 BASH
@@ -89,9 +94,14 @@ BASH
 
 ```sh
 bash <<'BASH'
-log=$(mktemp) || exit 2
-trap 'rm -f "$log"' EXIT
-JOBS=1 heavy-run python3 hooks/lib/review_ask_event_runner_test.py -v >"$log" 2>&1 || exit 1
+scratch=$(mktemp -d) || exit 2
+trap 'rm -f "$scratch/report"; rmdir "$scratch"' EXIT
+log="$scratch/report"
+interpreter=/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9
+[ -f "$interpreter" ] && [ ! -L "$interpreter" ] && [ "$(stat -f '%u:%Lp:%z' "$interpreter")" = '0:755:102352' ] || exit 2
+[ "$(shasum -a 256 "$interpreter" | awk '{print $1}')" = 'c5a13e37785524fbc0384539d3c99aa4f888cb7c89e13e0bf0018436378b13bc' ] || exit 2
+printf '%s\n' '20cd19b406d367b17b98916b40ad06bd4854f11df4b77879497db0642160c249  hooks/lib/review_ask_report.py' '1983e66e2a040fe9b4d246e44dc44577a5095513cf4b9ef58f815238cafb45ee  hooks/lib/review_ask_imported_report_test.py' '40d849a8da4af2c9921928a8007674266becf1c4c1e3006b4fdfe6e4742321f8  hooks/lib/review_ask_event.py' 'd5ecfa9900449c59ef3ea0e9814249a5d12b328b57fe7e98ee96c6a4df11dc84  hooks/lib/review_ask_event_test.py' | shasum -a 256 -c >/dev/null || exit 2
+JOBS=1 heavy-run env -i HOME="$scratch" PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 "$interpreter" hooks/lib/review_ask_event_runner_test.py -v >"$log" 2>&1 || exit 1
 for name in actual_event_suite failing_suite skipped_suite missing_case extra_case import_failure private_output direct_child_timeout; do
   [ "$(grep -Ec "^test_$name \\(__main__\\.RunnerTest(\\.test_$name)?\\) \\.\\.\\. ok$" "$log")" -eq 1 ] || exit 2
 done

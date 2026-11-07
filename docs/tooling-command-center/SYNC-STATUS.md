@@ -89,6 +89,10 @@ and does not enable a hook.
 existing native pair verifier with sealed synthetic data. Both target controls
 pass; its full gate is pending. It does not qualify a real binary or install.
 
+[Agentbrew #853](https://github.com/fyodoriv/agentbrew/pull/853) prepares a
+synthetic chat runner and gate. Its focused controls pass; its full gate is
+pending. Caller-provided bindings and transport do not qualify live admission.
+
 [Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also
 contains nine pure owner-receipt controls for issue #810. The first format was
 rejected after review; the registered compatibility pivot passed. This does

@@ -58,3 +58,16 @@ No candidate rule exists before the finalized baseline hash is recorded.
 Anchors: issue #821, the closed original plan and #850's schema preparation;
 Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al.
 (2017), preregistration.
+
+## Frozen case artifact
+
+An independent author created the synthetic artifact under
+`~/.local/state/agentbrew/experiments/chat-rule-schema-v1/` before any new
+model call. It is 1,301 bytes with SHA-256
+`aa1bc50cdd81444386553893121d6a678a37ce4e6a6e1aa265c755cb51d7c1ca`.
+An independent reviewer checked all four classes, order, expected values,
+selection rule and synthetic privacy without disclosing the cases here. The
+local file is owner-read-only (`0400`); that is not filesystem immutability.
+The future runner must verify this exact hash immediately before use, retain
+the verified bytes, and refuse any missing or changed artifact. No model call
+or candidate rule is authorized by this record.

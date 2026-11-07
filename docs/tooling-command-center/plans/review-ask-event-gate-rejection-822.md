@@ -7,6 +7,10 @@ function replaced the outer loop's `mode` variable. As a result, the gate
 printed `valid_stock`, `duplicate` and `forged_failed` in place of registered
 mode names. The exact six-name oracle did not pass. The rejection threshold
 applies; a later diagnostic pass is not a successful registered measurement.
+The first failing oracle required exactly one `ok - valid` line; the removed
+log does not identify its first mismatch. The separate diagnostic observed
+`ok - valid_stock`, `ok - duplicate` and `ok - forged_failed`, which explains
+why the fixed-name oracle cannot accept that output.
 
 Preserve the uncommitted attempt in the `test/review-ask-event-envelope-822`
 worktree. The independent synthetic event-adapter controls passed, but their

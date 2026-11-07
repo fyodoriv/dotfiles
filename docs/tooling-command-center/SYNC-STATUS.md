@@ -89,8 +89,8 @@ and does not enable a hook.
 synthetic target controls for the existing native pair verifier. Both controls
 and the full 22-step gate passed. It does not qualify a real binary or install.
 
-[Agentbrew #853](https://github.com/fyodoriv/agentbrew/pull/853) preserves a
-rejected synthetic chat runner approach. A forged-mode control triggered a
+[Agentbrew #853](https://github.com/fyodoriv/agentbrew/pull/853) was closed
+without merge and preserves a rejected synthetic chat runner approach. A forged-mode control triggered a
 fake request, meeting its registered rejection threshold. Later passing tests
 do not qualify it. A distinct approach needs a new prediction before testing;
 caller-provided bindings and transport do not qualify live admission.

@@ -63,11 +63,11 @@ check "resilience.network_watchdog_exec" "network-watchdog is executable" \
 # was launchctl bootout+bootstrap; this check catches future regressions.
 check "resilience.network_watchdog_clean" "network-resilience LaunchAgent exit code is clean (not 127)" \
   "! launchctl print gui/\$UID/com.dotfiles.network-resilience 2>/dev/null | grep -q 'last exit code = 127'" \
-  "echo 'Reload: launchctl bootout gui/\$UID/com.dotfiles.network-resilience && launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist'"
+  "" "You: open Terminal and run launchctl bootout gui/\$UID/com.dotfiles.network-resilience && launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist"
 
 check "resilience.network_watchdog_loaded" "network-resilience LaunchAgent loaded" \
   "launchctl list 2>/dev/null | grep -q com.dotfiles.network-resilience" \
-  "echo 'Load: launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist'"
+  "" "You: open Terminal and run dotfiles apply; if the agent is still unloaded, run launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist"
 
 # ── mas (optional App Store CLI) ───────────────────────────────────────
 check_advisory "resilience.mas_installed" "mas (App Store CLI) installed" \

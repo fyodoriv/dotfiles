@@ -435,3 +435,80 @@ EOF
   [ -e "$TEST_DIR/fix-ran" ]
   [ ! -e "$TEST_DIR/guidance-launched" ]
 }
+
+@test "network clean failure shows manual guidance" {
+  KEEP_AWAKE_TOOLS=false
+  launchctl() { [ "${1:-}" != print ] || printf 'last exit code = 127\n'; }
+  check() {
+    [ "$1" = resilience.network_watchdog_clean ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/network-result"
+    else printf 'fail|%s|%s\n' "$4" "${5:-}" > "$TEST_DIR/network-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  if ! grep -q '^fail||You:.*launchctl bootout.*launchctl bootstrap' "$TEST_DIR/network-result"; then
+    echo 'expected manual network clean guidance' >&2
+    return 1
+  fi
+}
+
+@test "network unloaded shows manual guidance" {
+  KEEP_AWAKE_TOOLS=false
+  launchctl() { return 0; }
+  check() {
+    [ "$1" = resilience.network_watchdog_loaded ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/network-result"
+    else printf 'fail|%s|%s\n' "$4" "${5:-}" > "$TEST_DIR/network-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  if ! grep -q '^fail||You:.*dotfiles apply.*launchctl bootstrap' "$TEST_DIR/network-result"; then
+    echo 'expected manual network loaded guidance' >&2
+    return 1
+  fi
+}
+
+@test "network clean remains passing" {
+  KEEP_AWAKE_TOOLS=false
+  launchctl() { [ "${1:-}" != print ] || printf 'last exit code = 0\n'; }
+  check() {
+    [ "$1" = resilience.network_watchdog_clean ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/network-result"; else printf 'fail\n' > "$TEST_DIR/network-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/network-result"
+}
+
+@test "network loaded remains passing" {
+  KEEP_AWAKE_TOOLS=false
+  launchctl() { [ "${1:-}" != list ] || printf '123 0 com.dotfiles.network-resilience\n'; }
+  check() {
+    [ "$1" = resilience.network_watchdog_loaded ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/network-result"; else printf 'fail\n' > "$TEST_DIR/network-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/network-result"
+}
+
+@test "network real doctor fix shows both steps without launches" {
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '/^check "resilience\.network_watchdog_(clean|loaded)"/ { print; getline; print; getline; print }' \
+    "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" > "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  [ "$(grep -c '^check "resilience\.network_watchdog_' "$TEST_DOTFILES/modules/resilience/doctor.sh")" -eq 2 ]
+  printf 'check "test.fix_mode" "fix mode control" "[ -e %s/fix-ran ]" "touch %s/fix-ran"\n' "$TEST_DIR" "$TEST_DIR" >> "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  printf '#!/bin/sh\n[ "$1" = source-path ] && printf "%%s\n" "%s"\nexit 0\n' "$TEST_DOTFILES" > "$TEST_DOTFILES/bin/chezmoi"
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  printf '#!/bin/sh\ncase "$1" in print) echo "last exit code = 127" ;; list) exit 0 ;; *) touch "%s/network-launched" ;; esac\n' "$TEST_DIR" > "$TEST_DOTFILES/bin/launchctl"
+  printf '#!/bin/sh\ntouch "%s/network-launched"\n' "$TEST_DIR" > "$TEST_DOTFILES/bin/dotfiles"
+  chmod +x "$TEST_DOTFILES/bin/launchctl" "$TEST_DOTFILES/bin/dotfiles"
+  ln -s "$(command -v jq)" "$TEST_DOTFILES/bin/jq"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
+  export PATH="$TEST_DOTFILES/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  for name in launchctl dotfiles; do [ "$(command -v "$name")" = "$TEST_DOTFILES/bin/$name" ]; done
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience
+  [ "$status" -eq 1 ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.network_watchdog_clean")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("You:") and contains("launchctl bootout") and contains("launchctl bootstrap")) and ((.[0].fix // "") == "")' >/dev/null
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.network_watchdog_loaded")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("You:") and contains("dotfiles apply") and contains("launchctl bootstrap")) and ((.[0].fix // "") == "")' >/dev/null
+  [ -e "$TEST_DIR/fix-ran" ]
+  [ ! -e "$TEST_DIR/network-launched" ]
+}

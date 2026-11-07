@@ -345,9 +345,9 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 | `resilience.sleepwatcher_loaded` | sleepwatcher LaunchAgent loaded | You: follow the Terminal steps shown by doctor. If the plist is missing, the steps create it without replacing an existing file before loading it. |
 | `resilience.wakeup_hook_exists` | `~/.wakeup` hook fires network-watchdog | You: run `dotfiles apply` to restore the hook |
 | `resilience.network_watchdog_exec` | network-watchdog is executable | `chmod +x` |
-| `resilience.network_watchdog_clean` | network-resilience LaunchAgent last exit is not 127 | None (hint: reload the LaunchAgent) |
+| `resilience.network_watchdog_clean` | network-resilience LaunchAgent last exit is not 127 | You: run the Terminal reload steps shown by doctor |
 | `resilience.headless_chrome_under_heavy_run` | Headless Chrome main processes outside a `heavy-run` parent stay at or under `HEADLESS_UNLOCKED_MAX` (default 3), counted by `bin/headless-chrome-unlocked` (advisory) | None (hint: start browser test runs as `heavy-run <command>`) |
-| `resilience.network_watchdog_loaded` | network-resilience LaunchAgent loaded | None (hint: `launchctl bootstrap`) |
+| `resilience.network_watchdog_loaded` | network-resilience LaunchAgent loaded | You: run `dotfiles apply`, then use the Terminal bootstrap step shown by doctor if needed |
 | `resilience.mas_installed` | Optional `mas` App Store CLI installed (advisory) | You: run `brew install mas` for the CLI, or use the App Store directly |
 | `resilience.amphetamine_installed` | Amphetamine.app installed (advisory) | You: install it from the App Store, then run `dotfiles-resilience-setup` in a terminal |
 | `resilience.amphetamine_stale_single_use` | advisory — no stale Amphetamine Single-Use assertion | — (hint: end the Amphetamine session) |

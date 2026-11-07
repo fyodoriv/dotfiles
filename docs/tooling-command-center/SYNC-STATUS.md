@@ -191,3 +191,8 @@ on both architectures. Each ran two builds of a fixed program, compared the
 outputs and ran one. Independent review confirmed the command, results and
 cleanup. The binaries were not retained for later comparison; the real reader
 and its dependencies remain unqualified.
+
+The [locked crate probe](plans/judge-locked-crate-probe.md) acquired the one
+missing Linux archive. Its size, checksum, receipt and private file metadata
+passed independent review. It remains unextracted; this is not a reader build
+or a qualification of the registry metadata.

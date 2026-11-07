@@ -11,10 +11,10 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | --- | --- | --- |
 | chat-message-rule-decision-821 | Prepare | The first baseline failed and #853 met its rejection threshold; preserve both and register a distinct approach. |
 | review-ask-classifier-822 | Prepare | #851 shipped synthetic classification and #857 shipped its synthetic event runner. Real-event and delivery qualification remain. |
-| sync-selection-preflight | Prepare | #859 failed its registered full-gate pivot. Draft #861's distinct discovery design passed focused checks; its full gate is running. Target cases remain sealed. |
+| sync-selection-preflight | Prepare | #859 failed its registered full-gate pivot. #861 merged its distinct synthetic discovery design after the full gate passed. Target cases remain sealed. |
 | source-lease-real-failure-classification | Blocked | The natural cohort is closed without a classified failure. |
 | source-lease-release-window-research | Blocked | The controlled cohort is exhausted; qualification failed. |
-| plugin-lifecycle-timeout-observation | Check | Nine pure recorder-health controls pass in draft #819; process-group ownership remains unqualified. |
+| plugin-lifecycle-timeout-observation | Check | #860 merged nine pure recorder-health controls; draft #819's process-group ownership remains unqualified. |
 | locked-install-evidence | Prepare | Instrumentation and baseline shipped in #704 and #707. Five negative families were unsafe; qualify a maintained-tool projection for the remaining guard, donor and stamp repair. |
 | dependency-alert-remediation | Prepare | Freeze and prepare the registered negative controls; full graph remains constrained. |
 | dependency-alerts-172-175 | Check | Refresh published-parent compatibility evidence. |
@@ -32,7 +32,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | checkup-run-record | Prepare | Qualify the registered caller and safety controls. |
 | gdoc-cdp-screenshots | Prepare | Advance transport and ownership preparation; real Docs proof remains. |
 | page-zero-errors-skill | Prepare | Prepare real-browser and session-boundary qualification. |
-| plugin-history-leak-audit | Prepare | Execute its registered synthetic preparation. |
+| plugin-history-leak-audit | Prepare | The registered synthetic history and scanner binding passed; qualify real-source coherence and the remaining audit boundaries. |
 | speed-up-npm-ci | Blocked | Needs verified cutover and a full seven-day field cohort. |
 | speed-up-npx-biome | Blocked | Needs verified cutover and a full seven-day field cohort. |
 | speed-up-bash-worktree-deps-sh | Blocked | Needs verified cutover and a full seven-day field cohort. |

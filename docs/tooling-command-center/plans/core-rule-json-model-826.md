@@ -87,3 +87,12 @@ BASH
 Anchors: the rejected sparse-array control and existing Ajv use in plugin
 manifest validation; Basili, Caldiera and Rombach (1994), Goal Question Metric;
 Munafò et al. (2017), preregistration.
+
+The first red command was inconclusive: its checkout had no `node_modules`, so
+Vitest could not load `vitest/config` and the JSON report was empty. The
+diagnostic is preserved at `/tmp/core-json-model-red-diagnostic.log`. This is
+not the registered placeholder failure and is not model evidence. Keep the
+unmodified placeholder and plan in that checkout. Repeat the same registered
+red in a clean task-owned checkout with existing dependencies, after checking
+its source and dependency identity; do not install or alter canonical
+dependencies for the experiment.

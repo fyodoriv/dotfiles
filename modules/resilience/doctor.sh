@@ -30,7 +30,7 @@ check "resilience.agent_tmux_executable" "agent-tmux wrapper is executable" \
 # ── sleepwatcher ──────────────────────────────────────────────────────
 check "resilience.sleepwatcher_binary" "sleepwatcher binary present" \
   "[ -x /opt/homebrew/sbin/sleepwatcher ] || [ -x /usr/local/sbin/sleepwatcher ]" \
-  "echo 'Install: brew install sleepwatcher'"
+  "" "You: open Terminal and run brew install sleepwatcher, then run dotfiles apply."
 
 # keep_awake_tools (default: full profile) decides whether apply loads the
 # agent, so the doctor expects it only then.

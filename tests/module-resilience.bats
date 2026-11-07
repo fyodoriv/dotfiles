@@ -46,6 +46,93 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ -f "$TEST_DOTFILES/modules/resilience/doctor.sh" ]
 }
 
+@test "sleepwatcher missing gives manual install steps" {
+  FIX_MODE=true
+  KEEP_AWAKE_TOOLS=false
+  check() {
+    [ "$1" = resilience.sleepwatcher_binary ] || return 0
+    local cmd="$3" first='/opt/homebrew/sbin/sleepwatcher' second='/usr/local/sbin/sleepwatcher'
+    [[ "$cmd" == *"$first"* && "$cmd" == *"$second"* ]] || return 1
+    cmd="${cmd//"$first"/"$TEST_DIR/first-sleepwatcher"}"
+    cmd="${cmd//"$second"/"$TEST_DIR/second-sleepwatcher"}"
+    if eval "$cmd"; then printf 'pass\n' > "$TEST_DIR/sleepwatcher-result"
+    elif [ -n "$4" ]; then printf 'auto %s\n' "$4" > "$TEST_DIR/sleepwatcher-result"
+    else printf 'fail %s\n' "${5:-}" > "$TEST_DIR/sleepwatcher-result"; fi
+  }
+  check_advisory() { :; }
+  brew() { touch "$TEST_DIR/sleepwatcher-launched"; }
+  open() { touch "$TEST_DIR/sleepwatcher-launched"; }
+  dotfiles-resilience-setup() { touch "$TEST_DIR/sleepwatcher-launched"; }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  if ! grep -q '^fail .*You:.*brew install sleepwatcher' "$TEST_DIR/sleepwatcher-result"; then
+    echo 'expected manual sleepwatcher guidance' >&2
+    return 1
+  fi
+  [ ! -e "$TEST_DIR/sleepwatcher-launched" ]
+}
+
+@test "sleepwatcher present remains passing" {
+  FIX_MODE=true
+  KEEP_AWAKE_TOOLS=false
+  check() {
+    [ "$1" = resilience.sleepwatcher_binary ] || return 0
+    local cmd="$3" first='/opt/homebrew/sbin/sleepwatcher' second='/usr/local/sbin/sleepwatcher'
+    [[ "$cmd" == *"$first"* && "$cmd" == *"$second"* ]] || return 1
+    cmd="${cmd//"$first"/"$TEST_DIR/first-sleepwatcher"}"
+    cmd="${cmd//"$second"/"$TEST_DIR/second-sleepwatcher"}"
+    if eval "$cmd"; then printf 'pass\n' > "$TEST_DIR/sleepwatcher-result"
+    else printf 'fail\n' > "$TEST_DIR/sleepwatcher-result"; fi
+  }
+  check_advisory() { :; }
+  brew() { touch "$TEST_DIR/sleepwatcher-launched"; }
+  open() { touch "$TEST_DIR/sleepwatcher-launched"; }
+  dotfiles-resilience-setup() { touch "$TEST_DIR/sleepwatcher-launched"; }
+  printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/first-sleepwatcher"
+  chmod +x "$TEST_DIR/first-sleepwatcher"
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/sleepwatcher-result"
+  mv "$TEST_DIR/first-sleepwatcher" "$TEST_DIR/second-sleepwatcher"
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/sleepwatcher-result"
+  [ ! -e "$TEST_DIR/sleepwatcher-launched" ]
+}
+
+@test "sleepwatcher real doctor fix shows steps without launches" {
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '/^check "resilience\.sleepwatcher_binary"/ { capture=1 } capture { print; if ($0 !~ /\\$/) exit }' \
+    "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" > "$TEST_DIR/original-check"
+  [ "$(grep -o '/opt/homebrew/sbin/sleepwatcher' "$TEST_DIR/original-check" | wc -l | tr -d ' ')" -eq 1 ]
+  [ "$(grep -o '/usr/local/sbin/sleepwatcher' "$TEST_DIR/original-check" | wc -l | tr -d ' ')" -eq 1 ]
+  awk -v first="$TEST_DIR/first-sleepwatcher" -v second="$TEST_DIR/second-sleepwatcher" \
+    '{ gsub("/opt/homebrew/sbin/sleepwatcher", first); gsub("/usr/local/sbin/sleepwatcher", second); print }' \
+    "$TEST_DIR/original-check" > "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  ! grep -qE '/opt/homebrew/sbin/sleepwatcher|/usr/local/sbin/sleepwatcher' "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -Fq "$TEST_DIR/first-sleepwatcher" "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -Fq "$TEST_DIR/second-sleepwatcher" "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  [ ! -e "$TEST_DIR/first-sleepwatcher" ] && [ ! -e "$TEST_DIR/second-sleepwatcher" ]
+  printf 'check "test.fix_mode" "fix mode control" "[ -e %s/fix-ran ]" "touch %s/fix-ran"\n' "$TEST_DIR" "$TEST_DIR" >> "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  printf '#!/bin/sh\n[ "$1" = source-path ] && printf "%%s\\n" "%s"\nexit 0\n' "$TEST_DOTFILES" > "$TEST_DOTFILES/bin/chezmoi"
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  for name in brew open dotfiles-resilience-setup; do
+    printf '#!/bin/sh\ntouch "%s/sleepwatcher-launched"\n' "$TEST_DIR" > "$TEST_DOTFILES/bin/$name"
+    chmod +x "$TEST_DOTFILES/bin/$name"
+  done
+  ln -s "$(command -v jq)" "$TEST_DOTFILES/bin/jq"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
+  export PATH="$TEST_DOTFILES/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  for name in brew open dotfiles-resilience-setup; do
+    [ -x "$TEST_DOTFILES/bin/$name" ]
+    [ "$(command -v "$name")" = "$TEST_DOTFILES/bin/$name" ]
+  done
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience
+  [ "$status" -eq 1 ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.sleepwatcher_binary")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("You:") and contains("brew install sleepwatcher")) and ((.[0].fix // "") == "")' >/dev/null
+  [ -e "$TEST_DIR/fix-ran" ]
+  [ ! -e "$TEST_DIR/sleepwatcher-launched" ]
+}
+
 @test "mas missing is advisory with owner guidance" {
   FIX_MODE=true
   KEEP_AWAKE_TOOLS=false

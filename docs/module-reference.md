@@ -341,7 +341,7 @@ Keeps agents alive through lid close, network drops, and terminal close: tmux, s
 |----|---------------|----------|
 | `resilience.tmux_installed` | tmux installed | None (hint: `brew install tmux`) |
 | `resilience.agent_tmux_executable` | `agent-tmux` wrapper is executable | `chmod +x` |
-| `resilience.sleepwatcher_binary` | sleepwatcher binary present | None (hint: `brew install sleepwatcher`) |
+| `resilience.sleepwatcher_binary` | sleepwatcher binary present | You: run `brew install sleepwatcher` in Terminal, then run `dotfiles apply` |
 | `resilience.sleepwatcher_loaded` | sleepwatcher LaunchAgent loaded | You: follow the Terminal steps shown by doctor. If the plist is missing, the steps create it without replacing an existing file before loading it. |
 | `resilience.wakeup_hook_exists` | `~/.wakeup` hook fires network-watchdog | None (hint: `dotfiles apply`) |
 | `resilience.network_watchdog_exec` | network-watchdog is executable | `chmod +x` |

@@ -46,6 +46,77 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ -f "$TEST_DOTFILES/modules/resilience/doctor.sh" ]
 }
 
+@test "mas missing is advisory with owner guidance" {
+  FIX_MODE=true
+  KEEP_AWAKE_TOOLS=false
+  check() { [ "$1" != resilience.mas_installed ] || printf 'wrong-kind\n' > "$TEST_DIR/mas-result"; return 0; }
+  check_advisory() {
+    [ "$1" = resilience.mas_installed ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/mas-result"
+    else printf 'warn %s\n' "$4" > "$TEST_DIR/mas-result"; fi
+  }
+  command() {
+    if [ "${1:-}" = -v ] && [ "${2:-}" = mas ]; then return 1; fi
+    builtin command "$@"
+  }
+  brew() { touch "$TEST_DIR/mas-launched"; }
+  open() { touch "$TEST_DIR/mas-launched"; }
+  dotfiles-resilience-setup() { touch "$TEST_DIR/mas-launched"; }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  if ! grep -q '^warn .*optional.*You:.*brew install mas.*App Store' "$TEST_DIR/mas-result"; then
+    echo 'expected advisory for missing mas' >&2
+    return 1
+  fi
+  [ ! -e "$TEST_DIR/mas-launched" ]
+}
+
+@test "mas installed remains passing" {
+  FIX_MODE=true
+  KEEP_AWAKE_TOOLS=false
+  check() { [ "$1" != resilience.mas_installed ] || printf 'wrong-kind\n' > "$TEST_DIR/mas-result"; return 0; }
+  check_advisory() {
+    [ "$1" = resilience.mas_installed ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/mas-result"
+    else printf 'warn\n' > "$TEST_DIR/mas-result"; fi
+  }
+  mas() { :; }
+  brew() { touch "$TEST_DIR/mas-launched"; }
+  open() { touch "$TEST_DIR/mas-launched"; }
+  dotfiles-resilience-setup() { touch "$TEST_DIR/mas-launched"; }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/mas-result"
+  [ ! -e "$TEST_DIR/mas-launched" ]
+}
+
+@test "mas real doctor fix is advisory without launches" {
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '/^check(_advisory)? "resilience\.mas_installed"/ { print; getline; print; getline; print; exit }' \
+    "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" > "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  [ "$(grep -c 'resilience.mas_installed' "$TEST_DOTFILES/modules/resilience/doctor.sh")" -eq 1 ]
+  printf 'check "test.fix_mode" "fix mode control" "[ -e %s/fix-ran ]" "touch %s/fix-ran"\n' "$TEST_DIR" "$TEST_DIR" >> "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  printf '#!/bin/sh\n[ "$1" = source-path ] && printf "%%s\\n" "%s"\nexit 0\n' "$TEST_DOTFILES" > "$TEST_DOTFILES/bin/chezmoi"
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  for name in brew open dotfiles-resilience-setup; do
+    printf '#!/bin/sh\ntouch "%s/mas-launched"\n' "$TEST_DIR" > "$TEST_DOTFILES/bin/$name"
+    chmod +x "$TEST_DOTFILES/bin/$name"
+  done
+  ln -s "$(command -v jq)" "$TEST_DOTFILES/bin/jq"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew"
+  export PATH="$TEST_DOTFILES/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  ! command -v mas >/dev/null
+  for name in brew open dotfiles-resilience-setup; do
+    [ -x "$TEST_DOTFILES/bin/$name" ]
+    [ "$(command -v "$name")" = "$TEST_DOTFILES/bin/$name" ]
+  done
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.mas_installed")] | length == 1 and .[0].status == "warn" and (.[0].fix | contains("optional") and contains("You:") and contains("brew install mas") and contains("App Store"))' >/dev/null
+  [ -e "$TEST_DIR/fix-ran" ]
+  [ ! -e "$TEST_DIR/mas-launched" ]
+}
+
 @test "missing App Store app is an advisory with a person-owned step and no UI launch" {
   export AMPHETAMINE_APP_PATH="$TEST_DIR/missing.app" KEEP_AWAKE_TOOLS=true
   FIX_MODE=true

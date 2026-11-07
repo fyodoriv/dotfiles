@@ -69,10 +69,10 @@ check "resilience.network_watchdog_loaded" "network-resilience LaunchAgent loade
   "launchctl list 2>/dev/null | grep -q com.dotfiles.network-resilience" \
   "echo 'Load: launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.dotfiles.network-resilience.plist'"
 
-# ── mas (App Store CLI — needed for Amphetamine install) ──────────────
-check "resilience.mas_installed" "mas (App Store CLI) installed" \
+# ── mas (optional App Store CLI) ───────────────────────────────────────
+check_advisory "resilience.mas_installed" "mas (App Store CLI) installed" \
   "command -v mas >/dev/null 2>&1" \
-  "echo 'Install: brew install mas'"
+  "mas is optional. You: run brew install mas for the CLI, or use the App Store directly."
 
 # ── Amphetamine (lid-close persistence on AC) ─────────────────────────
 # Soft check — Amphetamine is App Store only and requires user sign-in,

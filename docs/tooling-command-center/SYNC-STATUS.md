@@ -159,7 +159,8 @@ test entry unlisted; the registered entry correction and Knip check passed.
 Its final-head control repeat and full gate remain.
 The four selection cases are still sealed.
 
-[Agentbrew draft #860](https://github.com/fyodoriv/agentbrew/pull/860)
-omits the writer that caused #858's Knip failure. Nine recorder controls, Knip
-and independent review passed; the full gate is running. The process-group
-runner and the earlier timeout cause remain unqualified.
+[Agentbrew #860](https://github.com/fyodoriv/agentbrew/pull/860) merged its
+no-writer recorder pivot after nine controls, Knip, independent review and an
+uncached 22-step gate passed (6,504 tests passed; 33 skipped). Local main was
+fast-forwarded to `55c1032c`. The process-group runner and earlier timeout cause
+remain unqualified.

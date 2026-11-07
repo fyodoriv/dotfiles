@@ -76,6 +76,10 @@ remains separate. The registered local-model baseline stopped on an invalid
 response for its first case. Its empty reservation is retained and must not be
 reused; no real chat was used. Its task and issue #821 remain open.
 
+[Agentbrew #850](https://github.com/fyodoriv/agentbrew/pull/850) prepares a
+separate schema-based protocol using only fake transport. Ten protocol and four
+gate controls pass; its final gate is pending. No new baseline was run.
+
 [Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) prepares
 read-only guidance for a busy source lease. Its two synthetic refusal controls
 and 16 existing lease tests pass; its final gate is pending. It does not

@@ -101,3 +101,11 @@ fi
 # Secrets-in-zshrc check removed — covered by security module (dotfiles audit)
 
 # PATH check moved to shell/doctor.sh (shell.dotfiles_on_path)
+
+# ── Free disk space ───────────────────────────────────────────────────
+# AI agents filled a 926 GB disk with scratch copies and build output in
+# about a week (2026-11-07). com.dotfiles.agent-scratch-prune removes the
+# safe part every 6 hours; this check warns when the disk is still low.
+check_advisory "disk.free_space" "the home volume has at least 10% free space" \
+  "[ \"\$(df -k \"\$HOME\" | awk 'NR==2{print int(\$4*100/\$2)}')\" -ge 10 ]" \
+  "run: $DOTFILES_DIR/bin/agent-scratch-prune --dry-run, then without --dry-run; then look at large folders with: du -sh ~/.cache/* ~/.local/state/* ~/.codex/* ~/.ollama 2>/dev/null | sort -h | tail"

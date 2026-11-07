@@ -125,6 +125,7 @@ unverifiable scans are always repeated.
 | `agent.*` | All deployed `com.dotfiles.*` LaunchAgents loaded | `launchctl load` |
 | `spotlight.*` (11 dirs) | Dev directories (`~/apps`, `~/.cache`, `~/.npm`, `~/.yarn`, `~/.docker`, `~/.pyenv`, `~/.local`, `~/.config`, `~/Library/Caches`, etc.) have a `.metadata_never_index` marker **and** are out of the Spotlight index. The marker alone is not proof: on macOS 27, `~/apps` has it and is still indexed. The probe (`lib/spotlight-probe.sh`) runs `mdls -name _kMDItemFileName` on up to 3 direct children; `(null)` means not indexed. | `touch .metadata_never_index`. If the probe still finds an indexed item, you: open System Settings → Spotlight → Search Privacy, then add the named folder. |
 | `spotlight.agent_worktrees` | `~/apps/tooling/wt` is a symlink to `wt.noindex`. Spotlight skips a `.noindex` folder; it ignores the `.metadata_never_index` marker there. Runs only when `~/apps/tooling` exists. | Rename `wt` to `wt.noindex` and link `wt` to it. Existing worktree paths keep working. |
+| `disk.free_space` (advisory) | The home volume has at least 10% free space. AI agents can fill a disk with scratch copies and build output in a week. | None. Run `agent-scratch-prune --dry-run`, then without `--dry-run`; then look at the largest folders. |
 
 Spotlight check count varies based on which directories exist on your machine.
 

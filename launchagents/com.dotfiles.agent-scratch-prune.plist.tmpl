@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.dotfiles.agent-scratch-prune — every 6 hours, remove the disk space AI
+  agents leave behind: idle build output, clean pushed agent worktrees, and
+  old scratch folders (bin/agent-scratch-prune). Agents filled a 926 GB disk
+  in about a week (2026-11-07), so a weekly cleanup is too slow.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dotfiles.agent-scratch-prune</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}/bin/agent-scratch-prune</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>21600</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>15</integer>
+    <key>LowPriorityIO</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/agent-scratch-prune.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/dotfiles/logs/agent-scratch-prune.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LANG</key>
+        <string>C.UTF-8</string>
+        <key>PATH</key>
+        <string>{{ template "launchagent-path" . }}</string>
+        <key>HOME</key>
+        <string>{{ .chezmoi.homeDir }}</string>
+        <key>AGENT_SCRATCH_DIR_IDLE_DAYS</key>
+        <string>{{ if hasKey . "agent_scratch_idle_days" }}{{ .agent_scratch_idle_days }}{{ else }}30{{ end }}</string>
+    </dict>
+</dict>
+</plist>

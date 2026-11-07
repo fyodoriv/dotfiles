@@ -9,6 +9,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 
 | Task ID | State | Next step or dependency |
 | --- | --- | --- |
+| chat-message-rule-decision-821 | Prepare | The first baseline stopped on an invalid response; preserve its reservation and register a distinct method. |
 | sync-selection-preflight | Prepare | Register and land the synthetic measurement first. |
 | source-lease-real-failure-classification | Blocked | The natural cohort is closed without a classified failure. |
 | source-lease-release-window-research | Blocked | The controlled cohort is exhausted; qualification failed. |

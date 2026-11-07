@@ -18,7 +18,7 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#827](https://github.com/fyodoriv/agentbrew/issues/827) | Check | Qualify a decision eval and a separate sync-cost baseline. |
 | [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Compare core-rule activation options; qualify the required gate before delivery. |
 | [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | Design and register reviewer-action coverage; qualify the required gate. |
-| [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | Draft #830 now has a fail-closed reservation, 16 passing synthetic controls and local gate discovery; qualify its final tree. |
+| [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | The registered baseline stopped on an invalid first response; retain its empty reservation and register a distinct method. |
 | [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | Draft #849 identifies a busy lease without reading or removing it; its final gate is pending. Safe release remains unproved. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Register the isolated owner-success observation; preserve the #767 boundary. |
 | [#789](https://github.com/fyodoriv/agentbrew/issues/789) | Check | The proposed compiler-error fallback conflicts with a frozen source-build pivot. |

@@ -70,11 +70,11 @@ are separate from the closed research cohorts.
 The pure recorder-health preparation in
 [Agentbrew #819](https://github.com/fyodoriv/agentbrew/pull/819) passed nine
 controls; its real health channel and group-signal runner remain unqualified.
-[Agentbrew #830](https://github.com/fyodoriv/agentbrew/pull/830) passed sixteen
-fake-transport receipt controls and added a checked step to the local full gate.
-Hosted CI remains separate. No model baseline or real chat was used.
-Its full gate is running on a revision that also tracks the still-open
-measurement task.
+[Agentbrew #830](https://github.com/fyodoriv/agentbrew/pull/830) merged after
+sixteen fake-transport controls and all 21 local gate steps passed. Hosted CI
+remains separate. The registered local-model baseline stopped on an invalid
+response for its first case. Its empty reservation is retained and must not be
+reused; no real chat was used. Its task and issue #821 remain open.
 
 [Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) prepares
 read-only guidance for a busy source lease. Its two synthetic refusal controls

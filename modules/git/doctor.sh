@@ -180,7 +180,7 @@ if command -v gh &>/dev/null; then
   _git_gh_capture_auth() {
     if ${FIX_MODE:-false} || ! $_git_gh_auth_snapshot_ready; then
       _git_gh_auth_snapshot_status=0
-      _git_gh_auth_snapshot_output="$(gh auth status -h github.com 2>&1)" \
+      _git_gh_auth_snapshot_output="$(gh auth status -h github.com --active 2>&1)" \
         || _git_gh_auth_snapshot_status=$?
       _git_gh_auth_snapshot_ready=true
     fi
@@ -192,7 +192,28 @@ if command -v gh &>/dev/null; then
   _git_gh_has_scope() {
     _git_gh_capture_auth
     # Preserve the original producer status when the caller enables pipefail.
-    (printf '%s\n' "$_git_gh_auth_snapshot_output"; exit "$_git_gh_auth_snapshot_status") | grep -q "$1"
+    (printf '%s\n' "$_git_gh_auth_snapshot_output"; exit "$_git_gh_auth_snapshot_status") | awk -v target="$1" '
+      function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+      BEGIN { single = sprintf("%c", 39); double = sprintf("%c", 34) }
+      /^[[:space:]]*(-[[:space:]]*)?Token scopes:/ {
+        lines++
+        value = $0
+        sub(/^[[:space:]]*(-[[:space:]]*)?Token scopes:[[:space:]]*/, "", value)
+        if (value == "" || value ~ /,[[:space:]]*$/) bad = 1
+        count = split(value, tokens, ",")
+        for (i = 1; i <= count; i++) {
+          token = trim(tokens[i])
+          first = substr(token, 1, 1)
+          if (first == single || first == double) {
+            if (length(token) < 2 || substr(token, length(token), 1) != first) bad = 1
+            else token = substr(token, 2, length(token) - 2)
+          }
+          if (token !~ /^[[:alnum:]_:-]+$/ || index(token, single) || index(token, double)) bad = 1
+          if (token == target) found = 1
+        }
+      }
+      END { if (lines == 1 && !bad && found) exit 0; exit 1 }
+    '
   }
   check "git.gh_protocol"       "gh CLI uses SSH protocol"    "[ \"\$(gh config get git_protocol 2>/dev/null)\" = 'ssh' ]"    "gh config set git_protocol ssh 2>/dev/null"
   check "git.gh_auth" "gh authenticated to github.com" \

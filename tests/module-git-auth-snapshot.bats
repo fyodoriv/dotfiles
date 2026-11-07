@@ -16,11 +16,14 @@ setup() {
   export GIT_CONFIG_GLOBAL="$TEST_DIR/gitconfig"
   touch "$GIT_CONFIG_GLOBAL"
   export GH_AUTH_FIXTURE_LOG="$TEST_DIR/auth-calls"
+  GH_AUTH_FIXTURE_ARGS="$TEST_DIR/auth-args"
   CHECK_RESULTS="$TEST_DIR/check-results"
   : > "$GH_AUTH_FIXTURE_LOG"
+  : > "$GH_AUTH_FIXTURE_ARGS"
   : > "$CHECK_RESULTS"
   GH_AUTH_FIXTURE_RC=0
   GH_AUTH_FIXTURE_OUTPUT='Token scopes: repo, gist, read:org, workflow, admin:public_key, delete_repo'
+  GH_AUTH_ACTIVE_OUTPUT=''
   GH_ADMIN_SCOPES=false
   IS_ENTERPRISE=false
   FIX_MODE=false
@@ -30,9 +33,14 @@ setup() {
 
   gh() {
     case "$*" in
-      'auth status -h github.com')
+      'auth status -h github.com'|'auth status -h github.com --active')
         printf 'probe\n' >> "$GH_AUTH_FIXTURE_LOG"
-        printf '%s\n' "$GH_AUTH_FIXTURE_OUTPUT"
+        printf '%s\n' "$*" >> "$GH_AUTH_FIXTURE_ARGS"
+        if [ "$*" = 'auth status -h github.com --active' ] && [ -n "$GH_AUTH_ACTIVE_OUTPUT" ]; then
+          printf '%s\n' "$GH_AUTH_ACTIVE_OUTPUT"
+        else
+          printf '%s\n' "$GH_AUTH_FIXTURE_OUTPUT"
+        fi
         return "$GH_AUTH_FIXTURE_RC"
         ;;
       *) return 0 ;;
@@ -91,6 +99,85 @@ setup() {
   grep -qx 'git.gh_auth:0' "$CHECK_RESULTS"
   grep -qx 'git.gh_scope.read:org:1' "$CHECK_RESULTS"
   [ "$(wc -l < "$GH_AUTH_FIXTURE_LOG" | tr -d ' ')" -eq 1 ]
+}
+
+scope_active_checked() {
+  [ "$(wc -l < "$GH_AUTH_FIXTURE_LOG" | tr -d ' ')" -eq 1 ]
+  grep -qx 'auth status -h github.com --active' "$GH_AUTH_FIXTURE_ARGS"
+}
+
+@test "scope exact rejects delete_repo as repo" {
+  GH_AUTH_FIXTURE_OUTPUT='Token scopes: delete_repo, gist, read:org'
+  source "$MODULE"
+  [ "$(wc -l < "$GH_AUTH_FIXTURE_LOG" | tr -d ' ')" -eq 1 ]
+  grep -qx 'git.gh_scope.repo:1' "$CHECK_RESULTS" || { echo 'false repo grant'; return 1; }
+  scope_active_checked
+}
+
+@test "scope exact ignores non-scope text" {
+  GH_AUTH_FIXTURE_OUTPUT=$'Token scopes: repo, read:org\ngist not granted'
+  source "$MODULE"
+  [ "$(wc -l < "$GH_AUTH_FIXTURE_LOG" | tr -d ' ')" -eq 1 ]
+  grep -qx 'git.gh_scope.gist:1' "$CHECK_RESULTS" || { echo 'false gist grant'; return 1; }
+  scope_active_checked
+}
+
+@test "scope exact rejects longer org name" {
+  GH_AUTH_FIXTURE_OUTPUT='Token scopes: repo, gist, read:organization'
+  source "$MODULE"
+  [ "$(wc -l < "$GH_AUTH_FIXTURE_LOG" | tr -d ' ')" -eq 1 ]
+  grep -qx 'git.gh_scope.read:org:1' "$CHECK_RESULTS" || { echo 'false org grant'; return 1; }
+  scope_active_checked
+}
+
+scope_all_granted() {
+  source "$MODULE"
+  for scope in repo gist read:org; do grep -qx "git.gh_scope.$scope:0" "$CHECK_RESULTS" || return 1; done
+  scope_active_checked
+}
+
+@test "scope exact accepts bare names" {
+  GH_AUTH_FIXTURE_OUTPUT='  - Token scopes: repo, gist, read:org'
+  scope_all_granted
+}
+
+@test "scope exact accepts quoted names" {
+  GH_AUTH_FIXTURE_OUTPUT="  - Token scopes: 'repo', 'gist', 'read:org'"
+  scope_all_granted
+}
+
+@test "scope exact accepts double-quoted names" {
+  GH_AUTH_FIXTURE_OUTPUT='  - Token scopes: "repo", "gist", "read:org"'
+  scope_all_granted
+}
+
+@test "scope exact selects active account" {
+  GH_AUTH_FIXTURE_OUTPUT=$'Active account: false\nToken scopes: repo, gist, read:org\nActive account: true\nToken scopes: gist, read:org'
+  GH_AUTH_ACTIVE_OUTPUT='  - Token scopes: gist, read:org'
+  source "$MODULE"
+  grep -qx 'git.gh_scope.repo:1' "$CHECK_RESULTS"
+  scope_active_checked
+}
+
+@test "scope exact rejects ambiguous evidence" {
+  for value in 'Fine-grained token' $'Token scopes: repo, gist, read:org\nToken scopes: repo' "Token scopes: 'repo', 'gist" 'Token scopes:' 'Token scopes: repo, @invalid, gist'; do
+    GH_AUTH_FIXTURE_OUTPUT="$value"
+    : > "$CHECK_RESULTS"
+    : > "$GH_AUTH_FIXTURE_LOG"
+    : > "$GH_AUTH_FIXTURE_ARGS"
+    source "$MODULE"
+    for scope in repo gist read:org; do grep -qx "git.gh_scope.$scope:1" "$CHECK_RESULTS" || return 1; done
+    scope_active_checked
+  done
+  GH_AUTH_FIXTURE_OUTPUT='unknown flag: --active'
+  GH_AUTH_FIXTURE_RC=1
+  : > "$CHECK_RESULTS"
+  : > "$GH_AUTH_FIXTURE_LOG"
+  : > "$GH_AUTH_FIXTURE_ARGS"
+  source "$MODULE"
+  grep -qx 'git.gh_auth:1' "$CHECK_RESULTS"
+  for scope in repo gist read:org; do grep -qx "git.gh_scope.$scope:1" "$CHECK_RESULTS" || return 1; done
+  scope_active_checked
 }
 
 @test "git auth snapshot does not probe while listing check IDs" {

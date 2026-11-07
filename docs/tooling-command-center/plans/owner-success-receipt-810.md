@@ -46,6 +46,23 @@ receipt or diagnostic. The cleanup test checks injected success, EPERM and
 unknown outcomes remain unchanged, with no decision callback or process
 launch. Unknowns never become a complete record.
 
+Before implementing the format, the first `complete_record_accepted` control
+must fail against an explicit placeholder with the fixed diagnostic
+`owner receipt unimplemented`. A missing test, compilation error or other
+failure is inconclusive. Run only that named pure control:
+
+```sh
+bash <<'BASH'
+set -o pipefail
+log=$(mktemp) || exit 2
+trap 'rm -f "$log"' EXIT
+test -f rust/tests/owner_success_receipt.rs || exit 2
+JOBS=1 CARGO_BUILD_JOBS=1 heavy-run cargo test --locked --offline --manifest-path rust/Cargo.toml --test owner_success_receipt complete_record_accepted -- --test-threads=1 2>&1 | tee "$log"
+status=${PIPESTATUS[0]}
+[ "$status" -ne 0 ] && grep -Fq 'owner receipt unimplemented' "$log" && grep -Eq 'test result: FAILED\. 0 passed; 1 failed;' "$log"
+BASH
+```
+
 Run only the dedicated test, not the old lifecycle cohort:
 
 ```sh

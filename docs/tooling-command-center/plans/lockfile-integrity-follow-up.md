@@ -1,6 +1,6 @@
 # Record lockfile integrity investigation
 
-On Nov 7, a read-only count of Agentbrew's `package-lock.json` found 79 of 908
+On Nov 7, a read-only count of Agentbrew's `package-lock.json` found 79 of 907
 non-root, non-link package entries without an `integrity` field. Some may be
 optional or represented by another verified source; this count is not a
 vulnerability finding and does not prove any installed package is unsafe.

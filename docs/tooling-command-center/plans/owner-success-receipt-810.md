@@ -96,3 +96,54 @@ No new admission is authorized by this plan.
 
 Anchors: issue #810 and draft #767's lifecycle plan; Basili, Caldiera and
 Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.
+
+## Rejected format and compatibility pivot
+
+The first pure format passed its eight tests, but independent review found it
+would mark an EPERM result with `cleanup: success` complete. This violates the
+registered safety requirement. Reject that format. Its private retained source
+has SHA-256 `169f90ddb19a816f1f8cb39846aa87a47f019e59ed7c7e30a0ac5fb0d239d83b`.
+No worker, lifecycle fixture or signal ran.
+
+Before changing the retained format, register a distinct compatibility check.
+Predict nine of nine pure tests pass: preserve the original eight and add
+`eperm_success_conflict_unqualified`. The new case must keep the supplied
+`cleanup: success` value intact while marking both `permission_denied` and
+`other_error` TERM combinations unqualified. This is evidence-completeness
+classification only; it does not
+declare any physical cleanup safe. Any contradictory combination marked
+complete, changed injected outcome, privacy leak or prior-control regression
+rejects this approach.
+
+After committing this pivot, add the named test against the retained first
+format. Its fixed assertion message is `conflicting EPERM marked complete`.
+The red command must see exactly that one failed test and diagnostic:
+
+```sh
+bash <<'BASH'
+set -o pipefail
+log=$(mktemp) || exit 2
+trap 'rm -f "$log"' EXIT
+JOBS=1 CARGO_BUILD_JOBS=1 heavy-run cargo test --locked --offline --manifest-path rust/Cargo.toml --test owner_success_receipt eperm_success_conflict_unqualified -- --test-threads=1 2>&1 | tee "$log"
+status=${PIPESTATUS[0]}
+[ "$status" -ne 0 ] && grep -Fq 'test eperm_success_conflict_unqualified ... FAILED' "$log" && grep -Fq 'conflicting EPERM marked complete' "$log" && grep -Eq 'test result: FAILED\. 0 passed; 1 failed;' "$log"
+BASH
+```
+
+Then implement the compatibility rule and run:
+
+```sh
+bash <<'BASH'
+set -o pipefail
+log=$(mktemp) || exit 2
+trap 'rm -f "$log"' EXIT
+JOBS=1 CARGO_BUILD_JOBS=1 heavy-run cargo test --locked --offline --manifest-path rust/Cargo.toml --test owner_success_receipt -- --test-threads=1 2>&1 | tee "$log" || exit 1
+names='complete_record_accepted missing_field_refused unknown_terminal_unqualified unknown_reservation_unqualified unknown_ownership_unqualified invalid_enum_refused private_fields_refused cleanup_outcome_unchanged eperm_success_conflict_unqualified'
+for name in $names; do [ "$(grep -Ec "^test $name \.\.\. ok$" "$log")" -eq 1 ] || exit 2; done
+grep -Eq '^test result: ok\. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out' "$log"
+BASH
+```
+
+Require no skips or filtered tests and independent review. No physical
+admission follows. Anchors: the same issue, source and GQM/preregistration
+references above.

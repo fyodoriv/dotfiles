@@ -1,0 +1,238 @@
+# Judge reader: isolated Rust toolchain probe
+
+Issue #752 and draft #755 need source-qualified Linux readers. The separate
+Alpine runtime probe passed for both architectures with independently checked
+configuration and cleanup. The official Rust image template installs gcc,
+musl-dev and the Rust toolchain. Docker Hub advertised these immutable child
+manifests for Rust 1.99.1 on Alpine 3.24:
+
+- ARM64: `sha256:0a555e8b51945db91fd7b8411b4272bb5b8bfa04261d31eaeb2ada564bc02632`, 351,110,062 compressed bytes.
+- AMD64: `sha256:2c83bf1a38975801abfd05e92387242ab4d5f96fe05131e2a279f3009ad16393`, 352,121,318 compressed bytes.
+- List: `sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383`.
+
+Sources: https://hub.docker.com/v2/repositories/library/rust/tags/1.99.1-alpine3.24
+and https://github.com/rust-lang/docker-rust/blob/master/Dockerfile-alpine.template .
+
+Goal: qualify toolchain availability. Predict both pinned images will report
+Rust release 1.99.1, the correct native musl host, a Cargo version, and a gcc
+musl target of the correct architecture. Success is 2/2 toolchains with those
+outputs, the checked isolation configuration, and verified cleanup. A wrong
+version, host, compiler target, isolation check or failed cleanup rejects this
+approach. Missing resources, image, daemon, or timeout are inconclusive. The
+measurement is the command below, after this plan is independently reviewed
+and committed. Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric.
+
+Run each image sequentially, without network or mounts, with read-only root,
+no capabilities, no new privileges, an unprivileged user, one CPU, 512 MiB
+and 16 processes. Inspect configuration before execution and remove only the
+verified owned container ID and label. Keep shared image cache entries. This
+checks configuration, not actual egress. It performs no build or archive
+extraction by the host and does not use the previously downloaded archives.
+
+The registry reports 703,231,380 compressed bytes in total, before shared
+layers. The 6 GiB host-root free-space check is not a daemon-store quota and
+cannot guarantee enough storage. A pull or create timeout can leave daemon-side
+activity. A Unix socket may proxy elsewhere. Docker is not a complete boundary
+for hostile code. Repeated signals, SIGKILL, host failure or cleanup failure
+can leave an owned container; private records help investigation but do not
+prove removal. Do not retry an inconclusive or failed admission automatically.
+
+```sh
+set -eu
+umask 077
+py="$HOME/.local/share/uv/python/cpython-3.13.18-macos-aarch64-none/bin/python3.13"
+[ -f "$py" ]
+[ ! -L "$py" ]
+[ "$(stat -f '%u %Lp %z' "$py")" = '501 755 17593392' ]
+[ "$(shasum -a 256 "$py" | cut -d ' ' -f 1)" = 747ca8797fea0949368e9e39d0f75b1eeadbae6c24edadda792ae22299e47a01 ]
+JOBS=1 heavy-run /usr/bin/env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR=/private/tmp LANG=C "$py" -I -S - <<'PY'
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import resource
+import signal
+import shutil
+import stat
+import subprocess
+import tempfile
+import uuid
+
+cli = Path('/usr/local/' + 'bin/docker').resolve(strict=True)
+info = cli.stat()
+if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o755 or info.st_size != 38294464:
+    raise SystemExit('Docker CLI identity changed')
+with cli.open('rb') as stream:
+    if hashlib.file_digest(stream, 'sha256').hexdigest() != 'cac12f15213d5806f1ffcbc6c159da969e8bf606bf81eafcea89b4c79d7945fd':
+        raise SystemExit('Docker CLI identity changed')
+socket = Path('/var/' + 'run/docker.sock')
+socketinfo = socket.stat()
+if (not stat.S_ISSOCK(socketinfo.st_mode) or socketinfo.st_uid != os.getuid()
+    or socket.resolve() != (Path.home() / '.docker/run/docker.sock').resolve()):
+    raise SystemExit('local Docker socket unavailable')
+if shutil.disk_usage('/').free < 6 * 1024**3:
+    raise SystemExit('insufficient free disk')
+root = Path(tempfile.mkdtemp(prefix='judge-rust-image-probe-', dir='/private/tmp'))
+(root / 'config').mkdir(mode=0o700)
+(root / 'home').mkdir(mode=0o700)
+print(f'Private probe logs: {root}', flush=True)
+env = {'HOME': str(root / 'home'), 'DOCKER_CONFIG': str(root / 'config'),
+       'DOCKER_HOST': 'unix:///var/run/docker.sock', 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C'}
+counter = 0
+events = root / 'events.log'
+
+def record(message):
+    with events.open('a', encoding='ascii') as out:
+        out.write(message + '\n')
+        out.flush()
+        os.fsync(out.fileno())
+
+def interrupted(signum, frame):
+    raise InterruptedError('interrupted')
+
+for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(sig, interrupted)
+
+def limit_output():
+    resource.setrlimit(resource.RLIMIT_FSIZE, (1024 * 1024, 1024 * 1024))
+
+def call(args, timeout, allow_failure=False):
+    global counter
+    counter += 1
+    record(f'{counter:03d} {args[0]} start')
+    outpath = root / f'{counter:03d}.out'
+    errpath = root / f'{counter:03d}.err'
+    with outpath.open('xb') as out, errpath.open('xb') as err:
+        try:
+            result = subprocess.run([str(cli), *args], env=env, cwd=root, stdin=subprocess.DEVNULL,
+                                    stdout=out, stderr=err, timeout=timeout, check=False,
+                                    preexec_fn=limit_output)
+        except subprocess.TimeoutExpired:
+            record(f'{counter:03d} timeout')
+            raise
+    record(f'{counter:03d} exit {result.returncode}')
+    if result.returncode and not allow_failure:
+        raise RuntimeError('docker-command-failed')
+    return result.returncode, outpath.read_text(errors='replace').strip()
+
+def inspect(target):
+    rc, text = call(['container', 'inspect', target], 15, allow_failure=True)
+    if rc:
+        return None
+    value = json.loads(text)
+    if len(value) != 1:
+        raise RuntimeError('ambiguous-container')
+    return value[0]
+
+def cleanup(target, nonce):
+    current = inspect(target)
+    if not current:
+        raise RuntimeError('container-identity-unavailable')
+    labels = (current.get('Config') or {}).get('Labels') or {}
+    cid = current.get('Id') or ''
+    if labels.get('agentbrew.probe') != nonce or cid != target or not re.fullmatch('[0-9a-f]{64}', cid):
+        raise RuntimeError('container-identity-mismatch')
+    if (current.get('State') or {}).get('Running'):
+        call(['stop', '--time', '1', cid], 15)
+    call(['container', 'rm', cid], 15)
+    _, remaining = call(['container', 'ls', '-aq', '--no-trunc', '--filter', 'id=' + cid], 15)
+    if remaining:
+        raise RuntimeError('container-removal-unconfirmed')
+
+images = [
+    ('arm64', 'aarch64', 'sha256:0a555e8b51945db91fd7b8411b4272bb5b8bfa04261d31eaeb2ada564bc02632'),
+    ('amd64', 'x86_64', 'sha256:2c83bf1a38975801abfd05e92387242ab4d5f96fe05131e2a279f3009ad16393'),
+]
+try:
+    _, daemon = call(['info', '--format', '{{.OSType}}'], 15)
+    if daemon != 'linux':
+        raise RuntimeError('non-linux-daemon')
+    for arch, machine, digest in images:
+        image = 'rust@' + digest
+        nonce = uuid.uuid4().hex
+        name = 'agentbrew-judge-probe-' + nonce
+        _, existing = call(['container', 'ls', '-aq', '--no-trunc', '--filter', 'label=agentbrew.probe=' + nonce], 15)
+        if existing:
+            raise RuntimeError('container-label-collision')
+        call(['pull', '--quiet', '--platform', 'linux/' + arch, image], 300)
+        _, raw = call(['image', 'inspect', image], 15)
+        data = json.loads(raw)
+        if len(data) != 1 or data[0].get('Os') != 'linux' or data[0].get('Architecture') != arch:
+            raise RuntimeError('image-platform-mismatch')
+        image_id = data[0].get('Id') or ''
+        if not re.fullmatch('sha256:[0-9a-f]{64}', image_id) or image not in (data[0].get('RepoDigests') or []):
+            raise RuntimeError('image-identity-mismatch')
+        ownership = root / ('ownership-' + nonce + '.json')
+        with ownership.open('x', encoding='utf-8') as out:
+            json.dump({'name': name, 'nonce': nonce, 'image': image, 'image_id': image_id}, out, sort_keys=True)
+            out.flush()
+            os.fsync(out.fileno())
+        target = None
+        create_attempted = False
+        try:
+            create_attempted = True
+            _, cid = call(['create', '--name', name, '--label', 'agentbrew.probe=' + nonce,
+                '--platform', 'linux/' + arch, '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+                '--security-opt', 'no-new-privileges', '--user', '65534:65534', '--memory', '512m',
+                '--cpus', '1', '--pids-limit', '16', '--entrypoint', '/bin/sh', image, '-c', 'set -e; rustc -vV; cargo -V; gcc -dumpmachine'], 30)
+            if not re.fullmatch('[0-9a-f]{64}', cid):
+                raise RuntimeError('container-id-invalid')
+            target = cid
+            with (root / ('id-' + nonce)).open('x', encoding='ascii') as out:
+                out.write(cid + '\n')
+                out.flush()
+                os.fsync(out.fileno())
+            state = inspect(cid)
+            host = state['HostConfig'] if state else {}
+            labels = (state.get('Config') or {}).get('Labels') or {} if state else {}
+            mounts = state.get('Mounts') or [] if state else []
+            config = state.get('Config') or {} if state else {}
+            if (not state or labels.get('agentbrew.probe') != nonce or state.get('Id') != cid
+                or state.get('Image') != image_id or (state.get('State') or {}).get('Running')
+                or config.get('Entrypoint') != ['/bin/sh'] or config.get('Cmd') != ['-c', 'set -e; rustc -vV; cargo -V; gcc -dumpmachine']
+                or host.get('NetworkMode') != 'none' or not host.get('ReadonlyRootfs')
+                or host.get('Privileged') or host.get('Binds') or host.get('Devices') or mounts
+                or host.get('CapDrop') != ['ALL'] or 'no-new-privileges' not in (host.get('SecurityOpt') or [])
+                or (state.get('Config') or {}).get('User') != '65534:65534'
+                or host.get('Memory') != 512 * 1024**2 or host.get('NanoCpus') != 10**9
+                or host.get('PidsLimit') != 16 or host.get('PidMode') or host.get('IpcMode') == 'host'):
+                raise RuntimeError('container-isolation-mismatch')
+            _, output = call(['start', '--attach', cid], 120)
+            final = inspect(cid)
+            if (not re.search(r'^release: 1\.99\.1$', output, re.MULTILINE)
+                or not re.search(r'^host: ' + re.escape(machine) + r'-unknown-linux-musl$', output, re.MULTILINE)
+                or not re.search(r'^cargo 1\.[0-9]+\.[0-9]+', output, re.MULTILINE)
+                or not re.search(r'^' + re.escape(machine) + r'-[a-z0-9_+-]+-linux-musl$', output, re.MULTILINE)
+                or not final or (final.get('State') or {}).get('Running')
+                or (final.get('State') or {}).get('ExitCode') != 0):
+                raise RuntimeError('toolchain-output-mismatch')
+        finally:
+            try:
+                if target:
+                    cleanup(target, nonce)
+                    record('cleanup-verified')
+                elif create_attempted:
+                    # A matching label is required even for the known random name.
+                    current = inspect(name)
+                    labels = (current.get('Config') or {}).get('Labels') or {} if current else {}
+                    cid = current.get('Id') or '' if current else ''
+                    if labels.get('agentbrew.probe') == nonce and re.fullmatch('[0-9a-f]{64}', cid):
+                        cleanup(cid, nonce)
+                    # The daemon may still finish a timed-out create later.
+                    record('creation-unconfirmed')
+                    print('container creation unconfirmed; retain private logs', flush=True)
+            except BaseException:
+                record('cleanup-unconfirmed')
+                raise
+        print(arch + ': isolated toolchain probe passed', flush=True)
+    print('judge Rust toolchain probe: 2 passed', flush=True)
+except (OSError, ValueError, KeyError, subprocess.SubprocessError, RuntimeError) as error:
+    print('runtime probe stopped; inspect private logs', flush=True)
+    raise SystemExit(1)
+PY
+```
+
+Passing only qualifies these version and configuration checks. Offline
+dependencies, source identity, actual builds, reproducibility, artifact
+verification and publisher compatibility need separate registered work.

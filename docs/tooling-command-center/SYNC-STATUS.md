@@ -164,13 +164,19 @@ uncached 22-step gate passed (6,504 tests passed; 33 skipped). Local main was
 fast-forwarded to `55c1032c`. The process-group runner and earlier timeout cause
 remain unqualified.
 
-[Agentbrew draft #861](https://github.com/fyodoriv/agentbrew/pull/861) uses an
+[Agentbrew #861](https://github.com/fyodoriv/agentbrew/pull/861) uses an
 explicit default exclusion for its synthetic sync test. Nine controls,
-discovery, rule-3, Knip, types and independent review passed; the full gate is
-running. The real selection cases remain sealed.
+discovery, rule-3, Knip, types and independent review passed. The uncached
+22-step gate passed with 6,504 tests passed and 33 skipped. It was merged and
+local main fast-forwarded to `cef72da9`. The real selection cases remain sealed.
 
 The [Rust archive probe](plans/judge-rust-archive-probe-v2.md) acquired six
 official Linux musl toolchain archives. Their sizes, hashes, receipt and private
 file metadata passed an independent recheck. XZ headers report about 1.6 GB
 uncompressed. The files have not been extracted or run; #755's source-bound
 assets and build/reproducibility controls remain open.
+
+The [Alpine runtime probe](plans/judge-linux-image-probe.md) passed on both
+Linux architectures. Independent review confirmed the recorded configuration,
+outputs and cleanup. This does not prove network egress isolation, qualify a
+toolchain or establish build reproducibility.

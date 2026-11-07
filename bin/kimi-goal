@@ -1,0 +1,85 @@
+#!/bin/bash
+# kimi-goal — run a tooling goal headless in OpenCode on the Kimi Code plan.
+#
+# OpenCode loads the rules, skills, commands, and MCP servers (memory
+# included) that agentbrew syncs to ~/.config/opencode/. Only the model
+# differs: Kimi through OpenCode's built-in kimi-code-plan-global provider.
+#
+# Key: the Kimi Code key (Kimi Code Console, billed to the membership) is
+# read from `opencode auth login` or, for headless/launchd runs, from the
+# macOS Keychain:
+#   security add-generic-password -a "$USER" -s kimi-code-api-key -w
+# KIMI_API_KEY in the environment wins.
+#
+# Usage: kimi-goal [--dir DIR] [--rounds N] [--auto] [--dry-run] "<goal>"
+#        kimi-goal --check
+# Env:   KIMI_GOAL_MODEL (default kimi-code-plan-global/k3.1-pro)
+#        KIMI_GOAL_OPENCODE_BIN (default opencode)
+# Each round after the first continues the same session. A round that
+# prints a line starting with GOAL MET or GOAL BLOCKED ends the loop.
+set -euo pipefail
+
+SERVICE="kimi-code-api-key"
+SECURITY_BIN="${KIMI_GOAL_SECURITY_BIN:-security}"
+OC="${KIMI_GOAL_OPENCODE_BIN:-opencode}"
+model="${KIMI_GOAL_MODEL:-kimi-code-plan-global/k3.1-pro}"
+dir="$PWD" rounds=1 auto=false dry=false check=false goal=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dir) dir="$2"; shift 2 ;;
+    --rounds) rounds="$2"; shift 2 ;;
+    --auto) auto=true; shift ;;
+    --dry-run) dry=true; shift ;;
+    --check) check=true; shift ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    *) goal="${goal:+$goal }$1"; shift ;;
+  esac
+done
+
+case "$rounds" in ''|*[!0-9]*) echo "kimi-goal: --rounds needs a number" >&2; exit 64 ;; esac
+
+key_source="none"
+if [ -n "${KIMI_API_KEY:-}" ]; then
+  key_source="env"
+else
+  k="$("$SECURITY_BIN" find-generic-password -a "${USER:-}" -s "$SERVICE" -w 2>/dev/null)" || k=""
+  if [ -n "$k" ]; then export KIMI_API_KEY="$k"; key_source="keychain"; fi
+fi
+if [ "$key_source" = none ] && "$OC" auth list 2>/dev/null | grep -qi "kimi"; then
+  key_source="opencode-auth"
+fi
+
+if $check; then
+  echo "key: $key_source"
+  echo "model: $model"
+  [ "$key_source" != none ]
+  exit $?
+fi
+
+if [ -z "$goal" ]; then echo "kimi-goal: give a goal" >&2; exit 64; fi
+if [ "$key_source" = none ] && ! $dry; then
+  echo "kimi-goal: no Kimi Code key found." >&2
+  echo "Run: opencode auth login   (pick Kimi Code Plan), or save it to the Keychain:" >&2
+  echo "  security add-generic-password -a \"\$USER\" -s $SERVICE -w" >&2
+  exit 2
+fi
+
+prompt="Goal: $goal
+Work autonomously in $dir until the goal is met. Follow AGENTS.md and the run-goal skill. When done print GOAL MET with evidence; when blocked print GOAL BLOCKED with the reason."
+
+i=1
+while [ "$i" -le "$rounds" ]; do
+  args=(run -m "$model" --dir "$dir" --title "kimi-goal: ${goal:0:60}")
+  [ "$i" -gt 1 ] && args+=(--continue)
+  $auto && args+=(--auto)
+  msg="$prompt"; [ "$i" -gt 1 ] && msg="Continue the goal. Print GOAL MET or GOAL BLOCKED when it applies."
+  if $dry; then
+    printf 'round %s: %s' "$i" "$OC"; printf ' %q' "${args[@]}"; printf ' <prompt>\n'
+  else
+    out="$("$OC" "${args[@]}" "$msg" 2>&1 | tee /dev/stderr)" || true
+    # Only a line that starts with the marker counts; the prompt itself names it.
+    if grep -qE '^[[:space:]]*GOAL (MET|BLOCKED)' <<<"$out"; then exit 0; fi
+  fi
+  i=$((i + 1))
+done

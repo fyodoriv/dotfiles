@@ -11,6 +11,7 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 | **Claude Code** | XHigh | `claude-opus-5-5` + `effortLevel: "xhigh"` (per-machine override below) | `~/.claude/settings.json` | **dotfiles** (`.chezmoiscripts/run_after_claude-settings-model.sh` + `modules/claude/doctor.sh` → `claude.model_default`; `Agentfile.yaml` `defaultModel`/`defaultEffort` for agentbrew model sync) |
 | **Codex** | _carve-out_ | n/a — Codex is OpenAI-first (default `o3` / `gpt-5.X`); Anthropic isn't a first-class provider in `~/.codex/config.toml` | `~/.codex/config.toml` `model = "..."` (TOML top-level) | **operator** (carve-out — Codex defaults to OpenAI models; routing Codex through an Anthropic provider is out of scope for the tier-1 default) |
 | **Gemini CLI** | _carve-out_ | n/a — Gemini CLI uses Gemini-family models only, not Anthropic | `~/.gemini/settings.json` | **operator** (carve-out — different model family entirely; "Opus 5.5 XHigh" doesn't translate) |
+| **OpenCode** (CLI + Desktop) | per run | default stays local (`lmstudio/...`); Kimi runs pick `kimi-code-plan-global/k3.1-pro` with `-m` or the Desktop model picker | `~/.config/opencode/opencode.json` | **agentbrew** owns the file; dotfiles never writes it. `bin/kimi-goal` passes the model per run |
 | Per-persona `ANTHROPIC_MODEL` | — | varies | minsky `personaRunner.ts` | **minsky** (pipeline override) |
 
 **Identifier-string gotchas (these have bitten us before — verify before changing):**
@@ -26,3 +27,15 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 ## Claude Code env pins
 
 `.chezmoiscripts/run_after_claude-settings-env.sh` merges `AGENT_GUARD_DEPTH_MAX=2` into the `env` object of `~/.claude/settings.json` on every apply. This lets the agent-usage-guard plugin allow nested subagents up to depth 2 instead of its default depth 1. It also pins `AGENT_GUARD_AGENT_MAX=10`, the guard's limit on agents running at once on this Mac (owner choice 2026-11-06); it also pins `AGENT_GUARD_AGENT_TOKENS_MAX=25000000`, the guard's subagent token budget per window; its other agent limits keep their defaults. It writes through a symlink, keeps the file mode, and refuses to touch a settings file that is not valid JSON. The doctor check `claude.env_pins` warns on drift (`dotfiles doctor --module claude --fix` repairs it). It also pins `CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000`, so Claude Code compacts a conversation near 350k tokens. Without it, a 1M-context model grows past 400k, where the guard refuses tool calls that nobody can approve, and a long `/goal` run stops until someone types `/compact`. Check both with `jq .env ~/.claude/settings.json`. Test: `tests/claude-settings-env.bats`.
+
+## Kimi Code plan in OpenCode
+
+OpenCode Desktop (cask `opencode-desktop`) and the `opencode` CLI run Kimi through the built-in `kimi-code-plan-global` provider (endpoint `https://api.kimi.ai/coding/v1`, billed to the Kimi Code membership). agentbrew syncs the same rules, skills, commands, and MCP servers (memory included) to OpenCode as to Claude Code.
+
+1. Buy the Kimi Code plan and create a key in the Kimi Code Console. A platform API key bills per token instead.
+2. Store the key: `opencode auth login` (pick Kimi Code Plan). For headless or LaunchAgent runs, also save it to the Keychain: `security add-generic-password -a "$USER" -s kimi-code-api-key -w`.
+3. Check: `kimi-goal --check` (doctor line `local-ai.kimi_key`).
+4. GUI: open OpenCode Desktop and pick `Kimi Code Plan / k3.1-pro`.
+5. Headless goal: `kimi-goal --dir ~/apps/tooling/agentbrew --rounds 5 --auto "<goal>"`. Preview with `--dry-run`. `--auto` approves tool permissions that are not denied, so use it only for unattended runs in a worktree.
+
+Gaps against Claude Code: Claude Code hooks (agentbrew PreToolUse gates) do not run in OpenCode, so the git and gh wrappers in `bin/` are the only backstop.

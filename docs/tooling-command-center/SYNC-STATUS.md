@@ -107,6 +107,11 @@ full gate passed. It covers part of #475; that issue remains open.
 fixed imported unittest report format. Focused and stock-shell controls pass;
 the full gate is running. The event runner and real hook remain unqualified.
 
+[Agentbrew #856](https://github.com/fyodoriv/agentbrew/pull/856) prepares the
+JSON-bound core-rule selection model. Eleven synthetic controls and type
+checking pass; final discovery and the full gate remain. It does not qualify
+real enabled-plugin state or session delivery.
+
 [Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also
 contains nine pure owner-receipt controls for issue #810. The first format was
 rejected after review; the registered compatibility pivot passed. This does

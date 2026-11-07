@@ -19,7 +19,7 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Compare core-rule activation options; qualify the required gate before delivery. |
 | [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | Draft #851 prepares a bounded synthetic classifier; its full gate and real-event qualification remain. |
 | [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | The first baseline failed; draft #850 prepares a distinct fake-only schema protocol and awaits its final gate. |
-| [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | Draft #849 identifies a busy lease without reading or removing it; its final gate is pending. Safe release remains unproved. |
+| [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | PR #849 shipped busy-lease identification; safe release remains unproved. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Register the isolated owner-success observation; preserve the #767 boundary. |
 | [#789](https://github.com/fyodoriv/agentbrew/issues/789) | Check | The proposed compiler-error fallback conflicts with a frozen source-build pivot. |
 | [#752](https://github.com/fyodoriv/agentbrew/issues/752) | Prepare | Draft #755 needs a source-qualified compiler-free judge asset set, calibration and the connector contract. |

@@ -85,10 +85,9 @@ bounded reviewer-command classifier. Its synthetic controls and stock hook
 suite pass; the full gate and real event qualification remain. It sends no
 message and does not enable a hook.
 
-[Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) prepares
-read-only guidance for a busy source lease. Its two synthetic refusal controls
-and 16 existing lease tests pass; its final gate is pending. It does not
-authorize or implement stale-lease removal.
+[Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) merged
+read-only guidance for a busy source lease after its full 21-step gate passed.
+It does not authorize or implement stale-lease removal; issue #814 stays open.
 
 The sync-warning fix [#847](https://github.com/fyodoriv/agentbrew/pull/847)
 merged after its full 20-step gate passed; issue #787 is closed and local

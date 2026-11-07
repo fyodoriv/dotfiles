@@ -103,6 +103,10 @@ and full 22-step controls passed. Event integration remains open.
 active-account GitHub scope checks. Its eight controls, existing auth tests and
 full gate passed. It covers part of #475; that issue remains open.
 
+[Agentbrew #855](https://github.com/fyodoriv/agentbrew/pull/855) prepares the
+fixed imported unittest report format. Focused and stock-shell controls pass;
+the full gate is running. The event runner and real hook remain unqualified.
+
 [Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also
 contains nine pure owner-receipt controls for issue #810. The first format was
 rejected after review; the registered compatibility pivot passed. This does

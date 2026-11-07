@@ -157,7 +157,8 @@ them. -->
 
 - [ ] Make `make check` fast in the inner loop
   - **ID**: speed-up-make-check
-  - **Blocked**: needs-time — 2026-10-22: shipped per-test caching in `make test` (`bin/bats-affected --pairs` + `bin/cached-run --per-file --deps`, keyed on HEAD), an input-keyed cache for the install e2e, lazy lint lists (one `file` call), and inner-loop steering in AGENTS.md and the `make check` output (PR #261). Baseline 2026-10-22: dotfiles `make check` line 5m04s/day (27x in 9 sessions, p95 5m12s); tooling line 17m57s/day (42x in 3 sessions). A four-run edit loop took 1034 s before and 440 s after (repeat runs 459 s -> 65 s and 164 s -> 6 s). Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (the dotfiles `make check` line), then close or pivot.
+  - **Evidence**: On Nov 6, the registered seven-day agent time review reported six Dotfiles `make check` calls totaling 1,350,074 ms, or 3.21 min/day. This exceeds the 2 min/day pivot threshold; the original approach did not meet the outcome. The local gate-timing log points to the test phase as the largest aggregate, but its rows are not bound to those six calls, so they do not establish the cause of this result.
+  - **Next**: Pivot from relying on caching and steering alone. First register and qualify per-invocation attribution, then identify the slowest contributing step and propose a separately measured change. Keep existing caches and safety gates until a replacement is proved.
   - **Tags**: perf, agents
   - **Details**: The 2026-10-20 checkup time review: `make check` costs 2m38s/day (17x in 7 sessions, p95 5m12s). Agents run the full gate while iterating instead of `bin/bats-affected`.
   - **Files**: `Makefile`, `AGENTS.md`, `bin/cached-run`

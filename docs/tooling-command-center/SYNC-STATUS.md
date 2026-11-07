@@ -85,9 +85,9 @@ bounded reviewer-command classifier. Its synthetic controls, stock hook suite,
 and full gate passed. Real event qualification remains. It sends no message
 and does not enable a hook.
 
-[Agentbrew #852](https://github.com/fyodoriv/agentbrew/pull/852) tests the
-existing native pair verifier with sealed synthetic data. Both target controls
-pass; its full gate is pending. It does not qualify a real binary or install.
+[Agentbrew #852](https://github.com/fyodoriv/agentbrew/pull/852) shipped
+synthetic target controls for the existing native pair verifier. Both controls
+and the full 22-step gate passed. It does not qualify a real binary or install.
 
 [Agentbrew #853](https://github.com/fyodoriv/agentbrew/pull/853) preserves a
 rejected synthetic chat runner approach. A forged-mode control triggered a

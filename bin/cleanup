@@ -156,6 +156,10 @@ cleanup_main() {
   clean "Gradle daemon logs" "$HOME/.gradle/daemon"
   clean "Gradle caches (>30d)" "" "fd -t d -d 1 --changed-before 30d . $HOME/.gradle/caches --exec rm -rf {} 2>/dev/null"
 
+  # Node compile cache: one folder per Node version and arch; old versions
+  # (2.8 GB for a Rosetta-era x64 Node on the owner's Mac) are never read.
+  clean "Node compile cache (>14d)" "" "fd -t d -d 1 --changed-before 14d . $HOME/.cache/node-compile --exec rm -rf {} 2>/dev/null"
+
   # Xcode derived data (if exists)
   clean "Xcode derived data" "$HOME/Library/Developer/Xcode/DerivedData"
 

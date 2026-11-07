@@ -101,6 +101,11 @@
 {{-     $ageRecipient = promptStringOnce . "age_recipient" "age public key (recipient)" "" -}}
 {{-   end -}}
 {{- end -}}
+{{/* agent_scratch_idle_days: com.dotfiles.agent-scratch-prune deletes old agent scratch folders after this many idle days */ -}}
+{{- $agentScratchIdleDays := 30 -}}
+{{- if hasKey . "agent_scratch_idle_days" -}}
+{{-   $agentScratchIdleDays = int .agent_scratch_idle_days -}}
+{{- end -}}
 {{- $morningHour := 8 -}}
 {{- $morningMinute := 30 -}}
 {{- if eq $profile "full" -}}
@@ -245,6 +250,7 @@ data:
   keep_awake_tools: {{ $keepAwakeTools }}
   use_encryption: {{ $useEncryption }}
   age_recipient: {{ $ageRecipient | quote }}
+  agent_scratch_idle_days: {{ $agentScratchIdleDays }}
   morning_hour: {{ $morningHour }}
   morning_minute: {{ $morningMinute }}
   git_work_name: {{ $gitWorkName | quote }}

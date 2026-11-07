@@ -159,6 +159,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Auto-upgrade | `auto_upgrade` | `false` | Weekly Topgrade via LaunchAgent (Sunday 9 AM); managed-endpoint safe mode disables it while a required runtime publisher is blocked. |
 | Encryption | `use_encryption` | `false` | age encryption for secrets (requires key at `~/.config/chezmoi/key.txt`) |
 | age recipient | `age_recipient` | `unused-no-encryption-configured` | Your age public key. Prompted only when `use_encryption` is `true`. |
+| Agent scratch idle days | `agent_scratch_idle_days` | `30` | Days an agent scratch folder in `~/.local/state` sits unchanged before `com.dotfiles.agent-scratch-prune` deletes it (7-365). |
 | Morning briefing time | `morning_hour` / `morning_minute` | `8` / `30` | When the `morning` LaunchAgent runs. Prompted only on the full profile. |
 | Dotfiles directory | `dotfiles_dir` | `apps/dotfiles` | Path relative to `$HOME` where this repo lives. Leave as default unless you cloned elsewhere. |
 | Repos directory | `repos_dir` | `apps` | Path relative to `$HOME` where your code repos live. Used by `git-maintain` and doctor. |
@@ -894,6 +895,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |
+| `com.dotfiles.agent-scratch-prune` | `agent-scratch-prune` | Every 6 hours, and at load | Remove what AI agents leave behind: idle build output (2 days), clean pushed agent worktrees (7 days), old scratch folders (`agent_scratch_idle_days`, 30), temp-folder entries (3 days) (`logs/agent-scratch-prune.log`) |
 | `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools; company plugins to their newest signed release (opt-in: `auto_upgrade: true`) |
 
 **One LaunchAgent per job.** `dotfiles apply` unloads and deletes:
@@ -1301,6 +1303,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | Script | Description | Schedule |
 |--------|-------------|----------|
 | `cleanup` | Reclaim disk from caches, logs, and build artifacts | Weekly (Sun 3 AM) |
+| `agent-scratch-prune` | Reclaim disk that AI agents leave behind: idle `node_modules`/`.venv`/Cargo `target`, clean pushed worktrees in `~/.codex/worktrees`, old scratch folders in `~/.local/state`, and agent temp entries in the macOS per-user temp folder idle 3 days. Never touches dirty, unpushed, locked, or recent work. `--dry-run` lists what would go | Every 6 hours (LaunchAgent) |
 | `app-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |

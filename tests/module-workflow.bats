@@ -49,6 +49,10 @@ STUB
 
   is_overridden() { grep -qx "$1" "$OVERRIDES_FILE" 2>/dev/null; }
 
+  # Advisory checks never change the pass/fail counts; record id and test.
+  ADVISORY_LOG="$TEST_HOME/advisory.log"
+  check_advisory() { printf '%s\t%s\n' "$1" "$3" >> "$ADVISORY_LOG"; }
+
   check() {
     local id="$1" desc="$2" test_cmd="$3" fix_cmd="${4:-}"
     if $LIST_MODE; then return; fi
@@ -239,4 +243,22 @@ PLIST
   check() { printf '%s\n' "$1" >> "$CHECKED"; }
   source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
   grep -qx 'agent.chrome-dock-guard' "$CHECKED"
+}
+
+# ── disk.free_space ───────────────────────────────────────────────────
+# fake_df PCT — a df on PATH that reports PCT% of a 1000000 KB volume free.
+fake_df() {
+  mkdir -p "$TEST_HOME/fakebin"
+  printf '#!/bin/bash\necho "Filesystem 1024-blocks Used Available Capacity Mounted"\necho "/dev/x 1000000 0 %s 0%% /"\n' "$(($1 * 10000))" > "$TEST_HOME/fakebin/df"
+  chmod +x "$TEST_HOME/fakebin/df"
+}
+
+@test "workflow: disk.free_space passes at 10% free and fails at 5%" {
+  source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  test_cmd="$(awk -F'\t' '$1=="disk.free_space"{print $2}' "$ADVISORY_LOG")"
+  [ -n "$test_cmd" ]
+  fake_df 10
+  PATH="$TEST_HOME/fakebin:$PATH" eval "$test_cmd"
+  fake_df 5
+  ! PATH="$TEST_HOME/fakebin:$PATH" eval "$test_cmd"
 }

@@ -1,0 +1,275 @@
+#!/bin/bash
+# agent-scratch-prune — reclaim disk space that AI coding agents leave behind.
+#
+# Agents (Codex, Claude Code, others) copy whole repos into scratch folders,
+# build them, and never delete the result. On the owner's Mac this filled a
+# 926 GB disk: 40 GB in one goal-run folder and 28 GB of Codex worktrees in
+# about a week (2026-11-07). This job removes only what is safe to remove:
+#
+#   1. Build output (rebuildable): node_modules, Python .venv (with
+#      pyvenv.cfg), Python tool caches, and Cargo target dirs (CACHEDIR.TAG
+#      plus .rustc_info.json, so renamed targets count too), when
+#      nothing else in the project changed for BUILD_IDLE_DAYS (default 2).
+#   2. Agent worktrees: a git worktree under a worktree root that is clean,
+#      has no commit missing from a remote, is not locked, and saw no change
+#      for WORKTREE_IDLE_DAYS (default 7). Removed with `git worktree remove`.
+#      Empty leftover worktree folders go too.
+#   3. Old scratch folders in ~/.local/state: mktemp-style folders
+#      (name.Ab3xYz) and the entries inside *-goal-YYYY-MM-DD folders, when
+#      nothing in them changed for DIR_IDLE_DAYS (default 30).
+#   4. Old temp entries: files and folders in the macOS per-user temp folder
+#      (getconf DARWIN_USER_TEMP_DIR, where agent mktemp runs land) with no
+#      change for TMP_IDLE_DAYS (default 3, the age macOS itself uses).
+#      App entries (com.*, TemporaryItems) and sockets are skipped. Agents
+#      left 37 GB there in one week on the owner's Mac.
+#
+# Never touched: dirty or unpushed work, locked worktrees, anything changed
+# recently, symlinks, and any path outside the roots below.
+#
+# Runs every 6 hours from com.dotfiles.agent-scratch-prune. The folder idle
+# days come from the agent_scratch_idle_days setting (`dotfiles config`).
+#
+# Usage: agent-scratch-prune [--dry-run]
+#
+# Overrides (tests and one-off runs):
+#   AGENT_SCRATCH_STATE_DIR            default ~/.local/state
+#   AGENT_SCRATCH_WORKTREE_ROOTS       space-separated, default ~/.codex/worktrees
+#   AGENT_SCRATCH_BUILD_IDLE_DAYS      default 2
+#   AGENT_SCRATCH_WORKTREE_IDLE_DAYS   default 7
+#   AGENT_SCRATCH_DIR_IDLE_DAYS        default 30
+#   AGENT_SCRATCH_TMP_DIR              default: getconf DARWIN_USER_TEMP_DIR
+#   AGENT_SCRATCH_TMP_IDLE_DAYS        default 3
+
+set -euo pipefail
+
+DRY_RUN=false
+freed_kb=0
+removed_count=0
+
+_settings() {
+  STATE_DIR="${AGENT_SCRATCH_STATE_DIR:-$HOME/.local/state}"
+  WORKTREE_ROOTS="${AGENT_SCRATCH_WORKTREE_ROOTS:-$HOME/.codex/worktrees}"
+  BUILD_IDLE_DAYS="${AGENT_SCRATCH_BUILD_IDLE_DAYS:-2}"
+  WORKTREE_IDLE_DAYS="${AGENT_SCRATCH_WORKTREE_IDLE_DAYS:-7}"
+  DIR_IDLE_DAYS="${AGENT_SCRATCH_DIR_IDLE_DAYS:-30}"
+  TMP_DIR="${AGENT_SCRATCH_TMP_DIR:-$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || true)}"
+  TMP_DIR="${TMP_DIR%/}"
+  TMP_IDLE_DAYS="${AGENT_SCRATCH_TMP_IDLE_DAYS:-3}"
+}
+
+_kb() { du -sk "$1" 2>/dev/null | awk '{print $1+0}'; }
+
+# _recent PATH DAYS [SKIP] — true when any file under PATH (not inside .git
+# or SKIP) changed in the last DAYS days. Files only: removing a sibling
+# build dir bumps the folder's own time, which is not real work. Output is
+# captured, not piped: a pipe into `grep -q` can die of SIGPIPE under
+# pipefail and turn "recent" into "idle".
+_recent() {
+  local path="$1" days="$2" skip="${3:-/nonexistent-skip}"
+  [ -n "$(find "$path" \( -path "$skip" -o -name .git \) -prune \
+    -o \( -type f -o -type l \) -mtime "-$days" -print -quit 2>/dev/null)" ]
+}
+
+# _under_root PATH — true when PATH resolves inside the state dir or a
+# worktree root. Guards every rm -rf.
+_under_root() {
+  local target root resolved
+  target="$(cd "$(dirname "$1")" 2>/dev/null && pwd -P)/$(basename "$1")" || return 1
+  for root in "$STATE_DIR" $WORKTREE_ROOTS ${TMP_DIR:+"$TMP_DIR"}; do
+    resolved="$(cd "$root" 2>/dev/null && pwd -P)" || continue
+    case "$target" in "$resolved"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+_remove() {
+  local label="$1" path="$2" kb="${3:-}"
+  [ -L "$path" ] && return 0
+  if ! _under_root "$path"; then
+    echo "refused (outside agent scratch roots): $path" >&2
+    return 0
+  fi
+  [ -n "$kb" ] || kb="$(_kb "$path")"
+  if $DRY_RUN; then
+    echo "[dry-run] would remove $label: $path ($((kb / 1024)) MiB)"
+  else
+    rm -rf "$path" 2>/dev/null || true
+    echo "removed $label: $path ($((kb / 1024)) MiB)"
+  fi
+  freed_kb=$((freed_kb + kb))
+  removed_count=$((removed_count + 1))
+}
+
+# 1. Build output ──────────────────────────────────────────────────────────
+_build_dirs() {
+  local root="$1"
+  # node_modules and .venv: stop descending at the first match.
+  find "$root" -mindepth 1 -maxdepth 8 -type d \( -name .git -prune -o \( -name node_modules -o -name .venv \) -print -prune \) 2>/dev/null
+  # Cargo marks every target dir (also renamed ones) with CACHEDIR.TAG.
+  find "$root" -mindepth 2 -maxdepth 8 \( -name .git -o -name node_modules -o -name .venv \) -prune \
+    -o -type f -name CACHEDIR.TAG -print 2>/dev/null | sed 's|/CACHEDIR.TAG$||'
+}
+
+prune_build_output() {
+  local root="$1" dir project
+  [ -d "$root" ] || return 0
+  while IFS= read -r dir; do
+    [ -n "$dir" ] && [ -d "$dir" ] || continue
+    case "$(basename "$dir")" in
+      .venv) [ -f "$dir/pyvenv.cfg" ] || continue ;;
+    esac
+    case "$(basename "$dir")" in
+      node_modules | .venv | .pytest_cache | .ruff_cache | .mypy_cache) ;;
+      # Any other CACHEDIR.TAG dir counts only when it is a Cargo target.
+      *) [ -f "$dir/.rustc_info.json" ] || continue ;;
+    esac
+    project="$(dirname "$dir")"
+    _recent "$dir" "$BUILD_IDLE_DAYS" && continue
+    _recent "$project" "$BUILD_IDLE_DAYS" "$dir" && continue
+    _remove "build output" "$dir"
+  done < <(_build_dirs "$root" | sort -u)
+}
+
+# 2. Agent worktrees ───────────────────────────────────────────────────────
+_worktree_safe_to_remove() {
+  local checkout="$1" gitdir
+  gitdir="$(git -C "$checkout" rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+  [ -f "$gitdir/locked" ] && return 1
+  # Idle checks first: git status may refresh the index and bump its time.
+  _recent "$gitdir/HEAD" "$WORKTREE_IDLE_DAYS" && return 1
+  _recent "$gitdir/index" "$WORKTREE_IDLE_DAYS" && return 1
+  _recent "$checkout" "$WORKTREE_IDLE_DAYS" && return 1
+  [ -z "$(git --no-optional-locks -C "$checkout" status --porcelain 2>/dev/null)" ] || return 1
+  [ "$(git -C "$checkout" rev-list --count HEAD --not --remotes 2>/dev/null || echo 1)" = "0" ] || return 1
+  return 0
+}
+
+prune_worktrees() {
+  local root entry checkout kb
+  for root in $WORKTREE_ROOTS; do
+    [ -d "$root" ] || continue
+    for entry in "$root"/*; do
+      [ -d "$entry" ] && [ ! -L "$entry" ] || continue
+      checkout="$(find "$entry" -maxdepth 2 -name .git -print -quit 2>/dev/null)"
+      if [ -z "$checkout" ]; then
+        # Leftover folder with no files at all: an abandoned worktree shell.
+        if [ -z "$(find "$entry" -type f -print -quit 2>/dev/null)" ] \
+          && [ -z "$(find "$entry" -maxdepth 0 -mtime "-$WORKTREE_IDLE_DAYS" -print 2>/dev/null)" ]; then
+          _remove "empty worktree folder" "$entry"
+        fi
+        continue
+      fi
+      checkout="$(dirname "$checkout")"
+      _worktree_safe_to_remove "$checkout" || continue
+      kb="$(_kb "$entry")"
+      if $DRY_RUN; then
+        echo "[dry-run] would remove clean, pushed worktree: $checkout ($((kb / 1024)) MiB)"
+      else
+        git -C "$checkout" worktree remove "$checkout" 2>/dev/null || {
+          echo "kept (git worktree remove refused): $checkout" >&2
+          continue
+        }
+        [ "$entry" != "$checkout" ] && [ -d "$entry" ] && [ -z "$(find "$entry" -type f -print -quit 2>/dev/null)" ] && rm -rf "$entry"
+        echo "removed clean, pushed worktree: $checkout ($((kb / 1024)) MiB)"
+      fi
+      freed_kb=$((freed_kb + kb))
+      removed_count=$((removed_count + 1))
+    done
+  done
+}
+
+# 3. Old scratch folders ───────────────────────────────────────────────────
+# mktemp-style suffix: a dot plus 6-12 letters/digits with at least one
+# upper-case letter or digit (".Ab3xYz"), so ".backup" never matches.
+_is_mktemp_name() {
+  local suffix="${1##*.}"
+  [ "$suffix" != "$1" ] || return 1
+  printf '%s' "$suffix" | grep -Eq '^[A-Za-z0-9]{6,12}$' || return 1
+  printf '%s' "$suffix" | grep -q '[A-Z0-9]'
+}
+
+prune_old_scratch() {
+  local entry child
+  [ -d "$STATE_DIR" ] || return 0
+  for entry in "$STATE_DIR"/*; do
+    [ -e "$entry" ] && [ ! -L "$entry" ] || continue
+    case "$(basename "$entry")" in
+      *-goal-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9])
+        [ -d "$entry" ] || continue
+        for child in "$entry"/* "$entry"/.[!.]*; do
+          [ -e "$child" ] && [ ! -L "$child" ] || continue
+          _recent "$child" "$DIR_IDLE_DAYS" && continue
+          _remove "old goal scratch" "$child"
+        done
+        ;;
+      *)
+        [ -d "$entry" ] && _is_mktemp_name "$(basename "$entry")" || continue
+        _recent "$entry" "$DIR_IDLE_DAYS" && continue
+        _remove "old scratch folder" "$entry"
+        ;;
+    esac
+  done
+}
+
+# 4. Old temp entries ─────────────────────────────────────────────────────
+# _tmp_scan PATH CUTOFF — one walk prints "recent" (a file changed after the
+# CUTOFF epoch), "empty" (no files), or the size in KB. The temp folder can
+# hold 60,000+ entries, so one process walk per entry, not four.
+_tmp_scan() {
+  find "$1" \( -type f -o -type l \) -exec stat -f '%m %b' {} + 2>/dev/null \
+    | awk -v cut="$2" '{ n++; if ($1 > cut) r = 1; b += $2 }
+        END { if (r) print "recent"; else if (n == 0) print "empty"; else print int(b / 2) }' || true
+}
+
+prune_old_tmp() {
+  local entry scan cutoff
+  [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ] || return 0
+  cutoff=$(($(date +%s) - TMP_IDLE_DAYS * 86400))
+  for entry in "$TMP_DIR"/* "$TMP_DIR"/.[!.]*; do
+    [ -e "$entry" ] && [ ! -L "$entry" ] || continue
+    [ -f "$entry" ] || [ -d "$entry" ] || continue
+    case "${entry##*/}" in
+      com.* | TemporaryItems) continue ;;
+    esac
+    scan="$(_tmp_scan "$entry" "$cutoff")"
+    # "empty": a folder with no files may be a tool's fresh work area.
+    case "$scan" in recent | empty | "") continue ;; esac
+    _remove "old temp entry" "$entry" "$scan"
+  done
+}
+
+agent_scratch_prune_main() {
+  case "${1:-}" in
+    -h | --help)
+      sed -n '/^#!/d; /^$/q; /^[^#]/q; s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+      return 0
+      ;;
+    --dry-run) DRY_RUN=true ;;
+    "") ;;
+    *) echo "unknown option: $1 (try --help)" >&2; return 2 ;;
+  esac
+  _settings
+  # Keep the LaunchAgent log bounded (it appends one line per removal).
+  local log="$HOME/.local/share/dotfiles/logs/agent-scratch-prune.log"
+  if [ -f "$log" ]; then
+    tail -n 2000 "$log" > "$log.tmp" && mv "$log.tmp" "$log" || rm -f "$log.tmp"
+  fi
+  freed_kb=0
+  removed_count=0
+
+  prune_worktrees
+  prune_build_output "$STATE_DIR"
+  local root
+  for root in $WORKTREE_ROOTS; do prune_build_output "$root"; done
+  prune_old_scratch
+  prune_old_tmp
+
+  local verb="freed"
+  $DRY_RUN && verb="would free"
+  printf 'agent-scratch-prune: %s %d.%d GiB in %d item(s)\n' "$verb" \
+    $((freed_kb / 1048576)) $(((freed_kb % 1048576) * 10 / 1048576)) "$removed_count"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  agent_scratch_prune_main "$@"
+fi

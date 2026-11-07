@@ -127,6 +127,10 @@ settings:
     type: token
     default: unused-no-encryption-configured
     description: Your age public key. Used only when use_encryption is true.
+  agent_scratch_idle_days:
+    type: int:7-365
+    default: 30
+    description: Days an agent scratch folder (~/.local/state mktemp or goal folders) sits unchanged before com.dotfiles.agent-scratch-prune deletes it. Build output goes after 2 days, clean pushed agent worktrees after 7.
   morning_hour:
     type: int:0-23
     default: 8

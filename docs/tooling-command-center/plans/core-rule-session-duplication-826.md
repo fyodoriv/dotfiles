@@ -52,3 +52,9 @@ does not prove how a particular live agent dispatches them.
 
 Anchors: #826's scoped-rule contract; Basili, Caldiera and Rombach (1994),
 Goal Question Metric; Munafò et al. (2017), preregistration.
+
+The registered oracle passed: it observed two generated hook commands and one
+canonical body in each independently captured handler output. The candidate
+therefore meets the original duplicate rejection threshold. Its uncommitted
+source and test remain in the task-owned worktree. This models dispatch and
+does not claim a live agent session was observed.

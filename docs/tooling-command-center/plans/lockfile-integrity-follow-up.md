@@ -13,3 +13,7 @@ and safe lockfile-regeneration experiment before any lockfile change. Preserve
 install behavior and require the normal dependency and full gates. The count
 command inspected `packages` entries, excluded the root and entries marked
 `link`, and counted absent `integrity` fields.
+
+A later local classification found no `resolved` field on any of the 79.
+Of these, 65 are marked development dependencies and three are optional;
+these categories can overlap. This still does not prove a vulnerability.

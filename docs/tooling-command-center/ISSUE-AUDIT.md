@@ -17,7 +17,7 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#828](https://github.com/fyodoriv/agentbrew/issues/828) | Check | The prior recording control was invalid. PR #844 proved only a saved-frame VP9 codec path; live capture, timing, cleanup and agent use remain unproved. |
 | [#827](https://github.com/fyodoriv/agentbrew/issues/827) | Check | Qualify a decision eval and a separate sync-cost baseline. |
 | [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Compare core-rule activation options; qualify the required gate before delivery. |
-| [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | #851 shipped a synthetic classifier; real-event and delivery qualification remain. |
+| [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | #851 shipped a synthetic classifier. The event-gate oracle failed; a distinct gate and real-event qualification remain. |
 | [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | The first baseline failed; #853's synthetic approach met its rejection threshold. Register a distinct approach before measurement. |
 | [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | PR #849 shipped busy-lease identification; safe release remains unproved. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Nine pure receipt controls are in #767; qualify an isolated observation and ownership before any physical admission. |

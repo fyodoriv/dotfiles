@@ -239,3 +239,11 @@ The [Darwin sandbox boundary probe](plans/judge-darwin-sandbox-probe.md)
 passed six synthetic checks. Independent review verified the saved statuses,
 profile and canaries. This does not qualify compiler descendants or their
 cleanup. The loopback positive control was in the parent process.
+
+[Dotfiles #524](https://github.com/fyodoriv/dotfiles/pull/524) made the
+optional mas check advisory, with owner guidance and no installer launch. The
+three focused controls and 12-test resilience suite passed. The original
+one-job gate failed on Bats option parsing; the separately registered serial
+gate passed 12 selected files and plugin checks with a fresh cache. Independent
+review confirmed the selector, log and final commit. Local Dotfiles advanced to
+`bd830443`; issue #475 remains open.

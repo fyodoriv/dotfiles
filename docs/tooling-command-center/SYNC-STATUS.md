@@ -73,6 +73,13 @@ controls; its real health channel and group-signal runner remain unqualified.
 [Agentbrew #830](https://github.com/fyodoriv/agentbrew/pull/830) passed sixteen
 fake-transport receipt controls and added a checked step to the local full gate.
 Hosted CI remains separate. No model baseline or real chat was used.
+Its full gate is running on a revision that also tracks the still-open
+measurement task.
+
+[Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) prepares
+read-only guidance for a busy source lease. Its two synthetic refusal controls
+and 16 existing lease tests pass; its final gate is pending. It does not
+authorize or implement stale-lease removal.
 
 The sync-warning fix [#847](https://github.com/fyodoriv/agentbrew/pull/847)
 merged after its full 20-step gate passed; issue #787 is closed and local

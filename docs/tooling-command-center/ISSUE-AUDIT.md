@@ -19,7 +19,7 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Compare core-rule activation options; qualify the required gate before delivery. |
 | [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | Design and register reviewer-action coverage; qualify the required gate. |
 | [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | Draft #830 now has a fail-closed reservation, 16 passing synthetic controls and local gate discovery; qualify its final tree. |
-| [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | Define safe lease recovery without reusing PID-only identity or closed cohorts. |
+| [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | Draft #849 identifies a busy lease without reading or removing it; its final gate is pending. Safe release remains unproved. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Register the isolated owner-success observation; preserve the #767 boundary. |
 | [#789](https://github.com/fyodoriv/agentbrew/issues/789) | Check | The proposed compiler-error fallback conflicts with a frozen source-build pivot. |
 | [#752](https://github.com/fyodoriv/agentbrew/issues/752) | Prepare | Draft #755 needs a source-qualified compiler-free judge asset set, calibration and the connector contract. |

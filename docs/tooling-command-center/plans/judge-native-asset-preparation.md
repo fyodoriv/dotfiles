@@ -151,3 +151,14 @@ Success requires 14/14 and independent review of all three bindings. Any
 unsafe acceptance, missed positive, skipped test or missing binding rejects
 this approach. This remains a synthetic boundary, not an installation proof.
 The GQM and preregistration anchors above apply.
+
+## Asset-set pivot rejected
+
+On Nov 7, 2026, the 14 named tests reported 14 passes with zero skipped
+cases. Independent review found that the model compared each architecture
+only with its own receipt. A self-consistent asset set for the wrong host
+target could pass. The registered review requirement therefore failed.
+The second model is also unqualified and remains uncommitted as evidence.
+A future proposal must bind the target independently and register its
+measurement before implementation. Neither synthetic model qualifies a real
+receipt, ownership check, compiler resolver or production installation.

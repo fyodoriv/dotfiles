@@ -12,3 +12,12 @@ and queue epoch remain separate, unqualified boundaries.
 
 The queue project-identity reader has shipped. Its preparation does not make
 the current metadata private or authorize an opaque-writer cutover.
+
+The registered seven-day `make check` result crossed its pivot threshold.
+[PR #509](https://github.com/fyodoriv/dotfiles/pull/509) records the result;
+the speed task remains open. Existing step timings lack a run identifier and
+cannot yet be tied to the measured tool calls.
+
+The Dotfiles Rust inventory task permits source collection before its shared
+validator is available. A pinned agent-hook source receipt is being registered
+as a partial collection; it cannot close the repository-wide inventory task.

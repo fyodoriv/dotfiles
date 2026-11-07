@@ -39,7 +39,23 @@ service settings, owner processes, or resource limits during preparation.
 - **Evidence / acceptance:** Every task is actionable, blocked with a reason, or explicitly unknown.
 - **Verification:** Read the current task blocks and linked PR states.
 
-### 2. Qualify the compiler decision boundary
+### 2. Prepare gate timing attribution
+- **Why:** Aggregate step rows cannot establish which phase caused the measured pivot.
+- **Parallelism:** After task 1; may proceed alongside the compiler boundary review.
+- **Owner / boundary:** Dotfiles gate timing and its existing consumers.
+- **Change:** Register and qualify a way to bind step records to the correct invocation, including concurrent runs and the tool-time metric boundary.
+- **Evidence / acceptance:** An independent review accepts the frozen controls and exact pre-registered measurement before code; old records and privacy remain safe.
+- **Verification:** The reviewed measurement command and the repository gate.
+
+### 3. Collect the agent-hook source slice
+- **Why:** The migration inventory needs source-bound evidence for executable entrypoints and embedded interpreter boundaries.
+- **Parallelism:** After task 1; independent of the shared validator's delivery.
+- **Owner / boundary:** Dotfiles tracked `agent-hooks/` sources at a pinned Git revision.
+- **Change:** Land a reproducible receipt registration, then collect and independently review the bounded source slice.
+- **Evidence / acceptance:** All tracked paths match the pinned tree; every recorded anchor matches its source; registered planted errors are rejected. The overall inventory remains open.
+- **Verification:** The exact command in the landed source-receipt registration, independent source review, and the repository gate.
+
+### 4. Qualify the compiler decision boundary
 - **Why:** A receipt checker alone cannot prove correct decisions.
 - **Parallelism:** After task 1; independent of other safe task research.
 - **Owner / boundary:** Dotfiles test-only compiler observation fixture.
@@ -47,7 +63,7 @@ service settings, owner processes, or resource limits during preparation.
 - **Evidence / acceptance:** A reviewed, committed prediction names the subject, inputs, failure controls, command, success and pivot before implementation; live observation remains unclaimed.
 - **Verification:** The registered fixture command and independent review.
 
-### 3. Deliver qualified changes
+### 5. Deliver qualified changes
 - **Why:** Make proved behavior available and keep local defaults current.
 - **Parallelism:** After the relevant experiment and required gate pass.
 - **Owner / boundary:** The owning repository and its normal delivery gate.

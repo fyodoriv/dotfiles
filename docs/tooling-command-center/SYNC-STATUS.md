@@ -271,3 +271,10 @@ review read all 33 sources and checked the exact commit. The fresh repository
 gate passed its one selected test file and both plugin suites; installer e2e
 was skipped under the no-installer-change rule. The receipt does not prove
 full checks, repairs or dynamic callers. Local Dotfiles advanced to `975a254`.
+
+[Dotfiles #528](https://github.com/fyodoriv/dotfiles/pull/528) gave manual
+steps for stale and unloaded network agents. Both registered red cases, five
+focused controls and the 25-test resilience suite passed. The fresh serial
+gate checked 12 selected files and both plugin suites; installer e2e was
+skipped under the no-installer-change rule. Independent review verified the
+final commit and gate. Local Dotfiles advanced to `eda4397`; #475 remains open.

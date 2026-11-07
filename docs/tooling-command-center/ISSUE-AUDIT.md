@@ -18,11 +18,11 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#827](https://github.com/fyodoriv/agentbrew/issues/827) | Check | Qualify a decision eval and a separate sync-cost baseline. |
 | [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Compare core-rule activation options; qualify the required gate before delivery. |
 | [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | Design and register reviewer-action coverage; qualify the required gate. |
-| [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Blocked | Draft #830 needs a permitted full-gate route before its baseline. |
+| [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | Draft #830 now has a fail-closed reservation and 16 passing synthetic controls; qualify its final tree and durable test discovery. |
 | [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | Define safe lease recovery without reusing PID-only identity or closed cohorts. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Register the isolated owner-success observation; preserve the #767 boundary. |
 | [#789](https://github.com/fyodoriv/agentbrew/issues/789) | Check | The proposed compiler-error fallback conflicts with a frozen source-build pivot. |
-| [#787](https://github.com/fyodoriv/agentbrew/issues/787) | Blocked | Draft #847 needs a compliant full-gate route. |
+| [#787](https://github.com/fyodoriv/agentbrew/issues/787) | Prepare | Review draft #847 on its clean tree and run the ordinary full gate. |
 | [#752](https://github.com/fyodoriv/agentbrew/issues/752) | Prepare | Qualify calibration and the connector contract for draft #755. |
 | [#692](https://github.com/fyodoriv/agentbrew/issues/692) | Prepare | Register bounded parallel-fetch and process-group controls. |
 | [#572](https://github.com/fyodoriv/agentbrew/issues/572) | Prepare | Qualify the registered checkup recorder callers and safety controls. |

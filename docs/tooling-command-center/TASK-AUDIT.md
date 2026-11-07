@@ -12,13 +12,13 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | sync-selection-preflight | Prepare | Register and land the synthetic measurement first. |
 | source-lease-real-failure-classification | Blocked | The natural cohort is closed without a classified failure. |
 | source-lease-release-window-research | Blocked | The controlled cohort is exhausted; qualification failed. |
-| plugin-lifecycle-timeout-observation | Blocked | Draft #819 needs a permitted full-gate route. |
+| plugin-lifecycle-timeout-observation | Check | Nine pure recorder-health controls pass in draft #819; process-group ownership remains unqualified. |
 | locked-install-evidence | Prepare | Land the registered instrumentation before repair. |
 | dependency-alert-remediation | Prepare | Freeze and prepare the registered negative controls; full graph remains constrained. |
 | dependency-alerts-172-175 | Check | Refresh published-parent compatibility evidence. |
 | dependency-peer-compatibility | Check | Refresh published peer and parent compatibility. |
 | nudge-polling-loops-to-blocking-waits | Blocked | A full verified seven-day field cohort is required. |
-| eval-id-composition-observation | Prepare | Implement the registered synthetic observation harness. |
+| eval-id-composition-observation | Check | The synthetic harness and evidence are in draft #848; the ordinary full gate is running on its clean tree. |
 | rust-source-inventory | Prepare | Continue existing draft #767 and its worker qualification. |
 | rust-measurement-harness | Blocked | Needs the source inventory. |
 | rust-native-delivery | Blocked | Needs the measurement harness. |

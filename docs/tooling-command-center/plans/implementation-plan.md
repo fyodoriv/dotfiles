@@ -74,6 +74,5 @@ service settings, owner processes, or resource limits during preparation.
 ## Rollout, security, and regression coverage
 
 Preserve frozen cases, closed cohorts, existing queue safety checks and private
-data. Do not promote a synthetic result into a live ownership claim. The
-Agentbrew full-gate conflict and the compiler capture authority remain open
-decisions; each needs an independently reviewed qualification path.
+data. Do not promote a synthetic result into a live ownership claim. An ordinary Agentbrew gate may run on a clean unrelated tree outside the
+closed research cohorts. Compiler capture authority remains unqualified.

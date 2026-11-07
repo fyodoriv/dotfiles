@@ -56,3 +56,15 @@ issue #475, which remains open. The Dock-guard issue #487 remains unverified:
 a disabled job alone does not establish the options used by its doctor skip.
 The compiler holdout author confirmed that its platform was unspecified; it
 cannot be retrospectively claimed as a Darwin-specific fixture.
+
+Agentbrew [draft PR #848](https://github.com/fyodoriv/agentbrew/pull/848)
+contains the registered eval-ID composition observation. Four synthetic
+controls and the existing validator tests passed. Two independent reviews found an ordinary clean-tree gate permissible outside
+the closed cohorts. It is running; the task stays open until it passes.
+
+The pure recorder-health preparation in
+[Agentbrew #819](https://github.com/fyodoriv/agentbrew/pull/819) passed nine
+controls; its real health channel and group-signal runner remain unqualified.
+[Agentbrew #830](https://github.com/fyodoriv/agentbrew/pull/830) passed sixteen
+separate fake-transport receipt controls; normal Vitest discovery does not yet
+run that Node suite. No model baseline or real chat was used.

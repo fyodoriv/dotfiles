@@ -57,6 +57,22 @@ The endpoint-path scripts also source shared helpers or invoke managed shim
 helpers. Independent review checked the source family; the receipt does not
 claim every dynamic caller or semantic boundary is covered.
 
+## Doctor module sources
+
+The [doctor source receipt](doctor-source-receipt.json) pins the tracked
+`modules/*/doctor.sh` family at its recorded Git revision. It records each
+file's mode and blob plus one selected check or function boundary per file.
+The read-only [receipt checker](doctor-source-receipt-check.py) compares the
+receipt to the pinned tree and rejects planted identity and anchor errors.
+Run it from the repository root:
+
+```sh
+python3 docs/plans/doctor-source-receipt-check.py
+```
+
+These anchors are entry points for review, not a full list of executable
+boundaries or dynamic callers. The shared Rust validator is still required.
+
 ## Continue the inventory
 
 Use the pinned Git blob IDs to compare the ledger with the current tree.

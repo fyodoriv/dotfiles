@@ -1,0 +1,318 @@
+{
+  "format": 1,
+  "revision": "fb319879feb3f036fe1243fbb22821b9be69c5df",
+  "files": [
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "mode": "100755",
+      "blob": "707535f119447e360aaa40fd87cc31cff7db0b94"
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "mode": "100755",
+      "blob": "16139a7bc922c1a68d9a7bd8a0df9c47c848712b"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "mode": "100644",
+      "blob": "5de664ddc388d3b6500b255d95dc8ffb8e44374a"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "mode": "100755",
+      "blob": "0fb00800f5815414dba2739d0821a3b7811f52a7"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "mode": "100755",
+      "blob": "3385121a5b325b0941acbe95ddff60a80d984d88"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "mode": "100755",
+      "blob": "c8603e87e37aa6bdb387281f20a3b13b6686c1fe"
+    },
+    {
+      "path": "agent-hooks/with-endpoint-path.sh",
+      "mode": "100755",
+      "blob": "7ba38ee681a3a0dd1a7edca283394fa7f2e306f4"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 12,
+      "text": "source \"$_hook_dir/bootstrap-endpoint-path.sh\""
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 24,
+      "text": "    if command -v shfmt >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 &&"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 25,
+      "text": "      _document_tree=$(printf '%s' \"$command\" | shfmt --to-json 2>/dev/null | jq -ce -f \"$_hook_dir/plain-document-write.jq\" 2>/dev/null); then"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 36,
+      "text": "      if $_document_safe && _command_code=$(printf '%s' \"$_document_tree\" | jq '.tree' | shfmt --from-json 2>/dev/null); then"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 124,
+      "text": "is_git_word() { case \"$1\" in [gG][iI][tT]) return 0 ;; esac; return 1; }"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 166,
+      "text": "  case \"$command\" in"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 284,
+      "text": "  case \"$rest\" in *[\\;\\&\\|\\\\$'\\n']*) return 1 ;; esac"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "line": 416,
+      "text": "case \"$command\" in"
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "line": 32,
+      "text": "  hook_root=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd 2>/dev/null || true)\""
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "line": 51,
+      "text": "  source \"$lib_root/lib/dotfiles-endpoint-paths.sh\""
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "line": 62,
+      "text": "  jq_path=\"$(dotfiles_resolve_jq \"$dotfiles_dir\" \"$home\" 2>/dev/null || true)\""
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "line": 65,
+      "text": "  py_path=\"$(dotfiles_resolve_python \"$dotfiles_dir\" \"$home\" python3 2>/dev/null || true)\""
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "line": 81,
+      "text": "if [[ \"${BASH_SOURCE[0]}\" != \"${0}\" ]]; then"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 1,
+      "text": "# Recognize one plain cat invocation, never a shell input or pipeline."
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 3,
+      "text": "def quoted_delimiter:"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 7,
+      "text": "def output_path:"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 11,
+      "text": "select(.Type == \"File\" and (.Stmts | length) == 1)"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 16,
+      "text": "| select($statement.Cmd.Type == \"CallExpr\" and"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 21,
+      "text": "         ($statement.Cmd.Args[0].Parts[0].Value | IN(\"cat\", \"/bin/cat\", \"/usr/bin/cat\")))"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 29,
+      "text": "    (.Op == \"<<\" or .Op == \"<<-\") and"
+    },
+    {
+      "path": "agent-hooks/plain-document-write.jq",
+      "line": 32,
+      "text": "| {"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 14,
+      "text": "source \"$_hook_dir/bootstrap-endpoint-path.sh\""
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 83,
+      "text": "case \"$tool\" in"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 107,
+      "text": "done <<EOF"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 108,
+      "text": "/usr/bin/python3.13|$_shim/python3.13"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 111,
+      "text": "/usr/bin/jq|$_shim/jq"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 112,
+      "text": "/usr/bin/perl|$_shim/perl"
+    },
+    {
+      "path": "agent-hooks/prepend-endpoint-path.sh",
+      "line": 115,
+      "text": "/usr/bin/awk|$_shim/awk"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 10,
+      "text": "source \"$_hook_dir/bootstrap-endpoint-path.sh\""
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 47,
+      "text": "  case \"$1\" in test|test:*|test-*|t|build|verify|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 190,
+      "text": "_strip_text() {"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 191,
+      "text": "  /usr/bin/perl -0777 -pe '"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 195,
+      "text": "      $s =~ s/<<-?\\s*([\"\\x27]?)(\\w+)\\1([^\\n]*\\n)(?:.*?\\n)??[ \\t]*\\2[ \\t]*$/ $3/gms;"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 214,
+      "text": "        $r/gsex;"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 219,
+      "text": "    $_ = strip($_);"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 220,
+      "text": "  '"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "line": 230,
+      "text": "done < <(printf '%s\\n' \"$command\" | _strip_text | sed -E 's/(&&|\\|\\||;|\\||[(){}])/\\n/g')"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 39,
+      "text": "  source \"$_lib_root/lib/dotfiles-endpoint-paths.sh\""
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 53,
+      "text": "_path_prefix=\"$(dotfiles_agent_path_prefix \"$_dotfiles_dir\" \"$_home\")\""
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 57,
+      "text": "  DOTFILES_ADHOC_SIGN_QUIET=1 \"$_dotfiles_dir/bin/dotfiles-adhoc-sign-jq\" 2>/dev/null || true"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 59,
+      "text": "    \"$_dotfiles_dir/bin/dotfiles-link-jq-shim\" 2>/dev/null || true"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 62,
+      "text": "  DOTFILES_ADHOC_SIGN_QUIET=1 \"$_dotfiles_dir/bin/dotfiles-adhoc-sign-ggrep\" 2>/dev/null || true"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 64,
+      "text": "    \"$_dotfiles_dir/bin/dotfiles-link-grep-shim\" 2>/dev/null || true"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 67,
+      "text": "  DOTFILES_ADHOC_SIGN_QUIET=1 \"$_dotfiles_dir/bin/dotfiles-adhoc-sign-uv-pythons\" 2>/dev/null || true"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 69,
+      "text": "    \"$_dotfiles_dir/bin/dotfiles-link-python-shim\" 2>/dev/null || true"
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 72,
+      "text": "_py_cmd=\"$(dotfiles_resolve_python \"$_dotfiles_dir\" \"$_home\" python3 2>/dev/null || echo python3)\""
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "line": 73,
+      "text": "\"$_py_cmd\" \"$_lib_root/lib/dotfiles-agent-session-env.py\" \"$_dotfiles_dir\" \"$_home\" \"$_path_prefix\""
+    },
+    {
+      "path": "agent-hooks/with-endpoint-path.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "agent-hooks/with-endpoint-path.sh",
+      "line": 18,
+      "text": "source \"$_hook_dir/bootstrap-endpoint-path.sh\""
+    },
+    {
+      "path": "agent-hooks/with-endpoint-path.sh",
+      "line": 25,
+      "text": "exec \"$@\""
+    }
+  ]
+}

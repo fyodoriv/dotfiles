@@ -80,6 +80,11 @@ reused; no real chat was used. Its task and issue #821 remain open.
 separate schema-based protocol using only fake transport. Ten protocol and four
 gate controls pass; its final gate is pending. No new baseline was run.
 
+[Agentbrew #851](https://github.com/fyodoriv/agentbrew/pull/851) prepares a
+bounded reviewer-command classifier. Its synthetic controls and stock hook
+suite pass; the full gate and real event qualification remain. It sends no
+message and does not enable a hook.
+
 [Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) prepares
 read-only guidance for a busy source lease. Its two synthetic refusal controls
 and 16 existing lease tests pass; its final gate is pending. It does not

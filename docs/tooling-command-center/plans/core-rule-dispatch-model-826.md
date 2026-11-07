@@ -21,6 +21,8 @@ missing or malformed fields are unqualified. Session IDs must be nonblank
 strings. Rule IDs and known IDs must be valid nonempty strings. Reject invalid
 arrays or records rather than treating them as empty or disabled. Dispatcher
 counts other than one are unqualified.
+Legacy-hook presence must also be an exact boolean, and plugin IDs must be
+nonblank strings; malformed values are unqualified.
 
 Freeze these 10 named controls in
 `src/plugins/core-rule-dispatch-model.test.ts` before implementing the helper:
@@ -38,15 +40,16 @@ ninth requires `unqualified` for an eligible unknown ID. The tenth requires
 `unqualified` for duplicate plugin IDs with conflicting data. Assert that the
 deep-frozen input object is unchanged in every case, including unqualified
 paths. Fold zero and two dispatcher counts into the seventh case, malformed
-types into the fifth and sixth, and invalid rule/known-ID values into the ninth.
+types, including the legacy flag, into the fifth through seventh, invalid
+rule/known-ID values into the ninth, and invalid plugin IDs into the tenth.
 No file or settings mutation is part of the helper.
 
 Before the helper, the first named case must fail against a test-only
 placeholder with the assertion diagnostic `dispatcher placeholder`. After
 implementation use the exact JSON oracles below. Each
 oracle requires the expected named status, and green requires exactly 10
-passed, zero failed or pending tests. Preserve the report privately if a
-control fails. Any duplicate selected ID, false success on an unqualified case,
+passed, zero failed or pending tests. Preserve the green qualification report
+privately if a control fails. Any duplicate selected ID, false success on an unqualified case,
 input mutation, process or network call, or missing case rejects this model.
 Process/network absence is source-reviewed only, not a measured sandbox claim.
 An independent source review is required. Gate discovery and any production

@@ -263,3 +263,11 @@ five focused controls and the 20-test resilience suite passed. A fresh serial
 gate ran all 12 selected files and the plugin suites; install e2e was skipped
 under the no-installer-change rule. Independent review checked the exact commit
 and gate evidence. Local Dotfiles advanced to `a846166`; #475 remains open.
+
+[Dotfiles #527](https://github.com/fyodoriv/dotfiles/pull/527) recorded
+pinned identities and one representative boundary for each of 33 doctor
+modules. The checker rejected 264 planted errors in two runs. Independent
+review read all 33 sources and checked the exact commit. The fresh repository
+gate passed its one selected test file and both plugin suites; installer e2e
+was skipped under the no-installer-change rule. The receipt does not prove
+full checks, repairs or dynamic callers. Local Dotfiles advanced to `975a254`.

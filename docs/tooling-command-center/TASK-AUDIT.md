@@ -77,7 +77,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | apply-skip-unchanged-scripts | Blocked | Needs a timed full apply on the managed Mac. |
 | checkup-skip-apply-when-unchanged | Check | Two qualifying later checkups are not yet evidenced locally. |
 | speed-up-make-check | Prepare | Synthetic attribution controls passed; register real-agent receipt delivery. |
-| rust-source-inventory | Prepare | Continue source collection; the final adapter needs Agentbrew's validator. |
+| rust-source-inventory | Prepare | #527 pinned doctor module identities and representative boundaries; continue source collection. The final adapter needs Agentbrew's validator. |
 | rust-measurement-harness | Blocked | Needs source inventory and the shared harness. |
 | rust-native-delivery | Blocked | Needs the measurement harness. |
 | rust-process-primitives | Blocked | Needs native delivery. |

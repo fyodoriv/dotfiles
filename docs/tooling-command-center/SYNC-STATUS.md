@@ -5,10 +5,22 @@ Dotfiles task blocks. Explicit blocked fields do not capture every dependency.
 Separate audits are checking the tasks against source, existing PRs, and the
 actual acceptance criteria. GitHub issues and PRs overlap these task blocks.
 
+The first pass found actionable preparation in both repositories. Agentbrew
+includes sync-selection, locked-install, dependency evidence, eval-ID,
+inventory, checkup-record, document-capture, browser-error and leak-audit
+work. Dotfiles includes compiler-observation preparation, queue-privacy
+prerequisites, source collection and the measured gate-speed pivot. An
+actionable preparation step does not mean its whole task is deliverable.
+Other tasks remain blocked or need current evidence; do not count missing
+samples as success.
+
 The compiler queue protocol and receipt oracle have shipped. An independent
 review found that the oracle does not execute an observer against the sealed
 cases, so its zero-false-decision criterion is not yet proved. The live capture
 and queue epoch remain separate, unqualified boundaries.
+[PR #512](https://github.com/fyodoriv/dotfiles/pull/512) registered the
+test-only oracle harness and its controls. Its implementation is in dry run;
+no decision subject or live observer has been qualified.
 
 The queue project-identity reader has shipped. Its preparation does not make
 the current metadata private or authorize an opaque-writer cutover.

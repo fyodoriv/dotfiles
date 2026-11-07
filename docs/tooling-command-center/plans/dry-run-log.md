@@ -10,3 +10,18 @@ record errors. Independent source review passed. The delivery checkout
 repeated the same check, and [PR #511](https://github.com/fyodoriv/dotfiles/pull/511)
 merged. This is bounded source evidence, not a deployed-hook or
 whole-inventory result.
+
+## Compiler oracle harness
+
+The isolated test-only harness first failed its valid-control assertion with
+the unimplemented subject boundary. After implementation, the registered
+command in [the harness plan](../../plans/compiler-oracle-harness.md) exited
+0: the valid control, all 12 invalid controls, and the retained fixture tests
+passed. Its test step was:
+
+```sh
+heavy-run cargo test --offline --locked --manifest-path tests/fixtures/compiler-queue-observer/Cargo.toml
+```
+
+The sealed inputs and existing oracle hashes matched. This tests the harness
+only; no actual decision model or live observer was qualified.

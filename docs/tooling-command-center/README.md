@@ -6,5 +6,6 @@ their own pull requests.
 
 - [Sources and work](LINKS.md)
 - [Current status](SYNC-STATUS.md)
+- [Task audit](TASK-AUDIT.md)
 - [Implementation plan](plans/implementation-plan.md)
 - [Dry-run record](plans/dry-run-log.md)

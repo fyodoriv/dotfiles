@@ -21,7 +21,7 @@ source "$DOTFILES_DIR/lib/dotfiles-arch.sh"
 # ── tmux ──────────────────────────────────────────────────────────────
 check "resilience.tmux_installed" "tmux installed (session persistence for agents)" \
   "command -v tmux >/dev/null 2>&1" \
-  "echo 'Install: brew install tmux'"
+  "" "You: open Terminal and run brew install tmux."
 
 check "resilience.agent_tmux_executable" "agent-tmux wrapper is executable" \
   "[ -x \"\$DOTFILES_DIR/bin/agent-tmux\" ]" \
@@ -51,7 +51,7 @@ fi
 
 check "resilience.wakeup_hook_exists" '$HOME/.wakeup hook fires network-watchdog' \
   "[ -f \"\$HOME/.wakeup\" ] && grep -q 'network-watchdog' \"\$HOME/.wakeup\"" \
-  "echo 'Re-apply dotfiles to restore: dotfiles apply'"
+  "" "You: open Terminal and run dotfiles apply to restore the wakeup hook."
 
 check "resilience.network_watchdog_exec" "network-watchdog is executable" \
   "[ -x '$DOTFILES_DIR/bin/network-watchdog' ]" \

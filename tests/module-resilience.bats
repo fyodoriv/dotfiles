@@ -353,3 +353,85 @@ EOF
   grep -q 'resilience.headless_chrome_under_heavy_run' "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh"
   [ -x "$BATS_TEST_DIRNAME/../bin/headless-chrome-unlocked" ]
 }
+
+@test "tmux missing shows manual guidance" {
+  KEEP_AWAKE_TOOLS=false
+  command() {
+    if [ "${1:-}" = -v ] && [ "${2:-}" = tmux ]; then return 1; fi
+    builtin command "$@"
+  }
+  check() {
+    [ "$1" = resilience.tmux_installed ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/guidance-result"
+    else printf 'fail|%s|%s\n' "$4" "${5:-}" > "$TEST_DIR/guidance-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  if ! grep -q '^fail||You:.*brew install tmux' "$TEST_DIR/guidance-result"; then
+    echo 'expected manual tmux guidance' >&2
+    return 1
+  fi
+}
+
+@test "wakeup missing shows manual guidance" {
+  KEEP_AWAKE_TOOLS=false
+  [ ! -e "$HOME/.wakeup" ]
+  check() {
+    [ "$1" = resilience.wakeup_hook_exists ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/guidance-result"
+    else printf 'fail|%s|%s\n' "$4" "${5:-}" > "$TEST_DIR/guidance-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  if ! grep -q '^fail||You:.*dotfiles apply' "$TEST_DIR/guidance-result"; then
+    echo 'expected manual wakeup guidance' >&2
+    return 1
+  fi
+}
+
+@test "tmux present remains passing" {
+  KEEP_AWAKE_TOOLS=false
+  tmux() { :; }
+  check() {
+    [ "$1" = resilience.tmux_installed ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/guidance-result"; else printf 'fail\n' > "$TEST_DIR/guidance-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/guidance-result"
+}
+
+@test "wakeup present remains passing" {
+  KEEP_AWAKE_TOOLS=false
+  printf '%s\n' network-watchdog > "$HOME/.wakeup"
+  check() {
+    [ "$1" = resilience.wakeup_hook_exists ] || return 0
+    if eval "$3"; then printf 'pass\n' > "$TEST_DIR/guidance-result"; else printf 'fail\n' > "$TEST_DIR/guidance-result"; fi
+  }
+  source "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  grep -qx pass "$TEST_DIR/guidance-result"
+}
+
+@test "resilience real doctor fix shows both steps without launches" {
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '/^check "resilience\.(tmux_installed|wakeup_hook_exists)"/ { print; getline; print; getline; print }' \
+    "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" > "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  [ "$(grep -c '^check "resilience\.' "$TEST_DOTFILES/modules/resilience/doctor.sh")" -eq 2 ]
+  printf 'check "test.fix_mode" "fix mode control" "[ -e %s/fix-ran ]" "touch %s/fix-ran"\n' "$TEST_DIR" "$TEST_DIR" >> "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  printf '#!/bin/sh\n[ "$1" = source-path ] && printf "%%s\n" "%s"\nexit 0\n' "$TEST_DOTFILES" > "$TEST_DOTFILES/bin/chezmoi"
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  for name in brew dotfiles; do
+    printf '#!/bin/sh\ntouch "%s/guidance-launched"\n' "$TEST_DIR" > "$TEST_DOTFILES/bin/$name"
+    chmod +x "$TEST_DOTFILES/bin/$name"
+  done
+  ln -s "$(command -v jq)" "$TEST_DOTFILES/bin/jq"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
+  export PATH="$TEST_DOTFILES/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  ! command -v tmux >/dev/null
+  for name in brew dotfiles; do [ "$(command -v "$name")" = "$TEST_DOTFILES/bin/$name" ]; done
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience
+  [ "$status" -eq 1 ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.tmux_installed")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("You:") and contains("brew install tmux")) and ((.[0].fix // "") == "")' >/dev/null
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.wakeup_hook_exists")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("You:") and contains("dotfiles apply")) and ((.[0].fix // "") == "")' >/dev/null
+  [ -e "$TEST_DIR/fix-ran" ]
+  [ ! -e "$TEST_DIR/guidance-launched" ]
+}

@@ -58,3 +58,8 @@ canonical body in each independently captured handler output. The candidate
 therefore meets the original duplicate rejection threshold. Its uncommitted
 source and test remain in the task-owned worktree. This models dispatch and
 does not claim a live agent session was observed.
+
+The [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) says
+matching hooks run in parallel and a plugin's copy of a handler stays separate.
+That supports treating the duplicate as a risk; it does not replace the
+modeled observation or prove a particular live session's result.

@@ -203,3 +203,9 @@ stopped before container creation: Docker returned `No such image` for the
 pinned ARM image. The registered result is inconclusive. The same image was
 visible in a later read-only check; the reason for the earlier response is
 unknown. The admission marker is consumed, and no reader build was attempted.
+
+The distinct [image preflight](plans/judge-reader-build-preflight-v2.md) also
+received `No such image` for ARM and stopped before the build admission.
+Independent review classified it as inconclusive. Later read-only listing and
+inspection by image ID found the pinned image. The conflicting observations
+do not establish the cause; both admissions remain consumed.

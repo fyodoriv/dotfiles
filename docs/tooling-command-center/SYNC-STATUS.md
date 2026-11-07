@@ -57,6 +57,10 @@ a disabled job alone does not establish the options used by its doctor skip.
 The compiler holdout author confirmed that its platform was unspecified; it
 cannot be retrospectively claimed as a Darwin-specific fixture.
 
+Dotfiles [PR #522](https://github.com/fyodoriv/dotfiles/pull/522) added the
+person-owned browser Spotlight repair steps after a reproduced missing-guidance
+control and passing module and repository gates. Issue #475 remains open.
+
 Agentbrew [PR #848](https://github.com/fyodoriv/agentbrew/pull/848) merged the
 registered eval-ID composition observation and removed its completed task.
 Four synthetic controls, the existing validator tests and the corrected full

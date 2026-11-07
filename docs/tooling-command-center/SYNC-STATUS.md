@@ -95,6 +95,10 @@ fake request, meeting its registered rejection threshold. Later passing tests
 do not qualify it. A distinct approach needs a new prediction before testing;
 caller-provided bindings and transport do not qualify live admission.
 
+[Agentbrew #854](https://github.com/fyodoriv/agentbrew/pull/854) prepares a
+synthetic reviewer report parser and its gate discovery. Focused and stock-shell
+controls passed; the full gate is running. Event integration remains open.
+
 [Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also
 contains nine pure owner-receipt controls for issue #810. The first format was
 rejected after review; the registered compatibility pivot passed. This does

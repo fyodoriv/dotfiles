@@ -22,7 +22,6 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | Define safe lease recovery without reusing PID-only identity or closed cohorts. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Register the isolated owner-success observation; preserve the #767 boundary. |
 | [#789](https://github.com/fyodoriv/agentbrew/issues/789) | Check | The proposed compiler-error fallback conflicts with a frozen source-build pivot. |
-| [#787](https://github.com/fyodoriv/agentbrew/issues/787) | Prepare | Draft #847 was corrected and its ordinary full gate is running. |
 | [#752](https://github.com/fyodoriv/agentbrew/issues/752) | Prepare | Draft #755 needs a source-qualified compiler-free judge asset set, calibration and the connector contract. |
 | [#692](https://github.com/fyodoriv/agentbrew/issues/692) | Prepare | Register bounded parallel-fetch and process-group controls. |
 | [#572](https://github.com/fyodoriv/agentbrew/issues/572) | Prepare | Qualify the registered checkup recorder callers and safety controls. |

@@ -35,7 +35,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | speed-up-npx-biome | Blocked | Needs verified cutover and a full seven-day field cohort. |
 | speed-up-bash-worktree-deps-sh | Blocked | Needs verified cutover and a full seven-day field cohort. |
 | speed-up-agentbrew-test-loop | Blocked | Needs verified cutover and a full seven-day field cohort. |
-| flip-catalog-to-registry-first-at-ga | Check | Refresh registry GA status. |
+| flip-catalog-to-registry-first-at-ga | Blocked | The registry working group still lists API v1 GA as ideating; the opt-in remains. |
 | restore-agentbrew-release-automation | Check | Verify Actions and npm authentication. |
 | rust-state-and-agentfile | Blocked | Needs text and process primitives. |
 | rust-catalog-and-sources | Blocked | Needs native state and Agentfile support. |

@@ -70,8 +70,15 @@ controls; its real health channel and group-signal runner remain unqualified.
 fake-transport receipt controls and added a checked step to the local full gate.
 Hosted CI remains separate. No model baseline or real chat was used.
 
-The sync-warning draft [#847](https://github.com/fyodoriv/agentbrew/pull/847)
-now passes its focused ordering and timing controls; its full gate is running.
+The sync-warning fix [#847](https://github.com/fyodoriv/agentbrew/pull/847)
+merged after its full 20-step gate passed; issue #787 is closed and local
+Agentbrew main was fast-forwarded to the merge.
 The local composition for judge draft #755 has four unresolved build/install
 conflicts. Main's compiler-free prebuilt pair does not cover the draft's judge
 reader or changed publisher; a source-qualified asset set is still needed.
+Two synthetic models passed their tests but failed independent review; neither
+qualifies the asset set or a production installation.
+
+The official [registry working group charter](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/community/working-groups/registry.mdx)
+still lists registry API v1 GA as ideating, with no target date. The registry
+lookup remains opt-in pending that external milestone.

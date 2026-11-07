@@ -134,12 +134,12 @@ The official [registry working group charter](https://github.com/modelcontextpro
 still lists registry API v1 GA as ideating, with no target date. The registry
 lookup remains opt-in pending that external milestone.
 
-[Agentbrew draft #857](https://github.com/fyodoriv/agentbrew/pull/857)
-adds an owned synthetic reviewer-event runner. Eight runner controls, six gate
-controls and stock fixture discovery passed in the retained follow-up; the
-first discovery observation lost its log and was rejected. Full repository
-verification remains pending. Issue #822 still needs real event and delivery
-qualification.
+[Agentbrew #857](https://github.com/fyodoriv/agentbrew/pull/857) merged its
+owned synthetic reviewer-event runner. Eight runner controls, six gate controls,
+stock discovery, independent review and the uncached 22-step gate passed
+(6,495 tests passed; 33 skipped). The first discovery observation lost its log
+and was rejected. Local main was fast-forwarded to `68e0d1da`. Issue #822
+still needs real event, MCP and delivery qualification.
 
 [Agentbrew #856](https://github.com/fyodoriv/agentbrew/pull/856) merged its
 JSON-bound synthetic core-rule model after 11 controls, independent review and

@@ -9,7 +9,8 @@ not say the whole task can ship. **Blocked** names a known dependency.
 
 | Task ID | State | Next step or dependency |
 | --- | --- | --- |
-| chat-message-rule-decision-821 | Prepare | The first baseline stopped on an invalid response; preserve its reservation and register a distinct experiment. |
+| chat-message-rule-decision-821 | Prepare | The first baseline failed and #853 met its rejection threshold; preserve both and register a distinct approach. |
+| review-ask-classifier-822 | Prepare | #851 shipped synthetic classification; qualify the event envelope and later real delivery. |
 | sync-selection-preflight | Prepare | Register and land the synthetic measurement first. |
 | source-lease-real-failure-classification | Blocked | The natural cohort is closed without a classified failure. |
 | source-lease-release-window-research | Blocked | The controlled cohort is exhausted; qualification failed. |

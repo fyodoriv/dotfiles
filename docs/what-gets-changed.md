@@ -280,3 +280,9 @@ With `use_ai_tools: true`, apply installs the npm terminal CLI and links
 `chatgpt` cask, the GUI host. Node upgrades reinstall the CLI on the selected
 Node and move the link. This does not replace ChatGPT.app's bundled CLI or
 write agent config. See [Codex health checks](module-reference.md#codex).
+
+## OpenCode Desktop
+
+With `use_ai_tools: true`, a full profile also installs the `opencode-desktop`
+cask. dotfiles does not write OpenCode config (agentbrew owns it) or a Kimi key.
+See [Kimi Code plan in OpenCode](model-configuration.md#kimi-code-plan-in-opencode).

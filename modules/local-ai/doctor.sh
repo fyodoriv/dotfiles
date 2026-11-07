@@ -204,3 +204,9 @@ PY
 check "local-ai.opencode_mcp_format" "opencode.json: MCP entries use new schema (type+command-array)" \
   "_opencode_mcp_format_ok" \
   ""  # no --fix: agentbrew owns ~/.config/opencode/, see header comment + agentbrew P0 fix-opencode-adapter-format
+
+# ── Kimi Code plan for OpenCode (bin/kimi-goal) ─────────────────────
+# Advisory: the key is a human step (buy the plan, create a Kimi Code key).
+check_advisory "local-ai.kimi_key" "Kimi Code key for OpenCode (kimi-goal --check)" \
+  "\"\$HOME/bin/kimi-goal\" --check >/dev/null 2>&1 || kimi-goal --check >/dev/null 2>&1" \
+  "opencode auth login (pick Kimi Code Plan), or: security add-generic-password -a \"\$USER\" -s kimi-code-api-key -w"

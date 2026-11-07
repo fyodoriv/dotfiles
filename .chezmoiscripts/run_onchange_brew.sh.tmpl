@@ -96,6 +96,8 @@ brew "duti"
 {{ if .use_ai_tools -}}
 # ChatGPT hosts the Codex GUI; the terminal CLI is installed separately.
 cask "chatgpt"
+# OpenCode Desktop: GUI agent for non-Claude models (Kimi Code plan); see bin/kimi-goal.
+cask "opencode-desktop"
 {{ end -}}
 
 # ── Full: Extras ─────────────────────────────────────────────────

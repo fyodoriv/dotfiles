@@ -1345,6 +1345,7 @@ scratch work.
 
 | Script | Description |
 |--------|-------------|
+| `kimi-goal` | Run a goal headless in OpenCode on the Kimi Code plan (`--check`, `--dry-run`, `--rounds N`, `--auto`); see [model-configuration.md](docs/model-configuration.md#kimi-code-plan-in-opencode) |
 | `dotfiles-lock-checked` | Run a dotfiles command; treat a `[lock] Skipping`/`Timed out` run as not applied, wait, re-run, exit 75 if still locked. `--log FILE` checks a `dotfiles-upgrade` log (lock skip or no Summary = did not run) |
 | `cheat` | Quick cheatsheet for all custom commands and shortcuts; the `dotfiles` commands come from `dotfiles actions` |
 | `note` | Append timestamped notes to a daily markdown file |

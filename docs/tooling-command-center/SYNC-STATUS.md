@@ -222,3 +222,15 @@ and container configuration, private output bytes, same-architecture byte
 comparisons, limited ELF checks and cleanup. This does not establish reader
 behavior, complete static-link properties, network egress isolation or release
 readiness. The outputs remain private.
+
+The [reader smoke checks](plans/judge-reader-smoke-draft.md) passed the allowed
+file and symlink-refusal cases on both Linux architectures. Independent review
+confirmed the commands, markers, input hashes, container settings and cleanup.
+The generated per-check files were removed with the containers; the evidence
+is the checked command and its retained markers.
+
+The [judge integration plan](plans/judge-current-main-integration.md) was not
+executed. Independent conflict review found that a source-bound Darwin judge
+reader and verified composition with the existing compiler-free pair are
+needed before either conflict side can be chosen safely. The prior in-progress
+merge and untracked files remain preserved.

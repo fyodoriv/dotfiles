@@ -1,5 +1,11 @@
 # Judge draft: two-stage integration prediction (draft)
 
+**Not executed.** Independent conflict review found that choosing either side
+would lose a required capability: main's compiler-free source-bound native
+pair, or the draft's required judge reader. A source-bound Darwin reader and a
+verified composition with the pair are prerequisites. Preserve the existing
+merge and register the actual composition before resolving these conflicts.
+
 Draft #755 is at `9db12ffc85591dddc75f38e7170c6ab0f7a60f25`. Its existing
 worktree has an unfinished merge of main parent
 `24a3c6fbbd83b685fe142699eaf0d935f0e70406`; four paths remain conflicted.

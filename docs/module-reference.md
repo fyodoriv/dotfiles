@@ -282,7 +282,7 @@ On `profile: core`, the module runs only when the `agent-browser` CLI is install
 | `agent-browser.singleton_preflight` | singleton preflight helper installed | None |
 | `agent-browser.reap_strays_helper` | stray target reap helper installed | None |
 | `agent-browser.no_forwarded_launches` | launchd Chrome logs have no forwarded singleton launches | None |
-| `agent-browser.no_stray_newtab_targets` | managed Chromes expose no stray blank/newtab targets (one is allowed with `chrome.keep_blank_window`) | None |
+| `agent-browser.no_stray_newtab_targets` | managed Chromes expose no stray blank/newtab targets (one is allowed with `chrome.keep_blank_window`); on failure, the agent gets a read-only review command | None |
 | `agent-browser.remote_debugging_process_count` | Chrome remote-debugging process count stays at the managed threshold; only processes whose program is Chrome itself count, not a launcher in front of it | None |
 | `agent-browser.profile_preflight_guard` | zshrc.ai-tools guards launchd-owned AGENT_BROWSER_PROFILE | None |
 | `agent-browser.legacy_launchers_safe` | legacy agent-browser launch scripts do not launch managed profiles | None |

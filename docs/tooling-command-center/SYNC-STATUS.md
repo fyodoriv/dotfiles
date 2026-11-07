@@ -19,8 +19,11 @@ review found that the oracle does not execute an observer against the sealed
 cases, so its zero-false-decision criterion is not yet proved. The live capture
 and queue epoch remain separate, unqualified boundaries.
 [PR #512](https://github.com/fyodoriv/dotfiles/pull/512) registered the
-test-only oracle harness and its controls. Its implementation is in dry run;
-no decision subject or live observer has been qualified.
+test-only oracle harness and its controls. The harness shipped in
+[PR #513](https://github.com/fyodoriv/dotfiles/pull/513). A separate pure
+decision-model experiment was registered in
+[PR #514](https://github.com/fyodoriv/dotfiles/pull/514); no decision subject
+or live observer has been qualified.
 
 The queue project-identity reader has shipped. Its preparation does not make
 the current metadata private or authorize an opaque-writer cutover.

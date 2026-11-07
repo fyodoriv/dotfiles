@@ -23,5 +23,7 @@ passed. Its test step was:
 heavy-run cargo test --offline --locked --manifest-path tests/fixtures/compiler-queue-observer/Cargo.toml
 ```
 
-The sealed inputs and existing oracle hashes matched. This tests the harness
-only; no actual decision model or live observer was qualified.
+The sealed inputs and existing oracle hashes matched. The delivery checkout
+passed the same command and full repository gate; the harness shipped in
+[PR #513](https://github.com/fyodoriv/dotfiles/pull/513). This tests the
+harness only; no actual decision model or live observer was qualified.

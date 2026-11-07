@@ -66,7 +66,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | Task ID | State | Next step or dependency |
 | --- | --- | --- |
 | github-connector-machine-credentials | Blocked | Needs an owned callback, bounded worker and safe GUI repair boundary. |
-| compiler-queue-observation | Prepare | Qualify the sealed-case harness, then test an actual decision subject. |
+| compiler-queue-observation | Prepare | Register the independent holdout, then test a decision subject; the harness has shipped. |
 | heavy-run-private-metadata | Prepare | Review managed routes and native bootstrap prerequisites; live cutover is blocked. |
 | headless-browser-runs-bypass-heavy-run | Check | Two qualifying post-change checkups are not yet evidenced locally. |
 | keepawake-power-protect-physical-validation | Blocked | Needs a person and the test laptop. |

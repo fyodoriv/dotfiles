@@ -59,9 +59,9 @@ service settings, owner processes, or resource limits during preparation.
 - **Why:** A receipt checker alone cannot prove correct decisions.
 - **Parallelism:** After task 1; independent of other safe task research.
 - **Owner / boundary:** Dotfiles test-only compiler observation fixture.
-- **Change:** Review and register a measurement that exercises a subject against the unchanged sealed inputs and independent oracle.
-- **Evidence / acceptance:** A reviewed, committed prediction names the subject, inputs, failure controls, command, success and pivot before implementation; live observation remains unclaimed.
-- **Verification:** The registered fixture command and independent review.
+- **Change:** Use the landed test harness, register an independent holdout hash, then evaluate a committed pure decision subject.
+- **Evidence / acceptance:** The registered controls and holdout pass without altered inputs or unsafe decisions; live observation remains unclaimed.
+- **Verification:** The command in [the decision-model registration](../../plans/compiler-queue-decision-model.md) and independent review.
 
 ### 5. Deliver qualified changes
 - **Why:** Make proved behavior available and keep local defaults current.

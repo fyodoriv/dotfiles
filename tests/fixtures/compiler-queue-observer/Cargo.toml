@@ -20,3 +20,7 @@ path = "receipts.rs"
 [[test]]
 name = "compiler_queue_epoch"
 path = "epoch.rs"
+
+[[test]]
+name = "compiler_queue_harness"
+path = "harness.rs"

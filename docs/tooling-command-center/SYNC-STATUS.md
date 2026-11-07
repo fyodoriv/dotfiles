@@ -155,5 +155,11 @@ preserved. The process-group runner and real diagnosis remain unqualified.
 [Agentbrew draft #859](https://github.com/fyodoriv/agentbrew/pull/859)
 contains nine isolated sync builder-binding controls. The registered red,
 green and static discovery checks passed. A Knip preflight found its intentional
-test entry unlisted; a correction is being registered. Its full gate remains.
+test entry unlisted; the registered entry correction and Knip check passed.
+Its final-head control repeat and full gate remain.
 The four selection cases are still sealed.
+
+[Agentbrew draft #860](https://github.com/fyodoriv/agentbrew/pull/860)
+omits the writer that caused #858's Knip failure. Nine recorder controls, Knip
+and independent review passed; the full gate is running. The process-group
+runner and the earlier timeout cause remain unqualified.

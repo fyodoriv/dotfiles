@@ -168,3 +168,9 @@ remain unqualified.
 explicit default exclusion for its synthetic sync test. Nine controls,
 discovery, rule-3, Knip, types and independent review passed; the full gate is
 running. The real selection cases remain sealed.
+
+The [Rust archive probe](plans/judge-rust-archive-probe-v2.md) acquired six
+official Linux musl toolchain archives. Their sizes, hashes, receipt and private
+file metadata passed an independent recheck. XZ headers report about 1.6 GB
+uncompressed. The files have not been extracted or run; #755's source-bound
+assets and build/reproducibility controls remain open.

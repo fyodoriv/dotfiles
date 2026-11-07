@@ -98,3 +98,56 @@ calibration and live connector remain separate issue #752 acceptance work.
 Anchor: `docs/plans/source-build-prebuilt-764.md` on main; #755's judge reader
 and publication contracts; Basili, Caldiera and Rombach (1994), Goal Question
 Metric; Munafò et al. (2017), preregistration.
+
+## First model rejected
+
+On Nov 7, 2026, the 11 named synthetic tests reported 11 passes, zero
+failures and zero skips. Independent source review found that the model did
+not receive the checkup/publisher artifact pair. Its version control changed
+one reader version against its own receipt rather than mixing independently
+valid assets. The registered success condition required independent review,
+so this model failed the gate. It cannot establish asset-set compatibility.
+Its uncommitted file remains in the composed worktree as evidence; do not
+ship it as the solution.
+
+## Pivot: independently bound asset set
+
+Before implementing a replacement, predict that a distinct decision model
+which validates three independently described assets and their shared release
+identity will accept 1/1 complete fixtures and reject 13/13 unsafe fixtures.
+Each asset has its own bytes, source and lock bindings, architecture and
+version. Checkup and publisher have independently checked entries in their
+existing shared pair receipt; the reader has a separate receipt. The mixed-release fixture must use individually valid
+receipts from different releases. A missing or corrupt pair member must fail.
+
+Measure with a fresh report and an exact parser:
+
+```sh
+bash <<'BASH'
+set -o pipefail
+report=$(mktemp) || exit 2
+trap 'rm -f "$report"' EXIT
+test -f src/judges/native-assets-set.test.ts || exit 2
+JOBS=1 heavy-run npm exec -- vitest run src/judges/native-assets-set.test.ts --maxWorkers=1 --reporter=json --outputFile="$report" || exit 1
+node - "$report" <<'NODE'
+const fs = require('node:fs');
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const names = ['complete set', 'missing reader', 'changed reader source', 'changed reader lockfile', 'changed publisher source', 'wrong architecture', 'corrupt reader', 'symlink', 'unsafe ownership', 'mixed releases', 'compiler failure', 'missing checkup', 'missing publisher', 'corrupt publisher'];
+const tests = r.testResults.flatMap((file) => file.assertionResults);
+if (!r.success || r.numTotalTests !== 14 || r.numPassedTests !== 14 || r.numFailedTests !== 0 || r.numPendingTests !== 0 || r.numTodoTests !== 0 || tests.length !== 14) process.exit(1);
+for (const name of names) {
+  if (tests.filter((test) => test.fullName.endsWith(name) && test.status === 'passed').length !== 1) process.exit(1);
+}
+console.log('14 named synthetic asset-set decisions passed');
+NODE
+BASH
+```
+
+Use the fake adapter counter canary, require one observed failing compiler call
+with zero fallback, and check scratch predecessor bytes and hash in every
+case. Do not execute fixture bytes or launch a compiler on the absent path.
+
+Success requires 14/14 and independent review of all three bindings. Any
+unsafe acceptance, missed positive, skipped test or missing binding rejects
+this approach. This remains a synthetic boundary, not an installation proof.
+The GQM and preregistration anchors above apply.

@@ -256,3 +256,10 @@ pivot passed 12 fresh selected files and plugin checks; install e2e was skipped
 under the existing no-installer-change rule. Independent review verified the
 final commit and gate evidence. Local Dotfiles advanced to `10d0ec8`; issue
 #475 remains open.
+
+[Dotfiles #526](https://github.com/fyodoriv/dotfiles/pull/526) gave manual
+steps for missing tmux and the wakeup hook. Both registered red controls,
+five focused controls and the 20-test resilience suite passed. A fresh serial
+gate ran all 12 selected files and the plugin suites; install e2e was skipped
+under the no-installer-change rule. Independent review checked the exact commit
+and gate evidence. Local Dotfiles advanced to `a846166`; #475 remains open.

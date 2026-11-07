@@ -152,12 +152,11 @@ without merging after its full gate found an unused writer export. The finding
 was reproduced locally and met the transfer's pivot. Its source and logs are
 preserved. The process-group runner and real diagnosis remain unqualified.
 
-[Agentbrew draft #859](https://github.com/fyodoriv/agentbrew/pull/859)
-contains nine isolated sync builder-binding controls. The registered red,
-green and static discovery checks passed. A Knip preflight found its intentional
-test entry unlisted; the registered entry correction and Knip check passed.
-Its final-head control repeat and full gate remain.
-The four selection cases are still sealed.
+[Agentbrew #859](https://github.com/fyodoriv/agentbrew/pull/859) was closed
+without merging after its full gate rejected the isolated `.prep.ts` file as
+behavior without a test. The finding was reproduced and met the registered
+pivot. The earlier synthetic results and source are preserved. The four target
+selection cases remain sealed.
 
 [Agentbrew #860](https://github.com/fyodoriv/agentbrew/pull/860) merged its
 no-writer recorder pivot after nine controls, Knip, independent review and an

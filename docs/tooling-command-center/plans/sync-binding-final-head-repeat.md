@@ -1,4 +1,7 @@
-# Sync binding: final integrated-head repeat
+# Sync binding: final integrated-head repeat (superseded)
+
+#859 failed its registered full-gate pivot before this repeat ran. Its approach
+is rejected. This plan is retained as history and must not be executed.
 
 The nine synthetic controls passed before formatting and main integration. Knip
 then passed after the test was declared as an explicit entry. Before the PR is

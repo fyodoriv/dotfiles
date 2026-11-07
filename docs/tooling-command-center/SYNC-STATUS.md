@@ -99,6 +99,10 @@ caller-provided bindings and transport do not qualify live admission.
 synthetic reviewer report parser and its gate discovery. Focused, stock-shell
 and full 22-step controls passed. Event integration remains open.
 
+[Dotfiles #523](https://github.com/fyodoriv/dotfiles/pull/523) shipped exact
+active-account GitHub scope checks. Its eight controls, existing auth tests and
+full gate passed. It covers part of #475; that issue remains open.
+
 [Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also
 contains nine pure owner-receipt controls for issue #810. The first format was
 rejected after review; the registered compatibility pivot passed. This does

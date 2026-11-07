@@ -133,3 +133,10 @@ qualifies the asset set or a production installation.
 The official [registry working group charter](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/community/working-groups/registry.mdx)
 still lists registry API v1 GA as ideating, with no target date. The registry
 lookup remains opt-in pending that external milestone.
+
+[Agentbrew draft #857](https://github.com/fyodoriv/agentbrew/pull/857)
+adds an owned synthetic reviewer-event runner. Eight runner controls, six gate
+controls and stock fixture discovery passed in the retained follow-up; the
+first discovery observation lost its log and was rejected. Full repository
+verification remains pending. Issue #822 still needs real event and delivery
+qualification.

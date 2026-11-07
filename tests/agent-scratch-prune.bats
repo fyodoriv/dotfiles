@@ -236,3 +236,14 @@ make_worktree() {
   run "$SCRIPT"
   [ -f "$TMPD/run.Ab3xYz/old" ]
 }
+
+@test "trims its log in place, so launchd keeps writing to the same file" {
+  log="$HOME/.local/share/dotfiles/logs/agent-scratch-prune.log"
+  mkdir -p "$(dirname "$log")"
+  seq 1 3000 > "$log"
+  before="$(stat -f %i "$log")"
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(stat -f %i "$log")" = "$before" ]
+  [ "$(wc -l < "$log" | tr -d ' ')" -eq 2000 ]
+}

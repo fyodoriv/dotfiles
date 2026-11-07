@@ -250,9 +250,12 @@ agent_scratch_prune_main() {
   esac
   _settings
   # Keep the LaunchAgent log bounded (it appends one line per removal).
-  local log="$HOME/.local/share/dotfiles/logs/agent-scratch-prune.log"
-  if [ -f "$log" ]; then
-    tail -n 2000 "$log" > "$log.tmp" && mv "$log.tmp" "$log" || rm -f "$log.tmp"
+  # Trim in place: launchd holds this file open as our stdout, so a `mv`
+  # over it sends every later line to a deleted file.
+  local log="$HOME/.local/share/dotfiles/logs/agent-scratch-prune.log" tmp
+  if [ -f "$log" ] && [ "$(wc -l < "$log")" -gt 2000 ]; then
+    tmp="$(mktemp)" && tail -n 2000 "$log" > "$tmp" && cat "$tmp" > "$log"
+    rm -f "$tmp"
   fi
   freed_kb=0
   removed_count=0

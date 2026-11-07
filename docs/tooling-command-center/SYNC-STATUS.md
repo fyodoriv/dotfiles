@@ -80,10 +80,10 @@ reused; no real chat was used. Its task and issue #821 remain open.
 separate schema-based protocol after its 22-step full gate passed. No new
 baseline was run; distinct cases and a fresh prediction remain required.
 
-[Agentbrew #851](https://github.com/fyodoriv/agentbrew/pull/851) prepares a
-bounded reviewer-command classifier. Its synthetic controls and stock hook
-suite pass; the full gate and real event qualification remain. It sends no
-message and does not enable a hook.
+[Agentbrew #851](https://github.com/fyodoriv/agentbrew/pull/851) shipped a
+bounded reviewer-command classifier. Its synthetic controls, stock hook suite,
+and full gate passed. Real event qualification remains. It sends no message
+and does not enable a hook.
 
 [Agentbrew #852](https://github.com/fyodoriv/agentbrew/pull/852) tests the
 existing native pair verifier with sealed synthetic data. Both target controls

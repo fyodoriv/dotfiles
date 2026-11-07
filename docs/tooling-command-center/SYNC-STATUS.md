@@ -163,3 +163,8 @@ no-writer recorder pivot after nine controls, Knip, independent review and an
 uncached 22-step gate passed (6,504 tests passed; 33 skipped). Local main was
 fast-forwarded to `55c1032c`. The process-group runner and earlier timeout cause
 remain unqualified.
+
+[Agentbrew draft #861](https://github.com/fyodoriv/agentbrew/pull/861) uses an
+explicit default exclusion for its synthetic sync test. Nine controls,
+discovery, rule-3, Knip, types and independent review passed; the full gate is
+running. The real selection cases remain sealed.

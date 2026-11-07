@@ -11,7 +11,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | --- | --- | --- |
 | chat-message-rule-decision-821 | Prepare | The first baseline failed and #853 met its rejection threshold; preserve both and register a distinct approach. |
 | review-ask-classifier-822 | Prepare | #851 shipped synthetic classification and #857 shipped its synthetic event runner. Real-event and delivery qualification remain. |
-| sync-selection-preflight | Prepare | #859 passed nine isolated builder-binding controls but failed its registered full-gate pivot. A distinct test-discovery design is needed; target cases remain sealed. |
+| sync-selection-preflight | Prepare | #859 failed its registered full-gate pivot. Draft #861's distinct discovery design passed focused checks; its full gate is running. Target cases remain sealed. |
 | source-lease-real-failure-classification | Blocked | The natural cohort is closed without a classified failure. |
 | source-lease-release-window-research | Blocked | The controlled cohort is exhausted; qualification failed. |
 | plugin-lifecycle-timeout-observation | Check | Nine pure recorder-health controls pass in draft #819; process-group ownership remains unqualified. |

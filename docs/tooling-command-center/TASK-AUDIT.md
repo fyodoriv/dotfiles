@@ -1,6 +1,6 @@
 # Task audit
 
-Snapshot: Nov 6. This lists task blocks, not a deduplicated count of GitHub
+Snapshot refreshed: Nov 7. This lists task blocks, not a deduplicated count of GitHub
 issues or PRs. **Prepare** means a concrete next step is available; it does
 not say the whole task can ship. **Blocked** names a known dependency.
 **Check** means current evidence is incomplete. Recheck before claiming work.
@@ -18,7 +18,6 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | dependency-alerts-172-175 | Check | Refresh published-parent compatibility evidence. |
 | dependency-peer-compatibility | Check | Refresh published peer and parent compatibility. |
 | nudge-polling-loops-to-blocking-waits | Blocked | A full verified seven-day field cohort is required. |
-| eval-id-composition-observation | Check | The synthetic harness and evidence are in draft #848; the ordinary full gate is running on its clean tree. |
 | rust-source-inventory | Prepare | Continue existing draft #767 and its worker qualification. |
 | rust-measurement-harness | Blocked | Needs the source inventory. |
 | rust-native-delivery | Blocked | Needs the measurement harness. |

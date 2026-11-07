@@ -57,14 +57,21 @@ a disabled job alone does not establish the options used by its doctor skip.
 The compiler holdout author confirmed that its platform was unspecified; it
 cannot be retrospectively claimed as a Darwin-specific fixture.
 
-Agentbrew [draft PR #848](https://github.com/fyodoriv/agentbrew/pull/848)
-contains the registered eval-ID composition observation. Four synthetic
-controls and the existing validator tests passed. Two independent reviews found an ordinary clean-tree gate permissible outside
-the closed cohorts. It is running; the task stays open until it passes.
+Agentbrew [PR #848](https://github.com/fyodoriv/agentbrew/pull/848) merged the
+registered eval-ID composition observation and removed its completed task.
+Four synthetic controls, the existing validator tests and the corrected full
+gate passed. Two independent reviews confirmed that ordinary clean-tree gates
+are separate from the closed research cohorts.
 
 The pure recorder-health preparation in
 [Agentbrew #819](https://github.com/fyodoriv/agentbrew/pull/819) passed nine
 controls; its real health channel and group-signal runner remain unqualified.
 [Agentbrew #830](https://github.com/fyodoriv/agentbrew/pull/830) passed sixteen
-separate fake-transport receipt controls; normal Vitest discovery does not yet
-run that Node suite. No model baseline or real chat was used.
+fake-transport receipt controls and added a checked step to the local full gate.
+Hosted CI remains separate. No model baseline or real chat was used.
+
+The sync-warning draft [#847](https://github.com/fyodoriv/agentbrew/pull/847)
+now passes its focused ordering and timing controls; its full gate is running.
+The local composition for judge draft #755 has four unresolved build/install
+conflicts. Main's compiler-free prebuilt pair does not cover the draft's judge
+reader or changed publisher; a source-qualified asset set is still needed.

@@ -85,6 +85,11 @@ bounded reviewer-command classifier. Its synthetic controls and stock hook
 suite pass; the full gate and real event qualification remain. It sends no
 message and does not enable a hook.
 
+[Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also
+contains nine pure owner-receipt controls for issue #810. The first format was
+rejected after review; the registered compatibility pivot passed. This does
+not qualify worker ownership, process cleanup or a physical observation.
+
 [Agentbrew #849](https://github.com/fyodoriv/agentbrew/pull/849) merged
 read-only guidance for a busy source lease after its full 21-step gate passed.
 It does not authorize or implement stale-lease removal; issue #814 stays open.

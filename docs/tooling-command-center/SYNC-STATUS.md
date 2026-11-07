@@ -209,3 +209,9 @@ received `No such image` for ARM and stopped before the build admission.
 Independent review classified it as inconclusive. Later read-only listing and
 inspection by image ID found the pinned image. The conflicting observations
 do not establish the cause; both admissions remain consumed.
+
+The separate [lookup diagnostic](plans/judge-image-lookup-diagnostic.md)
+matched its prediction: both digest lookups failed and both pinned image IDs
+resolved with the expected architecture and repository digest. Independent
+review confirmed all four records. This does not establish the underlying
+cause or admit a reader build.

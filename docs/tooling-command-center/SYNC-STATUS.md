@@ -37,3 +37,14 @@ The Dotfiles Rust inventory task permits source collection before its shared
 validator is available. The pinned agent-hook source receipt shipped in
 [PR #511](https://github.com/fyodoriv/dotfiles/pull/511) as a partial
 collection; it does not close the repository-wide inventory task.
+
+On Nov 6, the compiler holdout hash was registered and bound in
+[PR #515](https://github.com/fyodoriv/dotfiles/pull/515) and
+[PR #516](https://github.com/fyodoriv/dotfiles/pull/516). Source review found a
+missing independently qualified root; [PR #517](https://github.com/fyodoriv/dotfiles/pull/517)
+records that finding. No candidate or holdout decision result was measured.
+
+The gate attribution experiment was registered in
+[PR #518](https://github.com/fyodoriv/dotfiles/pull/518). Its fourteen
+synthetic controls passed in [PR #519](https://github.com/fyodoriv/dotfiles/pull/519).
+Real-agent receipt delivery and the original speed outcome remain unproved.

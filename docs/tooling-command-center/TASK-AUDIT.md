@@ -66,7 +66,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | Task ID | State | Next step or dependency |
 | --- | --- | --- |
 | github-connector-machine-credentials | Blocked | Needs an owned callback, bounded worker and safe GUI repair boundary. |
-| compiler-queue-observation | Prepare | Register the independent holdout, then test a decision subject; the harness has shipped. |
+| compiler-queue-observation | Prepare | The holdout is registered; independently qualify root attestation before a decision candidate. |
 | heavy-run-private-metadata | Prepare | Review managed routes and native bootstrap prerequisites; live cutover is blocked. |
 | headless-browser-runs-bypass-heavy-run | Check | Two qualifying post-change checkups are not yet evidenced locally. |
 | keepawake-power-protect-physical-validation | Blocked | Needs a person and the test laptop. |
@@ -75,7 +75,7 @@ not say the whole task can ship. **Blocked** names a known dependency.
 | proof-install-field-outcome | Check | No qualifying local install record was found; another machine may have one. |
 | apply-skip-unchanged-scripts | Blocked | Needs a timed full apply on the managed Mac. |
 | checkup-skip-apply-when-unchanged | Check | Two qualifying later checkups are not yet evidenced locally. |
-| speed-up-make-check | Prepare | The registered pivot was reached; qualify per-invocation attribution. |
+| speed-up-make-check | Prepare | Synthetic attribution controls passed; register real-agent receipt delivery. |
 | rust-source-inventory | Prepare | Continue source collection; the final adapter needs Agentbrew's validator. |
 | rust-measurement-harness | Blocked | Needs source inventory and the shared harness. |
 | rust-native-delivery | Blocked | Needs the measurement harness. |

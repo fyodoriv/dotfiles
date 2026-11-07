@@ -146,3 +146,14 @@ JSON-bound synthetic core-rule model after 11 controls, independent review and
 an uncached 22-step gate passed (6,495 tests passed, 33 skipped). Local main
 was fast-forwarded to `806ad42b`. Issue #826 remains open for trusted live
 plugin-state selection and delivery.
+
+[Agentbrew #858](https://github.com/fyodoriv/agentbrew/pull/858) was closed
+without merging after its full gate found an unused writer export. The finding
+was reproduced locally and met the transfer's pivot. Its source and logs are
+preserved. The process-group runner and real diagnosis remain unqualified.
+
+[Agentbrew draft #859](https://github.com/fyodoriv/agentbrew/pull/859)
+contains nine isolated sync builder-binding controls. The registered red,
+green and static discovery checks passed. A Knip preflight found its intentional
+test entry unlisted; a correction is being registered. Its full gate remains.
+The four selection cases are still sealed.

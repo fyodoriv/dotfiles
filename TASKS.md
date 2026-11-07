@@ -158,7 +158,7 @@ them. -->
 - [ ] Make `make check` fast in the inner loop
   - **ID**: speed-up-make-check
   - **Evidence**: On Nov 6, the registered seven-day agent time review reported six Dotfiles `make check` calls totaling 1,350,074 ms, or 3.21 min/day. This exceeds the 2 min/day pivot threshold; the original approach did not meet the outcome. The local gate-timing log points to the test phase as the largest aggregate, but its rows are not bound to those six calls, so they do not establish the cause of this result.
-  - **Next**: Pivot from relying on caching and steering alone. First qualify the [synthetic attribution registration](docs/plans/gate-attribution-synthetic.md), then register real-agent receipt delivery before identifying the slowest contributing step and proposing a separately measured change. Keep existing caches and safety gates until a replacement is proved.
+  - **Next**: Pivot from relying on caching and steering alone. The [synthetic attribution controls](docs/plans/gate-attribution-synthetic.md) pass. Register real-agent receipt delivery before identifying the slowest contributing step and proposing a separately measured change. Keep existing caches and safety gates until a replacement is proved.
   - **Tags**: perf, agents
   - **Details**: The 2026-10-20 checkup time review: `make check` costs 2m38s/day (17x in 7 sessions, p95 5m12s). Agents run the full gate while iterating instead of `bin/bats-affected`.
   - **Files**: `Makefile`, `AGENTS.md`, `bin/cached-run`

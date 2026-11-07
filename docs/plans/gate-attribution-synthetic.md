@@ -96,3 +96,15 @@ or meets the task's speed threshold.
 Anchors: Basili, Caldiera and Rombach (1994), Goal Question Metric; Forsgren,
 Humble and Kim (2018), delivery performance; the existing Agentbrew perf-row
 contract in `docs/agent-perf.md` and Dotfiles `scripts/gate-timed.sh`.
+
+## Synthetic result
+
+The test-only join matched all six valid calls and refused all eight registered
+unsafe inputs. The controls also check exact step links, every invocation and
+completion, and fixed output. This is a fixture-specific in-memory model, not
+a malformed-packet-safe API. It does not check a real completion status,
+receipt transport, untrusted output, or actual timing rows. Caller-supplied IDs
+can be echoed, so a future contract must prove that IDs are independently
+generated and non-sensitive. It does not
+attribute any real `make check` call or identify the cause of the seven-day
+result. The next step is a separately registered real-agent receipt experiment.

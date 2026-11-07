@@ -125,3 +125,14 @@ Anchor: Bats parallel execution documentation
 https://bats-core.readthedocs.io/en/stable/usage.html#parallel-execution;
 Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al.
 (2017), preregistration.
+
+## One-shot preflight result
+
+The registered preflight exited 1 before the named test passed. Bats
+preprocessing and tracing reported `Operation not permitted` while creating
+here-document temporary files; its TAP output reported `not ok 1
+bats-gather-tests`. The private receipt contains the status, output, tool
+hashes and version records. The post-run checks were not reached. The denied
+path is unknown. This consumes the one-shot admission and rejects the
+candidate; it does not establish whether one-job Bats works outside that
+containment. Preserve the receipt and do not retry the method.

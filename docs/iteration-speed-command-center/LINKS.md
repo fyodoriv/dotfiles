@@ -2,3 +2,4 @@
 
 - [Shared agent instructions](https://github.com/fyodoriv/agentbrew/blob/main/templates/AGENTS.md)
 - [Owner rule source](https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/Agentfile.yaml)
+- [Command-center draft](https://github.com/fyodoriv/dotfiles/pull/530)

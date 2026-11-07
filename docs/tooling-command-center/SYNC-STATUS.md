@@ -185,3 +185,9 @@ The [Rust image probe](plans/judge-rust-image-probe.md) then passed on both
 architectures. Independent review confirmed the pinned images, compiler and
 Cargo versions, musl targets, configuration and cleanup. It did not build a
 program or independently test network egress.
+
+The [synthetic compiler probe](plans/judge-synthetic-build-probe.md) passed
+on both architectures. Each ran two builds of a fixed program, compared the
+outputs and ran one. Independent review confirmed the command, results and
+cleanup. The binaries were not retained for later comparison; the real reader
+and its dependencies remain unqualified.

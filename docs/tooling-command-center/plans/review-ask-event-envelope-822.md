@@ -37,10 +37,31 @@ Before implementation create six named tests: `test_matching_event_reminds`,
 `test_input_is_not_disclosed`. A test-only placeholder returns no reminder.
 Run `python3 hooks/lib/review_ask_event_test.py ReviewAskEventTest.test_matching_event_reminds -v`
 and require exit 1 with the named test `FAIL` and the fixed reminder in its
-assertion. After implementation run exactly:
+assertion. Use this self-checking red command:
 
 ```sh
-JOBS=1 heavy-run python3 hooks/lib/review_ask_event_test.py -v
+bash <<'BASH'
+log=$(mktemp) || exit 2
+trap 'rm -f "$log"' EXIT
+python3 hooks/lib/review_ask_event_test.py ReviewAskEventTest.test_matching_event_reminds -v >"$log" 2>&1
+result=$?
+[ "$result" -eq 1 ] && grep -Fq 'test_matching_event_reminds (__main__.ReviewAskEventTest.test_matching_event_reminds) ... FAIL' "$log" && grep -Fq 'Verify the reviewer request, then draft the chat review ask.' "$log"
+BASH
+```
+
+After implementation run exactly:
+
+```sh
+bash <<'BASH'
+log=$(mktemp) || exit 2
+trap 'rm -f "$log"' EXIT
+JOBS=1 heavy-run python3 hooks/lib/review_ask_event_test.py -v >"$log" 2>&1 || exit 1
+for name in test_matching_event_reminds test_failure_event_silent test_interrupted_event_silent test_unrelated_command_silent test_malformed_event_silent test_input_is_not_disclosed; do
+  [ "$(grep -Fxc "$name (__main__.ReviewAskEventTest.$name) ... ok" "$log")" -eq 1 ] || exit 2
+done
+[ "$(grep -Ec '^test_.* \.\.\. (ok|FAIL|ERROR|skipped)' "$log")" -eq 6 ] || exit 2
+grep -Eq '^Ran 6 tests in [0-9.]+s$' "$log" && grep -Fxq OK "$log" && ! grep -Eq '^(FAILED|ERROR)| \.\.\. (FAIL|ERROR|skipped)' "$log"
+BASH
 ```
 
 Success requires exit 0, each of the six names exactly once with `ok`,
@@ -49,7 +70,10 @@ unchanged classifier tests and the ordinary unfiltered full gate. Any reminder
 on the four negative classes, disclosure, classifier regression, network or
 message action rejects this approach. Independently review the final source.
 Inspect the pure adapter for alternate launch paths; tests install network and
-process-launch sentinels before importing it and assert zero calls. The local
+process-launch sentinels before importing it and assert zero calls. Patch
+`subprocess.Popen`, `os.system`, `socket.create_connection`, and
+`socket.socket.connect`; call each sentinel once as a canary, assert four
+rejections, reset the count, then import and exercise the adapter. The local
 gate must discover the controls or the preparation cannot merge. Register and
 measure gate discovery separately before editing the gate.
 

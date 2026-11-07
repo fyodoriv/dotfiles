@@ -44,6 +44,12 @@ Darwin probe confirmed an owned child's OS birth time survived exec.
 Live observation still needs a qualified capture wrapper, trusted
 reservation records and a coherent queue epoch.
 
+The test-only [oracle harness](compiler-oracle-harness.md) passes each sealed
+observation to a trusted in-process callback without its case ID or expected
+answer. It checks the callback's bounded response with the existing receipt
+oracle. Its positive callback is a harness control, not an observer result.
+It does not capture process output or establish live ownership or privacy.
+
 ## Admission epoch fixture
 
 Two identical idle snapshots hid one observed admission in a disposable

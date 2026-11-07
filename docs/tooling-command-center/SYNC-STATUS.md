@@ -103,13 +103,13 @@ and full 22-step controls passed. Event integration remains open.
 active-account GitHub scope checks. Its eight controls, existing auth tests and
 full gate passed. It covers part of #475; that issue remains open.
 
-[Agentbrew #855](https://github.com/fyodoriv/agentbrew/pull/855) prepares the
-fixed imported unittest report format. Focused and stock-shell controls pass;
-the full gate is running. The event runner and real hook remain unqualified.
+[Agentbrew #855](https://github.com/fyodoriv/agentbrew/pull/855) shipped the
+fixed imported unittest report format. Focused, stock-shell and full 22-step
+controls passed. The event runner and real hook remain unqualified.
 
 [Agentbrew #856](https://github.com/fyodoriv/agentbrew/pull/856) prepares the
 JSON-bound core-rule selection model. Eleven synthetic controls and type
-checking pass; final discovery and the full gate remain. It does not qualify
+checking and final discovery pass; the full gate is running. It does not qualify
 real enabled-plugin state or session delivery.
 
 [Agentbrew #767](https://github.com/fyodoriv/agentbrew/pull/767) now also

@@ -140,3 +140,9 @@ controls and stock fixture discovery passed in the retained follow-up; the
 first discovery observation lost its log and was rejected. Full repository
 verification remains pending. Issue #822 still needs real event and delivery
 qualification.
+
+[Agentbrew #856](https://github.com/fyodoriv/agentbrew/pull/856) merged its
+JSON-bound synthetic core-rule model after 11 controls, independent review and
+an uncached 22-step gate passed (6,495 tests passed, 33 skipped). Local main
+was fast-forwarded to `806ad42b`. Issue #826 remains open for trusted live
+plugin-state selection and delivery.

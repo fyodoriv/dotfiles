@@ -16,8 +16,8 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#829](https://github.com/fyodoriv/agentbrew/issues/829) | Check | The prior context-limit route was abandoned; register a distinct proof. |
 | [#828](https://github.com/fyodoriv/agentbrew/issues/828) | Check | The prior recording control was invalid. PR #844 proved only a saved-frame VP9 codec path; live capture, timing, cleanup and agent use remain unproved. |
 | [#827](https://github.com/fyodoriv/agentbrew/issues/827) | Check | Qualify a decision eval and a separate sync-cost baseline. |
-| [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Earlier scoped and sparse-array models were rejected and preserved. The distinct JSON-bound model passed 11 synthetic cases; discovery and full gate remain. |
-| [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | #851 shipped a synthetic classifier. The event-gate oracle failed; a distinct gate and real-event qualification remain. |
+| [#826](https://github.com/fyodoriv/agentbrew/issues/826) | Prepare | Earlier scoped and sparse-array models were rejected and preserved. #856 shipped the distinct JSON-bound synthetic model; trusted live plugin state and delivery remain. |
+| [#822](https://github.com/fyodoriv/agentbrew/issues/822) | Prepare | #851 shipped a synthetic classifier. Draft #857 qualifies a distinct synthetic event runner; the full gate and real-event qualification remain. |
 | [#821](https://github.com/fyodoriv/agentbrew/issues/821) | Prepare | The first baseline failed; #853's synthetic approach met its rejection threshold. Register a distinct approach before measurement. |
 | [#814](https://github.com/fyodoriv/agentbrew/issues/814) | Prepare | PR #849 shipped busy-lease identification; safe release remains unproved. |
 | [#810](https://github.com/fyodoriv/agentbrew/issues/810) | Prepare | Nine pure receipt controls are in #767; qualify an isolated observation and ownership before any physical admission. |
@@ -39,6 +39,6 @@ claiming an implementation path. Issues overlap task blocks and drafts.
 | [#487](https://github.com/fyodoriv/dotfiles/issues/487) | Check | The core-theme slice shipped; disabling the job alone does not supply the two options needed for the Dock-guard skip. Verify the reported overlay or qualify a safe integration path. |
 | [#483](https://github.com/fyodoriv/dotfiles/issues/483) | Check | Both prior fast-path approaches were abandoned; a distinct registered method is needed. |
 | [#480](https://github.com/fyodoriv/dotfiles/issues/480) | Prepare | Design safe draft controls; live acceptance needs a throwaway Slack workspace. |
-| [#475](https://github.com/fyodoriv/dotfiles/issues/475) | Prepare | #521 shipped stray-tab guidance, #522 browser Spotlight guidance, and #523 exact active-account scope checks. Fresh-Mac and remaining doctor evidence remain. |
+| [#475](https://github.com/fyodoriv/dotfiles/issues/475) | Prepare | #521 shipped stray-tab guidance, #522 browser Spotlight guidance, and #523 exact active-account scope checks. Agentbrew #350 treats a session-only CLAUDECODE as a warning when stdout is redirected, as doctor does; startup-file exports remain drift. Fresh-Mac and remaining doctor evidence remain. |
 | [#472](https://github.com/fyodoriv/dotfiles/issues/472) | Check | A quoted-search method still needs trusted executable and operand evidence. |
 | [#399](https://github.com/fyodoriv/dotfiles/issues/399) | Prepare | Prepare navigation controls; live acceptance needs a throwaway Slack workspace. |

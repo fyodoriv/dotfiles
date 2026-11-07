@@ -234,3 +234,8 @@ executed. Independent conflict review found that a source-bound Darwin judge
 reader and verified composition with the existing compiler-free pair are
 needed before either conflict side can be chosen safely. The prior in-progress
 merge and untracked files remain preserved.
+
+The [Darwin sandbox boundary probe](plans/judge-darwin-sandbox-probe.md)
+passed six synthetic checks. Independent review verified the saved statuses,
+profile and canaries. This does not qualify compiler descendants or their
+cleanup. The loopback positive control was in the parent process.

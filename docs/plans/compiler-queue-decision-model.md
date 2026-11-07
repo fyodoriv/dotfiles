@@ -58,10 +58,9 @@ callback and run the original-case test as a red control. Implement the
 candidate, run that same original-case test, and commit the candidate source.
 Record its full SHA with the independent reviewer. Only then reveal the exact
 holdout bytes and run the complete measurement from
-the repository root. A follow-up registration will record the immutable hash
-commit and exact value before subject code is written; set `HOLDOUT_COMMIT` to
-that commit for the commands below. The follow-up registration must bind the
-full immutable SHA in the command before subject code is written.
+the repository root. The hash-only registration landed at
+`d377204da6e1b9305552119251f8bbfb7c411ba4`, before subject code. The
+measurement binds that immutable commit in the command below.
 
 The red control uses a callback that returns an explicit error. The named test
 must run and fail with the fixed `subject_error` reason. A compilation error,
@@ -94,7 +93,7 @@ BASH
 ```
 
 After the candidate is committed and the holdout is revealed, export
-`HOLDOUT_COMMIT` as the registered full SHA and `CANDIDATE_COMMIT` as the
+`CANDIDATE_COMMIT` as the
 full pre-disclosure candidate SHA. Then run:
 
 ```sh
@@ -121,6 +120,7 @@ PY
 }
 : "${CANDIDATE_COMMIT:?set to the full pre-disclosure candidate commit}"
 [[ "$CANDIDATE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 2
+HOLDOUT_COMMIT=d377204da6e1b9305552119251f8bbfb7c411ba4
 [[ "$HOLDOUT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 2
 git merge-base --is-ancestor "$HOLDOUT_COMMIT" "$CANDIDATE_COMMIT" || exit 2
 set -o pipefail

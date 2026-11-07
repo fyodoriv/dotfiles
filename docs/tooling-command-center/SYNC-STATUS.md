@@ -180,3 +180,8 @@ The [Alpine runtime probe](plans/judge-linux-image-probe.md) passed on both
 Linux architectures. Independent review confirmed the recorded configuration,
 outputs and cleanup. This does not prove network egress isolation, qualify a
 toolchain or establish build reproducibility.
+
+The [Rust image probe](plans/judge-rust-image-probe.md) then passed on both
+architectures. Independent review confirmed the pinned images, compiler and
+Cargo versions, musl targets, configuration and cleanup. It did not build a
+program or independently test network egress.

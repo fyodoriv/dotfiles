@@ -95,3 +95,10 @@ flags, so the local settings file alone is not proven authoritative.
 Anchors: [Claude Code hooks](https://code.claude.com/docs/en/hooks), which
 documents parallel matching hooks and separate plugin copies; Basili, Caldiera
 and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.
+
+The ten original controls passed. Independent review then identified sparse
+arrays as a missing malformed-input case. A focused reproduction failed twice:
+sparse known IDs and sparse plugin-rule IDs were classified as modeled instead
+of unqualified. This meets the registered false-success pivot. Preserve the
+uncommitted model and `/tmp/core-dispatch-sparse-red.log`; do not qualify a
+later patch to this approach as success. Register a distinct design first.

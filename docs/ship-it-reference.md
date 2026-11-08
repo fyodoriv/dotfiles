@@ -562,6 +562,8 @@ For Jenkins failures, read the actual console log before retrying or pushing fix
 
 Stage explicit files only. Never use `git add -A`, `git add .`, or `git add -u`.
 
+After staging, check that `git status --short` lists every file you meant to add. `git add` skips a gitignored file with only a hint and still exits 0, so a commit can ship without it. Check a new dot-folder file with `git check-ignore -v <path>`. If it is ignored, allow just that file in `.gitignore`. In 2026-11, a `.agents/local-models` file was silently dropped from a merged agentbrew PR this way.
+
 Use the repo's commit convention. Prefer a concise conventional-commit subject; include the required ticket key when the repo requires one. Do not commit secrets, screenshots for PR evidence, transient logs, or unrelated agent work.
 
 ## 5. Push and open/update PR

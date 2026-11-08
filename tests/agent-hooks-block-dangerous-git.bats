@@ -181,3 +181,45 @@ _check_command_text() {
   unset -f shfmt
   [ "$status" -eq 2 ]
 }
+
+# Issue #502: with a shell expansion, "branch" and a delete-like flag count only
+# inside one git invocation, not anywhere in the command.
+@test "#502 allows a commit message with prose next to a shell expansion" {
+  _check_command_text 'd=$(mktemp -d) && git commit -m "keep the branch head" -q'
+  [ "$status" -eq 0 ]
+}
+
+@test "#502 allows a branch create next to an unrelated substitution and -m" {
+  _check_command_text 'git commit -q -m init && git branch tmpx && tool run -m x "$(cat p.txt)"'
+  [ "$status" -eq 0 ]
+}
+
+@test "#502 allows a search over the hook whose pattern mentions branch and -D" {
+  _check_command_text 'rg -n "branch" ${HOOK_DIR}/block.sh -D'
+  [ "$status" -eq 0 ]
+}
+
+@test "#502 still blocks a force delete next to a substitution" {
+  _check_command_text 'x=$(pwd) && git branch -D topic'
+  [ "$status" -eq 2 ]
+}
+
+@test "#502 still blocks a substituted git word" {
+  _check_command_text '$(command -v git) branch -D topic'
+  [ "$status" -eq 2 ]
+}
+
+@test "#502 still blocks a substituted branch word" {
+  _check_command_text 'git $(echo branch) -D topic'
+  [ "$status" -eq 2 ]
+}
+
+@test "#502 still blocks git -C with a substituted dir" {
+  _check_command_text 'git -C "$(pwd)" branch --delete --force topic'
+  [ "$status" -eq 2 ]
+}
+
+@test "#502 still blocks a rewritten flag after branch" {
+  _check_command_text 'git branch ${FLAG} topic'
+  [ "$status" -eq 2 ]
+}

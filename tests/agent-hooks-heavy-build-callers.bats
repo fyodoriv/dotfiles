@@ -344,3 +344,35 @@ NOTE
 @test "queue caller N12: a probe chained to a globbed suite refuses" {
   assert_hook_decision N12 2 'command -v bats && command bats tests/*.bats'
 }
+
+@test "queue caller N13: a probe inside command substitution refuses" {
+  assert_hook_decision N13 2 '$(command -v bats) tests/'
+}
+
+@test "queue caller N14: a probe inside quoted command substitution refuses" {
+  assert_hook_decision N14 2 '"$(command -v bats)" tests/'
+}
+
+@test "queue caller N15: a probe inside backticks refuses" {
+  assert_hook_decision N15 2 '`command -v bats` tests/'
+}
+
+@test "queue caller N16: a probe stored in a variable then run refuses" {
+  assert_hook_decision N16 2 'b=$(command -v bats); $b tests/'
+}
+
+@test "queue caller N17: a probe inside eval text refuses" {
+  assert_hook_decision N17 2 'eval "$(command -v bats) tests/"'
+}
+
+@test "queue caller N18: a probe piped into another command refuses" {
+  assert_hook_decision N18 2 'command -v cargo | xargs -I{} {} build'
+}
+
+@test "queue caller N19: a probe piped with stderr into another command refuses" {
+  assert_hook_decision N19 2 'command -v cargo |& xargs -I{} {} build'
+}
+
+@test "queue caller N20: a probe feeding process substitution refuses" {
+  assert_hook_decision N20 2 'xargs -I{} {} build < <(command -v cargo)'
+}

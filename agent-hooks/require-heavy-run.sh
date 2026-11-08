@@ -90,7 +90,7 @@ _is_heavy() {
       *=*|if|while|until|then|do|else|elif|'!') w=("${w[@]:1}") ;;
       command)
         w=("${w[@]:1}")
-        _lookup_only && return 1
+        [ "$_lookup_ok" = 1 ] && _lookup_only && return 1
         _skip_flags ;;
       time|nohup) w=("${w[@]:1}"); _skip_flags ;;
       exec) w=("${w[@]:1}"); _skip_flags -a ;;
@@ -236,19 +236,31 @@ _strip_text() {
         $r/gsex;
       $s =~ s/\$(\((?:[^()]++|(?1))*\))/push @extra, substr($1, 1, -1); "S"/ge;
       $s =~ s/`([^`]*)`/push @extra, $1; "S"/ge;
-      return $s . join("", map { "\n$_\n" } @extra);
+      # Mark every lifted line with \x01 so its output is known to feed another command.
+      return $s . join("", map { my $e = $_; $e =~ s/^(?!\x01)/\x01/mg; "\n$e\n" } @extra);
     }
     $_ = strip($_);
   '
 }
 
-while IFS= read -r seg; do
-  seg="${seg#"${seg%%[![:space:]]*}"}"
-  case "$seg" in heavy-run|heavy-run\ *) continue ;; esac
-  if _is_heavy "$seg"; then
-    echo "BLOCKED: a full test suite or build must queue on the Mac-wide lock. Run this as \`heavy-run <command>\`." >&2
-    exit 2
-  fi
-done < <(printf '%s\n' "$command" | _strip_text | sed -E 's/(&&|\|\||;|\||[(){}])/\n/g')
+stripped="$(printf '%s\n' "$command" | _strip_text)"
+# The command -v lookup allowance holds only for a top-level probe whose output
+# feeds nothing: no pipe (| or |&) or process substitution anywhere in the
+# command, and not a line lifted out of $(...), backticks, sh -c, or eval text.
+_piped=0
+grep -qE '(^|[^|])\|([^|]|$)|[<>]\(' <<< "$stripped" && _piped=1
+while IFS= read -r line; do
+  _lookup_ok=1
+  [ "$_piped" -eq 0 ] || _lookup_ok=0
+  case "$line" in $'\x01'*) _lookup_ok=0; line="${line#$'\x01'}" ;; esac
+  while IFS= read -r seg; do
+    seg="${seg#"${seg%%[![:space:]]*}"}"
+    case "$seg" in heavy-run|heavy-run\ *) continue ;; esac
+    if _is_heavy "$seg"; then
+      echo "BLOCKED: a full test suite or build must queue on the Mac-wide lock. Run this as \`heavy-run <command>\`." >&2
+      exit 2
+    fi
+  done < <(printf '%s\n' "$line" | sed -E 's/(&&|\|\||;|\||[(){}])/\n/g')
+done <<< "$stripped"
 
 exit 0

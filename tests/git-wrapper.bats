@@ -179,8 +179,9 @@ counting_system_git() {
   printf '#!/bin/bash\n[ "$1" = --version ] && echo x >> "%s"\necho "system-git $*"\n' "$COUNT_FILE" > "$CACHED_SYSTEM_GIT"
   chmod +x "$CACHED_SYSTEM_GIT"
   touch -t 202001010000 "$CACHED_SYSTEM_GIT"
-  DEV_GIT="$TEST_DIR/dev-git"
-  : > "$DEV_GIT"
+  # Stands in for the Xcode or CLT usr/bin directory.
+  DEV_GIT="$TEST_DIR/dev-bin"
+  mkdir -p "$DEV_GIT"
   touch -t 202001010000 "$DEV_GIT"
 }
 
@@ -195,16 +196,19 @@ counting_system_git() {
   [ "$(wc -l < "$COUNT_FILE" | tr -d ' ')" -eq 1 ]
 }
 
-@test "probe cache: a developer-dir git newer than the marker forces a new probe" {
+@test "probe cache: an Xcode or CLT bin dir newer than the marker forces a new probe" {
   counting_system_git
   make_git_candidates
   run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" \
     DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="$PATH_GIT_DIR:/usr/bin:/bin" "$GIT_WRAPPER" status
   [[ "$output" == "system-git status" ]]
-  # Simulate an Xcode update: the shim keeps its old mtime but now fails,
-  # and the developer-dir git is replaced (newer than the marker).
+  # Simulate an Xcode update: the shim keeps its old mtime but now fails.
+  # The installer writes a git with an old build-time mtime into the bin
+  # directory; only the directory's mtime moves (to the install time).
   printf '#!/bin/bash\necho "Xcode license not accepted" >&2\nexit 69\n' > "$CACHED_SYSTEM_GIT"
   touch -t 202001010000 "$CACHED_SYSTEM_GIT"
+  : > "$DEV_GIT/git"
+  touch -t 202001010000 "$DEV_GIT/git"
   touch -t 203001010000 "$DEV_GIT"
   run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" \
     DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="$PATH_GIT_DIR:/usr/bin:/bin" "$GIT_WRAPPER" status

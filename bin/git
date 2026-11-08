@@ -31,11 +31,12 @@ PRIVATE_PUSH_ALLOWLIST="${DOTFILES_PRIVATE_PUSH_ALLOWLIST:-${XDG_CONFIG_HOME:-$H
 # leaves a marker. The marker counts only while it is newer than the binary
 # and, for the /usr/bin/git shim, newer than the Xcode and Command Line
 # Tools bin directories. An installer keeps the build-time mtime on each
-# binary, but the directory it writes gets the install time; an update can
+# binary, but the directory it writes gets the install time (Xcode.app
+# itself gets the time the install finished); an update can
 # need a new licence, and the shim itself changes only with macOS.
 # Clear the cache with: rm -rf ~/.cache/dotfiles/git-probe
 _git_probe_dir="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/git-probe"
-_git_probe_deps="${DOTFILES_GIT_PROBE_DEPS-/Applications/Xcode.app/Contents/Developer/usr/bin:/Library/Developer/CommandLineTools/usr/bin}"
+_git_probe_deps="${DOTFILES_GIT_PROBE_DEPS-/Applications/Xcode.app:/Applications/Xcode.app/Contents/Developer/usr/bin:/Library/Developer/CommandLineTools/usr/bin${DEVELOPER_DIR:+:$DEVELOPER_DIR/usr/bin}}"
 _git_marker_fresh() {
   local marker="$1" bin="$2" dep
   [ -f "$marker" ] && [ "$marker" -nt "$bin" ] || return 1

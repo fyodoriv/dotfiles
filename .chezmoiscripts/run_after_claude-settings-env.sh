@@ -14,7 +14,10 @@
 # subagents run until a Claude plan window is 95% used, not 80%. In a /goal
 # run nobody can answer "ask", so the default 80% refused every review agent
 # for 8 hours at 84% weekly use (2026-11-08). The owner expects only Claude's
-# own limit. 98% still keeps the last 2% for the main session.
+# own limit. 98% still keeps the last 2% for the main session; the guard's
+# wind-down notice moves to 98% too. The burn rule still applies.
+# AGENT_GUARD_ROLLING_MAX=40 allows 40 agent starts per 10 minutes, not 12.
+# One review fan-out (8 reviewers + 3 fixers) used all 12 (2026-11-08).
 #
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000 makes Claude Code compact a
 # conversation near 350k tokens. The guard refuses tool calls above 400k
@@ -30,7 +33,7 @@
 set -euo pipefail
 
 SETTINGS="$HOME/.claude/settings.json"
-DESIRED_ENV='{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","AGENT_GUARD_LIMIT_ASK_PERCENT":"95","AGENT_GUARD_LIMIT_DENY_PERCENT":"98","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
+DESIRED_ENV='{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","AGENT_GUARD_LIMIT_ASK_PERCENT":"95","AGENT_GUARD_LIMIT_DENY_PERCENT":"98","AGENT_GUARD_ROLLING_MAX":"40","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}'
 
 if [ "${1:-}" = "--print-desired" ]; then
   printf '%s\n' "$DESIRED_ENV"

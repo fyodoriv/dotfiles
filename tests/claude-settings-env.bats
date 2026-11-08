@@ -31,7 +31,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 }
 
 @test "is a no-op when the value is already set" {
-  echo '{"env":{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","AGENT_GUARD_LIMIT_ASK_PERCENT":"95","AGENT_GUARD_LIMIT_DENY_PERCENT":"98","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}}' > "$HOME/.claude/settings.json"
+  echo '{"env":{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","AGENT_GUARD_LIMIT_ASK_PERCENT":"95","AGENT_GUARD_LIMIT_DENY_PERCENT":"98","AGENT_GUARD_ROLLING_MAX":"40","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}}' > "$HOME/.claude/settings.json"
   run bash "$SCRIPT"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -97,7 +97,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 
 @test "--print-desired prints the pinned env" {
   run bash "$SCRIPT" --print-desired
-  [ "$output" = '{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","AGENT_GUARD_LIMIT_ASK_PERCENT":"95","AGENT_GUARD_LIMIT_DENY_PERCENT":"98","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}' ]
+  [ "$output" = '{"AGENT_GUARD_AGENT_MAX":"10","AGENT_GUARD_AGENT_TOKENS_MAX":"25000000","AGENT_GUARD_DEPTH_MAX":"2","AGENT_GUARD_LIMIT_ASK_PERCENT":"95","AGENT_GUARD_LIMIT_DENY_PERCENT":"98","AGENT_GUARD_ROLLING_MAX":"40","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"350000"}' ]
 }
 
 @test "writes the auto-compact window" {
@@ -142,4 +142,5 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
   [ "$(jq -r '.env.AGENT_GUARD_LIMIT_ASK_PERCENT' "$HOME/.claude/settings.json")" = "95" ]
   [ "$(jq -r '.env.AGENT_GUARD_LIMIT_DENY_PERCENT' "$HOME/.claude/settings.json")" = "98" ]
+  [ "$(jq -r '.env.AGENT_GUARD_ROLLING_MAX' "$HOME/.claude/settings.json")" = "40" ]
 }

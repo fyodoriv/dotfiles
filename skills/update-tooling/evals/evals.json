@@ -200,6 +200,19 @@
         "Preserves old dist on probe refusal",
         "Keeps endpoint safe mode ahead of the Node probe and build"
       ]
+    },
+    {
+      "id": 19,
+      "prompt": "Confirm OpenCode is ready like Claude and refresh tooling. Agentbrew's CLI is stale, a sibling checkout is dirty, an upstream skill became a plugin, and chezmoi finds a hand-edited .gitconfig. A hosted-model smoke passes but the configured local default times out.",
+      "expected_output": "Fast-forward only clean canonical checkouts, rebuild and verify Agentbrew, preserve the dirty checkout, and inspect upstream history before classifying the converted skill. Probe OpenCode's default model, MCP connections, and browser. Do not substitute the hosted pass for the failed default or force chezmoi past the drift confirmation; report both blockers exactly.",
+      "expectations": [
+        "Preserves unrelated dirty work and rebuilds stale Agentbrew safely",
+        "Tests the configured OpenCode default model rather than only an explicit hosted model",
+        "Applies an actual 120-second agent-tool or installed external timeout to the probe",
+        "Checks MCP and browser runtime evidence",
+        "Classifies skill-to-plugin conversion from source evidence without deleting the installed copy",
+        "Does not force-apply .gitconfig or claim full readiness with a failed default model"
+      ]
     }
   ]
 }

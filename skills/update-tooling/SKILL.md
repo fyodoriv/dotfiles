@@ -351,6 +351,27 @@ files. When package upgrades are explicitly requested, run
 `~/.local/bin/codex` to the selected npm prefix. Do not use ChatGPT.app's
 bundled CLI as the terminal CLI or install the discontinued `codex-app` cask.
 
+### OpenCode CLI
+
+When OpenCode is installed or the user asks about its readiness, run
+`opencode --version` and `opencode mcp list`. Then run one smoke test in an empty
+scratch directory with no `--model` override:
+
+```bash
+opencode run 'Reply with exactly: OPENCODE_READY'
+```
+
+Bound it with the invoking agent tool's 120,000 ms timeout. If the host has no
+tool timeout, use an already-installed external timeout command. Never invent an
+OpenCode timeout flag or leave the probe unbounded.
+
+This must test the configured default model. An explicit hosted-model pass is
+extra evidence, never a substitute for a failed or timed-out default. Record the
+model, elapsed time, and exact error or timeout. Do not read credential files or
+call OpenCode ready from configuration files, MCP connections, or a different
+model alone. Major-version upgrades and changes to the default model need their
+own approval; do not use a routine refresh to hide a failed smoke test.
+
 ## 4. Verify machine stability
 
 Run these checks after the apply. Capture actual output and separate owned

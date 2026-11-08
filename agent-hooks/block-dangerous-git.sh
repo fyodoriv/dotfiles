@@ -444,6 +444,28 @@ branch_delete_allowed() {
   return 1
 }
 
+# A lone rg search reads its quoted pattern as data, never runs it (#472).
+# Only the plain form qualifies: no shell syntax that could run or redirect
+# anything, no env prefix (RIPGREP_CONFIG_PATH), no --pre/-z (they run
+# programs). Anything else keeps the conservative text match below.
+literal_search_only() {
+  case "$command" in
+    "rg "*) ;;
+    *) return 1 ;;
+  esac
+  case "$command" in
+    *[\;\&\|\`\$\<\>\(\)\\]*|*$'\n'*) return 1 ;;
+  esac
+  local tok
+  for tok in ${command//[\'\"]/ }; do
+    case "$tok" in
+      --pre*|--search-zip|-z|-[a-zA-Z]*z*) return 1 ;;
+    esac
+  done
+  return 0
+}
+literal_search_only && exit 0
+
 case "$command" in
   *"git reset --hard"*)   block "git reset --hard" ;;
   *"git clean -f"*)       block "git clean -f" ;;

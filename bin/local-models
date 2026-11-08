@@ -1,0 +1,209 @@
+#!/bin/bash
+# local-models — keep only the local AI models your apps need.
+#
+# Ollama is the one local model engine. Each app lists the Ollama models it
+# needs in `.agents/local-models` (one tag per line, `#` starts a comment).
+# That list is the app's reservation: cleanup never removes a reserved
+# model. A model no app reserves is removed after it is
+# LOCAL_MODELS_PRUNE_DAYS old (by download date; Ollama keeps no last-use
+# time). On the owner's Mac, unreserved models held 19 GB (2026-11-07).
+#
+# Reservations come from:
+#   1. every `.agents/local-models` file under LOCAL_MODELS_ROOTS (depth 5)
+#   2. the Ollama models in ~/.config/opencode/opencode.json
+#   3. ~/.config/dotfiles/local-models.reserved (your own extra models)
+#
+# Usage:
+#   local-models status            installed, reserved, and missing models
+#   local-models check             exit 1 when a reserved model is missing
+#   local-models ensure            install Ollama and pull missing reserved
+#                                  models (only when something reserves one)
+#   local-models prune [--yes] [--min-age-days N]
+#                                  remove unreserved models (dry run without --yes)
+#
+# Safety: prune does nothing when no reservation file is found, or when
+# Ollama cannot list its models. It never touches LM Studio or Hugging Face.
+#
+# Overrides (tests and one-off runs):
+#   LOCAL_MODELS_ROOTS       space-separated, default ~/apps
+#   LOCAL_MODELS_OLLAMA      the ollama command, default ollama
+#   LOCAL_MODELS_MANIFESTS   default ~/.ollama/models/manifests/registry.ollama.ai/library
+#   LOCAL_MODELS_OPENCODE    default ~/.config/opencode/opencode.json
+#   LOCAL_MODELS_EXTRA       default ~/.config/dotfiles/local-models.reserved
+
+set -euo pipefail
+
+_settings() {
+  ROOTS="${LOCAL_MODELS_ROOTS:-$HOME/apps}"
+  OLLAMA="${LOCAL_MODELS_OLLAMA:-ollama}"
+  MANIFESTS="${LOCAL_MODELS_MANIFESTS:-${OLLAMA_MODELS:-$HOME/.ollama/models}/manifests/registry.ollama.ai/library}"
+  OPENCODE="${LOCAL_MODELS_OPENCODE:-$HOME/.config/opencode/opencode.json}"
+  EXTRA="${LOCAL_MODELS_EXTRA:-$HOME/.config/dotfiles/local-models.reserved}"
+}
+
+# A tag without ":" means ":latest", as in Ollama.
+_norm() {
+  local t="${1#registry.ollama.ai/library/}"
+  case "$t" in *:*) printf '%s\n' "$t" ;; *) printf '%s:latest\n' "$t" ;; esac
+}
+
+_reservation_files() {
+  local root
+  for root in $ROOTS; do
+    [ -d "$root" ] || continue
+    find -H "$root" -maxdepth 5 \( -name node_modules -o -name .git \) -prune -o \
+      -type f -path '*/.agents/local-models' -print 2>/dev/null
+  done
+  [ -f "$EXTRA" ] && printf '%s\n' "$EXTRA"
+  return 0
+}
+
+# Prints "tag<TAB>source" lines.
+_reserved() {
+  local f line
+  while IFS= read -r f; do
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%%#*}"
+      line="$(printf '%s' "$line" | tr -d '[:space:]')"
+      [ -n "$line" ] && printf '%s\t%s\n' "$(_norm "$line")" "$f"
+    done < "$f"
+  done < <(_reservation_files)
+  if [ -f "$OPENCODE" ] && command -v jq >/dev/null 2>&1; then
+    jq -r '.provider.ollama.models // {} | keys[]' "$OPENCODE" 2>/dev/null |
+      while IFS= read -r line; do printf '%s\t%s\n' "$(_norm "$line")" "$OPENCODE"; done
+  fi
+  return 0
+}
+
+_reserved_tags() { _reserved | cut -f1 | sort -u; }
+
+# Prints "tag<TAB>size" for each installed model. Fails when Ollama cannot list.
+_installed() {
+  local out
+  out="$("$OLLAMA" list 2>/dev/null)" || return 1
+  printf '%s\n' "$out" | awk 'NR > 1 && $1 != "" { print $1 "\t" $3 " " $4 }'
+}
+
+# Days since the model was downloaded (manifest mtime). Unknown means 0.
+_age_days() {
+  local name="${1%%:*}" tag="${1#*:}" f m
+  f="$MANIFESTS/$name/$tag"
+  [ -f "$f" ] || { echo 0; return; }
+  m="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || date +%s)"
+  echo $(( ($(date +%s) - m) / 86400 ))
+}
+
+_size_gb() { # "9.3 GB" / "522 MB" -> GB with one decimal, as tenths
+  awk -v s="$1" 'BEGIN { split(s, a, " "); v = a[1] + 0;
+    if (a[2] == "MB") v /= 1000; else if (a[2] == "KB") v /= 1000000;
+    printf "%d\n", v * 10 + 0.5 }'
+}
+
+cmd_status() {
+  local reserved installed tag size unres=0 missing=0
+  reserved="$(_reserved_tags)"
+  if ! installed="$(_installed)"; then
+    echo "Ollama is not running or not installed; cannot list models."
+    [ -n "$reserved" ] && { echo "Reserved:"; printf '  %s\n' $reserved; }
+    return 1
+  fi
+  printf '%-22s %-9s %s\n' MODEL SIZE STATUS
+  while IFS=$'\t' read -r tag size; do
+    [ -n "$tag" ] || continue
+    if grep -qxF "$tag" <<<"$reserved"; then
+      printf '%-22s %-9s reserved\n' "$tag" "$size"
+    else
+      printf '%-22s %-9s NOT reserved (%s days old)\n' "$tag" "$size" "$(_age_days "$tag")"
+      unres=$((unres + $(_size_gb "$size")))
+    fi
+  done <<<"$installed"
+  while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
+    cut -f1 <<<"$installed" | grep -qxF "$tag" && continue
+    printf '%-22s %-9s MISSING (reserved by %s)\n' "$tag" - \
+      "$(_reserved | awk -F'\t' -v t="$tag" '$1 == t { print $2; exit }')"
+    missing=$((missing + 1))
+  done <<<"$reserved"
+  printf 'unreserved: %d.%d GB, missing: %d\n' $((unres / 10)) $((unres % 10)) "$missing"
+}
+
+cmd_check() {
+  local reserved installed tag bad=0
+  reserved="$(_reserved_tags)"
+  [ -n "$reserved" ] || return 0
+  installed="$(_installed | cut -f1)" || { echo "Ollama is not running; reserved models unknown"; return 1; }
+  while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
+    grep -qxF "$tag" <<<"$installed" || { echo "missing: $tag (ollama pull $tag)"; bad=1; }
+  done <<<"$reserved"
+  return "$bad"
+}
+
+cmd_ensure() {
+  local reserved tag
+  reserved="$(_reserved_tags)"
+  if [ -z "$reserved" ]; then
+    echo "No app reserves a local model; nothing to install."
+    return 0
+  fi
+  if ! command -v "$OLLAMA" >/dev/null 2>&1; then
+    echo "An app reserves a local model; installing Ollama."
+    brew install ollama
+  fi
+  while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
+    _installed | cut -f1 | grep -qxF "$tag" || "$OLLAMA" pull "$tag"
+  done <<<"$reserved"
+}
+
+cmd_prune() {
+  local yes=false min_age=0 reserved installed tag size age n=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --yes) yes=true ;;
+      --min-age-days) min_age="${2:?--min-age-days needs a number}"; shift ;;
+      *) echo "unknown option: $1" >&2; return 2 ;;
+    esac
+    shift
+  done
+  reserved="$(_reserved_tags)"
+  if [ -z "$(_reservation_files)" ] && [ -z "$reserved" ]; then
+    echo "local-models: no reservation found; refusing to prune."
+    return 0
+  fi
+  if ! installed="$(_installed)"; then
+    echo "local-models: Ollama cannot list models; skipping prune."
+    return 0
+  fi
+  while IFS=$'\t' read -r tag size; do
+    [ -n "$tag" ] || continue
+    grep -qxF "$tag" <<<"$reserved" && continue
+    age="$(_age_days "$tag")"
+    [ "$age" -ge "$min_age" ] || continue
+    if $yes; then
+      "$OLLAMA" rm "$tag" >/dev/null && echo "removed unreserved model: $tag ($size)"
+    else
+      echo "would remove unreserved model: $tag ($size, $age days old)"
+    fi
+    n=$((n + 1))
+  done <<<"$installed"
+  echo "local-models: $n unreserved model(s)$($yes || echo ' (dry run; add --yes)')"
+}
+
+main() {
+  _settings
+  local cmd="${1:-status}"
+  [ $# -gt 0 ] && shift
+  case "$cmd" in
+    status) cmd_status ;;
+    check) cmd_check ;;
+    ensure) cmd_ensure ;;
+    prune) cmd_prune "$@" ;;
+    -h | --help | help) sed -n '/^#!/d; /^$/q; /^[^#]/q; s/^# \{0,1\}//p' "${BASH_SOURCE[0]}" ;;
+    *) echo "unknown command: $cmd (try --help)" >&2; return 2 ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

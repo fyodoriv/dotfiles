@@ -131,6 +131,10 @@ settings:
     type: int:7-365
     default: 30
     description: Days an agent scratch folder (~/.local/state mktemp or goal folders) sits unchanged before com.dotfiles.agent-scratch-prune deletes it. Build output goes after 2 days, clean pushed agent worktrees after 7.
+  local_models_prune_days:
+    type: int:0-365
+    default: 14
+    description: Days after download before com.dotfiles.agent-scratch-prune removes an Ollama model that no app reserves in .agents/local-models (see local-models). 0 turns the cleanup off.
   morning_hour:
     type: int:0-23
     default: 8

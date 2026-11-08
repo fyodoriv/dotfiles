@@ -1,7 +1,8 @@
 #!/bin/bash
-# Doctor checks for the local-AI stack module. Engine-agnostic: detects
-# whichever inference server is in use (LM Studio :1234 preferred for raw
-# perf; Ollama :11434 as the universally-allowed fallback).
+# Doctor checks for the local-AI stack module. Ollama (:11434) is the one
+# local engine. Apps reserve the models they need in .agents/local-models;
+# bin/local-models installs those on demand and removes the rest. A second
+# engine (LM Studio) only duplicates models on disk, so the doctor flags it.
 #
 # Auto-discovered by ~/bin/dotfiles-doctor when this file exists. To skip:
 # `dotfiles doctor --skip local-ai.<id>`.
@@ -20,10 +21,16 @@ _ollama_installed()   { command -v ollama >/dev/null 2>&1; }
 _lmstudio_up() { curl -sf -m 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1; }
 _ollama_up()   { curl -sf -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; }
 
-# At least one engine must be installed
-check "local-ai.engine_installed" "at least one inference engine installed (LM Studio or Ollama)" \
-  "_lmstudio_installed || _ollama_installed" \
-  "brew install --cask lm-studio   OR   brew install ollama"
+# Ollama must be installed (local-models ensure installs it and the
+# reserved models only when some app reserves one).
+check "local-ai.engine_installed" "Ollama installed" \
+  "_ollama_installed" \
+  "local-models ensure"
+
+# One engine only: LM Studio keeps its own copy of every model.
+check_advisory "local-ai.single_engine" "only one local engine (no LM Studio next to Ollama)" \
+  "! _lmstudio_installed" \
+  "brew uninstall --cask lm-studio && rm -rf ~/.lmstudio"
 
 # ── opencode binary ─────────────────────────────────────────────────
 check "local-ai.opencode_installed" "opencode binary present" \
@@ -59,8 +66,8 @@ if [ "${LIST_MODE:-false}" = true ] || _ollama_installed; then
 fi
 
 # ── At least one inference engine should be reachable right now ─────
-check "local-ai.inference_api_responding" "at least one inference API responding (:1234 LM Studio or :11434 Ollama)" \
-  "_lmstudio_up || _ollama_up" \
+check "local-ai.inference_api_responding" "Ollama API responding on :11434" \
+  "_ollama_up" \
   "\$HOME/bin/local-ai-warmup (or check ~/.local/share/dotfiles/logs/local-ai-warmup.log)"
 
 # ── opencode-serve daemon ───────────────────────────────────────────
@@ -68,50 +75,18 @@ check "local-ai.opencode_serve_api" "opencode-serve responding on :4096" \
   "curl -sf -m 2 http://127.0.0.1:4096/ >/dev/null" \
   "launchctl kickstart -k gui/\$(id -u)/com.dotfiles.opencode-serve"
 
-# ── Models on disk (whichever engine is up) ─────────────────────────
-_local_ai_size_bucket() {
-  local mem_gb
-  mem_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
-  if   [ "$mem_gb" -le 32 ]; then echo "14b"
-  elif [ "$mem_gb" -le 64 ]; then echo "coder-30b"
-  else                            echo "32b"
-  fi
+# ── Models on disk: exactly what apps reserve ──────────────────────
+_local_models() {
+  if [ -x "${DOTFILES_DIR:-}/bin/local-models" ]; then printf '%s' "$DOTFILES_DIR/bin/local-models"
+  else command -v local-models 2>/dev/null || printf 'local-models'; fi
 }
-
-# Discovery lists both engine-specific ID sets without querying the host.
-_local_ai_lmstudio_responding=false
-if [ "${LIST_MODE:-false}" = true ]; then
-  LOCAL_AI_BUCKET="${DOTFILES_LOCAL_AI_SIZE:-14b}"
-else
-  LOCAL_AI_BUCKET="${DOTFILES_LOCAL_AI_SIZE:-$(_local_ai_size_bucket)}"
-  _lmstudio_up && _local_ai_lmstudio_responding=true
-fi
-
-if [ "${LIST_MODE:-false}" = true ] || $_local_ai_lmstudio_responding; then
-  EXPECTED_PRIMARY="qwen/qwen3-${LOCAL_AI_BUCKET}"
-  EXPECTED_SMALL="qwen/qwen3-0.6b"
-  check "local-ai.lmstudio_primary" "LM Studio: primary model ($EXPECTED_PRIMARY) on disk" \
-    "\"\$HOME/.lmstudio/bin/lms\" ls 2>/dev/null | grep -q \"$EXPECTED_PRIMARY\"" \
-    "lms get qwen3-${LOCAL_AI_BUCKET} --mlx -y"
-  check "local-ai.lmstudio_small" "LM Studio: small_model ($EXPECTED_SMALL) on disk" \
-    "\"\$HOME/.lmstudio/bin/lms\" ls 2>/dev/null | grep -q \"$EXPECTED_SMALL\"" \
-    "lms get qwen3-0.6b --mlx -y"
-fi
-if [ "${LIST_MODE:-false}" = true ] || { ! $_local_ai_lmstudio_responding && _ollama_up; }; then
-  # The Ollama library names qwen3 and qwen3-coder as separate entries —
-  # a naive `qwen3:${bucket}` substitution produces invalid tags like
-  # `qwen3:coder-30b`. Map the size bucket to the right entry/tag pair.
-  case "$LOCAL_AI_BUCKET" in
-    coder-30b) EXPECTED_PRIMARY="qwen3-coder:30b" ;;
-    *)         EXPECTED_PRIMARY="qwen3:${LOCAL_AI_BUCKET}" ;;
-  esac
-  EXPECTED_SMALL="qwen3:0.6b"
-  check "local-ai.ollama_primary" "Ollama: primary model ($EXPECTED_PRIMARY) on disk" \
-    "ollama list 2>/dev/null | grep -q \"^$EXPECTED_PRIMARY\"" \
-    "ollama pull $EXPECTED_PRIMARY"
-  check "local-ai.ollama_small" "Ollama: small_model ($EXPECTED_SMALL) on disk" \
-    "ollama list 2>/dev/null | grep -q \"^$EXPECTED_SMALL\"" \
-    "ollama pull $EXPECTED_SMALL"
+if [ "${LIST_MODE:-false}" = true ] || _ollama_up; then
+  check "local-ai.reserved_models_present" "every model an app reserves is on disk (local-models check)" \
+    "\"\$(_local_models)\" check >/dev/null" \
+    "\"\$(_local_models)\" ensure"
+  check_advisory "local-ai.no_unreserved_models" "no Ollama model sits on disk unreserved (local-models status)" \
+    "! \"\$(_local_models)\" prune 2>/dev/null | grep -q '^would remove'" \
+    "\"\$(_local_models)\" prune --yes"
 fi
 
 # ── Shell wiring ────────────────────────────────────────────────────

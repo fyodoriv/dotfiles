@@ -249,3 +249,17 @@ make_worktree() {
   [ "$(stat -f %i "$log")" = "$before" ]
   [ "$(wc -l < "$log" | tr -d ' ')" -eq 2000 ]
 }
+
+@test "step 5 prunes unreserved Ollama models only when LOCAL_MODELS_PRUNE_DAYS is set" {
+  mkdir -p "$HOME/apps/a/.agents" "$TEST_DIR/man/big"
+  echo "qwen3:14b" > "$HOME/apps/a/.agents/local-models"
+  touch -t "$(date -v-30d +%Y%m%d%H%M)" "$TEST_DIR/man/big/1b"
+  printf '#!/bin/bash\n[ "$1" = list ] && printf "NAME ID SIZE MOD\\nqwen3:14b a 9 GB x\\nbig:1b b 1 GB x\\n"\n[ "$1" = rm ] && echo "rm $2" >> "%s/rm.log"\nexit 0\n' "$TEST_DIR" > "$TEST_DIR/ollama"
+  chmod +x "$TEST_DIR/ollama"
+  export LOCAL_MODELS_ROOTS="$HOME/apps" LOCAL_MODELS_OLLAMA="$TEST_DIR/ollama" LOCAL_MODELS_MANIFESTS="$TEST_DIR/man"
+  export LOCAL_MODELS_OPENCODE="$TEST_DIR/none" LOCAL_MODELS_EXTRA="$TEST_DIR/none"
+  run "$SCRIPT"
+  [ ! -f "$TEST_DIR/rm.log" ]
+  LOCAL_MODELS_PRUNE_DAYS=14 run "$SCRIPT"
+  [ "$(cat "$TEST_DIR/rm.log")" = "rm big:1b" ]
+}

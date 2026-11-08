@@ -10,10 +10,8 @@ load test_helper
 
 DOCTOR="$BATS_TEST_DIRNAME/../modules/local-ai/doctor.sh"
 
-@test "doctor: coder-30b bucket maps to qwen3-coder:30b" {
-  grep -q 'coder-30b)' "$DOCTOR"
-  grep -q '"qwen3-coder:30b"' "$DOCTOR"
-}
+# The RAM-size bucket mapping was removed on 2026-11-07: apps now reserve
+# exact tags in .agents/local-models (bin/local-models).
 
 @test "doctor: no naive qwen3:coder-30b substitution remains in code" {
   ! grep -vE '^\s*#' "$DOCTOR" | grep -q 'qwen3:coder-30b'

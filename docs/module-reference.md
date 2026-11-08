@@ -515,20 +515,21 @@ Organization-specific Claude checks (e.g. cloned-MCP-repo verifications) live in
 
 ### local-ai (conditional)
 
-Engine-agnostic local inference stack: LM Studio (`:1234`) or Ollama (`:11434`), plus `opencode serve` on `:4096`. Model checks run only for the engine that is installed or up. The module runs only when `local_ai_agents` is on (default: `use_local_ai` or `owner_machine`).
+Local inference stack: Ollama (`:11434`) is the one engine, plus `opencode serve` on `:4096`. Apps reserve the models they need in `.agents/local-models`; [`local-models`](../README.md#local-ai-models) installs them on demand and removes the rest. The module runs only when `local_ai_agents` is on (default: `use_local_ai` or `owner_machine`).
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
-| `local-ai.engine_installed` | LM Studio or Ollama installed | `brew install --cask lm-studio` or `brew install ollama` |
+| `local-ai.engine_installed` | Ollama installed | `local-models ensure` |
+| `local-ai.single_engine` | No LM Studio next to Ollama (advisory; it keeps a second copy of models) | None (hint: `brew uninstall --cask lm-studio`) |
 | `local-ai.opencode_installed` | `opencode` binary present | opencode install script |
 | `local-ai.opencode_signature_valid` | `opencode` code signature is valid | `codesign --force --sign -` |
 | `local-ai.warmup_agent_loaded` | `com.dotfiles.local-ai-warmup` LaunchAgent registered | `launchctl bootstrap` |
 | `local-ai.opencode_serve_agent_loaded` | `com.dotfiles.opencode-serve` LaunchAgent registered | `launchctl bootstrap` |
 | `local-ai.ollama_agent_loaded` | Collision-safe `com.dotfiles.ollama` LaunchAgent registered (Ollama only) | `launchctl bootstrap` |
-| `local-ai.inference_api_responding` | At least one inference API responds | Runs `local-ai-warmup` |
+| `local-ai.inference_api_responding` | Ollama API responds on `:11434` | Runs `local-ai-warmup` |
 | `local-ai.opencode_serve_api` | `opencode serve` responds on `:4096` | `launchctl kickstart -k` |
-| `local-ai.lmstudio_primary` / `local-ai.lmstudio_small` | LM Studio primary and small models on disk | `lms get` |
-| `local-ai.ollama_primary` / `local-ai.ollama_small` | Ollama primary and small models on disk | `ollama pull` |
+| `local-ai.reserved_models_present` | Every model an app reserves is on disk | `local-models ensure` |
+| `local-ai.no_unreserved_models` | No unreserved Ollama model on disk (advisory) | `local-models prune --yes` |
 | `local-ai.oc_alias` | `oc` alias defined for fast attach to `opencode serve` | None (hint: `dotfiles apply`) |
 | `local-ai.opencode_tools_enabled` | `opencode.json` has an Ollama model with `tools: true` | None (hint: edit `~/.config/opencode/opencode.json`) |
 | `local-ai.opencode_mcp_format` | `opencode.json` MCP entries use the type + command-array schema | None (agentbrew owns `~/.config/opencode/`) |

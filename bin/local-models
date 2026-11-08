@@ -181,7 +181,7 @@ cmd_prune() {
     age="$(_age_days "$tag")"
     [ "$age" -ge "$min_age" ] || continue
     if $yes; then
-      "$OLLAMA" rm "$tag" >/dev/null && echo "removed unreserved model: $tag ($size)"
+      "$OLLAMA" rm "$tag" >/dev/null 2>&1 && echo "removed unreserved model: $tag ($size)"
     else
       echo "would remove unreserved model: $tag ($size, $age days old)"
     fi

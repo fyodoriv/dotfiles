@@ -93,3 +93,8 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -F -q '`postinstall`' "$REF"
   grep -q 'Never add an empty' "$REF"
 }
+
+@test "ship-it commit step checks that gitignored new files were really staged" {
+  grep -q 'git add` skips a gitignored file' "$REF"
+  grep -q 'git check-ignore -v <path>' "$REF"
+}

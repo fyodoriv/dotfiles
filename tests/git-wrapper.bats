@@ -6,6 +6,8 @@ GIT_WRAPPER="$BATS_TEST_DIRNAME/../bin/git"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
+  # Keep probe markers out of the real ~/.cache.
+  export XDG_CACHE_HOME="$TEST_DIR/cache"
   GIT_STUB="$TEST_DIR/real-git"
   GIT_ARGS="$TEST_DIR/git-args.txt"
   cat > "$GIT_STUB" <<'STUB'
@@ -165,4 +167,74 @@ make_git_candidates() {
 
   [ "$status" -eq 0 ]
   [[ "$output" == "path-git status" ]]
+}
+
+# Probe cache (#483): a passing probe leaves a marker; the marker must not
+# outlive an Xcode or CLT update, which replaces the developer-dir git.
+
+counting_system_git() {
+  COUNT_FILE="$TEST_DIR/probe-count"
+  mkdir -p "$TEST_DIR/sys"
+  CACHED_SYSTEM_GIT="$TEST_DIR/sys/git"
+  printf '#!/bin/bash\n[ "$1" = --version ] && echo x >> "%s"\necho "system-git $*"\n' "$COUNT_FILE" > "$CACHED_SYSTEM_GIT"
+  chmod +x "$CACHED_SYSTEM_GIT"
+  touch -t 202001010000 "$CACHED_SYSTEM_GIT"
+  # Stands in for the Xcode or CLT usr/bin directory.
+  DEV_GIT="$TEST_DIR/dev-bin"
+  mkdir -p "$DEV_GIT"
+  touch -t 202001010000 "$DEV_GIT"
+}
+
+@test "probe cache: a healthy system git is probed once, then skipped" {
+  counting_system_git
+  for _ in 1 2 3; do
+    run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" \
+      DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="/usr/bin:/bin" "$GIT_WRAPPER" status
+    [ "$status" -eq 0 ]
+    [[ "$output" == "system-git status" ]]
+  done
+  [ "$(wc -l < "$COUNT_FILE" | tr -d ' ')" -eq 1 ]
+}
+
+@test "probe cache: an Xcode or CLT bin dir newer than the marker forces a new probe" {
+  counting_system_git
+  make_git_candidates
+  run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" \
+    DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="$PATH_GIT_DIR:/usr/bin:/bin" "$GIT_WRAPPER" status
+  [[ "$output" == "system-git status" ]]
+  # Simulate an Xcode update: the shim keeps its old mtime but now fails.
+  # The installer writes a git with an old build-time mtime into the bin
+  # directory; only the directory's mtime moves (to the install time).
+  printf '#!/bin/bash\necho "Xcode license not accepted" >&2\nexit 69\n' > "$CACHED_SYSTEM_GIT"
+  touch -t 202001010000 "$CACHED_SYSTEM_GIT"
+  : > "$DEV_GIT/git"
+  touch -t 202001010000 "$DEV_GIT/git"
+  touch -t 203001010000 "$DEV_GIT"
+  run env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" \
+    DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="$PATH_GIT_DIR:/usr/bin:/bin" "$GIT_WRAPPER" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == "path-git status" ]]
+}
+
+@test "probe cache: an unwritable cache dir still runs git" {
+  counting_system_git
+  mkdir -p "$TEST_DIR/ro"
+  chmod 500 "$TEST_DIR/ro"
+  run env -u DOTFILES_REAL_GIT XDG_CACHE_HOME="$TEST_DIR/ro" DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" \
+    DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="/usr/bin:/bin" "$GIT_WRAPPER" status
+  chmod 700 "$TEST_DIR/ro"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "system-git status" ]]
+}
+
+@test "probe cache: marker names stay distinct for a_b/git and a/b/git" {
+  mkdir -p "$TEST_DIR/a_b" "$TEST_DIR/a/b"
+  printf '#!/bin/bash\necho ok\n' > "$TEST_DIR/a_b/git"
+  printf '#!/bin/bash\necho ok\n' > "$TEST_DIR/a/b/git"
+  chmod +x "$TEST_DIR/a_b/git" "$TEST_DIR/a/b/git"
+  for d in a_b a/b; do
+    env -u DOTFILES_REAL_GIT DOTFILES_SYSTEM_GIT="$TEST_DIR/$d/git" DOTFILES_GIT_PROBE_DEPS= \
+      PATH="/usr/bin:/bin" "$GIT_WRAPPER" status >/dev/null
+  done
+  [ "$(ls "$XDG_CACHE_HOME/dotfiles/git-probe" | wc -l | tr -d ' ')" -eq 2 ]
 }

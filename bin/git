@@ -26,8 +26,35 @@ PRIVATE_PUSH_ALLOWLIST="${DOTFILES_PRIVATE_PUSH_ALLOWLIST:-${XDG_CONFIG_HOME:-$H
 
 # A candidate counts only if it runs. An unaccepted Xcode licence leaves
 # /usr/bin/git executable but failing on every call.
+#
+# The probe costs one extra git process per call (#483), so a passing probe
+# leaves a marker. The marker counts only while it is newer than the binary
+# and, for the /usr/bin/git shim, newer than the Xcode and Command Line
+# Tools bin directories. An installer keeps the build-time mtime on each
+# binary, but the directory it writes gets the install time (Xcode.app
+# itself gets the time the install finished); an update can
+# need a new licence, and the shim itself changes only with macOS.
+# Clear the cache with: rm -rf ~/.cache/dotfiles/git-probe
+_git_probe_dir="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/git-probe"
+_git_probe_deps="${DOTFILES_GIT_PROBE_DEPS-/Applications/Xcode.app:/Applications/Xcode.app/Contents/Developer/usr/bin:/Library/Developer/CommandLineTools/usr/bin${DEVELOPER_DIR:+:$DEVELOPER_DIR/usr/bin}}"
+_git_marker_fresh() {
+  local marker="$1" bin="$2" dep
+  [ -f "$marker" ] && [ "$marker" -nt "$bin" ] || return 1
+  [ "$bin" = "$SYSTEM_GIT" ] || return 0
+  local IFS=':'
+  for dep in $_git_probe_deps; do
+    [ -e "$dep" ] && ! [ "$marker" -nt "$dep" ] && return 1
+  done
+  return 0
+}
 _git_candidate_runs() {
-  [ -x "$1" ] && "$1" --version >/dev/null 2>&1
+  local key="${1//_/__}"
+  local marker="$_git_probe_dir/${key//\//_s}"
+  [ -x "$1" ] || return 1
+  _git_marker_fresh "$marker" "$1" && return 0
+  "$1" --version >/dev/null 2>&1 || return 1
+  mkdir -p "$_git_probe_dir" 2>/dev/null && : > "$marker" 2>/dev/null
+  return 0
 }
 
 # DOTFILES_SYSTEM_GIT exists so tests can stand in for /usr/bin/git.

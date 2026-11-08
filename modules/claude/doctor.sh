@@ -52,7 +52,7 @@ check "claude.model_default" "Claude Code config pinned to Opus 5.5 xhigh (or th
   "_claude_model_is_default" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-model.sh'"
 
-# Env pins (AGENT_GUARD_AGENT_MAX=10 and AGENT_GUARD_AGENT_TOKENS_MAX=25000000: agent limits; AGENT_GUARD_DEPTH_MAX=2: depth 2;
+# Env pins (AGENT_GUARD_AGENT_MAX=10 and AGENT_GUARD_AGENT_TOKENS_MAX=25000000: agent limits; AGENT_GUARD_DEPTH_MAX=2: depth 2; AGENT_GUARD_LIMIT_ASK/DENY_PERCENT=95/98: plan-limit cutoffs; AGENT_GUARD_ROLLING_MAX=40: starts per 10 min;
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000: compact before the guard's 400k line). The
 # expected values come from the fix script's --print-desired, so the check
 # and the fix never disagree.
@@ -62,7 +62,7 @@ _claude_env_pinned() {
   want="$(bash "$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-env.sh" --print-desired 2>/dev/null)" || return 1
   jq -e --argjson want "$want" '(.env // {}) as $e | all($want | to_entries[]; $e[.key] == .value)' "$settings" >/dev/null 2>&1
 }
-check "claude.env_pins" "Claude Code env pins set (AGENT_GUARD_AGENT_MAX=10, AGENT_GUARD_AGENT_TOKENS_MAX=25000000, AGENT_GUARD_DEPTH_MAX=2, CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000)" \
+check "claude.env_pins" "Claude Code env pins set (AGENT_GUARD_AGENT_MAX=10, AGENT_GUARD_AGENT_TOKENS_MAX=25000000, AGENT_GUARD_DEPTH_MAX=2, AGENT_GUARD_LIMIT_ASK_PERCENT=95, AGENT_GUARD_LIMIT_DENY_PERCENT=98, AGENT_GUARD_ROLLING_MAX=40, CLAUDE_CODE_AUTO_COMPACT_WINDOW=350000)" \
   "_claude_env_pinned" \
   "bash '$DOTFILES_DIR/.chezmoiscripts/run_after_claude-settings-env.sh'"
 

@@ -11,7 +11,7 @@ setup() {
   export CALLER_DISPATCH_MARKER="$BATS_TEST_TMPDIR/dispatched"
   mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/work"
   local tool
-  for tool in cargo rustc npm; do
+  for tool in cargo rustc npm bats make; do
     printf '%s\n' '#!/bin/sh' 'printf "x\n" >> "$CALLER_DISPATCH_MARKER"' 'exit 98' > "$BATS_TEST_TMPDIR/bin/$tool"
     chmod 700 "$BATS_TEST_TMPDIR/bin/$tool"
   done
@@ -259,4 +259,88 @@ NOTE
 
 @test "queue caller S02: a variable toolchain cannot authorize inspection" {
   assert_hook_decision S02 2 'cargo +$MODE metadata --no-deps --format-version 1'
+}
+
+@test "queue caller D01: a literal availability probe is read-only discovery" {
+  assert_hook_decision D01 0 'command -v bats'
+}
+
+@test "queue caller D02: a literal availability probe is read-only discovery" {
+  assert_hook_decision D02 0 'command -V bats'
+}
+
+@test "queue caller D03: a literal availability probe is read-only discovery" {
+  assert_hook_decision D03 0 'command -v bats make cargo'
+}
+
+@test "queue caller D04: a literal availability probe is read-only discovery" {
+  assert_hook_decision D04 0 'command -v bats >/dev/null 2>&1 || echo missing'
+}
+
+@test "queue caller D05: a literal availability probe is read-only discovery" {
+  assert_hook_decision D05 0 'if command -pv bats >/dev/null; then echo ok; fi'
+}
+
+@test "queue caller D06: a literal version probe is read-only discovery" {
+  assert_hook_decision D06 0 'bats --version'
+}
+
+@test "queue caller D07: a literal version probe is read-only discovery" {
+  assert_hook_decision D07 0 'bats -v'
+}
+
+@test "queue caller D08: queued suites and one named file keep their allowance" {
+  assert_hook_decision D08 0 'command -v bats && heavy-run bats tests/'
+}
+
+@test "queue caller D09: queued suites and one named file keep their allowance" {
+  assert_hook_decision D09 0 'command -v bats && bats tests/one.bats'
+}
+
+@test "queue caller N01: a probe chained to a full suite refuses" {
+  assert_hook_decision N01 2 'command -v bats && bats tests/'
+}
+
+@test "queue caller N02: a probe chained to a full suite refuses" {
+  assert_hook_decision N02 2 'command -v bats; make test-all'
+}
+
+@test "queue caller N03: a probe chained to a full suite refuses" {
+  assert_hook_decision N03 2 'command -v bats || bats tests/'
+}
+
+@test "queue caller N04: a probe chained to a full suite refuses" {
+  assert_hook_decision N04 2 'bash -c "command -v bats && bats tests/"'
+}
+
+@test "queue caller N05: command without a lookup flag still runs the suite" {
+  assert_hook_decision N05 2 'command bats tests/'
+}
+
+@test "queue caller N06: command without a lookup flag still runs the suite" {
+  assert_hook_decision N06 2 'command -p bats tests/'
+}
+
+@test "queue caller N07: an unknown flag cluster is not a lookup" {
+  assert_hook_decision N07 2 'command -vx bats tests/'
+}
+
+@test "queue caller N08: command substitution in a probe still refuses" {
+  assert_hook_decision N08 2 'command -v $(bats tests/)'
+}
+
+@test "queue caller N09: command substitution in a probe still refuses" {
+  assert_hook_decision N09 2 'command -v "`make test-all`"'
+}
+
+@test "queue caller N10: a version flag with a suite path still refuses" {
+  assert_hook_decision N10 2 'bats --version tests/'
+}
+
+@test "queue caller N11: an option-like name is not a literal probe" {
+  assert_hook_decision N11 2 'command -v -- bats tests/'
+}
+
+@test "queue caller N12: a probe chained to a globbed suite refuses" {
+  assert_hook_decision N12 2 'command -v bats && command bats tests/*.bats'
 }

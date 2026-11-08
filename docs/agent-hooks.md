@@ -169,6 +169,11 @@ Unknown Rust tool invocations also refuse. Only the bounded version, help,
 metadata, project-location and sysroot inspection forms in the
 [caller coverage contract](plans/queue-caller-coverage.md) pass unwrapped.
 The exact `verify` package script must queue even with a filename argument.
+Read-only discovery passes unwrapped: `command -v` or `command -V` (also with
+`-p`) followed only by literal names and output redirections such as
+`>/dev/null 2>&1`, and a lone `bats --version`, `-v`, `--help`, or `-h`.
+A probe chained to a suite (`command -v bats && bats tests/`), a probe with a
+command substitution, and `command` without a lookup flag still refuse.
 Literal quoted Rust executable paths are recognized at a bare command boundary;
 inert documentation strings remain ignored. Each hook invocation owns only
 its input text and decision. This does not prove queue ownership or cover

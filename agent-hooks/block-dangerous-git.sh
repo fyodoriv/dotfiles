@@ -176,23 +176,54 @@ looks_like_branch_delete() {
     esac
   done
   if [ "$dyn" -eq 1 ]; then
-    for opt in "${w[@]}"; do
+    # Scan one invocation at a time (split at ; && || | &). In each, the
+    # subcommand must follow a git word (or a rewritten word, which could be
+    # git) and global options; a delete-like flag counts only after it. Words
+    # of other commands (commit messages, search patterns) never count (#502).
+    local g=0 skip=0 dynw bare
+    for opt in "${w[@]}" ";"; do
+      case "$opt" in
+        *\;|\;*|'&&'|'||'|'|'|'&')
+          # A rewritten word could expand to a flag, unless the command is in a
+          # read-only listing mode (git branch --list ${x}).
+          if [ "$sub" -eq 1 ] && { [ "$flagish" -eq 1 ] || { [ "$rwflag" -eq 1 ] && [ "$ro" -eq 0 ]; }; }; then
+            return 0
+          fi
+          g=0 skip=0 sub=0 flagish=0 rwflag=0 ro=0
+          continue ;;
+      esac
+      dynw=0
+      case "$opt" in \$*|*\`*) dynw=1 ;; esac
       # A leading $ comes from $'branch' once its quotes are dropped.
-      opt="${opt#\$}"
-      case "$opt" in
-        update-ref) sub=1 ;;
-        --list|-l|--show-current|--contains|--merged|--no-merged|--points-at) ro=1 ;;
-      esac
-      is_branch_word "$opt" && sub=1
-      case "$opt" in
-        --*) if is_long_prefix "$opt" delete || is_long_prefix "$opt" force; then flagish=1; fi ;;
-        -?*) case "$opt" in *[DdfMm]*) flagish=1 ;; esac ;;
-      esac
+      bare="${opt#\$}"
+      if [ "$sub" -eq 1 ]; then
+        case "$bare" in
+          --list|-l|--show-current|--contains|--merged|--no-merged|--points-at) ro=1 ;;
+        esac
+        case "$opt" in
+          --*) if is_long_prefix "$opt" delete || is_long_prefix "$opt" force; then flagish=1; fi ;;
+          -?*) case "$opt" in *[DdfMm]*) flagish=1 ;; esac ;;
+        esac
+        [ "$dynw" -eq 1 ] && rwflag=1
+      elif [ "$g" -eq 1 ]; then
+        if [ "$skip" -eq 1 ]; then
+          skip=0
+        elif is_branch_word "$bare" || [ "$bare" = update-ref ]; then
+          sub=1
+        else
+          case "$opt" in
+            -C|--git-dir|--work-tree|--namespace|-c|--config-env) skip=1 ;;
+            -*) ;;
+            # The rest of a split substitution ($(echo git) gives "git)").
+            *[gG][iI][tT]*|*\)|*\`) ;;
+            *) [ "$dynw" -eq 1 ] || g=0 ;;
+          esac
+        fi
+      else
+        case "${bare##*/}" in *[gG][iI][tT]*|*[\?\*\[]*) g=1 ;; esac
+        [ "$dynw" -eq 1 ] && g=1
+      fi
     done
-    # A rewritten word could expand to a flag, unless the command is in a
-    # read-only listing mode (git branch --list ${x}).
-    if [ "$rwflag" -eq 1 ] && [ "$ro" -eq 0 ]; then flagish=1; fi
-    if [ "$sub" -eq 1 ] && [ "$flagish" -eq 1 ]; then return 0; fi
   fi
   for ((i = 0; i < n; i++)); do
     is_git_word "${w[i]##*/}" || continue

@@ -39,6 +39,8 @@
         <string>{{ .chezmoi.homeDir }}</string>
         <key>AGENT_SCRATCH_DIR_IDLE_DAYS</key>
         <string>{{ if hasKey . "agent_scratch_idle_days" }}{{ .agent_scratch_idle_days }}{{ else }}30{{ end }}</string>
+        <key>LOCAL_MODELS_PRUNE_DAYS</key>
+        <string>{{ if hasKey . "local_models_prune_days" }}{{ .local_models_prune_days }}{{ else }}14{{ end }}</string>
     </dict>
 </dict>
 </plist>

@@ -1,0 +1,4 @@
+# Ollama models dotfiles needs (bin/local-ai-agent, opencode defaults).
+# bin/local-models never removes a model listed here.
+qwen3:14b
+qwen3:0.6b

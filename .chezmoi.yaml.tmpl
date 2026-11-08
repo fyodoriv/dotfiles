@@ -106,6 +106,11 @@
 {{- if hasKey . "agent_scratch_idle_days" -}}
 {{-   $agentScratchIdleDays = int .agent_scratch_idle_days -}}
 {{- end -}}
+{{/* local_models_prune_days: days after download before an Ollama model no app reserves is removed; 0 = off */ -}}
+{{- $localModelsPruneDays := 14 -}}
+{{- if hasKey . "local_models_prune_days" -}}
+{{-   $localModelsPruneDays = int .local_models_prune_days -}}
+{{- end -}}
 {{- $morningHour := 8 -}}
 {{- $morningMinute := 30 -}}
 {{- if eq $profile "full" -}}
@@ -251,6 +256,7 @@ data:
   use_encryption: {{ $useEncryption }}
   age_recipient: {{ $ageRecipient | quote }}
   agent_scratch_idle_days: {{ $agentScratchIdleDays }}
+  local_models_prune_days: {{ $localModelsPruneDays }}
   morning_hour: {{ $morningHour }}
   morning_minute: {{ $morningMinute }}
   git_work_name: {{ $gitWorkName | quote }}

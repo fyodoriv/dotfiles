@@ -22,6 +22,10 @@
 #      change for TMP_IDLE_DAYS (default 3, the age macOS itself uses).
 #      App entries (com.*, .com.*, TemporaryItems) and sockets are skipped. Agents
 #      left 37 GB there in one week on the owner's Mac.
+#   5. Unreserved Ollama models: `local-models prune` removes models no app
+#      lists in .agents/local-models, LOCAL_MODELS_PRUNE_DAYS after download
+#      (setting local_models_prune_days, 14 in the LaunchAgent). Off when 0
+#      or unset, and in --dry-run it only reports.
 #
 # Never touched: dirty or unpushed work, locked worktrees, anything changed
 # recently, symlinks, and any path outside the roots below.
@@ -238,6 +242,19 @@ prune_old_tmp() {
   done
 }
 
+# 5. Unreserved Ollama models (bin/local-models owns the rules).
+prune_local_models() {
+  local days="${LOCAL_MODELS_PRUNE_DAYS:-0}" lm
+  [ "$days" -gt 0 ] 2>/dev/null || return 0
+  lm="$(dirname "${BASH_SOURCE[0]}")/local-models"
+  [ -x "$lm" ] || lm="$(command -v local-models 2>/dev/null)" || return 0
+  if $DRY_RUN; then
+    "$lm" prune --min-age-days "$days" || true
+  else
+    "$lm" prune --yes --min-age-days "$days" || true
+  fi
+}
+
 agent_scratch_prune_main() {
   case "${1:-}" in
     -h | --help)
@@ -266,6 +283,7 @@ agent_scratch_prune_main() {
   for root in $WORKTREE_ROOTS; do prune_build_output "$root"; done
   prune_old_scratch
   prune_old_tmp
+  prune_local_models
 
   local verb="freed"
   $DRY_RUN && verb="would free"

@@ -92,7 +92,8 @@ SH
   run bash "$OPTIONAL_REPO/bin/dotfiles-doctor" --module local-ai --list
   [ "$status" -eq 0 ]
   [[ "$output" == *"local-ai.ollama_agent_loaded"* ]]
-  [[ "$output" == *"local-ai.lmstudio_primary"* ]]
-  [[ "$output" == *"local-ai.ollama_primary"* ]]
+  [[ "$output" == *"local-ai.reserved_models_present"* ]]
+  [[ "$output" == *"local-ai.no_unreserved_models"* ]]
+  [[ "$output" != *"local-ai.lmstudio_primary"* ]]
   [ ! -e "$PROBE_MARKER" ]
 }

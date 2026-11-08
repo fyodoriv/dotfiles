@@ -160,6 +160,7 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Encryption | `use_encryption` | `false` | age encryption for secrets (requires key at `~/.config/chezmoi/key.txt`) |
 | age recipient | `age_recipient` | `unused-no-encryption-configured` | Your age public key. Prompted only when `use_encryption` is `true`. |
 | Agent scratch idle days | `agent_scratch_idle_days` | `30` | Days an agent scratch folder in `~/.local/state` sits unchanged before `com.dotfiles.agent-scratch-prune` deletes it (7-365). |
+| Local model prune days | `local_models_prune_days` | `14` | Days after download before `com.dotfiles.agent-scratch-prune` removes an Ollama model that no app reserves ([local AI models](#local-ai-models)). `0` turns it off (0-365). |
 | Morning briefing time | `morning_hour` / `morning_minute` | `8` / `30` | When the `morning` LaunchAgent runs. Prompted only on the full profile. |
 | Dotfiles directory | `dotfiles_dir` | `apps/dotfiles` | Path relative to `$HOME` where this repo lives. Leave as default unless you cloned elsewhere. |
 | Repos directory | `repos_dir` | `apps` | Path relative to `$HOME` where your code repos live. Used by `git-maintain` and doctor. |
@@ -416,6 +417,17 @@ AI agent tooling (tmux agent launchers, agent-browser config) is opt-in. When pr
 This deploys `~/.zshrc.ai-tools`, which sets up tmux agent launchers (`tcc`, `tcdx`) and agent-browser tuning. It also installs a `~/bin/claude` wrapper that strips leaked `ANTHROPIC_MODEL` values and starts Claude Code with `--permission-mode bypassPermissions` unless you pass an explicit permission mode. For `claude rc` (Remote Control), it puts that flag after the verb, because Remote Control refuses to start when the flag comes first.
 
 Teammates who want MCP servers, shared skills, and generated agent config should also follow [docs/agentbrew-setup.md](docs/agentbrew-setup.md) for `agentbrew init`, credential setup, sync, status checks, and recovery.
+
+### Local AI models
+
+Ollama is the one local model engine; dotfiles does not use LM Studio (it keeps a second copy of every model). Each app lists the Ollama models it needs in `.agents/local-models`, one tag per line:
+
+```text
+# .agents/local-models
+qwen3:14b   # eval judge
+```
+
+That list is a reservation. `local-models ensure` installs Ollama and pulls a reserved model only when some app needs it. Every 6 hours `com.dotfiles.agent-scratch-prune` runs `local-models prune`, which removes models that no app reserves once they are `local_models_prune_days` (14) old. It also reads the Ollama models in `~/.config/opencode/opencode.json` and your own extras in `~/.config/dotfiles/local-models.reserved`. It removes nothing when it finds no reservation or Ollama is down. Run `local-models status` to see what is reserved, unreserved, and missing.
 
 ### 4. Enterprise secrets
 
@@ -895,7 +907,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |
-| `com.dotfiles.agent-scratch-prune` | `agent-scratch-prune` | Every 6 hours, and at load | Remove what AI agents leave behind: idle build output (2 days), clean pushed agent worktrees (7 days), old scratch folders (`agent_scratch_idle_days`, 30), temp-folder entries (3 days) (`logs/agent-scratch-prune.log`) |
+| `com.dotfiles.agent-scratch-prune` | `agent-scratch-prune` | Every 6 hours, and at load | Remove what AI agents leave behind: idle build output (2 days), clean pushed agent worktrees (7 days), old scratch folders (`agent_scratch_idle_days`, 30), temp-folder entries (3 days), Ollama models no app reserves (`local_models_prune_days`, 14) (`logs/agent-scratch-prune.log`) |
 | `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools; company plugins to their newest signed release (opt-in: `auto_upgrade: true`) |
 
 **One LaunchAgent per job.** `dotfiles apply` unloads and deletes:
@@ -1303,6 +1315,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | Script | Description | Schedule |
 |--------|-------------|----------|
 | `cleanup` | Reclaim disk from caches, logs, and build artifacts | Weekly (Sun 3 AM) |
+| `local-models` | Keep only the Ollama models your apps reserve in `.agents/local-models`: `status`, `check`, `ensure` (installs Ollama and pulls missing reserved models only when needed), `prune --yes` (removes unreserved ones; dry run without `--yes`). See [local AI models](#local-ai-models) | On demand; prune every 6 hours |
 | `agent-scratch-prune` | Reclaim disk that AI agents leave behind: idle `node_modules`/`.venv`/Cargo `target`, clean pushed worktrees in `~/.codex/worktrees`, old scratch folders in `~/.local/state`, and agent temp entries in the macOS per-user temp folder idle 3 days. Never touches dirty, unpushed, locked, or recent work. `--dry-run` lists what would go | Every 6 hours (LaunchAgent) |
 | `app-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |

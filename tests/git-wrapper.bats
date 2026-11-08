@@ -238,3 +238,30 @@ counting_system_git() {
   done
   [ "$(ls "$XDG_CACHE_HOME/dotfiles/git-probe" | wc -l | tr -d ' ')" -eq 2 ]
 }
+
+@test "probe cache: a caller-set HOME gets no marker" {
+  # A tool that runs git with HOME inside a repo must not find a new
+  # file there (agentbrew verify-changed.test.ts saw .home/.cache/...).
+  counting_system_git
+  mkdir -p "$TEST_DIR/fake-home"
+  run env -u DOTFILES_REAL_GIT -u XDG_CACHE_HOME HOME="$TEST_DIR/fake-home" USER=no-such-user-dotfiles \
+    DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="/usr/bin:/bin" "$GIT_WRAPPER" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == "system-git status" ]]
+  [ ! -e "$TEST_DIR/fake-home/.cache" ]
+}
+
+@test "probe cache: a numeric USER never puts a marker in the current dir" {
+  # In bash, ~0 and ~-0 are directory-stack forms that expand to $PWD.
+  counting_system_git
+  mkdir -p "$TEST_DIR/cwd"
+  cd "$TEST_DIR/cwd"
+  for u in 0 -0; do
+    run env -u DOTFILES_REAL_GIT -u XDG_CACHE_HOME HOME="$TEST_DIR/cwd/.home" USER="$u" \
+      DOTFILES_SYSTEM_GIT="$CACHED_SYSTEM_GIT" DOTFILES_GIT_PROBE_DEPS="$DEV_GIT" PATH="/usr/bin:/bin" "$GIT_WRAPPER" status
+    [ "$status" -eq 0 ]
+    [[ "$output" == "system-git status" ]]
+  done
+  [ ! -e "$TEST_DIR/cwd/.cache" ]
+  [ ! -e "$TEST_DIR/cwd/.home" ]
+}

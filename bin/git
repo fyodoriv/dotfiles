@@ -35,7 +35,24 @@ PRIVATE_PUSH_ALLOWLIST="${DOTFILES_PRIVATE_PUSH_ALLOWLIST:-${XDG_CONFIG_HOME:-$H
 # itself gets the time the install finished); an update can
 # need a new licence, and the shim itself changes only with macOS.
 # Clear the cache with: rm -rf ~/.cache/dotfiles/git-probe
-_git_probe_dir="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/git-probe"
+# The cache lives in $XDG_CACHE_HOME when set, else in the account's home
+# from the user database, not $HOME:
+# tools and tests run git with HOME inside a repo, and a marker there shows
+# up as a changed file. No valid account home means no cache, only probes.
+_git_probe_dir=""
+if [ -n "${XDG_CACHE_HOME:-}" ]; then
+  _git_probe_dir="$XDG_CACHE_HOME/dotfiles/git-probe"
+else
+  case "${USER:-}" in
+    # A name must start with a letter or _: ~0 and ~-0 expand to $PWD.
+    '' | [!A-Za-z_]* | *[!A-Za-z0-9._-]*) ;;
+    *)
+      _git_home=""
+      eval "_git_home=~$USER"
+      [ "${_git_home#\~}" = "$_git_home" ] && _git_probe_dir="$_git_home/.cache/dotfiles/git-probe"
+      ;;
+  esac
+fi
 _git_probe_deps="${DOTFILES_GIT_PROBE_DEPS-/Applications/Xcode.app:/Applications/Xcode.app/Contents/Developer/usr/bin:/Library/Developer/CommandLineTools/usr/bin${DEVELOPER_DIR:+:$DEVELOPER_DIR/usr/bin}}"
 _git_marker_fresh() {
   local marker="$1" bin="$2" dep
@@ -51,9 +68,9 @@ _git_candidate_runs() {
   local key="${1//_/__}"
   local marker="$_git_probe_dir/${key//\//_s}"
   [ -x "$1" ] || return 1
-  _git_marker_fresh "$marker" "$1" && return 0
+  [ -n "$_git_probe_dir" ] && _git_marker_fresh "$marker" "$1" && return 0
   "$1" --version >/dev/null 2>&1 || return 1
-  mkdir -p "$_git_probe_dir" 2>/dev/null && : > "$marker" 2>/dev/null
+  [ -n "$_git_probe_dir" ] && mkdir -p "$_git_probe_dir" 2>/dev/null && : > "$marker" 2>/dev/null
   return 0
 }
 

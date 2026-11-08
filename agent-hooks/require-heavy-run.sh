@@ -62,6 +62,22 @@ _skip_flags() {
   done
 }
 
+# True when the words in w after `command` are a lookup: -v or -V (alone or
+# with -p), then only literal names and output redirections. A lookup prints
+# where a name resolves and never runs it. Any other word is not proven inert.
+_lookup_only() {
+  local n names=0
+  case "${w[0]:-}" in -v|-V|-pv|-pV|-vp|-Vp) ;; *) return 1 ;; esac
+  for n in "${w[@]:1}"; do
+    case "$n" in
+      '>/dev/null'|'1>/dev/null'|'2>/dev/null'|'&>/dev/null'|'2>&1'|'>&2') ;;
+      -*|*[!A-Za-z0-9_.+@/-]*) return 1 ;;
+      *) names=$((names + 1)) ;;
+    esac
+  done
+  [ "$names" -gt 0 ]
+}
+
 # True when one simple command (no && ; |) is a heavy run.
 _is_heavy() {
   local -a w
@@ -72,7 +88,11 @@ _is_heavy() {
   while [ "${#w[@]}" -gt 0 ]; do
     case "${w[0]}" in
       *=*|if|while|until|then|do|else|elif|'!') w=("${w[@]:1}") ;;
-      time|command|nohup) w=("${w[@]:1}"); _skip_flags ;;
+      command)
+        w=("${w[@]:1}")
+        [ "$_lookup_ok" = 1 ] && _lookup_only && return 1
+        _skip_flags ;;
+      time|nohup) w=("${w[@]:1}"); _skip_flags ;;
       exec) w=("${w[@]:1}"); _skip_flags -a ;;
       timeout)
         w=("${w[@]:1}"); _skip_flags -s -k --signal --kill-after
@@ -162,6 +182,8 @@ _is_heavy() {
       return 1 ;;
     bats)
       rest=(${raw[@]+"${raw[@]}"})
+      # A lone version or help flag runs no tests.
+      case "${rest[*]-}" in --version|-v|--help|-h) return 1 ;; esac
       local filtered=0
       case "${rest[0]:-}" in
         -f|--filter)
@@ -214,19 +236,31 @@ _strip_text() {
         $r/gsex;
       $s =~ s/\$(\((?:[^()]++|(?1))*\))/push @extra, substr($1, 1, -1); "S"/ge;
       $s =~ s/`([^`]*)`/push @extra, $1; "S"/ge;
-      return $s . join("", map { "\n$_\n" } @extra);
+      # Mark every lifted line with \x01 so its output is known to feed another command.
+      return $s . join("", map { my $e = $_; $e =~ s/^(?!\x01)/\x01/mg; "\n$e\n" } @extra);
     }
     $_ = strip($_);
   '
 }
 
-while IFS= read -r seg; do
-  seg="${seg#"${seg%%[![:space:]]*}"}"
-  case "$seg" in heavy-run|heavy-run\ *) continue ;; esac
-  if _is_heavy "$seg"; then
-    echo "BLOCKED: a full test suite or build must queue on the Mac-wide lock. Run this as \`heavy-run <command>\`." >&2
-    exit 2
-  fi
-done < <(printf '%s\n' "$command" | _strip_text | sed -E 's/(&&|\|\||;|\||[(){}])/\n/g')
+stripped="$(printf '%s\n' "$command" | _strip_text)"
+# The command -v lookup allowance holds only for a top-level probe whose output
+# feeds nothing: no pipe (| or |&) or process substitution anywhere in the
+# command, and not a line lifted out of $(...), backticks, sh -c, or eval text.
+_piped=0
+grep -qE '(^|[^|])\|([^|]|$)|[<>]\(' <<< "$stripped" && _piped=1
+while IFS= read -r line; do
+  _lookup_ok=1
+  [ "$_piped" -eq 0 ] || _lookup_ok=0
+  case "$line" in $'\x01'*) _lookup_ok=0; line="${line#$'\x01'}" ;; esac
+  while IFS= read -r seg; do
+    seg="${seg#"${seg%%[![:space:]]*}"}"
+    case "$seg" in heavy-run|heavy-run\ *) continue ;; esac
+    if _is_heavy "$seg"; then
+      echo "BLOCKED: a full test suite or build must queue on the Mac-wide lock. Run this as \`heavy-run <command>\`." >&2
+      exit 2
+    fi
+  done < <(printf '%s\n' "$line" | sed -E 's/(&&|\|\||;|\||[(){}])/\n/g')
+done <<< "$stripped"
 
 exit 0

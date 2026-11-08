@@ -89,21 +89,6 @@ them. -->
 
 ## P2
 
-- [ ] Allow read-only test-runner discovery through the queue guard
-  - **ID**: heavy-run-read-only-discovery
-  - **Tags**: hooks, reliability, tooling
-  - **Details**: On Nov 7, the heavy-run guard blocked `command -v bats`, a read-only availability check, with its full-suite refusal. Permit proven read-only discovery while continuing to block actual unqueued suites and unresolved or dynamically rewritten commands. Do not weaken the existing queue or safety controls.
-  - **Files**: `agent-hooks/require-heavy-run.sh`, its existing Bats tests, and hook guidance.
-  - **Output**: code
-  - **Acceptance**: A literal read-only availability probe succeeds without running the runner. Actual unqueued full-suite commands, chained suite execution, and ambiguous dynamic command forms remain blocked; queued suites and existing single-test allowances retain their behavior.
-  - **Hypothesis**: A syntax-aware discovery check reduces false refusals from 1/1 observed probe to 0/1 while preserving all registered dangerous-command and existing guard controls.
-  - **Measurement**: First commit an exact safe and dangerous control matrix, then run `JOBS=1 heavy-run bats tests/agent-hooks-heavy-build-callers.bats` before and after the change and `JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` with a fresh cache. Reproduce the blocked availability probe before the fix; keep all payloads as synthetic JSON data and assert no fixture command executes.
-  - **Success**: The read-only probe is allowed, every registered full-suite, chained-execution and ambiguous-command negative remains blocked, all existing guard tests pass, and the full gate passes.
-  - **Pivot**: Any unsafe allow, lost existing allowance, unexpected execution, missing evidence or gate failure rejects the candidate; preserve the failure and redesign the parser instead of weakening the negative controls.
-  - **Anchor**: Nov 7 observed guard refusal; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.
-  - **Competitive-goal**: none — correctness of the existing test queue guard, not a scorecard count.
-
-
 - [ ] Make one-job test runs work with GNU parallel installed
   - **ID**: make-check-one-job-bats
   - **Tags**: tests, reliability, tooling

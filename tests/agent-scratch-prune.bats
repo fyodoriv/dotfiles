@@ -213,7 +213,8 @@ make_worktree() {
 }
 
 @test "removes temp entries idle 3 days, keeps recent and app entries" {
-  mkdir -p "$TMPD/careerbrew-web.Ab3xYz/node_modules" "$TMPD/fresh.Qw7erT" "$TMPD/com.docker.abc"
+  mkdir -p "$TMPD/careerbrew-web.Ab3xYz/node_modules" "$TMPD/fresh.Qw7erT" "$TMPD/com.docker.abc" "$TMPD/.com.openai.codex.ab12cd"
+  echo x > "$TMPD/.com.openai.codex.ab12cd/lock"
   echo x > "$TMPD/careerbrew-web.Ab3xYz/node_modules/a.js"
   echo x > "$TMPD/fresh.Qw7erT/log"
   echo x > "$TMPD/com.docker.abc/state"
@@ -226,6 +227,7 @@ make_worktree() {
   [ ! -e "$TMPD/old-file.txt" ]
   [ -f "$TMPD/fresh.Qw7erT/log" ]
   [ -f "$TMPD/com.docker.abc/state" ]
+  [ -f "$TMPD/.com.openai.codex.ab12cd/lock" ]
 }
 
 @test "keeps a temp entry that one file inside still uses" {

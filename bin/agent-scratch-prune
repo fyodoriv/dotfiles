@@ -20,7 +20,7 @@
 #   4. Old temp entries: files and folders in the macOS per-user temp folder
 #      (getconf DARWIN_USER_TEMP_DIR, where agent mktemp runs land) with no
 #      change for TMP_IDLE_DAYS (default 3, the age macOS itself uses).
-#      App entries (com.*, TemporaryItems) and sockets are skipped. Agents
+#      App entries (com.*, .com.*, TemporaryItems) and sockets are skipped. Agents
 #      left 37 GB there in one week on the owner's Mac.
 #
 # Never touched: dirty or unpushed work, locked worktrees, anything changed
@@ -229,7 +229,7 @@ prune_old_tmp() {
     [ -e "$entry" ] && [ ! -L "$entry" ] || continue
     [ -f "$entry" ] || [ -d "$entry" ] || continue
     case "${entry##*/}" in
-      com.* | TemporaryItems) continue ;;
+      com.* | .com.* | TemporaryItems) continue ;;
     esac
     scan="$(_tmp_scan "$entry" "$cutoff")"
     # "empty": a folder with no files may be a tool's fresh work area.

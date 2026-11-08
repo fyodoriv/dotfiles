@@ -23,7 +23,7 @@ setup() {
 case "$1" in
   list) [ -f "$FAKE_STATE.down" ] && exit 1
         echo "NAME ID SIZE MODIFIED"; cat "$FAKE_STATE" ;;
-  rm|pull) echo "$1 $2" >> "$FAKE_LOG" ;;
+  rm|pull) echo "$1 $2" >> "$FAKE_LOG"; printf "SPINNER-NOISE\n" >&2 ;;
 esac
 SH
   chmod +x "$TEST_DIR/ollama"
@@ -136,4 +136,12 @@ reserve() { mkdir -p "$HOME/apps/$1/.agents"; printf '%s\n' "${@:2}" > "$HOME/ap
   ln -s "$TEST_DIR/real" "$HOME/apps/wt"
   LOCAL_MODELS_ROOTS="$HOME/apps/wt" run "$SCRIPT" prune --yes
   [ ! -f "$FAKE_LOG" ]
+}
+
+@test "prune output stays clean: ollama progress on stderr is not logged" {
+  reserve app1 qwen3:14b
+  run "$SCRIPT" prune --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"SPINNER-NOISE"* ]]
+  [[ "$output" == *"removed unreserved model: qwen3.6:27b"* ]]
 }

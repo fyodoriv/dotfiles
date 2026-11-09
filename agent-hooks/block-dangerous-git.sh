@@ -465,19 +465,29 @@ literal_search_only() {
   case "$command" in
     *[\;\&\|\`\$\<\>\(\)\\]*|*$'\n'*) return 1 ;;
   esac
-  local scan tok options=1
-  scan=$(printf '%s' "$command" | /usr/bin/sed -E "s/'[^']*'|\"[^\"]*\"/x/g")
-  case "$scan" in *[\'\"]*) return 1 ;; esac
-  for tok in $scan; do
-    [ "$options" -eq 1 ] || continue
-    case "$tok" in
-      -n|--line-number|-F|--fixed-strings) ;;
-      --) options=0 ;;
-      rg) ;;
-      -*) return 1 ;;
-      *) ;;
+  local rest quote pattern after path opt
+  rest=${command#rg }
+  for opt in -n --line-number -F --fixed-strings; do
+    case "$rest" in
+      "$opt "*) rest=${rest#"$opt "}; break ;;
     esac
   done
+  case "$rest" in
+    \'*) quote="'" ;;
+    \"*) quote='"' ;;
+    *) return 1 ;;
+  esac
+  rest=${rest#"$quote"}
+  pattern=${rest%%"$quote"*}
+  after=${rest#*"$quote"}
+  [ "$after" != "$rest" ] || return 1
+  case "$after" in
+    " "*) path=${after# } ;;
+    *) return 1 ;;
+  esac
+  case "$path" in
+    ''|-*|*[[:space:]]*) return 1 ;;
+  esac
   return 0
 }
 literal_search_only && exit 0

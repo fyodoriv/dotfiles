@@ -123,3 +123,13 @@ probe() {
   run probe "rg 'git reset --hard' --hostname-bin helper --hyperlink-format 'file://{host}{path}' ."
   [ "$status" -eq 2 ]
 }
+
+@test "unsafe 18: quoted pre-pattern pre blocks" {
+  run probe "rg '--pre' helper 'git reset --hard' ."
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 19: quoted post-pattern pre blocks" {
+  run probe "rg 'git reset --hard' '--pre' helper ."
+  [ "$status" -eq 2 ]
+}

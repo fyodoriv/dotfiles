@@ -97,7 +97,11 @@ JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # without `parallel` on PATH the test targets run bats serially (slower, same
 # tests). Install it with `brew install parallel` or `make install-deps`.
 HAS_PARALLEL := $(shell command -v parallel >/dev/null 2>&1 && echo yes)
-ifeq ($(HAS_PARALLEL),yes)
+ifeq ($(JOBS),1)
+BATS_JOBS :=
+JOBS_LABEL := serial: one job
+TEST_FILE_JOBS :=
+else ifeq ($(HAS_PARALLEL),yes)
 BATS_JOBS := --jobs $(JOBS) --no-parallelize-within-files
 JOBS_LABEL := $(JOBS) jobs
 TEST_FILE_JOBS := --jobs $(JOBS)
@@ -112,9 +116,9 @@ BATS_PEER_FILES = $(filter-out tests/doctor.bats,$(BATS_ALL_FILES))
 define BATS_FULL_RUN
 [ -n "$(BATS_ALL_FILES)" ] || exit 1; \
 result=0; \
-if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) -- $(BATS_PEER_FILES) || result=$$?; fi; \
+if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) $(BATS_PEER_FILES) || result=$$?; fi; \
 if [ -n "$(filter tests/doctor.bats,$(BATS_ALL_FILES))" ]; then \
-  bats -- tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
+  bats tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
 fi; \
 exit "$$result"
 endef
@@ -208,7 +212,7 @@ e2e-if-needed: ## Run the install e2e only when an installer path changed
 # Each step's duration goes to ~/.local/state/dotfiles/gate-timings.jsonl
 # (scripts/gate-timed.sh) for the monthly speed review in /tooling-checkup.
 check: ## Lint + task queue lint + test + install e2e when needed (timed)
-	@scripts/gate-timed.sh total $(MAKE) --no-print-directory check-steps
+	@DOTFILES_GATE_INVOCATION="$${DOTFILES_GATE_INVOCATION:-$$(uuidgen)}" scripts/gate-timed.sh total $(MAKE) --no-print-directory check-steps
 	@echo ""
 	@echo "✓ All checks passed"
 	@echo "  Iterating? Use make lint and bats tests/<name>.bats; run make check once before you commit."

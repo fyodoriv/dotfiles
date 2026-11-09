@@ -167,6 +167,9 @@ directly.
   Perl programs or prove control flow inside a snippet.
 - State any known pre-existing failure explicitly; do not claim completion
   without fresh command output.
+- `make check` gives each invocation an opaque ID. Every step row carries that
+  ID and the final `gate-receipt` line carries its status, so an agent can join
+  its real tool completion to the exact gate steps without timestamp guesses.
 
 ### Test command shims
 
@@ -185,10 +188,12 @@ than appending them after `/bin`. The explicit plugin target still selects
 syntax errors as product failures. Use a fresh cache after an interpreter
 correction when prior cache provenance is uncertain.
 
-Bats 1.14 rejects `--jobs 1` with its file-parallel flags. For a single-worker
-gate, `JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` selects plain
-serial Bats and retains every gate step. This invocation does not raise the
-shared heavy-job limit or prove that consumer worker budgeting is complete.
+Bats 1.14 rejects `--jobs 1` with its file-parallel flags and rejects a
+standalone `--` before test paths. `JOBS=1 heavy-run make check` selects plain
+serial Bats and retains every gate step. Keep `cached-run`'s own `--` between
+its command and per-file inputs; Bats never receives that separator. A
+single-worker invocation does not raise the shared heavy-job limit or prove
+that consumer worker budgeting is complete.
 
 ### Doctor test contracts
 

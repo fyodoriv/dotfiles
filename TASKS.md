@@ -91,6 +91,7 @@ them. -->
 
 - [ ] Restore the full Bats suite with the installed CLI argument parser
   - **ID**: full-suite-bats-argument-compatibility
+  - **Blocked**: pre-existing-full-suite-failure — the parser fix and strict scheduler controls pass, and the real full suite executed 1,756 tests without a parser error. It then hit the unchanged-base failure `command eval files are valid and point at existing commands`: `commands/evals/kimi-goal.evals.json` names missing `commands/kimi-goal.md`. The run later stalled under shared load and was stopped. Fix that unrelated artifact drift and rerun the complete suite green before closing this task.
   - **Tags**: tests, reliability, tooling
   - **Details**: On 2026-11-08, both the unchanged base and the readiness-retro branch failed `heavy-run make test-all` before test execution with `Error: Bad command line option '--'` (exit 2). The required `make check` gate passed on the branch. Inventory every Bats `--` separator and installed-version contract; preserve safe path handling and affected-test selection. This is distinct from the one-job parallel-flag task.
   - **Files**: `Makefile`, `tests/makefile-bats-jobs.bats`, contributor test guidance.
@@ -105,6 +106,7 @@ them. -->
 
 - [ ] Make one-job test runs work with GNU parallel installed
   - **ID**: make-check-one-job-bats
+  - **Blocked**: pre-existing-full-gate-failure — all three one-job scheduler targets and all three multi-job controls pass with exact coverage. The required fresh repository gate remains blocked by the same unchanged-base `kimi-goal` eval-to-command drift described in `full-suite-bats-argument-compatibility`. Rerun `JOBS=1 heavy-run make check` green after that drift is fixed before closing this task.
   - **Tags**: tests, reliability, tooling
   - **Details**: On Nov 7, `JOBS=1 heavy-run make check` failed before running Bats tests because Bats rejects `--no-parallelize-within-files` with `--jobs 1`. The Makefile currently supplies both whenever GNU parallel is available. Select the serial route for one job, and preserve the existing parallel route for more than one job. Do not weaken test selection or doctor isolation.
   - **Files**: `Makefile`, `tests/makefile-bats-jobs.bats`, contributor test guidance.
@@ -116,7 +118,6 @@ them. -->
   - **Pivot**: Any rejected one-job recipe, lost multiple-job option, changed selected-test or doctor-order behavior, or gate failure rejects this approach; preserve the evidence and redesign the selection.
   - **Anchor**: Bats parallel execution documentation, https://bats-core.readthedocs.io/en/stable/usage.html#parallel-execution; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.
   - **Competitive-goal**: none — reliability of the existing test gate, not a scorecard count.
-
 
 - [ ] Prove agent continuity through a battery lid close with Power Protect
   - **ID**: keepawake-power-protect-physical-validation
@@ -200,8 +201,9 @@ them. -->
 
 - [ ] Make `make check` fast in the inner loop
   - **ID**: speed-up-make-check
-  - **Evidence**: On Nov 6, the registered seven-day agent time review reported six Dotfiles `make check` calls totaling 1,350,074 ms, or 3.21 min/day. This exceeds the 2 min/day pivot threshold; the original approach did not meet the outcome. The local gate-timing log points to the test phase as the largest aggregate, but its rows are not bound to those six calls, so they do not establish the cause of this result.
-  - **Next**: Pivot from relying on caching and steering alone. The [synthetic attribution controls](docs/plans/gate-attribution-synthetic.md) pass. Register real-agent receipt delivery before identifying the slowest contributing step and proposing a separately measured change. Keep existing caches and safety gates until a replacement is proved.
+  - **Evidence**: On Nov 9, the seven-day review reported 27 Dotfiles `make check` calls totaling 57m45s, or 8.25 min/day. An exclusive unchanged-base call passed its internal steps in 3 s but took 788.87 s including `heavy-run` wait. Real invocation receipts now bind each step row and final status without timestamp guesses; the failed real-agent control matched all three emitted rows. This is attribution, not a measured speed improvement.
+  - **Next**: On or after Nov 16, rerun the seven-day review and use attributed successful and failed calls to register a separately measured optimization. Keep existing caches and safety gates until a replacement is proved.
+  - **Blocked**: needs-time — real receipt delivery shipped Nov 9; the registered seven-day outcome must be measured on or after Nov 16. Current 8.25 min/day does not meet the under-1-min/day acceptance.
   - **Tags**: perf, agents
   - **Details**: The 2026-10-20 checkup time review: `make check` costs 2m38s/day (17x in 7 sessions, p95 5m12s). Agents run the full gate while iterating instead of `bin/bats-affected`.
   - **Files**: `Makefile`, `AGENTS.md`, `bin/cached-run`

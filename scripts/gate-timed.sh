@@ -16,6 +16,12 @@ step="${1:?usage: gate-timed.sh <step> <command> [args...]}"
 shift
 case "$step" in lint|lint-tasks|test|plugins-bash32|e2e|total) ;; *) echo "gate-timed: unknown step $step" >&2; exit 2 ;; esac
 
+invocation="${DOTFILES_GATE_INVOCATION:-}"
+if [ -n "$invocation" ]; then
+  case "$invocation" in *[!A-Za-z0-9-]*) echo 'gate-timed: invalid invocation label' >&2; exit 2 ;; esac
+  [ "${#invocation}" -le 64 ] || { echo 'gate-timed: invalid invocation label' >&2; exit 2; }
+fi
+
 start="$(date +%s)"
 "$@"
 status=$?
@@ -24,11 +30,19 @@ seconds=$(( $(date +%s) - start ))
 if [ "${DOTFILES_GATE_TIMINGS:-1}" != "0" ]; then
   file="${DOTFILES_GATE_TIMINGS_FILE:-$HOME/.local/state/dotfiles/gate-timings.jsonl}"
   if mkdir -p "$(dirname "$file")" 2>/dev/null; then
-    printf '{"ts":"%s","step":"%s","seconds":%d,"status":%d}\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$step" "$seconds" "$status" >> "$file" 2>/dev/null
+    if [ -n "$invocation" ]; then
+      printf '{"ts":"%s","step":"%s","seconds":%d,"status":%d,"invocation":"%s"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$step" "$seconds" "$status" "$invocation" >> "$file" 2>/dev/null
+    else
+      printf '{"ts":"%s","step":"%s","seconds":%d,"status":%d}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$step" "$seconds" "$status" >> "$file" 2>/dev/null
+    fi
     if [ "$(wc -l < "$file" 2>/dev/null || echo 0)" -gt 2000 ]; then
       tail -n 2000 "$file" > "$file.tmp" 2>/dev/null && mv "$file.tmp" "$file" 2>/dev/null
     fi
   fi
+fi
+if [ "$step" = total ] && [ -n "$invocation" ] && [ "${DOTFILES_GATE_TIMINGS:-1}" != "0" ]; then
+  printf 'gate-receipt: %s status=%d\n' "$invocation" "$status"
 fi
 exit "$status"

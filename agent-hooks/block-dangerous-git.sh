@@ -465,15 +465,17 @@ literal_search_only() {
   case "$command" in
     *[\;\&\|\`\$\<\>\(\)\\]*|*$'\n'*) return 1 ;;
   esac
-  local tok options=1
-  for tok in ${command//[\'\"]/ }; do
+  local scan tok options=1
+  scan=$(printf '%s' "$command" | /usr/bin/sed -E "s/'[^']*'|\"[^\"]*\"/x/g")
+  case "$scan" in *[\'\"]*) return 1 ;; esac
+  for tok in $scan; do
     [ "$options" -eq 1 ] || continue
     case "$tok" in
       -n|--line-number|-F|--fixed-strings) ;;
       --) options=0 ;;
       rg) ;;
       -*) return 1 ;;
-      *) options=0 ;;
+      *) ;;
     esac
   done
   return 0

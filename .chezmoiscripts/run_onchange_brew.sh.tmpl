@@ -96,8 +96,6 @@ brew "duti"
 {{ if .use_ai_tools -}}
 # ChatGPT hosts the Codex GUI; the terminal CLI is installed separately.
 cask "chatgpt"
-# OpenCode Desktop: GUI agent for non-Claude models (Kimi Code plan); see bin/kimi-goal.
-cask "opencode-desktop"
 {{ end -}}
 
 # ── Full: Extras ─────────────────────────────────────────────────
@@ -191,6 +189,22 @@ if [ -s "$DEFERRED_CASKS" ]; then
 else
   echo "✓ Homebrew packages up to date"
 fi
+
+{{ $opencodeExcluded := false -}}
+{{ $agentfile := joinPath .chezmoi.homeDir ".config/agentbrew/Agentfile.yaml" -}}
+{{ if stat $agentfile -}}
+{{   $agentfileData := fromYaml (include $agentfile) -}}
+{{   if hasKey $agentfileData "excludeAgents" -}}
+{{     $opencodeExcluded = has "opencode" $agentfileData.excludeAgents -}}
+{{   end -}}
+{{ end -}}
+{{ if and (dig "opencode_desktop" false .) (not $opencodeExcluded) -}}
+# Optional GUI: keep a managed-machine policy or download failure out of the
+# required bundle. The CLI remains available without this cask.
+if ! brew list --cask opencode-desktop &>/dev/null; then
+  brew install --cask opencode-desktop || echo "⚠ OpenCode Desktop optional install failed; continuing without it"
+fi
+{{ end -}}
 
 {{ if dig "use_local_ai" false . -}}
 # ── Local-LLM stack: mlx-lm on Apple Silicon only ────────────────

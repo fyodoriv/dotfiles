@@ -284,6 +284,9 @@ write agent config. See [Codex health checks](module-reference.md#codex).
 
 ## OpenCode Desktop
 
-With `use_ai_tools: true`, a full profile also installs the `opencode-desktop`
-cask. dotfiles does not write OpenCode config (agentbrew owns it) or a Kimi key.
+The `opencode-desktop` cask is opt-in. Run
+`dotfiles config set opencode_desktop true`, then `dotfiles apply`. The default
+and an `opencode` entry in `excludeAgents` do not install it. Its install
+failure is advisory and does not stop later apply steps. dotfiles does not
+write OpenCode config (agentbrew owns it) or a Kimi key.
 See [Kimi Code plan in OpenCode](model-configuration.md#kimi-code-plan-in-opencode).

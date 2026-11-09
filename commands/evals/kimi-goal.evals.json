@@ -1,0 +1,48 @@
+{
+  "command_name": "kimi-goal",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run a headless goal with the optimized default, then override it with KIMI_GOAL_MODEL=custom/model",
+      "expected_output": "The default goal uses `kimi-code-plan-global/k3.1-pro-highspeed`, and the explicit override uses `custom/model` without changing ordinary OpenCode defaults.",
+      "expectations": [
+        "Selects highspeed only for the goal invocation",
+        "Preserves KIMI_GOAL_MODEL as an explicit override",
+        "Does not change the ordinary local default",
+        "Does not add a platform-specific command file"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Check that the ordinary OpenCode model remains local after goal optimization",
+      "expected_output": "The ordinary model remains `ollama/qwen3:14b`; highspeed appears only in `kimi-goal` and is not forced into the ordinary config.",
+      "expectations": [
+        "Reads the served ordinary model as `ollama/qwen3:14b`",
+        "Does not replace it with highspeed",
+        "Keeps highspeed scoped to the existing goal CLI"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Run a goal when the Kimi key is missing or the request fails",
+      "expected_output": "The CLI returns nonzero with setup guidance and no credential in output or curl arguments; it does not retry with another credential or invent a response.",
+      "expectations": [
+        "Returns nonzero for missing-key and request failures",
+        "Uses a generic redacted error message",
+        "Does not print a credential in output or process arguments",
+        "Does not retry with a different credential or endpoint"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Condense duplicated instructions to below 8,000 tokens while preserving the keychain policy and the required iteration rule",
+      "expected_output": "The duplicated keychain and pre-registration sections are shortened with detailed links intact, the required iteration paragraph remains in Agentfile.yaml, and AgentBrew reports a deployed total below 8,000 tokens with drift=0.",
+      "expectations": [
+        "Measures before/after context totals",
+        "Keeps both keychain flags and the detailed policy link",
+        "Retains the required iteration paragraph and its test contract",
+        "Does not edit generated OpenCode files directly"
+      ]
+    }
+  ]
+}

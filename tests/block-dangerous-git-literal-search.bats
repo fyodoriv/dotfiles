@@ -133,3 +133,13 @@ probe() {
   run probe "rg 'git reset --hard' '--pre' helper ."
   [ "$status" -eq 2 ]
 }
+
+@test "unsafe 20: a path glob cannot expand into options" {
+  run probe "rg 'git reset --hard' *"
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 21: mixed quotes cannot conceal an option" {
+  run probe "rg 'git reset --hard' ''--pre=helper"
+  [ "$status" -eq 2 ]
+}

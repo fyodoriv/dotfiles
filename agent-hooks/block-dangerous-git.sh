@@ -486,7 +486,7 @@ literal_search_only() {
     *) return 1 ;;
   esac
   case "$path" in
-    ''|-*|*[[:space:]]*) return 1 ;;
+    ''|-*|*[!A-Za-z0-9_./-]*) return 1 ;;
   esac
   return 0
 }

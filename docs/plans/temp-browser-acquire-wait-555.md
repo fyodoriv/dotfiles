@@ -24,6 +24,12 @@ Registered before the review fixes.
 
 Two failures remain after the first wait implementation: cleanup can overlap two browsers on one port, and lease expiry during waiting prints the holder twice. Predicted counts after the fix: zero overlap and one notice. Stop the old browser before making its lock available; use an atomic rename only after that stop. Add a TERM-ignoring old-process control and an expiry-during-wait control. The original release race and all existing controls must stay green. Any second launch before the old exit rejects the approach.
 
+## Concurrent-cleanup control
+
+Registered before the next review fix.
+
+A delayed releaser and a waiter can both clean the old lock. Without an identity check, the delayed rename can delete the replacement. Predicted missing replacement locks: one; after the fix: zero. Serialize the short rename section and compare the original lock inode before moving it. A delayed cleanup skips a different inode. Add a delayed-first-rename regression and retain the no-overlap, one-notice, and full lifecycle controls.
+
 ## Anchor
 
 Issue #555's queueing contract; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

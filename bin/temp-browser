@@ -11,7 +11,7 @@
 # per user account. Release or takeover deletes it.
 #
 # Usage:
-#   temp-browser acquire --owner <id> --reason <text>   # prints the CDP port
+#   temp-browser acquire --owner <id> --reason <text> [--wait [--timeout <s>]]
 #   temp-browser status
 #   temp-browser release --owner <id>
 #
@@ -36,7 +36,7 @@ OPEN_BIN="${TEMP_BROWSER_OPEN:-open}"
 
 usage() {
   cat <<'EOF'
-Usage: temp-browser acquire --owner <id> --reason <text>
+Usage: temp-browser acquire --owner <id> --reason <text> [--wait [--timeout <seconds>]]
        temp-browser status
        temp-browser release --owner <id>
 
@@ -50,12 +50,25 @@ EOF
 
 field() { cat "$LOCK/$1" 2>/dev/null || true; }
 
-pid_alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+pid_alive() {
+  [ -n "$1" ] && kill -0 "$1" 2>/dev/null || return 1
+  local state
+  state="$(ps -o stat= -p "$1" 2>/dev/null || true)"
+  case "$state" in *Z*) return 1 ;; esac
+  return 0
+}
 
 lock_stale() {
-  local pid expires
+  local pid expires acquirer
   pid="$(field pid)"
   expires="$(field expires)"
+  if [ -z "$pid" ]; then
+    acquirer="$(field acquirer)"
+    if pid_alive "$acquirer"; then return 1; fi
+    [ -n "$acquirer" ] && return 0
+    [ -n "$expires" ] && [ "$expires" -le "$(date +%s)" ] && return 0
+    return 1
+  fi
   ! pid_alive "$pid" && return 0
   [ -n "$expires" ] && [ "$expires" -le "$(date +%s)" ] && return 0
   return 1
@@ -77,8 +90,32 @@ stop_browser() {
 }
 
 discard_lock() {
-  stop_browser "$(field pid)" "$(field profile)"
-  rm -rf "$LOCK"
+  # One cleanup marker inside the old lock admits one cleanup caller. Stop the
+  # browser before the atomic rename; no other caller can rename that lock or
+  # a replacement created afterwards.
+  local retired="$STATE_DIR/retired.$$.$RANDOM" pid profile cleanup_record cleanup_pid claimant
+  claimant="$STATE_DIR/claimant.$$.$RANDOM"
+  printf '%s %s\n' "$$" "$RANDOM.$RANDOM" > "$claimant"
+  if ! ln "$claimant" "$LOCK/cleanup" 2>/dev/null; then
+    cleanup_record="$(cat "$LOCK/cleanup" 2>/dev/null || true)"
+    cleanup_pid="${cleanup_record%% *}"
+    if [ -z "$cleanup_record" ] || pid_alive "$cleanup_pid"; then
+      rm -f "$claimant"
+      return 1
+    fi
+    if [ "$(cat "$LOCK/cleanup" 2>/dev/null || true)" != "$cleanup_record" ]; then
+      rm -f "$claimant"
+      return 1
+    fi
+    rm -f "$LOCK/cleanup"
+    ln "$claimant" "$LOCK/cleanup" 2>/dev/null || { rm -f "$claimant"; return 1; }
+  fi
+  rm -f "$claimant"
+  pid="$(field pid)"
+  profile="$(field profile)"
+  stop_browser "$pid" "$profile"
+  mv "$LOCK" "$retired" 2>/dev/null || return 1
+  rm -rf "$retired"
 }
 
 holder_line() {
@@ -165,27 +202,63 @@ launch_browser() {
 }
 
 cmd_acquire() {
-  parse_opts "$@"
+  local wait="" wait_timeout=30
+  local args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --wait) wait=1; shift ;;
+      --timeout) wait_timeout="${2:-}"; shift 2 || shift ;;
+      *) args+=("$1"); shift ;;
+    esac
+  done
+  case "$wait_timeout" in ''|*[!0-9]*) echo "temp-browser: --timeout needs whole seconds" >&2; exit 2 ;; esac
+  parse_opts "${args[@]}"
   if [ -z "$OWNER" ] || [ -z "$REASON" ]; then
     echo "temp-browser: acquire needs --owner and --reason" >&2
     exit 2
   fi
   mkdir -p "$STATE_DIR"
-  if ! mkdir "$LOCK" 2>/dev/null; then
+  local deadline=$(( $(date +%s) + wait_timeout )) reported=0
+  while ! mkdir "$LOCK" 2>/dev/null; do
     if [ "$(field owner)" = "$OWNER" ] && ! lock_stale; then
       echo $(($(date +%s) + LEASE)) > "$LOCK/expires"
       field port
       return 0
     fi
     if lock_stale; then
-      echo "temp-browser: discarding stale lock ($(holder_line))" >&2
-      discard_lock
+      if [ "$reported" -eq 0 ]; then
+        echo "temp-browser: discarding stale lock ($(holder_line))" >&2
+        reported=1
+      fi
+      if discard_lock; then
+        continue
+      fi
+      if [ -z "$wait" ]; then
+        echo "temp-browser: busy, $(holder_line)" >&2
+        exit 3
+      fi
+      if [ "$(date +%s)" -ge "$deadline" ]; then
+        echo "temp-browser: wait timed out after $wait_timeout second(s)" >&2
+        exit 3
+      fi
+      sleep 0.2
+      continue
     fi
-    if ! mkdir "$LOCK" 2>/dev/null; then
+    if [ -z "$wait" ]; then
       echo "temp-browser: busy, $(holder_line)" >&2
       exit 3
     fi
-  fi
+    if [ "$reported" -eq 0 ]; then
+      echo "temp-browser: waiting, $(holder_line)" >&2
+      reported=1
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo "temp-browser: wait timed out after $wait_timeout second(s)" >&2
+      exit 3
+    fi
+    sleep 0.2
+  done
+  printf '%s\n' "$$" > "$LOCK/acquirer"
   local profile
   profile="$(mktemp -d "$STATE_DIR/profile.XXXXXX")"
   # The theme only helps tell browsers apart; a failed write never blocks.
@@ -239,7 +312,7 @@ cmd_release() {
     echo "temp-browser: not yours, $(holder_line)" >&2
     exit 3
   fi
-  discard_lock
+  discard_lock || true
   echo "temp-browser: released"
 }
 

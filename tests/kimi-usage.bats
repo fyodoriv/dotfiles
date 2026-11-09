@@ -34,12 +34,12 @@ JSON
 
 @test "shows actual 5-hour and monthly quotas when no weekly limit is reported" {
   write_no_weekly_fixture
-  FAKE_KEY=sk-test-placeholder run bash "$KU"
+  FAKE_KEY=test-key run bash "$KU"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Weekly: no weekly limit reported for this plan"* ]]
   [[ "$output" == *"5-hour: 60/100 quota units left (59.76%); resets Mon Nov 9 02:48 UTC"* ]]
   [[ "$output" == *"Monthly: 97.55% quota left; resets Tue Dec 8 21:48 UTC"* ]]
-  [[ "$output" != *"sk-test-placeholder"* ]]
+  [[ "$output" != *"test-key"* ]]
 }
 
 @test "shows the weekly ratio when the plan reports one" {
@@ -68,27 +68,47 @@ JSON
   [[ "$output" != *"sk-"* ]]
 }
 
+@test "forecast says when the current 5-hour average cannot exhaust before reset" {
+  write_no_weekly_fixture
+  reset=$(/bin/date -u -v+1H '+%Y-%m-%dT%H:%M:%SZ')
+  jq --arg reset "$reset" '.limits[0].detail.used = "50" | .limits[0].detail.remaining = "50" | .limits[0].detail.resetTime = $reset | .usages.limit_5h.reset_time = $reset' "$KIMI_USAGE_FIXTURE" > "$TEST_DIR/forecast.json"
+  mv "$TEST_DIR/forecast.json" "$KIMI_USAGE_FIXTURE"
+  FAKE_KEY=k run bash "$KU" --forecast
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"5-hour forecast: no exhaustion before reset; about 38 units left at reset (current average)"* ]]
+}
+
+@test "forecast names estimated exhaustion before reset when the burn rate is high" {
+  write_no_weekly_fixture
+  reset=$(/bin/date -u -v+1H '+%Y-%m-%dT%H:%M:%SZ')
+  jq --arg reset "$reset" '.limits[0].detail.used = "90" | .limits[0].detail.remaining = "10" | .limits[0].detail.resetTime = $reset | .usages.limit_5h.reset_time = $reset' "$KIMI_USAGE_FIXTURE" > "$TEST_DIR/forecast.json"
+  mv "$TEST_DIR/forecast.json" "$KIMI_USAGE_FIXTURE"
+  FAKE_KEY=k run bash "$KU" --forecast
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"5-hour forecast: quota runs out in 27m (current average)"* ]]
+}
+
 @test "uses environment credential first and keeps it out of curl argv" {
   write_no_weekly_fixture
-  export KIMI_API_KEY=env-placeholder
-  FAKE_KEY=keychain-placeholder run bash "$KU"
+  export KIMI_API_KEY=env-key
+  FAKE_KEY=keychain-key run bash "$KU"
   [ "$status" -eq 0 ]
-  grep -q 'Bearer env-placeholder' "${KIMI_USAGE_FIXTURE}.config"
-  [[ "$(cat "${KIMI_USAGE_FIXTURE}.argv")" != *"env-placeholder"* ]]
-  [[ "$(cat "${KIMI_USAGE_FIXTURE}.argv")" != *"keychain-placeholder"* ]]
+  grep -q 'Bearer env-key' "${KIMI_USAGE_FIXTURE}.config"
+  [[ "$(cat "${KIMI_USAGE_FIXTURE}.argv")" != *"env-key"* ]]
+  [[ "$(cat "${KIMI_USAGE_FIXTURE}.argv")" != *"keychain-key"* ]]
   [[ "$(cat "${KIMI_USAGE_FIXTURE}.argv")" == *"https://api.kimi.com/coding/v1/usages"* ]]
   [[ "$(cat "${KIMI_USAGE_FIXTURE}.argv")" != *"--request"* ]]
-  [[ "$output" != *"env-placeholder"* ]]
-  [[ "$output" != *"keychain-placeholder"* ]]
+  [[ "$output" != *"env-key"* ]]
+  [[ "$output" != *"keychain-key"* ]]
 }
 
 @test "malformed JSON fails without leaking the credential" {
   write_no_weekly_fixture
   printf '{not-json\n' > "$KIMI_USAGE_FIXTURE"
-  FAKE_KEY=sk-secret-placeholder run bash "$KU"
+  FAKE_KEY=secret-key run bash "$KU"
   [ "$status" -eq 4 ]
   [[ "$output" == *"unreadable usage response"* ]]
-  [[ "$output" != *"sk-secret-placeholder"* ]]
+  [[ "$output" != *"secret-key"* ]]
 }
 
 @test "request failure is nonzero and never prints the credential" {
@@ -98,8 +118,8 @@ JSON
 exit 22
 STUB
   chmod +x "$TEST_DIR/curl"
-  FAKE_KEY=sk-secret-placeholder run bash "$KU"
+  FAKE_KEY=secret-key run bash "$KU"
   [ "$status" -ne 0 ]
   [[ "$output" == *"could not read Kimi usage"* ]]
-  [[ "$output" != *"sk-secret-placeholder"* ]]
+  [[ "$output" != *"secret-key"* ]]
 }

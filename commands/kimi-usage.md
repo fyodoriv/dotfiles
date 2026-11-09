@@ -12,3 +12,4 @@ Run `kimi-usage` and show its output verbatim. It uses the existing environment 
 - If Kimi reports a weekly window, show its remaining quota and reset time.
 - If Kimi reports no weekly limit, say so plainly and show the actual 5-hour and monthly windows instead of inventing a weekly total.
 - On failure, show the command's error and do not retry with a different credential or endpoint.
+- For `/kimi-usage forecast`, run `kimi-usage --forecast`. It compares the current 5-hour average burn rate with the reset time and says whether exhaustion is estimated before reset. State that the forecast is only an estimate from current usage, not a guarantee. Do not invent a monthly forecast without a precise elapsed window.

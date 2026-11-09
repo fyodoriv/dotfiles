@@ -44,6 +44,18 @@
         "Does not silently skip configured recall or claim context-dependent readiness",
         "Keeps OAuth, privacy choices, schedules, and private records local"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "/kimi-usage forecast when the current 5-hour average cannot exhaust before reset, and when a high burn rate exhausts early",
+      "expected_output": "The agent runs `kimi-usage --forecast`, compares used, remaining, elapsed, and reset values, reports no exhaustion before reset with the estimated remainder in the first case, and names the estimated exhaustion duration in the second. It labels both as current-average estimates, not guarantees, and does not invent a monthly forecast.",
+      "expectations": [
+        "Uses used, remaining, and elapsed time to compute the current average burn rate",
+        "Compares time to exhaustion with time to reset",
+        "Reports the estimated remainder at reset when no exhaustion is expected",
+        "Names the estimated exhaustion duration when it precedes reset",
+        "Labels forecasts as estimates and does not invent a monthly forecast"
+      ]
     }
   ]
 }

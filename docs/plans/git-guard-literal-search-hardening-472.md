@@ -44,6 +44,12 @@ Predicted unsafe permits: two; after the fix: zero. Do not execute the candidate
 
 Add one spoofed-version control and one real `--hostname-bin` control. The original controls and first-review controls must retain their outcomes. The same measurement and pivot apply.
 
+## Post-pattern option controls
+
+Registered before the parser fix.
+
+Predicted unsafe permits: two; after the fix: zero. Ripgrep accepts options after the pattern, so stopping validation at the first positional argument lets `--pre` and `--hostname-bin` through. Continue option validation through all arguments; only explicit `--` ends it. Add both post-pattern execution controls and retain all 19 existing controls.
+
 ## Anchor
 
 Issue #472's trusted-resolution and fail-closed requirements; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

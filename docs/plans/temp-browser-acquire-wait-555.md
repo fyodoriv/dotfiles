@@ -36,6 +36,12 @@ Registered before the recovery fix.
 
 Predicted wedges: two. A cleanup marker left by a dead process must not block release, and an expired acquisition with no browser PID must be recoverable. Record the acquiring shell PID when the lock is created and the cleanup PID when its marker is created. A live acquiring or cleanup PID keeps the lock; a dead one permits retry. A PID-less legacy record still requires expiry evidence. Add dead-cleanup and expired-initialization controls plus a live-initialization guard. Existing race and lifecycle controls must stay green.
 
+## Atomic cleanup-marker registration
+
+Registered before the marker fix.
+
+The two-step cleanup directory/PID write admits a second owner. Predicted replacement-lock loss: one; after the fix: zero. Create each ownership record as `PID random-token` before one atomic hard-link operation. A dead record is removed only when its complete token still matches. Empty records cannot authorize removal. Retain every cleanup, recovery, and wait control.
+
 ## Anchor
 
 Issue #555's queueing contract; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

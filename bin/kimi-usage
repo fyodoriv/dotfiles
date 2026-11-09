@@ -1,0 +1,77 @@
+#!/bin/bash
+# kimi-usage — print remaining Kimi Code subscription quota, never the API key.
+set -euo pipefail
+
+SERVICE="kimi-code-api-key"
+SECURITY_BIN="${KIMI_USAGE_SECURITY_BIN:-security}"
+CURL_BIN="${KIMI_USAGE_CURL_BIN:-curl}"
+URL="${KIMI_USAGE_URL:-https://api.kimi.com/coding/v1/usages}"
+
+if [ -z "${KIMI_API_KEY:-}" ]; then
+  key="$("$SECURITY_BIN" find-generic-password -a "${USER:-}" -s "$SERVICE" -w 2>/dev/null)" || key=""
+  if [ -n "$key" ]; then export KIMI_API_KEY="$key"; fi
+fi
+
+if [ -z "${KIMI_API_KEY:-}" ]; then
+  echo "kimi-usage: no Kimi Code key found." >&2
+  echo "Run: opencode auth login   (pick Kimi Code Plan), or save it to the Keychain:" >&2
+  echo "  security add-generic-password -a \"\$USER\" -s $SERVICE -w" >&2
+  exit 2
+fi
+
+if ! response="$(printf 'header = "Authorization: Bearer %s"\n' "$KIMI_API_KEY" | "$CURL_BIN" -sf --max-time 30 --config - -H 'Accept: application/json' "$URL")"; then
+  echo "kimi-usage: could not read Kimi usage; check the connection and account access." >&2
+  exit 3
+fi
+if ! jq empty <<<"$response" 2>/dev/null; then
+  echo "kimi-usage: Kimi returned an unreadable usage response." >&2
+  exit 4
+fi
+
+ratio_percent() {
+  jq -nr --argjson ratio "$1" '((1 - $ratio) * 10000 | round) / 100'
+}
+
+detail_percent() {
+  jq -nr --argjson remaining "$1" --argjson limit "$2" '(($remaining * 10000 / $limit) | round) / 100'
+}
+
+friendly_time() {
+  local value="$1" day
+  [ -n "$value" ] || { printf 'unknown'; return; }
+  day="${value%%.*Z}Z"
+  /bin/date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$day" "+%a %b %-d %H:%M UTC" 2>/dev/null || printf '%s' "$value"
+}
+
+weekly_detail=$(jq -r '[.limits[]? | select(.window.duration == 10080 and .window.timeUnit == "TIME_UNIT_MINUTE") | .detail] | first | select(. != null) | [.remaining, .limit, .resetTime] | @tsv' <<<"$response")
+weekly_ratio=$(jq -r '.usages.limit_7d.used_ratio // empty' <<<"$response")
+weekly_reset=$(jq -r '.usages.limit_7d.reset_time // empty' <<<"$response")
+
+if [ -n "$weekly_detail" ]; then
+  IFS=$'\t' read -r remaining limit reset <<<"$weekly_detail"
+  printf 'Weekly: %s/%s quota units left (%s%%); resets %s\n' \
+    "$remaining" "$limit" "$(detail_percent "$remaining" "$limit")" "$(friendly_time "$reset")"
+elif [ -n "$weekly_ratio" ]; then
+  printf 'Weekly: %s%% quota left; resets %s\n' "$(ratio_percent "$weekly_ratio")" "$(friendly_time "$weekly_reset")"
+else
+  echo "Weekly: no weekly limit reported for this plan"
+fi
+
+hour_detail=$(jq -r '[.limits[]? | select(.window.duration == 300 and .window.timeUnit == "TIME_UNIT_MINUTE") | .detail] | first | select(. != null) | [.remaining, .limit, .resetTime] | @tsv' <<<"$response")
+hour_ratio=$(jq -r '.usages.limit_5h.used_ratio // empty' <<<"$response")
+if [ -n "$hour_detail" ]; then
+  IFS=$'\t' read -r remaining limit reset <<<"$hour_detail"
+  if [ -n "$hour_ratio" ]; then
+    percentage=$(ratio_percent "$hour_ratio")
+  else
+    percentage=$(detail_percent "$remaining" "$limit")
+  fi
+  printf '5-hour: %s/%s quota units left (%s%%); resets %s\n' \
+    "$remaining" "$limit" "$percentage" "$(friendly_time "$reset")"
+fi
+
+monthly_ratio=$(jq -r '.usages.limit_month_total.used_ratio // .usages.limit_month_code.used_ratio // empty' <<<"$response")
+monthly_reset=$(jq -r '.usages.limit_month_total.reset_time // .usages.limit_month_code.reset_time // empty' <<<"$response")
+if [ -n "$monthly_ratio" ]; then
+  printf 'Monthly: %s%% quota left; resets %s\n' "$(ratio_percent "$monthly_ratio")" "$(friendly_time "$monthly_reset")"
+fi

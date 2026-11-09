@@ -36,7 +36,7 @@ OpenCode Desktop (cask `opencode-desktop`) and the `opencode` CLI run Kimi throu
 2. Store the key: `opencode auth login` (pick Kimi Code Plan). For headless or LaunchAgent runs, also save it to the Keychain: `security add-generic-password -a "$USER" -s kimi-code-api-key -w`.
 3. Check: `kimi-goal --check` (doctor line `local-ai.kimi_key`).
 4. GUI: open OpenCode Desktop and pick `Kimi Code Plan / k3.1-pro-highspeed` for goal work. The ordinary model default stays local.
-5. Headless goal: `kimi-goal --dir ~/apps/tooling/agentbrew --rounds 5 --auto "<goal>"`. Preview with `--dry-run`. `--auto` approves tool permissions that are not denied, so use it only for unattended runs in a worktree.
+5. Headless goal: `kimi-goal --dir ~/apps/tooling/agentbrew --rounds 5 --auto "<goal>"`. Preview with `--dry-run`. `--auto` approves tool permissions that are not denied, so use it only for unattended runs in a worktree. `KIMI_GOAL_MODEL` overrides the highspeed default when you need a different model.
 6. Remaining subscription quota: run `kimi-usage`, or type `/kimi-usage` in an agent. It reads `https://api.kimi.com/coding/v1/usages` with the same environment or Keychain credential and prints only quota fields. Weekly limits appear first when the plan reports them; reported 5-hour and monthly windows are also shown. If no weekly limit is reported, it says so instead of inventing a weekly total. Add `--forecast` to compare the current 5-hour average burn rate with the reset time. The forecast is an estimate from current usage, not a guarantee; no monthly forecast is made without a precise elapsed window.
 
 Gaps against Claude Code: Claude Code hooks (agentbrew PreToolUse gates) do not run in OpenCode, so the git and gh wrappers in `bin/` are the only backstop.

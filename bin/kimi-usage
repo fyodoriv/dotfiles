@@ -6,6 +6,12 @@ SERVICE="kimi-code-api-key"
 SECURITY_BIN="${KIMI_USAGE_SECURITY_BIN:-security}"
 CURL_BIN="${KIMI_USAGE_CURL_BIN:-curl}"
 URL="${KIMI_USAGE_URL:-https://api.kimi.com/coding/v1/usages}"
+forecast=false
+case "${1:-}" in
+  --forecast|forecast) forecast=true; shift ;;
+  "") ;;
+  *) echo "kimi-usage: unknown argument: $1 (expected --forecast)" >&2; exit 64 ;;
+esac
 
 if [ -z "${KIMI_API_KEY:-}" ]; then
   key="$("$SECURITY_BIN" find-generic-password -a "${USER:-}" -s "$SERVICE" -w 2>/dev/null)" || key=""
@@ -43,6 +49,41 @@ friendly_time() {
   /bin/date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$day" "+%a %b %-d %H:%M UTC" 2>/dev/null || printf '%s' "$value"
 }
 
+forecast_5h() {
+  local used="$1" remaining="$2" reset="$3"
+  local reset_epoch now start elapsed until_reset rate remaining_seconds minutes left
+  reset_epoch=$(/bin/date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "${reset%%.*Z}Z" +%s)
+  now=$(/bin/date -u +%s)
+  start=$((reset_epoch - 18000))
+  elapsed=$((now - start))
+  until_reset=$((reset_epoch - now))
+  if [ "$until_reset" -le 0 ]; then
+    echo "5-hour forecast: reset is due now; a new window starts then"
+    return
+  fi
+  if [ "$remaining" -le 0 ]; then
+    echo "5-hour forecast: quota is exhausted"
+    return
+  fi
+  if [ "$used" -le 0 ] || [ "$elapsed" -le 0 ]; then
+    echo "5-hour forecast: not enough current-window usage to estimate"
+    return
+  fi
+  rate=$(awk -v used="$used" -v elapsed="$elapsed" 'BEGIN { printf "%.10f", used * 3600 / elapsed }')
+  remaining_seconds=$(awk -v remaining="$remaining" -v rate="$rate" 'BEGIN { printf "%.0f", remaining * 3600 / rate }')
+  if [ "$remaining_seconds" -lt "$until_reset" ]; then
+    minutes=$(( (remaining_seconds + 30) / 60 ))
+    if [ "$minutes" -ge 60 ]; then
+      printf '5-hour forecast: quota runs out in %dh %dm (current average)\n' "$((minutes / 60))" "$((minutes % 60))"
+    else
+      printf '5-hour forecast: quota runs out in %dm (current average)\n' "$minutes"
+    fi
+  else
+    left=$(awk -v remaining="$remaining" -v rate="$rate" -v until_reset="$until_reset" 'BEGIN { printf "%.0f", remaining - rate * until_reset / 3600 }')
+    printf '5-hour forecast: no exhaustion before reset; about %s units left at reset (current average)\n' "$left"
+  fi
+}
+
 weekly_detail=$(jq -r '[.limits[]? | select(.window.duration == 10080 and .window.timeUnit == "TIME_UNIT_MINUTE") | .detail] | first | select(. != null) | [.remaining, .limit, .resetTime] | @tsv' <<<"$response")
 weekly_ratio=$(jq -r '.usages.limit_7d.used_ratio // empty' <<<"$response")
 weekly_reset=$(jq -r '.usages.limit_7d.reset_time // empty' <<<"$response")
@@ -57,10 +98,10 @@ else
   echo "Weekly: no weekly limit reported for this plan"
 fi
 
-hour_detail=$(jq -r '[.limits[]? | select(.window.duration == 300 and .window.timeUnit == "TIME_UNIT_MINUTE") | .detail] | first | select(. != null) | [.remaining, .limit, .resetTime] | @tsv' <<<"$response")
+hour_detail=$(jq -r '[.limits[]? | select(.window.duration == 300 and .window.timeUnit == "TIME_UNIT_MINUTE") | .detail] | first | select(. != null) | [.used, .remaining, .limit, .resetTime] | @tsv' <<<"$response")
 hour_ratio=$(jq -r '.usages.limit_5h.used_ratio // empty' <<<"$response")
 if [ -n "$hour_detail" ]; then
-  IFS=$'\t' read -r remaining limit reset <<<"$hour_detail"
+  IFS=$'\t' read -r used remaining limit reset <<<"$hour_detail"
   if [ -n "$hour_ratio" ]; then
     percentage=$(ratio_percent "$hour_ratio")
   else
@@ -74,4 +115,13 @@ monthly_ratio=$(jq -r '.usages.limit_month_total.used_ratio // .usages.limit_mon
 monthly_reset=$(jq -r '.usages.limit_month_total.reset_time // .usages.limit_month_code.reset_time // empty' <<<"$response")
 if [ -n "$monthly_ratio" ]; then
   printf 'Monthly: %s%% quota left; resets %s\n' "$(ratio_percent "$monthly_ratio")" "$(friendly_time "$monthly_reset")"
+fi
+
+if $forecast; then
+  if [ -n "$hour_detail" ]; then
+    IFS=$'\t' read -r used remaining limit reset <<<"$hour_detail"
+    forecast_5h "$used" "$remaining" "$reset"
+  else
+    echo "5-hour forecast: not enough data for the current window"
+  fi
 fi

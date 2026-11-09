@@ -444,6 +444,55 @@ branch_delete_allowed() {
   return 1
 }
 
+# A lone rg search reads its quoted pattern as data, never runs it (#472).
+# Only the trusted Homebrew installations qualify. Do not execute a candidate
+# to identify it: an unknown executable or spoofed version is not evidence.
+# Inherited config and every option outside the small read-only allowlist keep
+# the conservative text match below.
+literal_search_only() {
+  [ -z "${RIPGREP_CONFIG_PATH+x}" ] || return 1
+  local rg_path
+  rg_path=$(type -P rg) || return 1
+  case "$rg_path" in
+    /opt/homebrew/bin/rg|/usr/local/bin/rg) ;;
+    *) return 1 ;;
+  esac
+  [ -x "$rg_path" ] && [ "$(command -v rg)" = "$rg_path" ] || return 1
+  case "$command" in
+    "rg "*) ;;
+    *) return 1 ;;
+  esac
+  case "$command" in
+    *[\;\&\|\`\$\<\>\(\)\\]*|*$'\n'*) return 1 ;;
+  esac
+  local rest quote pattern after path opt
+  rest=${command#rg }
+  for opt in -n --line-number -F --fixed-strings; do
+    case "$rest" in
+      "$opt "*) rest=${rest#"$opt "}; break ;;
+    esac
+  done
+  case "$rest" in
+    \'*) quote="'" ;;
+    \"*) quote='"' ;;
+    *) return 1 ;;
+  esac
+  rest=${rest#"$quote"}
+  pattern=${rest%%"$quote"*}
+  case "$pattern" in -*) return 1 ;; esac
+  after=${rest#*"$quote"}
+  [ "$after" != "$rest" ] || return 1
+  case "$after" in
+    " "*) path=${after# } ;;
+    *) return 1 ;;
+  esac
+  case "$path" in
+    ''|-*|*[!A-Za-z0-9_./-]*) return 1 ;;
+  esac
+  return 0
+}
+literal_search_only && exit 0
+
 case "$command" in
   *"git reset --hard"*)   block "git reset --hard" ;;
   *"git clean -f"*)       block "git clean -f" ;;

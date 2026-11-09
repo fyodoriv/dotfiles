@@ -13,7 +13,7 @@
 #
 # Usage: kimi-goal [--dir DIR] [--rounds N] [--auto] [--dry-run] "<goal>"
 #        kimi-goal --check
-# Env:   KIMI_GOAL_MODEL (default kimi-code-plan-global/k3.1-pro)
+# Env:   KIMI_GOAL_MODEL (default kimi-code-plan-global/k3.1-pro-highspeed)
 #        KIMI_GOAL_OPENCODE_BIN (default opencode)
 # Each round after the first continues the same session. A round that
 # prints a line starting with GOAL MET or GOAL BLOCKED ends the loop.
@@ -22,7 +22,7 @@ set -euo pipefail
 SERVICE="kimi-code-api-key"
 SECURITY_BIN="${KIMI_GOAL_SECURITY_BIN:-security}"
 OC="${KIMI_GOAL_OPENCODE_BIN:-opencode}"
-model="${KIMI_GOAL_MODEL:-kimi-code-plan-global/k3.1-pro}"
+model="${KIMI_GOAL_MODEL:-kimi-code-plan-global/k3.1-pro-highspeed}"
 dir="$PWD" rounds=1 auto=false dry=false check=false goal=""
 
 while [ $# -gt 0 ]; do

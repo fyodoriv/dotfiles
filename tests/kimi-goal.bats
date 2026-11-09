@@ -30,7 +30,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   FAKE_KEY=sk-test-placeholder FAKE_REPLY="GOAL MET" run bash "$KG" --dir /tmp "fix x"
   [ "$status" -eq 0 ]
   [[ "$output" == *"KEY=sk-test-placeholder"* ]]
-  [[ "$output" == *"-m kimi-code-plan-global/k3.1-pro"* ]]
+  [[ "$output" == *"-m kimi-code-plan-global/k3.1-pro-highspeed"* ]]
   [[ "$output" == *"--dir /tmp"* ]]
 }
 
@@ -40,6 +40,11 @@ teardown() { rm -rf "$TEST_DIR"; }
   [[ "$output" == *"--continue"* ]]
   FAKE_KEY=k FAKE_REPLY="GOAL MET" run bash "$KG" --rounds 3 "fix x"
   [ "$(grep -c '^ARGS=' <<<"$output")" -eq 1 ]
+}
+
+@test "KIMI_GOAL_MODEL overrides the highspeed default" {
+  FAKE_KEY=k FAKE_REPLY="GOAL MET" KIMI_GOAL_MODEL=custom/model run bash "$KG" "fix x"
+  [[ "$output" == *"-m custom/model"* ]]
 }
 
 @test "--auto is opt-in" {
@@ -52,7 +57,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 @test "--dry-run prints the commands without running opencode or needing a key" {
   run bash "$KG" --dry-run --rounds 2 "fix x"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"round 1:"*"kimi-code-plan-global/k3.1-pro"* ]]
+  [[ "$output" == *"round 1:"*"kimi-code-plan-global/k3.1-pro-highspeed"* ]]
   [[ "$output" == *"round 2:"*"--continue"* ]]
   [[ "$output" != *"KEY="* ]]
 }

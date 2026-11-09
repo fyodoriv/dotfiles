@@ -25,9 +25,10 @@
     {
       "id": 3,
       "prompt": "Run a goal when the Kimi key is missing or the request fails",
-      "expected_output": "The CLI returns nonzero with setup guidance and no credential in output or curl arguments; it does not retry with another credential or invent a response.",
+      "expected_output": "Missing keys return nonzero with setup guidance. Request failures remain redacted without inventing a response or a new exit-status requirement; no retry uses another credential or endpoint.",
       "expectations": [
-        "Returns nonzero for missing-key and request failures",
+        "Returns nonzero for missing keys",
+        "Keeps request failures redacted without inventing a new exit-status requirement",
         "Uses a generic redacted error message",
         "Does not print a credential in output or process arguments",
         "Does not retry with a different credential or endpoint"

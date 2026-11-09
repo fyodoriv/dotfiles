@@ -50,6 +50,12 @@ Registered before the parser fix.
 
 Predicted unsafe permits: two; after the fix: zero. Ripgrep accepts options after the pattern, so stopping validation at the first positional argument lets `--pre` and `--hostname-bin` through. Continue option validation through all arguments; only explicit `--` ends it. Add both post-pattern execution controls and retain all 19 existing controls.
 
+## Quoted-option controls
+
+Registered before the grammar fix.
+
+Predicted unsafe permits: two; after the fix: zero. Shell quote removal means a quoted `--pre` or `--hostname-bin` is still an option. Replace masking with a smaller grammar: optional `-n`, `--line-number`, `-F`, or `--fixed-strings`; then one simply quoted pattern; then one plain path with no whitespace or leading dash. Reject every trailing argument, including quoted options. Add quoted pre-pattern and post-pattern execution controls and retain all 21 existing controls.
+
 ## Anchor
 
 Issue #472's trusted-resolution and fail-closed requirements; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

@@ -445,20 +445,19 @@ branch_delete_allowed() {
 }
 
 # A lone rg search reads its quoted pattern as data, never runs it (#472).
-# Resolve and identify the executable: a function or an unrelated PATH entry
-# does not qualify. Inherited config can inject a preprocessor, so it must be
-# unset. Compact flags are rejected conservatively when they contain z.
+# Only the trusted Homebrew installations qualify. Do not execute a candidate
+# to identify it: an unknown executable or spoofed version is not evidence.
+# Inherited config and every option outside the small read-only allowlist keep
+# the conservative text match below.
 literal_search_only() {
   [ -z "${RIPGREP_CONFIG_PATH+x}" ] || return 1
-  local rg_path rg_version
+  local rg_path
   rg_path=$(type -P rg) || return 1
-  [ -n "$rg_path" ] && [ -x "$rg_path" ] || return 1
-  [ "$(command -v rg)" = "$rg_path" ] || return 1
-  rg_version=$("$rg_path" --version 2>/dev/null) || return 1
-  case "$rg_version" in
-    ripgrep\ *) ;;
+  case "$rg_path" in
+    /opt/homebrew/bin/rg|/usr/local/bin/rg) ;;
     *) return 1 ;;
   esac
+  [ -x "$rg_path" ] && [ "$(command -v rg)" = "$rg_path" ] || return 1
   case "$command" in
     "rg "*) ;;
     *) return 1 ;;
@@ -466,10 +465,15 @@ literal_search_only() {
   case "$command" in
     *[\;\&\|\`\$\<\>\(\)\\]*|*$'\n'*) return 1 ;;
   esac
-  local tok
+  local tok options=1
   for tok in ${command//[\'\"]/ }; do
+    [ "$options" -eq 1 ] || continue
     case "$tok" in
-      --pre*|--search-zip|-*z*) return 1 ;;
+      -n|--line-number|-F|--fixed-strings) ;;
+      --) options=0 ;;
+      rg) ;;
+      -*) return 1 ;;
+      *) options=0 ;;
     esac
   done
   return 0

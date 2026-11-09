@@ -99,3 +99,17 @@ probe() {
   run probe "rg -znC2 'git reset --hard' ."
   [ "$status" -eq 2 ]
 }
+
+@test "unsafe 14: a spoofed ripgrep version does not establish trust" {
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/bin/sh\necho "ripgrep 99.0.0 (spoofed)"\n' > "$BATS_TEST_TMPDIR/bin/rg"
+  chmod +x "$BATS_TEST_TMPDIR/bin/rg"
+  export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+  run probe "rg 'git reset --hard' ."
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 15: hostname-bin cannot execute a helper" {
+  run probe "rg --hostname-bin 'git reset --hard' --hyperlink-format 'file://{host}{path}' x ."
+  [ "$status" -eq 2 ]
+}

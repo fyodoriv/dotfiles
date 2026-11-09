@@ -62,6 +62,12 @@ Registered before the path fix.
 
 Predicted unsafe permits: two; after the fix: zero. A glob can expand into execution options, and mixed quotes can conceal one. Restrict the path to literal ASCII letters, digits, `_`, `.`, `/`, and interior `-`. Reject glob, brace, quote, whitespace, expansion, and leading-dash forms. Add a real glob-expansion control and a mixed-quote option control; retain all 23 existing controls.
 
+## Pattern-position option controls
+
+Registered before the pattern fix.
+
+Predicted unsafe permits: two; after the fix: zero. A quoted pattern beginning with `-` is parsed as an option even with `-F`. Reject leading-dash patterns. Add `--pre=...` controls with and without `-F`; retain all 25 existing controls.
+
 ## Anchor
 
 Issue #472's trusted-resolution and fail-closed requirements; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

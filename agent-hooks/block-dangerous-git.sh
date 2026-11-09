@@ -479,6 +479,7 @@ literal_search_only() {
   esac
   rest=${rest#"$quote"}
   pattern=${rest%%"$quote"*}
+  case "$pattern" in -*) return 1 ;; esac
   after=${rest#*"$quote"}
   [ "$after" != "$rest" ] || return 1
   case "$after" in

@@ -143,3 +143,13 @@ probe() {
   run probe "rg 'git reset --hard' ''--pre=helper"
   [ "$status" -eq 2 ]
 }
+
+@test "unsafe 22: a pattern-position pre option blocks" {
+  run probe "rg '--pre=git reset --hard' ."
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 23: -F does not make a leading-dash pattern literal" {
+  run probe "rg -F '--pre=git reset --hard' ."
+  [ "$status" -eq 2 ]
+}

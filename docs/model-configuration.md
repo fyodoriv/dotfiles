@@ -31,7 +31,7 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 
 ## Kimi Code plan in OpenCode
 
-OpenCode Desktop (cask `opencode-desktop`) and the `opencode` CLI run Kimi through the built-in `kimi-code-plan-global` provider (endpoint `https://api.kimi.ai/coding/v1`, billed to the Kimi Code membership). agentbrew syncs the same rules, skills, commands, and MCP servers (memory included) to OpenCode as to Claude Code.
+OpenCode Desktop (cask `opencode-desktop`) and the `opencode` CLI run Kimi through the built-in `kimi-code-plan-global` provider (endpoint `https://api.kimi.ai/coding/v1`, billed to the Kimi Code membership). The desktop cask is opt-in: run `dotfiles config set opencode_desktop true` and then `dotfiles apply`. A failed optional cask install does not stop apply. agentbrew syncs the same rules, skills, commands, and MCP servers (memory included) to OpenCode as to Claude Code.
 
 1. Buy the Kimi Code plan and create a key in the Kimi Code Console. A platform API key bills per token instead.
 2. Store the key: `opencode auth login` (pick Kimi Code Plan). For headless or LaunchAgent runs, also save it to the Keychain: `security add-generic-password -a "$USER" -s kimi-code-api-key -w`.

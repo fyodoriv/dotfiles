@@ -103,6 +103,10 @@ settings:
     type: bool
     default: false
     description: Deploy ~/.zshrc.ai-tools (agent launchers, agent-browser tuning).
+  opencode_desktop:
+    type: bool
+    default: false
+    description: Install the optional OpenCode Desktop cask; a failed optional install does not stop apply.
   use_local_ai:
     type: bool
     default: false

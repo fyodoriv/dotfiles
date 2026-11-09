@@ -8,6 +8,10 @@
 {{-   $gheHost = promptStringOnce . "github_enterprise_host" "GitHub Enterprise hostname" "github.example.com" -}}
 {{- end -}}
 {{- $useAiTools := promptBoolOnce . "use_ai_tools" "Enable AI agent tooling (ANTHROPIC_MODEL, agent-browser)" false -}}
+{{- $opencodeDesktop := false -}}
+{{- if hasKey . "opencode_desktop" -}}
+{{-   $opencodeDesktop = .opencode_desktop -}}
+{{- end -}}
 {{- $useLocalAi := promptBoolOnce . "use_local_ai" "Enable local-LLM stack (pipx + aider + mlx-lm on Apple Silicon; ~30 GB model weights require explicit opt-in via ~/.config/dotfiles/.local-llm-bootstrap-confirmed sentinel)" false -}}
 {{- $dotfilesDir := promptStringOnce . "dotfiles_dir" "Dotfiles directory relative to home (e.g. apps/dotfiles, dotfiles)" "apps/dotfiles" -}}
 {{- $reposDir := promptStringOnce . "repos_dir" "Repos directory relative to home (e.g. apps, repos, src)" "apps" -}}
@@ -249,6 +253,7 @@ data:
   claude_remote_control: {{ $claudeRemoteControl }}
   weekly_metrics: {{ $weeklyMetrics }}
   use_ai_tools: {{ $useAiTools }}
+  opencode_desktop: {{ $opencodeDesktop }}
   use_local_ai: {{ $useLocalAi }}
   local_ai_agents: {{ $localAiAgents }}
   gh_admin_scopes: {{ $ghAdminScopes }}

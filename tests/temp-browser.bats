@@ -177,6 +177,122 @@ teardown() {
   grep -q 'exit 3' "$BATS_TEST_DIRNAME/../docs/agent-browser-policy.md"
 }
 
+@test "acquire --wait takes the lock after release and prints the holder once" {
+  "$SCRIPT" acquire --owner agent-a --reason "bot sign-in" >/dev/null
+  ( sleep 0.3; "$SCRIPT" release --owner agent-a >/dev/null ) &
+  releaser=$!
+  run "$SCRIPT" acquire --owner agent-b --reason waiting --wait --timeout 3
+  wait "$releaser"
+  [ "$status" -eq 0 ]
+  [ "$output" = 9399 ] || [[ "$output" == *$'\n'9399 ]]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/owner")" = agent-b ]
+  [ "$(grep -c 'held by agent-a' <<< "$output")" -eq 1 ]
+}
+
+@test "acquire --wait times out with exit 3 and one holder notice" {
+  "$SCRIPT" acquire --owner agent-a --reason "bot sign-in" >/dev/null
+  SECONDS=0
+  run "$SCRIPT" acquire --owner agent-b --reason waiting --wait --timeout 1
+  [ "$status" -eq 3 ]
+  [ "$SECONDS" -lt 4 ]
+  [ "$(grep -c 'held by agent-a' <<< "$output")" -eq 1 ]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/owner")" = agent-a ]
+}
+
+@test "acquire --wait rejects an invalid timeout before launching" {
+  run "$SCRIPT" acquire --owner agent-b --reason waiting --wait --timeout nope
+  [ "$status" -eq 2 ]
+  [ ! -e "$TEMP_BROWSER_STATE_DIR/lock" ]
+}
+
+@test "cleanup does not launch a second browser before the old process exits" {
+  cat > "$TEST_DIR/fake-chrome" <<'STUB'
+#!/bin/bash
+if [ -n "${OLD_BROWSER_PID_FILE:-}" ] && kill -0 "$(cat "$OLD_BROWSER_PID_FILE")" 2>/dev/null; then
+  echo overlap > "${TEMP_BROWSER_STATE_DIR}/overlap"
+fi
+trap '' TERM
+while :; do sleep 0.1; done
+STUB
+  chmod +x "$TEST_DIR/fake-chrome"
+  "$SCRIPT" acquire --owner agent-a --reason first >/dev/null
+  export OLD_BROWSER_PID_FILE="$TEST_DIR/old-pid"
+  cat "$TEMP_BROWSER_STATE_DIR/lock/pid" > "$OLD_BROWSER_PID_FILE"
+  ( sleep 0.3; "$SCRIPT" release --owner agent-a >/dev/null ) &
+  releaser=$!
+  run "$SCRIPT" acquire --owner agent-b --reason second --wait --timeout 6
+  wait "$releaser"
+  [ "$status" -eq 0 ]
+  [ ! -e "$TEMP_BROWSER_STATE_DIR/overlap" ]
+  ! kill -0 "$(cat "$OLD_BROWSER_PID_FILE")" 2>/dev/null
+  kill -9 "$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")" 2>/dev/null || true
+}
+
+@test "lease expiry during --wait still prints the holder once" {
+  "$SCRIPT" acquire --owner agent-a --reason expiring >/dev/null
+  echo $(( $(date +%s) + 1 )) > "$TEMP_BROWSER_STATE_DIR/lock/expires"
+  run "$SCRIPT" acquire --owner agent-b --reason waiting --wait --timeout 4
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'held by agent-a' <<< "$output")" -eq 1 ]
+}
+
+@test "a delayed cleanup cannot delete the replacement lock" {
+  cat > "$TEST_DIR/mv" <<'STUB'
+#!/bin/bash
+if [ ! -e "${TEMP_BROWSER_STATE_DIR}/mv-delayed" ]; then
+  touch "${TEMP_BROWSER_STATE_DIR}/mv-delayed"
+  for _ in $(seq 1 50); do
+    [ -e "${TEMP_BROWSER_STATE_DIR}/second-done" ] && break
+    sleep 0.1
+  done
+else
+  touch "${TEMP_BROWSER_STATE_DIR}/second-done"
+fi
+/bin/mv "$@"
+STUB
+  chmod +x "$TEST_DIR/mv"
+  export PATH="$TEST_DIR:$PATH"
+  "$SCRIPT" acquire --owner agent-a --reason first >/dev/null
+  old_chrome_pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
+  echo 999999 > "$TEMP_BROWSER_STATE_DIR/lock/pid"
+  ( "$SCRIPT" release --owner agent-a >/dev/null ) &
+  releaser=$!
+  run "$SCRIPT" acquire --owner agent-b --reason second --wait --timeout 8
+  wait "$releaser"
+  kill "$old_chrome_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/owner")" = agent-b ]
+}
+
+@test "a dead cleanup owner does not wedge release" {
+  "$SCRIPT" acquire --owner agent-a --reason first >/dev/null
+  printf '999999 dead-token\n' > "$TEMP_BROWSER_STATE_DIR/lock/cleanup"
+  run "$SCRIPT" release --owner agent-a
+  [ "$status" -eq 0 ]
+  [ ! -e "$TEMP_BROWSER_STATE_DIR/lock" ]
+}
+
+@test "an expired PID-less acquisition is recoverable" {
+  "$SCRIPT" acquire --owner agent-a --reason first >/dev/null
+  old_chrome_pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
+  rm "$TEMP_BROWSER_STATE_DIR/lock/pid"
+  echo 1 > "$TEMP_BROWSER_STATE_DIR/lock/expires"
+  run "$SCRIPT" acquire --owner agent-b --reason second
+  kill "$old_chrome_pid" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/owner")" = agent-b ]
+}
+
+@test "a live PID-less acquisition remains held" {
+  mkdir -p "$TEMP_BROWSER_STATE_DIR/lock"
+  printf 'agent-a\n' > "$TEMP_BROWSER_STATE_DIR/lock/owner"
+  printf '%s\n' "$$" > "$TEMP_BROWSER_STATE_DIR/lock/acquirer"
+  echo $(( $(date +%s) + 60 )) > "$TEMP_BROWSER_STATE_DIR/lock/expires"
+  run "$SCRIPT" acquire --owner agent-b --reason second
+  [ "$status" -eq 3 ]
+  [ -d "$TEMP_BROWSER_STATE_DIR/lock" ]
+}
+
 @test "TEMP_BROWSER_LAUNCH hook gets profile and port; its pid is recorded" {
   cat > "$TEST_DIR/hook" <<'STUB'
 #!/bin/bash

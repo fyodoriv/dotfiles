@@ -28,8 +28,8 @@ temp-browser release --owner "$AGENT_BROWSER_SESSION"  # stops the browser, dele
 ```
 
 - The lock is a directory under `~/.local/state/temp-browser/lock` (`mkdir` is atomic). It records the owner, the reason, the browser pid, the port, the profile, and the lease expiry (default 1 hour, `TEMP_BROWSER_LEASE_SECONDS`).
-- A second agent is refused (exit 3) with the holder's name and reason.
-- An expired lease or a browser that exited is discarded (browser stopped, profile deleted) and taken over.
+- A second agent is refused (exit 3) with the holder's name and reason. Add `--wait` to poll instead; `--timeout <seconds>` changes the default 30-second limit. It prints the holder once and exits 3 only after that limit.
+- An expired lease or a browser that exited is discarded (browser stopped, profile deleted) and taken over. Cleanup renames the old lock aside atomically so it cannot delete a new owner's lock. Acquirer and cleanup PIDs make interrupted initialization and cleanup recoverable; live owners stay protected.
 - The same owner can acquire again; that renews the lease and prints the port.
 - The browser runs `--headless=new` in the background. It never raises or focuses a window.
 - `TEMP_BROWSER_HEADED=1` starts a headed window, for passkey, hardware-key, or visible sign-ins. It launches with `open -g -n -a`: a new instance, kept in the background. It never activates or raises a window; you bring it forward yourself.

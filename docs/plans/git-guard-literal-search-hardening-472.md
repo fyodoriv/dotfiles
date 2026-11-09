@@ -34,6 +34,16 @@ Zero unsafe permits, zero original-control regressions, and a fresh green reposi
 
 Any unsafe permit or inability to establish executable identity rejects this exemption. Remove it rather than broaden the grammar or accept an unresolved command.
 
+## Second independent-review pivot
+
+Registered before the next code change.
+
+The `--hostname-bin` option is another process-execution path. A spoofed `ripgrep` version string also showed that executing an unknown candidate for `--version` neither proves identity nor is safe.
+
+Predicted unsafe permits: two; after the fix: zero. Do not execute the candidate. Qualify only the exact resolved `/opt/homebrew/bin/rg` or `/usr/local/bin/rg` installation selected by the same PATH. Replace the flag denylist with the small frozen allowlist: no option, `-n`, `--line-number`, `-F`, `--fixed-strings`, and the option terminator `--`. All other options, including `--hostname-bin`, keep the conservative refusal.
+
+Add one spoofed-version control and one real `--hostname-bin` control. The original controls and first-review controls must retain their outcomes. The same measurement and pivot apply.
+
 ## Anchor
 
 Issue #472's trusted-resolution and fail-closed requirements; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

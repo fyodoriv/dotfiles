@@ -445,10 +445,20 @@ branch_delete_allowed() {
 }
 
 # A lone rg search reads its quoted pattern as data, never runs it (#472).
-# Only the plain form qualifies: no shell syntax that could run or redirect
-# anything, no env prefix (RIPGREP_CONFIG_PATH), no --pre/-z (they run
-# programs). Anything else keeps the conservative text match below.
+# Resolve and identify the executable: a function or an unrelated PATH entry
+# does not qualify. Inherited config can inject a preprocessor, so it must be
+# unset. Compact flags are rejected conservatively when they contain z.
 literal_search_only() {
+  [ -z "${RIPGREP_CONFIG_PATH+x}" ] || return 1
+  local rg_path rg_version
+  rg_path=$(type -P rg) || return 1
+  [ -n "$rg_path" ] && [ -x "$rg_path" ] || return 1
+  [ "$(command -v rg)" = "$rg_path" ] || return 1
+  rg_version=$("$rg_path" --version 2>/dev/null) || return 1
+  case "$rg_version" in
+    ripgrep\ *) ;;
+    *) return 1 ;;
+  esac
   case "$command" in
     "rg "*) ;;
     *) return 1 ;;
@@ -459,7 +469,7 @@ literal_search_only() {
   local tok
   for tok in ${command//[\'\"]/ }; do
     case "$tok" in
-      --pre*|--search-zip|-z|-[a-zA-Z]*z*) return 1 ;;
+      --pre*|--search-zip|-*z*) return 1 ;;
     esac
   done
   return 0

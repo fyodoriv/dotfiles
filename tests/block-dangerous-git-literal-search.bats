@@ -65,3 +65,37 @@ probe() {
   run probe "rg x && git reset --hard"
   [ "$status" -eq 2 ]
 }
+
+@test "unsafe 9: inherited ripgrep config blocks" {
+  export RIPGREP_CONFIG_PATH="$BATS_TEST_TMPDIR/rg.conf"
+  run probe "rg 'git reset --hard' ."
+  unset RIPGREP_CONFIG_PATH
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 10: exported rg function blocks" {
+  rg() { :; }
+  export -f rg
+  run probe "rg 'git reset --hard' ."
+  unset -f rg
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 11: an unidentified rg executable blocks" {
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/bin/sh\nexit 0\n' > "$BATS_TEST_TMPDIR/bin/rg"
+  chmod +x "$BATS_TEST_TMPDIR/bin/rg"
+  export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+  run probe "rg 'git reset --hard' ."
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 12: compact -zC2 flags block" {
+  run probe "rg -zC2 'git reset --hard' ."
+  [ "$status" -eq 2 ]
+}
+
+@test "unsafe 13: compact -znC2 flags block" {
+  run probe "rg -znC2 'git reset --hard' ."
+  [ "$status" -eq 2 ]
+}

@@ -56,6 +56,12 @@ Registered before the grammar fix.
 
 Predicted unsafe permits: two; after the fix: zero. Shell quote removal means a quoted `--pre` or `--hostname-bin` is still an option. Replace masking with a smaller grammar: optional `-n`, `--line-number`, `-F`, or `--fixed-strings`; then one simply quoted pattern; then one plain path with no whitespace or leading dash. Reject every trailing argument, including quoted options. Add quoted pre-pattern and post-pattern execution controls and retain all 21 existing controls.
 
+## Literal-path controls
+
+Registered before the path fix.
+
+Predicted unsafe permits: two; after the fix: zero. A glob can expand into execution options, and mixed quotes can conceal one. Restrict the path to literal ASCII letters, digits, `_`, `.`, `/`, and interior `-`. Reject glob, brace, quote, whitespace, expansion, and leading-dash forms. Add a real glob-expansion control and a mixed-quote option control; retain all 23 existing controls.
+
 ## Anchor
 
 Issue #472's trusted-resolution and fail-closed requirements; Basili, Caldiera and Rombach (1994), Goal Question Metric; Munafò et al. (2017), preregistration.

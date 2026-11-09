@@ -87,21 +87,6 @@ them. -->
   - **Anchor**: tooling-checkup runs 2026-10-25 and 2026-10-27 (machine_metrics phase); Gunther 2007, *Guerrilla Capacity Planning* (load beyond core count); Forsgren, Humble, Kim 2018 (stability).
   - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
 
-- [ ] Make the configured OpenCode default model respond within the readiness budget
-  - **ID**: opencode-default-model-readiness
-  - **Tags**: opencode, local-ai, reliability, readiness
-  - **Mode**: AFK
-  - **Details**: On 2026-11-08 the hosted Kimi smoke returned `OPENCODE_READY`, but the configured default `ollama/qwen3:14b` produced no response before 240 seconds. Raw Ollama answered in 3 seconds with thinking disabled; OpenAI-compatible streaming with `reasoning_effort: none` answered in 6 seconds. A scratch OpenCode run with `--variant none` answered in 130 seconds, while the stored model option and root `#none` form did not meet a 180-second bound. Isolate the CLI/server/request boundary and land a supported fix; do not hide the failure by selecting another model only for the probe.
-  - **Files**: `modules/local-ai/doctor.sh`, `tests/module-local-ai.bats`, `skills/update-tooling/SKILL.md`; coordinate any provider-bootstrap change with Agentbrew.
-  - **Output**: code
-  - **Acceptance**: three consecutive fresh CLI runs with no model override return the exact smoke answer within the Success bound; the active server, installed config and MCP state are re-read; hosted-only success is reported separately; existing local model choices and credentials are preserved.
-  - **Hypothesis**: a supported reasoning-control or runtime-boundary fix cuts the default-model smoke from over 240 seconds to under 120 seconds because raw local inference and streaming already complete in 3–6 seconds with reasoning disabled.
-  - **Measurement**: from an empty scratch directory, run `opencode run 'Reply with exactly: OPENCODE_READY'` three times with no `--model`, using a 120-second agent-tool or installed external timeout and recording elapsed seconds and exit status; rerun `opencode mcp list` and `dotfiles doctor --module local-ai`.
-  - **Success**: 3 of 3 default-model runs exit 0 with the exact answer in under 120 seconds each, with no new doctor failure.
-  - **Pivot**: if the installed CLI cannot honor a persistent reasoning control, abandon config-only attempts; evaluate the separately approved V2 upgrade or a default-model change instead of extending timeouts.
-  - **Anchor**: Ollama OpenAI compatibility `reasoning_effort` documentation (checked 2026-11-08); Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — restores the existing local-agent readiness contract, not a scorecard metric.
-
 ## P2
 
 - [ ] Restore the full Bats suite with the installed CLI argument parser

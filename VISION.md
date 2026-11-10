@@ -91,7 +91,8 @@ performance numbers. It replaces the earlier rule that telemetry was off until
 the owner stored a key.
 
 - **Why.** One Mac cannot show whether a command got slower for everyone.
-  Numbers from all installs feed a public dashboard (p50 and p95 per command,
+  Numbers from all installs feed a dashboard that is private to the
+  maintainer (p50 and p95 per command,
   version, and runtime) and a regression gate.
 - **Asked at install; on only after you say yes** (Enter counts as yes). The
   installer shows what is sent, an example event, and the privacy

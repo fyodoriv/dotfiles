@@ -13,6 +13,7 @@ setup() {
   export DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl"
   export DOTFILES_COMMANDS_FILE="$TEST_DIR/commands.jsonl"
   export DOTFILES_TELEMETRY_STATE="$TEST_DIR/telemetry.json"
+  export DOTFILES_INSTALL_RECEIPT="$TEST_DIR/install-receipt.json"
   export DOTFILES_TELEMETRY_URL="http://127.0.0.1:9/fake"
   export DOTFILES_TELEMETRY_KEY_FILE="$TEST_DIR/key"
   export DOTFILES_POSTHOG_KEY="phc_testFakeKey1"

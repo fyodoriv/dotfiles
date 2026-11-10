@@ -674,7 +674,9 @@ machine-readable output. With no answer it comes back at most once a day and
 3 times in all. The repo ships the write-only project key in
 `config/telemetry-key`; in a fork that empties that file nobody is asked and
 nothing is sent. A yes covers only later events: nothing recorded before it is
-sent.
+sent. One exception: the shell start time before the install and the install
+day are a baseline, measured before your yes (see
+[How much it helps](#how-much-it-helps)).
 
 **What is sent**, at most once a day: the command or task name, its duration,
 ok or error, counts, the dotfiles version, OS, CPU type, and a random install
@@ -699,6 +701,18 @@ id. One event:
 }
 ```
 
+Two more events come from the install receipt. With no receipt neither is
+sent.
+
+- `dotfiles.install`, once per install: `seconds` (time to configured), `ok`,
+  and `profile` (`core` or `full`). Sent only when the install finished on or
+  after the day of your yes.
+- `dotfiles.gains`, at most once a day: `zsh_ms_before`, `zsh_ms_now`, and
+  `days_since_install`.
+
+A `dotfiles.run` event carries `seconds_saved`, a whole number. It is an
+estimate.
+
 **What is never sent**: a path, file name, host name, user name, argument,
 message, or content. No person profile. Every name comes from a fixed list,
 so typed text cannot leave. The code that enforces this is
@@ -707,8 +721,9 @@ so typed text cannot leave. The code that enforces this is
 **Your IP address**: PostHog receives the request IP address, like any web
 server. GeoIP lookup is disabled and no location is stored.
 
-**Where it goes**: PostHog EU, for a public performance dashboard and a
-regression gate.
+**Where it goes**: PostHog EU. The dashboard is private to the maintainer.
+The maintainer reads the totals and averages, and uses them for a regression
+gate.
 
 **Turn it off**, any of:
 
@@ -723,6 +738,25 @@ flag or variable at a later install records no, also over an earlier yes.
 **Inspect it**: `dotfiles telemetry status` shows your answer and what is
 pending. `dotfiles telemetry send --dry-run` prints the exact request body
 and sends nothing. Full rules: [docs/observability.md](docs/observability.md#telemetry).
+
+### How much it helps
+
+The numbers compare this Mac with itself before the install.
+
+- **Baseline**: the same Mac before the install. `bin/dotfiles-install run`
+  measures it once, before it changes anything, and saves it in the install
+  receipt (`~/.local/state/dotfiles/install-receipt.json`).
+- **Measured**: shell start (`zsh_ms_before` from the receipt; `zsh_ms_now`
+  is the median of the daily shell start samples of the last 7 days), and
+  time to configured (`seconds` of the install run). The two shell numbers
+  use different methods: before is the full run time of one interactive
+  `zsh`, now is `~/.zshrc` start to first prompt. Read the difference as a
+  direction, not as an exact number.
+- **Estimated**: saved seconds (`seconds_saved`). It is the number of
+  automation runs times the per-task table in
+  [`lib/stats.sh`](lib/stats.sh) (`_task_estimate`). No clock measures it.
+- **Local view**: `dotfiles metrics --gains` prints before and now on this
+  Mac. It sends nothing.
 
 ## Proof
 

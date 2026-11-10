@@ -72,9 +72,11 @@ Asked at install; on only after you say yes (Enter counts as yes).
 
 `bin/dotfiles-telemetry` is the one sender. It can send two content-free
 local logs to PostHog EU (`https://eu.i.posthog.com/batch/`): the stats log
-and the commands log (see [Logs](#logs)). The numbers feed a public
-performance dashboard (p50 and p95 per command, version, and runtime) and a
-regression gate.
+and the commands log (see [Logs](#logs)). It also sends two events built
+from the install receipt (see [Gain events](#gain-events)). The numbers feed
+a performance dashboard (p50 and p95 per command, version, and runtime) and a
+regression gate. The dashboard is private to the maintainer, who reads the
+totals and averages.
 
 ### The question
 
@@ -170,6 +172,45 @@ How the code enforces it:
 - `tests/telemetry.bats` seeds the logs with a home path, a user name, a
   plain lowercase word, a plain uppercase word, an email, a URL, and a long
   token, and fails if any reaches the request body.
+- `tests/telemetry-gains.bats` does the same for the install receipt: a path
+  where a number belongs, a profile name that is not on the list, and a time
+  that is not a UTC timestamp never reach the request body.
+
+### Gain events
+
+These events show how much dotfiles helps against the same Mac before the
+install. Both come from the install receipt
+(`~/.local/state/dotfiles/install-receipt.json`, written by
+`bin/dotfiles-install run`; see `lib/mac-baseline.sh`). With no receipt
+neither is sent.
+
+| Event | When | Properties (plus the common ones) |
+|---|---|---|
+| `dotfiles.install` | Once per receipt. A new install run writes a new end time, and that sends a new event. | `seconds` (time to configured, measured), `ok`, `profile` (`core` or `full`; any other value is dropped). The event time is the end of the install. |
+| `dotfiles.gains` | At most once a day, with the daily send. | `zsh_ms_before` (receipt `.before.zsh_ms`, measured), `zsh_ms_now` (measured), `days_since_install` (days since receipt `.before.taken_at`). |
+
+- `dotfiles.run` carries `seconds_saved` as a whole number. It is an
+  estimate: runs times the per-task table in `lib/stats.sh`
+  (`_task_estimate`).
+- `zsh_ms_now` is the median of the daily `shell-start` samples that
+  `~/.zshrc` already writes to the stats log, from the last 7 days. The send
+  starts no new measurement, so it stays fast. With no sample the field is
+  left out.
+- The two shell numbers use different methods. `zsh_ms_before` is the full
+  run time of `zsh -i -c 'exit 0'`. `zsh_ms_now` is `~/.zshrc` start to first
+  prompt. Read the difference as a direction.
+- **Consent.** The install event is sent only when the install finished on or
+  after the day of the yes. A `shell-start` sample from before the day of the
+  yes is never used. `zsh_ms_before` and `days_since_install` are a baseline
+  from before the yes. This is the one exception to "a yes covers only later
+  events", and the consent text says so.
+- **Checks.** A receipt number must be a number from 0 to 1,000,000,000 and
+  leaves as a whole number. `ok` must be a boolean. A time must be a UTC
+  timestamp. Any other value is dropped.
+- **Cursors.** The state file keeps `install_sent` (the end time of the last
+  install that was sent) and `gains_day`. Both move only after the endpoint
+  answers 2xx.
+- The local view is `dotfiles metrics --gains`. It sends nothing.
 
 ### Turn it off
 
@@ -189,9 +230,11 @@ the Mac. `DOTFILES_STATS_LOG=0` turns the logs off too.
 
 - `dotfiles telemetry status`: on or off and why, your answer and its day,
   the key source (`env`, `keychain`, `default`, or `none`; never the value),
-  pending events, the last send, and the last problem.
-- `dotfiles telemetry send --dry-run`: the exact request body, with the key
-  shown as `<posthog_key>`. It sends nothing and changes nothing.
+  pending events (log lines, and the install and gains events that are due),
+  the last send, and the last problem.
+- `dotfiles telemetry send --dry-run`: the exact request body of each log and
+  of the install and gains events, with the key shown as `<posthog_key>`. It
+  sends nothing and changes nothing.
 
 ### The key
 
@@ -279,7 +322,8 @@ nothing is sent. The key is never printed or logged.
 - The cursor moves only after the endpoint answers 2xx.
 - Recording a command costs a few milliseconds and never throws.
 - **State**: `~/.local/state/dotfiles/telemetry.json` (install id, answer and
-  its day, two cursors, last send day, last try; mode 600, written with a temp
+  its day, two log cursors, the install event cursor, the last gains day,
+  last send day, last try; mode 600, written with a temp
   file and a rename). A file whose content is not valid means unset, never
   yes, and the cursors start at the end of the logs. When `jq` itself fails,
   the file is left as it is and nothing is sent, so a stored no is never

@@ -73,6 +73,10 @@ should_skip_agent() {
     # Scheduled syncs can be turned off; run dotfiles-sync by hand instead
     dotfiles-sync|tooling-sync)
       [ "${AUTO_SYNC:-true}" = "false" ] && return 0 ;;
+    # Only after a yes to the telemetry question. `dotfiles telemetry on`
+    # and `off` also load and remove it at once.
+    telemetry)
+      ! grep -q '"consent":"yes"' "${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}" 2>/dev/null && return 0 ;;
     # Silent system-wide upgrades require explicit opt-in
     dotfiles-upgrade)
       [ "$AUTO_UPGRADE" != "true" ] && return 0 ;;

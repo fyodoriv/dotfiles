@@ -160,7 +160,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `tooling-sync` | Every 60 min + at load | all | Fast-forward the tooling repos (skipped when `auto_sync: false`) |
 | `dotfiles-doctor` | Monday 9:00 AM | all | Weekly health check with `--fix` |
 | `cleanup` | Periodic | all | Clean caches, logs, and temp files |
-| `telemetry` | Every hour, at load | all | Sends the anonymous performance numbers at most once a day, only after your yes and with a key; otherwise exits at once ([telemetry](observability.md#telemetry)) |
+| `telemetry` | Every hour, at load | all | Sends the anonymous performance numbers at most once a day. Installed only while your telemetry answer is yes; `dotfiles telemetry off` removes it ([telemetry](observability.md#telemetry)) |
 | `agent-scratch-prune` | Every 6 hours, at load | all | Removes idle AI-agent build output, clean pushed agent worktrees, old agent scratch folders, and temp entries idle 3+ days |
 | `git-maintain` | Periodic | all | Git gc, prune, and maintenance across repos |
 | `capslock-control` | At load | `capslock_control` (default `owner_machine`) | Remap Caps Lock to Control (skipped and cleared when `capslock_control` is false) |

@@ -104,7 +104,8 @@ the answer, then `Share anonymous performance numbers? [Y/n]`.
   `actions`, or a command with `--help`, `--json`, or `--quiet`. With no
   answer it comes back at most once a day and 3 times in all; then it stays
   silent until you run `dotfiles telemetry ask`, `on`, or `off`. A run that
-  does not ask starts no new process.
+  does not ask starts no new process (after a dismissed question, one `date`
+  call until an answer or the third question).
 - An answer is never asked again. A later install never changes a no. An
   explicit opt-out at a later install (see [Turn it off](#turn-it-off))
   records no, also over an earlier yes.
@@ -117,7 +118,8 @@ Per log line: the event name (`dotfiles.run` or `dotfiles.command`), its
 time, the task or command name, `ok`, `duration_ms`, and the count fields
 (`seconds_saved`, `units`, `pass`, `fail`, `fixed`, `warn`, `skip`). Added at
 send time: `app_version` (the short SHA of the last upstream commit in the
-checkout, so a local commit never makes a per-machine value), `os` (`darwin`
+checkout, so a local commit never makes a per-machine value; a checkout whose
+`origin` is not the upstream repo sends `unknown`), `os` (`darwin`
 or `linux`),
 `arch`, and `runtime` (`shell`). All keyed by a random install id.
 
@@ -191,7 +193,10 @@ the Mac. `DOTFILES_STATS_LOG=0` turns the logs off too.
 The project key is write-only: it can add events and cannot read them. Lookup
 order: `DOTFILES_POSTHOG_KEY`, then the committed one-line file
 `config/telemetry-key`, then the macOS Keychain item (service `dotfiles`,
-account `posthog_key`). The Keychain is read only when the first two hold no
+account `posthog_key`). The committed file is the project's key for everyone.
+The env variable is the override: a fork or a test sets it to send to its own
+PostHog project. The Keychain item is the owner's key from before the file
+existed. The Keychain is read only when the first two hold no
 key, and with no key at all the daily path looks at most once an hour. A
 value that is not `phc_` plus letters and digits is no key. No key means
 nothing is sent. The key is never printed or logged.
@@ -199,21 +204,34 @@ nothing is sent. The key is never printed or logged.
 ### Reliability
 
 - A send never fails a command. Every error is swallowed and one content-free
-  line goes to `~/.local/state/dotfiles/telemetry.log`.
+  line goes to `~/.local/state/dotfiles/telemetry.log` (at most 200 lines).
+  The commands log keeps its newest 10,000 lines once it passes 20,000.
 - The daily send happens at most once a day. It stops after 3 seconds in
   total; what is left goes on a later run. A request that hangs is killed.
   After a try it waits one hour. A manual `dotfiles telemetry send` allows
   10 seconds per request.
+- Every way out of the daily path marks the clock hour in the state file, so
+  for the rest of that hour a `dotfiles` run starts no process for the send.
+  With `DO_NOT_TRACK`, `CI`, or `DOTFILES_TELEMETRY=0` set, a run never
+  starts one.
 - **Who starts it.** The LaunchAgent `com.dotfiles.telemetry` (every hour and
   at load; the script sends at most once a day). Also a `dotfiles` run on a
   terminal, as a fully detached child (its own process group, SIGHUP ignored,
   no open terminal), so it lives on when the run ends. A scheduled job never
   starts a send: launchd kills what a job leaves behind when it exits, and
   that could stop a send half way.
+- **The LaunchAgent exists only while your answer is yes.** A yes (at the
+  question or with `dotfiles telemetry on`) renders its plist and loads it.
+  `dotfiles telemetry off` unloads it and removes the plist. `dotfiles apply`
+  installs it only when the state file says yes, and removes an installed
+  copy otherwise. `dotfiles uninstall` removes it with the other agents. A
+  wake never creates a state file or an install id for someone who never
+  answered.
 - Each state write takes a short lock, reads the file again, and changes
   only its own fields. The send path never writes the answer. A
   `dotfiles telemetry off` during a send is kept, and the send stops before
-  the next request.
+  the next request. A writer that stalls for more than 3 seconds loses the
+  lock; when it wakes up it reads the file again before it writes.
 - The key is never an argument of a process: jq gets it through its
   environment and curl on stdin.
 - A first send is small. One send takes at most the newest 2,000 events of
@@ -223,8 +241,11 @@ nothing is sent. The key is never printed or logged.
 - Recording a command costs a few milliseconds and never throws.
 - **State**: `~/.local/state/dotfiles/telemetry.json` (install id, answer and
   its day, two cursors, last send day, last try; mode 600, written with a temp
-  file and a rename). A file that cannot be read means unset, never yes, and
-  the cursors start at the end of the logs. A log that was cut moves the
+  file and a rename). A file whose content is not valid means unset, never
+  yes, and the cursors start at the end of the logs. When `jq` itself fails,
+  the file is left as it is and nothing is sent, so a stored no is never
+  lost. Only an answer or a question creates the file; `status` and the
+  hourly wake never do. A log that was cut moves the
   cursor to its end, not to zero. Delete the file to reset.
 
 ## Health check

@@ -55,7 +55,10 @@
 # The key is write-only (it can add events, never read them). Lookup order:
 # DOTFILES_POSTHOG_KEY, then the committed file config/telemetry-key, then
 # the macOS Keychain item service "dotfiles", account "posthog_key". The
-# Keychain is read only when the first two hold no key. A value that is not
+# committed file is the project's key for everyone. The env variable is the
+# override: a fork or a test sets it to send to its own PostHog project. The
+# Keychain item is the owner's key from before the file existed; it is read
+# only when the first two hold no key. A value that is not
 # `phc_` plus letters and digits is no key. No key means nothing is sent.
 #
 # It sends only when all hold: the answer is yes, a key is found, and
@@ -67,6 +70,9 @@
 # LaunchAgent com.dotfiles.telemetry (hourly; this script sends at most once
 # a day), and from a `dotfiles` run on a terminal as a fully detached child.
 # A scheduled job never starts it: launchd kills what a job leaves behind.
+# The LaunchAgent exists only while the stored answer is yes: a yes loads it,
+# `telemetry off` unloads it and removes its plist, and `dotfiles apply`
+# installs it only when the state file says yes.
 # A `telemetry off` during a send stops it before the next request.
 #
 # Lifecycle: the install id, the answer and its day, the two cursors (log
@@ -75,8 +81,10 @@
 # written with a temp file and a rename, under a short lock so two runs never
 # lose each other's change). Failures go to telemetry.log next to it. Delete the state file to reset: a new install id, the answer is unset
 # again, and at most the capped newest events are sent after a new yes.
-# A state file that cannot be read resets the same way (unset, never yes),
-# and starts both cursors at the end of the logs, so nothing old is sent.
+# A state file whose content is not valid resets the same way (unset, never
+# yes), and starts both cursors at the end of the logs, so nothing old is
+# sent. When jq itself fails the file is left as it is and nothing is sent.
+# A run that only reads (status, the hourly wake) never creates the file.
 # A file from before the question (no answer in it) is unset; if it says
 # telemetry was turned off, the answer is no.
 
@@ -129,6 +137,9 @@ line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 # state_set changes some and writes the file.
 S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
 S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
+# READ_FAILED: jq could not run on the file, so its content is unknown.
+# STATE_INVALID: jq ran and the content is not a state object.
+READ_FAILED=0 STATE_INVALID=0
 
 new_install_id() { od -An -tx1 -N16 /dev/urandom | tr -d ' \n'; }
 
@@ -149,45 +160,56 @@ save_state() {
   ) 2>/dev/null || rm -f "$tmp"
 }
 
-# Read the state file. Every field is checked, so a hand-edited value cannot
-# break the arithmetic below. No file: a new install, answer unset. A file
-# that is not a JSON object with an install id: reset to unset, with both
-# cursors at the end of the logs, so a broken file never means yes and never
-# sends the whole history again. A cursor that is not a whole number (or is
-# absurdly large) also means the end of its log. A file from before the
-# question has no answer: unset, or no when it says telemetry was turned off.
+# Read the state file into the S_ variables. It never writes: a write happens
+# only under the lock (state_set, record_consent), so a run that only reads
+# never creates a file or an install id on disk.
+# Every field is checked, so a hand-edited value cannot break the arithmetic
+# below. No file: a new install, answer unset. A file whose content is not a
+# JSON object with an install id (STATE_INVALID): unset, with both cursors at
+# the end of the logs, so a broken file never means yes and never sends the
+# whole history again. When jq itself fails (READ_FAILED) the content is
+# unknown: the answer is treated as unset for this run, nothing is sent, and
+# nothing is written, so a stored no is never lost. A cursor that is not a
+# whole number (or is absurdly large) also means the end of its log. A file
+# from before the question has no answer: unset, or no when it says telemetry
+# was turned off.
 load_state() {
-  local fields=""
-  if [ -e "$STATE" ]; then
-    fields="$(jq -r '
-      def count: if type == "number" and . >= 0 then floor else 0 end;
-      def cursor:
-        if . == null then 0
-        elif type == "number" and . >= 0 and . == floor and . < 1000000000000 then .
-        else -1 end;
-      def day: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") then . else "-" end;
-      def hour: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$") then . else "-" end;
-      select(type == "object")
-      | select((.install_id | type) == "string" and (.install_id | test("^[0-9a-f]{32}$")))
-      | [.install_id, (.sent | cursor), (.sent_commands | cursor),
-         (if .consent == "yes" or .consent == "no" then .consent
-          elif .enabled == false then "no"
-          else "unset" end),
-         (.consent_at | day), (.last_send | day), (.last_try | count),
-         (.try_hour | hour), ([(.asks | count), 99] | min), (.asked_day | day)]
-      | map(tostring) | join(" ")' "$STATE" 2>/dev/null | head -n 1)"
-    if [ -z "$fields" ]; then
-      S_ID="$(new_install_id)" S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
-      S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
-      S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
-      log_error "state file could not be read; reset, answer unset"
-      save_state
-      return 0
-    fi
+  local fields="" rc=0
+  READ_FAILED=0 STATE_INVALID=0
+  S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
+  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
+  [ -n "$S_ID" ] || S_ID="$(new_install_id)"
+  [ -e "$STATE" ] || return 0
+  # The file is read as raw text and parsed inside jq, so jq exits 0 for any
+  # content. A non-zero exit means jq (or the read) failed, not the content.
+  fields="$(jq -R -s -r '
+    def count: if type == "number" and . >= 0 then floor else 0 end;
+    def cursor:
+      if . == null then 0
+      elif type == "number" and . >= 0 and . == floor and . < 1000000000000 then .
+      else -1 end;
+    def day: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") then . else "-" end;
+    def hour: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$") then . else "-" end;
+    (try fromjson catch null) as $state
+    | if ($state | type) == "object" and ($state.install_id | type) == "string"
+         and ($state.install_id | test("^[0-9a-f]{32}$"))
+      then $state
+        | [.install_id, (.sent | cursor), (.sent_commands | cursor),
+           (if .consent == "yes" or .consent == "no" then .consent
+            elif .enabled == false then "no"
+            else "unset" end),
+           (.consent_at | day), (.last_send | day), (.last_try | count),
+           (.try_hour | hour), ([(.asks | count), 99] | min), (.asked_day | day)]
+        | map(tostring) | join(" ")
+      else "invalid" end' "$STATE" 2>/dev/null)" || rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$fields" ]; then
+    READ_FAILED=1
+    return 0
   fi
-  if [ -z "$fields" ]; then
+  if [ "$fields" = "invalid" ]; then
+    STATE_INVALID=1
     S_ID="$(new_install_id)"
-    save_state
+    S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
     return 0
   fi
   read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY <<<"$fields"
@@ -200,41 +222,66 @@ load_state() {
 }
 
 # One state change at a time, across runs: a mkdir lock held for the read,
-# the change, and the write. A lock still there after 3 seconds is from a run
-# that died, so it is taken over. DOTFILES_TELEMETRY_TEST_HOLD (tests only)
-# makes state_set wait that many seconds between its read and its write, to
-# prove that a second run waits for the lock.
+# the change, and the write. The holder leaves a file named by its process id
+# in the lock. A lock still there after 3 seconds is from a run that died or
+# stalled, so it is taken over. A stalled holder that wakes up sees that its
+# file is gone (state_owned) and does not write what it read before: it takes
+# the lock and reads again. Returns 1 when the lock cannot be taken; then
+# nothing is written. DOTFILES_TELEMETRY_TEST_HOLD (tests only) makes the
+# first state_set of a run wait that many seconds between its read and its
+# write, to prove that a second run waits for the lock.
 state_lock() {
   local tries=0
   mkdir -p "$(dirname "$STATE")" 2>/dev/null
   until mkdir "$STATE.wlock" 2>/dev/null; do
     tries=$((tries + 1))
-    if [ "$tries" -ge 60 ]; then
-      rmdir "$STATE.wlock" 2>/dev/null
-      mkdir "$STATE.wlock" 2>/dev/null
-      return 0
-    fi
+    [ "$tries" -lt 130 ] || return 1
+    [ "$tries" -ne 60 ] || rm -rf "$STATE.wlock" 2>/dev/null
     sleep 0.05
   done
+  : >"$STATE.wlock/$$" 2>/dev/null || { rmdir "$STATE.wlock" 2>/dev/null; return 1; }
 }
-state_unlock() { rmdir "$STATE.wlock" 2>/dev/null; return 0; }
+state_owned() { [ -e "$STATE.wlock/$$" ]; }
+state_unlock() {
+  state_owned || return 0
+  rm -f "$STATE.wlock/$$" 2>/dev/null
+  rmdir "$STATE.wlock" 2>/dev/null
+  return 0
+}
 
-# state_set NAME VALUE [NAME VALUE ...]: under the lock, read the file again,
-# change only the named fields, and write. So a change another run made
-# meanwhile (for example `telemetry off`) is kept: the send path names only
-# cursors and try times, and never the answer.
+# state_set [NAME VALUE ...]: under the lock, read the file again, change only
+# the named fields, and write. So a change another run made meanwhile (for
+# example `telemetry off`) is kept: the send path names only cursors and try
+# times, and never the answer. This is also the only place (with
+# record_consent) that creates a missing file. When jq cannot read the file,
+# nothing is written. Returns 1 when nothing was written.
 state_set() {
-  state_lock
-  load_state
-  if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -n "${DOTFILES_TELEMETRY_TEST_HOLD:-}" ]; then
-    sleep "$DOTFILES_TELEMETRY_TEST_HOLD"
-  fi
-  while [ "$#" -ge 2 ]; do
-    printf -v "$1" '%s' "$2"
-    shift 2
+  local index
+  for _ in 1 2 3; do
+    state_lock || return 1
+    load_state
+    if [ "$READ_FAILED" -eq 1 ]; then
+      state_unlock
+      return 1
+    fi
+    if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -n "${DOTFILES_TELEMETRY_TEST_HOLD:-}" ]; then
+      sleep "$DOTFILES_TELEMETRY_TEST_HOLD"
+      unset DOTFILES_TELEMETRY_TEST_HOLD
+    fi
+    index=1
+    while [ "$index" -lt "$#" ]; do
+      printf -v "${@:index:1}" '%s' "${@:index+1:1}"
+      index=$((index + 2))
+    done
+    # Still the holder: write. Otherwise another run took the lock over while
+    # this one stalled, so what was read is stale: read again.
+    if state_owned; then
+      save_state
+      state_unlock
+      return 0
+    fi
   done
-  save_state
-  state_unlock
+  return 1
 }
 
 # One line per failure, no content: a time and a fixed text. Kept short.
@@ -290,6 +337,7 @@ not_now() {
   local why
   why="$(blocked)"
   [ -z "$why" ] || { echo "$why"; return 0; }
+  [ "$READ_FAILED" -eq 0 ] || { echo "the state file could not be read"; return 0; }
   case "$S_CONSENT" in
     yes) ;;
     no) echo "you said no; change it: dotfiles telemetry on" ;;
@@ -336,12 +384,19 @@ os_name() { case "$(uname -s)" in Darwin) echo darwin ;; Linux) echo linux ;; *)
 arch_name() { case "$(uname -m)" in arm64 | aarch64) echo arm64 ;; x86_64 | amd64) echo x64 ;; *) echo other ;; esac; }
 
 # The version to report: the short SHA of the last commit this checkout
-# shares with UPSTREAM_REF, or "unknown". Never a local commit.
+# shares with UPSTREAM_REF, or "unknown". Never a local commit. A checkout
+# whose origin is not the upstream repo (a fork) reports "unknown": its
+# origin branch holds the fork's own commits, which would identify the fork.
 VERSION=""
+UPSTREAM_HOST='github\.com'
+UPSTREAM_URL_PATTERN="^(https://${UPSTREAM_HOST}/|git@${UPSTREAM_HOST}:|ssh://git@${UPSTREAM_HOST}/)fyodoriv/dotfiles(\\.git)?/?\$"
 app_version() {
-  local base
+  local base="" origin
   if [ -z "$VERSION" ]; then
-    base="$(git -C "$DOTFILES_DIR" merge-base HEAD "$UPSTREAM_REF" 2>/dev/null || true)"
+    origin="$(git -C "$DOTFILES_DIR" remote get-url origin 2>/dev/null || true)"
+    if [[ "$origin" =~ $UPSTREAM_URL_PATTERN ]]; then
+      base="$(git -C "$DOTFILES_DIR" merge-base HEAD "$UPSTREAM_REF" 2>/dev/null || true)"
+    fi
     [ -z "$base" ] || base="$(git -C "$DOTFILES_DIR" rev-parse --short "$base" 2>/dev/null || true)"
     [[ "$base" =~ ^[0-9a-f]{4,40}$ ]] || base="unknown"
     VERSION="$base"
@@ -577,10 +632,14 @@ cmd_status() {
   if [ -n "$why" ]; then echo "telemetry: off ($why)"
   elif [ -z "$KEY" ]; then echo "telemetry: off (no key, so nothing is sent)"
   else echo "telemetry: on"; fi
-  case "$S_CONSENT" in
-    yes | no) echo "consent: $S_CONSENT (given ${S_CONSENT_AT:-on an unknown day})" ;;
-    *) echo "consent: unset (not asked yet; answer: dotfiles telemetry on, or off)" ;;
-  esac
+  if [ "$READ_FAILED" -eq 1 ]; then
+    echo "consent: unknown (jq could not read the state file; nothing is sent and nothing is changed)"
+  else
+    case "$S_CONSENT" in
+      yes | no) echo "consent: $S_CONSENT (given ${S_CONSENT_AT:-on an unknown day})" ;;
+      *) echo "consent: unset (not asked yet; answer: dotfiles telemetry on, or off)" ;;
+    esac
+  fi
   echo "key: $KEY_SOURCE"
   echo "endpoint: $URL"
   read -r pending skipped <<<"$(pending_counts)"
@@ -596,26 +655,91 @@ cmd_send() {
 
 # The automatic path: quiet, at most one working send a day, at most
 # AUTO_TIMEOUT seconds in total, and after a try it waits RETRY_SECONDS.
+# Every return path leaves this clock hour in the state file, so lib/stats.sh
+# starts no new process for the rest of the hour. Only with a stored yes:
+# without one that gate stops earlier, and a wake must never create a state
+# file or an install id for someone who never answered.
 cmd_daily() {
-  [ -z "$(not_now)" ] || return 0
-  [ "$S_LAST_SEND" != "$(today)" ] || return 0
-  [ $(($(date +%s) - S_LAST_TRY)) -ge "$RETRY_SECONDS" ] || return 0
+  local hour
+  hour="$(date -u +%FT%H)"
+  if [ -n "$(not_now)" ] || [ "$S_LAST_SEND" = "$(today)" ] ||
+    [ $(($(date +%s) - S_LAST_TRY)) -lt "$RETRY_SECONDS" ]; then
+    [ "$S_CONSENT" != "yes" ] || [ "$S_TRY_HOUR" = "$hour" ] || state_set S_TRY_HOUR "$hour" || true
+    return 0
+  fi
   DEADLINE=$((SECONDS + AUTO_TIMEOUT))
   send_all "$AUTO_TIMEOUT" >/dev/null 2>&1 || true
 }
 
 # record_consent yes|no: one locked read, change, and write. A new yes covers
 # only later events: both cursors move to the end of the logs, so nothing
-# recorded before the yes is ever sent.
+# recorded before the yes is ever sent. Then the LaunchAgent is made to match
+# the answer. Returns 1 when the answer could not be saved.
 record_consent() {
-  state_lock
-  load_state
-  if [ "$1" = "yes" ] && [ "$S_CONSENT" != "yes" ]; then
-    S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
+  local saved=1
+  for _ in 1 2 3; do
+    state_lock || break
+    load_state
+    if [ "$READ_FAILED" -eq 1 ]; then
+      state_unlock
+      break
+    fi
+    if [ "$1" = "yes" ] && [ "$S_CONSENT" != "yes" ]; then
+      S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
+    fi
+    S_CONSENT="$1" S_CONSENT_AT="$(today)"
+    if state_owned; then
+      save_state
+      state_unlock
+      saved=0
+      break
+    fi
+  done
+  if [ "$saved" -ne 0 ]; then
+    load_state
+    echo "telemetry: could not save your answer (the state file could not be read or locked). Nothing is sent." >&2
+    return 1
   fi
-  S_CONSENT="$1" S_CONSENT_AT="$(today)"
-  save_state
-  state_unlock
+  agent_sync
+}
+
+# The LaunchAgent com.dotfiles.telemetry exists only while the stored answer
+# is yes. A yes renders its plist and loads it; any other answer unloads it
+# and removes the plist. `dotfiles apply` follows the same rule
+# (should_skip_agent in .chezmoiscripts/run_onchange_launchagents.sh.tmpl).
+# It acts only for the real state file and from the checkout that chezmoi
+# applies, so a scratch state or a development worktree never changes launchd.
+# In a test only the fakes (the two seams) are ever called. Never fails.
+agent_sync() {
+  local label="com.dotfiles.telemetry" launchctl_bin="launchctl" chezmoi_bin="chezmoi" plist template domain
+  if [ -n "${BATS_TEST_FILENAME:-}" ]; then
+    launchctl_bin="${DOTFILES_TELEMETRY_LAUNCHCTL:-}" chezmoi_bin="${DOTFILES_TELEMETRY_CHEZMOI:-}"
+    [ -n "$launchctl_bin" ] && [ -n "$chezmoi_bin" ] || return 0
+  else
+    [ "$(uname -s)" = "Darwin" ] || return 0
+    [ "$STATE" = "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json" ] || return 0
+    command -v launchctl >/dev/null 2>&1 && command -v chezmoi >/dev/null 2>&1 || return 0
+    [ "$(chezmoi source-path 2>/dev/null | { read -r dir && cd "$dir" 2>/dev/null && pwd -P; })" = "$(cd "$DOTFILES_DIR" && pwd -P)" ] || return 0
+  fi
+  plist="$HOME/Library/LaunchAgents/$label.plist"
+  template="$DOTFILES_DIR/launchagents/$label.plist.tmpl"
+  domain="gui/$(id -u)"
+  if [ "$S_CONSENT" = "yes" ]; then
+    [ -f "$template" ] || return 0
+    mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.local/share/dotfiles/logs" 2>/dev/null || return 0
+    if "$chezmoi_bin" execute-template <"$template" >"$plist.tmp.$$" 2>/dev/null && [ -s "$plist.tmp.$$" ]; then
+      mv -f "$plist.tmp.$$" "$plist"
+      "$launchctl_bin" bootout "$domain/$label" >/dev/null 2>&1 || true
+      "$launchctl_bin" bootstrap "$domain" "$plist" >/dev/null 2>&1 || log_error "could not load the LaunchAgent"
+    else
+      # No chezmoi data yet (a new install): `dotfiles apply` installs it.
+      rm -f "$plist.tmp.$$"
+    fi
+  elif [ -e "$plist" ]; then
+    "$launchctl_bin" bootout "$domain/$label" >/dev/null 2>&1 || true
+    rm -f "$plist"
+  fi
+  return 0
 }
 
 # Throw away keys typed before the question shows, so a stray Enter is never
@@ -630,14 +754,14 @@ drain_input() {
 }
 
 cmd_on() {
-  record_consent yes
+  record_consent yes || exit 1
   what_is_sent
   echo ""
   echo "telemetry: turned on. Turn it off: dotfiles telemetry off"
 }
 
 cmd_off() {
-  record_consent no
+  record_consent no || exit 1
   echo "telemetry: turned off. Nothing is sent. Turn it on: dotfiles telemetry on"
 }
 
@@ -665,10 +789,11 @@ cmd_ask() {
   fi
   # An opt-out always wins, also over an earlier yes.
   if [ -n "$optout" ]; then
-    [ "$S_CONSENT" = "no" ] || record_consent no
+    [ "$S_CONSENT" = "no" ] || record_consent no || return 0
     echo "telemetry: off ($optout). Nothing is sent. Turn it on later: dotfiles telemetry on"
     return 0
   fi
+  [ "$READ_FAILED" -eq 0 ] || return 0
   resolve_key
   [ -n "$KEY" ] || return 0
   if [ "$S_CONSENT" != "unset" ]; then
@@ -683,7 +808,7 @@ cmd_ask() {
     [ "$S_ASKS" -lt "$MAX_ASKS" ] || return 0
     [ "$S_ASKED_DAY" != "$(today)" ] || return 0
     # Counted before the question shows, so a closed window counts too.
-    state_set S_ASKS "$((S_ASKS + 1))" S_ASKED_DAY "$(today)"
+    state_set S_ASKS "$((S_ASKS + 1))" S_ASKED_DAY "$(today)" || return 0
   fi
   [ "$install" -eq 0 ] || choices="[Y/n]"
   drain_input
@@ -701,11 +826,11 @@ cmd_ask() {
     [ -n "$answer" ] || [ "$install" -eq 0 ] || answer="y"
     case "$answer" in
       y | Y | yes | YES | Yes)
-        record_consent yes
+        record_consent yes || return 0
         echo "telemetry: on. Thank you. Turn it off any time: dotfiles telemetry off" >&2
         return 0 ;;
       n | N | no | NO | No)
-        record_consent no
+        record_consent no || return 0
         echo "telemetry: off. Nothing is sent. Turn it on any time: dotfiles telemetry on" >&2
         return 0 ;;
     esac
@@ -719,6 +844,11 @@ cmd_ask() {
 }
 
 load_state
+if [ "$STATE_INVALID" -eq 1 ]; then
+  # Repair a file with invalid content once, under the lock.
+  log_error "state file content was not valid; reset, answer unset"
+  state_set || true
+fi
 case "${1:-status}" in
   status) cmd_status ;;
   on) cmd_on ;;

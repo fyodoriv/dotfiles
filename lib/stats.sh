@@ -117,13 +117,17 @@ _telemetry_read_state() {
 # leaves behind, which could stop a send half way. Those Macs send from the
 # LaunchAgent com.dotfiles.telemetry instead.
 # It starts nothing (and no new process) unless the stored answer is yes,
-# today has no send yet, and this clock hour has no try yet.
+# no off switch is set (CI, DO_NOT_TRACK, DOTFILES_TELEMETRY=0), today has no
+# send yet, and this clock hour has no try yet.
 # bin/dotfiles-telemetry checks every rule again; a send never fails a caller.
 # Never in a test, unless DOTFILES_TELEMETRY_SPAWN=1 asks for the real path.
 _telemetry_daily() {
   local tel day="${1%%T*}" hour="${1%%:*}"
   if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -z "${DOTFILES_TELEMETRY_SPAWN:-}" ]; then return 0; fi
   [ -n "${DOTFILES_TELEMETRY_TTY:-}" ] || [ -n "${_DOTFILES_ON_TERMINAL:-}" ] || [ -t 0 ] || [ -t 2 ] || return 0
+  [ -z "${CI:-}" ] || return 0
+  [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
+  case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
   _telemetry_read_state
   case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'*) ;; *) return 0 ;; esac
   case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$day\""* | *"\"try_hour\":\"$hour\""*) return 0 ;; esac
@@ -144,8 +148,10 @@ _telemetry_daily() {
 # scheduler, or an agent run; there the answer stays unset and nothing is sent.
 # Never before help, version, cd, completion, or machine-readable output.
 # Never without a key (env or config/telemetry-key): nothing could be sent.
-# After 3 unanswered questions it stays silent. All of this is plain bash: a
-# run that does not ask starts no new process.
+# After 3 unanswered questions it stays silent, and after one it stays silent
+# for the rest of that day. All of this is plain bash: a run that does not
+# ask starts no new process, except one `date` on a Mac where a question was
+# dismissed and may come back.
 # DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
 dotfiles_telemetry_ask() {
   local arg key_line="" root
@@ -168,7 +174,28 @@ dotfiles_telemetry_ask() {
   fi
   _telemetry_read_state
   case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'* | *'"consent":"no"'* | *'"asks":3'*) return 0 ;; esac
+  # A question was dismissed before: it may come back once on a later day.
+  case "$_TELEMETRY_STATE_LINE" in
+    *'"asked_day":"2'*)
+      case "$_TELEMETRY_STATE_LINE" in *"\"asked_day\":\"$(date -u +%F)\""*) return 0 ;; esac ;;
+  esac
   bash "$root/bin/dotfiles-telemetry" ask --first-run || true
+  return 0
+}
+
+# Keep the commands log small: over 20,000 lines, keep the newest 10,000.
+# The telemetry cursor then points past the end, which the sender reads as
+# "the end of the log", so no line is sent twice.
+_commands_log_cap() {
+  local lines tmp="$DOTFILES_COMMANDS_FILE.tmp.$$"
+  lines="$(wc -l <"$DOTFILES_COMMANDS_FILE" 2>/dev/null)" || return 0
+  lines="${lines//[^0-9]/}"
+  [ "${lines:-0}" -gt 20000 ] || return 0
+  if tail -n 10000 "$DOTFILES_COMMANDS_FILE" >"$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$DOTFILES_COMMANDS_FILE" 2>/dev/null || rm -f "$tmp"
+  else
+    rm -f "$tmp"
+  fi
   return 0
 }
 
@@ -195,6 +222,8 @@ log_command() {
   [ -d "${DOTFILES_COMMANDS_FILE%/*}" ] || mkdir -p "${DOTFILES_COMMANDS_FILE%/*}" 2>/dev/null || return 0
   echo "{\"command\":\"$command\",\"timestamp\":\"$timestamp\",\"ok\":$ok,\"duration_ms\":$duration_ms}" \
     >> "$DOTFILES_COMMANDS_FILE" 2>/dev/null || return 0
+  # About one run in 200 checks the size, so the log cannot grow without end.
+  if [ $((RANDOM % 200)) -eq 0 ] || [ -n "${DOTFILES_COMMANDS_ROTATE_NOW:-}" ]; then _commands_log_cap; fi
   _telemetry_daily "$timestamp"
 }
 

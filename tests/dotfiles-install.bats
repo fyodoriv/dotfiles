@@ -411,7 +411,10 @@ make_tool_repo() {
 
 # ── The telemetry question (docs/observability.md#telemetry) ─────────────
 # The question shows only when a key is present. This fake key is never sent.
-telemetry_consent() { jq -r .consent "$XDG_STATE_HOME/dotfiles/telemetry.json"; }
+# No state file means nobody answered.
+telemetry_consent() {
+  if [ -e "$XDG_STATE_HOME/dotfiles/telemetry.json" ]; then jq -r .consent "$XDG_STATE_HOME/dotfiles/telemetry.json"; else echo unset; fi
+}
 telemetry_key() { export DOTFILES_POSTHOG_KEY="phc_testFakeKey1" DOTFILES_TELEMETRY_KEY_FILE=/dev/null; }
 
 @test "run with no telemetry key prints nothing about telemetry and asks nothing" {

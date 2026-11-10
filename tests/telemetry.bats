@@ -47,7 +47,25 @@ say_yes() {
   bash "$TEL" on >/dev/null
   set_state '.sent = 0 | .sent_commands = 0'
 }
-consent() { jq -r .consent "$DOTFILES_TELEMETRY_STATE"; }
+# No state file means nobody answered: a run that only reads never creates it.
+consent() { if [ -e "$DOTFILES_TELEMETRY_STATE" ]; then jq -r .consent "$DOTFILES_TELEMETRY_STATE"; else echo unset; fi; }
+# Fakes for the two tools that install the LaunchAgent. The fake chezmoi
+# "renders" the template by copying it; the fake launchctl logs its arguments.
+fake_agent_tools() {
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >>"%s/launchctl.log"\n' "$TEST_DIR" >"$TEST_DIR/fake-launchctl"
+  printf '#!/bin/bash\n[ "$1" = "execute-template" ] || exit 1\ncat\n' >"$TEST_DIR/fake-chezmoi"
+  chmod +x "$TEST_DIR/fake-launchctl" "$TEST_DIR/fake-chezmoi"
+  export DOTFILES_TELEMETRY_LAUNCHCTL="$TEST_DIR/fake-launchctl" DOTFILES_TELEMETRY_CHEZMOI="$TEST_DIR/fake-chezmoi"
+  PLIST="$HOME/Library/LaunchAgents/com.dotfiles.telemetry.plist"
+}
+# A jq that fails once (exit 5) when $TEST_DIR/jq-fail exists, then works.
+# It fails every time while $TEST_DIR/jq-fail-always exists.
+fail_once_jq() {
+  mkdir -p "$TEST_DIR/jqshim"
+  printf '#!/bin/bash\n[ ! -e "%s/jq-fail-always" ] || exit 5\nif [ -e "%s/jq-fail" ]; then rm -f "%s/jq-fail"; exit 5; fi\nexec "%s" "$@"\n' \
+    "$TEST_DIR" "$TEST_DIR" "$TEST_DIR" "$(command -v jq)" >"$TEST_DIR/jqshim/jq"
+  chmod +x "$TEST_DIR/jqshim/jq"
+}
 requests() { if [ -f "$FAKE_LOG" ]; then jq -s 'length' "$FAKE_LOG"; else echo 0; fi; }
 set_state() { jq -c "$1" "$DOTFILES_TELEMETRY_STATE" >"$TEST_DIR/state.new" && mv "$TEST_DIR/state.new" "$DOTFILES_TELEMETRY_STATE"; }
 # bin/dotfiles writes its timing line in the background: wait for line $1.
@@ -440,6 +458,38 @@ PY
   [ "$(consent)" = "no" ]
 }
 
+# The gate in lib/stats.sh is plain bash. A copy of lib/ next to a stub of the
+# telemetry script counts how often the question process would start.
+gate_root() {
+  GATE="$TEST_DIR/gate"
+  [ ! -d "$GATE" ] || return 0
+  mkdir -p "$GATE/bin" "$GATE/lib"
+  cp "$REPO"/lib/*.sh "$GATE/lib/"
+  printf '#!/bin/bash\necho "$*" >>"%s/gate.calls"\n' "$TEST_DIR" >"$GATE/bin/dotfiles-telemetry"
+  chmod +x "$GATE/bin/dotfiles-telemetry"
+}
+ask_starts() {
+  gate_root
+  : >"$TEST_DIR/gate.calls"
+  DOTFILES_TELEMETRY_TTY=1 bash -c "source '$GATE/lib/stats.sh'; dotfiles_telemetry_ask stats"
+  wc -l <"$TEST_DIR/gate.calls" | tr -d ' '
+}
+
+@test "after a dismissed question, a run on the same day starts no question process" {
+  state() { printf '{"install_id":"0123456789abcdef0123456789abcdef","consent":"unset","asks":%s,"asked_day":"%s"}\n' "$1" "$2" >"$DOTFILES_TELEMETRY_STATE"; }
+  [ "$(ask_starts)" -eq 1 ] # never asked: the question starts
+  state 1 "$(date -u +%F)"
+  [ "$(ask_starts)" -eq 0 ] # dismissed today: nothing starts
+  state 1 "2020-01-01"
+  [ "$(ask_starts)" -eq 1 ] # an earlier day: it may come back
+  state 3 "2020-01-01"
+  [ "$(ask_starts)" -eq 0 ] # three times: never again
+  # The real script writes the day and count in the shape the gate reads.
+  rm -f "$DOTFILES_TELEMETRY_STATE"
+  run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
+  [ "$(ask_starts)" -eq 0 ]
+}
+
 @test "with no key nobody is asked and nothing is printed; an opt-out is still recorded" {
   export DOTFILES_POSTHOG_KEY=""
   run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --install"
@@ -450,7 +500,7 @@ PY
   run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
   [ "$(consent)" = "unset" ]
-  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" = "0" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
   run bash "$TEL" ask --install --no
   [[ "$output" == *"telemetry: off (--no-telemetry)"* ]]
   [ "$(consent)" = "no" ]
@@ -616,6 +666,7 @@ PY
     export GIT_CONFIG_GLOBAL=/dev/null GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
     git init -q .
     git add bin && git commit -q -m upstream
+    git remote add origin https://github.com/fyodoriv/dotfiles.git
     git update-ref refs/remotes/origin/feat/chezmoi HEAD
     git rev-parse --short HEAD >"$TEST_DIR/upstream.sha"
     echo local >local.txt && git add local.txt && git commit -q -m "a local commit"
@@ -625,6 +676,15 @@ PY
   run bash "$repo/bin/dotfiles-telemetry" send --dry-run
   [[ "$output" == *"\"app_version\": \"$(cat "$TEST_DIR/upstream.sha")\""* ]]
   [[ "$output" != *"$(cat "$TEST_DIR/local.sha")"* ]]
+  # A fork: its origin branch holds its own commits, so no SHA is sent.
+  for url in https://github.com/someone/dotfiles.git git@github.com:fyodoriv/dotfiles-fork.git https://example.com/fyodoriv/dotfiles; do
+    (cd "$repo" && GIT_CONFIG_GLOBAL=/dev/null git remote set-url origin "$url")
+    run bash "$repo/bin/dotfiles-telemetry" send --dry-run
+    [[ "$output" == *'"app_version": "unknown"'* ]] || { echo "$url: $output"; return 1; }
+  done
+  (cd "$repo" && GIT_CONFIG_GLOBAL=/dev/null git remote set-url origin git@github.com:fyodoriv/dotfiles.git)
+  run bash "$repo/bin/dotfiles-telemetry" send --dry-run
+  [[ "$output" == *"\"app_version\": \"$(cat "$TEST_DIR/upstream.sha")\""* ]]
   (cd "$repo" && git update-ref -d refs/remotes/origin/feat/chezmoi)
   run bash "$repo/bin/dotfiles-telemetry" send --dry-run
   [[ "$output" == *'"app_version": "unknown"'* ]]
@@ -813,6 +873,54 @@ SH
   done
 }
 
+# Review fix 4: only a jq that ran and rejected the content resets the state.
+@test "a failed jq read changes nothing: a stored no stays no, and a yes sends nothing" {
+  fail_once_jq
+  bash "$TEL" off >/dev/null
+  cp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
+  for command in status daily "ask --install" "ask --first-run" send; do
+    : >"$TEST_DIR/jq-fail"
+    # shellcheck disable=SC2086
+    run bash -c "printf 'y\n' | PATH='$TEST_DIR/jqshim:$PATH' DOTFILES_TELEMETRY_TTY=1 bash '$TEL' $command"
+    [ ! -e "$TEST_DIR/jq-fail" ] # the fake failure was used
+    cmp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json" || { echo "$command changed the state: $output"; return 1; }
+    [[ "$output" != *"Share anonymous performance numbers?"* ]] || { echo "$command asked again"; return 1; }
+  done
+  : >"$TEST_DIR/jq-fail"
+  PATH="$TEST_DIR/jqshim:$PATH" run bash "$TEL" status
+  [[ "$output" == *"consent: unknown"* ]]
+  # A stored yes with a failed read sends nothing in that run.
+  say_yes
+  : >"$TEST_DIR/jq-fail"
+  PATH="$TEST_DIR/jqshim:$PATH" run bash "$TEL" send
+  [[ "$output" == *"not sent (the state file could not be read)"* ]]
+  [ "$(requests)" -eq 0 ]
+  [ "$(consent)" = "yes" ]
+  # An answer that cannot be saved says so, and the file stays as it was.
+  cp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
+  : >"$TEST_DIR/jq-fail-always"
+  PATH="$TEST_DIR/jqshim:$PATH" run bash "$TEL" off
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"could not save your answer"* ]]
+  cmp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
+  [ ! -e "$DOTFILES_TELEMETRY_STATE.wlock" ]
+}
+
+@test "a run that only reads never creates a state file or an install id" {
+  rm -f "$DOTFILES_TELEMETRY_STATE"
+  for command in daily status example "send --dry-run" send "ask --install"; do
+    # shellcheck disable=SC2086
+    run bash -c "bash '$TEL' $command </dev/null"
+    [ ! -e "$DOTFILES_TELEMETRY_STATE" ] || { echo "$command created the state file"; return 1; }
+  done
+  [ ! -e "$DOTFILES_TELEMETRY_STATE.wlock" ]
+  # A file from before the question (no answer) is left as it is by a wake.
+  printf '{"install_id":"0123456789abcdef0123456789abcdef","sent":1}\n' >"$DOTFILES_TELEMETRY_STATE"
+  cp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
+  bash "$TEL" daily
+  cmp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
+}
+
 @test "the state file is private, written whole, and leaves no temp file" {
   bash "$TEL" on >/dev/null
   [ "$(stat -c %a "$DOTFILES_TELEMETRY_STATE" 2>/dev/null || stat -f %Lp "$DOTFILES_TELEMETRY_STATE")" = "600" ]
@@ -858,6 +966,21 @@ SH
   before="$(requests)"
   bash "$TEL" send >/dev/null 2>&1 || true
   [ "$(requests)" -eq "$before" ]
+}
+
+# The send holds the state lock for 6 seconds, past the 3 second takeover.
+# `off` takes the lock over and writes no. The send then sees that it lost
+# the lock and reads again, instead of writing the yes it read before.
+@test "a writer that stalls past the lock takeover does not save what it read before" {
+  say_yes
+  DOTFILES_TELEMETRY_TEST_HOLD=6 bash "$TEL" send >/dev/null 2>&1 3>&- &
+  send_pid=$!
+  sleep 0.4
+  bash "$TEL" off >/dev/null
+  [ "$(consent)" = "no" ]
+  wait "$send_pid"
+  [ "$(consent)" = "no" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE.wlock" ]
 }
 
 @test "only one send runs at a time; a stale lock is cleared" {
@@ -961,6 +1084,126 @@ wait_for_last_send() {
   bash -c "source '$REPO/lib/stats.sh'; log_run sync; log_run sync; log_command doctor ok 12"
   sleep 1
   [ "$(wc -l <"$TEST_DIR/security.calls" | tr -d ' ')" -eq 1 ]
+}
+
+# Review fix 1: every return path of the daily send marks the clock hour, and
+# the gate in lib/stats.sh also stops on an off switch.
+@test "the daily path marks the hour on every return path, and only with a stored yes" {
+  say_yes
+  hour="$(date -u +%FT%H)"
+  try_hour() { jq -r .try_hour "$DOTFILES_TELEMETRY_STATE"; }
+  # A failed try under an hour ago, in the clock hour before this one.
+  set_state ".last_try = $(($(date +%s) - 60)) | .try_hour = \"2020-01-01T00\""
+  bash "$TEL" daily
+  [ "$(try_hour)" = "$hour" ]
+  [ "$(requests)" -eq 0 ]
+  # A stored yes with an off switch set.
+  for switch in DO_NOT_TRACK=1 DOTFILES_TELEMETRY=0 CI=1; do
+    set_state '.last_try = 0 | .try_hour = ""'
+    env "$switch" bash "$TEL" daily
+    [ "$(try_hour)" = "$hour" ] || { echo "$switch did not mark the hour"; return 1; }
+  done
+  [ "$(requests)" -eq 0 ]
+  # A no is never marked: the gate stops on the answer.
+  bash "$TEL" off >/dev/null
+  set_state '.try_hour = ""'
+  bash "$TEL" daily
+  [ "$(try_hour)" = "" ]
+}
+
+@test "with an off switch set, a terminal run starts no process for the send" {
+  say_yes
+  gate_root
+  : >"$TEST_DIR/gate.calls"
+  export DOTFILES_STATS_LOG=1 DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1
+  DO_NOT_TRACK=1 bash -c "source '$GATE/lib/stats.sh'; log_run sync"
+  DOTFILES_TELEMETRY=0 bash -c "source '$GATE/lib/stats.sh'; log_run sync"
+  CI=1 bash -c "source '$GATE/lib/stats.sh'; log_command doctor ok 12"
+  sleep 1
+  [ ! -s "$TEST_DIR/gate.calls" ]
+  # The control: with no switch the same run starts the send script once.
+  bash -c "source '$GATE/lib/stats.sh'; log_run sync"
+  tries=0
+  until [ -s "$TEST_DIR/gate.calls" ]; do tries=$((tries + 1)); [ "$tries" -lt 100 ]; sleep 0.05; done
+  [ "$(cat "$TEST_DIR/gate.calls")" = "daily" ]
+}
+
+# Review fix 2: the LaunchAgent exists only while the stored answer is yes.
+@test "a yes loads the LaunchAgent; off unloads it and removes its plist" {
+  fake_agent_tools
+  bash "$TEL" on >/dev/null
+  [ -s "$PLIST" ]
+  grep -q '<string>daily</string>' "$PLIST"
+  grep -q "^bootstrap gui/$(id -u) $PLIST\$" "$TEST_DIR/launchctl.log"
+  bash "$TEL" off >/dev/null
+  [ ! -e "$PLIST" ]
+  grep -q "^bootout gui/$(id -u)/com.dotfiles.telemetry\$" "$TEST_DIR/launchctl.log"
+  # A yes and a no at the question, and an install opt-out, do the same.
+  rm -f "$DOTFILES_TELEMETRY_STATE"
+  run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask"
+  [ -s "$PLIST" ]
+  run bash "$TEL" ask --install --no
+  [ ! -e "$PLIST" ]
+  rm -f "$DOTFILES_TELEMETRY_STATE"
+  run bash -c "printf 'n\n' | DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask"
+  [ ! -e "$PLIST" ]
+  # Nothing but an answer touches launchd.
+  : >"$TEST_DIR/launchctl.log"
+  bash "$TEL" on >/dev/null
+  : >"$TEST_DIR/launchctl.log"
+  bash "$TEL" status >/dev/null
+  bash "$TEL" daily
+  bash "$TEL" send >/dev/null
+  [ ! -s "$TEST_DIR/launchctl.log" ]
+  [ -s "$PLIST" ]
+}
+
+@test "a yes with no chezmoi data installs no broken plist; apply does it later" {
+  fake_agent_tools
+  printf '#!/bin/bash\nexit 1\n' >"$TEST_DIR/fake-chezmoi"
+  run bash "$TEL" on
+  [ "$status" -eq 0 ]
+  [ "$(consent)" = "yes" ]
+  [ ! -e "$PLIST" ]
+  [ -z "$(ls "$HOME/Library/LaunchAgents" 2>/dev/null)" ]
+  [ ! -s "$TEST_DIR/launchctl.log" ]
+}
+
+@test "dotfiles apply installs the telemetry LaunchAgent only when the state says yes" {
+  apply="$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$apply")"
+  eval "$(sed -n '/^remove_skipped_agent() {/,/^}/p' "$apply")"
+  self_reload_should_defer() { return 1; }
+  launchctl() { echo "$*" >>"$TEST_DIR/launchctl.log"; }
+  PROFILE=full
+  should_skip_agent telemetry # no state file: nobody answered
+  bash "$TEL" off >/dev/null
+  should_skip_agent telemetry
+  bash "$TEL" on >/dev/null
+  ! should_skip_agent telemetry
+  # An installed copy is unloaded and removed when the answer is no longer yes.
+  mkdir -p "$HOME/Library/LaunchAgents"
+  echo plist >"$HOME/Library/LaunchAgents/com.dotfiles.telemetry.plist"
+  bash "$TEL" off >/dev/null
+  should_skip_agent telemetry
+  run remove_skipped_agent telemetry com.dotfiles.telemetry.plist
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/Library/LaunchAgents/com.dotfiles.telemetry.plist" ]
+  grep -q '^unload ' "$TEST_DIR/launchctl.log"
+  # Uninstall still removes every com.dotfiles.* agent, this one too.
+  grep -q 'LaunchAgents/com.dotfiles.\*.plist' "$REPO/bin/dotfiles-uninstall"
+}
+
+@test "the commands log is capped: over 20,000 lines it keeps the newest 10,000" {
+  export DOTFILES_STATS_LOG=1
+  for ((i = 1; i <= 20001; i++)); do echo "{\"command\":\"status\",\"timestamp\":\"$NOW\",\"ok\":true,\"duration_ms\":$i}"; done >"$DOTFILES_COMMANDS_FILE"
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  [[ "$(tail -n 1 "$DOTFILES_COMMANDS_FILE")" == *'"command":"doctor"'* ]]
+  [ -z "$(ls "$TEST_DIR" | grep 'commands.jsonl.tmp' || true)" ]
+  # A small log is left alone.
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10001 ]
 }
 
 @test "the LaunchAgent runs the daily send and nothing else" {

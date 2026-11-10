@@ -3,9 +3,10 @@
 <!--
   com.dotfiles.telemetry — the one scheduled sender of the anonymous
   performance numbers (bin/dotfiles-telemetry daily). It runs every hour and
-  at load; the script itself sends at most once a day, only after a yes, only
-  with a key, and stops after 3 seconds. With no yes or no key it exits at
-  once. Other scheduled jobs never start a send: launchd kills what a job
+  at load; the script itself sends at most once a day, only with a key, and
+  stops after 3 seconds. It is installed only while the stored telemetry
+  answer is yes: `dotfiles telemetry on` loads it, `off` removes it, and
+  apply skips it otherwise (should_skip_agent). Other scheduled jobs never start a send: launchd kills what a job
   leaves behind when it exits, which could stop a send half way (2026-11-09).
 -->
 <plist version="1.0">

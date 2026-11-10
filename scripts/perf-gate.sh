@@ -9,10 +9,21 @@
 # A command fails when
 #   head_min > base_min * 1.10  AND  head_min - base_min > 3 ms   (slower), or
 #   head_min > its ceiling in the budget file                     (over-ceiling).
-# A command whose file the base commit does not have is "new": only the ceiling
-# applies. Any other problem at the base (the command fails there, the checkout
-# is broken, no base commit) is a setup error, exit 2: the gate never passes a
-# comparison it could not make.
+# A command name that the base budget file does not have, and whose file the
+# base commit does not have, is "new": only the ceiling applies. A name that
+# the base budget file has always runs the base row's command at the base.
+# Any other problem (a command fails in either tree, the checkout is broken,
+# no base commit, git fails) is a setup error, exit 2: the gate never passes
+# a comparison it could not make.
+#
+# A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
+# tests/perf-gate.bats changes its own judge. The gate prints a warning and
+# exits 2 unless config/perf-budget.tsv has a new line
+# PERF_GATE_ALLOW=perf-gate:<reason>.
+#
+# An allow line counts when the base budget file does not have the same line
+# (same name and same reason). A line that the base has unchanged is stale:
+# the gate stops before any timing, exit 1, and names the line to remove.
 #
 # Usage: scripts/perf-gate.sh [--json] [--force]
 #   --json   print one JSON object (per command: base_min, head_min, ratio, verdict)
@@ -26,6 +37,8 @@
 #   PERF_GATE_RUNS       timed runs per tree (default 15)
 #   PERF_GATE_WARMUPS    untimed runs per tree first (default 2)
 #   PERF_GATE_HEAVY_RUN  0 = never call heavy-run (tests)
+#   PERF_GATE_PERL       perl to run the timer with (default /usr/bin/perl,
+#                        then perl on PATH)
 #
 # Timing choices:
 # - perl with Time::HiRes (scripts/perf-gate.pl), not hyperfine. bash 3.2 has no $EPOCHREALTIME, and
@@ -42,7 +55,10 @@
 #   code path than the head tree and skew the comparison. It lives under
 #   ~/.cache/dotfiles/perf-gate.noindex/<commit> (Spotlight skips .noindex).
 #   The gate removes only its own checkouts there, under a lock, and never
-#   runs a repo-wide `git worktree prune`.
+#   runs a repo-wide `git worktree prune`. A checkout with any changed, new,
+#   or ignored file is built again, not trusted. The gate removes a folder
+#   only when its marker <commit>.ready is there, and it unlinks a symlink
+#   without following it; a folder it did not build is a setup error.
 # - Scope comes from the path lists of the base AND the head budget file, so a
 #   PR cannot switch the gate off by editing its own list.
 # - Every run gets an empty environment plus a scratch HOME, so no telemetry,
@@ -69,6 +85,22 @@ runs="${PERF_GATE_RUNS:-15}"
 warmups="${PERF_GATE_WARMUPS:-2}"
 case "$runs" in '' | *[!0-9]* | 0) echo "perf gate: PERF_GATE_RUNS must be a number above 0" >&2; exit 2 ;; esac
 case "$warmups" in '' | *[!0-9]*) echo "perf gate: PERF_GATE_WARMUPS must be a number" >&2; exit 2 ;; esac
+
+# The cache place and perl: checked first, so a broken setup exits 2 early.
+cache_root="${XDG_CACHE_HOME:-}"
+[ -n "$cache_root" ] || cache_root="${HOME:+$HOME/.cache}"
+case "$cache_root" in
+  /*) ;;
+  '') echo "perf gate: HOME and XDG_CACHE_HOME are both unset; the base checkout cache has no place" >&2; exit 2 ;;
+  *) echo "perf gate: the cache folder must be an absolute path, not '$cache_root' (check XDG_CACHE_HOME)" >&2; exit 2 ;;
+esac
+cache="$cache_root/dotfiles/perf-gate.noindex"
+perl_bin="${PERF_GATE_PERL:-}"
+if [ -z "$perl_bin" ]; then
+  perl_bin=/usr/bin/perl
+  [ -x "$perl_bin" ] || perl_bin="$(command -v perl 2>/dev/null || true)"
+fi
+[ -n "$perl_bin" ] && [ -x "$perl_bin" ] || { echo "perf gate: perl not found (${perl_bin:-no perl on PATH}); the timer needs it" >&2; exit 2; }
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "perf gate: not in a git repository" >&2; exit 2; }
@@ -112,19 +144,23 @@ if [ "$force" = 0 ] && [ -n "$base_sha" ]; then
   paths="$(
     { cat "$budget"; git show "$base_sha:config/perf-budget.tsv" 2>/dev/null; } | sed -n 's/^PERF_GATE_PATH=\(..*\)$/\1/p'
   )"
+  # The gate's own files always count, whatever the lists say.
+  paths="$paths"$'\n'"scripts/perf-gate.sh"$'\n'"scripts/perf-gate.pl"$'\n'"tests/perf-gate.bats"
+  # Capture first: a git failure must stop the gate, not look like "no change".
+  changed_files="$(git diff --no-renames --name-only "$base_sha")" \
+    || { echo "perf gate: git diff against ${base_sha:0:12} failed; cannot tell what changed" >&2; exit 2; }
+  new_files="$(git ls-files -o --exclude-standard)" \
+    || { echo "perf gate: git ls-files failed; cannot tell what changed" >&2; exit 2; }
   while IFS= read -r changed; do
     [ -n "$changed" ] || continue
     while IFS= read -r prefix; do
       case "$changed" in "$prefix" | "${prefix%/}"/*) runtime_change=1; break 2 ;; esac
     done <<< "$paths"
-  done < <(git diff --no-renames --name-only "$base_sha" 2>/dev/null; git ls-files -o --exclude-standard 2>/dev/null)
+  done <<< "$changed_files"$'\n'"$new_files"
   [ "$runtime_change" = 1 ] || skip "no runtime change"
 fi
 
 # ── Timing and verdicts (scripts/perf-gate.pl) ───────────────────────
-cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/perf-gate.noindex"
-perl_bin=/usr/bin/perl
-[ -x "$perl_bin" ] || perl_bin=perl
 set -- "$perl_bin" "$script_dir/perf-gate.pl" "$root" "$base_sha" "$cache" "$runs" "$warmups" "$json" "$base_ref" "$base_date"
 if [ "${PERF_GATE_HEAVY_RUN:-1}" = 0 ]; then
   "$@"

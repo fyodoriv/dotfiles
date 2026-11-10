@@ -5,23 +5,42 @@
 #
 # 1. Builds (or reuses) the base checkout: a detached git worktree at
 #    <cache-dir>/<base-sha>. A checkout is valid only when its HEAD is that
-#    commit. Build and prune happen under <cache-dir>/lock, and every gate
+#    commit and `git status` shows no changed, new, or ignored file; any other
+#    checkout is built again. The gate writes <cache-dir>/<base-sha>.ready for
+#    each checkout it builds. It removes a folder only with that marker, and
+#    it unlinks a symlink without following it. Build and prune happen under <cache-dir>/lock, and every gate
 #    holds a shared lock on <cache-dir>/<sha>.use while it times, so no gate
 #    removes a checkout that another gate uses.
-# 2. Times each command of config/perf-budget.tsv in both trees, in turn.
-# 3. Prints the verdicts. Exit: 0 pass, 1 slower or over a ceiling, 2 setup error.
+# 2. Times each command of config/perf-budget.tsv in both trees, in turn. A
+#    name that the base budget file has runs the BASE row's command at the
+#    base, so a PR cannot dodge the comparison by editing the row.
+# 3. Prints the verdicts. Exit: 0 pass, 1 slower or over a ceiling, 2 setup
+#    error (a command that fails in either tree is a setup error).
+#
+# A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
+# tests/perf-gate.bats changes its own judge. The gate says so and needs
+# PERF_GATE_ALLOW=perf-gate:<reason>.
+#
+# An allow line counts when the base budget file does not have the same line
+# (same name and same reason). A line that the base has unchanged is stale.
 #
 # The reasons for each timing choice are in scripts/perf-gate.sh.
 use strict; use warnings;
 use Time::HiRes qw(time);
 use File::Temp qw(tempdir);
 use File::Path qw(make_path remove_tree);
+use File::Glob qw(bsd_glob);
 use Fcntl qw(:flock);
 use POSIX ();
 
 my ($head, $sha, $cache, $runs, $warmups, $json, $ref, $ref_date) = @ARGV;
 die "usage: perf-gate.pl <head-dir> <base-sha> <cache-dir> <runs> <warmups> <json> <ref> <ref-date>\n" unless defined $ref_date;
 my ($RATIO, $FLOOR_MS) = (1.10, 3);
+# The gate's own files, and the allow name for a PR that changes them.
+# The Makefile is not here: most Makefile changes are not about this gate, and
+# tests/perf-gate.bats (which is here) pins the Makefile recipe.
+my @GATE_FILES = ("scripts/perf-gate.sh", "scripts/perf-gate.pl", "tests/perf-gate.bats");
+my $SELF_ALLOW = "perf-gate";
 # A setup error exits 2. $^S is true inside eval: leave those to the caller.
 $SIG{__DIE__} = sub { die @_ if $^S; print STDERR $_[0]; exit 2 };
 
@@ -52,11 +71,12 @@ sub parse {
   while (my $l = <$fh>) {
     chomp $l;
     next if $l =~ /^\s*(#|$)/ || $l =~ /^PERF_GATE_PATH=/;
-    if ($l =~ /^PERF_GATE_ALLOW=([A-Za-z0-9_.-]+):\s*(\S.*)$/) { $allow{$1} = $2; next; }
+    if ($l =~ /^PERF_GATE_ALLOW=([A-Za-z0-9_.-]+):\s*\S/) { $allow{$1} = $l; next; }   # name => the whole line
     my ($name, $ceiling, $argv, $stdin) = split /\t/, $l;
     die "perf gate: bad line $. in $file (want: name<TAB>ceiling_ms<TAB>command[<TAB>stdin])\n"
       unless defined $argv && $name =~ /^[A-Za-z0-9_.-]+$/ && $ceiling =~ /^\d+$/ && $argv =~ /\S/;
     die "perf gate: command $name is listed twice in $file\n" if $seen{$name}++;
+    die "perf gate: the name $SELF_ALLOW is reserved for a change to the gate itself ($file line $.)\n" if $name eq $SELF_ALLOW;
     push @cmds, { name => $name, ceiling => $ceiling, argv => [split " ", $argv], stdin => $stdin // "" };
   }
   close $fh;
@@ -64,39 +84,66 @@ sub parse {
 }
 
 # ── Base checkout ────────────────────────────────────────────────────
-# Remove one checkout of this gate. Only a path <cache>/<40 hex> is ever removed.
+# Remove one checkout of this gate. Only a path <cache>/<40 hex> is ever
+# touched. A symlink is unlinked, never followed. A folder is removed only
+# when the gate's marker <path>.ready says the gate built it. Returns 1 when
+# the path is gone, 0 when a folder without the marker was left alone.
 sub remove_checkout {
   my ($dir) = @_;
-  return unless $cache ne "" && $dir =~ m{^\Q$cache\E/[0-9a-f]{40}$};
-  git_quiet($head, "worktree", "remove", "--force", $dir);
+  return 1 unless $cache ne "" && $dir =~ m{^\Q$cache\E/[0-9a-f]{40}$};
+  if (-l $dir) { unlink $dir; unlink "$dir.ready"; return !-l $dir; }
+  return 0 if -e $dir && !-e "$dir.ready";
+  git_quiet($head, "worktree", "remove", "--force", $dir) if -e $dir;
   remove_tree($dir) if -e $dir;
+  unlink "$dir.ready";
+  return 1;
 }
 
+# True when the tree has no changed, new, or ignored file. A git error is "not clean".
+sub clean_tree {
+  my ($dir) = @_;
+  open(my $fh, "-|", "git", "-C", $dir, "status", "--porcelain", "--ignored", "--untracked-files=all") or return 0;
+  my $out = do { local $/; <$fh> } // "";
+  return close($fh) && $out eq "";
+}
 my $base = "";
 my $use_lock;   # held until exit
+sub base_ok { return !-l $base && -d $base && git_out($base, "rev-parse", "HEAD") eq $sha && clean_tree($base); }
 if ($sha ne "") {
   die "perf gate: bad base commit $sha\n" unless $sha =~ /^[0-9a-f]{40}$/;
-  make_path($cache);
+  die "perf gate: the cache folder must be an absolute path, not '$cache'\n" unless $cache =~ m{^/};
+  eval { make_path($cache); 1 } && -d $cache && -w $cache
+    or die "perf gate: cannot create or write the cache folder $cache\n";
   open(my $lock, ">>", "$cache/lock") or die "perf gate: cannot open $cache/lock: $!\n";
   flock($lock, LOCK_EX) or die "perf gate: cannot lock $cache/lock: $!\n";
   open($use_lock, ">>", "$cache/$sha.use") or die "perf gate: cannot open $cache/$sha.use: $!\n";
   flock($use_lock, LOCK_SH) or die "perf gate: cannot lock $cache/$sha.use: $!\n";
   $base = "$cache/$sha";
-  if (!(-d $base && git_out($base, "rev-parse", "HEAD") eq $sha)) {
-    remove_checkout($base);
+  # A checkout at another commit, or one with an edited or added file, is not
+  # the base: build it again.
+  if (!base_ok()) {
+    print STDERR "perf gate: the cached base checkout is not a clean copy of the base commit; building it again\n" if -d $base;
+    remove_checkout($base)
+      or die "perf gate: $base is not a clean base checkout, and the gate did not build it (no $base.ready).\n"
+      . "The gate does not remove a folder it did not build. Look at it, then move or remove it by hand.\n";
     # -f: a checkout whose folder was deleted is still registered in git.
     git_quiet($head, "-c", "core.hooksPath=/dev/null", "worktree", "add", "-f", "--detach", $base, $sha);
-    die "perf gate: cannot check out the base commit $sha at $base\n"
-      unless -d $base && git_out($base, "rev-parse", "HEAD") eq $sha;
+    die "perf gate: cannot check out a clean copy of the base commit $sha at $base\n" unless base_ok();
   }
+  # The marker: the gate built this checkout, or found it valid just now.
+  { open(my $m, ">>", "$base.ready") or die "perf gate: cannot write $base.ready: $!\n"; close $m; }
   utime(undef, undef, $base);
   # Keep this checkout and the newest other one. Skip any that a gate uses.
-  my @others = sort { (stat $b)[9] <=> (stat $a)[9] } grep { $_ ne $base && -d $_ } glob("$cache/[0-9a-f]*");
+  my @others = sort { ((lstat $b)[9] // 0) <=> ((lstat $a)[9] // 0) }
+    grep { $_ ne $base && m{/[0-9a-f]{40}$} && (-l $_ || -d $_) } bsd_glob("$cache/[0-9a-f]*");
   shift @others;
   for my $old (@others) {
     next unless $old =~ m{/([0-9a-f]{40})$};
     open(my $u, ">>", "$cache/$1.use") or next;
-    if (flock($u, LOCK_EX | LOCK_NB)) { remove_checkout($old); unlink "$cache/$1.use"; }
+    if (flock($u, LOCK_EX | LOCK_NB)) {
+      if (remove_checkout($old)) { unlink "$cache/$1.use"; }
+      else { print STDERR "perf gate: left $old alone: the gate did not build it (no $old.ready). Remove it by hand if it is old.\n"; }
+    }
     close $u;
   }
   close $lock;
@@ -108,8 +155,39 @@ my ($cmds, $allow) = parse($budget);
 die "perf gate: $budget lists no command\n" unless @$cmds;
 my ($base_cmds, $base_allow) = $base ne "" ? parse("$base/config/perf-budget.tsv") : ([], {});
 my %known = map { $_->{name} => 1 } @$cmds, @$base_cmds;
+$known{$SELF_ALLOW} = 1;
+my %base_row = map { $_->{name} => $_ } @$base_cmds;
+# An allow line counts for this PR when the base does not have the same line.
+# A line that the base has with the same name and reason is stale.
+sub fresh { my ($name) = @_; return exists $allow->{$name} && ($base_allow->{$name} // "") ne $allow->{$name}; }
+sub reason { my ($name) = @_; (my $r = $allow->{$name}) =~ s/^[^:]*:\s*//; return $r; }
+
+# ── A change to the gate itself ──────────────────────────────────────
+# These files judge the PR that changes them. So the change must show in the
+# budget file, where a reviewer looks: without a new allow line, exit 2.
+if ($base ne "") {
+  my @changed = grep {
+    git_quiet($head, "cat-file", "-e", "$sha:$_") && !git_quiet($head, "diff", "--no-renames", "--quiet", $sha, "--", $_)
+  } @GATE_FILES;
+  if (@changed) {
+    print STDERR "perf gate: WARNING: this change edits the gate itself (@changed). The gate judges its own PR: review these files by hand.\n";
+    die "perf gate: @changed differ from the base, and no new allow line covers that.\n"
+      . "Add PERF_GATE_ALLOW=$SELF_ALLOW:<reason> to config/perf-budget.tsv so the review sees it.\n"
+      . (exists $allow->{$SELF_ALLOW} ? "The line there now is the same as in the base: write this PR's own reason.\n" : "")
+      unless fresh($SELF_ALLOW);
+    print STDERR "perf gate: allowed by PERF_GATE_ALLOW=$SELF_ALLOW: " . reason($SELF_ALLOW) . "\n";
+  }
+}
 for my $name (sort keys %$allow) {
   die "perf gate: PERF_GATE_ALLOW=$name names no command of the budget file\n" unless $known{$name};
+}
+# A stale allow line stops the gate here, before any timing.
+my @stale = map { $allow->{$_} } grep { !fresh($_) } sort keys %$allow;
+if (@stale) {
+  print STDERR "perf gate: an allow line covers one PR, and the base budget file already has this one.\n";
+  print STDERR "remove this line from config/perf-budget.tsv: $_\n" for @stale;
+  print STDERR "(If this PR needs the allow again, write the line with this PR's own reason.)\n";
+  exit 1;
 }
 
 my $scratch = tempdir("perf-gate.XXXXXX", TMPDIR => 1, CLEANUP => 1);
@@ -140,30 +218,42 @@ sub slower { my ($b, $h) = @_; return $h > $b * $RATIO && $h - $b > $FLOOR_MS; }
 my $started = time;
 my (@rows, @problems);
 my $n = 0;
-for my $c (@$cmds) {
+for my $c (@$cmds, @$base_cmds) {
   $c->{stdin_file} = "/dev/null";
-  if ($c->{stdin} ne "") {
-    $c->{stdin_file} = "$scratch/stdin." . $n++;
-    open(my $fh, ">", $c->{stdin_file}) or die "perf gate: $!\n";
-    print $fh $c->{stdin}, "\n"; close $fh;
+  next if $c->{stdin} eq "";
+  $c->{stdin_file} = "$scratch/stdin." . $n++;
+  open(my $fh, ">", $c->{stdin_file}) or die "perf gate: $!\n";
+  print $fh $c->{stdin}, "\n"; close $fh;
+}
+for my $c (@$cmds) {
+  # A name that the base budget has is never "new": the base runs its own row,
+  # whatever this tree's row says now (a renamed file, a wrapper in front).
+  my $bc = $base_row{ $c->{name} };
+  my $has_base = defined $bc;
+  if ($has_base) {
+    print STDERR "perf gate: $c->{name}: the command row changed; the base runs its own row (@{ $bc->{argv} })\n"
+      if "@{ $bc->{argv} }\t$bc->{stdin}" ne "@{ $c->{argv} }\t$c->{stdin}";
+  } else {
+    # A new name is "new" only when the base commit does not have the file. A
+    # command the base has must run there.
+    $bc = $c;
+    (my $prog = $c->{argv}[0]) =~ s{^\./}{};
+    $has_base = $base ne "" && ($prog !~ m{/} && !-e "$head/$prog" || git_quiet($head, "cat-file", "-e", "$sha:$prog"));
   }
-  (my $prog = $c->{argv}[0]) =~ s{^\./}{};
-  # "New" means one thing only: the base commit does not have the file. A
-  # command the base has must run there; a failure is a setup error, never a pass.
-  my $has_base = $base ne "" && ($prog !~ m{/} && !-e "$head/$prog" || git_quiet($head, "cat-file", "-e", "$sha:$prog"));
-  my ($bmin, $hmin, $failed, $count);
+  my ($bmin, $hmin, $count);
   my $round = sub {
     my ($times, $timed) = @_;
     for my $i (1 .. $times) {
       # Swap the order each pass, so neither tree always runs first.
       for my $side ($i % 2 ? ("base", "head") : ("head", "base")) {
         next if $side eq "base" && !$has_base;
-        my ($ms, $st) = run_once($side eq "base" ? $base : $head, $c);
-        if ($st != 0) {
-          if ($side eq "head") { $failed = $st; return; }
-          die "perf gate: $c->{name} failed in the base checkout (status " . ($st >> 8) . "): @{ $c->{argv} }\n"
-            . "The base has this command, so the gate cannot compare. Check $base, or fix the command row.\n";
-        }
+        my ($ms, $st) = $side eq "base" ? run_once($base, $bc) : run_once($head, $c);
+        # A command that fails is a setup error in either tree, never a pass or a verdict.
+        my $how = $st & 127 ? "signal " . ($st & 127) : "status " . ($st >> 8);
+        die "perf gate: $c->{name} failed in this tree ($how): @{ $c->{argv} }\n"
+          . "The gate cannot time a command that fails. Fix the command or its row.\n" if $st != 0 && $side eq "head";
+        die "perf gate: $c->{name} failed in the base checkout ($how): @{ $bc->{argv} }\n"
+          . "The base has this command, so the gate cannot compare. Check $base, or fix the command row.\n" if $st != 0;
         next unless $timed;
         if ($side eq "base") { $bmin = $ms if !defined $bmin || $ms < $bmin; }
         else { $hmin = $ms if !defined $hmin || $ms < $hmin; $count++; }
@@ -171,22 +261,19 @@ for my $c (@$cmds) {
     }
   };
   $round->($warmups || 1, 0);   # at least one untimed run: it also proves the command works
-  $round->($runs, 1) unless $failed;
+  $round->($runs, 1);
   for (1 .. 2) {
-    last if $failed || !$has_base || !slower($bmin, $hmin);
+    last if !$has_base || !slower($bmin, $hmin);
     $round->($runs, 1);
   }
   my %r = (name => $c->{name}, ceiling => $c->{ceiling}, base => $bmin, head => $hmin, runs => $count // 0);
-  if ($failed) {
-    $r{verdict} = "error";
-    push @problems, "$c->{name}: the command failed in this tree (status " . ($failed >> 8) . "): @{ $c->{argv} }";
-  } else {
+  {
     $r{ratio} = $hmin / $bmin if $has_base && $bmin > 0;
     $r{verdict} = $has_base ? "ok" : "new";
     if ($has_base && slower($bmin, $hmin)) {
       my $msg = sprintf("%s got slower: %.1f ms -> %.1f ms (%+.1f%%; the limit is +%d%% and %d ms)",
         $c->{name}, $bmin, $hmin, ($r{ratio} - 1) * 100, ($RATIO - 1) * 100 + 0.5, $FLOOR_MS);
-      if (exists $allow->{ $c->{name} } && !exists $base_allow->{ $c->{name} }) { $r{verdict} = "allowed"; }
+      if (fresh($c->{name})) { $r{verdict} = "allowed"; }
       else { $r{verdict} = "slower"; push @problems, $msg; }
     }
     if ($hmin > $c->{ceiling}) {
@@ -199,13 +286,8 @@ for my $c (@$cmds) {
 # A tracked command may not leave the budget file silently.
 my %in_head = map { $_->{name} => 1 } @$cmds;
 for my $b (@$base_cmds) {
-  next if $in_head{ $b->{name} } || (exists $allow->{ $b->{name} } && !exists $base_allow->{ $b->{name} });
+  next if $in_head{ $b->{name} } || fresh($b->{name});
   push @problems, "$b->{name} is in the base budget file but not in this one: put the row back, or add PERF_GATE_ALLOW=$b->{name}:<reason>";
-}
-# An allow line is for one PR. One that the base already has is stale.
-for my $name (sort keys %$allow) {
-  push @problems, "PERF_GATE_ALLOW=$name is already in the base budget file: remove the line (it covers one PR only)"
-    if exists $base_allow->{$name};
 }
 
 my $ok = @problems ? 0 : 1;

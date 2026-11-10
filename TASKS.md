@@ -650,6 +650,34 @@ them. -->
   - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
 
 
+- [ ] Stop the pre-push leak check flagging a public github.com URL pattern as a private ssh host
+  - **ID**: pre-push-ssh-host-false-alarm-escaped-regex
+  - **Tags**: git-hooks, privacy, reliability
+  - **Details**: On 2026-11-10 the pre-push hook blocked a push of PR #562 (send anonymous performance telemetry by default). The flagged line was a bash regex for the public upstream repo URL. Its third alternative was `ssh://` followed by `git@github\.com/` (the dot is escaped for the regex). `lib/private-ref-markers.awk` (the `ssh host` rule) reads the host as the letters up to the backslash, so it sees `github`, which is not on its public-host list, and reports a private host. Exact hook output: `✗ 2 private reference(s) in lines or messages of pushed commits:` / `   0aecf8c: ssh host` / `   9e36e83: ssh host` / `Use placeholders: ~ for a home dir, github.example.com for a host. Then rewrite those commits.` / `push blocked by dotfiles pre-push hook` / `If a person checked it: dotfiles leak allow --once <commit sha>, in a terminal.` The false alarm forced a code change (the host moved into a variable) and a rewrite of three unpushed commits. The hook must stay fail-closed for a real private host.
+  - **Files**: `lib/private-ref-markers.awk`, `tests/gh-wrapper-leak-guard.bats`, `docs/privacy-gates.md`.
+  - **Output**: code
+  - **Acceptance**: a failing test first: feed the awk rule one line that holds the ssh scheme form of the public github.com repo URL with the dot escaped by a backslash (a regex), and assert no `ssh host` hit; then the same line with a made-up private host and an escaped dot, and assert one hit. Both the escaped and the plain form of github.com, gitlab.com, bitbucket.org, and codeberg.org pass; every existing private-host test still fails closed.
+  - **Hypothesis**: reading an escaped dot as a dot in the ssh-host rule moves false alarms on public-host regexes from 1 known case to 0 with no lost true hit.
+  - **Measurement**: `bats tests/gh-wrapper-leak-guard.bats`, with the two new cases.
+  - **Success**: 0 hits on the public escaped form and 1 hit on the private escaped form; all older cases unchanged.
+  - **Pivot**: if any older private-host case stops failing closed, drop the change and document the workaround (keep the host in a variable) in `docs/privacy-gates.md` instead.
+  - **Anchor**: PR #562 push block on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — correctness of an existing privacy gate, not a scorecard metric.
+
+- [ ] Make the perf gate cache test hold its lock before it goes on
+  - **ID**: perf-gate-cache-test-holder-race
+  - **Tags**: tests, reliability, perf-gate
+  - **Details**: On 2026-11-10 `heavy-run make check` failed once on a PR that did not change the gate code: `tests/perf-gate.bats` test 24 ("the base checkout is cached by commit, two are kept, and one in use is not removed"), line 386, `[ -d "$CACHE/$first" ]  # in use: kept`. The Mac was under memory pressure (heavy-run paused the run twice). Suspected cause, not proven: the test starts a perl process that takes a shared lock, and waits at most 2 seconds for its "held" line. When the holder starts later than that, the gate sees no lock and removes the checkout. The test goes on without a check that the lock is held.
+  - **Files**: `tests/perf-gate.bats`.
+  - **Output**: code
+  - **Acceptance**: the test fails with a clear message (or waits longer) when the holder did not report "held"; it passes 20 of 20 times with `stress`-style load from 10 parallel bats jobs.
+  - **Hypothesis**: a checked wait for the holder moves the failure rate of test 24 under load from 1 known failure to 0 of 20 runs.
+  - **Measurement**: `for i in $(seq 20); do bats -f 'cached by commit' tests/perf-gate.bats || echo FAIL; done` while a second shell runs `bats tests/telemetry.bats` with ten parallel jobs.
+  - **Success**: 0 FAIL lines in 20 runs.
+  - **Pivot**: if it still fails with the holder confirmed, the gate's pruning has a real race; fix `scripts/perf-gate.pl`, not the test.
+  - **Anchor**: Luo, Hariri, Eloussi and Marinov (2014), An Empirical Analysis of Flaky Tests.
+  - **Competitive-goal**: none — stability of an existing gate test, not a scorecard metric.
+
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

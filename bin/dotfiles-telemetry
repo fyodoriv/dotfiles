@@ -98,6 +98,7 @@ COMMANDS="${DOTFILES_COMMANDS_FILE:-$STATE_DIR/commands.jsonl}"
 STATE="${DOTFILES_TELEMETRY_STATE:-$STATE_DIR/telemetry.json}"
 ERROR_LOG="${STATE%.json}.log"
 LOCK="$STATE.lock"
+ASKED_UNTIL="${STATE%.json}.asked-until"
 KEY_FILE="${DOTFILES_TELEMETRY_KEY_FILE:-$DOTFILES_DIR/config/telemetry-key}"
 URL="${DOTFILES_TELEMETRY_URL:-https://eu.i.posthog.com}"
 URL="${URL%/}/batch/"
@@ -140,6 +141,23 @@ S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
 # READ_FAILED: jq could not run on the file, so its content is unknown.
 # STATE_INVALID: jq ran and the content is not a state object.
 READ_FAILED=0 STATE_INVALID=0
+
+# Never as root. Under sudo the launchd domain would be root's, and the state
+# file, the lock, and the plist would become root-owned, so the user could not
+# read or change them afterwards. So as root nothing is saved, loaded, or
+# sent, and one line (per run) says so. DOTFILES_TELEMETRY_TEST_UID is for
+# tests only.
+ROOT_NOTED=0
+is_root() {
+  local uid="$EUID"
+  [ -z "${BATS_TEST_FILENAME:-}" ] || uid="${DOTFILES_TELEMETRY_TEST_UID:-$EUID}"
+  [ "$uid" = "0" ]
+}
+root_note() {
+  [ "$ROOT_NOTED" -eq 0 ] || return 0
+  ROOT_NOTED=1
+  echo "telemetry: running as root (sudo), so nothing is saved, loaded, or sent. Run it as your user." >&2
+}
 
 new_install_id() { od -An -tx1 -N16 /dev/urandom | tr -d ' \n'; }
 
@@ -257,6 +275,7 @@ state_unlock() {
 # nothing is written. Returns 1 when nothing was written.
 state_set() {
   local index
+  if is_root; then root_note; return 1; fi
   for _ in 1 2 3; do
     state_lock || return 1
     load_state
@@ -286,6 +305,7 @@ state_set() {
 
 # One line per failure, no content: a time and a fixed text. Kept short.
 log_error() {
+  ! is_root || return 0
   mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || return 0
   (
     umask 077
@@ -337,6 +357,7 @@ not_now() {
   local why
   why="$(blocked)"
   [ -z "$why" ] || { echo "$why"; return 0; }
+  ! is_root || { echo "running as root"; return 0; }
   [ "$READ_FAILED" -eq 0 ] || { echo "the state file could not be read"; return 0; }
   case "$S_CONSENT" in
     yes) ;;
@@ -677,6 +698,7 @@ cmd_daily() {
 # the answer. Returns 1 when the answer could not be saved.
 record_consent() {
   local saved=1
+  if is_root; then root_note; return 1; fi
   for _ in 1 2 3; do
     state_lock || break
     load_state
@@ -690,6 +712,7 @@ record_consent() {
     S_CONSENT="$1" S_CONSENT_AT="$(today)"
     if state_owned; then
       save_state
+      rm -f "$ASKED_UNTIL" "$ASKED_UNTIL.now" 2>/dev/null
       state_unlock
       saved=0
       break
@@ -710,9 +733,16 @@ record_consent() {
 # It acts only for the real state file and from the checkout that chezmoi
 # applies, so a scratch state or a development worktree never changes launchd.
 # In a test only the fakes (the two seams) are ever called. Never fails.
+# A repeat yes does not reload a job that is loaded with the same plist: a
+# bootstrap right after a bootout can fail (launchd error 5: the old job is
+# still going away), and the job would then stay unloaded until the next
+# login. When a reload is needed and the bootstrap fails, it is tried once
+# more after a short wait.
 agent_sync() {
-  local label="com.dotfiles.telemetry" launchctl_bin="launchctl" chezmoi_bin="chezmoi" plist template domain
+  local label="com.dotfiles.telemetry" launchctl_bin="launchctl" chezmoi_bin="chezmoi" plist template domain wait=1
+  if is_root; then root_note; return 0; fi
   if [ -n "${BATS_TEST_FILENAME:-}" ]; then
+    wait=0.1
     launchctl_bin="${DOTFILES_TELEMETRY_LAUNCHCTL:-}" chezmoi_bin="${DOTFILES_TELEMETRY_CHEZMOI:-}"
     [ -n "$launchctl_bin" ] && [ -n "$chezmoi_bin" ] || return 0
   else
@@ -728,9 +758,16 @@ agent_sync() {
     [ -f "$template" ] || return 0
     mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.local/share/dotfiles/logs" 2>/dev/null || return 0
     if "$chezmoi_bin" execute-template <"$template" >"$plist.tmp.$$" 2>/dev/null && [ -s "$plist.tmp.$$" ]; then
+      if [ -f "$plist" ] && cmp -s "$plist.tmp.$$" "$plist" && "$launchctl_bin" print "$domain/$label" >/dev/null 2>&1; then
+        rm -f "$plist.tmp.$$"
+        return 0
+      fi
       mv -f "$plist.tmp.$$" "$plist"
       "$launchctl_bin" bootout "$domain/$label" >/dev/null 2>&1 || true
-      "$launchctl_bin" bootstrap "$domain" "$plist" >/dev/null 2>&1 || log_error "could not load the LaunchAgent"
+      if ! "$launchctl_bin" bootstrap "$domain" "$plist" >/dev/null 2>&1; then
+        sleep "$wait"
+        "$launchctl_bin" bootstrap "$domain" "$plist" >/dev/null 2>&1 || log_error "could not load the LaunchAgent"
+      fi
     else
       # No chezmoi data yet (a new install): `dotfiles apply` installs it.
       rm -f "$plist.tmp.$$"
@@ -751,6 +788,57 @@ drain_input() {
   stty -icanon min 0 time 0 2>/dev/null || return 0
   cat >/dev/null 2>&1 || true
   stty "$saved" 2>/dev/null || true
+}
+
+# The first-run gate in lib/stats.sh must know "a question was dismissed
+# today" without a new process, and bash 3.2 has no clock of its own. So the
+# day is kept as a file time: this marker's modification time is the next UTC
+# midnight. The gate writes an empty file (its time is now) and compares the
+# two with a bash test. When the marker cannot be written, the gate falls
+# back to one `date` call.
+mark_asked_today() {
+  local next stamp=""
+  next=$((($(date +%s) / 86400 + 1) * 86400))
+  # BSD date reads -r SECONDS; GNU date reads -d @SECONDS.
+  stamp="$(TZ=UTC date -r "$next" +%Y%m%d%H%M.%S 2>/dev/null)" || stamp=""
+  [[ "$stamp" =~ ^[0-9]{12}\.[0-9]{2}$ ]] || stamp="$(TZ=UTC date -d "@$next" +%Y%m%d%H%M.%S 2>/dev/null)" || stamp=""
+  if [[ "$stamp" =~ ^[0-9]{12}\.[0-9]{2}$ ]] && (umask 077 && TZ=UTC touch -t "$stamp" "$ASKED_UNTIL") 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$ASKED_UNTIL" 2>/dev/null
+  return 0
+}
+
+# cap-commands (lib/stats.sh calls it, about once per 200 commands when the
+# log is long): over COMMANDS_MAX lines, keep the newest COMMANDS_KEEP. The
+# commands cursor moves back by the number of dropped lines, under the state
+# lock, so a line that was not sent yet is still sent. It waits for no send:
+# while one runs, the log is left alone until a later call. With no state
+# file (nobody answered) only the log is cut, and no state file is created.
+COMMANDS_MAX=20000
+COMMANDS_KEEP=10000
+cmd_cap_commands() {
+  local lines drop tmp="$COMMANDS.tmp.$$"
+  if is_root; then root_note; return 0; fi
+  [ "$(line_count "$COMMANDS")" -gt "$COMMANDS_MAX" ] || return 0
+  lock || return 0
+  if state_lock; then
+    load_state
+    lines="$(line_count "$COMMANDS")"
+    drop=$((lines - COMMANDS_KEEP))
+    if [ "$READ_FAILED" -eq 0 ] && [ "$drop" -gt 0 ]; then
+      if tail -n "$COMMANDS_KEEP" "$COMMANDS" >"$tmp" 2>/dev/null && mv -f "$tmp" "$COMMANDS" 2>/dev/null; then
+        if [ -e "$STATE" ] && [ "$STATE_INVALID" -eq 0 ] && state_owned; then
+          if [ "$S_SENT_COMMANDS" -gt "$drop" ]; then S_SENT_COMMANDS=$((S_SENT_COMMANDS - drop)); else S_SENT_COMMANDS=0; fi
+          save_state
+        fi
+      else
+        rm -f "$tmp"
+      fi
+    fi
+    state_unlock
+  fi
+  unlock
 }
 
 cmd_on() {
@@ -796,6 +884,7 @@ cmd_ask() {
   [ "$READ_FAILED" -eq 0 ] || return 0
   resolve_key
   [ -n "$KEY" ] || return 0
+  if is_root; then root_note; return 0; fi
   if [ "$S_CONSENT" != "unset" ]; then
     [ "$install" -eq 0 ] || echo "telemetry: your answer is $S_CONSENT (given ${S_CONSENT_AT:-earlier}); not asked again. Change it: dotfiles telemetry on, or off"
     return 0
@@ -809,6 +898,7 @@ cmd_ask() {
     [ "$S_ASKED_DAY" != "$(today)" ] || return 0
     # Counted before the question shows, so a closed window counts too.
     state_set S_ASKS "$((S_ASKS + 1))" S_ASKED_DAY "$(today)" || return 0
+    mark_asked_today
   fi
   [ "$install" -eq 0 ] || choices="[Y/n]"
   drain_input
@@ -857,6 +947,7 @@ case "${1:-status}" in
   ask) shift; cmd_ask "$@" ;;
   example) what_is_sent ;;
   daily) cmd_daily ;;
+  cap-commands) cmd_cap_commands ;;
   *) echo "Unknown subcommand: $1 (see dotfiles telemetry --help)" >&2; exit 2 ;;
 esac
 exit 0

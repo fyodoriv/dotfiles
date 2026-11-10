@@ -6,7 +6,9 @@
   at load; the script itself sends at most once a day, only with a key, and
   stops after 3 seconds. It is installed only while the stored telemetry
   answer is yes: `dotfiles telemetry on` loads it, `off` removes it, and
-  apply skips it otherwise (should_skip_agent). Other scheduled jobs never start a send: launchd kills what a job
+  apply skips it otherwise (should_skip_agent). A custom XDG_STATE_HOME
+  reaches the job only when it is set where the plist is rendered
+  (`dotfiles telemetry on` or `dotfiles apply`). Other scheduled jobs never start a send: launchd kills what a job
   leaves behind when it exits, which could stop a send half way (2026-11-09).
 -->
 <plist version="1.0">
@@ -41,6 +43,10 @@
         <string>{{ template "launchagent-path" . }}</string>
         <key>HOME</key>
         <string>{{ .chezmoi.homeDir }}</string>
+{{- if env "XDG_STATE_HOME" }}
+        <key>XDG_STATE_HOME</key>
+        <string>{{ env "XDG_STATE_HOME" }}</string>
+{{- end }}
     </dict>
 </dict>
 </plist>

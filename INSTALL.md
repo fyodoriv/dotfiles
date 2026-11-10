@@ -81,13 +81,15 @@ Ask these together, in one round:
    (recommended set, background repair job, shell hook).
 5. "Help make dotfiles faster: share anonymous performance numbers?" First
    run `bash <DIR>/bin/dotfiles-telemetry example` and show the person its
-   output: what is sent, one real event, and the privacy promise (never a
+   output: what is sent, an example event, and the privacy promise (never a
    path, file name, host name, user name, argument, message, or content; no
    person profile; it goes to PostHog EU for a public dashboard; PostHog
    receives the request IP address, like any web server, but GeoIP lookup is
    disabled and no location is stored). Yes (recommended) / No. Never answer for the person. With no
    answer, pass no flag: the install records nothing, nothing is sent, and
-   dotfiles asks the person once on their next run in a terminal.
+   dotfiles asks the person on their next run in a terminal. Skip this
+   question when `bash <DIR>/bin/dotfiles-telemetry status` shows
+   `key: none`: with no key nothing is sent and nobody is asked.
 
 Map the answers to flags: `--profile core|full`, `--name "<name>"`,
 `--email "<email>"`, `--no-macos-defaults`, `--no-agentbrew`,

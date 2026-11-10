@@ -530,7 +530,11 @@ _known_command() {
 
 # The telemetry question, once, when it has no answer yet and a person is at
 # the terminal (lib/stats.sh).
-dotfiles_telemetry_ask "${cmd:-start}"
+dotfiles_telemetry_ask "${cmd:-start}" "$@"
+# Is a person at the terminal? Checked here: the line below is written from a
+# background block with no terminal of its own (lib/stats.sh _telemetry_daily).
+_DOTFILES_ON_TERMINAL=""
+if [ -t 0 ] || [ -t 2 ]; then _DOTFILES_ON_TERMINAL=1; fi
 
 # With the stats log off (tests, DOTFILES_STATS_LOG=0), run the command as is.
 dotfiles_stats_log_on || { dispatch "$@"; exit $?; }

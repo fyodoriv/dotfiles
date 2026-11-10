@@ -81,8 +81,12 @@ regression gate.
 `bin/dotfiles-install run` asks it on a terminal, right after the
 prerequisite check. It cannot be missed: a blank line, a banner ("Help make
 dotfiles faster: share anonymous performance numbers?"), what is sent, one
-real event as JSON, the privacy promise, where the numbers go, how to change
+example event as JSON, the privacy promise, where the numbers go, how to change
 the answer, then `Share anonymous performance numbers? [Y/n]`.
+
+- **No key, no question.** With no key nothing could be sent, so nobody is
+  asked and the installer prints nothing about telemetry. The committed
+  `config/telemetry-key` is empty for now.
 
 - Enter or `y` records **yes**. `n` records **no**. One line confirms the
   answer and names the command that changes it.
@@ -92,10 +96,15 @@ the answer, then `Share anonymous performance numbers? [Y/n]`.
   logs, so nothing recorded before the yes is ever sent.
 - **No terminal** (an agent, a script, `CI` set): no question. The answer
   stays **unset** and nothing is sent. The first normal `dotfiles` command on
-  a terminal asks once. It asks only when stdin, stdout, and stderr are a
+  a terminal asks. It asks only when stdin, stdout, and stderr are a
   terminal, so never in a pipe, a hook, a scheduler, or an agent run. This
   question shows `[y/n]`: only a typed `y` or `n` is an answer, because the
   person did not expect a question there.
+- **It does not nag.** It never shows before `help`, `version`, `cd`,
+  `actions`, or a command with `--help`, `--json`, or `--quiet`. With no
+  answer it comes back at most once a day and 3 times in all; then it stays
+  silent until you run `dotfiles telemetry ask`, `on`, or `off`. A run that
+  does not ask starts no new process.
 - An answer is never asked again. A later install never changes a no. An
   explicit opt-out at a later install (see [Turn it off](#turn-it-off))
   records no, also over an earlier yes.
@@ -107,7 +116,9 @@ the answer, then `Share anonymous performance numbers? [Y/n]`.
 Per log line: the event name (`dotfiles.run` or `dotfiles.command`), its
 time, the task or command name, `ok`, `duration_ms`, and the count fields
 (`seconds_saved`, `units`, `pass`, `fail`, `fixed`, `warn`, `skip`). Added at
-send time: `app_version` (the git short SHA), `os` (`darwin` or `linux`),
+send time: `app_version` (the short SHA of the last upstream commit in the
+checkout, so a local commit never makes a per-machine value), `os` (`darwin`
+or `linux`),
 `arch`, and `runtime` (`shell`). All keyed by a random install id.
 
 ```json
@@ -143,7 +154,8 @@ How the code enforces it:
 
 - The sender builds each event from an allowlist. A field that is not on the
   list is dropped. A task name must be on the fixed list `TASK_NAMES` in the
-  sender, and a command name must be a dispatch arm of `bin/dotfiles`; any
+  sender, and a command name on the fixed list `COMMAND_NAMES` there (the
+  upstream dispatch arms; a fork's own command name is never sent); any
   other word sends no name. A number field must be a number; a time must be
   a UTC timestamp; the version must be a git short SHA.
 - The commands log gets only names from the dispatch list of `bin/dotfiles`.
@@ -188,14 +200,22 @@ nothing is sent. The key is never printed or logged.
 
 - A send never fails a command. Every error is swallowed and one content-free
   line goes to `~/.local/state/dotfiles/telemetry.log`.
-- The daily send runs in the background, apart from the command's output
-  and exit code, at most once a day. It stops after 3 seconds in total; what
-  is left goes on a later run. A request that hangs is killed. After a try
-  it waits one hour. A manual `dotfiles telemetry send` allows 10 seconds
-  per request.
-- Each state write reads the file again first and changes only its own
-  fields. A `dotfiles telemetry off` during a send is kept, and the send
-  stops before the next request.
+- The daily send happens at most once a day. It stops after 3 seconds in
+  total; what is left goes on a later run. A request that hangs is killed.
+  After a try it waits one hour. A manual `dotfiles telemetry send` allows
+  10 seconds per request.
+- **Who starts it.** The LaunchAgent `com.dotfiles.telemetry` (every hour and
+  at load; the script sends at most once a day). Also a `dotfiles` run on a
+  terminal, as a fully detached child (its own process group, SIGHUP ignored,
+  no open terminal), so it lives on when the run ends. A scheduled job never
+  starts a send: launchd kills what a job leaves behind when it exits, and
+  that could stop a send half way.
+- Each state write takes a short lock, reads the file again, and changes
+  only its own fields. The send path never writes the answer. A
+  `dotfiles telemetry off` during a send is kept, and the send stops before
+  the next request.
+- The key is never an argument of a process: jq gets it through its
+  environment and curl on stdin.
 - A first send is small. One send takes at most the newest 2,000 events of
   the last 30 days per log, 500 per request. Older events are skipped for
   good.

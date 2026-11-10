@@ -91,6 +91,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `load-sampler` | Append one system-load row to `~/.local/state/dotfiles/load-samples.tsv`, so a freeze leaves evidence | At login + every 30s |
 | `local-ai-warmup` | GET-only local-AI health check (never spawns model publishers) | At login + every 30 min |
 | `agent-scratch-prune` | Prune idle agent build output, clean pushed worktrees, and old scratch folders | At login + every 6 hours |
+| `telemetry` | Send anonymous performance numbers at most once a day, only after a yes and with a key | At login + every hour |
 
 ### Scheduling acceptance
 

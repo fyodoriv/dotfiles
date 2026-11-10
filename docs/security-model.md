@@ -163,6 +163,7 @@ All agents install to `~/Library/LaunchAgents/com.dotfiles.*`. All run as the cu
 |-------|----------|--------------|
 | `capslock-control` | At login | Maps CapsLock to Control via `hidutil` |
 | `cleanup` | Sunday 03:00 | Cleans npm/yarn/brew/Gradle caches from safelisted dirs |
+| `telemetry` | Every hour | Sends anonymous performance numbers to PostHog EU at most once a day, only after your yes and with a key ([observability](observability.md#telemetry)) |
 | `agent-scratch-prune` | Every 6 hours | Deletes idle agent build output, clean fully pushed agent worktrees (`git worktree remove`), and mktemp/goal scratch folders idle 30+ days, and per-user temp entries idle 3+ days (not `com.*`), only under `~/.local/state`, `~/.codex/worktrees`, and the per-user temp folder; skips symlinks |
 | `dotfiles-doctor` | Monday 09:00 | Runs `dotfiles doctor --fix` (auto-repairs symlinks) |
 | `dotfiles-sync` | Every 30 min | Auto git commit+push of dotfiles changes |

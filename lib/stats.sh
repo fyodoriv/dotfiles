@@ -91,7 +91,7 @@ log_run() {
     echo "⚠ stats: cannot write to $DOTFILES_STATS_FILE" >&2
     return 0
   fi
-  _telemetry_daily "${timestamp%%T*}"
+  _telemetry_daily "$timestamp"
   return 0
 }
 
@@ -110,29 +110,49 @@ _telemetry_read_state() {
   if [ -r "$state" ]; then IFS= read -r _TELEMETRY_STATE_LINE <"$state" 2>/dev/null || true; fi
 }
 
-# _telemetry_daily DAY — start the daily send in the background, never in a
-# test. It starts nothing unless the stored answer is yes, or after today's
-# send. bin/dotfiles-telemetry checks every rule again; a send never fails a
-# caller.
+# _telemetry_daily TIMESTAMP — after a run on a terminal, start the daily send
+# as a fully detached child: its own process group, SIGHUP ignored, no open
+# terminal or pipe. So it lives on when this run ends or its window closes.
+# A scheduled job (no terminal) never starts it: launchd kills what a job
+# leaves behind, which could stop a send half way. Those Macs send from the
+# LaunchAgent com.dotfiles.telemetry instead.
+# It starts nothing (and no new process) unless the stored answer is yes,
+# today has no send yet, and this clock hour has no try yet.
+# bin/dotfiles-telemetry checks every rule again; a send never fails a caller.
+# Never in a test, unless DOTFILES_TELEMETRY_SPAWN=1 asks for the real path.
 _telemetry_daily() {
-  [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
-  local tel
+  local tel day="${1%%T*}" hour="${1%%:*}"
+  if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -z "${DOTFILES_TELEMETRY_SPAWN:-}" ]; then return 0; fi
+  [ -n "${DOTFILES_TELEMETRY_TTY:-}" ] || [ -n "${_DOTFILES_ON_TERMINAL:-}" ] || [ -t 0 ] || [ -t 2 ] || return 0
   _telemetry_read_state
   case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'*) ;; *) return 0 ;; esac
-  case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$1\""*) return 0 ;; esac
+  case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$day\""* | *"\"try_hour\":\"$hour\""*) return 0 ;; esac
   tel="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry"
-  [ -x "$tel" ] && (bash "$tel" daily >/dev/null 2>&1 &)
+  [ -x "$tel" ] || return 0
+  (
+    set -m
+    trap '' HUP
+    bash "$tel" daily </dev/null >/dev/null 2>&1 3>&- 8>&- 9>&- &
+  ) >/dev/null 2>&1
   return 0
 }
 
-# dotfiles_telemetry_ask COMMAND — before a normal `dotfiles` command, ask the
-# telemetry question once if it has no answer yet (the install had no
-# terminal). Only where a person can answer: stdin, stdout, and stderr are a
-# terminal, and CI and DO_NOT_TRACK are unset. So never in a pipe, a hook, a
+# dotfiles_telemetry_ask COMMAND [ARGS...] — before a normal `dotfiles`
+# command, ask the telemetry question if it has no answer yet (the install had
+# no terminal). Only where a person can answer: stdin, stdout, and stderr are
+# a terminal, and CI and DO_NOT_TRACK are unset. So never in a pipe, a hook, a
 # scheduler, or an agent run; there the answer stays unset and nothing is sent.
+# Never before help, version, cd, completion, or machine-readable output.
+# Never without a key (env or config/telemetry-key): nothing could be sent.
+# After 3 unanswered questions it stays silent. All of this is plain bash: a
+# run that does not ask starts no new process.
 # DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
 dotfiles_telemetry_ask() {
-  case "$1" in telemetry | install) return 0 ;; esac
+  local arg key_line="" root
+  case "$1" in telemetry | install | help | h | version | v | cd | actions | completion | completions | -* | __*) return 0 ;; esac
+  for arg in "${@:2}"; do
+    case "$arg" in --help | -h | --version | --json | --quiet | -q | --porcelain) return 0 ;; esac
+  done
   if [ -z "${DOTFILES_TELEMETRY_TTY:-}" ]; then
     [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
     { [ -t 0 ] && [ -t 1 ] && [ -t 2 ]; } || return 0
@@ -140,9 +160,15 @@ dotfiles_telemetry_ask() {
   [ -z "${CI:-}" ] || return 0
   [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
   case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [ -z "${DOTFILES_POSTHOG_KEY:-}" ]; then
+    arg="${DOTFILES_TELEMETRY_KEY_FILE:-$root/config/telemetry-key}"
+    if [ -r "$arg" ]; then IFS= read -r key_line <"$arg" 2>/dev/null || true; fi
+    [ -n "$key_line" ] || return 0
+  fi
   _telemetry_read_state
-  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'* | *'"consent":"no"'*) return 0 ;; esac
-  bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry" ask || true
+  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'* | *'"consent":"no"'* | *'"asks":3'*) return 0 ;; esac
+  bash "$root/bin/dotfiles-telemetry" ask --first-run || true
   return 0
 }
 
@@ -169,7 +195,7 @@ log_command() {
   [ -d "${DOTFILES_COMMANDS_FILE%/*}" ] || mkdir -p "${DOTFILES_COMMANDS_FILE%/*}" 2>/dev/null || return 0
   echo "{\"command\":\"$command\",\"timestamp\":\"$timestamp\",\"ok\":$ok,\"duration_ms\":$duration_ms}" \
     >> "$DOTFILES_COMMANDS_FILE" 2>/dev/null || return 0
-  _telemetry_daily "${timestamp%%T*}"
+  _telemetry_daily "$timestamp"
 }
 
 # get_time_saved_summary — Print a one-line summary of total automation runs

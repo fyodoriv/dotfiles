@@ -666,10 +666,13 @@ Asked at install; on only after you say yes (Enter counts as yes).
 
 `bin/dotfiles-install run` asks one loud question on a terminal: "Help make
 dotfiles faster: share anonymous performance numbers?" It shows what is sent,
-one real event, and the privacy promise, then `[Y/n]`. With no terminal (an
+an example event, and the privacy promise, then `[Y/n]`. With no terminal (an
 agent, a script, CI) it asks nothing and nothing is sent; the first `dotfiles`
-command you run in a terminal asks once, and there only a typed `y` or `n`
-is an answer. A yes covers only later events: nothing recorded before it is
+command you run in a terminal asks, and there only a typed `y` or `n` is an
+answer. That question never shows before help, version, `cd`, or
+machine-readable output. With no answer it comes back at most once a day and
+3 times in all. While the repo ships no key (`config/telemetry-key` is empty)
+nobody is asked and nothing is sent. A yes covers only later events: nothing recorded before it is
 sent.
 
 **What is sent**, at most once a day: the command or task name, its duration,
@@ -968,6 +971,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |
+| `com.dotfiles.telemetry` | `dotfiles-telemetry daily` | Every hour, and at load | Send the anonymous performance numbers at most once a day, only after your yes and with a key ([telemetry](#telemetry)); otherwise it exits at once |
 | `com.dotfiles.agent-scratch-prune` | `agent-scratch-prune` | Every 6 hours, and at load | Remove what AI agents leave behind: idle build output (2 days), clean pushed agent worktrees (7 days), old scratch folders (`agent_scratch_idle_days`, 30), temp-folder entries (3 days), Ollama models no app reserves (`local_models_prune_days`, 14) (`logs/agent-scratch-prune.log`) |
 | `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools; company plugins to their newest signed release (opt-in: `auto_upgrade: true`) |
 

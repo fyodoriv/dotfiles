@@ -410,12 +410,28 @@ make_tool_repo() {
 }
 
 # ── The telemetry question (docs/observability.md#telemetry) ─────────────
+# The question shows only when a key is present. This fake key is never sent.
 telemetry_consent() { jq -r .consent "$XDG_STATE_HOME/dotfiles/telemetry.json"; }
+telemetry_key() { export DOTFILES_POSTHOG_KEY="phc_testFakeKey1" DOTFILES_TELEMETRY_KEY_FILE=/dev/null; }
+
+@test "run with no telemetry key prints nothing about telemetry and asks nothing" {
+  unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
+  export DOTFILES_TELEMETRY_TTY=1 DOTFILES_POSTHOG_KEY="" DOTFILES_TELEMETRY_KEY_FILE=/dev/null
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  # The checkout path may hold the word, so look for the texts the question
+  # and its one-line notices use.
+  [[ "$output" != *"elemetry:"* ]] || { echo "$output" | grep -i "telemetry:"; return 1; }
+  [[ "$output" != *"dotfiles telemetry"* ]]
+  [[ "$output" != *"PostHog"* ]]
+  [[ "$output" != *"performance numbers"* ]]
+}
 install_run() { bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew "$@"; }
 
 @test "run on a terminal asks the telemetry question loudly; y is yes" {
   unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
   export DOTFILES_TELEMETRY_TTY=1
+  telemetry_key
   run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   [[ "$output" == *"Help make dotfiles faster: share anonymous performance numbers?"* ]]
@@ -431,6 +447,7 @@ install_run() { bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew "$@";
 @test "run: Enter is yes, n is no" {
   unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
   export DOTFILES_TELEMETRY_TTY=1
+  telemetry_key
   run bash -c "$(declare -f install_run); REPO='$REPO'; printf '\n' | install_run"
   [ "$(telemetry_consent)" = "yes" ]
   rm -f "$XDG_STATE_HOME/dotfiles/telemetry.json"
@@ -441,6 +458,7 @@ install_run() { bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew "$@";
 
 @test "run with no terminal asks nothing and leaves the answer unset" {
   unset CI DO_NOT_TRACK DOTFILES_TELEMETRY DOTFILES_TELEMETRY_TTY
+  telemetry_key
   run install_run </dev/null
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   [[ "$output" == *"telemetry: not asked (no terminal), so nothing is sent."* ]]
@@ -451,6 +469,7 @@ install_run() { bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew "$@";
 @test "run --no-telemetry, DOTFILES_TELEMETRY=0, and DO_NOT_TRACK record no without a question" {
   unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
   export DOTFILES_TELEMETRY_TTY=1
+  telemetry_key
   run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run --no-telemetry"
   [[ "$output" == *"telemetry: off (--no-telemetry). Nothing is sent."* ]]
   [[ "$output" != *"[Y/n]"* ]]
@@ -468,6 +487,7 @@ install_run() { bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew "$@";
 @test "a second run never asks again and keeps a no" {
   unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
   export DOTFILES_TELEMETRY_TTY=1
+  telemetry_key
   run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'n\n' | install_run"
   [ "$(telemetry_consent)" = "no" ]
   run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run"

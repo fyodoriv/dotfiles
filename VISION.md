@@ -94,7 +94,7 @@ the owner stored a key.
   Numbers from all installs feed a public dashboard (p50 and p95 per command,
   version, and runtime) and a regression gate.
 - **Asked at install; on only after you say yes** (Enter counts as yes). The
-  installer shows what is sent, one real example event, and the privacy
+  installer shows what is sent, an example event, and the privacy
   promise. With no terminal it asks nothing, and nothing is sent until a
   person answers.
 - **The promise.** Never a path, file name, host name, user name, argument,

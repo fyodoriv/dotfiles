@@ -36,7 +36,10 @@ SH
     >"$DOTFILES_STATS_FILE"
 }
 
-teardown() { rm -rf "$TEST_DIR"; }
+teardown() {
+  if [ -f "$TEST_DIR/server.pid" ]; then kill "$(cat "$TEST_DIR/server.pid")" 2>/dev/null || true; fi
+  rm -rf "$TEST_DIR"
+}
 
 # A yes covers only later events. say_yes also moves both cursors back to the
 # start, so the lines a test seeded count as recorded after the yes.
@@ -166,7 +169,7 @@ seed_lines() {
     "never a path, file name, host name, user name" "argument, message, or content" \
     "No person profile" "request IP address, like any web server" \
     "GeoIP lookup is disabled" "location is stored" "Only events recorded after your yes" \
-    "bin/dotfiles-telemetry" "docs/observability.md#telemetry" "PostHog EU" \
+    "An example event:" "bin/dotfiles-telemetry" "docs/observability.md#telemetry" "PostHog EU" \
     "dotfiles telemetry off" "Share anonymous performance numbers? [Y/n]" "telemetry: on."; do
     [[ "$output" == *"$text"* ]] || { echo "missing: $text"; echo "$output"; return 1; }
   done
@@ -389,7 +392,7 @@ PY
 @test "a normal command on a terminal asks once, then the daily send works and is small" {
   seed_lines 2600
   export DOTFILES_STATS_LOG=1
-  run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' cd"
+  run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Share anonymous performance numbers? [y/n]"* ]]
   [ "$(consent)" = "yes" ]
@@ -398,19 +401,92 @@ PY
   printf '{"task":"sync","timestamp":"%s","units":9001}\n' "$NOW" >>"$DOTFILES_STATS_FILE"
   bash "$TEL" daily
   [ "$(requests)" -eq 2 ]
-  [ "$(jq -s -c '[.[].batch[].properties | (.units // .command)]' "$FAKE_LOG")" = '[9001,"cd"]' ]
+  [ "$(jq -s -c '[.[].batch[].properties | (.units // .command)]' "$FAKE_LOG")" = '[9001,"stats"]' ]
   [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "$(date -u +%F)" ]
-  run bash -c "printf 'n\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' cd"
+  run bash -c "printf 'n\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
   [ "$(consent)" = "yes" ]
 }
 
+@test "the first-run question does not nag: not before help, version, cd, or machine output" {
+  for args in "cd" "help" "--help" "version" "--version" "actions --json" "stats --json" "doctor --help" "status -h" "telemetry status"; do
+    run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' $args"
+    [[ "$output" != *"Share anonymous performance numbers?"* ]] || { echo "asked before: dotfiles $args"; return 1; }
+  done
+  [ "$(consent)" = "unset" ]
+}
+
+@test "with no answer it asks at most once a day and 3 times, then stays silent" {
+  ask() { run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats </dev/null"; }
+  ask
+  [[ "$output" == *"Share anonymous performance numbers?"* ]]
+  [[ "$output" == *"asks again on a later run"* ]]
+  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" = "1" ]
+  ask # the same day: silent
+  [[ "$output" != *"Share anonymous performance numbers?"* ]]
+  set_state '.asked_day = "2020-01-01"'
+  ask
+  [[ "$output" == *"Share anonymous performance numbers?"* ]]
+  set_state '.asked_day = "2020-01-02"'
+  ask
+  [[ "$output" == *"dotfiles does not ask again"* ]]
+  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" = "3" ]
+  set_state '.asked_day = "2020-01-03"'
+  ask
+  [[ "$output" != *"Share anonymous performance numbers?"* ]]
+  [ "$(consent)" = "unset" ]
+  # An explicit ask still works.
+  run bash -c "printf 'n\n' | DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask"
+  [ "$(consent)" = "no" ]
+}
+
+@test "with no key nobody is asked and nothing is printed; an opt-out is still recorded" {
+  export DOTFILES_POSTHOG_KEY=""
+  run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --install"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run bash -c "bash '$TEL' ask --install </dev/null"
+  [ -z "$output" ]
+  run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
+  [[ "$output" != *"Share anonymous performance numbers?"* ]]
+  [ "$(consent)" = "unset" ]
+  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" = "0" ]
+  run bash "$TEL" ask --install --no
+  [[ "$output" == *"telemetry: off (--no-telemetry)"* ]]
+  [ "$(consent)" = "no" ]
+}
+
+@test "with no jq the question stays silent; other commands say how to fix it" {
+  mkdir "$TEST_DIR/nojq"
+  ln -s "$(command -v dirname)" "$TEST_DIR/nojq/dirname"
+  run env PATH="$TEST_DIR/nojq" /bin/bash "$TEL" ask --install
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run env PATH="$TEST_DIR/nojq" /bin/bash "$TEL" status
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"jq is not installed"* ]]
+}
+
+@test "a failure in the middle of a command still stops it when the run is timed" {
+  mkdir -p "$TEST_DIR/repo/bin" "$TEST_DIR/repo/lib"
+  cp "$REPO"/lib/*.sh "$TEST_DIR/repo/lib/"
+  awk '/^  cd\)$/ { print "  canary-arm)"; print "    false"; print "    echo AFTER-FALSE"; print "    ;;" } { print }' \
+    "$REPO/bin/dotfiles" >"$TEST_DIR/repo/bin/dotfiles"
+  grep -q 'canary-arm)' "$TEST_DIR/repo/bin/dotfiles"
+  DOTFILES_STATS_LOG=1 run bash "$TEST_DIR/repo/bin/dotfiles" canary-arm
+  [ "$status" -eq 1 ]
+  [[ "$output" != *"AFTER-FALSE"* ]]
+  DOTFILES_STATS_LOG=0 run bash "$TEST_DIR/repo/bin/dotfiles" canary-arm
+  [ "$status" -eq 1 ]
+  [[ "$output" != *"AFTER-FALSE"* ]]
+}
+
 @test "a command with no terminal never asks; nor with CI or DO_NOT_TRACK; nor telemetry itself" {
-  run bash -c "printf 'y\n' | bash '$REPO/bin/dotfiles' cd"
+  run bash -c "printf 'y\n' | bash '$REPO/bin/dotfiles' stats"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
-  run bash -c "printf 'y\n' | CI=1 DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' cd"
+  run bash -c "printf 'y\n' | CI=1 DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
-  run bash -c "printf 'y\n' | DO_NOT_TRACK=1 DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' cd"
+  run bash -c "printf 'y\n' | DO_NOT_TRACK=1 DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
   run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' telemetry status"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
@@ -509,21 +585,74 @@ PY
 
 @test "every task name a script records is on the fixed list, and so is every command" {
   names="$(sed -n 's/^TASK_NAMES="\(.*\)"$/\1/p' "$TEL")"
+  commands="$(sed -n 's/^COMMAND_NAMES="\(.*\)"$/\1/p' "$TEL")"
   [ -n "$names" ]
+  [ -n "$commands" ]
   recorded="$(grep -rhE '^[^#]*log_run "?[a-z]' --exclude=dotfiles-telemetry "$REPO/bin" | grep -oE 'log_run "?[a-z][a-z0-9-]*' | sed -E 's/log_run "?//' | sort -u)"
   [ "$(echo "$recorded" | wc -l)" -ge 8 ]
   for name in $recorded doctor shell-start; do
     [[ " $names " == *" $name "* ]] || { echo "not in TASK_NAMES: $name"; return 1; }
   done
+  # Every dispatch arm of bin/dotfiles is on the committed command list.
+  arms="$(grep -E '^  [a-z0-9"|-]+\)' "$REPO/bin/dotfiles" | sed -e 's/).*//' -e 's/[" ]//g' | tr '|' '\n' | grep -E '^[a-z][a-z0-9-]{0,39}$' | sort -u)"
+  [ "$(echo "$arms" | wc -l)" -ge 30 ]
+  for name in $arms; do
+    [[ " $commands " == *" $name "* ]] || { echo "not in COMMAND_NAMES: $name"; return 1; }
+  done
   say_yes
   for name in $names; do printf '{"task":"%s","timestamp":"%s"}\n' "$name" "$NOW"; done >"$DOTFILES_STATS_FILE"
-  for name in doctor apply sync telemetry start; do printf '{"command":"%s","timestamp":"%s","ok":true,"duration_ms":1}\n' "$name" "$NOW"; done >"$DOTFILES_COMMANDS_FILE"
+  for name in $commands forkonlyarm; do printf '{"command":"%s","timestamp":"%s","ok":true,"duration_ms":1}\n' "$name" "$NOW"; done >"$DOTFILES_COMMANDS_FILE"
   bash "$TEL" send >/dev/null
   [ "$(jq -s -r '[.[].batch[].properties.task | select(. != null)] | join(" ")' "$FAKE_LOG")" = "$names" ]
-  [ "$(jq -s -r '[.[].batch[].properties.command | select(. != null)] | join(" ")' "$FAKE_LOG")" = "doctor apply sync telemetry start" ]
+  [ "$(jq -s -r '[.[].batch[].properties.command | select(. != null)] | join(" ")' "$FAKE_LOG")" = "$commands" ]
+}
+
+@test "app_version is the last upstream commit, never a local commit" {
+  repo="$TEST_DIR/fork"
+  mkdir -p "$repo/bin" "$repo/config"
+  cp "$TEL" "$repo/bin/dotfiles-telemetry"
+  (
+    cd "$repo"
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
+    git init -q .
+    git add bin && git commit -q -m upstream
+    git update-ref refs/remotes/origin/feat/chezmoi HEAD
+    git rev-parse --short HEAD >"$TEST_DIR/upstream.sha"
+    echo local >local.txt && git add local.txt && git commit -q -m "a local commit"
+    git rev-parse --short HEAD >"$TEST_DIR/local.sha"
+  )
+  say_yes
+  run bash "$repo/bin/dotfiles-telemetry" send --dry-run
+  [[ "$output" == *"\"app_version\": \"$(cat "$TEST_DIR/upstream.sha")\""* ]]
+  [[ "$output" != *"$(cat "$TEST_DIR/local.sha")"* ]]
+  (cd "$repo" && git update-ref -d refs/remotes/origin/feat/chezmoi)
+  run bash "$repo/bin/dotfiles-telemetry" send --dry-run
+  [[ "$output" == *'"app_version": "unknown"'* ]]
+}
+
+@test "the key is never an argument of a process" {
+  say_yes
+  real_jq="$(command -v jq)"
+  mkdir "$TEST_DIR/shim"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >>"%s/jq.args"\nexec "%s" "$@"\n' "$TEST_DIR" "$real_jq" >"$TEST_DIR/shim/jq"
+  chmod +x "$TEST_DIR/shim/jq"
+  PATH="$TEST_DIR/shim:$PATH" run bash "$TEL" send
+  [[ "$output" == *"sent 2 event(s)"* ]]
+  [ "$(jq -s -r '.[0].api_key' "$FAKE_LOG")" = "phc_testFakeKey1" ]
+  [ -s "$TEST_DIR/jq.args" ]
+  run grep -c "phc_testFakeKey1" "$TEST_DIR/jq.args" "$FAKE_LOG.args"
+  [[ "$output" != *":"[1-9]* ]]
 }
 
 # ── Reliability ─────────────────────────────────────────────────────────
+@test "the count is of events sent, not of log lines" {
+  say_yes
+  printf 'not json\n[1,2]\n' >>"$DOTFILES_STATS_FILE"
+  run bash "$TEL" send
+  [[ "$output" == *"sent 2 event(s)"* ]]
+  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" = "4" ]
+}
+
 @test "send posts the pending events once, then nothing new" {
   say_yes
   run bash "$TEL" send
@@ -673,6 +802,17 @@ SH
   [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" = "2" ]
 }
 
+@test "a cursor that is not a whole number means the end of the log" {
+  say_yes
+  for bad in '1.5' '"12"' '-3' '1e30' '[]'; do
+    set_state ".sent = $bad"
+    run bash "$TEL" status
+    [[ "$output" == *"pending: 0 event(s)"* ]] || { echo "$bad: $output"; return 1; }
+    run bash "$TEL" send
+    [ "$(requests)" -eq 0 ]
+  done
+}
+
 @test "the state file is private, written whole, and leaves no temp file" {
   bash "$TEL" on >/dev/null
   [ "$(stat -c %a "$DOTFILES_TELEMETRY_STATE" 2>/dev/null || stat -f %Lp "$DOTFILES_TELEMETRY_STATE")" = "600" ]
@@ -703,6 +843,23 @@ SH
   [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "" ]
 }
 
+# The send reads the state, then waits one second before it writes (the test
+# hold). An `off` in that second must not be lost: it waits for the lock.
+@test "telemetry off between a send's read and its write is not lost" {
+  say_yes
+  DOTFILES_TELEMETRY_TEST_HOLD=1 bash "$TEL" send >/dev/null 2>&1 3>&- &
+  send_pid=$!
+  sleep 0.4
+  bash "$TEL" off >/dev/null
+  wait "$send_pid"
+  [ "$(consent)" = "no" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE.wlock" ]
+  # A later send does nothing.
+  before="$(requests)"
+  bash "$TEL" send >/dev/null 2>&1 || true
+  [ "$(requests)" -eq "$before" ]
+}
+
 @test "only one send runs at a time; a stale lock is cleared" {
   say_yes
   mkdir "$DOTFILES_TELEMETRY_STATE.lock"
@@ -713,6 +870,104 @@ SH
   run bash "$TEL" send
   [[ "$output" == *"sent 2 event(s)"* ]]
   [ ! -e "$DOTFILES_TELEMETRY_STATE.lock" ]
+}
+
+# ── The real trigger path: log_run -> detached child -> send ────────────
+# A local HTTP endpoint (python) and the real curl. The endpoint answers after
+# one second, and the test kills the whole process group of the run in that
+# second, as launchd and a closed terminal do. The send must still finish.
+start_endpoint() {
+  cat >"$TEST_DIR/endpoint.py" <<'PY'
+import http.server, sys, time
+out, port_file = sys.argv[1], sys.argv[2]
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        time.sleep(1)
+        with open(out, "ab") as f:
+            f.write(body + b"\n")
+        self.send_response(200)
+        self.end_headers()
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+open(port_file, "w").write(str(server.server_address[1]))
+server.serve_forever()
+PY
+  python3 "$TEST_DIR/endpoint.py" "$FAKE_LOG" "$TEST_DIR/port" >/dev/null 2>&1 3>&- &
+  echo $! >"$TEST_DIR/server.pid"
+  local tries=0
+  until [ -s "$TEST_DIR/port" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 100 ] || return 1
+    sleep 0.05
+  done
+  export DOTFILES_TELEMETRY_URL="http://127.0.0.1:$(cat "$TEST_DIR/port")" DOTFILES_TELEMETRY_CURL=curl
+}
+wait_for_last_send() {
+  local tries=0
+  until [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE" 2>/dev/null)" = "$(date -u +%F)" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 200 ] || return 1
+    sleep 0.05
+  done
+}
+
+@test "the real path: a terminal run starts a send that outlives the run and its process group" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 is needed for the local endpoint"
+  say_yes
+  start_endpoint
+  export DOTFILES_STATS_LOG=1 DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1
+  (
+    set -m
+    bash -c "source '$REPO/lib/stats.sh'; log_run sync; echo \$\$ >'$TEST_DIR/parent.pid'" 3>&- &
+    wait $!
+  )
+  # The run is over. Kill what is left of its process group, mid-request.
+  [ -s "$TEST_DIR/parent.pid" ]
+  kill -TERM -- "-$(cat "$TEST_DIR/parent.pid")" 2>/dev/null || true
+  [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "" ]
+  wait_for_last_send
+  [ "$(requests)" -eq 1 ]
+  [ "$(jq -s '.[0].batch | length' "$FAKE_LOG")" -eq 3 ]
+  [ "$(jq -s -r '.[0].api_key' "$FAKE_LOG")" = "phc_testFakeKey1" ]
+  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" = "3" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE.lock" ]
+}
+
+@test "a run with no terminal (a scheduled job) starts no send" {
+  say_yes
+  export DOTFILES_STATS_LOG=1 DOTFILES_TELEMETRY_SPAWN=1
+  run bash -c "source '$REPO/lib/stats.sh'; log_run sync; log_command doctor ok 12" </dev/null
+  sleep 1
+  [ "$(requests)" -eq 0 ]
+  [ "$(jq -r .last_try "$DOTFILES_TELEMETRY_STATE")" = "0" ]
+}
+
+@test "after a try this hour, a terminal run starts no new process for the send" {
+  say_yes
+  fake_security="$TEST_DIR/fake-security"
+  printf '#!/bin/bash\necho called >>"%s/security.calls"\n' "$TEST_DIR" >"$fake_security"
+  chmod +x "$fake_security"
+  export DOTFILES_TELEMETRY_SECURITY="$fake_security" DOTFILES_POSTHOG_KEY=""
+  export DOTFILES_STATS_LOG=1 DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1
+  bash -c "source '$REPO/lib/stats.sh'; log_run sync"
+  tries=0
+  until [ -s "$TEST_DIR/security.calls" ]; do tries=$((tries + 1)); [ "$tries" -lt 100 ]; sleep 0.05; done
+  [ "$(jq -r .try_hour "$DOTFILES_TELEMETRY_STATE")" = "$(date -u +%FT%H)" ]
+  # Without the hour in the fast gate, each of these would start the send
+  # script, and with last_try at 0 it would look for a key again.
+  set_state '.last_try = 0'
+  bash -c "source '$REPO/lib/stats.sh'; log_run sync; log_run sync; log_command doctor ok 12"
+  sleep 1
+  [ "$(wc -l <"$TEST_DIR/security.calls" | tr -d ' ')" -eq 1 ]
+}
+
+@test "the LaunchAgent runs the daily send and nothing else" {
+  plist="$REPO/launchagents/com.dotfiles.telemetry.plist.tmpl"
+  grep -q 'bin/dotfiles-telemetry</string>' "$plist"
+  grep -q '<string>daily</string>' "$plist"
+  grep -q '<key>StartInterval</key>' "$plist"
 }
 
 @test "log_run and log_command start no send in a test and drop a bad name or time" {

@@ -46,7 +46,7 @@ dotfiles/
 ```bash
 make lint       # shellcheck all scripts
 make test       # bats test suite
-make check      # lint + test (MUST pass before committing)
+make check      # lint + test (hosted CI runs it on each pull request)
 ```
 
 ## Prompt And Task Interpretation
@@ -138,7 +138,7 @@ load test_helper
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`, `test:`
 - Keep the commit subject at or under 72 characters; count before committing
   because the local `commit-msg` hook rejects longer subjects.
-- Run `make check` before every commit
+- Run `make lint` and the touched tests before committing; hosted CI runs `make check` on the pull request
 - Update README alongside behavior changes — README drift is a bug
 
 ## Ownership Boundary

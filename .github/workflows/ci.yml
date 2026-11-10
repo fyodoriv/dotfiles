@@ -11,6 +11,10 @@ name: CI
 # - macOS jobs are few on purpose: the free plan runs 5 at a time.
 
 on:
+  pull_request:
+    branches: [feat/chezmoi]
+  push:
+    branches: [feat/chezmoi]
   workflow_dispatch:
 
 permissions:
@@ -37,7 +41,8 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Shellcheck all scripts
-        run: make lint
+        # lint-full: the cached `make lint` needs macOS `md5`.
+        run: make lint-full
       - name: Validate TASKS.md
         run: make lint-tasks
       - name: Audit tasks-lint pin freshness
@@ -55,16 +60,47 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install dependencies
-        run: brew install shellcheck bats-core parallel chezmoi jq fd
+        # bash: the git hooks and the coverage harness need Homebrew bash;
+        # the runner has only /bin/bash 3.2. coreutils: tests call gtimeout.
+        run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd
+      - name: Restore the per-file gate cache
+        # bin/cached-run skips a file whose inputs passed before, like nx.
+        # A cache entry cannot be changed, so each run saves a new one and
+        # restores the newest. A pull request reads its own entries and the
+        # default branch's; it cannot write to the default branch's.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/cached-run
+          key: cached-run-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            cached-run-${{ runner.os }}-
+      - name: Check the compare base of a push run
+        # With a missing base (a recreated branch, a force push) the gate
+        # would select no test and pass. Fail instead.
+        if: github.event_name == 'push'
+        env:
+          BASE: ${{ github.event.before }}
+        run: git cat-file -e "${BASE}^{commit}"
       - name: Gate (make check)
+        env:
+          # A push run compares with the commit before the push. Compared
+          # with origin/feat/chezmoi (itself), it would select no test.
+          BATS_AFFECTED_BASE: ${{ github.event_name == 'push' && github.event.before || 'origin/feat/chezmoi' }}
+          # perf-gate.bats times 100 ms sleeps. On this runner they took up to
+          # 241 ms, and other tests failed in each of 3 runs. It stays a local
+          # test until TASKS.md perf-gate-hosted-runner-noise. make reads
+          # this variable from the environment.
+          TEST_SKIP_FILE: tests/perf-gate.bats
         run: make check
-      - name: Full suite (not on pull requests)
-        if: github.event_name != 'pull_request'
+      - name: Full suite (manual runs only)
+        # Fails today: TASKS.md full-suite-bats-argument-compatibility.
+        if: github.event_name == 'workflow_dispatch'
         run: make test-all
 
   doctor:
-    # Applies the whole config to the runner, so it stays off pull requests.
-    if: github.event_name != 'pull_request'
+    # Applies the whole config to the runner. Manual start only: a clean
+    # runner has no chezmoi config yet (TASKS.md hosted-doctor-audit-clean-runner).
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -105,6 +141,9 @@ jobs:
           echo "OK (under ${threshold}ms threshold)"
 
   audit:
+    # Checks an installed machine, so it fails on a clean runner. Manual
+    # start only (TASKS.md hosted-doctor-audit-clean-runner).
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -115,6 +154,9 @@ jobs:
         run: ./bin/dotfiles-audit
 
   coverage:
+    # Manual only: the traced full suite did not finish in 45 minutes on a
+    # hosted runner. TASKS.md hosted-coverage-job-time.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

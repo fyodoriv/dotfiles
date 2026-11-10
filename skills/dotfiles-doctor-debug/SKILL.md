@@ -201,7 +201,7 @@ If a check reports failure but has no auto-fix:
 2. Add a fix command (4th argument to `check()`, or `fix:` field in YAML)
 3. Fix must be idempotent (safe to run multiple times)
 4. Test: `dotfiles doctor --fix` should resolve the failure
-5. Run `make check` before committing
+5. Run `make lint` and the touched tests before committing; hosted CI runs `make check` on the pull request
 
 ## Rules
 
@@ -209,4 +209,4 @@ If a check reports failure but has no auto-fix:
 - Override checks only for intentional deviations from the standard
 - Fix commands must be idempotent
 - Test the fix by running `dotfiles doctor --fix` then `dotfiles doctor` again
-- Run `make check` before committing any changes to doctor modules
+- Run `make lint` and the touched tests before committing any changes to doctor modules; hosted CI runs `make check`

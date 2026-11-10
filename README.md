@@ -88,7 +88,7 @@ Settings drift. Scripts break. Nobody notices until something is slow again.
   (all 35 discovered modules, subject to feature gates). Selected at init time.
 - **149 macOS defaults** applied via lifecycle scripts — key repeat, Spotlight pruning/exclusions, 15-minute idle lock, Finder, animations, analytics, power management. See [notable changes](docs/onboarding.md#step-2-initialize-chezmoi).
 - **298 ms median shell startup** across seven daily samples on one Mac. The CI budget is 200 ms.
-- **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
+- **bats tests** + shellcheck on every script. hosted CI runs `make check` on each pull request; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
 - **Anonymous performance telemetry, with your yes** — asked at install; on only after you say yes (Enter counts as yes). `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([what is sent](#telemetry)).
@@ -1248,7 +1248,7 @@ where dotfiles is behind are in
 
 ## Performance
 
-Shell startup is benchmarked on every CI run and must stay under 200ms. The badge at the top reflects this threshold. Check the latest result in the [CI doctor job summary](https://github.example.com/your-org/dotfiles/actions/workflows/ci.yml).
+Shell startup must stay under 200ms. The CI `doctor` job benchmarks it when someone starts it by hand (`gh workflow run ci.yml`). The badge at the top reflects this threshold. Check the latest result in the [CI doctor job summary](https://github.example.com/your-org/dotfiles/actions/workflows/ci.yml).
 
 Measured on M3 Max, 64GB RAM, 300+ package JS/TS monorepo:
 
@@ -1525,7 +1525,7 @@ make lint-tasks     # validate TASKS.md queue format + P0/P1 rule-9 fields
 make test           # affected tests only; skips a test that passed with the same inputs
 make test-all       # full suite (cached)
 make test-force     # full suite, no cache
-make check          # lint + TASKS.md lint + perf gate + test + e2e when needed (run once before committing)
+make check          # lint + TASKS.md lint + perf gate + test + e2e when needed (hosted CI runs it on each pull request)
 make perf-gate      # fail when a tracked command got over 10% slower than the merge-base (part of make check)
 make install-deps   # install dev dependencies (required + optional tools)
 make fmt            # format shell scripts with shfmt
@@ -1538,11 +1538,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and editing rules. See [
 
 ### Where tests run
 
-Bats and shellcheck run only on a developer machine, through `make check`. The workflows in `.github/workflows/` do not run anywhere today:
+Bats and shellcheck run in two places:
 
-- **`fyodoriv/dotfiles`**: Actions is turned off, so no workflow runs on pushes or PRs.
+- **Your machine**: `make lint` and the Bats files you touched, before a commit. The private-pattern leak gates (pre-commit, pre-push, `bin/gh`) run only here.
+- **GitHub Actions** on `fyodoriv/dotfiles`: the same `make check` on a hosted macOS runner for every pull request and every push to `feat/chezmoi`. Hosted runners are free for public repositories. Jobs, limits, and what stays local: [docs/ci-setup.md](docs/ci-setup.md).
 
-So run `make check` (or the affected `bats` files) before you push, and paste the result in the PR test plan.
+So run the affected `bats` files before you push, and merge only when the hosted checks are green. Run the full `make check` locally only when GitHub Actions is off, or to reproduce a hosted failure.
 
 `make install-deps` installs the Homebrew tools used by local validation:
 required for `make check`/tests (`shellcheck`, `bats-core`, `parallel`,

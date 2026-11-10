@@ -6,15 +6,35 @@ How to enable and configure CI (continuous integration) on your team's fork of t
 
 ## How CI works in this repo
 
-The workflow (`.github/workflows/ci.yml`) starts by hand today (`gh workflow run ci.yml`):
+The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/chezmoi`, on every push to `feat/chezmoi`, and by hand (`gh workflow run ci.yml`):
 
 | Job | Runner | What it does |
 |-----|--------|-------------|
-| **lint** | ubuntu-latest | `make lint` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-latest | `make check` -- the local gate; then `make test-all` (full bats suite) when the run is not a pull request |
-| **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (never on a pull request) |
-| **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan |
-| **coverage** | ubuntu-latest | `bin/dotfiles-coverage` + bats -- shell coverage report artifact |
+| **lint** | ubuntu-latest | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
+| **test** | macos-latest | `make check` -- the local gate; then `make test-all` (full bats suite) on a manual run only, until task `full-suite-bats-argument-compatibility` lands |
+| **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (manual start only: a clean runner has no chezmoi config) |
+| **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
+| **coverage** | ubuntu-latest | Manual runs only (`gh workflow run ci.yml`): `bin/dotfiles-coverage` + bats -- shell coverage report artifact. It did not finish in 45 minutes on a hosted runner (task `hosted-coverage-job-time`) |
+
+### What the hosted gate leaves out
+
+- `tests/perf-gate.bats` (`TEST_SKIP_FILE=tests/perf-gate.bats make check`). Its fixtures time 100 ms sleeps. On the hosted macOS runner such a sleep took 174 to 241 ms, and other tests failed in each of 3 runs. Run it locally when you change the perf gate. Task: `perf-gate-hosted-runner-noise`.
+- The `doctor`, `audit` and `coverage` jobs (manual runs only; see the table).
+
+### Step cache (like nx)
+
+`bin/cached-run` records each test or lint file that passed, keyed on its content and on every file it reads. A later run skips a file whose inputs did not change. Lint files, the bash 3.2 plugin suites and the install e2e gain most. The key of a test file also holds the commit, so a test is skipped only when the same commit runs again (a re-run of a job). On a new pull request commit the lint entries are reused and the affected tests run. The `test` job keeps that record between runs with `actions/cache` (`~/.cache/cached-run`). A cache entry cannot be changed, so each run saves a new entry and restores the newest one. A pull request can read the entries of `feat/chezmoi` and its own; it cannot write to the entries of `feat/chezmoi`. The summary line shows the effect: `cached-run: N files: M unchanged (passed before), K checked`. To run everything, delete the entries: `gh cache delete --all`.
+
+### Cost, limits, and what stays local
+
+- **Cost: zero.** Standard GitHub-hosted runners are free and unlimited for public repositories, macOS included ([GitHub docs](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)). Never switch a job to a larger runner: those are billed.
+- **Limits on the free plan** ([GitHub docs](https://docs.github.com/en/actions/reference/limits)): 20 jobs at a time, of which 5 on macOS; 6 hours per job; 10 GB of cache per repository. A pull request uses one macOS job (`test`). A new push to a pull request cancels its older `ci.yml` run.
+- **No secrets.** No workflow reads a secret. A pull request from a fork gets a read-only token.
+- **Leak gates stay local.** The private-pattern file lives only on the owner's machine and is never uploaded. A hosted runner cannot run that gate, so the pre-commit hook, the pre-push hook, and `bin/gh` stay the authority ([privacy-gates.md](privacy-gates.md)). No step prints the environment.
+- **Actions are pinned.** Every `uses:` names a full commit SHA, and only GitHub-owned actions are used. `tests/github-workflows.bats` enforces this. Dependabot proposes the SHA updates.
+- **Also armed when Actions is on**: `brew-audit.yml` runs on the 1st of each month and may open a public issue. `release.yml` creates a GitHub release when a `v*` tag is pushed.
+- **Local only**: the leak gates above, and anything that needs `sudo` or a login session.
+- **Turn it off**: `gh api -X PUT repos/fyodoriv/dotfiles/actions/permissions -F enabled=false`. `make check` is then the only gate again.
 
 Organization-specific branch-protection / approval workflows belong in your private overlay (see your overlay's `.github/workflows/`).
 

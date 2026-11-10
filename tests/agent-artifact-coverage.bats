@@ -86,7 +86,8 @@ EOF
     json_name="$(jq -r '.command_name' "$eval_file")"
 
     [ "$json_name" = "$filename_name" ]
-    [ -f "$root/commands/$json_name.md" ]
+    # An eval covers a command file, or a CLI in bin/ that has no command file.
+    [ -f "$root/commands/$json_name.md" ] || [ -x "$root/bin/$json_name" ]
     jq -e '.evals | type == "array" and length > 0' "$eval_file" >/dev/null
   done
   shopt -u nullglob

@@ -91,14 +91,157 @@ log_run() {
     echo "⚠ stats: cannot write to $DOTFILES_STATS_FILE" >&2
     return 0
   fi
-  # Opt-in telemetry: at most one send a day, in the background, never in a
-  # test (bin/dotfiles-telemetry sends nothing without a key and the notice).
-  if [ -z "${BATS_TEST_FILENAME:-}" ]; then
-    local _tel
-    _tel="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry"
-    [ -x "$_tel" ] && (bash "$_tel" daily >/dev/null 2>&1 &)
-  fi
+  _telemetry_daily "$timestamp"
   return 0
+}
+
+# ── Command timing and telemetry hooks ──────────────────────────────────
+# Both hooks below are plain bash on the common path (no new process), so a
+# command pays almost nothing for them.
+DOTFILES_COMMANDS_FILE="${DOTFILES_COMMANDS_FILE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/commands.jsonl}"
+
+# Read the first line of the telemetry state file into _TELEMETRY_STATE_LINE
+# ("" when there is none). bin/dotfiles-telemetry owns the file and writes it
+# as one line. Shell-variable scope: it lives for this script run only.
+_TELEMETRY_STATE_LINE=""
+_TELEMETRY_STATE_PATH=""
+_telemetry_read_state() {
+  _TELEMETRY_STATE_PATH="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
+  _TELEMETRY_STATE_LINE=""
+  if [ -r "$_TELEMETRY_STATE_PATH" ]; then IFS= read -r _TELEMETRY_STATE_LINE <"$_TELEMETRY_STATE_PATH" 2>/dev/null || true; fi
+}
+
+# The repo root, from this file's own path, in plain bash (no new process).
+_stats_repo_root() {
+  _STATS_REPO_ROOT="${BASH_SOURCE[0]}"
+  case "$_STATS_REPO_ROOT" in
+    */*) _STATS_REPO_ROOT="${_STATS_REPO_ROOT%/*}/.." ;;
+    *) _STATS_REPO_ROOT=".." ;;
+  esac
+}
+
+# _telemetry_daily TIMESTAMP — after a run on a terminal, start the daily send
+# as a fully detached child: its own process group, SIGHUP ignored, no open
+# terminal or pipe. So it lives on when this run ends or its window closes.
+# A scheduled job (no terminal) never starts it: launchd kills what a job
+# leaves behind, which could stop a send half way. Those Macs send from the
+# LaunchAgent com.dotfiles.telemetry instead.
+# It starts nothing (and no new process) unless the stored answer is yes,
+# no off switch is set (CI, DO_NOT_TRACK, DOTFILES_TELEMETRY=0), today has no
+# send yet, and this clock hour has no try yet. Never as root (sudo): the
+# state file would become root-owned.
+# bin/dotfiles-telemetry checks every rule again; a send never fails a caller.
+# Never in a test, unless DOTFILES_TELEMETRY_SPAWN=1 asks for the real path.
+_telemetry_daily() {
+  local tel day="${1%%T*}" hour="${1%%:*}"
+  if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -z "${DOTFILES_TELEMETRY_SPAWN:-}" ]; then return 0; fi
+  [ -n "${DOTFILES_TELEMETRY_TTY:-}" ] || [ -n "${_DOTFILES_ON_TERMINAL:-}" ] || [ -t 0 ] || [ -t 2 ] || return 0
+  [ "$EUID" != "0" ] || return 0
+  [ -z "${CI:-}" ] || return 0
+  [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
+  case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
+  _telemetry_read_state
+  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'*) ;; *) return 0 ;; esac
+  case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$day\""* | *"\"try_hour\":\"$hour\""*) return 0 ;; esac
+  _stats_repo_root
+  tel="$_STATS_REPO_ROOT/bin/dotfiles-telemetry"
+  [ -x "$tel" ] || return 0
+  (
+    set -m
+    trap '' HUP
+    bash "$tel" daily </dev/null >/dev/null 2>&1 3>&- 8>&- 9>&- &
+  ) >/dev/null 2>&1
+  return 0
+}
+
+# dotfiles_telemetry_ask COMMAND [ARGS...] — before a normal `dotfiles`
+# command, ask the telemetry question if it has no answer yet (the install had
+# no terminal). Only where a person can answer: stdin, stdout, and stderr are
+# a terminal, and CI and DO_NOT_TRACK are unset. So never in a pipe, a hook, a
+# scheduler, or an agent run; there the answer stays unset and nothing is sent.
+# Never before help, version, cd, completion, or machine-readable output.
+# Never without a key (env or config/telemetry-key): nothing could be sent.
+# After 3 unanswered questions it stays silent, and after one it stays silent
+# for the rest of that day. All of this is plain bash: a run that does not
+# ask starts no new process. bash 3.2 has no clock, so "dismissed today" is a
+# file time: bin/dotfiles-telemetry sets the marker telemetry.asked-until to
+# the next UTC midnight, this gate writes an empty file (its time is now) and
+# compares the two. Only with no marker (an older state file) or after that
+# midnight does it start one `date`. Never as root (sudo).
+# DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
+dotfiles_telemetry_ask() {
+  local arg key_line="" marker
+  case "$1" in telemetry | install | help | h | version | v | cd | actions | completion | completions | -* | __*) return 0 ;; esac
+  for arg in "${@:2}"; do
+    case "$arg" in --help | -h | --version | --json | --quiet | -q | --porcelain) return 0 ;; esac
+  done
+  if [ -z "${DOTFILES_TELEMETRY_TTY:-}" ]; then
+    [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
+    { [ -t 0 ] && [ -t 1 ] && [ -t 2 ]; } || return 0
+  fi
+  [ "$EUID" != "0" ] || return 0
+  [ -z "${CI:-}" ] || return 0
+  [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
+  case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
+  _stats_repo_root
+  if [ -z "${DOTFILES_POSTHOG_KEY:-}" ]; then
+    arg="${DOTFILES_TELEMETRY_KEY_FILE:-$_STATS_REPO_ROOT/config/telemetry-key}"
+    if [ -r "$arg" ]; then IFS= read -r key_line <"$arg" 2>/dev/null || true; fi
+    [ -n "$key_line" ] || return 0
+  fi
+  _telemetry_read_state
+  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'* | *'"consent":"no"'* | *'"asks":3'*) return 0 ;; esac
+  # A question was dismissed before: it may come back once on a later day.
+  case "$_TELEMETRY_STATE_LINE" in
+    *'"asked_day":"2'*)
+      marker="${_TELEMETRY_STATE_PATH%.json}.asked-until"
+      if [ -e "$marker" ] && { : >"$marker.now"; } 2>/dev/null && [ "$marker" -nt "$marker.now" ]; then return 0; fi
+      case "$_TELEMETRY_STATE_LINE" in *"\"asked_day\":\"$(date -u +%F)\""*) return 0 ;; esac ;;
+  esac
+  bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" ask --first-run || true
+  return 0
+}
+
+# Keep the commands log small: over 20,000 lines, keep the newest 10,000.
+# bin/dotfiles-telemetry does the cut (cap-commands), because it owns the
+# telemetry cursor: it moves the cursor back by the number of dropped lines,
+# under its lock, so a line that was not sent yet is still sent.
+_commands_log_cap() {
+  local lines
+  lines="$(wc -l <"$DOTFILES_COMMANDS_FILE" 2>/dev/null)" || return 0
+  lines="${lines//[^0-9]/}"
+  [ "${lines:-0}" -gt 20000 ] || return 0
+  _stats_repo_root
+  DOTFILES_COMMANDS_FILE="$DOTFILES_COMMANDS_FILE" bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" cap-commands >/dev/null 2>&1 || true
+  return 0
+}
+
+# log_command — record one `dotfiles <command>` run for performance numbers.
+#
+# Args:
+#   $1  command name: the top-level subcommand, from the dispatch arms of
+#       bin/dotfiles. Never an argument. A name that is not a short lowercase
+#       word is dropped.
+#   $2  outcome: `ok`, or anything else for "ok":false.
+#   $3  wall time in ms.
+#
+# Side effects: appends one JSONL line to $DOTFILES_COMMANDS_FILE
+# (~/.local/state/dotfiles/commands.jsonl), under the same on/off rule as
+# log_run. The line holds the name, the time, ok, and duration_ms: no
+# argument, path, or message. Returns 0 always.
+log_command() {
+  dotfiles_stats_log_on || return 0
+  local command="$1" outcome="$2" duration_ms="$3" ok=true timestamp
+  [[ "$command" =~ ^[a-z][a-z0-9-]{0,39}$ ]] || return 0
+  [[ "$duration_ms" =~ ^[0-9]{1,10}$ ]] || return 0
+  [ "$outcome" = "ok" ] || ok=false
+  timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [ -d "${DOTFILES_COMMANDS_FILE%/*}" ] || mkdir -p "${DOTFILES_COMMANDS_FILE%/*}" 2>/dev/null || return 0
+  echo "{\"command\":\"$command\",\"timestamp\":\"$timestamp\",\"ok\":$ok,\"duration_ms\":$duration_ms}" \
+    >> "$DOTFILES_COMMANDS_FILE" 2>/dev/null || return 0
+  # About one run in 200 checks the size, so the log cannot grow without end.
+  if [ $((RANDOM % 200)) -eq 0 ] || [ -n "${DOTFILES_COMMANDS_ROTATE_NOW:-}" ]; then _commands_log_cap; fi
+  _telemetry_daily "$timestamp"
 }
 
 # get_time_saved_summary — Print a one-line summary of total automation runs

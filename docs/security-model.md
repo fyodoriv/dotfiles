@@ -163,6 +163,7 @@ All agents install to `~/Library/LaunchAgents/com.dotfiles.*`. All run as the cu
 |-------|----------|--------------|
 | `capslock-control` | At login | Maps CapsLock to Control via `hidutil` |
 | `cleanup` | Sunday 03:00 | Cleans npm/yarn/brew/Gradle caches from safelisted dirs |
+| `telemetry` | Every hour | Sends anonymous performance numbers to PostHog EU at most once a day. Installed only while your telemetry answer is yes ([observability](observability.md#telemetry)) |
 | `agent-scratch-prune` | Every 6 hours | Deletes idle agent build output, clean fully pushed agent worktrees (`git worktree remove`), and mktemp/goal scratch folders idle 30+ days, and per-user temp entries idle 3+ days (not `com.*`), only under `~/.local/state`, `~/.codex/worktrees`, and the per-user temp folder; skips symlinks |
 | `dotfiles-doctor` | Monday 09:00 | Runs `dotfiles doctor --fix` (auto-repairs symlinks) |
 | `dotfiles-sync` | Every 30 min | Auto git commit+push of dotfiles changes |
@@ -327,5 +328,5 @@ writes `~/.local/share/dotfiles/metrics/weekly-<YYYY-Www>.json`.
 - Does not modify `/etc/` or `/Library/` (system-wide) directories
 - Does not run any daemons as root
 - Does not modify other users' files or configuration
-- Does not phone home. Telemetry is opt-in only: `dotfiles telemetry` sends content-free usage counts to PostHog EU only after the owner stores a key, and `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([observability](observability.md#telemetry)). The opt-in weekly metrics file (below) stays local; only `agentbrew metrics share` can send it, and only after you opt in there too.
+- Does not phone home without your yes. Telemetry is asked at install; it is on only after you say yes (Enter counts as yes). It then sends anonymous performance numbers to PostHog EU: command or task name, duration, ok or error, counts, version, OS, CPU type, and a random install id. Never a path, file name, host name, user name, argument, message, or content; no person profile. PostHog receives the request IP address, like any web server; GeoIP lookup is disabled and no location is stored. A yes covers only later events. `dotfiles telemetry off`, `--no-telemetry` at install, `DOTFILES_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `CI` stops it ([observability](observability.md#telemetry)). The opt-in weekly metrics file (below) stays local; only `agentbrew metrics share` can send it, and only after you opt in there too.
 - Does not store passwords or tokens in tracked files

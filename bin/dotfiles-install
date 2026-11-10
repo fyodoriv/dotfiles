@@ -14,6 +14,7 @@
 #   --email EMAIL           git commit email
 #   --no-macos-defaults     Do not change macOS system settings
 #   --no-agentbrew          Do not install agentbrew afterwards
+#   --no-telemetry          Record "no" to anonymous performance telemetry; do not ask
 #   --agentbrew-dir DIR     Where to clone agentbrew (default: next to this repo)
 #   --agentbrew-flags "..." Flags passed to agentbrew's installer (for example "--no-auto-repair")
 #   --tool URL              Also install another tool repo after agentbrew: a read-only
@@ -52,7 +53,7 @@ install_event() { log_run install 1 "$1" "$((SECONDS * 1000))" "${2:-}"; }
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
-usage() { sed -n '2,27p' "$0" | sed -E 's/^# ?//'; }
+usage() { sed -n '2,28p' "$0" | sed -E 's/^# ?//'; }
 
 # macOS settings domains that macos*.sh may change (data/macos-defaults.json).
 defaults_domains() {
@@ -301,7 +302,7 @@ critical() {
 }
 
 cmd_run() {
-  local yes=0 profile=core name="" email="" macos=1 agentbrew=1 ab_dir="" ab_flags="" dir rel
+  local yes=0 profile=core name="" email="" macos=1 agentbrew=1 telemetry_flag="" ab_dir="" ab_flags="" dir rel
   local tools_dir="" url tool_dir i
   local -a tool_urls=() tool_flags=()
   while [ "$#" -gt 0 ]; do
@@ -312,6 +313,7 @@ cmd_run() {
       --email) email="${2:-}"; shift ;;
       --no-macos-defaults) macos=0 ;;
       --no-agentbrew) agentbrew=0 ;;
+      --no-telemetry) telemetry_flag="--no" ;;
       --agentbrew-dir) ab_dir="${2:-}"; shift ;;
       --agentbrew-flags) ab_flags="${2:-}"; shift ;;
       --tool) tool_urls+=("${2:-}"); tool_flags+=(""); shift ;;
@@ -330,6 +332,13 @@ cmd_run() {
 
   step "1/6 Check prerequisites"
   preflight install || { say "Install the missing tools above, then run again. Nothing was changed."; exit 1; }
+
+  # The telemetry question comes early (it needs jq from the step above), so
+  # nobody misses it in the long output below. On a terminal it asks; with no
+  # terminal it asks nothing and the answer stays unset. $telemetry_flag is
+  # unquoted on purpose: empty is no flag.
+  # shellcheck disable=SC2086
+  bash "$REPO_DIR/bin/dotfiles-telemetry" ask --install $telemetry_flag || true
 
   step "2/6 Back up current settings"
   BACKUP_ID="$(date +%Y%m%d-%H%M%S)"

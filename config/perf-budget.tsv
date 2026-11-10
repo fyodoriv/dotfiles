@@ -31,7 +31,11 @@ PERF_GATE_PATH=scripts/perf-gate.pl
 
 # Allow section: one line per intended slowdown above 10% in this PR.
 #   PERF_GATE_ALLOW=<name>:<reason>
-# The ceiling still applies. The next PR removes the line: the gate fails on
-# an allow line that the base already has.
+# The ceiling still applies. A line counts when the base does not have the
+# same line (same name and reason). The gate stops on a line that the base
+# has unchanged: the next PR removes it, or writes its own reason.
 # A row removed from this file needs an allow line too. An allow line that
 # names no command is an error.
+# A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
+# tests/perf-gate.bats changes its own judge. It needs the line
+# PERF_GATE_ALLOW=perf-gate:<reason>.

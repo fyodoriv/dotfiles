@@ -91,7 +91,7 @@ Settings drift. Scripts break. Nobody notices until something is slow again.
 - **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
-- **Opt-in telemetry** — `dotfiles telemetry` sends anonymous usage counts to PostHog EU only after you store a key; `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([details](docs/observability.md#telemetry)).
+- **Anonymous performance telemetry, with your yes** — asked at install; on only after you say yes (Enter counts as yes). `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([what is sent](#telemetry)).
 - **Metrics and contributing back** — `dotfiles metrics` shows agent time, hook blocks, MCP health, and machine load on your Mac. `--share FILE` writes a privacy-safe snapshot. `--table` prints every [outcome metric](docs/metrics.md) with its goal and pivot. `--baseline` prints the zsh start, free disk, and LaunchAgent lines that `dotfiles-install plan` showed before the install. `dotfiles contribute` opens a PR to `fyodoriv/dotfiles` (or `--repo agentbrew`) from your branch, forking it for you; it asks first (`--yes` skips the question).
 - **Never destroys personal config** — `~/.zshrc.local` and `~/.gitconfig.local` are gitignored and never overwritten.
 
@@ -660,6 +660,69 @@ dotfiles stats --oneliner    # single line for embedding
 dotfiles stats --recalc      # rewrite historical data with current estimates
 ```
 
+## Telemetry
+
+Asked at install; on only after you say yes (Enter counts as yes).
+
+`bin/dotfiles-install run` asks one loud question on a terminal: "Help make
+dotfiles faster: share anonymous performance numbers?" It shows what is sent,
+an example event, and the privacy promise, then `[Y/n]`. With no terminal (an
+agent, a script, CI) it asks nothing and nothing is sent; the first `dotfiles`
+command you run in a terminal asks, and there only a typed `y` or `n` is an
+answer. That question never shows before help, version, `cd`, or
+machine-readable output. With no answer it comes back at most once a day and
+3 times in all. While the repo ships no key (`config/telemetry-key` is empty)
+nobody is asked and nothing is sent. A yes covers only later events: nothing recorded before it is
+sent.
+
+**What is sent**, at most once a day: the command or task name, its duration,
+ok or error, counts, the dotfiles version, OS, CPU type, and a random install
+id. One event:
+
+```json
+{
+  "event": "dotfiles.command",
+  "distinct_id": "0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e0f",
+  "properties": {
+    "$process_person_profile": false,
+    "$geoip_disable": true,
+    "app_version": "f6006d0",
+    "os": "darwin",
+    "arch": "arm64",
+    "runtime": "shell",
+    "command": "doctor",
+    "duration_ms": 1840,
+    "ok": true
+  },
+  "timestamp": "2026-11-09T18:04:11Z"
+}
+```
+
+**What is never sent**: a path, file name, host name, user name, argument,
+message, or content. No person profile. Every name comes from a fixed list,
+so typed text cannot leave. The code that enforces this is
+[`bin/dotfiles-telemetry`](bin/dotfiles-telemetry).
+
+**Your IP address**: PostHog receives the request IP address, like any web
+server. GeoIP lookup is disabled and no location is stored.
+
+**Where it goes**: PostHog EU, for a public performance dashboard and a
+regression gate.
+
+**Turn it off**, any of:
+
+- `dotfiles telemetry off` (and `dotfiles telemetry on` to turn it back on).
+- `bin/dotfiles-install run --yes --no-telemetry` at install.
+- `DOTFILES_TELEMETRY=0` or `DO_NOT_TRACK=1` in your shell profile.
+- `CI` set: nothing is sent.
+
+A no is never asked again, and a later install never changes it. An opt-out
+flag or variable at a later install records no, also over an earlier yes.
+
+**Inspect it**: `dotfiles telemetry status` shows your answer and what is
+pending. `dotfiles telemetry send --dry-run` prints the exact request body
+and sends nothing. Full rules: [docs/observability.md](docs/observability.md#telemetry).
+
 ## Proof
 
 Each claim above is measured below. Run `scripts/proof.sh` to refresh the numbers; `tests/proof.bats` fails when this section and the generator differ.
@@ -668,7 +731,7 @@ Each claim above is measured below. Run `scripts/proof.sh` to refresh the number
 Every number below comes from `docs/proof/metrics.json`. `scripts/proof.sh` writes that file and this section.
 Headline rows are field outcomes. `real use` numbers come from the local, content-free stats log that each real automation run writes (`~/.dotfiles-stats.jsonl`, see [observability](docs/observability.md)).
 
-Each machine aggregates its own log here. Opt-in telemetry (`dotfiles telemetry`, off until the owner sets a key) can send the same content-free counts to PostHog EU; this section does not read them yet.
+Each machine aggregates its own log here. Telemetry (`dotfiles telemetry`, asked at install, on only after a yes) can send the same content-free numbers to PostHog EU; this section does not read them yet.
 
 | Claim | Theory | Metric | Result | Source |
 |---|---|---|---|---|
@@ -908,6 +971,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |
+| `com.dotfiles.telemetry` | `dotfiles-telemetry daily` | Every hour, and at load | Send the anonymous performance numbers at most once a day. Installed only while your telemetry answer is yes: `dotfiles telemetry on` loads it, `off` removes it ([telemetry](#telemetry)) |
 | `com.dotfiles.agent-scratch-prune` | `agent-scratch-prune` | Every 6 hours, and at load | Remove what AI agents leave behind: idle build output (2 days), clean pushed agent worktrees (7 days), old scratch folders (`agent_scratch_idle_days`, 30), temp-folder entries (3 days), Ollama models no app reserves (`local_models_prune_days`, 14) (`logs/agent-scratch-prune.log`) |
 | `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools; company plugins to their newest signed release (opt-in: `auto_upgrade: true`) |
 
@@ -1264,7 +1328,7 @@ dotfiles sync                                     Commit tracked/staged local ch
 dotfiles managed                                  List all managed files
 dotfiles status                                   Git status of dotfiles repo
 dotfiles stats [--oneliner] [--recalc]            Automation stats (runs, time saved, streak)
-dotfiles telemetry [status|on|off|send --dry-run] Opt-in anonymous usage counts (PostHog EU)
+dotfiles telemetry [status|on|off|send --dry-run] Anonymous performance numbers to PostHog EU (asked at install)
 dotfiles install plan|run|restore                 One-step install with backup and auto-restore (see INSTALL.md)
 dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP health, machine load (local only)
 dotfiles metrics --table                         Every docs/metrics.md metric: value, goal, pivot ((stub) if no data)
@@ -1394,6 +1458,8 @@ User-configurable variables that customize dotfiles behavior. Set them in `~/.zs
 |----------|---------|---------|
 | `DOTFILES_REPOS_DIR` | `$HOME/apps` | Directory containing git repos for `morning`, `git-maintain`, and doctor checks |
 | `DOTFILES_STATS_FILE` | `$HOME/.dotfiles-stats.jsonl` | JSON Lines file tracking automation statistics (time saved, runs) |
+| `DOTFILES_TELEMETRY` | *(unset)* | Set to `0` to send no [telemetry](#telemetry). At install it records your answer as no. |
+| `DO_NOT_TRACK` | *(unset)* | Any value except empty or `0` sends no [telemetry](#telemetry). At install it records your answer as no. |
 | `DOTFILES_CI` | `false` | Set to `true` in CI to skip macOS-specific checks (spotlight, pager, etc.) |
 | `DOTFILES_DOCTOR_NOTIFY` | `0` | Set to `1` to enable macOS notification banners after `dotfiles-doctor` runs (failures and `--fix` successes). Default off; logs and exit codes unchanged. |
 | `DOTFILES_NETWORK_TARGETS` | Anthropic, GitHub URLs | Space-separated URLs for network watchdog connectivity checks |

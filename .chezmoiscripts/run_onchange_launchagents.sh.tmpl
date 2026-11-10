@@ -8,6 +8,7 @@
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 # self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
 # chrome options: {{ include "lib/chrome-purpose-options.sh" | sha256sum }}
+# telemetry consent: {{ $telemetryState := env "DOTFILES_TELEMETRY_STATE" | default (joinPath (env "XDG_STATE_HOME" | default (joinPath .chezmoi.homeDir ".local/state")) "dotfiles" "telemetry.json") }}{{ $telemetryAnswer := "not yes" }}{{ if stat $telemetryState }}{{ if contains "\"consent\":\"yes\"" (include $telemetryState) }}{{ $telemetryAnswer = "yes" }}{{ end }}{{ end }}{{ $telemetryAnswer }}
 # plugins.lock: {{ $lock := joinPath .chezmoi.homeDir ".config/dotfiles/plugins.lock" }}{{ if stat $lock }}{{ include $lock | sha256sum }}{{ end }}
 set -euo pipefail
 
@@ -73,6 +74,10 @@ should_skip_agent() {
     # Scheduled syncs can be turned off; run dotfiles-sync by hand instead
     dotfiles-sync|tooling-sync)
       [ "${AUTO_SYNC:-true}" = "false" ] && return 0 ;;
+    # Only after a yes to the telemetry question. `dotfiles telemetry on`
+    # and `off` also load and remove it at once.
+    telemetry)
+      ! grep -q '"consent":"yes"' "${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}" 2>/dev/null && return 0 ;;
     # Silent system-wide upgrades require explicit opt-in
     dotfiles-upgrade)
       [ "$AUTO_UPGRADE" != "true" ] && return 0 ;;

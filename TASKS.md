@@ -678,6 +678,104 @@ them. -->
   - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
 
 
+- [ ] Stop the pre-push leak check flagging a public github.com URL pattern as a private ssh host
+  - **ID**: pre-push-ssh-host-false-alarm-escaped-regex
+  - **Tags**: git-hooks, privacy, reliability
+  - **Details**: On 2026-11-10 the pre-push hook blocked a push of PR #562 (send anonymous performance telemetry by default). The flagged line was a bash regex for the public upstream repo URL. Its third alternative was `ssh://` followed by `git@github\.com/` (the dot is escaped for the regex). `lib/private-ref-markers.awk` (the `ssh host` rule) reads the host as the letters up to the backslash, so it sees `github`, which is not on its public-host list, and reports a private host. Exact hook output: `✗ 2 private reference(s) in lines or messages of pushed commits:` / `   0aecf8c: ssh host` / `   9e36e83: ssh host` / `Use placeholders: ~ for a home dir, github.example.com for a host. Then rewrite those commits.` / `push blocked by dotfiles pre-push hook` / `If a person checked it: dotfiles leak allow --once <commit sha>, in a terminal.` The false alarm forced a code change (the host moved into a variable) and a rewrite of three unpushed commits. The hook must stay fail-closed for a real private host.
+  - **Files**: `lib/private-ref-markers.awk`, `tests/gh-wrapper-leak-guard.bats`, `docs/privacy-gates.md`.
+  - **Output**: code
+  - **Acceptance**: a failing test first: feed the awk rule one line that holds the ssh scheme form of the public github.com repo URL with the dot escaped by a backslash (a regex), and assert no `ssh host` hit; then the same line with a made-up private host and an escaped dot, and assert one hit. Both the escaped and the plain form of github.com, gitlab.com, bitbucket.org, and codeberg.org pass; every existing private-host test still fails closed.
+  - **Hypothesis**: reading an escaped dot as a dot in the ssh-host rule moves false alarms on public-host regexes from 1 known case to 0 with no lost true hit.
+  - **Measurement**: `bats tests/gh-wrapper-leak-guard.bats`, with the two new cases.
+  - **Success**: 0 hits on the public escaped form and 1 hit on the private escaped form; all older cases unchanged.
+  - **Pivot**: if any older private-host case stops failing closed, drop the change and document the workaround (keep the host in a variable) in `docs/privacy-gates.md` instead.
+  - **Anchor**: PR #562 push block on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — correctness of an existing privacy gate, not a scorecard metric.
+
+- [ ] Make the perf gate cache test hold its lock before it goes on
+  - **ID**: perf-gate-cache-test-holder-race
+  - **Tags**: tests, reliability, perf-gate
+  - **Details**: On 2026-11-10 `heavy-run make check` failed once on a PR that did not change the gate code: `tests/perf-gate.bats` test 24 ("the base checkout is cached by commit, two are kept, and one in use is not removed"), line 386, `[ -d "$CACHE/$first" ]  # in use: kept`. The Mac was under memory pressure (heavy-run paused the run twice). Suspected cause, not proven: the test starts a perl process that takes a shared lock, and waits at most 2 seconds for its "held" line. When the holder starts later than that, the gate sees no lock and removes the checkout. The test goes on without a check that the lock is held.
+  - **Files**: `tests/perf-gate.bats`.
+  - **Output**: code
+  - **Acceptance**: the test fails with a clear message (or waits longer) when the holder did not report "held"; it passes 20 of 20 times with `stress`-style load from 10 parallel bats jobs.
+  - **Hypothesis**: a checked wait for the holder moves the failure rate of test 24 under load from 1 known failure to 0 of 20 runs.
+  - **Measurement**: `for i in $(seq 20); do bats -f 'cached by commit' tests/perf-gate.bats || echo FAIL; done` while a second shell runs `bats tests/telemetry.bats` with ten parallel jobs.
+  - **Success**: 0 FAIL lines in 20 runs.
+  - **Pivot**: if it still fails with the holder confirmed, the gate's pruning has a real race; fix `scripts/perf-gate.pl`, not the test.
+  - **Anchor**: Luo, Hariri, Eloussi and Marinov (2014), An Empirical Analysis of Flaky Tests.
+  - **Competitive-goal**: none — stability of an existing gate test, not a scorecard metric.
+
+- [ ] Cap the telemetry command log for root and for a machine without jq
+  - **ID**: telemetry-commands-log-cap-without-jq-or-as-root
+  - **Tags**: telemetry, reliability
+  - **Details**: `lib/stats.sh` (`_commands_log_cap`) asks `bin/dotfiles-telemetry cap-commands` to cut `commands.jsonl` when it grows over the cut limit. That command exits early in two cases. It exits 1 when jq is missing (the check near line 126). It exits for root (the root guard), and a container user is often root. In both cases nothing cuts the log, so `commands.jsonl` grows without end. Idea: when no telemetry state file exists, there is no cursor to protect. Then `lib/stats.sh` can do a plain `tail` to a temp file and `mv`. Keep the `cap-commands` path when a state file exists, because it moves the cursor under its lock.
+  - **Files**: `lib/stats.sh`, `bin/dotfiles-telemetry`, `tests/telemetry.bats`, `docs/observability.md`.
+  - **Output**: code
+  - **Acceptance**: failing tests first. With jq off PATH and no state file, a log one line over the cut limit is cut to the keep limit. The same holds with the test uid set to 0. With a state file present, the cut still goes through `cap-commands` and the cursor moves back by the number of dropped lines.
+  - **Hypothesis**: a plain cap in the hook moves the count of cases where an over-limit log is cut to the keep limit from 0 of 2 to 2 of 2 (no jq, root), with 0 lost unsent lines when a state file exists.
+  - **Measurement**: `bats tests/telemetry.bats`, with the new cases.
+  - **Success**: the log is at the keep limit in both new cases; every older cursor test passes.
+  - **Pivot**: if a plain cut can race with a send and lose an unsent line, drop the fallback and make `cap-commands` itself work without jq and as root.
+  - **Anchor**: review of PR #567 on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — bounded disk use of an existing log, not a scorecard metric.
+
+- [ ] Keep `dotfiles apply` working when the telemetry state file is unreadable
+  - **ID**: apply-tolerates-unreadable-telemetry-state
+  - **Tags**: telemetry, reliability, apply
+  - **Details**: The consent line near the top of `.chezmoiscripts/run_onchange_launchagents.sh.tmpl` runs `include` on the telemetry state file when `stat` finds it. A file that exists but is unreadable makes the template fail, and then `dotfiles apply` can fail. One way to get such a file: an old `sudo` run left it root-owned with mode 600. Not reproduced yet: reproduce it first. Idea: treat an unreadable file as "not yes" in the template. Add a doctor check that reports a state file the user does not own, with the fix command.
+  - **Files**: `.chezmoiscripts/run_onchange_launchagents.sh.tmpl`, `modules/` (the telemetry or observability doctor), `tests/telemetry.bats`, `docs/observability.md`, `docs/module-reference.md`.
+  - **Output**: code
+  - **Acceptance**: a failing test first: render the template with a state file of mode 000 and assert exit 0 and a "not yes" consent line. The doctor check fails on a state file with a different owner or no read bit, and names the fix.
+  - **Hypothesis**: a tolerant read moves the template render with an unreadable state file from exit non-zero to exit 0, and the LaunchAgent stays off in that case.
+  - **Measurement**: `bats tests/telemetry.bats`, with the new render case and the doctor case.
+  - **Success**: exit 0 and "not yes" in the render case; the doctor case reports the file; every older consent test passes.
+  - **Pivot**: if chezmoi templates cannot test readability without a failing `include`, move the consent read out of the template into the script body (a `grep` with `2>/dev/null`).
+  - **Anchor**: review of PR #567 on 2026-11-10; Forsgren, Humble and Kim (2018), Accelerate (change failure rate).
+  - **Competitive-goal**: none — install reliability of an existing script, not a scorecard metric.
+
+- [ ] Fix five small telemetry defects found in review
+  - **ID**: telemetry-review-nits
+  - **Tags**: telemetry, reliability, tests
+  - **Details**: Five small items from the review of PR #567. (1) The command-log cap can shift the cursor by one when a line is appended during the cut: count the dropped lines and cut with `tail -n +$((drop+1))`. (2) `launchagents/com.dotfiles.telemetry.plist.tmpl` writes `XDG_STATE_HOME` into the plist without XML escaping; a path with `&` or `<` breaks the plist. (3) A root install with an opt-out prints the "(sudo)" line and saves no "no" answer, so the question can come back. (4) The `EUID` guards in `lib/stats.sh` are tested only by a grep of the source: add the test uid seam that `bin/dotfiles-telemetry` already has (`DOTFILES_TELEMETRY_TEST_UID`) and test the behavior. (5) The file `telemetry.asked-until.now` stays on disk until the user answers: remove it after the time compare.
+  - **Files**: `bin/dotfiles-telemetry`, `lib/stats.sh`, `launchagents/com.dotfiles.telemetry.plist.tmpl`, `tests/telemetry.bats`, `docs/observability.md`.
+  - **Output**: code
+  - **Acceptance**: one failing test first for each item, then the fix. Item 1: a line appended during the cut is sent exactly once. Item 2: a state path with `&` gives a plist that `plutil -lint` accepts. Item 3: the opt-out as root either saves "no" or prints a line that says how to save it as the user. Item 4: the guard test runs the function with the test uid 0. Item 5: no `.asked-until.now` file is left after a dismissed question.
+  - **Hypothesis**: the five fixes move the count of known open review findings on the telemetry path from 5 to 0, with 0 changed behavior for a normal user.
+  - **Measurement**: `bats tests/telemetry.bats`, with the five new cases.
+  - **Success**: all five new cases pass and every older telemetry test passes.
+  - **Pivot**: if one item needs a design change (for example a root-owned "no" file), split it into its own task and ship the other four.
+  - **Anchor**: review of PR #567 on 2026-11-10; Fagan (1976), Design and code inspections to reduce errors in program development.
+  - **Competitive-goal**: none — correctness of an existing feature, not a scorecard metric.
+
+- [ ] Give the perf gate the two-rule estimator that agentbrew uses
+  - **ID**: perf-gate-paired-median-parity
+  - **Tags**: perf-gate, reliability
+  - **Details**: The agentbrew gate (PR fyodoriv/agentbrew#927) reports "slower" only when two rules agree: the minimum rule and a paired-median rule. Under load that cut false alarms from 2 in 20 runs to 0 in 20 runs, and it still caught 20 of 20 seeded slowdowns. That gate also prints JSON when a stale allow line stops it, and it shows the verdict `over-ceiling-at-base`. The dotfiles gate (`scripts/perf-gate.pl`) still uses the minimum rule alone. Under memory pressure it gave two false "slower" results in its own tests. Port the estimator and the two output items. This task is not the same as `perf-gate-cache-test-holder-race`: that task is about the lock in one cache test, and this one is about the timing verdict.
+  - **Files**: `scripts/perf-gate.pl`, `tests/perf-gate.bats`, `docs/observability.md`.
+  - **Output**: code
+  - **Acceptance**: failing tests first: a fixture where only the minimum rule fires gives "ok"; a fixture where both rules fire gives "slower". A stale allow line with JSON output on gives valid JSON and a non-zero exit. A command over its ceiling on the base too shows `over-ceiling-at-base`.
+  - **Hypothesis**: the two-rule estimator moves false "slower" verdicts on an unchanged tree under load from 2 known cases to 0 in 20 runs, while 20 of 20 seeded slowdowns of 25% are still caught.
+  - **Measurement**: 20 clean runs and 20 seeded runs of `heavy-run make perf-gate` in a normal slot (not `--exclusive`) while a second `heavy-run make check` holds another slot; count the "slower" verdicts in each set.
+  - **Success**: 0 "slower" in the 20 clean runs and 20 "slower" in the 20 seeded runs.
+  - **Pivot**: 1 or more false alarm in the clean set, or fewer than 19 caught in the seeded set -> do not port the estimator as is; measure the noise source first (paired order, warmups).
+  - **Anchor**: PR fyodoriv/agentbrew#927 (2 in 20 to 0 in 20); Kalibera and Jones (2013), Rigorous benchmarking in reasonable time.
+  - **Competitive-goal**: none — trust in an existing gate, not a scorecard metric.
+
+- [ ] Prune old perf gate cache folders that have no `.ready` marker
+  - **ID**: perf-gate-prune-unmarked-cache-folders
+  - **Tags**: perf-gate, cleanup
+  - **Details**: `scripts/perf-gate.pl` removes an old base checkout only when its `<sha>.ready` marker says the gate built it. A folder from before the marker existed has none. The gate never prunes it, and it prints "left ... alone: the gate did not build it" on every run. Idea: prune an unmarked folder when three things hold. Its name is 40 hex characters. `git worktree list` names it as a worktree of this repo. It is older than 7 days. Any other unmarked folder stays, with the note.
+  - **Files**: `scripts/perf-gate.pl`, `tests/perf-gate.bats`, `docs/observability.md`.
+  - **Output**: code
+  - **Acceptance**: failing tests first: an unmarked, registered, 8-day-old 40-hex folder is removed and no note is printed; the same folder at 6 days stays; an unmarked folder that is not a registered worktree stays at any age; a folder in use (lock held) stays.
+  - **Hypothesis**: the prune rule moves the note count on a run with one old unmarked folder from 1 to 0, with 0 removed folders that the gate cannot prove are its own.
+  - **Measurement**: `bats -f 'unmarked' tests/perf-gate.bats`, with the four new cases.
+  - **Success**: all four cases pass; every older cache test passes.
+  - **Pivot**: if a registered worktree check cannot tell a gate checkout from a user worktree, drop the prune and print the note once per day instead.
+  - **Anchor**: gate output on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — disk use and quiet output of an existing gate, not a scorecard metric.
+
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

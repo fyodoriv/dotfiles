@@ -371,20 +371,6 @@ them. -->
   - **Anchor**: PR fyodoriv/agentbrew#927 (2 in 20 to 0 in 20); Kalibera and Jones (2013), Rigorous benchmarking in reasonable time.
   - **Competitive-goal**: none — trust in an existing gate, not a scorecard metric.
 
-- [ ] Prune old perf gate cache folders that have no `.ready` marker
-  - **ID**: perf-gate-prune-unmarked-cache-folders
-  - **Tags**: perf-gate, cleanup
-  - **Details**: `scripts/perf-gate.pl` removes an old base checkout only when its `<sha>.ready` marker says the gate built it. A folder from before the marker existed has none. The gate never prunes it, and it prints "left ... alone: the gate did not build it" on every run. Idea: prune an unmarked folder when three things hold. Its name is 40 hex characters. `git worktree list` names it as a worktree of this repo. It is older than 7 days. Any other unmarked folder stays, with the note.
-  - **Files**: `scripts/perf-gate.pl`, `tests/perf-gate.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: failing tests first: an unmarked, registered, 8-day-old 40-hex folder is removed and no note is printed; the same folder at 6 days stays; an unmarked folder that is not a registered worktree stays at any age; a folder in use (lock held) stays.
-  - **Hypothesis**: the prune rule moves the note count on a run with one old unmarked folder from 1 to 0, with 0 removed folders that the gate cannot prove are its own.
-  - **Measurement**: `bats -f 'unmarked' tests/perf-gate.bats`, with the four new cases.
-  - **Success**: all four cases pass; every older cache test passes.
-  - **Pivot**: if a registered worktree check cannot tell a gate checkout from a user worktree, drop the prune and print the note once per day instead.
-  - **Anchor**: gate output on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — disk use and quiet output of an existing gate, not a scorecard metric.
-
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

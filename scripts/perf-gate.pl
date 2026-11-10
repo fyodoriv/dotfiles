@@ -8,7 +8,10 @@
 #    commit and `git status` shows no changed, new, or ignored file; any other
 #    checkout is built again. The gate writes <cache-dir>/<base-sha>.ready for
 #    each checkout it builds. It removes a folder only with that marker, and
-#    it unlinks a symlink without following it. Build and prune happen under <cache-dir>/lock, and every gate
+#    it unlinks a symlink without following it. One exception, for a checkout
+#    from before the marker existed: the prune removes an unmarked folder
+#    that git lists as a worktree of this repo and that is over 7 days old.
+#    Build and prune happen under <cache-dir>/lock, and every gate
 #    holds a shared lock on <cache-dir>/<sha>.use while it times, so no gate
 #    removes a checkout that another gate uses.
 # 2. Times each command of config/perf-budget.tsv in both trees, in turn. A
@@ -30,6 +33,7 @@ use Time::HiRes qw(time);
 use File::Temp qw(tempdir);
 use File::Path qw(make_path remove_tree);
 use File::Glob qw(bsd_glob);
+use Cwd qw(realpath);
 use Fcntl qw(:flock);
 use POSIX ();
 
@@ -86,13 +90,29 @@ sub parse {
 # ── Base checkout ────────────────────────────────────────────────────
 # Remove one checkout of this gate. Only a path <cache>/<40 hex> is ever
 # touched. A symlink is unlinked, never followed. A folder is removed only
-# when the gate's marker <path>.ready says the gate built it. Returns 1 when
-# the path is gone, 0 when a folder without the marker was left alone.
-sub remove_checkout {
+# when the gate's marker <path>.ready says the gate built it. With $old_too
+# (the prune), a folder with no marker is removed too when old_checkout says
+# it is an old checkout of the gate. Returns 1 when the path is gone, 0 when
+# a folder without the marker was left alone.
+my $OLD_DAYS = 7;
+# True for a checkout from before the marker existed: git lists the path as a
+# worktree of this repo, and the folder is over $OLD_DAYS days old.
+sub old_checkout {
   my ($dir) = @_;
+  my $mtime = (lstat $dir)[9];
+  return 0 unless defined $mtime && time - $mtime > $OLD_DAYS * 86400;
+  my $real = realpath($dir) // $dir;
+  for my $line (split /\n/, git_out($head, "worktree", "list", "--porcelain")) {
+    next unless $line =~ /^worktree (.+)$/;
+    return 1 if $1 eq $dir || $1 eq $real || (realpath($1) // "") eq $real;
+  }
+  return 0;
+}
+sub remove_checkout {
+  my ($dir, $old_too) = @_;
   return 1 unless $cache ne "" && $dir =~ m{^\Q$cache\E/[0-9a-f]{40}$};
   if (-l $dir) { unlink $dir; unlink "$dir.ready"; return !-l $dir; }
-  return 0 if -e $dir && !-e "$dir.ready";
+  return 0 if -e $dir && !-e "$dir.ready" && !($old_too && old_checkout($dir));
   git_quiet($head, "worktree", "remove", "--force", $dir) if -e $dir;
   remove_tree($dir) if -e $dir;
   unlink "$dir.ready";
@@ -141,8 +161,8 @@ if ($sha ne "") {
     next unless $old =~ m{/([0-9a-f]{40})$};
     open(my $u, ">>", "$cache/$1.use") or next;
     if (flock($u, LOCK_EX | LOCK_NB)) {
-      if (remove_checkout($old)) { unlink "$cache/$1.use"; }
-      else { print STDERR "perf gate: left $old alone: the gate did not build it (no $old.ready). Remove it by hand if it is old.\n"; }
+      if (remove_checkout($old, 1)) { unlink "$cache/$1.use"; }
+      else { print STDERR "perf gate: left $old alone: the gate did not build it (no $old.ready). Remove it by hand if it is old. (The gate prunes it itself only when git lists it as a worktree of this repo and it is over $OLD_DAYS days old.)\n"; }
     }
     close $u;
   }

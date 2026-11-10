@@ -354,6 +354,62 @@ gate() {
   [ "$(cat "$CACHE/$a/mine.txt")" = keep ]
 }
 
+# old_unmarked <days>: an old gate checkout from before the marker existed: a
+# registered worktree at <cache>/<commit>, no .ready file, that many days old.
+# A second, new folder is there too, because the prune keeps the newest one.
+# Sets OLD to the path.
+old_unmarked() {
+  local sha
+  sha="$(git -C "$FIX" rev-parse main)"
+  quicker 0.07
+  merge "the base moves on"
+  mkdir -p "$CACHE/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  OLD="$CACHE/$sha"
+  git -C "$FIX" worktree add -q --detach "$OLD" "$sha"
+  /usr/bin/perl -e 'my $t = time - $ARGV[0] * 86400; utime($t, $t, $ARGV[1]) or die' "$1" "$OLD"
+  quicker 0.04
+}
+
+@test "an unmarked folder that is a registered worktree and 8 days old is pruned, with no note" {
+  old_unmarked 8
+  gate
+  [ "$status" -eq 0 ]
+  [ ! -e "$OLD" ]
+  [[ "$output" != *"left $OLD alone"* ]]
+  ! git -C "$FIX" worktree list --porcelain | grep -qF "$OLD"
+}
+
+@test "an unmarked folder that is a registered worktree but 6 days old stays" {
+  old_unmarked 6
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked folder that is not a registered worktree stays at any age" {
+  old_unmarked 8
+  git -C "$FIX" worktree remove --force "$OLD"
+  mkdir -p "$OLD"
+  echo keep > "$OLD/mine.txt"
+  /usr/bin/perl -e 'my $t = time - 400 * 86400; utime($t, $t, $ARGV[0]) or die' "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ "$(cat "$OLD/mine.txt")" = keep ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked old folder that another gate uses stays" {
+  old_unmarked 8
+  /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH) or die; $| = 1; print "held\n"; sleep 60' \
+    "$OLD.use" > "$TEST_DIR/holder.out" &
+  HOLDER=$!
+  wait_for_holder "$TEST_DIR/holder.out"
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+}
+
 @test "a cache path with a space still prunes old checkouts" {
   export XDG_CACHE_HOME="$TEST_DIR/my cache"
   local spaced="$XDG_CACHE_HOME/dotfiles/perf-gate.noindex" first

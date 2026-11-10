@@ -332,7 +332,10 @@ baseline, so it works the same on every machine.
   changed, new, or ignored file; if not, it builds the checkout again. It
   builds and removes checkouts under a lock, and removes only its own: a
   folder with the marker `<commit>.ready` next to it. It unlinks a symlink
-  without following it.
+  without following it. A checkout from before the marker existed has none:
+  the prune removes it when git lists it as a worktree of this repo and it is
+  over 7 days old. Any other unmarked folder stays, and the gate prints a note
+  with its path.
 - **Field numbers**: the gate measures one machine before a merge. Numbers
   from real installs will be on the performance dashboard (link: to be added
   with the telemetry timing events).

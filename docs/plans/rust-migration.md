@@ -5,7 +5,8 @@ This plan was rewritten on 2026-11-10 after the
 [validation review](#validation-review-2026-11-09). No code is ported yet.
 The re-plan Pivot did not apply: gate G stays. A first independent review of
 this rewrite found five of the seven MUST findings only partly resolved. This
-revision applies its fixes. A second review has not confirmed them yet. The
+revision applies its fixes. A second independent review on 2026-11-10 graded all
+seven findings resolved in both plans. The
 owner has not ruled on the defaults in
 [Decisions](#decisions-2026-11-10); the agentbrew task
 `rust-owner-rules-on-replan-defaults` tracks that. The measured hot paths
@@ -48,8 +49,9 @@ Two existing tools measure each slice:
   ([details](../observability.md#telemetry)). The owner's dashboard
   ("Tooling performance: agentbrew + dotfiles", private since 2026-11-10)
   shows p50 and p95 of `duration_ms` by command, version and runtime. It
-  needs a login; a public link is to be added. The local logs are the
-  fallback.
+  is in the owner's PostHog project and needs a login. It cannot be
+  verified from the repository. A public link is to be added. The local
+  logs are the fallback.
 
 ## Evidence and current state
 
@@ -483,8 +485,9 @@ the reviewer wrote it.
 
 Status on 2026-11-10: a first review of the re-plan graded findings 1, 2
 and 6 resolved and findings 3, 4, 5 and 7 partly resolved in this
-repository. This revision applies the fixes it asked for. No second review
-has confirmed them. The task's Success line needs that confirmation.
+repository. This revision applies the fixes it asked for. A second
+independent review on 2026-11-10 graded all seven findings resolved in both
+plans.
 
 ### Resolved findings (2026-11-10)
 

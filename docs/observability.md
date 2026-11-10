@@ -86,7 +86,8 @@ the answer, then `Share anonymous performance numbers? [Y/n]`.
 
 - **No key, no question.** With no key nothing could be sent, so nobody is
   asked and the installer prints nothing about telemetry. The committed
-  `config/telemetry-key` is empty for now.
+  `config/telemetry-key` holds the project's write-only key since 2026-11-10;
+  a fork that empties it gets no question.
 
 - Enter or `y` records **yes**. `n` records **no**. One line confirms the
   answer and names the command that changes it.

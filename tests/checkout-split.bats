@@ -137,7 +137,7 @@ esac
 FAKE
   chmod +x "$TEST_DIR/fakebin/chezmoi"
 
-  run env HOME="$home" PATH="$TEST_DIR/fakebin:$PATH" DOTFILES_DOCTOR_NOTIFY=0 \
+  run env HOME="$home" PATH="$TEST_DIR/fakebin:$PATH" DOTFILES_DOCTOR_NOTIFY=0 DOTFILES_CI=false \
     "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" --fix --module security --quiet
   [ "$status" -ne 0 ]
   [ "$(stat -f '%Lp' "$home/.ssh")" = "755" ]

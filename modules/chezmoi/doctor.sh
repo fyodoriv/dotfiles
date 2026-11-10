@@ -1,5 +1,6 @@
 #!/bin/bash
-# Doctor checks for chezmoi-managed symlink integrity.
+# Doctor checks for what `dotfiles apply` (chezmoi) needs: a usable telemetry
+# state file, and chezmoi-managed symlink integrity.
 #
 # When the dotfiles repo is relocated (e.g. `~/apps/dotfiles` →
 # `~/apps/tooling/dotfiles`) the chezmoi-managed symlinks like `~/.zshrc`,
@@ -22,6 +23,41 @@
 # pointed at the gone path; manual `chezmoi apply --exclude=scripts` was
 # needed to recover. No doctor check caught it.
 
+# ── Telemetry state file ────────────────────────────────────────────────
+# `dotfiles apply` reads the telemetry answer from this file, and
+# bin/dotfiles-telemetry reads and writes it. A file that another user owns
+# (for example root, after an old `sudo` run) or that has no read or write bit cannot
+# be used: apply then reads the answer as "not yes", and the answer cannot be
+# changed. No file is fine: nobody answered yet. The owner is read with `ls`,
+# which prints the same on macOS and Linux. DOTFILES_TELEMETRY_TEST_UID is for
+# tests only.
+_telemetry_state_file="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
+_telemetry_state_mine() {
+  local uid owner
+  uid="$(id -u)"
+  [ -z "${BATS_TEST_FILENAME:-}" ] || uid="${DOTFILES_TELEMETRY_TEST_UID:-$uid}"
+  # shellcheck disable=SC2012  # one fixed path, read for its numeric owner
+  owner="$(ls -ldn "$_telemetry_state_file" 2>/dev/null | awk '{print $3}')"
+  [ "$owner" = "$uid" ]
+}
+_telemetry_state_usable() {
+  [ -e "$_telemetry_state_file" ] || [ -L "$_telemetry_state_file" ] || return 0
+  _telemetry_state_mine && [ -r "$_telemetry_state_file" ] && [ -w "$_telemetry_state_file" ]
+}
+printf -v _telemetry_state_q '%q' "$_telemetry_state_file"
+if [ -e "$_telemetry_state_file" ] && ! _telemetry_state_mine; then
+  _telemetry_state_help="telemetry state file belongs to another user. You: open Terminal and run sudo chown \"\$(id -un)\" $_telemetry_state_q && chmod 600 $_telemetry_state_q"
+else
+  _telemetry_state_help="telemetry state file is not readable or not writable. You: open Terminal and run chmod 600 $_telemetry_state_q"
+fi
+check "chezmoi.telemetry_state_readable" \
+  "telemetry state file is yours and readable (or absent)" \
+  "_telemetry_state_usable" \
+  "[ -O $_telemetry_state_q ] && chmod 600 $_telemetry_state_q" \
+  "$_telemetry_state_help"
+unset _telemetry_state_q _telemetry_state_help
+
+# ── Managed symlinks ────────────────────────────────────────────────────
 if ! command -v chezmoi >/dev/null 2>&1; then
   # `audit_warn` is the doctor-framework helper for non-fatal advisories.
   # Skip the sweep entirely — without chezmoi we can't enumerate the

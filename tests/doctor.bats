@@ -502,6 +502,7 @@ setup_defaults_mock() {
 
   run env \
     HOME="$TEST_HOME" \
+    DOTFILES_CI=false \
     GIT_CONFIG_GLOBAL="$TEST_DIR/gitconfig" \
     DOTFILES_LOCK="$TEST_DIR/doctor-json.lock" \
     PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
@@ -572,6 +573,7 @@ EOF
 
   run env \
     HOME="$TEST_HOME" \
+    DOTFILES_CI=false \
     BASH_ENV= \
     ENV= \
     AGENTBREW_CALL_LOG="$TEST_DIR/agentbrew-calls.log" \

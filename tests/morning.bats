@@ -9,6 +9,8 @@ MORNING_CMD="$BATS_TEST_DIRNAME/../bin/morning"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
+  # The tests expect "main". A clean machine has no init.defaultBranch.
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main
   TEST_HOME="$TEST_DIR/home"
   TEST_REPOS="$TEST_DIR/repos"
   STUB_DIR="$TEST_DIR/stubs"

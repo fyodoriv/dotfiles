@@ -793,15 +793,17 @@ drain_input() {
 # The first-run gate in lib/stats.sh must know "a question was dismissed
 # today" without a new process, and bash 3.2 has no clock of its own. So the
 # day is kept as a file time: this marker's modification time is the next UTC
-# midnight. The gate writes an empty file (its time is now) and compares the
-# two with a bash test. When the marker cannot be written, the gate falls
-# back to one `date` call.
+# midnight. The gate compares it with the time of a bash here-string, which
+# is "now" and leaves no file. When the marker cannot be written, the gate
+# falls back to one `date` call.
 mark_asked_today() {
   local next stamp=""
   next=$((($(date +%s) / 86400 + 1) * 86400))
   # BSD date reads -r SECONDS; GNU date reads -d @SECONDS.
   stamp="$(TZ=UTC date -r "$next" +%Y%m%d%H%M.%S 2>/dev/null)" || stamp=""
   [[ "$stamp" =~ ^[0-9]{12}\.[0-9]{2}$ ]] || stamp="$(TZ=UTC date -d "@$next" +%Y%m%d%H%M.%S 2>/dev/null)" || stamp=""
+  # An older version left this clock file on disk; the gate needs none now.
+  rm -f "$ASKED_UNTIL.now" 2>/dev/null
   if [[ "$stamp" =~ ^[0-9]{12}\.[0-9]{2}$ ]] && (umask 077 && TZ=UTC touch -t "$stamp" "$ASKED_UNTIL") 2>/dev/null; then
     return 0
   fi
@@ -827,7 +829,9 @@ cmd_cap_commands() {
     lines="$(line_count "$COMMANDS")"
     drop=$((lines - COMMANDS_KEEP))
     if [ "$READ_FAILED" -eq 0 ] && [ "$drop" -gt 0 ]; then
-      if tail -n "$COMMANDS_KEEP" "$COMMANDS" >"$tmp" 2>/dev/null && mv -f "$tmp" "$COMMANDS" 2>/dev/null; then
+      # Cut by the counted lines, not "the newest N": a line that a command
+      # appends after the count is then kept, and the cursor stays right.
+      if tail -n "+$((drop + 1))" "$COMMANDS" >"$tmp" 2>/dev/null && mv -f "$tmp" "$COMMANDS" 2>/dev/null; then
         if [ -e "$STATE" ] && [ "$STATE_INVALID" -eq 0 ] && state_owned; then
           if [ "$S_SENT_COMMANDS" -gt "$drop" ]; then S_SENT_COMMANDS=$((S_SENT_COMMANDS - drop)); else S_SENT_COMMANDS=0; fi
           save_state
@@ -877,6 +881,12 @@ cmd_ask() {
   fi
   # An opt-out always wins, also over an earlier yes.
   if [ -n "$optout" ]; then
+    if [ "$S_CONSENT" != "no" ] && is_root; then
+      # Root saves nothing, so the "no" would be lost and the question could
+      # come back. Say so, and say how to save it.
+      echo "telemetry: your opt-out ($optout) was not saved: this run is root (sudo). Nothing is sent as root. Save it as your user: dotfiles telemetry off" >&2
+      return 0
+    fi
     [ "$S_CONSENT" = "no" ] || record_consent no || return 0
     echo "telemetry: off ($optout). Nothing is sent. Turn it on later: dotfiles telemetry on"
     return 0

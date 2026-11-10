@@ -8,7 +8,10 @@
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 # self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
 # chrome options: {{ include "lib/chrome-purpose-options.sh" | sha256sum }}
-# telemetry consent: {{ $telemetryState := env "DOTFILES_TELEMETRY_STATE" | default (joinPath (env "XDG_STATE_HOME" | default (joinPath .chezmoi.homeDir ".local/state")) "dotfiles" "telemetry.json") }}{{ $telemetryAnswer := "not yes" }}{{ if stat $telemetryState }}{{ if contains "\"consent\":\"yes\"" (include $telemetryState) }}{{ $telemetryAnswer = "yes" }}{{ end }}{{ end }}{{ $telemetryAnswer }}
+# The telemetry answer is read with grep, not `include`: a state file that
+# cannot be read (root-owned after an old sudo run) then means "not yes" and
+# never fails the render.
+# telemetry consent: {{ $telemetryState := env "DOTFILES_TELEMETRY_STATE" | default (joinPath (env "XDG_STATE_HOME" | default (joinPath .chezmoi.homeDir ".local/state")) "dotfiles" "telemetry.json") }}{{ output "/bin/sh" "-c" "if grep -q '\"consent\":\"yes\"' \"$1\" 2>/dev/null; then echo yes; else echo 'not yes'; fi" "sh" $telemetryState | trim }}
 # plugins.lock: {{ $lock := joinPath .chezmoi.homeDir ".config/dotfiles/plugins.lock" }}{{ if stat $lock }}{{ include $lock | sha256sum }}{{ end }}
 set -euo pipefail
 

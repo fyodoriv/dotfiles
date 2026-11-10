@@ -845,7 +845,8 @@ SH
   say_yes
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
-  grep -q -- "--max-time 3 " "$FAKE_LOG.args"
+  # 3 seconds in total: on a slow machine a second or two is gone before the request.
+  grep -Eq -- "--max-time [1-3] " "$FAKE_LOG.args"
   echo "{\"task\":\"sync\",\"timestamp\":\"$NOW\",\"units\":1}" >>"$DOTFILES_STATS_FILE"
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
@@ -1282,8 +1283,6 @@ wait_for_last_send() {
   [ ! -s "$TEST_DIR/launchctl.log" ]
   [ ! -e "$TEST_DIR/telemetry.log" ]
   [ -s "$PLIST" ]
-  # The hooks in lib/stats.sh start nothing for root (plain bash, EUID).
-  grep -q 'EUID' "$REPO/lib/stats.sh"
 }
 
 @test "apply runs the LaunchAgent script again when the telemetry answer changes" {
@@ -1420,4 +1419,191 @@ wait_for_last_send() {
   [ "$status" -eq 0 ]
   [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 1 ]
   [ "$(requests)" -eq 0 ]
+}
+
+# ── Review nits of PR #567 ──────────────────────────────────────────────
+
+@test "a line appended during the cap's cut is kept and sent exactly once" {
+  say_yes
+  : >"$DOTFILES_STATS_FILE"
+  line() { echo "{\"command\":\"$1\",\"timestamp\":\"$NOW\",\"ok\":true,\"duration_ms\":$2}"; }
+  for ((i = 1; i <= 20001; i++)); do line status "$i"; done >"$DOTFILES_COMMANDS_FILE"
+  set_state '.sent_commands = 20001' # every line is sent already
+  # A tail that first appends one line: a command that ends during the cut.
+  mkdir "$TEST_DIR/slow"
+  line doctor 7 >"$TEST_DIR/late-line"
+  printf '#!/bin/bash\ncat "%s" >>"%s"\nexec "%s" "$@"\n' \
+    "$TEST_DIR/late-line" "$DOTFILES_COMMANDS_FILE" "$(command -v tail)" >"$TEST_DIR/slow/tail"
+  chmod +x "$TEST_DIR/slow/tail"
+  PATH="$TEST_DIR/slow:$PATH" bash "$TEL" cap-commands
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10001 ]
+  [ "$(jq -r .sent_commands "$DOTFILES_TELEMETRY_STATE")" -eq 10000 ]
+  bash "$TEL" send >/dev/null
+  [ "$(jq -s -r '[.[].batch[].properties.command] | join(",")' "$FAKE_LOG")" = "doctor" ]
+  bash "$TEL" send >/dev/null
+  [ "$(jq -s '[.[].batch[]] | length' "$FAKE_LOG")" -eq 1 ]
+}
+
+@test "a state path with & or < still gives a valid LaunchAgent plist" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v plutil >/dev/null 2>&1 || skip "plutil not installed"
+  plist="$REPO/launchagents/com.dotfiles.telemetry.plist.tmpl"
+  render() { { printf '{{- $_ := set . "dotfiles_dir" "apps/dotfiles" -}}\n'; cat "$plist"; } | chezmoi execute-template --source "$REPO"; }
+  XDG_STATE_HOME="$TEST_DIR/a&b <c>" render >"$TEST_DIR/odd.plist"
+  plutil -lint "$TEST_DIR/odd.plist"
+  # launchd reads back the same path.
+  [ "$(plutil -extract EnvironmentVariables.XDG_STATE_HOME raw "$TEST_DIR/odd.plist")" = "$TEST_DIR/a&b <c>" ]
+}
+
+@test "an install opt-out as root says it was not saved, and how to save it" {
+  run env DOTFILES_TELEMETRY_TEST_UID=0 bash "$TEL" ask --install --no
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"was not saved"* ]]
+  [[ "$output" == *"dotfiles telemetry off"* ]]
+  [[ "$output" != *"telemetry: off (--no-telemetry). Nothing is sent."* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+  # A stored no of the user needs no new save: the normal line shows.
+  bash "$TEL" off >/dev/null
+  run env DOTFILES_TELEMETRY_TEST_UID=0 bash "$TEL" ask --install --no
+  [[ "$output" == *"telemetry: off (--no-telemetry)"* ]]
+  [[ "$output" != *"was not saved"* ]]
+}
+
+@test "the hooks in lib/stats.sh start nothing for root: no question, no send" {
+  gate_root
+  # No answer yet: a normal user is asked, root is not.
+  [ "$(ask_starts)" -eq 1 ]
+  [ "$(DOTFILES_TELEMETRY_TEST_UID=0 ask_starts)" -eq 0 ]
+  # A stored yes: a terminal run starts the daily send, but not for root.
+  say_yes
+  daily_starts() {
+    local tries=0
+    : >"$TEST_DIR/gate.calls"
+    DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1 bash -c "source '$GATE/lib/stats.sh'; _telemetry_daily '$NOW'"
+    until [ -s "$TEST_DIR/gate.calls" ] || [ "$tries" -ge 20 ]; do tries=$((tries + 1)); sleep 0.05; done
+    grep -c '^daily$' "$TEST_DIR/gate.calls" || true
+  }
+  [ "$(DOTFILES_TELEMETRY_TEST_UID=0 daily_starts)" -eq 0 ]
+  [ "$(daily_starts)" -eq 1 ]
+}
+
+@test "a dismissed question leaves no clock file behind" {
+  gate_root
+  run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
+  [ -e "$TEST_DIR/telemetry.asked-until" ]
+  [ "$(ask_starts)" -eq 0 ] # dismissed today: the gate compares the times
+  [ ! -e "$TEST_DIR/telemetry.asked-until.now" ]
+  # A file left by an older version goes away with the next question.
+  : >"$TEST_DIR/telemetry.asked-until.now"
+  set_state '.asked_day = "2020-01-01"'
+  touch -t 202001010000 "$TEST_DIR/telemetry.asked-until"
+  run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
+  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" -eq 2 ]
+  [ ! -e "$TEST_DIR/telemetry.asked-until.now" ]
+}
+
+# ── The commands log cap without jq, and as root ────────────────────────
+
+# Seed a log one line under the cut limit plus one; the hook adds one more.
+over_limit_log() {
+  for ((i = 1; i <= 20001; i++)); do echo "{\"command\":\"status\",\"timestamp\":\"$NOW\",\"ok\":true,\"duration_ms\":$i}"; done >"$DOTFILES_COMMANDS_FILE"
+}
+
+@test "with no jq and no state file the commands log is still capped" {
+  export DOTFILES_STATS_LOG=1
+  over_limit_log
+  # A PATH with the plain tools only: no jq.
+  mkdir "$TEST_DIR/nojq"
+  for tool in bash date mkdir wc tail cp mv rm dirname; do ln -s "$(command -v "$tool")" "$TEST_DIR/nojq/$tool"; done
+  env PATH="$TEST_DIR/nojq" DOTFILES_COMMANDS_ROTATE_NOW=1 /bin/bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  [[ "$(tail -n 1 "$DOTFILES_COMMANDS_FILE")" == *'"command":"doctor"'* ]]
+  [ -z "$(ls "$TEST_DIR" | grep 'commands.jsonl.tmp' || true)" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+}
+
+@test "as root with no state file the commands log is still capped, and keeps its mode" {
+  export DOTFILES_STATS_LOG=1
+  over_limit_log
+  chmod 640 "$DOTFILES_COMMANDS_FILE"
+  DOTFILES_TELEMETRY_TEST_UID=0 DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  [[ "$(tail -n 1 "$DOTFILES_COMMANDS_FILE")" == *'"command":"doctor"'* ]]
+  [[ "$(ls -l "$DOTFILES_COMMANDS_FILE")" == -rw-r-----* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+}
+
+@test "with a state file the cap goes through cap-commands, never the plain cut" {
+  export DOTFILES_STATS_LOG=1
+  gate_root # its fake bin/dotfiles-telemetry only logs the call
+  over_limit_log
+  echo '{"consent":"no"}' >"$DOTFILES_TELEMETRY_STATE"
+  : >"$TEST_DIR/gate.calls"
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$GATE/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(cat "$TEST_DIR/gate.calls")" = "cap-commands" ]
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 20002 ]
+  # With no state file the hook cuts by itself and starts no script.
+  rm -f "$DOTFILES_TELEMETRY_STATE"
+  : >"$TEST_DIR/gate.calls"
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$GATE/lib/stats.sh'; log_command doctor ok 5"
+  [ ! -s "$TEST_DIR/gate.calls" ]
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+}
+
+# ── A state file that cannot be read ────────────────────────────────────
+
+@test "apply still renders with an unreadable state file, and reads it as not yes" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  [ "$(id -u)" != "0" ] || skip "root can read every file"
+  consent_line() {
+    grep '^# telemetry consent:' "$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl" |
+      chezmoi execute-template --source "$REPO"
+  }
+  bash "$TEL" on >/dev/null
+  [[ "$(consent_line)" == *"consent: yes" ]]
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  run consent_line
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "# telemetry consent: not yes" ]
+  # The script body agrees: the agent stays off for that file.
+  apply="$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$apply")"
+  PROFILE=full
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  run should_skip_agent telemetry
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [ "$status" -eq 0 ]
+}
+
+@test "the doctor reports a telemetry state file that is not yours or not readable" {
+  # Load only the telemetry part of the chezmoi doctor module, with a check
+  # function that records the result and the help text.
+  check() {
+    if eval "$3" >/dev/null 2>&1; then echo "pass $1"; else echo "fail $1 | fix: $4 | $5"; fi
+  }
+  doctor() { eval "$(sed -n '/^# ── Telemetry state file/,/^# ── /p' "$REPO/modules/chezmoi/doctor.sh")"; }
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ] # no file: nobody answered
+  bash "$TEL" off >/dev/null
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ]
+  # No read bit (for example mode 000).
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  run doctor
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [[ "$output" == "fail chezmoi.telemetry_state_readable"* ]]
+  [[ "$output" == *"chmod 600"* ]]
+  # Another owner (for example root after an old sudo run): the fix needs sudo.
+  DOTFILES_TELEMETRY_TEST_UID=12345 run doctor
+  [[ "$output" == "fail chezmoi.telemetry_state_readable"* ]]
+  [[ "$output" == *"sudo chown"* ]]
+  [[ "$output" == *"$DOTFILES_TELEMETRY_STATE"* ]]
+  # The automatic fix repairs a file of your own.
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  fix="$(doctor | sed 's/.*| fix: \(.*\) | .*/\1/')"
+  bash -c "$fix"
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ]
+  [ "$(consent)" = "no" ]
 }

@@ -371,48 +371,6 @@ them. -->
   - **Anchor**: PR #562 push block on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — correctness of an existing privacy gate, not a scorecard metric.
 
-- [ ] Cap the telemetry command log for root and for a machine without jq
-  - **ID**: telemetry-commands-log-cap-without-jq-or-as-root
-  - **Tags**: telemetry, reliability
-  - **Details**: `lib/stats.sh` (`_commands_log_cap`) asks `bin/dotfiles-telemetry cap-commands` to cut `commands.jsonl` when it grows over the cut limit. That command exits early in two cases. It exits 1 when jq is missing (the check near line 126). It exits for root (the root guard), and a container user is often root. In both cases nothing cuts the log, so `commands.jsonl` grows without end. Idea: when no telemetry state file exists, there is no cursor to protect. Then `lib/stats.sh` can do a plain `tail` to a temp file and `mv`. Keep the `cap-commands` path when a state file exists, because it moves the cursor under its lock.
-  - **Files**: `lib/stats.sh`, `bin/dotfiles-telemetry`, `tests/telemetry.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: failing tests first. With jq off PATH and no state file, a log one line over the cut limit is cut to the keep limit. The same holds with the test uid set to 0. With a state file present, the cut still goes through `cap-commands` and the cursor moves back by the number of dropped lines.
-  - **Hypothesis**: a plain cap in the hook moves the count of cases where an over-limit log is cut to the keep limit from 0 of 2 to 2 of 2 (no jq, root), with 0 lost unsent lines when a state file exists.
-  - **Measurement**: `bats tests/telemetry.bats`, with the new cases.
-  - **Success**: the log is at the keep limit in both new cases; every older cursor test passes.
-  - **Pivot**: if a plain cut can race with a send and lose an unsent line, drop the fallback and make `cap-commands` itself work without jq and as root.
-  - **Anchor**: review of PR #567 on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — bounded disk use of an existing log, not a scorecard metric.
-
-- [ ] Keep `dotfiles apply` working when the telemetry state file is unreadable
-  - **ID**: apply-tolerates-unreadable-telemetry-state
-  - **Tags**: telemetry, reliability, apply
-  - **Details**: The consent line near the top of `.chezmoiscripts/run_onchange_launchagents.sh.tmpl` runs `include` on the telemetry state file when `stat` finds it. A file that exists but is unreadable makes the template fail, and then `dotfiles apply` can fail. One way to get such a file: an old `sudo` run left it root-owned with mode 600. Not reproduced yet: reproduce it first. Idea: treat an unreadable file as "not yes" in the template. Add a doctor check that reports a state file the user does not own, with the fix command.
-  - **Files**: `.chezmoiscripts/run_onchange_launchagents.sh.tmpl`, `modules/` (the telemetry or observability doctor), `tests/telemetry.bats`, `docs/observability.md`, `docs/module-reference.md`.
-  - **Output**: code
-  - **Acceptance**: a failing test first: render the template with a state file of mode 000 and assert exit 0 and a "not yes" consent line. The doctor check fails on a state file with a different owner or no read bit, and names the fix.
-  - **Hypothesis**: a tolerant read moves the template render with an unreadable state file from exit non-zero to exit 0, and the LaunchAgent stays off in that case.
-  - **Measurement**: `bats tests/telemetry.bats`, with the new render case and the doctor case.
-  - **Success**: exit 0 and "not yes" in the render case; the doctor case reports the file; every older consent test passes.
-  - **Pivot**: if chezmoi templates cannot test readability without a failing `include`, move the consent read out of the template into the script body (a `grep` with `2>/dev/null`).
-  - **Anchor**: review of PR #567 on 2026-11-10; Forsgren, Humble and Kim (2018), Accelerate (change failure rate).
-  - **Competitive-goal**: none — install reliability of an existing script, not a scorecard metric.
-
-- [ ] Fix five small telemetry defects found in review
-  - **ID**: telemetry-review-nits
-  - **Tags**: telemetry, reliability, tests
-  - **Details**: Five small items from the review of PR #567. (1) The command-log cap can shift the cursor by one when a line is appended during the cut: count the dropped lines and cut with `tail -n +$((drop+1))`. (2) `launchagents/com.dotfiles.telemetry.plist.tmpl` writes `XDG_STATE_HOME` into the plist without XML escaping; a path with `&` or `<` breaks the plist. (3) A root install with an opt-out prints the "(sudo)" line and saves no "no" answer, so the question can come back. (4) The `EUID` guards in `lib/stats.sh` are tested only by a grep of the source: add the test uid seam that `bin/dotfiles-telemetry` already has (`DOTFILES_TELEMETRY_TEST_UID`) and test the behavior. (5) The file `telemetry.asked-until.now` stays on disk until the user answers: remove it after the time compare.
-  - **Files**: `bin/dotfiles-telemetry`, `lib/stats.sh`, `launchagents/com.dotfiles.telemetry.plist.tmpl`, `tests/telemetry.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: one failing test first for each item, then the fix. Item 1: a line appended during the cut is sent exactly once. Item 2: a state path with `&` gives a plist that `plutil -lint` accepts. Item 3: the opt-out as root either saves "no" or prints a line that says how to save it as the user. Item 4: the guard test runs the function with the test uid 0. Item 5: no `.asked-until.now` file is left after a dismissed question.
-  - **Hypothesis**: the five fixes move the count of known open review findings on the telemetry path from 5 to 0, with 0 changed behavior for a normal user.
-  - **Measurement**: `bats tests/telemetry.bats`, with the five new cases.
-  - **Success**: all five new cases pass and every older telemetry test passes.
-  - **Pivot**: if one item needs a design change (for example a root-owned "no" file), split it into its own task and ship the other four.
-  - **Anchor**: review of PR #567 on 2026-11-10; Fagan (1976), Design and code inspections to reduce errors in program development.
-  - **Competitive-goal**: none — correctness of an existing feature, not a scorecard metric.
-
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
@@ -423,6 +381,34 @@ them. -->
   - **Files**: `skills/tooling-checkup/scripts/dashboard_export.py`, `skills/tooling-checkup/dashboard/index.html`, `skills/tooling-checkup/scripts/dashboard_comfort.cjs`, `tests/tooling-checkup-dashboard.bats`
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
+
+- [ ] Telemetry notices an unusable state folder, and cuts the log beside an unreadable state file
+  - **ID**: telemetry-state-folder-and-unreadable-cap
+  - **Tags**: telemetry, doctor
+  - **Details**: Two leftovers from the 2026-11-10 review of the telemetry follow-ups. (1) The doctor check `chezmoi.telemetry_state_readable` passes when the state folder itself is root-owned with mode 700: the file test then says "absent", while telemetry can read and write nothing. (2) With a state file that exists but cannot be read, `_commands_log_cap` starts `dotfiles-telemetry cap-commands`, which cuts nothing, so `commands.jsonl` grows until the user fixes the file.
+  - **Files**: `modules/chezmoi/doctor.sh`, `lib/stats.sh`, `tests/telemetry.bats`, `docs/observability.md`
+  - **Output**: code
+  - **Acceptance**: a bats test with a state folder the user cannot enter makes the doctor check fail with the fix command; a bats test with an unreadable state file and a log over the cap ends with a log at the cap.
+  - **Hypothesis**: the two cases where telemetry state is unusable without a report or a log cut go from 2 to 0.
+  - **Measurement**: `heavy-run bats tests/telemetry.bats`
+  - **Success**: both new tests pass (red before the fix), and every older test passes.
+  - **Pivot**: the folder check needs a root-only fixture or grows past a small helper -> document the case in `docs/observability.md` and close.
+  - **Anchor**: review of the telemetry follow-ups, 2026-11-10; Basili, Caldiera and Rombach 1994 (GQM).
+  - **Competitive-goal**: none — telemetry robustness, not a scorecard metric.
+
+- [ ] `hotfix` finds the default branch of a repo whose default is not `main`
+  - **ID**: hotfix-default-branch-without-origin-head
+  - **Tags**: git, workflow
+  - **Details**: Found on 2026-11-10, when the hosted check first ran `tests/hotfix.bats` on a clean machine. `bin/hotfix` reads the default branch from `origin/HEAD` and falls back to `main` when that ref is not set. In a repo whose default branch is `master` and that has no `origin/HEAD`, `hotfix` fails. The tests now set the branch name to `main`, so no test covers this case.
+  - **Files**: `bin/hotfix`, `tests/hotfix.bats`
+  - **Output**: code
+  - **Acceptance**: a bats test with a `master`-only repo and no `origin/HEAD` creates the hotfix branch from `master`.
+  - **Hypothesis**: `hotfix` runs that fail in a `master`-only repo without `origin/HEAD` go from every run to 0.
+  - **Measurement**: `heavy-run bats tests/hotfix.bats`
+  - **Success**: the new test passes (red before the fix), and every older test passes.
+  - **Pivot**: the lookup needs a network call -> print a clear error that names the fix (`git remote set-head origin -a`) and close.
+  - **Anchor**: review of the hosted-runner test fix, 2026-11-10; Basili, Caldiera and Rombach 1994 (GQM).
+  - **Competitive-goal**: none — workflow robustness, not a scorecard metric.
 
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint

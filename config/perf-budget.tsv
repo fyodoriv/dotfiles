@@ -39,4 +39,3 @@ PERF_GATE_PATH=scripts/perf-gate.pl
 # A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
 # tests/perf-gate.bats changes its own judge. It needs the line
 # PERF_GATE_ALLOW=perf-gate:<reason>.
-PERF_GATE_ALLOW=perf-gate:two-rule estimator (min and paired median), prune of old unmarked cache folders, checked lock wait in one test

@@ -1471,9 +1471,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and editing rules. See [
 
 ### Where tests run
 
-Bats and shellcheck run only on a developer machine, through `make check`. The workflows in `.github/workflows/` do not run anywhere today:
+Bats and shellcheck run in two places:
 
-- **`fyodoriv/dotfiles`**: Actions is turned off, so no workflow runs on pushes or PRs.
+- **Your machine**: `make check`, before every commit. The private-pattern leak gates (pre-commit, pre-push, `bin/gh`) run only here.
+- **GitHub Actions** on `fyodoriv/dotfiles`: the same `make check` on a hosted macOS runner for every pull request, and the full suite on every push to `feat/chezmoi`. Hosted runners are free for public repositories. Jobs, limits, and what stays local: [docs/ci-setup.md](docs/ci-setup.md).
 
 So run `make check` (or the affected `bats` files) before you push, and paste the result in the PR test plan.
 

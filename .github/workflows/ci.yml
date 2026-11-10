@@ -11,6 +11,10 @@ name: CI
 # - macOS jobs are few on purpose: the free plan runs 5 at a time.
 
 on:
+  pull_request:
+    branches: [feat/chezmoi]
+  push:
+    branches: [feat/chezmoi]
   workflow_dispatch:
 
 permissions:

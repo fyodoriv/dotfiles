@@ -103,6 +103,20 @@ them. -->
   - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — a process decision, not a scorecard metric.
 
+- [ ] Pin the Bats version in the hosted coverage job
+  - **ID**: ci-coverage-pin-bats-core
+  - **Tags**: ci, security, supply-chain
+  - **Details**: The `coverage` job in `.github/workflows/ci.yml` runs `git clone --depth 1` of the `bats-core` default branch and installs it with `sudo`. Every other dependency of the workflows is pinned to a commit SHA, and `tests/github-workflows.bats` enforces that only for `uses:` lines. A changed upstream branch would run unreviewed code on the runner. The job holds a read-only token and no secret, so the risk is a broken or misleading coverage run, not a leak. Check out one release commit instead, and extend the Bats test to reject an unpinned `git clone` in a workflow.
+  - **Files**: `.github/workflows/ci.yml`, `tests/github-workflows.bats`.
+  - **Output**: code
+  - **Acceptance**: the coverage job installs Bats at one named commit SHA, and the workflow test fails when a workflow clones a repository without a pinned commit.
+  - **Hypothesis**: pinning moves unpinned third-party code fetched by the workflows from 1 source to 0.
+  - **Measurement**: `bats tests/github-workflows.bats`, with a new test that counts `git clone` lines without a following `git checkout <40-hex>`.
+  - **Success**: 0 unpinned sources, and the new test is red on the unchanged workflow.
+  - **Pivot**: if a pinned Bats cannot run the coverage suite, drop the clone and use the runner's packaged Bats instead.
+  - **Anchor**: OpenSSF Scorecard "Pinned-Dependencies" check; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — supply-chain hygiene, not a scorecard metric.
+
 - [ ] Restore the full Bats suite with the installed CLI argument parser
   - **ID**: full-suite-bats-argument-compatibility
   - **Tags**: tests, reliability, tooling

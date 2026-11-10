@@ -396,6 +396,20 @@ them. -->
   - **Anchor**: review of the telemetry follow-ups, 2026-11-10; Basili, Caldiera and Rombach 1994 (GQM).
   - **Competitive-goal**: none — telemetry robustness, not a scorecard metric.
 
+- [ ] `hotfix` finds the default branch of a repo whose default is not `main`
+  - **ID**: hotfix-default-branch-without-origin-head
+  - **Tags**: git, workflow
+  - **Details**: Found on 2026-11-10, when the hosted check first ran `tests/hotfix.bats` on a clean machine. `bin/hotfix` reads the default branch from `origin/HEAD` and falls back to `main` when that ref is not set. In a repo whose default branch is `master` and that has no `origin/HEAD`, `hotfix` fails. The tests now set the branch name to `main`, so no test covers this case.
+  - **Files**: `bin/hotfix`, `tests/hotfix.bats`
+  - **Output**: code
+  - **Acceptance**: a bats test with a `master`-only repo and no `origin/HEAD` creates the hotfix branch from `master`.
+  - **Hypothesis**: `hotfix` runs that fail in a `master`-only repo without `origin/HEAD` go from every run to 0.
+  - **Measurement**: `heavy-run bats tests/hotfix.bats`
+  - **Success**: the new test passes (red before the fix), and every older test passes.
+  - **Pivot**: the lookup needs a network call -> print a clear error that names the fix (`git remote set-head origin -a`) and close.
+  - **Anchor**: review of the hosted-runner test fix, 2026-11-10; Basili, Caldiera and Rombach 1994 (GQM).
+  - **Competitive-goal**: none — workflow robustness, not a scorecard metric.
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Blocked**: needs-time — 2026-10-22: shipped `make lint` per-file cache (`bin/cached-run --per-file`: skips a script that passed with the same content, sourced files, shellcheck version, and `.shellcheckrc`; shared by all worktrees; misses run in parallel) plus `make lint-full` (PR #257). Baseline 2026-10-22: `make lint` lines sum 6m02s/day (tooling 2m08s, dotfiles 2m04s, agentbrew 1m50s); one run 17-39 s uncached, now 11.6 s cold and 1.2-1.3 s warm at load 40-50. Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), then close or pivot.

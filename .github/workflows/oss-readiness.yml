@@ -8,17 +8,20 @@ name: OSS Readiness
 # a "why is my PR blocked?" question.
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   no-leaks:
     name: No private identity / content / secret leaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install bats
         run: sudo apt-get update && sudo apt-get install -y bats

@@ -5,6 +5,11 @@
 # slowdown is large on purpose: these tests run next to other bats jobs, and a
 # 20% step of a 100 ms command can drown in that load. One test pins the 10%
 # limit with a 20% step of a 500 ms command, where the step is 100 ms.
+#
+# Under memory pressure two equal 100 ms trees have measured 13% apart. So no
+# test compares equal 100 ms trees. A test that only needs a runtime change
+# calls `quicker` (the head sleeps less than the base), and a test that needs
+# equal trees uses a 300 ms or 400 ms tool, where 10% is 30 ms or more.
 
 REPO_ROOT="$BATS_TEST_DIRNAME/.."
 GATE="$REPO_ROOT/scripts/perf-gate.sh"
@@ -37,6 +42,10 @@ tool() {
   printf '#!/bin/bash\nsleep %s\n' "$1" > "$FIX/${2:-tool.sh}"
   chmod +x "$FIX/${2:-tool.sh}"
 }
+
+# quicker [seconds]: a runtime change that cannot look slower: the tool now
+# sleeps less than at the base (50 ms against 100 ms by default).
+quicker() { tool "${1:-0.05}"; }
 
 # budget <line>...: write the fixture budget file: the path list, then these lines.
 budget() {
@@ -84,8 +93,10 @@ gate() {
 }
 
 @test "perf gate passes when the trees are equally fast" {
+  tool 0.40
+  merge "slow base"
   printf '# a comment\n' >> "$FIX/tool.sh"
-  PERF_GATE_RUNS=5 gate
+  gate
   [ "$status" -eq 0 ]
   [[ "$output" == *"perf gate: pass (1 commands"* ]]
   [[ "$output" =~ tool[[:space:]]+base.*head.*ok ]]
@@ -147,6 +158,7 @@ gate() {
 # ── The base side never passes silently ──────────────────────────────
 
 @test "a command that is missing at the base commit gets the ceiling check only" {
+  quicker
   tool 0.10 new.sh
   budget 'tool	2000	./tool.sh' 'fresh	2000	./new.sh'
   gate
@@ -211,7 +223,7 @@ gate() {
 }
 
 @test "perf gate prints the base ref, its date, and the merge-base" {
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   [[ "$output" =~ perf\ gate:\ base\ ref\ main\ \(last\ commit\ 20[0-9]{2}-[0-9]{2}-[0-9]{2}\),\ merge-base\ [0-9a-f]{12} ]]
@@ -222,7 +234,7 @@ gate() {
 @test "a base checkout whose folder is gone is built again" {
   local sha
   sha="$(git -C "$FIX" rev-parse main)"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   rm -rf "$CACHE/$sha"          # git still lists the worktree; the .use file stays
@@ -237,7 +249,7 @@ gate() {
 @test "a base checkout at another commit is built again, not trusted" {
   local sha
   sha="$(git -C "$FIX" rev-parse main)"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   # Someone moves the cached checkout to a commit where the tool is slow.
@@ -253,7 +265,7 @@ gate() {
 @test "a base checkout with an edited or added file is built again, not trusted" {
   local sha
   sha="$(git -C "$FIX" rev-parse main)"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   # Someone slows the tool inside the cached checkout, so a slow head looks equal.
@@ -276,7 +288,7 @@ gate() {
   echo '*.cache' > "$FIX/.gitignore"
   merge "ignore rule"
   sha="$(git -C "$FIX" rev-parse main)"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   [[ "$output" != *"not a clean copy"* ]]
@@ -323,7 +335,7 @@ gate() {
   mkdir -p "$CACHE/$a" "$CACHE/$b"
   echo keep > "$CACHE/$a/mine.txt"
   touch -t 202001010000 "$CACHE/$a"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   [[ "$output" == *"left $CACHE/$a alone"* ]]
@@ -335,7 +347,7 @@ gate() {
   local spaced="$XDG_CACHE_HOME/dotfiles/perf-gate.noindex" first
   first="$(git -C "$FIX" rev-parse main)"
   for n in 1 2 3; do
-    printf '# touch %s\n' "$n" >> "$FIX/tool.sh"
+    quicker "0.0$((10 - 3 * n))"    # 70, 40, 10 ms: each step is quicker than its base
     gate
     [ "$status" -eq 0 ]
     merge "step $n"
@@ -347,8 +359,11 @@ gate() {
 
 @test "the base checkout is cached by commit, two are kept, and one in use is not removed" {
   local first second third
+  # Four steps follow, each quicker than its base: 250 -> 190 -> 130 -> 70 -> 10 ms.
+  tool 0.25
+  merge "slow base"
   first="$(git -C "$FIX" rev-parse main)"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker 0.19
   gate
   [ "$status" -eq 0 ]
   [ -x "$CACHE/$first/tool.sh" ]
@@ -361,7 +376,7 @@ gate() {
 
   for n in 2 3; do
     merge "step $n"
-    printf '# touch %s\n' "$n" >> "$FIX/tool.sh"
+    if [ "$n" = 2 ]; then quicker 0.13; else quicker 0.07; fi
     sleep 1
     gate
     [ "$status" -eq 0 ]
@@ -373,7 +388,7 @@ gate() {
 
   kill "$HOLDER"; wait "$HOLDER" 2>/dev/null || true; HOLDER=""
   merge "step 4"
-  printf '# touch 4\n' >> "$FIX/tool.sh"
+  quicker 0.01
   sleep 1
   gate
   [ "$status" -eq 0 ]
@@ -385,7 +400,7 @@ gate() {
 @test "perf gate never prunes worktrees that are not its own" {
   git -C "$FIX" worktree add -q --detach "$TEST_DIR/other" main
   rm -rf "$TEST_DIR/other"      # a stale entry that `git worktree prune` would drop
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
   gate
   [ "$status" -eq 0 ]
   git -C "$FIX" worktree list | grep -qF "$TEST_DIR/other"
@@ -419,6 +434,8 @@ gate() {
 }
 
 @test "perf gate --force times the commands with no runtime change" {
+  tool 0.40
+  merge "slow base"
   gate --force
   [ "$status" -eq 0 ]
   [[ "$output" == *"perf gate: pass"* ]]
@@ -448,6 +465,7 @@ gate() {
 
 @test "a file moved out of a runtime path still counts as a runtime change" {
   printf '# shared code, long enough for git to see the move as a rename\n# line 2\n# line 3\n' > "$FIX/lib.sh"
+  tool 0.40
   merge "add lib"
   mkdir -p "$FIX/docs"
   git -C "$FIX" mv lib.sh docs/lib.sh
@@ -457,6 +475,7 @@ gate() {
 }
 
 @test "a command row removed from the budget fails without an allow line" {
+  tool 0.40
   tool 0.10 new.sh
   budget 'tool	2000	./tool.sh' 'second	2000	./new.sh'
   merge "two commands"
@@ -526,6 +545,7 @@ gate() {
   mkdir -p "$FIX/scripts"
   echo v1 > "$FIX/scripts/perf-gate.sh"
   echo v1 > "$FIX/scripts/perf-gate.pl"
+  tool 0.40
   # The fixture path list does not name scripts/: the gate files count anyway.
   merge "gate files at the base"
   echo v2 > "$FIX/scripts/perf-gate.pl"
@@ -633,9 +653,9 @@ gate() {
 # ── How the commands run ─────────────────────────────────────────────
 
 @test "the commands run with a scratch HOME and without the caller's environment" {
-  printf '#!/bin/bash\n[ -z "${BASH_ENV:-}" ] && [ -z "${SECRET_THING:-}" ] && [ "$DO_NOT_TRACK" = 1 ] && [ "$HOME" != "%s" ]\n' "$HOME" > "$FIX/tool.sh"
+  printf '#!/bin/bash\nsleep 0.30\n[ -z "${BASH_ENV:-}" ] && [ -z "${SECRET_THING:-}" ] && [ "$DO_NOT_TRACK" = 1 ] && [ "$HOME" != "%s" ]\n' "$HOME" > "$FIX/tool.sh"
   merge "env probe"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  printf '# a comment\n' >> "$FIX/tool.sh"
   run bash -c 'cd "$1" && BASH_ENV=/nonexistent SECRET_THING=x "$2"' _ "$FIX" "$GATE"
   [ "$status" -eq 0 ]
 }
@@ -644,7 +664,7 @@ gate() {
   mkdir -p "$TEST_DIR/bin"
   printf '#!/bin/bash\necho "$*" >> "%s/heavy-run.calls"\nshift\nexec "$@"\n' "$TEST_DIR" > "$TEST_DIR/bin/heavy-run"
   chmod +x "$TEST_DIR/bin/heavy-run"
-  printf '# touch\n' >> "$FIX/tool.sh"
+  quicker
 
   run bash -c 'cd "$1" && PATH="$3:$PATH" PERF_GATE_HEAVY_RUN=1 "$2"' _ "$FIX" "$GATE" "$TEST_DIR/bin"
   [ "$status" -eq 0 ]

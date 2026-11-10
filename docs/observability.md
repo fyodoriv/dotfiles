@@ -107,9 +107,10 @@ the answer, then `Share anonymous performance numbers? [Y/n]`.
   silent until you run `dotfiles telemetry ask`, `on`, or `off`. A run that
   does not ask starts no new process. After a dismissed question the day is
   kept as a file time (`telemetry.asked-until`, set to the next UTC midnight),
-  because bash 3.2 has no clock: a run compares it with a file it writes at
-  that moment, in plain bash. Only after that midnight, or with a state file
-  from before the marker existed, does a run start one `date`.
+  because bash 3.2 has no clock: a run compares it with the time of a bash
+  here-string, which is "now". Bash removes that itself, so no extra file
+  stays on disk. Only after that midnight, or with a state file from before
+  the marker existed, does a run start one `date`.
 - An answer is never asked again. A later install never changes a no. An
   explicit opt-out at a later install (see [Turn it off](#turn-it-off))
   records no, also over an earlier yes.
@@ -211,12 +212,17 @@ nothing is sent. The key is never printed or logged.
   line goes to `~/.local/state/dotfiles/telemetry.log` (at most 200 lines).
   The commands log keeps its newest 10,000 lines once it passes 20,000. The
   cut moves the send cursor back by the number of dropped lines, under the
-  state lock, so a line that was not sent yet is still sent. While a send
-  runs, the log is left alone until a later run.
+  state lock, so a line that was not sent yet is still sent. The cut drops
+  the counted lines only, so a line that a command appends during the cut is
+  kept and sent once. While a send runs, the log is left alone until a later
+  run.
 - **Never as root.** With `sudo`, the state file, the lock, and the plist
   would become root-owned, and your own runs could not read them afterwards.
   So as root nothing is saved, loaded, or sent, and one line says so. A
-  `sudo dotfiles …` run starts no question and no send.
+  `sudo dotfiles …` run starts no question and no send. An install opt-out
+  as root (`--no-telemetry`, `DOTFILES_TELEMETRY=0`, `DO_NOT_TRACK`) cannot
+  be saved either: one line says so and names the fix, `dotfiles telemetry
+  off` as your user.
 - The daily send happens at most once a day. It stops after 3 seconds in
   total; what is left goes on a later run. A request that hangs is killed.
   After a try it waits one hour. A manual `dotfiles telemetry send` allows
@@ -249,7 +255,8 @@ nothing is sent. The key is never printed or logged.
   variable is set where its plist is rendered (`dotfiles telemetry on` or
   `dotfiles apply`). Set it in the shell that runs them. A background apply
   with no such variable renders the plist without it and looks for the
-  answer in `~/.local/state`.
+  answer in `~/.local/state`. The path is XML-escaped in the plist, so a
+  folder name with `&` or `<` is safe.
 - Each state write takes a short lock, reads the file again, and changes
   only its own fields. The send path never writes the answer. A
   `dotfiles telemetry off` during a send is kept, and the send stops before

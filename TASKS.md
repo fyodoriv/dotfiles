@@ -399,20 +399,6 @@ them. -->
   - **Anchor**: review of PR #567 on 2026-11-10; Forsgren, Humble and Kim (2018), Accelerate (change failure rate).
   - **Competitive-goal**: none — install reliability of an existing script, not a scorecard metric.
 
-- [ ] Fix five small telemetry defects found in review
-  - **ID**: telemetry-review-nits
-  - **Tags**: telemetry, reliability, tests
-  - **Details**: Five small items from the review of PR #567. (1) The command-log cap can shift the cursor by one when a line is appended during the cut: count the dropped lines and cut with `tail -n +$((drop+1))`. (2) `launchagents/com.dotfiles.telemetry.plist.tmpl` writes `XDG_STATE_HOME` into the plist without XML escaping; a path with `&` or `<` breaks the plist. (3) A root install with an opt-out prints the "(sudo)" line and saves no "no" answer, so the question can come back. (4) The `EUID` guards in `lib/stats.sh` are tested only by a grep of the source: add the test uid seam that `bin/dotfiles-telemetry` already has (`DOTFILES_TELEMETRY_TEST_UID`) and test the behavior. (5) The file `telemetry.asked-until.now` stays on disk until the user answers: remove it after the time compare.
-  - **Files**: `bin/dotfiles-telemetry`, `lib/stats.sh`, `launchagents/com.dotfiles.telemetry.plist.tmpl`, `tests/telemetry.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: one failing test first for each item, then the fix. Item 1: a line appended during the cut is sent exactly once. Item 2: a state path with `&` gives a plist that `plutil -lint` accepts. Item 3: the opt-out as root either saves "no" or prints a line that says how to save it as the user. Item 4: the guard test runs the function with the test uid 0. Item 5: no `.asked-until.now` file is left after a dismissed question.
-  - **Hypothesis**: the five fixes move the count of known open review findings on the telemetry path from 5 to 0, with 0 changed behavior for a normal user.
-  - **Measurement**: `bats tests/telemetry.bats`, with the five new cases.
-  - **Success**: all five new cases pass and every older telemetry test passes.
-  - **Pivot**: if one item needs a design change (for example a root-owned "no" file), split it into its own task and ship the other four.
-  - **Anchor**: review of PR #567 on 2026-11-10; Fagan (1976), Design and code inspections to reduce errors in program development.
-  - **Competitive-goal**: none — correctness of an existing feature, not a scorecard metric.
-
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

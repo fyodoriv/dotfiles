@@ -1282,8 +1282,6 @@ wait_for_last_send() {
   [ ! -s "$TEST_DIR/launchctl.log" ]
   [ ! -e "$TEST_DIR/telemetry.log" ]
   [ -s "$PLIST" ]
-  # The hooks in lib/stats.sh start nothing for root (plain bash, EUID).
-  grep -q 'EUID' "$REPO/lib/stats.sh"
 }
 
 @test "apply runs the LaunchAgent script again when the telemetry answer changes" {
@@ -1420,4 +1418,85 @@ wait_for_last_send() {
   [ "$status" -eq 0 ]
   [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 1 ]
   [ "$(requests)" -eq 0 ]
+}
+
+# ── Review nits of PR #567 ──────────────────────────────────────────────
+
+@test "a line appended during the cap's cut is kept and sent exactly once" {
+  say_yes
+  : >"$DOTFILES_STATS_FILE"
+  line() { echo "{\"command\":\"$1\",\"timestamp\":\"$NOW\",\"ok\":true,\"duration_ms\":$2}"; }
+  for ((i = 1; i <= 20001; i++)); do line status "$i"; done >"$DOTFILES_COMMANDS_FILE"
+  set_state '.sent_commands = 20001' # every line is sent already
+  # A tail that first appends one line: a command that ends during the cut.
+  mkdir "$TEST_DIR/slow"
+  line doctor 7 >"$TEST_DIR/late-line"
+  printf '#!/bin/bash\ncat "%s" >>"%s"\nexec "%s" "$@"\n' \
+    "$TEST_DIR/late-line" "$DOTFILES_COMMANDS_FILE" "$(command -v tail)" >"$TEST_DIR/slow/tail"
+  chmod +x "$TEST_DIR/slow/tail"
+  PATH="$TEST_DIR/slow:$PATH" bash "$TEL" cap-commands
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10001 ]
+  [ "$(jq -r .sent_commands "$DOTFILES_TELEMETRY_STATE")" -eq 10000 ]
+  bash "$TEL" send >/dev/null
+  [ "$(jq -s -r '[.[].batch[].properties.command] | join(",")' "$FAKE_LOG")" = "doctor" ]
+  bash "$TEL" send >/dev/null
+  [ "$(jq -s '[.[].batch[]] | length' "$FAKE_LOG")" -eq 1 ]
+}
+
+@test "a state path with & or < still gives a valid LaunchAgent plist" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v plutil >/dev/null 2>&1 || skip "plutil not installed"
+  plist="$REPO/launchagents/com.dotfiles.telemetry.plist.tmpl"
+  render() { { printf '{{- $_ := set . "dotfiles_dir" "apps/dotfiles" -}}\n'; cat "$plist"; } | chezmoi execute-template --source "$REPO"; }
+  XDG_STATE_HOME="$TEST_DIR/a&b <c>" render >"$TEST_DIR/odd.plist"
+  plutil -lint "$TEST_DIR/odd.plist"
+  # launchd reads back the same path.
+  [ "$(plutil -extract EnvironmentVariables.XDG_STATE_HOME raw "$TEST_DIR/odd.plist")" = "$TEST_DIR/a&b <c>" ]
+}
+
+@test "an install opt-out as root says it was not saved, and how to save it" {
+  run env DOTFILES_TELEMETRY_TEST_UID=0 bash "$TEL" ask --install --no
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"was not saved"* ]]
+  [[ "$output" == *"dotfiles telemetry off"* ]]
+  [[ "$output" != *"telemetry: off (--no-telemetry). Nothing is sent."* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+  # A stored no of the user needs no new save: the normal line shows.
+  bash "$TEL" off >/dev/null
+  run env DOTFILES_TELEMETRY_TEST_UID=0 bash "$TEL" ask --install --no
+  [[ "$output" == *"telemetry: off (--no-telemetry)"* ]]
+  [[ "$output" != *"was not saved"* ]]
+}
+
+@test "the hooks in lib/stats.sh start nothing for root: no question, no send" {
+  gate_root
+  # No answer yet: a normal user is asked, root is not.
+  [ "$(ask_starts)" -eq 1 ]
+  [ "$(DOTFILES_TELEMETRY_TEST_UID=0 ask_starts)" -eq 0 ]
+  # A stored yes: a terminal run starts the daily send, but not for root.
+  say_yes
+  daily_starts() {
+    local tries=0
+    : >"$TEST_DIR/gate.calls"
+    DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1 bash -c "source '$GATE/lib/stats.sh'; _telemetry_daily '$NOW'"
+    until [ -s "$TEST_DIR/gate.calls" ] || [ "$tries" -ge 20 ]; do tries=$((tries + 1)); sleep 0.05; done
+    grep -c '^daily$' "$TEST_DIR/gate.calls" || true
+  }
+  [ "$(DOTFILES_TELEMETRY_TEST_UID=0 daily_starts)" -eq 0 ]
+  [ "$(daily_starts)" -eq 1 ]
+}
+
+@test "a dismissed question leaves no clock file behind" {
+  gate_root
+  run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
+  [ -e "$TEST_DIR/telemetry.asked-until" ]
+  [ "$(ask_starts)" -eq 0 ] # dismissed today: the gate compares the times
+  [ ! -e "$TEST_DIR/telemetry.asked-until.now" ]
+  # A file left by an older version goes away with the next question.
+  : >"$TEST_DIR/telemetry.asked-until.now"
+  set_state '.asked_day = "2020-01-01"'
+  touch -t 202001010000 "$TEST_DIR/telemetry.asked-until"
+  run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
+  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" -eq 2 ]
+  [ ! -e "$TEST_DIR/telemetry.asked-until.now" ]
 }

@@ -8,7 +8,8 @@
   answer is yes: `dotfiles telemetry on` loads it, `off` removes it, and
   apply skips it otherwise (should_skip_agent). A custom XDG_STATE_HOME
   reaches the job only when it is set where the plist is rendered
-  (`dotfiles telemetry on` or `dotfiles apply`). Other scheduled jobs never start a send: launchd kills what a job
+  (`dotfiles telemetry on` or `dotfiles apply`); the path is XML-escaped, so
+  a path with & or < is safe. Other scheduled jobs never start a send: launchd kills what a job
   leaves behind when it exits, which could stop a send half way (2026-11-09).
 -->
 <plist version="1.0">
@@ -45,7 +46,7 @@
         <string>{{ .chezmoi.homeDir }}</string>
 {{- if env "XDG_STATE_HOME" }}
         <key>XDG_STATE_HOME</key>
-        <string>{{ env "XDG_STATE_HOME" }}</string>
+        <string>{{ env "XDG_STATE_HOME" | html }}</string>
 {{- end }}
     </dict>
 </dict>

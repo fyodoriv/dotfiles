@@ -120,6 +120,14 @@ _stats_repo_root() {
   esac
 }
 
+# True for root (sudo). Plain bash. DOTFILES_TELEMETRY_TEST_UID is for tests
+# only, the same seam as in bin/dotfiles-telemetry.
+_stats_is_root() {
+  local uid="$EUID"
+  [ -z "${BATS_TEST_FILENAME:-}" ] || uid="${DOTFILES_TELEMETRY_TEST_UID:-$EUID}"
+  [ "$uid" = "0" ]
+}
+
 # _telemetry_daily TIMESTAMP — after a run on a terminal, start the daily send
 # as a fully detached child: its own process group, SIGHUP ignored, no open
 # terminal or pipe. So it lives on when this run ends or its window closes.
@@ -136,7 +144,7 @@ _telemetry_daily() {
   local tel day="${1%%T*}" hour="${1%%:*}"
   if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -z "${DOTFILES_TELEMETRY_SPAWN:-}" ]; then return 0; fi
   [ -n "${DOTFILES_TELEMETRY_TTY:-}" ] || [ -n "${_DOTFILES_ON_TERMINAL:-}" ] || [ -t 0 ] || [ -t 2 ] || return 0
-  [ "$EUID" != "0" ] || return 0
+  ! _stats_is_root || return 0
   [ -z "${CI:-}" ] || return 0
   [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
   case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
@@ -165,8 +173,11 @@ _telemetry_daily() {
 # for the rest of that day. All of this is plain bash: a run that does not
 # ask starts no new process. bash 3.2 has no clock, so "dismissed today" is a
 # file time: bin/dotfiles-telemetry sets the marker telemetry.asked-until to
-# the next UTC midnight, this gate writes an empty file (its time is now) and
-# compares the two. Only with no marker (an older state file) or after that
+# the next UTC midnight, and this gate compares it with "now". "Now" is the
+# time of a bash here-string on descriptor 3: bash makes it and removes it
+# itself, so no file is left and no process starts. The state file was written
+# before now; if it looks newer, that clock is not usable and the gate goes on
+# to `date`. Only then, with no marker (an older state file), or after that
 # midnight does it start one `date`. Never as root (sudo).
 # DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
 dotfiles_telemetry_ask() {
@@ -179,7 +190,7 @@ dotfiles_telemetry_ask() {
     [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
     { [ -t 0 ] && [ -t 1 ] && [ -t 2 ]; } || return 0
   fi
-  [ "$EUID" != "0" ] || return 0
+  ! _stats_is_root || return 0
   [ -z "${CI:-}" ] || return 0
   [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
   case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
@@ -195,7 +206,7 @@ dotfiles_telemetry_ask() {
   case "$_TELEMETRY_STATE_LINE" in
     *'"asked_day":"2'*)
       marker="${_TELEMETRY_STATE_PATH%.json}.asked-until"
-      if [ -e "$marker" ] && { : >"$marker.now"; } 2>/dev/null && [ "$marker" -nt "$marker.now" ]; then return 0; fi
+      if [ -e "$marker" ] && { [ "$marker" -nt /dev/fd/3 ] && [ ! "$_TELEMETRY_STATE_PATH" -nt /dev/fd/3 ]; } 3<<<"" 2>/dev/null; then return 0; fi
       case "$_TELEMETRY_STATE_LINE" in *"\"asked_day\":\"$(date -u +%F)\""*) return 0 ;; esac ;;
   esac
   bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" ask --first-run || true

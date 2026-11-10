@@ -14,7 +14,7 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 | **test** | macos-latest | `make check` -- the local gate; then `make test-all` (full bats suite) on a manual run only, until task `full-suite-bats-argument-compatibility` lands |
 | **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (manual start only: a clean runner has no chezmoi config) |
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
-| **coverage** | ubuntu-latest | `bin/dotfiles-coverage` + bats -- shell coverage report artifact |
+| **coverage** | ubuntu-latest | Manual runs only (`gh workflow run ci.yml`): `bin/dotfiles-coverage` + bats -- shell coverage report artifact. It did not finish in 45 minutes on a hosted runner (task `hosted-coverage-job-time`) |
 
 ### Step cache (like nx)
 

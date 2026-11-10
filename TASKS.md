@@ -131,6 +131,20 @@ them. -->
   - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — CI coverage, not a scorecard metric.
 
+- [ ] Make the hosted coverage job finish, then put it back on every pull request
+  - **ID**: hosted-coverage-job-time
+  - **Tags**: ci, coverage, reliability
+  - **Details**: On 2026-11-10 the `coverage` job of `.github/workflows/ci.yml` (Ubuntu, `./bin/dotfiles-coverage run tests/`: the full Bats suite under `set -x` tracing) was still running after 45 minutes in one hosted run and after 30 minutes in the next, with a 60 minute limit. It now runs only on a manual start. First measure: start it by hand and read where the time goes and which tests fail on Linux (the suite assumes macOS paths such as `/opt/homebrew`). Then choose: run it on macOS, trace only the affected test files on a pull request, or split the suite across jobs.
+  - **Files**: `.github/workflows/ci.yml`, `bin/dotfiles-coverage`, `docs/ci-setup.md`, `tests/coverage.bats`.
+  - **Output**: code
+  - **Acceptance**: the `coverage` job passes on two pull requests in a row in under 20 minutes, and the `if:` line that limits it to manual runs is gone.
+  - **Hypothesis**: tracing only what a pull request affects, on the operating system the suite targets, moves the hosted coverage job from no result in 45 minutes to a pass in under 20 minutes.
+  - **Measurement**: `gh run view <id> --json jobs --jq '.jobs[] | select(.name=="coverage") | [.conclusion, .startedAt, .completedAt]'` on two pull requests.
+  - **Success**: `success` twice, each under 20 minutes.
+  - **Pivot**: if no layout finishes under 20 minutes, keep coverage as a weekly scheduled run and check the floor there.
+  - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — CI coverage, not a scorecard metric.
+
 - [ ] Restore the full Bats suite with the installed CLI argument parser
   - **ID**: full-suite-bats-argument-compatibility
   - **Tags**: tests, reliability, tooling

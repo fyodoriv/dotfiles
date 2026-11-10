@@ -16,6 +16,11 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
 | **coverage** | ubuntu-latest | Manual runs only (`gh workflow run ci.yml`): `bin/dotfiles-coverage` + bats -- shell coverage report artifact. It did not finish in 45 minutes on a hosted runner (task `hosted-coverage-job-time`) |
 
+### What the hosted gate leaves out
+
+- `tests/perf-gate.bats` (`make check TEST_SKIP_FILE=tests/perf-gate.bats`). Its fixtures time 100 ms sleeps. On the hosted macOS runner such a sleep took 174 to 241 ms, and other tests failed in each of 3 runs. Run it locally when you change the perf gate. Task: `perf-gate-hosted-runner-noise`.
+- The `doctor`, `audit` and `coverage` jobs (manual runs only; see the table).
+
 ### Step cache (like nx)
 
 `bin/cached-run` records each test or lint file that passed, keyed on its content and on every file it reads. A later run skips a file whose inputs did not change. Lint files, the bash 3.2 plugin suites and the install e2e gain most. The key of a test file also holds the commit, so a test is skipped only when the same commit runs again. The `test` job keeps that record between runs with `actions/cache` (`~/.cache/cached-run`). A cache entry cannot be changed, so each run saves a new entry and restores the newest one. A pull request can read the entries of `feat/chezmoi` and its own; it cannot write to the entries of `feat/chezmoi`. The summary line shows the effect: `cached-run: N files: M unchanged (passed before), K checked`. To run everything, delete the entries: `gh cache delete --all`.

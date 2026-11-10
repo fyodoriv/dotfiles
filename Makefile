@@ -123,11 +123,17 @@ endef
 # with the same content of the changed files that select it
 # (bin/bats-affected --pairs feeds them to bin/cached-run --per-file --deps).
 # A fix to one file re-runs only the tests that file selects.
+# TEST_SKIP_FILE=<path> leaves one affected file out and says so. Hosted CI
+# uses it for tests/perf-gate.bats (TASKS.md perf-gate-hosted-runner-noise).
 test: ## Run affected tests only (skips tests that passed with the same inputs)
 	@pairs=$$(mktemp "$${TMPDIR:-/tmp}/bats-pairs.XXXXXX") || exit 1; \
 	trap 'rm -f "$$pairs"' EXIT; \
 	./bin/bats-affected --pairs > "$$pairs" || exit 1; \
 	affected=$$(cut -f1 "$$pairs" | LC_ALL=C sort -u); \
+	if [ -n "$(TEST_SKIP_FILE)" ] && printf '%s\n' "$$affected" | grep -qF -e "$(TEST_SKIP_FILE)"; then \
+	  echo "⚠ Skipping $(TEST_SKIP_FILE) (TEST_SKIP_FILE is set)"; \
+	  affected=$$(printf '%s\n' "$$affected" | grep -vF -e "$(TEST_SKIP_FILE)" || true); \
+	fi; \
 	if [ -z "$$affected" ]; then \
 	  echo "✓ No affected test files (nothing changed)"; \
 	else \

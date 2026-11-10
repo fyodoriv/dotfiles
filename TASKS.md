@@ -131,6 +131,20 @@ them. -->
   - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — CI coverage, not a scorecard metric.
 
+- [ ] Make the perf gate and its tests steady on hosted runners
+  - **ID**: perf-gate-hosted-runner-noise
+  - **Tags**: ci, perf, reliability
+  - **Details**: On 2026-11-10 `tests/perf-gate.bats` failed in 3 of 3 hosted macOS runs, each time on other tests (33; 18; 10, 17 and 20). The fixtures compare a 100 ms sleep with a 50 or 200 ms one. On the runner a 100 ms sleep took 174 to 241 ms, also when the file ran with no peer file (that change was reverted). The hosted gate now skips the file (`make check TEST_SKIP_FILE=tests/perf-gate.bats` in `.github/workflows/ci.yml`). Two parts: (1) make the fixtures independent of the wall clock (a fake timer for the verdict tests, or far wider gaps), then remove the skip; (2) check the real `make perf-gate` step on the runner: with this noise a pull request that touches a runtime path can fail with no real slowdown. Measure it with `gh workflow run ci.yml` on a branch that touches `bin/`, and decide whether the hosted run checks ceilings only.
+  - **Files**: `tests/perf-gate.bats`, `scripts/perf-gate.pl`, `.github/workflows/ci.yml`, `Makefile`, `docs/ci-setup.md`.
+  - **Output**: code
+  - **Acceptance**: `.github/workflows/ci.yml` has no `TEST_SKIP_FILE`, and `tests/perf-gate.bats` passes 10 hosted runs in a row.
+  - **Hypothesis**: fixtures that do not depend on the wall clock move hosted failures of `tests/perf-gate.bats` from 3 of 3 runs to 0 of 10.
+  - **Measurement**: `gh run list -w ci.yml -L 10 --json databaseId --jq '.[].databaseId' | xargs -I{} gh run view {} --log-failed | grep -c 'perf-gate.bats'`
+  - **Success**: 0 failures of this file in 10 runs.
+  - **Pivot**: if a fake timer changes more than 40 lines of `scripts/perf-gate.pl`, keep the file local-only and state that in `docs/ci-setup.md` as the final design.
+  - **Anchor**: Luo et al. (2014), An Empirical Analysis of Flaky Tests; Forsgren, Humble and Kim (2018), Accelerate (change failure rate).
+  - **Competitive-goal**: none — CI reliability, not a scorecard metric.
+
 - [ ] Make the hosted coverage job finish, then put it back on every pull request
   - **ID**: hosted-coverage-job-time
   - **Tags**: ci, coverage, reliability

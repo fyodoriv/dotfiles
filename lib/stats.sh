@@ -91,14 +91,85 @@ log_run() {
     echo "⚠ stats: cannot write to $DOTFILES_STATS_FILE" >&2
     return 0
   fi
-  # Opt-in telemetry: at most one send a day, in the background, never in a
-  # test (bin/dotfiles-telemetry sends nothing without a key and the notice).
-  if [ -z "${BATS_TEST_FILENAME:-}" ]; then
-    local _tel
-    _tel="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry"
-    [ -x "$_tel" ] && (bash "$_tel" daily >/dev/null 2>&1 &)
-  fi
+  _telemetry_daily "${timestamp%%T*}"
   return 0
+}
+
+# ── Command timing and telemetry hooks ──────────────────────────────────
+# Both hooks below are plain bash on the common path (no new process), so a
+# command pays almost nothing for them.
+DOTFILES_COMMANDS_FILE="${DOTFILES_COMMANDS_FILE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/commands.jsonl}"
+
+# Read the first line of the telemetry state file into _TELEMETRY_STATE_LINE
+# ("" when there is none). bin/dotfiles-telemetry owns the file and writes it
+# as one line. Shell-variable scope: it lives for this script run only.
+_TELEMETRY_STATE_LINE=""
+_telemetry_read_state() {
+  local state="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
+  _TELEMETRY_STATE_LINE=""
+  if [ -r "$state" ]; then IFS= read -r _TELEMETRY_STATE_LINE <"$state" 2>/dev/null || true; fi
+}
+
+# _telemetry_daily DAY — start the daily send in the background, never in a
+# test. It starts nothing unless the stored answer is yes, or after today's
+# send. bin/dotfiles-telemetry checks every rule again; a send never fails a
+# caller.
+_telemetry_daily() {
+  [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
+  local tel
+  _telemetry_read_state
+  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'*) ;; *) return 0 ;; esac
+  case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$1\""*) return 0 ;; esac
+  tel="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry"
+  [ -x "$tel" ] && (bash "$tel" daily >/dev/null 2>&1 &)
+  return 0
+}
+
+# dotfiles_telemetry_ask COMMAND — before a normal `dotfiles` command, ask the
+# telemetry question once if it has no answer yet (the install had no
+# terminal). Only where a person can answer: stdin, stdout, and stderr are a
+# terminal, and CI and DO_NOT_TRACK are unset. So never in a pipe, a hook, a
+# scheduler, or an agent run; there the answer stays unset and nothing is sent.
+# DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
+dotfiles_telemetry_ask() {
+  case "$1" in telemetry | install) return 0 ;; esac
+  if [ -z "${DOTFILES_TELEMETRY_TTY:-}" ]; then
+    [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
+    { [ -t 0 ] && [ -t 1 ] && [ -t 2 ]; } || return 0
+  fi
+  [ -z "${CI:-}" ] || return 0
+  [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
+  case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
+  _telemetry_read_state
+  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'* | *'"consent":"no"'*) return 0 ;; esac
+  bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry" ask || true
+  return 0
+}
+
+# log_command — record one `dotfiles <command>` run for performance numbers.
+#
+# Args:
+#   $1  command name: the top-level subcommand, from the dispatch arms of
+#       bin/dotfiles. Never an argument. A name that is not a short lowercase
+#       word is dropped.
+#   $2  outcome: `ok`, or anything else for "ok":false.
+#   $3  wall time in ms.
+#
+# Side effects: appends one JSONL line to $DOTFILES_COMMANDS_FILE
+# (~/.local/state/dotfiles/commands.jsonl), under the same on/off rule as
+# log_run. The line holds the name, the time, ok, and duration_ms: no
+# argument, path, or message. Returns 0 always.
+log_command() {
+  dotfiles_stats_log_on || return 0
+  local command="$1" outcome="$2" duration_ms="$3" ok=true timestamp
+  [[ "$command" =~ ^[a-z][a-z0-9-]{0,39}$ ]] || return 0
+  [[ "$duration_ms" =~ ^[0-9]{1,10}$ ]] || return 0
+  [ "$outcome" = "ok" ] || ok=false
+  timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [ -d "${DOTFILES_COMMANDS_FILE%/*}" ] || mkdir -p "${DOTFILES_COMMANDS_FILE%/*}" 2>/dev/null || return 0
+  echo "{\"command\":\"$command\",\"timestamp\":\"$timestamp\",\"ok\":$ok,\"duration_ms\":$duration_ms}" \
+    >> "$DOTFILES_COMMANDS_FILE" 2>/dev/null || return 0
+  _telemetry_daily "${timestamp%%T*}"
 }
 
 # get_time_saved_summary — Print a one-line summary of total automation runs

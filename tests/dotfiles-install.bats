@@ -408,3 +408,71 @@ make_tool_repo() {
   [ "$status" -eq 1 ]
   jq -se '[.[] | select(.task == "install")] | length == 1 and .[0].ok == false' "$DOTFILES_STATS_FILE"
 }
+
+# ── The telemetry question (docs/observability.md#telemetry) ─────────────
+telemetry_consent() { jq -r .consent "$XDG_STATE_HOME/dotfiles/telemetry.json"; }
+install_run() { bash "$REPO/bin/dotfiles-install" run --yes --no-agentbrew "$@"; }
+
+@test "run on a terminal asks the telemetry question loudly; y is yes" {
+  unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
+  export DOTFILES_TELEMETRY_TTY=1
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"Help make dotfiles faster: share anonymous performance numbers?"* ]]
+  [[ "$output" == *'"event": "dotfiles.command"'* ]]
+  [[ "$output" == *"never a path, file name, host name, user name"* ]]
+  [[ "$output" == *"Share anonymous performance numbers? [Y/n]"* ]]
+  [[ "$output" == *"telemetry: on. Thank you. Turn it off any time: dotfiles telemetry off"* ]]
+  [ "$(telemetry_consent)" = "yes" ]
+  # The question comes before the backup, so it is near the top.
+  [[ "${output%%2/6 Back up*}" == *"[Y/n]"* ]]
+}
+
+@test "run: Enter is yes, n is no" {
+  unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
+  export DOTFILES_TELEMETRY_TTY=1
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf '\n' | install_run"
+  [ "$(telemetry_consent)" = "yes" ]
+  rm -f "$XDG_STATE_HOME/dotfiles/telemetry.json"
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'n\n' | install_run"
+  [[ "$output" == *"telemetry: off. Nothing is sent. Turn it on any time: dotfiles telemetry on"* ]]
+  [ "$(telemetry_consent)" = "no" ]
+}
+
+@test "run with no terminal asks nothing and leaves the answer unset" {
+  unset CI DO_NOT_TRACK DOTFILES_TELEMETRY DOTFILES_TELEMETRY_TTY
+  run install_run </dev/null
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"telemetry: not asked (no terminal), so nothing is sent."* ]]
+  [[ "$output" != *"[Y/n]"* ]]
+  [ "$(telemetry_consent)" = "unset" ]
+}
+
+@test "run --no-telemetry, DOTFILES_TELEMETRY=0, and DO_NOT_TRACK record no without a question" {
+  unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
+  export DOTFILES_TELEMETRY_TTY=1
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run --no-telemetry"
+  [[ "$output" == *"telemetry: off (--no-telemetry). Nothing is sent."* ]]
+  [[ "$output" != *"[Y/n]"* ]]
+  [ "$(telemetry_consent)" = "no" ]
+  rm -f "$XDG_STATE_HOME/dotfiles/telemetry.json"
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | DOTFILES_TELEMETRY=0 install_run"
+  [[ "$output" == *"telemetry: off (DOTFILES_TELEMETRY=0)"* ]]
+  [ "$(telemetry_consent)" = "no" ]
+  rm -f "$XDG_STATE_HOME/dotfiles/telemetry.json"
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | DO_NOT_TRACK=1 install_run"
+  [[ "$output" == *"telemetry: off (DO_NOT_TRACK is set)"* ]]
+  [ "$(telemetry_consent)" = "no" ]
+}
+
+@test "a second run never asks again and keeps a no" {
+  unset CI DO_NOT_TRACK DOTFILES_TELEMETRY
+  export DOTFILES_TELEMETRY_TTY=1
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'n\n' | install_run"
+  [ "$(telemetry_consent)" = "no" ]
+  run bash -c "$(declare -f install_run); REPO='$REPO'; printf 'y\n' | install_run"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *"telemetry: your answer is no"* ]]
+  [[ "$output" != *"[Y/n]"* ]]
+  [ "$(telemetry_consent)" = "no" ]
+}

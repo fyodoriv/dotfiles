@@ -79,9 +79,20 @@ Ask these together, in one round:
    If yes, also ask agentbrew's three questions from
    https://github.com/fyodoriv/agentbrew/blob/main/INSTALL.md step 3
    (recommended set, background repair job, shell hook).
+5. "Help make dotfiles faster: share anonymous performance numbers?" First
+   run `bash <DIR>/bin/dotfiles-telemetry example` and show the person its
+   output: what is sent, one real event, and the privacy promise (never a
+   path, file name, host name, user name, argument, message, or content; no
+   person profile; it goes to PostHog EU for a public dashboard; PostHog
+   receives the request IP address, like any web server, but GeoIP lookup is
+   disabled and no location is stored). Yes (recommended) / No. Never answer for the person. With no
+   answer, pass no flag: the install records nothing, nothing is sent, and
+   dotfiles asks the person once on their next run in a terminal.
 
 Map the answers to flags: `--profile core|full`, `--name "<name>"`,
-`--email "<email>"`, `--no-macos-defaults`, `--no-agentbrew`, and
+`--email "<email>"`, `--no-macos-defaults`, `--no-agentbrew`,
+`--no-telemetry` (for a no to question 5; for a yes, run
+`bash <DIR>/bin/dotfiles telemetry on` after the install), and
 `--agentbrew-flags "<agentbrew flags>"` (for example `"--no-auto-repair"`).
 To install another tool repo in the same run, add `--tool <git URL>` (repeat
 it for more) and, after it, `--tool-flags "<its installer flags>"` (for

@@ -11,6 +11,15 @@ set -euo pipefail
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=../lib/colors.sh
 source "$DOTFILES_DIR/lib/colors.sh"
+# Command timing and the telemetry question are extras: a copy of this script
+# without lib/stats.sh still runs every command, and records nothing.
+if [ -r "$DOTFILES_DIR/lib/stats.sh" ]; then
+  # shellcheck source=../lib/stats.sh
+  source "$DOTFILES_DIR/lib/stats.sh"
+else
+  dotfiles_stats_log_on() { return 1; }
+  dotfiles_telemetry_ask() { return 0; }
+fi
 
 _check_for_updates() {
   # Skip if not a git repo or no remote
@@ -106,7 +115,7 @@ Advanced:
   managed                      List all managed files
   status                       Show git status of dotfiles repo
   stats                        Show automation stats (runs, time saved, streak)
-  telemetry [status|on|off|send [--dry-run]]  Opt-in anonymous usage counts to PostHog EU
+  telemetry [status|on|off|example|send [--dry-run]]  Anonymous performance numbers to PostHog EU (asked at install)
   install plan|run|restore     One-step install with backup and auto-restore
   metrics [--share FILE]       Agent time, hook blocks, MCP health, machine load
   contribute [--repo agentbrew] [--yes]  Open a PR upstream from your branch (forks
@@ -175,6 +184,7 @@ esac
 # --yes and its code calls lib/confirm.sh, or an `# unattended: <why>` note says
 # why it runs without one), `# yes-for: <subcommands>` (only those sub-forms
 # need a yes), and `# agent: <what to do differently>`.
+dispatch() {
 case "$cmd" in
   help|h)
     show_help
@@ -407,7 +417,7 @@ case "$cmd" in
     ;;
 
   telemetry)
-    # agent: ask the user before `telemetry send` or `telemetry on`; `status` and `send --dry-run` send nothing.
+    # agent: ask the user before `telemetry send` or `telemetry on` (`on` records the user's yes); `status` and `send --dry-run` send nothing.
     shift
     exec bash "$DOTFILES_DIR/bin/dotfiles-telemetry" "$@"
     ;;
@@ -508,3 +518,49 @@ case "$cmd" in
     exit 1
     ;;
 esac
+}
+
+# Is $1 the label of a dispatch arm above? Only such a name is ever recorded,
+# so nothing a person typed by mistake can reach the commands log. An unknown
+# name always exits 1, so only a failed run pays for this check.
+_known_command() {
+  [[ "$1" =~ ^[a-z][a-z0-9-]{0,39}$ ]] || return 1
+  grep -qE "^  ([a-z0-9\"-]+\|)*$1(\|[a-z0-9\"-]+)*\)\$" "$DOTFILES_DIR/bin/dotfiles"
+}
+
+# The telemetry question, once, when it has no answer yet and a person is at
+# the terminal (lib/stats.sh).
+dotfiles_telemetry_ask "${cmd:-start}"
+
+# With the stats log off (tests, DOTFILES_STATS_LOG=0), run the command as is.
+dotfiles_stats_log_on || { dispatch "$@"; exit $?; }
+
+# The command in its own subshell, so an `exec` or an `exit` in an arm ends only
+# that subshell and the timer below still reports. (A plain `( ... )` here is
+# not enough: bash 3.2 runs it in the timing process itself.)
+_dispatch_subshell() (
+  set -e
+  dispatch "$@"
+)
+
+# Time the run and record one content-free line: the command name and the wall
+# time, never an argument (lib/stats.sh log_command). `time` prints seconds
+# with three decimals; the command keeps the real stdout and stderr (fd 8, 9).
+set +e
+exec 8>&1 9>&2
+TIMEFORMAT='%3R'
+_elapsed="$( { time _dispatch_subshell "$@" 1>&8 2>&9 8>&- 9>&- ; } 2>&1 )"
+_rc=$?
+exec 8>&- 9>&-
+_elapsed="${_elapsed//[!0-9]/}"
+_outcome=ok
+[ "$_rc" -eq 0 ] || _outcome=error
+# Write the line in the background, so the person does not wait for it.
+if [ -n "$_elapsed" ]; then
+  {
+    if [ "$_rc" -eq 0 ] || _known_command "${cmd:-start}"; then
+      log_command "${cmd:-start}" "$_outcome" "$((10#$_elapsed))"
+    fi
+  } >/dev/null 2>&1 &
+fi
+exit "$_rc"

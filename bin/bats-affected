@@ -355,6 +355,12 @@ for file in "${changed_files[@]}"; do
     .github/workflows/ci.yml)
       affected+=("$TESTS_DIR/coverage.bats")
       affected+=("$TESTS_DIR/tasks-lint.bats")
+      affected+=("$TESTS_DIR/github-workflows.bats")
+      affected+=("$TESTS_DIR/install-deps.bats")
+      continue
+      ;;
+    .github/workflows/*.yml)
+      affected+=("$TESTS_DIR/github-workflows.bats")
       continue
       ;;
     .tasks-lint-version)

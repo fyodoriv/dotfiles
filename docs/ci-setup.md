@@ -6,13 +6,13 @@ How to enable and configure CI (continuous integration) on your team's fork of t
 
 ## How CI works in this repo
 
-The workflow (`.github/workflows/ci.yml`) runs on every push and pull request:
+The workflow (`.github/workflows/ci.yml`) starts by hand today (`gh workflow run ci.yml`):
 
 | Job | Runner | What it does |
 |-----|--------|-------------|
 | **lint** | ubuntu-latest | `make lint` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-13, macos-14, macos-15 | `make test-all` -- full bats suite on macOS |
-| **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark |
+| **test** | macos-latest | `make check` -- the local gate; then `make test-all` (full bats suite) when the run is not a pull request |
+| **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (never on a pull request) |
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan |
 | **coverage** | ubuntu-latest | `bin/dotfiles-coverage` + bats -- shell coverage report artifact |
 
@@ -47,8 +47,7 @@ trap helper on startup, open an append-only fd to a per-PID trace file, and
 write a `COV@<file>@<lineno>@<command>` marker for every executed line. The
 harness then walks the trace files, filters paths under `bin/`, `lib/`,
 and `modules/`, and emits a kcov-compatible JSON report so
-`.github/scripts/check-shell-coverage.sh` and the badge workflow keep working
-unchanged. macOS's legacy `/bin/bash` 3.2 does not support `BASH_XTRACEFD`, so
+`.github/scripts/check-shell-coverage.sh` keeps working unchanged. macOS's legacy `/bin/bash` 3.2 does not support `BASH_XTRACEFD`, so
 those subprocesses are left uninstrumented instead of leaking xtrace into
 stderr and corrupting output-sensitive tests. The same `.shell-coverage-floor`
 is enforced locally and in CI; set it from the lower full-suite baseline if

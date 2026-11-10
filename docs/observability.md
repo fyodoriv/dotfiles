@@ -254,6 +254,12 @@ nothing is sent. The key is never printed or logged.
   change hash. So when the answer changes outside `on` and `off` (a restored
   or hand-edited state file), the next `dotfiles apply` installs or removes
   the agent.
+- **A state file that cannot be read.** An old `sudo` run can leave the
+  state file root-owned. `dotfiles apply` then reads the answer as "not yes"
+  and goes on: it never fails on that file, and the agent stays off. The
+  doctor check `chezmoi.telemetry_state_readable` reports a state file that
+  another user owns or that has no read bit, and prints the fix
+  (`sudo chown` and `chmod 600`).
 - **Custom state folder.** The job gets `XDG_STATE_HOME` only when that
   variable is set where its plist is rendered (`dotfiles telemetry on` or
   `dotfiles apply`). Set it in the shell that runs them. A background apply

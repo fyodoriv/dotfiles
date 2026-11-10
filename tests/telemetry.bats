@@ -1548,3 +1548,61 @@ over_limit_log() {
   [ ! -s "$TEST_DIR/gate.calls" ]
   [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
 }
+
+# ── A state file that cannot be read ────────────────────────────────────
+
+@test "apply still renders with an unreadable state file, and reads it as not yes" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  [ "$(id -u)" != "0" ] || skip "root can read every file"
+  consent_line() {
+    grep '^# telemetry consent:' "$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl" |
+      chezmoi execute-template --source "$REPO"
+  }
+  bash "$TEL" on >/dev/null
+  [[ "$(consent_line)" == *"consent: yes" ]]
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  run consent_line
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "# telemetry consent: not yes" ]
+  # The script body agrees: the agent stays off for that file.
+  apply="$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$apply")"
+  PROFILE=full
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  run should_skip_agent telemetry
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [ "$status" -eq 0 ]
+}
+
+@test "the doctor reports a telemetry state file that is not yours or not readable" {
+  # Load only the telemetry part of the chezmoi doctor module, with a check
+  # function that records the result and the help text.
+  check() {
+    if eval "$3" >/dev/null 2>&1; then echo "pass $1"; else echo "fail $1 | fix: $4 | $5"; fi
+  }
+  doctor() { eval "$(sed -n '/^# ── Telemetry state file/,/^# ── /p' "$REPO/modules/chezmoi/doctor.sh")"; }
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ] # no file: nobody answered
+  bash "$TEL" off >/dev/null
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ]
+  # No read bit (for example mode 000).
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  run doctor
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [[ "$output" == "fail chezmoi.telemetry_state_readable"* ]]
+  [[ "$output" == *"chmod 600"* ]]
+  # Another owner (for example root after an old sudo run): the fix needs sudo.
+  DOTFILES_TELEMETRY_TEST_UID=12345 run doctor
+  [[ "$output" == "fail chezmoi.telemetry_state_readable"* ]]
+  [[ "$output" == *"sudo chown"* ]]
+  [[ "$output" == *"$DOTFILES_TELEMETRY_STATE"* ]]
+  # The automatic fix repairs a file of your own.
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  fix="$(doctor | sed 's/.*| fix: \(.*\) | .*/\1/')"
+  bash -c "$fix"
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ]
+  [ "$(consent)" = "no" ]
+}

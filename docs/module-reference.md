@@ -308,10 +308,11 @@ On `profile: core`, the module runs only when the `agent-browser` CLI is install
 
 ### chezmoi
 
-Sweeps every chezmoi-managed symlink. Catches links left behind when the repo moves.
+Sweeps every chezmoi-managed symlink. Catches links left behind when the repo moves. Also checks the telemetry state file that `dotfiles apply` reads.
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
+| `chezmoi.telemetry_state_readable` | The telemetry state file is yours and readable, or absent ([why](observability.md#telemetry)) | `chmod 600` on your own file; a file of another user needs `sudo chown` (the check prints the command) |
 | `chezmoi.installed` | advisory — `chezmoi` on PATH | — (hint: `brew bundle`) |
 | `chezmoi.managed_symlinks_valid` | No chezmoi-managed symlink points at a missing target | `chezmoi apply --exclude=scripts` |
 | `chezmoi.managed_symlinks_inventory` | advisory — lists the broken managed symlinks, when any | — |

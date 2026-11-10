@@ -371,20 +371,6 @@ them. -->
   - **Anchor**: PR #562 push block on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — correctness of an existing privacy gate, not a scorecard metric.
 
-- [ ] Keep `dotfiles apply` working when the telemetry state file is unreadable
-  - **ID**: apply-tolerates-unreadable-telemetry-state
-  - **Tags**: telemetry, reliability, apply
-  - **Details**: The consent line near the top of `.chezmoiscripts/run_onchange_launchagents.sh.tmpl` runs `include` on the telemetry state file when `stat` finds it. A file that exists but is unreadable makes the template fail, and then `dotfiles apply` can fail. One way to get such a file: an old `sudo` run left it root-owned with mode 600. Not reproduced yet: reproduce it first. Idea: treat an unreadable file as "not yes" in the template. Add a doctor check that reports a state file the user does not own, with the fix command.
-  - **Files**: `.chezmoiscripts/run_onchange_launchagents.sh.tmpl`, `modules/` (the telemetry or observability doctor), `tests/telemetry.bats`, `docs/observability.md`, `docs/module-reference.md`.
-  - **Output**: code
-  - **Acceptance**: a failing test first: render the template with a state file of mode 000 and assert exit 0 and a "not yes" consent line. The doctor check fails on a state file with a different owner or no read bit, and names the fix.
-  - **Hypothesis**: a tolerant read moves the template render with an unreadable state file from exit non-zero to exit 0, and the LaunchAgent stays off in that case.
-  - **Measurement**: `bats tests/telemetry.bats`, with the new render case and the doctor case.
-  - **Success**: exit 0 and "not yes" in the render case; the doctor case reports the file; every older consent test passes.
-  - **Pivot**: if chezmoi templates cannot test readability without a failing `include`, move the consent read out of the template into the script body (a `grep` with `2>/dev/null`).
-  - **Anchor**: review of PR #567 on 2026-11-10; Forsgren, Humble and Kim (2018), Accelerate (change failure rate).
-  - **Competitive-goal**: none — install reliability of an existing script, not a scorecard metric.
-
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

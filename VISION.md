@@ -101,7 +101,10 @@ the owner stored a key.
 - **The promise.** Never a path, file name, host name, user name, argument,
   message, or content. No person profile. PostHog receives the request IP
   address, like any web server; GeoIP lookup is disabled and no location is
-  stored. A yes covers only later events.
+  stored. A yes covers only later events. One exception: the shell start
+  time before the install and the install day are a baseline, measured
+  before the yes. They leave in the `dotfiles.gains` event, next to the
+  `dotfiles.install` event (install time, ok or error, profile).
   `bin/dotfiles-telemetry` is the one sender and enforces it with an
   allowlist; `tests/telemetry.bats` pins it.
 - **Opting out is reliable.** `dotfiles telemetry off`,

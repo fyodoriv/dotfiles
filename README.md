@@ -706,9 +706,13 @@ sent.
 
 - `dotfiles.install`, once per install: `seconds` (time to configured), `ok`,
   and `profile` (`core` or `full`). Sent only when the install finished on or
-  after the day of your yes.
+  after the day of your yes, and not more than 30 days ago.
 - `dotfiles.gains`, at most once a day: `zsh_ms_before`, `zsh_ms_now`, and
   `days_since_install`.
+
+Both events need a yes given on or after 2026-11-10, the day they shipped. An
+older yes was given to a text that did not name the baseline, so it does not
+cover them. `dotfiles telemetry on` gives a new yes.
 
 A `dotfiles.run` event carries `seconds_saved`, a whole number. It is an
 estimate.
@@ -746,12 +750,12 @@ The numbers compare this Mac with itself before the install.
 - **Baseline**: the same Mac before the install. `bin/dotfiles-install run`
   measures it once, before it changes anything, and saves it in the install
   receipt (`~/.local/state/dotfiles/install-receipt.json`).
-- **Measured**: shell start (`zsh_ms_before` from the receipt; `zsh_ms_now`
-  is the median of the daily shell start samples of the last 7 days), and
-  time to configured (`seconds` of the install run). The two shell numbers
-  use different methods: before is the full run time of one interactive
-  `zsh`, now is `~/.zshrc` start to first prompt. Read the difference as a
-  direction, not as an exact number.
+- **Measured**: shell start (`zsh_ms_before` from the receipt, `zsh_ms_now`
+  from the send), and time to configured (`seconds` of the install run).
+  Both shell numbers use one method: the full run time of
+  `zsh -i -c 'exit 0'`, the median of 3 runs. The daily send measures the
+  now value in the background, at most once a day. It may take 5 seconds at
+  most; when it fails or takes longer the number is left out.
 - **Estimated**: saved seconds (`seconds_saved`). It is the number of
   automation runs times the per-task table in
   [`lib/stats.sh`](lib/stats.sh) (`_task_estimate`). No clock measures it.

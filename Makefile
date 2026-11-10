@@ -130,9 +130,9 @@ test: ## Run affected tests only (skips tests that passed with the same inputs)
 	trap 'rm -f "$$pairs"' EXIT; \
 	./bin/bats-affected --pairs > "$$pairs" || exit 1; \
 	affected=$$(cut -f1 "$$pairs" | LC_ALL=C sort -u); \
-	if [ -n "$(TEST_SKIP_FILE)" ] && printf '%s\n' "$$affected" | grep -qF -e "$(TEST_SKIP_FILE)"; then \
+	if [ -n "$(TEST_SKIP_FILE)" ] && printf '%s\n' "$$affected" | grep -qxF -e "$(TEST_SKIP_FILE)" -e "$(CURDIR)/$(TEST_SKIP_FILE)"; then \
 	  echo "⚠ Skipping $(TEST_SKIP_FILE) (TEST_SKIP_FILE is set)"; \
-	  affected=$$(printf '%s\n' "$$affected" | grep -vF -e "$(TEST_SKIP_FILE)" || true); \
+	  affected=$$(printf '%s\n' "$$affected" | grep -vxF -e "$(TEST_SKIP_FILE)" -e "$(CURDIR)/$(TEST_SKIP_FILE)" || true); \
 	fi; \
 	if [ -z "$$affected" ]; then \
 	  echo "✓ No affected test files (nothing changed)"; \

@@ -74,6 +74,13 @@ jobs:
           key: cached-run-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             cached-run-${{ runner.os }}-
+      - name: Check the compare base of a push run
+        # With a missing base (a recreated branch, a force push) the gate
+        # would select no test and pass. Fail instead.
+        if: github.event_name == 'push'
+        env:
+          BASE: ${{ github.event.before }}
+        run: git cat-file -e "${BASE}^{commit}"
       - name: Gate (make check)
         env:
           # A push run compares with the commit before the push. Compared

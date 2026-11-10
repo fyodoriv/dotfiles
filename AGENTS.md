@@ -62,7 +62,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 1. **Prefer the modern CLI cohort** (`fd`, `rg`, `sd`, `xh`, …); POSIX only as a fallback.
 2. **Quote pip specs** (`pip install 'pkg>=1.2.3'`); keep command output out of the repo root.
 3. **Never hardcode `$HOME` paths**; use `~`, env vars, resolvers, or chezmoi templates.
-4. **Run `make check` before committing.** [Hosted CI](docs/ci-setup.md) repeats it on PRs.
+4. **[CI](docs/ci-setup.md) runs `make check` per PR.** Locally: lint, touched tests.
 5. **Update docs with every behavior change, in the same PR** (see Docs upkeep).
 6. **New modules need `modules/<name>/doctor.sh`.**
 7. **The Brewfile is inlined** in `.chezmoiscripts/run_onchange_brew.sh.tmpl`.
@@ -117,9 +117,9 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 ## Delivery
 
 1. Branch `type/description` (`feat`, `fix`, `docs`, `chore`, …) in a worktree; commit `type: description` (≤72 chars).
-2. Run `make check`; a red test is a real regression.
+2. Run `make lint` and touched tests; red is a real regression.
 3. Push the branch and open a PR to `feat/chezmoi`. PR body: `## Summary` (why + what), `## Details`, `## Docs`, then validation and `## Visual proof`. Template: [docs/ship-it-reference.md](docs/ship-it-reference.md).
-4. Squash-merge when green, remove the worktree and branch, and `git pull` the live checkout.
+4. Squash-merge on green CI, remove the worktree and branch, `git pull` the live checkout.
 
 Tasks: `TASKS.md` (tasks.md shape); delete a task block in the same commit as its fix; non-trivial tasks get `docs/plans/<task-id>.md`. [docs/constitution.md](docs/constitution.md#task-queue).
 

@@ -88,7 +88,7 @@ Settings drift. Scripts break. Nobody notices until something is slow again.
   (all 35 discovered modules, subject to feature gates). Selected at init time.
 - **149 macOS defaults** applied via lifecycle scripts — key repeat, Spotlight pruning/exclusions, 15-minute idle lock, Finder, animations, analytics, power management. See [notable changes](docs/onboarding.md#step-2-initialize-chezmoi).
 - **298 ms median shell startup** across seven daily samples on one Mac. The CI budget is 200 ms.
-- **bats tests** + shellcheck on every script. `make check` runs them before each commit; see [Where tests run](#where-tests-run).
+- **bats tests** + shellcheck on every script. hosted CI runs `make check` on each pull request; see [Where tests run](#where-tests-run).
 - **LaunchAgents** — sync, doctor, cleanup, git-maintain, app-priority, morning, and more.
 - **Time tracking** — `dotfiles stats` shows runs, time saved, and streak.
 - **Anonymous performance telemetry, with your yes** — asked at install; on only after you say yes (Enter counts as yes). `dotfiles telemetry off` or `DO_NOT_TRACK=1` stops it ([what is sent](#telemetry)).
@@ -1539,10 +1539,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and editing rules. See [
 
 Bats and shellcheck run in two places:
 
-- **Your machine**: `make check`, before every commit. The private-pattern leak gates (pre-commit, pre-push, `bin/gh`) run only here.
+- **Your machine**: `make lint` and the Bats files you touched, before a commit. The private-pattern leak gates (pre-commit, pre-push, `bin/gh`) run only here.
 - **GitHub Actions** on `fyodoriv/dotfiles`: the same `make check` on a hosted macOS runner for every pull request and every push to `feat/chezmoi`. Hosted runners are free for public repositories. Jobs, limits, and what stays local: [docs/ci-setup.md](docs/ci-setup.md).
 
-So run `make check` (or the affected `bats` files) before you push, and paste the result in the PR test plan.
+So run the affected `bats` files before you push, and merge only when the hosted checks are green. Run the full `make check` locally only when GitHub Actions is off, or to reproduce a hosted failure.
 
 `make install-deps` installs the Homebrew tools used by local validation:
 required for `make check`/tests (`shellcheck`, `bats-core`, `parallel`,

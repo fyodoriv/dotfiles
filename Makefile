@@ -218,7 +218,7 @@ check: ## Lint + task queue lint + test + install e2e when needed (timed)
 	@scripts/gate-timed.sh total $(MAKE) --no-print-directory check-steps
 	@echo ""
 	@echo "✓ All checks passed"
-	@echo "  Iterating? Use make lint and bats tests/<name>.bats; run make check once before you commit."
+	@echo "  Iterating? Use make lint and bats tests/<name>.bats; hosted CI runs make check on the pull request."
 
 check-steps:
 	@scripts/gate-timed.sh lint $(MAKE) --no-print-directory lint

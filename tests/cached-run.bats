@@ -673,7 +673,7 @@ calls() {
 }
 
 @test "make check points agents at the inner loop" {
-  grep -qF 'Iterating? Use make lint and bats tests/<name>.bats; run make check once before you commit.' \
+  grep -qF 'Iterating? Use make lint and bats tests/<name>.bats; hosted CI runs make check on the pull request.' \
     "$BATS_TEST_DIRNAME/../Makefile"
 }
 

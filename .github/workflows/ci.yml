@@ -63,6 +63,17 @@ jobs:
         # bash: the git hooks and the coverage harness need Homebrew bash;
         # the runner has only /bin/bash 3.2.
         run: brew install bash shellcheck bats-core parallel chezmoi jq fd
+      - name: Restore the per-file gate cache
+        # bin/cached-run skips a file whose inputs passed before, like nx.
+        # A cache entry cannot be changed, so each run saves a new one and
+        # restores the newest. A pull request reads its own entries and the
+        # default branch's; it cannot write to the default branch's.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/cached-run
+          key: cached-run-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            cached-run-${{ runner.os }}-
       - name: Gate (make check)
         run: make check
       - name: Full suite (manual runs only)

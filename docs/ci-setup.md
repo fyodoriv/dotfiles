@@ -16,6 +16,10 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
 | **coverage** | ubuntu-latest | `bin/dotfiles-coverage` + bats -- shell coverage report artifact |
 
+### Step cache (like nx)
+
+`bin/cached-run` records each test or lint file that passed, keyed on its content and on every file it reads. A later run skips a file whose inputs did not change. The `test` job keeps that record between runs with `actions/cache` (`~/.cache/cached-run`). A cache entry cannot be changed, so each run saves a new entry and restores the newest one. A pull request can read the entries of `feat/chezmoi` and its own; it cannot write to the entries of `feat/chezmoi`. The summary line shows the effect: `cached-run: N files: M unchanged (passed before), K checked`. To run everything, delete the entries: `gh cache delete --all`.
+
 ### Cost, limits, and what stays local
 
 - **Cost: zero.** Standard GitHub-hosted runners are free and unlimited for public repositories, macOS included ([GitHub docs](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)). Never switch a job to a larger runner: those are billed.

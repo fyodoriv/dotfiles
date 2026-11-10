@@ -14,7 +14,7 @@ Always loaded: open only the doc the routing table names.
 
 | Task | Command (from the repo root) |
 |---|---|
-| Commit gate | `make check` (lint + affected tests, commits ahead of base included) |
+| CI gate | `make check` (lint + affected tests, commits ahead of base included) |
 | Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
 | Full suite (background) | `heavy-run make test-all` |
 | Install e2e (real chezmoi and doctor) in a scratch HOME | `heavy-run make e2e` (`make check` runs it when an installer path changes) |

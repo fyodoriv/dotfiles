@@ -16,7 +16,7 @@ if [ "${1:-}" = "--stdin" ]; then
   changed="$(cat)"
 else
   cd "$(git rev-parse --show-toplevel)" || exit 2
-  base="$(git merge-base HEAD "${1:-origin/feat/chezmoi}" 2>/dev/null || echo HEAD)"
+  base="$(git merge-base HEAD "${1:-${BATS_AFFECTED_BASE:-origin/feat/chezmoi}}" 2>/dev/null || echo HEAD)"
   changed="$({ git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
 fi
 # Plus every lib that the e2e runs, two levels deep: libs sourced by the e2e

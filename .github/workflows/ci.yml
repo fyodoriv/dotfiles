@@ -75,6 +75,10 @@ jobs:
           restore-keys: |
             cached-run-${{ runner.os }}-
       - name: Gate (make check)
+        env:
+          # A push run compares with the commit before the push. Compared
+          # with origin/feat/chezmoi (itself), it would select no test.
+          BATS_AFFECTED_BASE: ${{ github.event_name == 'push' && github.event.before || 'origin/feat/chezmoi' }}
         run: make check
       - name: Full suite (manual runs only)
         # Fails today: TASKS.md full-suite-bats-argument-compatibility.

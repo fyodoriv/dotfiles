@@ -206,4 +206,4 @@ dotfiles doctor --list | grep mymod # verify check IDs appear
 - Check IDs must be globally unique
 - Every fix command should be idempotent (safe to run multiple times)
 - Use `checks.yaml` for declarative checks, `doctor.sh` for dynamic/runtime checks
-- Run `make check` before committing
+- Run `make lint` and the touched tests before committing; hosted CI runs `make check` on the pull request

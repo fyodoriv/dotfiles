@@ -1247,7 +1247,7 @@ where dotfiles is behind are in
 
 ## Performance
 
-Shell startup is benchmarked on every CI run and must stay under 200ms. The badge at the top reflects this threshold. Check the latest result in the [CI doctor job summary](https://github.example.com/your-org/dotfiles/actions/workflows/ci.yml).
+Shell startup must stay under 200ms. The CI `doctor` job benchmarks it when someone starts it by hand (`gh workflow run ci.yml`). The badge at the top reflects this threshold. Check the latest result in the [CI doctor job summary](https://github.example.com/your-org/dotfiles/actions/workflows/ci.yml).
 
 Measured on M3 Max, 64GB RAM, 300+ package JS/TS monorepo:
 
@@ -1524,7 +1524,7 @@ make lint-tasks     # validate TASKS.md queue format + P0/P1 rule-9 fields
 make test           # affected tests only; skips a test that passed with the same inputs
 make test-all       # full suite (cached)
 make test-force     # full suite, no cache
-make check          # lint + TASKS.md lint + perf gate + test + e2e when needed (run once before committing)
+make check          # lint + TASKS.md lint + perf gate + test + e2e when needed (hosted CI runs it on each pull request)
 make perf-gate      # fail when a tracked command got over 10% slower than the merge-base (part of make check)
 make install-deps   # install dev dependencies (required + optional tools)
 make fmt            # format shell scripts with shfmt

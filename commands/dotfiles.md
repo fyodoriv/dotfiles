@@ -36,3 +36,5 @@ Every other command: run `dotfiles actions --json`. It lists every top-level `do
 If dotfiles fails, surprises you, or could clearly work better, offer once to report it (CONTRIBUTING.md "Report problems and ideas"). Show the user the exact text, and post only after they say yes.
 
 For Glove80 keyboard profiles or pairing, run `dotfiles glove80 --help`. Ask before `dotfiles glove80 pair --yes`; the default keymap is a factory-layout assumption.
+
+For "what does dotfiles send?", "is telemetry on?", or "stop sharing my numbers", run `dotfiles telemetry status` (the answer, pending events, last send) and `dotfiles telemetry example` (what is sent, an example event, the privacy promise). Neither sends anything. `dotfiles telemetry off` records a no. Run `dotfiles telemetry on` only after the user says yes: it records their yes. An agent run never shows the consent question; never answer it for the user.

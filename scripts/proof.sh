@@ -134,7 +134,7 @@ render() {
       "Every number below comes from `docs/proof/metrics.json`. `scripts/proof.sh` writes that file and this section.",
       "Headline rows are field outcomes. `real use` numbers come from the local, content-free stats log that each real automation run writes (`~/.dotfiles-stats.jsonl`, see [observability](docs/observability.md)).",
       "",
-      "Each machine aggregates its own log here. Opt-in telemetry (`dotfiles telemetry`, off until the owner sets a key) can send the same content-free counts to PostHog EU; this section does not read them yet.",
+      "Each machine aggregates its own log here. Telemetry (`dotfiles telemetry`, asked at install, on only after a yes) can send the same content-free numbers to PostHog EU; this section does not read them yet.",
       "",
       "| Claim | Theory | Metric | Result | Source |",
       "|---|---|---|---|---|",

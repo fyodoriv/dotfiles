@@ -84,6 +84,34 @@ User stories under [`docs/user-stories/`](docs/user-stories/) are the contract:
 
 New capabilities earn a new user story; new user stories carry a numeric threshold and an SLI source per the constitution.
 
+## Strategy: measured speed, with consent
+
+Decision, 2026-11-09: dotfiles asks every install to share anonymous
+performance numbers. It replaces the earlier rule that telemetry was off until
+the owner stored a key.
+
+- **Why.** One Mac cannot show whether a command got slower for everyone.
+  Numbers from all installs feed a public dashboard (p50 and p95 per command,
+  version, and runtime) and a regression gate.
+- **Asked at install; on only after you say yes** (Enter counts as yes). The
+  installer shows what is sent, an example event, and the privacy
+  promise. With no terminal it asks nothing, and nothing is sent until a
+  person answers.
+- **The promise.** Never a path, file name, host name, user name, argument,
+  message, or content. No person profile. PostHog receives the request IP
+  address, like any web server; GeoIP lookup is disabled and no location is
+  stored. A yes covers only later events.
+  `bin/dotfiles-telemetry` is the one sender and enforces it with an
+  allowlist; `tests/telemetry.bats` pins it.
+- **Opting out is reliable.** `dotfiles telemetry off`,
+  `dotfiles-install run --no-telemetry`, `DOTFILES_TELEMETRY=0`,
+  `DO_NOT_TRACK=1`, and `CI`. A no is never asked again and never changed by
+  an install.
+- **It never costs the user.** A send runs in the background, at most once a
+  day, and never fails or slows a command.
+
+Details: [`docs/observability.md`](docs/observability.md#telemetry).
+
 ## Non-goals
 
 - **Not a generic dotfiles framework.** dotfiles is macOS + chezmoi + the author's stack. Linux support and other shell ecosystems (fish, nu) are forks' problems.

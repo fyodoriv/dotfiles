@@ -1,179 +1,862 @@
 #!/bin/bash
-# Opt-in field telemetry: send anonymous usage counts from the stats log to PostHog EU.
+# Anonymous performance telemetry to PostHog EU. Asked at install; on only
+# after you say yes (at install, Enter counts as yes).
 #
 # Usage:
-#   dotfiles telemetry status          Show on/off, why, pending events, last send
-#   dotfiles telemetry on | off        Turn sending on or off on this Mac
+#   dotfiles telemetry status          Show on/off, why, your answer, the key
+#                                      source, pending events, last send
+#   dotfiles telemetry on | off        Record your answer: yes or no
 #   dotfiles telemetry send [--dry-run]  Send pending events now; --dry-run prints
 #                                      the exact request body (key hidden), sends nothing
-#   dotfiles telemetry daily           Send at most once a day (log_run calls it)
-#   dotfiles telemetry notice          Print the one-line notice once
+#   dotfiles telemetry ask [--install] [--no] [--first-run]
+#                                      Ask the question on a terminal, when a key
+#                                      is present. --install is the installer's
+#                                      form: it also honors the opt-outs and says
+#                                      what it did. --no records no without
+#                                      asking. --first-run is the dispatcher's
+#                                      form: at most once a day and 3 times.
+#   dotfiles telemetry example         Show what is sent, an example event, and the
+#                                      privacy promise; changes nothing
+#   dotfiles telemetry daily           Send at most once a day (the LaunchAgent
+#                                      com.dotfiles.telemetry and lib/stats.sh call it)
 #
-# This script is the only adapter between the content-free stats log
-# (~/.dotfiles-stats.jsonl, lib/stats.sh) and the endpoint, so a move to a
-# self-hosted endpoint changes only this file. Same contract as careerbrew's
-# telemetry.py and agentbrew's core/telemetry.ts.
+# This script is the only sender. It reads two content-free local logs
+# (lib/stats.sh): the stats log (~/.dotfiles-stats.jsonl, one line per
+# automation run) and the commands log (~/.local/state/dotfiles/commands.jsonl,
+# one line per `dotfiles <command>` run). A move to a self-hosted endpoint
+# changes only this file. Same contract as agentbrew's core/telemetry.ts.
 #
-# What leaves the Mac: per stats line, the event name `dotfiles.run`, its time,
-# the task name, and the number fields (seconds_saved, units, pass, fail, fixed,
-# warn, skip, ok, duration_ms), keyed by a random install id. Never a path, a
-# host name, a user name, or a message. Person profiles and GeoIP are off.
+# What leaves the Mac, per log line: the event name (`dotfiles.run` or
+# `dotfiles.command`), its time, the task or command name, ok, duration_ms,
+# and count fields (seconds_saved, units, pass, fail, fixed, warn, skip).
+# Added at send time: the dotfiles version (the short SHA of the last upstream
+# commit in this checkout, never a local commit), os, arch, and runtime
+# "shell". All keyed by a random install id. Never a path, a file
+# name, a host name, a user name, an argument, a message, or content. Every
+# text value comes from a fixed list in this file (TASK_NAMES, COMMAND_NAMES),
+# so typed text and a fork's own command names cannot leave. Person profiles and GeoIP are
+# off. PostHog receives the request IP address, like any web server; GeoIP
+# lookup is disabled and no location is stored.
 #
-# It sends nothing unless all hold: a project key is set (DOTFILES_POSTHOG_KEY,
-# or the macOS Keychain item service "dotfiles", account "posthog_key"),
-# telemetry is on (the default), DO_NOT_TRACK is unset, and the notice was shown.
-# A failed send never fails a command. The cursor moves only after a send works.
+# Consent has three values: unset, yes, no. Nothing is sent unless it is yes.
+# `bin/dotfiles-install run` asks on a terminal. With no terminal the answer
+# stays unset, and the first `dotfiles` command on a terminal asks; that
+# question needs a typed y or n (a stray Enter is not a yes). With no answer
+# it asks again at most once a day and 3 times in all, then stays silent
+# until `dotfiles telemetry ask`. It never asks before help, version, cd, or
+# machine-readable output. With no key nobody is asked: nothing could be sent.
+# Keys typed before the question shows are thrown away. A yes covers only later events: both
+# cursors move to the end of the logs, so nothing recorded before it is sent.
+# Opt out without a question: `dotfiles-install run --no-telemetry`,
+# DOTFILES_TELEMETRY=0, or DO_NOT_TRACK=1 at install record no, also over an
+# earlier yes. An answer is never asked again, and an install without one of
+# these opt-outs never changes it.
 #
-# Lifecycle: the install id, the cursor (stats lines already sent), the on/off
-# flag, the last send day, and the notice flag live in one file,
-# ${XDG_STATE_HOME:-~/.local/state}/dotfiles/telemetry.json (mode 600).
-# Delete it to reset: a new install id, and the whole log is sent again.
+# The key is write-only (it can add events, never read them). Lookup order:
+# DOTFILES_POSTHOG_KEY, then the committed file config/telemetry-key, then
+# the macOS Keychain item service "dotfiles", account "posthog_key". The
+# committed file is the project's key for everyone. The env variable is the
+# override: a fork or a test sets it to send to its own PostHog project. The
+# Keychain item is the owner's key from before the file existed; it is read
+# only when the first two hold no key. A value that is not
+# `phc_` plus letters and digits is no key. No key means nothing is sent.
+#
+# It sends only when all hold: the answer is yes, a key is found, and
+# DO_NOT_TRACK, CI, and DOTFILES_TELEMETRY=0 are not set. A send never fails a
+# command. The cursor moves only after the endpoint answers 2xx. One send
+# takes at most the newest 2,000 events of the last 30 days per log, 500 per
+# request; older events are skipped for good. The automatic daily send stops
+# after 3 seconds in total; a request that hangs is killed. It runs from the
+# LaunchAgent com.dotfiles.telemetry (hourly; this script sends at most once
+# a day), and from a `dotfiles` run on a terminal as a fully detached child.
+# A scheduled job never starts it: launchd kills what a job leaves behind.
+# The LaunchAgent exists only while the stored answer is yes: a yes loads it,
+# `telemetry off` unloads it and removes its plist, and `dotfiles apply`
+# installs it only when the state file says yes.
+# A `telemetry off` during a send stops it before the next request.
+#
+# Lifecycle: the install id, the answer and its day, the two cursors (log
+# lines already handled), the last send day, the last try time and hour, and
+# the count and day of unanswered questions live in one file, ${XDG_STATE_HOME:-~/.local/state}/dotfiles/telemetry.json (mode 600,
+# written with a temp file and a rename, under a short lock so two runs never
+# lose each other's change). Failures go to telemetry.log next to it. Delete the state file to reset: a new install id, the answer is unset
+# again, and at most the capped newest events are sent after a new yes.
+# A state file whose content is not valid resets the same way (unset, never
+# yes), and starts both cursors at the end of the logs, so nothing old is
+# sent. When jq itself fails the file is left as it is and nothing is sent.
+# A run that only reads (status, the hourly wake) never creates the file.
+# A file from before the question (no answer in it) is unset; if it says
+# telemetry was turned off, the answer is no.
 
 set -uo pipefail
 { [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; } && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 STATS="${DOTFILES_STATS_FILE:-$HOME/.dotfiles-stats.jsonl}"
-STATE="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
+COMMANDS="${DOTFILES_COMMANDS_FILE:-$STATE_DIR/commands.jsonl}"
+STATE="${DOTFILES_TELEMETRY_STATE:-$STATE_DIR/telemetry.json}"
+ERROR_LOG="${STATE%.json}.log"
+LOCK="$STATE.lock"
+KEY_FILE="${DOTFILES_TELEMETRY_KEY_FILE:-$DOTFILES_DIR/config/telemetry-key}"
 URL="${DOTFILES_TELEMETRY_URL:-https://eu.i.posthog.com}"
 URL="${URL%/}/batch/"
 CURL="${DOTFILES_TELEMETRY_CURL:-curl}"
-BATCH_SIZE=500
-NOTICE="dotfiles sends anonymous usage counts (task, ok or error, duration, counts; never paths, names, or content) to PostHog EU once a key is set. Turn off: dotfiles telemetry off (or DO_NOT_TRACK=1)."
+BATCH_SIZE=500       # events per request
+MAX_EVENTS=2000      # newest events per log that one send may take
+MAX_AGE_DAYS=30      # older events are never sent
+AUTO_TIMEOUT=3       # seconds in total for one automatic daily send
+MANUAL_TIMEOUT=10    # seconds per request for `telemetry send`
+RETRY_SECONDS=3600   # the daily path tries at most once in this time
+# Every task name a stats log line may carry (the log_run callers, the doctor,
+# and the shell start timer). A line with another name sends no name.
+# tests/telemetry.bats fails when a caller is missing here.
+TASK_NAMES="app-priority audit cleanup doctor git-maintain hotfix install morning pr review shell-start sync upgrade"
+# Every command name a commands log line may carry: the dispatch arms of the
+# upstream bin/dotfiles. A fork's own arm is not here, so its name is never
+# sent. tests/telemetry.bats fails when an upstream arm is missing here.
+COMMAND_NAMES="actions add apply audit brew-add cd cheat config contribute defaults-add defaults-preview diff doctor edit enterprise glove80 h help init install leak managed memory metrics new-module plugin profile quickstart start stats status sync telemetry uninstall unmanage update upgrade v validate version"
+# app_version is the short SHA of the last commit this checkout shares with
+# this ref, so a local commit never makes a per-machine version.
+UPSTREAM_REF="origin/feat/chezmoi"
+MAX_ASKS=3           # unanswered first-run questions before it stays silent
+PRIVACY_URL="https://github.com/fyodoriv/dotfiles/blob/feat/chezmoi/docs/observability.md#telemetry"
 
-command -v jq >/dev/null 2>&1 || { echo "✗ jq is not installed. Fix: brew install jq" >&2; exit 1; }
-
-load_state() {
-  local s=""
-  [ -s "$STATE" ] && s="$(jq -c '.' "$STATE" 2>/dev/null)"
-  [ -n "$s" ] || s='{}'
-  jq -c '{install_id: (.install_id // ""), sent: (.sent // 0), enabled: (if .enabled == false then false else true end), last_send: (.last_send // ""), noticed: (.noticed // false)}' <<<"$s"
-}
-
-save_state() {
-  mkdir -p "$(dirname "$STATE")" 2>/dev/null || return 0
-  (umask 077 && printf '%s\n' "$1" >"$STATE.tmp.$$" && mv "$STATE.tmp.$$" "$STATE") 2>/dev/null || rm -f "$STATE.tmp.$$"
-}
-
-state_get() { jq -r ".$1" <<<"$STATE_JSON"; }
-state_set() { STATE_JSON="$(jq -c --argjson v "$2" ".$1 = \$v" <<<"$STATE_JSON")"; save_state "$STATE_JSON"; }
-
-STATE_JSON="$(load_state)"
-if [ -z "$(state_get install_id)" ]; then
-  state_set install_id "\"$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')\""
+if ! command -v jq >/dev/null 2>&1; then
+  # The question is an extra: with no jq it stays silent and asks nothing.
+  [ "${1:-}" != "ask" ] || exit 0
+  echo "✗ jq is not installed. Fix: brew install jq" >&2
+  exit 1
 fi
 
-# The project key, or "". DOTFILES_POSTHOG_KEY, when set (tests set it empty),
-# wins over the Keychain; a bats test never reads the Keychain. The value is never printed or logged.
-project_key() {
-  if [ -n "${DOTFILES_POSTHOG_KEY+x}" ]; then printf '%s' "$DOTFILES_POSTHOG_KEY"; return; fi
-  [ "$(uname -s)" = "Darwin" ] || return 0
-  [ -z "${BATS_TEST_FILENAME:-}" ] || return 0  # a test never reads the real Keychain
-  security find-generic-password -s dotfiles -a posthog_key -w 2>/dev/null || true
+today() { date -u +%F; }
+line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
+
+# ── State ───────────────────────────────────────────────────────────────
+# Script-scope copies of the state file fields. load_state fills them;
+# state_set changes some and writes the file.
+S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
+S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
+# READ_FAILED: jq could not run on the file, so its content is unknown.
+# STATE_INVALID: jq ran and the content is not a state object.
+READ_FAILED=0 STATE_INVALID=0
+
+new_install_id() { od -An -tx1 -N16 /dev/urandom | tr -d ' \n'; }
+
+save_state() {
+  local tmp="$STATE.tmp.$$"
+  mkdir -p "$(dirname "$STATE")" 2>/dev/null || return 0
+  (
+    umask 077
+    jq -n -c \
+      --arg id "$S_ID" --arg consent "$S_CONSENT" --arg consent_at "$S_CONSENT_AT" \
+      --argjson sent "$S_SENT" --argjson sent_commands "$S_SENT_COMMANDS" \
+      --arg last_send "$S_LAST_SEND" --argjson last_try "$S_LAST_TRY" \
+      --arg try_hour "$S_TRY_HOUR" --argjson asks "$S_ASKS" --arg asked_day "$S_ASKED_DAY" \
+      '{install_id: $id, consent: $consent, consent_at: $consent_at, sent: $sent,
+        sent_commands: $sent_commands, last_send: $last_send, last_try: $last_try,
+        try_hour: $try_hour, asks: $asks, asked_day: $asked_day}' \
+      >"$tmp" && mv -f "$tmp" "$STATE"
+  ) 2>/dev/null || rm -f "$tmp"
 }
 
-# Why sending is off by a switch (not by a missing key), or "".
+# Read the state file into the S_ variables. It never writes: a write happens
+# only under the lock (state_set, record_consent), so a run that only reads
+# never creates a file or an install id on disk.
+# Every field is checked, so a hand-edited value cannot break the arithmetic
+# below. No file: a new install, answer unset. A file whose content is not a
+# JSON object with an install id (STATE_INVALID): unset, with both cursors at
+# the end of the logs, so a broken file never means yes and never sends the
+# whole history again. When jq itself fails (READ_FAILED) the content is
+# unknown: the answer is treated as unset for this run, nothing is sent, and
+# nothing is written, so a stored no is never lost. A cursor that is not a
+# whole number (or is absurdly large) also means the end of its log. A file
+# from before the question has no answer: unset, or no when it says telemetry
+# was turned off.
+load_state() {
+  local fields="" rc=0
+  READ_FAILED=0 STATE_INVALID=0
+  S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
+  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
+  [ -n "$S_ID" ] || S_ID="$(new_install_id)"
+  [ -e "$STATE" ] || return 0
+  # The file is read as raw text and parsed inside jq, so jq exits 0 for any
+  # content. A non-zero exit means jq (or the read) failed, not the content.
+  fields="$(jq -R -s -r '
+    def count: if type == "number" and . >= 0 then floor else 0 end;
+    def cursor:
+      if . == null then 0
+      elif type == "number" and . >= 0 and . == floor and . < 1000000000000 then .
+      else -1 end;
+    def day: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") then . else "-" end;
+    def hour: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$") then . else "-" end;
+    (try fromjson catch null) as $state
+    | if ($state | type) == "object" and ($state.install_id | type) == "string"
+         and ($state.install_id | test("^[0-9a-f]{32}$"))
+      then $state
+        | [.install_id, (.sent | cursor), (.sent_commands | cursor),
+           (if .consent == "yes" or .consent == "no" then .consent
+            elif .enabled == false then "no"
+            else "unset" end),
+           (.consent_at | day), (.last_send | day), (.last_try | count),
+           (.try_hour | hour), ([(.asks | count), 99] | min), (.asked_day | day)]
+        | map(tostring) | join(" ")
+      else "invalid" end' "$STATE" 2>/dev/null)" || rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$fields" ]; then
+    READ_FAILED=1
+    return 0
+  fi
+  if [ "$fields" = "invalid" ]; then
+    STATE_INVALID=1
+    S_ID="$(new_install_id)"
+    S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
+    return 0
+  fi
+  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY <<<"$fields"
+  [ "$S_SENT" != "-1" ] || S_SENT="$(line_count "$STATS")"
+  [ "$S_SENT_COMMANDS" != "-1" ] || S_SENT_COMMANDS="$(line_count "$COMMANDS")"
+  [ "$S_CONSENT_AT" != "-" ] || S_CONSENT_AT=""
+  [ "$S_LAST_SEND" != "-" ] || S_LAST_SEND=""
+  [ "$S_TRY_HOUR" != "-" ] || S_TRY_HOUR=""
+  [ "$S_ASKED_DAY" != "-" ] || S_ASKED_DAY=""
+}
+
+# One state change at a time, across runs: a mkdir lock held for the read,
+# the change, and the write. The holder leaves a file named by its process id
+# in the lock. A lock still there after 3 seconds is from a run that died or
+# stalled, so it is taken over. A stalled holder that wakes up sees that its
+# file is gone (state_owned) and does not write what it read before: it takes
+# the lock and reads again. Returns 1 when the lock cannot be taken; then
+# nothing is written. DOTFILES_TELEMETRY_TEST_HOLD (tests only) makes the
+# first state_set of a run wait that many seconds between its read and its
+# write, to prove that a second run waits for the lock.
+state_lock() {
+  local tries=0
+  mkdir -p "$(dirname "$STATE")" 2>/dev/null
+  until mkdir "$STATE.wlock" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 130 ] || return 1
+    [ "$tries" -ne 60 ] || rm -rf "$STATE.wlock" 2>/dev/null
+    sleep 0.05
+  done
+  : >"$STATE.wlock/$$" 2>/dev/null || { rmdir "$STATE.wlock" 2>/dev/null; return 1; }
+}
+state_owned() { [ -e "$STATE.wlock/$$" ]; }
+state_unlock() {
+  state_owned || return 0
+  rm -f "$STATE.wlock/$$" 2>/dev/null
+  rmdir "$STATE.wlock" 2>/dev/null
+  return 0
+}
+
+# state_set [NAME VALUE ...]: under the lock, read the file again, change only
+# the named fields, and write. So a change another run made meanwhile (for
+# example `telemetry off`) is kept: the send path names only cursors and try
+# times, and never the answer. This is also the only place (with
+# record_consent) that creates a missing file. When jq cannot read the file,
+# nothing is written. Returns 1 when nothing was written.
+state_set() {
+  local index
+  for _ in 1 2 3; do
+    state_lock || return 1
+    load_state
+    if [ "$READ_FAILED" -eq 1 ]; then
+      state_unlock
+      return 1
+    fi
+    if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -n "${DOTFILES_TELEMETRY_TEST_HOLD:-}" ]; then
+      sleep "$DOTFILES_TELEMETRY_TEST_HOLD"
+      unset DOTFILES_TELEMETRY_TEST_HOLD
+    fi
+    index=1
+    while [ "$index" -lt "$#" ]; do
+      printf -v "${@:index:1}" '%s' "${@:index+1:1}"
+      index=$((index + 2))
+    done
+    # Still the holder: write. Otherwise another run took the lock over while
+    # this one stalled, so what was read is stale: read again.
+    if state_owned; then
+      save_state
+      state_unlock
+      return 0
+    fi
+  done
+  return 1
+}
+
+# One line per failure, no content: a time and a fixed text. Kept short.
+log_error() {
+  mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || return 0
+  (
+    umask 077
+    printf '%s %s\n' "$(date -u +%FT%TZ)" "$1" >>"$ERROR_LOG"
+    if [ "$(line_count "$ERROR_LOG")" -gt 200 ]; then
+      tail -n 100 "$ERROR_LOG" >"$ERROR_LOG.tmp.$$" && mv -f "$ERROR_LOG.tmp.$$" "$ERROR_LOG"
+    fi
+  ) 2>/dev/null || true
+}
+
+# ── Key and switches ────────────────────────────────────────────────────
+# Sets KEY and KEY_SOURCE (env, keychain, default, or none). The value is
+# never printed or logged. A bats test never reads the real Keychain.
+KEY="" KEY_SOURCE="none"
+valid_key() { [[ "$1" =~ ^phc_[A-Za-z0-9]+$ ]]; }
+resolve_key() {
+  local line="" security_bin=""
+  KEY="" KEY_SOURCE="none"
+  if valid_key "${DOTFILES_POSTHOG_KEY:-}"; then
+    KEY="$DOTFILES_POSTHOG_KEY" KEY_SOURCE="env"
+    return 0
+  fi
+  if [ -f "$KEY_FILE" ]; then IFS= read -r line <"$KEY_FILE" || true; fi
+  if valid_key "$line"; then
+    KEY="$line" KEY_SOURCE="default"
+    return 0
+  fi
+  # The Keychain is last, so a run with a key from the env or the file starts
+  # no `security` process. In a test only a fake (the seam) is ever called.
+  if [ -n "${BATS_TEST_FILENAME:-}" ]; then security_bin="${DOTFILES_TELEMETRY_SECURITY:-}"
+  elif [ "$(uname -s)" = "Darwin" ]; then security_bin="security"; fi
+  [ -n "$security_bin" ] || return 0
+  line="$("$security_bin" find-generic-password -s dotfiles -a posthog_key -w 2>/dev/null || true)"
+  if valid_key "$line"; then
+    KEY="$line" KEY_SOURCE="keychain"
+  fi
+  return 0
+}
+
+# Why a run-time switch stops sending whatever the stored answer is, or "".
 blocked() {
-  case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) echo "DO_NOT_TRACK is set"; return ;; esac
-  [ "$(state_get enabled)" = "true" ] || echo "turned off (turn on: dotfiles telemetry on)"
+  case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) echo "DO_NOT_TRACK is set"; return 0 ;; esac
+  [ -z "${CI:-}" ] || { echo "CI is set"; return 0; }
+  [ "${DOTFILES_TELEMETRY:-}" != "0" ] || echo "DOTFILES_TELEMETRY=0 is set"
 }
 
-line_count() { [ -f "$STATS" ] && wc -l <"$STATS" | tr -d ' ' || echo 0; }
-
-pending_count() {
-  local total sent
-  total="$(line_count)"; sent="$(state_get sent)"
-  [ "$sent" -le "$total" ] 2>/dev/null || sent=0
-  echo $((total - sent))
-}
-
-# Lines from $1+1, at most $2 of them, as a PostHog batch body with key $3.
-# Allowlisted fields only: anything else in a line never leaves the Mac.
-build_body() {
-  local from="$1" count="$2" key="$3" version
-  version="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-  tail -n "+$((from + 1))" "$STATS" 2>/dev/null | head -n "$count" | jq -R -s -c \
-    --arg key "$key" --arg id "$(state_get install_id)" --arg v "$version" '
-    def num: type == "number" and isinfinite == false and isnan == false;
-    [split("\n")[] | select(length > 0) | (try fromjson catch null) | select(type == "object") | . as $e |
-      {event: "dotfiles.run", distinct_id: $id,
-       properties: ({"$process_person_profile": false, "$geoip_disable": true, app_version: $v}
-         + (if ($e.task | type) == "string" and ($e.task | test("^[a-z0-9-]{1,40}$")) then {task: $e.task} else {} end)
-         + ([("seconds_saved","units","pass","fail","fixed","warn","skip","duration_ms") as $k
-              | select($e[$k] | num) | {($k): $e[$k]}] | add // {})
-         + (if ($e.ok | type) == "boolean" then {ok: $e.ok} else {} end))}
-      + (if ($e.timestamp | type) == "string" and ($e.timestamp | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")) then {timestamp: $e.timestamp} else {} end)
-    ] | {api_key: $key, batch: .}'
-}
-
-# POST stdin to the endpoint; prints the HTTP status. The body (with the key)
-# goes through stdin, so the key never shows in a process list.
-post() {
-  "$CURL" -sS -o /dev/null -w '%{http_code}' --max-time 10 -X POST \
-    -H 'Content-Type: application/json' --data-binary @- "$URL" 2>/dev/null || echo 000
-}
-
-cmd_status() {
-  local why key_state="no key"
+# Why nothing may be sent in this run, or "": a switch, or no yes.
+not_now() {
+  local why
   why="$(blocked)"
-  [ -n "$(project_key)" ] && key_state="key set"
+  [ -z "$why" ] || { echo "$why"; return 0; }
+  [ "$READ_FAILED" -eq 0 ] || { echo "the state file could not be read"; return 0; }
+  case "$S_CONSENT" in
+    yes) ;;
+    no) echo "you said no; change it: dotfiles telemetry on" ;;
+    *) echo "not asked yet; answer: dotfiles telemetry on, or off" ;;
+  esac
+}
+
+# A person can answer: stdin and stderr are a terminal and this is not CI.
+# DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
+interactive() {
+  [ -z "${CI:-}" ] || return 1
+  [ -n "${DOTFILES_TELEMETRY_TTY:-}" ] || { [ -t 0 ] && [ -t 2 ]; }
+}
+
+# ── What to send ────────────────────────────────────────────────────────
+cutoff_time() {
+  date -u -v-"${MAX_AGE_DAYS}"d +%FT%TZ 2>/dev/null || date -u -d "$MAX_AGE_DAYS days ago" +%FT%TZ 2>/dev/null || true
+}
+
+# plan FILE CURSOR prints "FROM TOTAL": send lines FROM+1..TOTAL of FILE.
+# FROM is the cursor after the caps: at most MAX_EVENTS newest lines, and no
+# leading line older than MAX_AGE_DAYS. A cursor past the end (the log was
+# cut or rotated) moves to the end, never to 0.
+plan() {
+  local file="$1" from="$2" total old
+  total="$(line_count "$file")"
+  [ "$from" -le "$total" ] || from="$total"
+  [ $((total - from)) -le "$MAX_EVENTS" ] || from=$((total - MAX_EVENTS))
+  if [ "$from" -lt "$total" ]; then
+    old="$(tail -n "+$((from + 1))" "$file" 2>/dev/null | awk -v cutoff="$(cutoff_time)" '
+      {
+        time = ""
+        if (match($0, /"timestamp":"[^"]*"/)) time = substr($0, RSTART + 13, RLENGTH - 14)
+        if (time != "" && time >= cutoff) exit
+        old++
+      }
+      END { print old + 0 }')"
+    from=$((from + ${old:-0}))
+  fi
+  echo "$from $total"
+}
+
+os_name() { case "$(uname -s)" in Darwin) echo darwin ;; Linux) echo linux ;; *) echo other ;; esac; }
+arch_name() { case "$(uname -m)" in arm64 | aarch64) echo arm64 ;; x86_64 | amd64) echo x64 ;; *) echo other ;; esac; }
+
+# The version to report: the short SHA of the last commit this checkout
+# shares with UPSTREAM_REF, or "unknown". Never a local commit. A checkout
+# whose origin is not the upstream repo (a fork) reports "unknown": its
+# origin branch holds the fork's own commits, which would identify the fork.
+VERSION=""
+UPSTREAM_HOST='github\.com'
+UPSTREAM_URL_PATTERN="^(https://${UPSTREAM_HOST}/|git@${UPSTREAM_HOST}:|ssh://git@${UPSTREAM_HOST}/)fyodoriv/dotfiles(\\.git)?/?\$"
+app_version() {
+  local base="" origin
+  if [ -z "$VERSION" ]; then
+    origin="$(git -C "$DOTFILES_DIR" remote get-url origin 2>/dev/null || true)"
+    if [[ "$origin" =~ $UPSTREAM_URL_PATTERN ]]; then
+      base="$(git -C "$DOTFILES_DIR" merge-base HEAD "$UPSTREAM_REF" 2>/dev/null || true)"
+    fi
+    [ -z "$base" ] || base="$(git -C "$DOTFILES_DIR" rev-parse --short "$base" 2>/dev/null || true)"
+    [[ "$base" =~ ^[0-9a-f]{4,40}$ ]] || base="unknown"
+    VERSION="$base"
+  fi
+}
+
+# events_body EVENT KEY: the log lines on stdin as one PostHog batch body, or
+# nothing when no line holds an event. This is the privacy boundary:
+# allowlisted fields only; anything else in a line never leaves the Mac. A
+# task or command name leaves only when it is on the fixed list. The key goes
+# to jq through the environment, not an argument, so it never shows in a
+# process list.
+events_body() {
+  local event="$1" key="$2"
+  app_version
+  DOTFILES_TELEMETRY_BODY_KEY="$key" jq -R -s -c \
+    --arg id "$S_ID" --arg event "$event" \
+    --arg version "$VERSION" --arg os "$(os_name)" --arg arch "$(arch_name)" \
+    --arg tasks "$TASK_NAMES" --arg commands "$COMMAND_NAMES" '
+    def is_number: type == "number" and isinfinite == false and isnan == false;
+    def is_time: type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$");
+    def name_field($line; $field; $allowed):
+      $line[$field] as $name
+      | if ($name | type) == "string" and any($allowed | split(" ")[]; length > 0 and . == $name)
+        then {($field): $name} else {} end;
+    def number_fields($line):
+      [("seconds_saved", "units", "pass", "fail", "fixed", "warn", "skip", "duration_ms") as $field
+        | select($line[$field] | is_number)
+        | {($field): $line[$field]}]
+      | add // {};
+    def ok_field($line):
+      if ($line.ok | type) == "boolean" then {ok: $line.ok} else {} end;
+    def time_field($line):
+      if ($line.timestamp | is_time) then {timestamp: $line.timestamp} else {} end;
+
+    [split("\n")[]
+      | select(length > 0)
+      | (try fromjson catch null)
+      | select(type == "object")
+      | . as $line
+      | {event: $event, distinct_id: $id,
+         properties: (
+           {"$process_person_profile": false, "$geoip_disable": true,
+            app_version: $version, os: $os, arch: $arch, runtime: "shell"}
+           + name_field($line; "task"; $tasks)
+           + name_field($line; "command"; $commands)
+           + number_fields($line)
+           + ok_field($line))}
+        + time_field($line)]
+    | select(length > 0)
+    | {api_key: env.DOTFILES_TELEMETRY_BODY_KEY, batch: .}'
+}
+
+# build_body FILE FROM COUNT EVENT KEY: COUNT lines after line FROM as a body.
+build_body() {
+  tail -n "+$(($2 + 1))" "$1" 2>/dev/null | head -n "$3" | events_body "$4" "$5"
+}
+
+# An example event, built by the same code that builds a send.
+example_event() {
+  printf '{"command":"doctor","timestamp":"%s","ok":true,"duration_ms":1840}\n' "$(date -u +%FT%TZ)" |
+    events_body dotfiles.command "" | jq '.batch[0]'
+}
+
+what_is_sent() {
+  echo "What is sent, at most once a day: the command or task name, its duration,"
+  echo "ok or error, counts, the dotfiles version, OS, CPU type, and a random"
+  echo "install id. An example event:"
+  echo ""
+  example_event
+  echo ""
+  echo "The privacy promise: never a path, file name, host name, user name,"
+  echo "argument, message, or content. No person profile. PostHog receives the"
+  echo "request IP address, like any web server; GeoIP lookup is disabled and no"
+  echo "location is stored. Only events recorded after your yes are sent."
+  echo "The code that enforces this is bin/dotfiles-telemetry; see"
+  echo "$PRIVACY_URL"
+  echo "Where it goes: PostHog EU, for a public performance dashboard."
+  echo "Change your answer any time: dotfiles telemetry off (or on)."
+}
+
+# POST stdin to the endpoint within $1 seconds; prints the HTTP status, or
+# nothing when the request could not run. The body (with the key) reaches curl
+# on stdin, and jq got the key through its environment, so the key is never
+# an argument of any process. curl has its own time
+# limit; a watchdog also kills a request that is still there one second later.
+post() {
+  local pid watchdog
+  exec 7<&0
+  "$CURL" -sS -o /dev/null -w '%{http_code}' --connect-timeout "$1" --max-time "$1" -X POST \
+    -H 'Content-Type: application/json' --data-binary @- "$URL" <&7 2>/dev/null &
+  pid=$!
+  exec 7<&-
+  (
+    sleep "$(($1 + 1))" &
+    nap=$!
+    trap 'kill "$nap" 2>/dev/null; exit 0' TERM
+    wait "$nap"
+    kill "$pid" 2>/dev/null
+  ) >/dev/null 2>&1 &
+  watchdog=$!
+  wait "$pid" 2>/dev/null
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  return 0
+}
+
+# ── Sending ─────────────────────────────────────────────────────────────
+# One send at a time (a mkdir lock; a lock older than 10 minutes is stale).
+HAVE_LOCK=0
+unlock() { [ "$HAVE_LOCK" -eq 0 ] || rmdir "$LOCK" 2>/dev/null; HAVE_LOCK=0; }
+lock() {
+  mkdir -p "$(dirname "$LOCK")" 2>/dev/null
+  if ! mkdir "$LOCK" 2>/dev/null; then
+    [ -n "$(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null)" ] || return 1
+    rmdir "$LOCK" 2>/dev/null
+    mkdir "$LOCK" 2>/dev/null || return 1
+  fi
+  HAVE_LOCK=1
+  trap unlock EXIT
+}
+
+# send_log FILE CURSOR_NAME EVENT TIMEOUT: send what plan allows from one log.
+# Adds to SENT_COUNT and SKIPPED_COUNT; sets FAILED_CODE and returns 1 when the
+# endpoint does not answer 2xx. The cursor moves after each request that worked.
+# Every state write reads the file again first (state_set), so this never
+# saves a copy from before a request. It stops before the next request when
+# the answer is no longer yes (STOPPED_WHY) or the time is up: DEADLINE is a
+# value of $SECONDS, 0 for no limit.
+SENT_COUNT=0 SKIPPED_COUNT=0 FAILED_CODE="" STOPPED_WHY="" DEADLINE=0
+send_log() {
+  local file="$1" cursor_name="$2" event="$3" timeout="$4"
+  local cursor from total count body code left events
+  [ -z "$STOPPED_WHY" ] || return 0
+  cursor="${!2}"
+  read -r from total <<<"$(plan "$file" "$cursor")"
+  if [ "$from" -ne "$cursor" ]; then
+    [ "$from" -lt "$cursor" ] || SKIPPED_COUNT=$((SKIPPED_COUNT + from - cursor))
+    state_set "$cursor_name" "$from"
+  fi
+  while [ "$from" -lt "$total" ]; do
+    [ "$S_CONSENT" = "yes" ] || { STOPPED_WHY="turned off during the send"; return 0; }
+    if [ "$DEADLINE" -gt 0 ]; then
+      left=$((DEADLINE - SECONDS))
+      [ "$left" -gt 0 ] || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
+      [ "$timeout" -le "$left" ] || timeout="$left"
+    fi
+    count=$((total - from))
+    [ "$count" -le "$BATCH_SIZE" ] || count="$BATCH_SIZE"
+    body="$(build_body "$file" "$from" "$count" "$event" "$KEY")"
+    if [ -n "$body" ]; then
+      code="$(printf '%s' "$body" | post "$timeout")"
+      if [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+        # Count events, not log lines: a line that is not an event sends nothing.
+        events="$(jq '.batch | length' <<<"$body" 2>/dev/null || echo 0)"
+        SENT_COUNT=$((SENT_COUNT + ${events:-0}))
+      else
+        [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
+        FAILED_CODE="$code"
+        return 1
+      fi
+    fi
+    from=$((from + count))
+    state_set "$cursor_name" "$from"
+  done
+}
+
+# send_all TIMEOUT: prints one result line. Never fails.
+send_all() {
+  local timeout="$1" why skipped=""
+  why="$(not_now)"
+  [ -z "$why" ] || { echo "telemetry: not sent ($why)"; return 0; }
+  lock || { echo "telemetry: not sent (another send is running)"; return 0; }
+  # The try time is saved before the key lookup, so a Mac with no key looks
+  # for one (and may ask the Keychain) at most once per RETRY_SECONDS. The
+  # try hour lets lib/stats.sh skip the next start with no new process.
+  state_set S_LAST_TRY "$(date +%s)" S_TRY_HOUR "$(date -u +%FT%H)"
+  resolve_key
+  [ -n "$KEY" ] || { echo "telemetry: not sent (no key)"; unlock; return 0; }
+  if send_log "$STATS" S_SENT dotfiles.run "$timeout" && send_log "$COMMANDS" S_SENT_COMMANDS dotfiles.command "$timeout"; then
+    [ "$SKIPPED_COUNT" -eq 0 ] || skipped=" (skipped $SKIPPED_COUNT older event(s))"
+    if [ -n "$STOPPED_WHY" ]; then
+      echo "telemetry: sent $SENT_COUNT event(s)$skipped, then stopped ($STOPPED_WHY)"
+    elif [ "$SENT_COUNT" -eq 0 ]; then
+      echo "telemetry: nothing new$skipped"
+    else
+      state_set S_LAST_SEND "$(today)"
+      echo "telemetry: sent $SENT_COUNT event(s)$skipped"
+    fi
+  else
+    log_error "send failed (http $FAILED_CODE)"
+    echo "telemetry: send failed (http $FAILED_CODE); will retry"
+  fi
+  unlock
+}
+
+# Print the first request of each log, exactly as a send would build it, with
+# the key hidden. Changes nothing and sends nothing.
+dry_run() {
+  local file cursor event from total count body pending=0
+  for file in "$STATS" "$COMMANDS"; do
+    if [ "$file" = "$STATS" ]; then cursor="$S_SENT" event="dotfiles.run"; else cursor="$S_SENT_COMMANDS" event="dotfiles.command"; fi
+    read -r from total <<<"$(plan "$file" "$cursor")"
+    count=$((total - from))
+    pending=$((pending + count))
+    [ "$count" -le "$BATCH_SIZE" ] || count="$BATCH_SIZE"
+    [ "$count" -gt 0 ] || continue
+    body="$(build_body "$file" "$from" "$count" "$event" "<posthog_key>")"
+    [ -n "$body" ] || continue
+    echo "POST $URL"
+    jq . <<<"$body"
+  done
+  echo "dry run: nothing sent. $pending event(s) pending, at most $BATCH_SIZE per request."
+}
+
+# Events a send would take now, and older ones it would skip: "PENDING SKIPPED".
+pending_counts() {
+  local from total pending=0 skipped=0 cursor
+  read -r from total <<<"$(plan "$STATS" "$S_SENT")"
+  cursor="$S_SENT"; [ "$cursor" -le "$total" ] || cursor="$total"
+  pending=$((pending + total - from)); skipped=$((skipped + from - cursor))
+  read -r from total <<<"$(plan "$COMMANDS" "$S_SENT_COMMANDS")"
+  cursor="$S_SENT_COMMANDS"; [ "$cursor" -le "$total" ] || cursor="$total"
+  pending=$((pending + total - from)); skipped=$((skipped + from - cursor))
+  echo "$pending $skipped"
+}
+
+# ── Commands ────────────────────────────────────────────────────────────
+cmd_status() {
+  local why pending skipped
+  why="$(not_now)"
+  resolve_key
   if [ -n "$why" ]; then echo "telemetry: off ($why)"
-  elif [ "$key_state" = "no key" ]; then echo "telemetry: off (no key, so nothing is sent; set one: security add-generic-password -s dotfiles -a posthog_key -w)"
+  elif [ -z "$KEY" ]; then echo "telemetry: off (no key, so nothing is sent)"
   else echo "telemetry: on"; fi
+  if [ "$READ_FAILED" -eq 1 ]; then
+    echo "consent: unknown (jq could not read the state file; nothing is sent and nothing is changed)"
+  else
+    case "$S_CONSENT" in
+      yes | no) echo "consent: $S_CONSENT (given ${S_CONSENT_AT:-on an unknown day})" ;;
+      *) echo "consent: unset (not asked yet; answer: dotfiles telemetry on, or off)" ;;
+    esac
+  fi
+  echo "key: $KEY_SOURCE"
   echo "endpoint: $URL"
-  echo "pending: $(pending_count) event(s)"
-  echo "last send: $(state_get last_send | sed 's/^$/never/')"
+  read -r pending skipped <<<"$(pending_counts)"
+  if [ "$skipped" -gt 0 ]; then echo "pending: $pending event(s) ($skipped older event(s) will be skipped, never sent)"
+  else echo "pending: $pending event(s)"; fi
+  echo "last send: ${S_LAST_SEND:-never}"
+  [ ! -s "$ERROR_LOG" ] || echo "last problem: $(tail -n 1 "$ERROR_LOG")"
 }
 
 cmd_send() {
-  local dry=0 sent from total n code key
-  [ "${1:-}" = "--dry-run" ] && dry=1
-  sent="$(state_get sent)"; total="$(line_count)"
-  [ "$sent" -le "$total" ] 2>/dev/null || sent=0
-  if [ "$dry" -eq 1 ]; then
-    echo "POST $URL"
-    build_body "$sent" "$BATCH_SIZE" "<posthog_key>" | jq .
+  if [ "${1:-}" = "--dry-run" ]; then dry_run; else send_all "$MANUAL_TIMEOUT"; fi
+}
+
+# The automatic path: quiet, at most one working send a day, at most
+# AUTO_TIMEOUT seconds in total, and after a try it waits RETRY_SECONDS.
+# Every return path leaves this clock hour in the state file, so lib/stats.sh
+# starts no new process for the rest of the hour. Only with a stored yes:
+# without one that gate stops earlier, and a wake must never create a state
+# file or an install id for someone who never answered.
+cmd_daily() {
+  local hour
+  hour="$(date -u +%FT%H)"
+  if [ -n "$(not_now)" ] || [ "$S_LAST_SEND" = "$(today)" ] ||
+    [ $(($(date +%s) - S_LAST_TRY)) -lt "$RETRY_SECONDS" ]; then
+    [ "$S_CONSENT" != "yes" ] || [ "$S_TRY_HOUR" = "$hour" ] || state_set S_TRY_HOUR "$hour" || true
     return 0
   fi
-  local why; why="$(blocked)"
-  [ -z "$why" ] || { echo "telemetry: not sent ($why)"; return 0; }
-  key="$(project_key)"
-  [ -n "$key" ] || { echo "telemetry: not sent (no key)"; return 0; }
-  [ "$total" -gt "$sent" ] || { echo "telemetry: nothing new"; return 0; }
-  from="$sent"
-  while [ "$from" -lt "$total" ]; do
-    n=$((total - from)); [ "$n" -gt "$BATCH_SIZE" ] && n="$BATCH_SIZE"
-    code="$(build_body "$from" "$n" "$key" | post)"
-    case "$code" in 2??) ;; *) echo "telemetry: send failed (http $code); will retry"; return 0 ;; esac
-    from=$((from + n))
-    state_set sent "$from"
+  DEADLINE=$((SECONDS + AUTO_TIMEOUT))
+  send_all "$AUTO_TIMEOUT" >/dev/null 2>&1 || true
+}
+
+# record_consent yes|no: one locked read, change, and write. A new yes covers
+# only later events: both cursors move to the end of the logs, so nothing
+# recorded before the yes is ever sent. Then the LaunchAgent is made to match
+# the answer. Returns 1 when the answer could not be saved.
+record_consent() {
+  local saved=1
+  for _ in 1 2 3; do
+    state_lock || break
+    load_state
+    if [ "$READ_FAILED" -eq 1 ]; then
+      state_unlock
+      break
+    fi
+    if [ "$1" = "yes" ] && [ "$S_CONSENT" != "yes" ]; then
+      S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
+    fi
+    S_CONSENT="$1" S_CONSENT_AT="$(today)"
+    if state_owned; then
+      save_state
+      state_unlock
+      saved=0
+      break
+    fi
   done
-  state_set last_send "\"$(date -u +%F)\""
-  echo "telemetry: sent $((from - sent)) event(s)"
+  if [ "$saved" -ne 0 ]; then
+    load_state
+    echo "telemetry: could not save your answer (the state file could not be read or locked). Nothing is sent." >&2
+    return 1
+  fi
+  agent_sync
 }
 
-cmd_daily() {
-  [ "$(state_get noticed)" = "true" ] || return 0
-  [ "$(state_get last_send)" = "$(date -u +%F)" ] && return 0
-  [ -z "$(blocked)" ] || return 0
-  cmd_send >/dev/null 2>&1 || true
+# The LaunchAgent com.dotfiles.telemetry exists only while the stored answer
+# is yes. A yes renders its plist and loads it; any other answer unloads it
+# and removes the plist. `dotfiles apply` follows the same rule
+# (should_skip_agent in .chezmoiscripts/run_onchange_launchagents.sh.tmpl).
+# It acts only for the real state file and from the checkout that chezmoi
+# applies, so a scratch state or a development worktree never changes launchd.
+# In a test only the fakes (the two seams) are ever called. Never fails.
+agent_sync() {
+  local label="com.dotfiles.telemetry" launchctl_bin="launchctl" chezmoi_bin="chezmoi" plist template domain
+  if [ -n "${BATS_TEST_FILENAME:-}" ]; then
+    launchctl_bin="${DOTFILES_TELEMETRY_LAUNCHCTL:-}" chezmoi_bin="${DOTFILES_TELEMETRY_CHEZMOI:-}"
+    [ -n "$launchctl_bin" ] && [ -n "$chezmoi_bin" ] || return 0
+  else
+    [ "$(uname -s)" = "Darwin" ] || return 0
+    [ "$STATE" = "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json" ] || return 0
+    command -v launchctl >/dev/null 2>&1 && command -v chezmoi >/dev/null 2>&1 || return 0
+    [ "$(chezmoi source-path 2>/dev/null | { read -r dir && cd "$dir" 2>/dev/null && pwd -P; })" = "$(cd "$DOTFILES_DIR" && pwd -P)" ] || return 0
+  fi
+  plist="$HOME/Library/LaunchAgents/$label.plist"
+  template="$DOTFILES_DIR/launchagents/$label.plist.tmpl"
+  domain="gui/$(id -u)"
+  if [ "$S_CONSENT" = "yes" ]; then
+    [ -f "$template" ] || return 0
+    mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.local/share/dotfiles/logs" 2>/dev/null || return 0
+    if "$chezmoi_bin" execute-template <"$template" >"$plist.tmp.$$" 2>/dev/null && [ -s "$plist.tmp.$$" ]; then
+      mv -f "$plist.tmp.$$" "$plist"
+      "$launchctl_bin" bootout "$domain/$label" >/dev/null 2>&1 || true
+      "$launchctl_bin" bootstrap "$domain" "$plist" >/dev/null 2>&1 || log_error "could not load the LaunchAgent"
+    else
+      # No chezmoi data yet (a new install): `dotfiles apply` installs it.
+      rm -f "$plist.tmp.$$"
+    fi
+  elif [ -e "$plist" ]; then
+    "$launchctl_bin" bootout "$domain/$label" >/dev/null 2>&1 || true
+    rm -f "$plist"
+  fi
+  return 0
 }
 
-cmd_notice() {
-  [ "$(state_get noticed)" = "true" ] && return 0
-  [ -z "$(blocked)" ] || return 0
-  [ -n "$(project_key)" ] || return 0
-  state_set noticed true
-  echo "$NOTICE"
+# Throw away keys typed before the question shows, so a stray Enter is never
+# an answer. Only on a real terminal: a pipe is read as it is.
+drain_input() {
+  local saved
+  [ -t 0 ] || return 0
+  saved="$(stty -g 2>/dev/null)" || return 0
+  stty -icanon min 0 time 0 2>/dev/null || return 0
+  cat >/dev/null 2>&1 || true
+  stty "$saved" 2>/dev/null || true
 }
 
+cmd_on() {
+  record_consent yes || exit 1
+  what_is_sent
+  echo ""
+  echo "telemetry: turned on. Turn it off: dotfiles telemetry off"
+}
+
+cmd_off() {
+  record_consent no || exit 1
+  echo "telemetry: turned off. Nothing is sent. Turn it on: dotfiles telemetry on"
+}
+
+# The consent question. An answer is never asked again. The question goes to
+# stderr and the answer comes from stdin, only where a person can answer.
+# Where nobody can, the answer stays unset and nothing is sent. With no key
+# nothing could be sent, so nobody is asked and nothing is printed.
+# At install Enter counts as yes. Elsewhere the person did not expect a
+# question, so only a typed y or n is an answer. The dispatcher's form
+# (--first-run) does not nag: at most once a day, MAX_ASKS times in all.
+cmd_ask() {
+  local install=0 first_run=0 optout="" answer tries choices="[y/n]"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --install) install=1 ;;
+      --first-run) first_run=1 ;;
+      --no) optout="--no-telemetry" ;;
+      *) echo "Unknown flag: $1 (see dotfiles telemetry --help)" >&2; exit 2 ;;
+    esac
+    shift
+  done
+  if [ "$install" -eq 1 ] && [ -z "$optout" ]; then
+    if [ "${DOTFILES_TELEMETRY:-}" = "0" ]; then optout="DOTFILES_TELEMETRY=0"; fi
+    case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) optout="DO_NOT_TRACK is set" ;; esac
+  fi
+  # An opt-out always wins, also over an earlier yes.
+  if [ -n "$optout" ]; then
+    [ "$S_CONSENT" = "no" ] || record_consent no || return 0
+    echo "telemetry: off ($optout). Nothing is sent. Turn it on later: dotfiles telemetry on"
+    return 0
+  fi
+  [ "$READ_FAILED" -eq 0 ] || return 0
+  resolve_key
+  [ -n "$KEY" ] || return 0
+  if [ "$S_CONSENT" != "unset" ]; then
+    [ "$install" -eq 0 ] || echo "telemetry: your answer is $S_CONSENT (given ${S_CONSENT_AT:-earlier}); not asked again. Change it: dotfiles telemetry on, or off"
+    return 0
+  fi
+  if ! interactive; then
+    [ "$install" -eq 0 ] || echo "telemetry: not asked (no terminal), so nothing is sent. dotfiles asks on your next run in a terminal. Answer now: dotfiles telemetry on, or off"
+    return 0
+  fi
+  if [ "$first_run" -eq 1 ]; then
+    [ "$S_ASKS" -lt "$MAX_ASKS" ] || return 0
+    [ "$S_ASKED_DAY" != "$(today)" ] || return 0
+    # Counted before the question shows, so a closed window counts too.
+    state_set S_ASKS "$((S_ASKS + 1))" S_ASKED_DAY "$(today)" || return 0
+  fi
+  [ "$install" -eq 0 ] || choices="[Y/n]"
+  drain_input
+  {
+    echo ""
+    echo "========================================================================"
+    echo "  Help make dotfiles faster: share anonymous performance numbers?"
+    echo "========================================================================"
+    what_is_sent
+    echo ""
+  } >&2
+  for tries in 1 2 3; do
+    printf 'Share anonymous performance numbers? %s ' "$choices" >&2
+    IFS= read -r answer || { echo "" >&2; break; }
+    [ -n "$answer" ] || [ "$install" -eq 0 ] || answer="y"
+    case "$answer" in
+      y | Y | yes | YES | Yes)
+        record_consent yes || return 0
+        echo "telemetry: on. Thank you. Turn it off any time: dotfiles telemetry off" >&2
+        return 0 ;;
+      n | N | no | NO | No)
+        record_consent no || return 0
+        echo "telemetry: off. Nothing is sent. Turn it on any time: dotfiles telemetry on" >&2
+        return 0 ;;
+    esac
+    [ "$tries" -eq 3 ] || echo "Please answer y or n." >&2
+  done
+  if [ "$first_run" -eq 1 ] && [ "$S_ASKS" -ge "$MAX_ASKS" ]; then
+    echo "telemetry: no answer, so nothing is sent. dotfiles does not ask again. Answer any time: dotfiles telemetry on, or off" >&2
+  else
+    echo "telemetry: no answer, so nothing is sent. dotfiles asks again on a later run in a terminal." >&2
+  fi
+}
+
+load_state
+if [ "$STATE_INVALID" -eq 1 ]; then
+  # Repair a file with invalid content once, under the lock.
+  log_error "state file content was not valid; reset, answer unset"
+  state_set || true
+fi
 case "${1:-status}" in
   status) cmd_status ;;
-  on) state_set enabled true; echo "telemetry: turned on" ;;
-  off) state_set enabled false; echo "telemetry: turned off" ;;
+  on) cmd_on ;;
+  off) cmd_off ;;
   send) shift; cmd_send "$@" ;;
+  ask) shift; cmd_ask "$@" ;;
+  example) what_is_sent ;;
   daily) cmd_daily ;;
-  notice) cmd_notice ;;
   *) echo "Unknown subcommand: $1 (see dotfiles telemetry --help)" >&2; exit 2 ;;
 esac
 exit 0

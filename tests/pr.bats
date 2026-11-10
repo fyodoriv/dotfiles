@@ -8,6 +8,9 @@ PR_CMD="$BATS_TEST_DIRNAME/../bin/pr"
 setup() {
   TEST_DIR="$(mktemp -d)"
 
+  # The tests expect "main". A clean machine has no init.defaultBranch.
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main
+
   # Create a bare remote repo
   REMOTE_REPO="$TEST_DIR/remote.git"
   git init --bare --quiet "$REMOTE_REPO"

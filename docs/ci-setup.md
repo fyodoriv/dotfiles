@@ -18,7 +18,7 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 
 ### What the hosted gate leaves out
 
-- `tests/perf-gate.bats` (`make check TEST_SKIP_FILE=tests/perf-gate.bats`). Its fixtures time 100 ms sleeps. On the hosted macOS runner such a sleep took 174 to 241 ms, and other tests failed in each of 3 runs. Run it locally when you change the perf gate. Task: `perf-gate-hosted-runner-noise`.
+- `tests/perf-gate.bats` (`TEST_SKIP_FILE=tests/perf-gate.bats make check`). Its fixtures time 100 ms sleeps. On the hosted macOS runner such a sleep took 174 to 241 ms, and other tests failed in each of 3 runs. Run it locally when you change the perf gate. Task: `perf-gate-hosted-runner-noise`.
 - The `doctor`, `audit` and `coverage` jobs (manual runs only; see the table).
 
 ### Step cache (like nx)

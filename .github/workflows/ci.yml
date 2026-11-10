@@ -79,10 +79,12 @@ jobs:
           # A push run compares with the commit before the push. Compared
           # with origin/feat/chezmoi (itself), it would select no test.
           BATS_AFFECTED_BASE: ${{ github.event_name == 'push' && github.event.before || 'origin/feat/chezmoi' }}
-        # perf-gate.bats times 100 ms sleeps. On this runner they took up to
-        # 241 ms, and other tests failed in each of 3 runs. It stays a local
-        # test until TASKS.md perf-gate-hosted-runner-noise.
-        run: make check TEST_SKIP_FILE=tests/perf-gate.bats
+          # perf-gate.bats times 100 ms sleeps. On this runner they took up to
+          # 241 ms, and other tests failed in each of 3 runs. It stays a local
+          # test until TASKS.md perf-gate-hosted-runner-noise. make reads
+          # this variable from the environment.
+          TEST_SKIP_FILE: tests/perf-gate.bats
+        run: make check
       - name: Full suite (manual runs only)
         # Fails today: TASKS.md full-suite-bats-argument-compatibility.
         if: github.event_name == 'workflow_dispatch'

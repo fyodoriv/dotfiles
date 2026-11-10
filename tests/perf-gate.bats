@@ -47,6 +47,18 @@ tool() {
 # sleeps less than at the base (50 ms against 100 ms by default).
 quicker() { tool "${1:-0.05}"; }
 
+# wait_for_holder <file> [tries]: wait until the lock holder wrote "held" to
+# the file (5 tries a second, 30 s by default). Fails with a clear message when
+# it did not, so a test never goes on without the lock.
+wait_for_holder() {
+  local n=0
+  until [ -s "$1" ]; do
+    n=$((n + 1))
+    [ "$n" -le "${2:-150}" ] || { echo "the lock holder did not report 'held' in time: the test cannot go on"; return 1; }
+    sleep 0.2
+  done
+}
+
 # budget <line>...: write the fixture budget file: the path list, then these lines.
 budget() {
   {
@@ -369,10 +381,10 @@ gate() {
   [ -x "$CACHE/$first/tool.sh" ]
 
   # Another gate still times in the first checkout: it holds the shared lock.
-  /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH); print "held\n"; sleep 60' \
+  /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH) or die; $| = 1; print "held\n"; sleep 60' \
     "$CACHE/$first.use" > "$TEST_DIR/holder.out" &
   HOLDER=$!
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$TEST_DIR/holder.out" ] && break; sleep 0.2; done
+  wait_for_holder "$TEST_DIR/holder.out"
 
   for n in 2 3; do
     merge "step $n"
@@ -395,6 +407,17 @@ gate() {
   [ ! -e "$CACHE/$first" ] && [ ! -e "$CACHE/$first.use" ]
   [ ! -e "$CACHE/$second" ]
   [ -d "$CACHE/$third" ] && [ -d "$CACHE/$(git -C "$FIX" rev-parse main)" ]
+}
+
+@test "a test stops with a clear message when the lock holder never reports" {
+  : > "$TEST_DIR/holder.out"
+  run wait_for_holder "$TEST_DIR/holder.out" 2
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"the lock holder did not report 'held' in time"* ]]
+
+  echo held > "$TEST_DIR/holder.out"
+  run wait_for_holder "$TEST_DIR/holder.out" 2
+  [ "$status" -eq 0 ]
 }
 
 @test "perf gate never prunes worktrees that are not its own" {

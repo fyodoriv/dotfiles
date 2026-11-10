@@ -755,7 +755,9 @@ ask_starts() {
 
 @test "a hung endpoint cannot hold the daily send: the request is killed" {
   say_yes
-  printf '#!/bin/bash\necho started >>"%s/hung.calls"\nexec sleep 60\n' "$TEST_DIR" >"$FAKE"
+  # The fake records its own pid (exec keeps it), so the check never matches
+  # a "sleep 60" of another process on this Mac.
+  printf '#!/bin/bash\necho "$$" >>"%s/hung.calls"\nexec sleep 60\n' "$TEST_DIR" >"$FAKE"
   start="$(date +%s)"
   run bash "$TEL" daily
   [ "$status" -eq 0 ]
@@ -764,8 +766,8 @@ ask_starts() {
   [ "$(wc -l <"$TEST_DIR/hung.calls" | tr -d ' ')" -eq 1 ]
   [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" = "0" ]
   [ ! -e "$DOTFILES_TELEMETRY_STATE.lock" ]
-  run pgrep -f "sleep 60"
-  [ "$status" -ne 0 ] || { pkill -f "sleep 60"; false; }
+  hung_pid="$(cat "$TEST_DIR/hung.calls")"
+  ! kill -0 "$hung_pid" 2>/dev/null || { kill "$hung_pid"; false; }
 }
 
 @test "the daily send stops after 3 seconds in total; the rest goes later" {

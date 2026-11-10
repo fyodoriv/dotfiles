@@ -258,7 +258,7 @@ nothing is sent. The key is never printed or logged.
   state file root-owned. `dotfiles apply` then reads the answer as "not yes"
   and goes on: it never fails on that file, and the agent stays off. The
   doctor check `chezmoi.telemetry_state_readable` reports a state file that
-  another user owns or that has no read bit, and prints the fix
+  another user owns or that you cannot read or write, and prints the fix
   (`sudo chown` and `chmod 600`).
 - **Custom state folder.** The job gets `XDG_STATE_HOME` only when that
   variable is set where its plist is rendered (`dotfiles telemetry on` or

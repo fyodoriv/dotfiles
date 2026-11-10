@@ -26,7 +26,7 @@
 # ── Telemetry state file ────────────────────────────────────────────────
 # `dotfiles apply` reads the telemetry answer from this file, and
 # bin/dotfiles-telemetry reads and writes it. A file that another user owns
-# (for example root, after an old `sudo` run) or that has no read bit cannot
+# (for example root, after an old `sudo` run) or that has no read or write bit cannot
 # be used: apply then reads the answer as "not yes", and the answer cannot be
 # changed. No file is fine: nobody answered yet. The owner is read with `ls`,
 # which prints the same on macOS and Linux. DOTFILES_TELEMETRY_TEST_UID is for
@@ -48,7 +48,7 @@ printf -v _telemetry_state_q '%q' "$_telemetry_state_file"
 if [ -e "$_telemetry_state_file" ] && ! _telemetry_state_mine; then
   _telemetry_state_help="telemetry state file belongs to another user. You: open Terminal and run sudo chown \"\$(id -un)\" $_telemetry_state_q && chmod 600 $_telemetry_state_q"
 else
-  _telemetry_state_help="telemetry state file is not readable. You: open Terminal and run chmod 600 $_telemetry_state_q"
+  _telemetry_state_help="telemetry state file is not readable or not writable. You: open Terminal and run chmod 600 $_telemetry_state_q"
 fi
 check "chezmoi.telemetry_state_readable" \
   "telemetry state file is yours and readable (or absent)" \

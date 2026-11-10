@@ -312,7 +312,7 @@ Sweeps every chezmoi-managed symlink. Catches links left behind when the repo mo
 
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
-| `chezmoi.telemetry_state_readable` | The telemetry state file is yours and readable, or absent ([why](observability.md#telemetry)) | `chmod 600` on your own file; a file of another user needs `sudo chown` (the check prints the command) |
+| `chezmoi.telemetry_state_readable` | The telemetry state file is yours, readable and writable, or absent ([why](observability.md#telemetry)) | `chmod 600` on your own file; a file of another user needs `sudo chown` (the check prints the command) |
 | `chezmoi.installed` | advisory — `chezmoi` on PATH | — (hint: `brew bundle`) |
 | `chezmoi.managed_symlinks_valid` | No chezmoi-managed symlink points at a missing target | `chezmoi apply --exclude=scripts` |
 | `chezmoi.managed_symlinks_inventory` | advisory — lists the broken managed symlinks, when any | — |

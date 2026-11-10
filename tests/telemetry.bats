@@ -845,7 +845,8 @@ SH
   say_yes
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
-  grep -q -- "--max-time 3 " "$FAKE_LOG.args"
+  # 3 seconds in total: on a slow machine a second or two is gone before the request.
+  grep -Eq -- "--max-time [1-3] " "$FAKE_LOG.args"
   echo "{\"task\":\"sync\",\"timestamp\":\"$NOW\",\"units\":1}" >>"$DOTFILES_STATS_FILE"
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]

@@ -224,7 +224,7 @@ dotfiles_telemetry_ask() {
 # (a container user). The copy (`cp -p`) keeps the owner and the mode of the
 # log, so a cut by root leaves a file the user can still write.
 _commands_log_cap() {
-  local lines drop tmp
+  local lines tmp
   lines="$(wc -l <"$DOTFILES_COMMANDS_FILE" 2>/dev/null)" || return 0
   lines="${lines//[^0-9]/}"
   [ "${lines:-0}" -gt 20000 ] || return 0
@@ -233,10 +233,12 @@ _commands_log_cap() {
     DOTFILES_COMMANDS_FILE="$DOTFILES_COMMANDS_FILE" bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" cap-commands >/dev/null 2>&1 || true
     return 0
   fi
-  drop=$((lines - 10000))
+  # The newest 10,000 lines, not "from line N on": two commands that end at the
+  # same moment both cut here with no lock, and the second one must not cut
+  # the short log by the first one's count.
   tmp="$DOTFILES_COMMANDS_FILE.tmp.$$"
   if cp -p "$DOTFILES_COMMANDS_FILE" "$tmp" 2>/dev/null &&
-    tail -n "+$((drop + 1))" "$DOTFILES_COMMANDS_FILE" >"$tmp" 2>/dev/null &&
+    tail -n 10000 "$DOTFILES_COMMANDS_FILE" >"$tmp" 2>/dev/null &&
     mv -f "$tmp" "$DOTFILES_COMMANDS_FILE" 2>/dev/null; then
     return 0
   fi

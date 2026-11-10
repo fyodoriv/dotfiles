@@ -382,6 +382,20 @@ them. -->
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
 
+- [ ] Telemetry notices an unusable state folder, and cuts the log beside an unreadable state file
+  - **ID**: telemetry-state-folder-and-unreadable-cap
+  - **Tags**: telemetry, doctor
+  - **Details**: Two leftovers from the 2026-11-10 review of the telemetry follow-ups. (1) The doctor check `chezmoi.telemetry_state_readable` passes when the state folder itself is root-owned with mode 700: the file test then says "absent", while telemetry can read and write nothing. (2) With a state file that exists but cannot be read, `_commands_log_cap` starts `dotfiles-telemetry cap-commands`, which cuts nothing, so `commands.jsonl` grows until the user fixes the file.
+  - **Files**: `modules/chezmoi/doctor.sh`, `lib/stats.sh`, `tests/telemetry.bats`, `docs/observability.md`
+  - **Output**: code
+  - **Acceptance**: a bats test with a state folder the user cannot enter makes the doctor check fail with the fix command; a bats test with an unreadable state file and a 20,002-line log leaves at most 10,000 lines.
+  - **Hypothesis**: the two cases where telemetry state is unusable without a report or a log cut go from 2 to 0.
+  - **Measurement**: `heavy-run bats tests/telemetry.bats`
+  - **Success**: both new tests pass (red before the fix), and every older test passes.
+  - **Pivot**: the folder check needs more than 10 lines or a root-only fixture -> document the case in `docs/observability.md` and close.
+  - **Anchor**: review of the telemetry follow-ups, 2026-11-10; Basili, Caldiera and Rombach 1994 (GQM).
+  - **Competitive-goal**: none — telemetry robustness, not a scorecard metric.
+
 - [ ] Make `make lint` fast in the inner loop
   - **ID**: speed-up-make-lint
   - **Blocked**: needs-time — 2026-10-22: shipped `make lint` per-file cache (`bin/cached-run --per-file`: skips a script that passed with the same content, sourced files, shellcheck version, and `.shellcheckrc`; shared by all worktrees; misses run in parallel) plus `make lint-full` (PR #257). Baseline 2026-10-22: `make lint` lines sum 6m02s/day (tooling 2m08s, dotfiles 2m04s, agentbrew 1m50s); one run 17-39 s uncached, now 11.6 s cold and 1.2-1.3 s warm at load 40-50. Measure on or after 2026-10-29 with `python3 ~/.claude/skills/tooling-checkup/scripts/agent_time_review.py --days 7` (sum of the `make lint` lines), then close or pivot.

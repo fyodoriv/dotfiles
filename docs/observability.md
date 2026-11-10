@@ -288,7 +288,12 @@ baseline, so it works the same on every machine.
   prints `load noise, not a slowdown`.
 - **Ceiling at the base**: when the command is over its ceiling at the base
   too, your tree did not cause it. The verdict is `over-ceiling-at-base`, the
-  gate prints a note, and it does not fail.
+  gate prints a note, and it does not fail. The 10% rule still applies to
+  that command. An allow line does not lift the ceiling: a command that is
+  slower by both rules and over its ceiling fails, with or without an allow
+  line. A limit of this verdict: on a machine where the base is always over
+  the ceiling, the ceiling does not stop drift under 10% per PR. Lower the
+  load, or set a ceiling that fits the machine.
 - **How it times**: 2 warmups, then 15 runs per tree, base and head in turn,
   with an empty environment and a scratch HOME. A command that looks slower
   by both rules is timed again, up to two more rounds.
@@ -343,8 +348,10 @@ baseline, so it works the same on every machine.
   builds and removes checkouts under a lock, and removes only its own: a
   folder with the marker `<commit>.ready` next to it. It unlinks a symlink
   without following it. A checkout from before the marker existed has none:
-  the prune removes it when git lists it as a worktree of this repo and it is
-  over 7 days old. Any other unmarked folder stays, and the gate prints a note
+  the prune removes it when it is over 7 days old and git lists it as a
+  worktree of this repo, detached at the commit in its name, with a clean
+  tree. Any other unmarked folder stays (a worktree on a branch, at another
+  commit, or with a changed file can hold your work), and the gate prints a note
   with its path.
 - **Field numbers**: the gate measures one machine before a merge. Numbers
   from real installs will be on the performance dashboard (link: to be added

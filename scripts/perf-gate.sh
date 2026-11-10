@@ -11,7 +11,7 @@
 #   the median of (head - base) over the paired passes is over that
 #   limit too                                                     (slower), or
 #   head_min > its ceiling in the budget file, and base_min is not
-#   over that ceiling too                                         (over-ceiling).
+#   over that ceiling too (an allow line never lifts the ceiling) (over-ceiling).
 # A command name that the base budget file does not have, and whose file the
 # base commit does not have, is "new": only the ceiling applies. A name that
 # the base budget file has always runs the base row's command at the base.

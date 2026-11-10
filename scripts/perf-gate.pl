@@ -10,7 +10,9 @@
 #    each checkout it builds. It removes a folder only with that marker, and
 #    it unlinks a symlink without following it. One exception, for a checkout
 #    from before the marker existed: the prune removes an unmarked folder
-#    that git lists as a worktree of this repo and that is over 7 days old.
+#    that is over 7 days old and that git lists as a worktree of this repo,
+#    detached at the commit in its name, with a clean tree. So a worktree
+#    with work in it (a branch, another commit, a changed file) stays.
 #    Build and prune happen under <cache-dir>/lock, and every gate
 #    holds a shared lock on <cache-dir>/<sha>.use while it times, so no gate
 #    removes a checkout that another gate uses.
@@ -100,16 +102,21 @@ sub parse {
 # it is an old checkout of the gate. Returns 1 when the path is gone, 0 when
 # a folder without the marker was left alone.
 my $OLD_DAYS = 7;
-# True for a checkout from before the marker existed: git lists the path as a
-# worktree of this repo, and the folder is over $OLD_DAYS days old.
+# True for a checkout from before the marker existed. All of this must hold:
+# the folder is over $OLD_DAYS days old; git lists the path as a worktree of
+# this repo; that worktree is detached at the commit in the folder name; its
+# tree is clean. The gate builds exactly that. A worktree on a branch, at
+# another commit, or with a changed or new file can hold a person's work.
 sub old_checkout {
   my ($dir) = @_;
   my $mtime = (lstat $dir)[9];
   return 0 unless defined $mtime && time - $mtime > $OLD_DAYS * 86400;
+  my ($name) = $dir =~ m{/([0-9a-f]{40})$} or return 0;
   my $real = realpath($dir) // $dir;
-  for my $line (split /\n/, git_out($head, "worktree", "list", "--porcelain")) {
-    next unless $line =~ /^worktree (.+)$/;
-    return 1 if $1 eq $dir || $1 eq $real || (realpath($1) // "") eq $real;
+  for my $block (split /\n\n+/, git_out($head, "worktree", "list", "--porcelain")) {
+    my ($path) = $block =~ /^worktree (.+)$/m or next;
+    next unless $path eq $dir || $path eq $real || (realpath($path) // "") eq $real;
+    return $block =~ /^HEAD \Q$name\E$/m && $block =~ /^detached$/m && clean_tree($dir) ? 1 : 0;
   }
   return 0;
 }
@@ -167,7 +174,7 @@ if ($sha ne "") {
     open(my $u, ">>", "$cache/$1.use") or next;
     if (flock($u, LOCK_EX | LOCK_NB)) {
       if (remove_checkout($old, 1)) { unlink "$cache/$1.use"; }
-      else { print STDERR "perf gate: left $old alone: the gate did not build it (no $old.ready). Remove it by hand if it is old. (The gate prunes it itself only when git lists it as a worktree of this repo and it is over $OLD_DAYS days old.)\n"; }
+      else { print STDERR "perf gate: left $old alone: the gate did not build it (no $old.ready). Remove it by hand if it is old. (The gate prunes it itself only when it is over $OLD_DAYS days old and git lists it as a clean worktree of this repo, detached at the commit in its name.)\n"; }
     }
     close $u;
   }
@@ -288,12 +295,15 @@ for my $c (@$cmds) {
     $has_base = $base ne "" && ($prog !~ m{/} && !-e "$head/$prog" || git_quiet($head, "cat-file", "-e", "$sha:$prog"));
   }
   my ($bmin, $hmin, $count, @deltas);
+  my $passes = 0;
   my $round = sub {
     my ($times, $timed) = @_;
-    for my $i (1 .. $times) {
+    for (1 .. $times) {
       my %pass;
-      # Swap the order each pass, so neither tree always runs first.
-      for my $side ($i % 2 ? ("base", "head") : ("head", "base")) {
+      # Swap the order each pass, so neither tree always runs first. The
+      # count goes on across rounds: with an odd run count, the next round
+      # starts with the other tree, so the orders even out.
+      for my $side (++$passes % 2 ? ("base", "head") : ("head", "base")) {
         next if $side eq "base" && !$has_base;
         my ($ms, $st) = $side eq "base" ? run_once($base, $bc) : run_once($head, $c);
         # A command that fails is a setup error in either tree, never a pass or a verdict.
@@ -334,7 +344,9 @@ for my $c (@$cmds) {
         $c->{name}, ($r{ratio} - 1) * 100, $delta;
     }
     if ($hmin > $c->{ceiling}) {
-      if ($has_base && $bmin > $c->{ceiling}) {
+      # An allow line covers the slowdown rule only. A tree that is slower by
+      # both rules and over its ceiling fails, wherever the base is.
+      if ($has_base && $bmin > $c->{ceiling} && $r{verdict} ne "allowed") {
         # The base is over the ceiling too, so this tree did not cause it.
         printf STDERR "perf gate: %s is over its ceiling: %.1f ms > %d ms, but so is the base (%.1f ms): this machine is slow now, or the ceiling is too low. Not counted against this tree.\n",
           $c->{name}, $hmin, $c->{ceiling}, $bmin;

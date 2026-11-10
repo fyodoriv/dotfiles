@@ -116,8 +116,9 @@ gate() {
 }
 
 @test "perf gate fails when the command is over its ceiling" {
-  tool 0.20
-  budget 'tool	150	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
+  # 100 ms at the base, 400 ms here, ceiling 250 ms: wide margins on both sides.
+  tool 0.40
+  budget 'tool	250	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool is over its ceiling"* ]]
@@ -140,16 +141,29 @@ gate() {
     and (.commands[0] | .verdict == "over-ceiling-at-base" and .over_ceiling_at_base == true)'
 }
 
+@test "an allow line does not lift the ceiling when the base is over it too" {
+  # 100 ms at the base, 600 ms here, ceiling 50 ms. The allow line covers the
+  # slowdown rule only: the ceiling still fails this tree.
+  tool 0.60
+  budget 'tool	50	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"perf gate: tool is over its ceiling: "* ]]
+  [[ "$output" != *"Not counted against this tree"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*over-ceiling$'\n' ]]
+}
+
 @test "slower by the fastest runs only is load noise: the paired runs must agree" {
-  # The base tool is fast in one timed run only (its second run) and 300 ms in
-  # every other run. The head tool always takes 300 ms. So the minimums differ
-  # by far more than 10%, but run for run the two trees are equal. Seven runs:
-  # the median of seven pairs holds when load hits some of them.
+  # The base tool takes 200 ms in one timed run only (its second run) and
+  # 300 ms in every other run. The head tool always takes 300 ms. So the
+  # minimums differ by 50%, but run for run the two trees are equal. The limit
+  # for the paired runs is 20 ms (10% of 200 ms). Seven runs: the median of
+  # seven pairs holds when load hits some of them.
   cat > "$FIX/tool.sh" <<TOOL
 #!/bin/bash
 n=\$((\$(cat "$TEST_DIR/count" 2>/dev/null || echo 0) + 1))
 echo "\$n" > "$TEST_DIR/count"
-if [ "\$n" = 2 ]; then sleep 0.05; else sleep 0.30; fi
+if [ "\$n" = 2 ]; then sleep 0.20; else sleep 0.30; fi
 TOOL
   merge "a base with one fast run"
   tool 0.30
@@ -440,6 +454,41 @@ old_unmarked() {
   [[ "$output" == *"left $OLD alone"* ]]
 }
 
+# age <days> <path>: set the folder's time that many days back.
+age() {
+  /usr/bin/perl -e 'my $t = time - $ARGV[0] * 86400; utime($t, $t, $ARGV[1]) or die' "$1" "$2"
+}
+
+@test "an unmarked old worktree with uncommitted work stays" {
+  old_unmarked 8
+  echo mine > "$OLD/notes.txt"
+  age 8 "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ "$(cat "$OLD/notes.txt")" = mine ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked old worktree on a branch stays" {
+  old_unmarked 8
+  git -C "$OLD" checkout -q -b my-work
+  age 8 "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked old worktree at another commit than its name stays" {
+  old_unmarked 8
+  git -C "$OLD" checkout -q --detach main
+  age 8 "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
 @test "an unmarked old folder that another gate uses stays" {
   old_unmarked 8
   /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH) or die; $| = 1; print "held\n"; sleep 60' \
@@ -643,8 +692,8 @@ old_unmarked() {
 }
 
 @test "an allow line does not lift the ceiling" {
-  tool 0.20
-  budget 'tool	150	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
+  tool 0.40
+  budget 'tool	250	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool is over its ceiling"* ]]

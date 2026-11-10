@@ -14,9 +14,8 @@ Always loaded: open only the doc the routing table names.
 
 | Task | Command (from the repo root) |
 |---|---|
-| Commit gate | `make check` (lint + affected tests) |
+| Commit gate | `make check` (lint + affected tests, commits ahead of base included) |
 | Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
-| Tests affected by a committed branch | `make check` (it adds commits ahead of base) |
 | Full suite (background) | `heavy-run make test-all` |
 | Install e2e (real chezmoi and doctor) in a scratch HOME | `heavy-run make e2e` (`make check` runs it when an installer path changes) |
 | Plugin suites on macOS `/bin/bash` 3.2 | `make test-plugins-bash32` (`make check` runs it on plugin changes) |
@@ -27,7 +26,7 @@ Always loaded: open only the doc the routing table names.
 
 ### Verification gates
 
-`make check` is the gate. Name known pre-existing failures (see Gotchas). No completion claim without fresh command output. Full text: [docs/constitution.md](docs/constitution.md#verification-gates).
+Name known pre-existing failures (see Gotchas). No completion claim without fresh command output. Full text: [docs/constitution.md](docs/constitution.md#verification-gates).
 
 ## Where to change what
 
@@ -73,6 +72,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 11. **P0/P1 tasks need** single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, `Anchor`.
 12. **Proactive healing**: a recurring error becomes a same-session fix or a task with its blocker.
 13. **Default by default**: safe, useful behavior is the default; opt-outs are narrow and documented.
+14. **Performance is a gate**: `make perf-gate` must pass (a tracked command gets at most 10% slower per PR); new hot-path commands join `config/perf-budget.tsv`. [Details](docs/observability.md#performance-gate).
 
 **Visual proof for every PR**: a browser screenshot for UI work, a pasted terminal transcript otherwise. Never commit proof images; never drive AppleScript or keystrokes to stage one.
 
@@ -98,10 +98,8 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 ## Gotchas
 
 - Root helpers need .chezmoiignore entries.
-
 - [Declared skills](docs/user-stories/README.md#agent-workflow-acceptance).
-
-- **Worktrees**: use `~/apps/tooling/wt/<name>` (`wt` links to `wt.noindex`, so Spotlight skips it). Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
+- **Worktrees**: use `~/apps/tooling/wt/<name>`. Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
 - **`make test` misses committed changes**: it tests uncommitted files only. On a branch: `bin/bats-affected origin/feat/chezmoi | xargs bats`.
 - **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
@@ -130,5 +128,4 @@ Tasks: `TASKS.md` (tasks.md shape); delete a task block in the same commit as it
 - A behavior change updates its doc in the same PR. The routing table names the doc.
 - A gotcha that cost time goes into Gotchas in the same PR, or becomes a test.
 - Every PR body has `## Docs`: the docs changed, or `Docs: none — <reason>`.
-- A new top-level `docs/*.md` gets a row in [docs/README.md](docs/README.md).
 - `tests/docs-contract.bats` enforces this file's sections and size, the docs map, and the README opening.

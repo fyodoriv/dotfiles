@@ -87,6 +87,39 @@ PostHog EU (`https://eu.i.posthog.com/batch/`). It is opt-in by key:
 - **State**: `~/.local/state/dotfiles/telemetry.json` (install id, cursor,
   on/off, last send day; mode 600). Delete it to reset.
 
+## Performance gate
+
+`make perf-gate` (also a step of `make check`) stops a PR that makes a tracked
+command slower. `scripts/perf-gate.sh` times each command in
+`config/perf-budget.tsv` in two trees in the same run: your working tree and a
+checkout of the merge-base with the default branch. It needs no stored
+baseline, so it works the same on every machine.
+
+- **Fails when** the fastest run in your tree is more than 10% and more than
+  3 ms slower than the fastest run at the base, or above the command's ceiling
+  in the budget file.
+- **How it times**: 2 warmups, then 15 runs per tree, base and head in turn,
+  with an empty environment and a scratch HOME. It compares the minimums. A
+  command that looks slower is timed again, up to two more rounds.
+- **Skips** when the diff touches no runtime path (the `PERF_GATE_PATH` lines
+  in the budget file): `perf gate: skipped (no runtime change)`.
+  `scripts/perf-gate.sh --force` times anyway.
+- **Queue**: timing runs through `heavy-run --exclusive`. Inside a heavy-run
+  slot (`heavy-run make check`) it runs directly.
+- **On a failure**: make the command faster. If the cost is intended, raise
+  the ceiling and give the reason in the PR. A step above 10% in one PR also
+  needs a `PERF_GATE_ALLOW=<name>:<reason>` line in the budget file; the next
+  PR removes it.
+- **New hot-path command**: add its row to the budget file in the same PR.
+  A command that is missing at the base gets the ceiling check only.
+- **Machine output**: `scripts/perf-gate.sh --json` prints `base_min`,
+  `head_min`, `ratio`, and `verdict` per command.
+- **Base checkouts**: detached worktrees under
+  `~/.cache/dotfiles/perf-gate/<commit>`; the newest two are kept.
+- **Field numbers**: the gate measures one machine before a merge. Numbers
+  from real installs will be on the performance dashboard (link: to be added
+  with the telemetry timing events).
+
 ## Health check
 
 `dotfiles doctor` is the health check. It runs every module's checks and

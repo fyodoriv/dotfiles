@@ -117,6 +117,20 @@ them. -->
   - **Anchor**: OpenSSF Scorecard "Pinned-Dependencies" check; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — supply-chain hygiene, not a scorecard metric.
 
+- [ ] Make the hosted doctor and audit jobs pass on a clean runner
+  - **ID**: hosted-doctor-audit-clean-runner
+  - **Tags**: ci, doctor, reliability
+  - **Details**: On 2026-11-10 the first hosted run of `.github/workflows/ci.yml` failed the `audit` job: `bin/dotfiles-audit` reported 47 failed checks, because it checks an installed machine (shims in `dotfiles/bin`, LaunchAgents, `~/.ssh` rights) and the runner has none. The `doctor` job runs `chezmoi apply --source "$PWD" --force` with no chezmoi config, and `chezmoi managed` fails there with `map has no entry for key "profile"`. Both jobs now start only by hand. Give the runner a config first (`chezmoi init` with fixed answers, or a CI data file), then make the audit skip machine-state checks under `DOTFILES_CI=1` the way the doctor does. The test `dotfiles managed lists files` in `tests/cli.bats` skips without a chezmoi config; remove the skip when the runner has one.
+  - **Files**: `.github/workflows/ci.yml`, `bin/dotfiles-audit`, `tests/cli.bats`, `docs/ci-setup.md`.
+  - **Output**: code
+  - **Acceptance**: the `doctor` and `audit` jobs pass on a hosted runner and run on every push to `feat/chezmoi`; the `managed` test runs on the hosted runner without a skip.
+  - **Hypothesis**: a runner with a chezmoi config and CI-aware audit checks moves hosted `doctor` and `audit` failures from 47 audit failures and 1 skipped job to 0.
+  - **Measurement**: `gh workflow run ci.yml --ref <branch>` then `gh run view <id> --json jobs --jq '.jobs[] | select(.name=="doctor" or .name=="audit") | .conclusion'`.
+  - **Success**: both jobs print `success` on two runs in a row.
+  - **Pivot**: if `chezmoi apply` cannot finish on a runner within 30 minutes, keep `doctor` manual and gate only `audit`.
+  - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — CI coverage, not a scorecard metric.
+
 - [ ] Restore the full Bats suite with the installed CLI argument parser
   - **ID**: full-suite-bats-argument-compatibility
   - **Tags**: tests, reliability, tooling

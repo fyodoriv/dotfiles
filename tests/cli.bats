@@ -114,6 +114,10 @@ readme_doctor_reference_block() {
 }
 
 @test "dotfiles managed lists files" {
+  # chezmoi can list files only after `chezmoi init` wrote this machine's
+  # config. A clean machine (a hosted runner) has none.
+  chezmoi execute-template '{{ .profile }}' >/dev/null 2>&1 ||
+    skip "no chezmoi config on this machine"
   run bash "$CLI" managed
   [ "$status" -eq 0 ]
   # Should list at least some managed files

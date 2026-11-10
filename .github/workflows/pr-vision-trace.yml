@@ -7,9 +7,6 @@ name: pr-vision-trace
 # `scripts/check-pr-vision-trace.mjs` and is paired-tested in
 # `src/check-pr-vision-trace.test.ts`.
 #
-# Skips on `push` events (no PR body to inspect). Skips on PRs from the
-# release bot / dependabot / pre-approved opt-out marker.
-
 # Parked: manual only. PR bodies in this repo do not carry the block today,
 # so a pull_request trigger would fail every PR. Restore the pull_request
 # trigger to turn the gate back on (TASKS.md: decide-pr-vision-trace-gate).
@@ -22,6 +19,7 @@ on:
         required: true
 
 permissions:
+  contents: read
   pull-requests: read
 
 jobs:
@@ -29,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

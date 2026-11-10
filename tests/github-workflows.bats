@@ -122,7 +122,10 @@ workflow_code() {
 
 @test "workflow files: ci.yml is read-only, keeps no credentials, cancels stale runs" {
   local file="$REPO_ROOT/.github/workflows/ci.yml"
-  ! workflow_code "$file" | grep -qE ':[[:space:]]*write\b'
+  ! workflow_code "$file" | grep -qE ':[[:space:]]*write\b' || {
+    echo "ci.yml grants a write permission"
+    return 1
+  }
   grep -q 'cancel-in-progress:' "$file"
   [ "$(grep -c 'persist-credentials: false' "$file")" -eq "$(workflow_code "$file" | grep -c 'uses: actions/checkout@')" ]
 }

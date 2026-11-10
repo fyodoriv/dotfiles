@@ -83,8 +83,8 @@ workflow_code() {
   local wf line
   for wf in "$REPO_ROOT"/.github/workflows/*.yml; do
     while IFS= read -r line; do
-      [[ "$line" =~ uses:\ [A-Za-z0-9._/-]+@[0-9a-f]{40}\ \#\ v[0-9] ]] || {
-        echo "$(basename "$wf"): not pinned to a SHA: $line"
+      [[ "$line" =~ uses:\ (actions|github)/[A-Za-z0-9._/-]+@[0-9a-f]{40}\ \#\ v[0-9] ]] || {
+        echo "$(basename "$wf"): not a GitHub-owned action pinned to a SHA: $line"
         return 1
       }
     done < <(workflow_code "$wf" | grep -E '^[[:space:]]*(-[[:space:]]*)?uses:')

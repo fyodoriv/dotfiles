@@ -1,12 +1,16 @@
 name: OSS Readiness
 
 # Fast, dedicated job for the no-leak contract, with a single-purpose
-# status check called "oss-readiness". Manual start today. The bats suite
+# status check called "oss-readiness". The bats suite
 # in ci.yml also runs these tests, but THIS workflow is the cited gate
 # in SECURITY.md (layer L4) and is the one referenced when humans triage
 # a "why is my PR blocked?" question.
 
 on:
+  pull_request:
+    branches: [feat/chezmoi]
+  push:
+    branches: [feat/chezmoi]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +20,7 @@ jobs:
   no-leaks:
     name: No private identity / content / secret leaks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

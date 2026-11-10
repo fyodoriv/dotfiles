@@ -103,6 +103,62 @@ them. -->
   - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — a process decision, not a scorecard metric.
 
+- [ ] Pin the Bats version in the hosted coverage job
+  - **ID**: ci-coverage-pin-bats-core
+  - **Tags**: ci, security, supply-chain
+  - **Details**: The `coverage` job in `.github/workflows/ci.yml` runs `git clone --depth 1` of the `bats-core` default branch and installs it with `sudo`. Every other dependency of the workflows is pinned to a commit SHA, and `tests/github-workflows.bats` enforces that only for `uses:` lines. A changed upstream branch would run unreviewed code on the runner. The job holds a read-only token and no secret, so the risk is a broken or misleading coverage run, not a leak. Check out one release commit instead, and extend the Bats test to reject an unpinned `git clone` in a workflow.
+  - **Files**: `.github/workflows/ci.yml`, `tests/github-workflows.bats`.
+  - **Output**: code
+  - **Acceptance**: the coverage job installs Bats at one named commit SHA, and the workflow test fails when a workflow clones a repository without a pinned commit.
+  - **Hypothesis**: pinning moves unpinned third-party code fetched by the workflows from 1 source to 0.
+  - **Measurement**: `bats tests/github-workflows.bats`, with a new test that counts `git clone` lines without a following `git checkout <40-hex>`.
+  - **Success**: 0 unpinned sources, and the new test is red on the unchanged workflow.
+  - **Pivot**: if a pinned Bats cannot run the coverage suite, drop the clone and use the runner's packaged Bats instead.
+  - **Anchor**: OpenSSF Scorecard "Pinned-Dependencies" check; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — supply-chain hygiene, not a scorecard metric.
+
+- [ ] Make the hosted doctor and audit jobs pass on a clean runner
+  - **ID**: hosted-doctor-audit-clean-runner
+  - **Tags**: ci, doctor, reliability
+  - **Details**: On 2026-11-10 the first hosted run of `.github/workflows/ci.yml` failed the `audit` job: `bin/dotfiles-audit` reported 47 failed checks, because it checks an installed machine (shims in `dotfiles/bin`, LaunchAgents, `~/.ssh` rights) and the runner has none. The `doctor` job runs `chezmoi apply --source "$PWD" --force` with no chezmoi config, and `chezmoi managed` fails there with `map has no entry for key "profile"`. Both jobs now start only by hand. Give the runner a config first (`chezmoi init` with fixed answers, or a CI data file), then make the audit skip machine-state checks under `DOTFILES_CI=1` the way the doctor does. The test `dotfiles managed lists files` in `tests/cli.bats` skips without a chezmoi config; remove the skip when the runner has one.
+  - **Files**: `.github/workflows/ci.yml`, `bin/dotfiles-audit`, `tests/cli.bats`, `docs/ci-setup.md`.
+  - **Output**: code
+  - **Acceptance**: the `doctor` and `audit` jobs pass on a hosted runner and run on every push to `feat/chezmoi`; the `managed` test runs on the hosted runner without a skip.
+  - **Hypothesis**: a runner with a chezmoi config and CI-aware audit checks moves hosted `doctor` and `audit` failures from 47 audit failures and 1 skipped job to 0.
+  - **Measurement**: `gh workflow run ci.yml --ref <branch>` then `gh run view <id> --json jobs --jq '.jobs[] | select(.name=="doctor" or .name=="audit") | .conclusion'`.
+  - **Success**: both jobs print `success` on two runs in a row.
+  - **Pivot**: if `chezmoi apply` cannot finish on a runner within 30 minutes, keep `doctor` manual and gate only `audit`.
+  - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — CI coverage, not a scorecard metric.
+
+- [ ] Make the perf gate and its tests steady on hosted runners
+  - **ID**: perf-gate-hosted-runner-noise
+  - **Tags**: ci, perf, reliability
+  - **Details**: On 2026-11-10 `tests/perf-gate.bats` failed in 3 of 3 hosted macOS runs, each time on other tests (33; 18; 10, 17 and 20). The fixtures compare a 100 ms sleep with a 50 or 200 ms one. On the runner a 100 ms sleep took 174 to 241 ms, also when the file ran with no peer file (that change was reverted). The hosted gate now skips the file (`TEST_SKIP_FILE=tests/perf-gate.bats make check` in `.github/workflows/ci.yml`). Two parts: (1) make the fixtures independent of the wall clock (a fake timer for the verdict tests, or far wider gaps), then remove the skip; (2) check the real `make perf-gate` step on the runner: with this noise a pull request that touches a runtime path can fail with no real slowdown. Measure it with `gh workflow run ci.yml` on a branch that touches `bin/`, and decide whether the hosted run checks ceilings only.
+  - **Files**: `tests/perf-gate.bats`, `scripts/perf-gate.pl`, `.github/workflows/ci.yml`, `Makefile`, `docs/ci-setup.md`.
+  - **Output**: code
+  - **Acceptance**: `.github/workflows/ci.yml` has no `TEST_SKIP_FILE`, and `tests/perf-gate.bats` passes every hosted run for a week.
+  - **Hypothesis**: fixtures that do not depend on the wall clock move hosted failures of `tests/perf-gate.bats` from 3 of 3 runs to 0 of 10.
+  - **Measurement**: `gh run list -w ci.yml -L 10 --json databaseId --jq '.[].databaseId' | xargs -I{} gh run view {} --log-failed | grep -c 'perf-gate.bats'`
+  - **Success**: 0 failures of this file in 10 runs.
+  - **Pivot**: if a fake timer needs a large change in `scripts/perf-gate.pl` (more than a screen of code), keep the file local-only and state that in `docs/ci-setup.md` as the final design.
+  - **Anchor**: Luo et al. (2014), An Empirical Analysis of Flaky Tests; Forsgren, Humble and Kim (2018), Accelerate (change failure rate).
+  - **Competitive-goal**: none — CI reliability, not a scorecard metric.
+
+- [ ] Make the hosted coverage job finish, then put it back on every pull request
+  - **ID**: hosted-coverage-job-time
+  - **Tags**: ci, coverage, reliability
+  - **Details**: On 2026-11-10 the `coverage` job of `.github/workflows/ci.yml` (Ubuntu, `./bin/dotfiles-coverage run tests/`: the full Bats suite under `set -x` tracing) was still running after 45 minutes in one hosted run and after 30 minutes in the next, with a 60 minute limit. It now runs only on a manual start. First measure: start it by hand and read where the time goes and which tests fail on Linux (the suite assumes macOS paths such as `/opt/homebrew`). Then choose: run it on macOS, trace only the affected test files on a pull request, or split the suite across jobs.
+  - **Files**: `.github/workflows/ci.yml`, `bin/dotfiles-coverage`, `docs/ci-setup.md`, `tests/coverage.bats`.
+  - **Output**: code
+  - **Acceptance**: the `coverage` job passes on two pull requests in a row in under 20 minutes, and the `if:` line that limits it to manual runs is gone.
+  - **Hypothesis**: tracing only what a pull request affects, on the operating system the suite targets, moves the hosted coverage job from no result in 45 minutes to a pass in under 20 minutes.
+  - **Measurement**: `gh run view <id> --json jobs --jq '.jobs[] | select(.name=="coverage") | [.conclusion, .startedAt, .completedAt]'` on two pull requests.
+  - **Success**: `success` twice, each under 20 minutes.
+  - **Pivot**: if no layout finishes under 20 minutes, keep coverage as a weekly scheduled run and check the floor there.
+  - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — CI coverage, not a scorecard metric.
+
 - [ ] Restore the full Bats suite with the installed CLI argument parser
   - **ID**: full-suite-bats-argument-compatibility
   - **Tags**: tests, reliability, tooling

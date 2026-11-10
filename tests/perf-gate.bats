@@ -57,7 +57,11 @@ merge() {
   git -C "$FIX" branch -q -f main work
 }
 
-gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
+# bats prints this output only when the test fails: it shows why a gate run went wrong.
+gate() {
+  run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"
+  printf 'gate %s -> status %s\n%s\n' "$*" "$status" "$output"
+}
 
 # ── Verdicts ─────────────────────────────────────────────────────────
 

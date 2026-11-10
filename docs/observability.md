@@ -215,7 +215,10 @@ nothing is sent. The key is never printed or logged.
   state lock, so a line that was not sent yet is still sent. The cut drops
   the counted lines only, so a line that a command appends during the cut is
   kept and sent once. While a send runs, the log is left alone until a later
-  run.
+  run. With no state file (nobody answered the question) there is no cursor,
+  so `lib/stats.sh` cuts the log by itself with `tail` and `mv`. That path
+  needs no jq and works for root, and the log keeps its owner and mode. With
+  a state file and no jq the log is not cut until jq is back.
 - **Never as root.** With `sudo`, the state file, the lock, and the plist
   would become root-owned, and your own runs could not read them afterwards.
   So as root nothing is saved, loaded, or sent, and one line says so. A

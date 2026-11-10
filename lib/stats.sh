@@ -214,16 +214,33 @@ dotfiles_telemetry_ask() {
 }
 
 # Keep the commands log small: over 20,000 lines, keep the newest 10,000.
-# bin/dotfiles-telemetry does the cut (cap-commands), because it owns the
-# telemetry cursor: it moves the cursor back by the number of dropped lines,
-# under its lock, so a line that was not sent yet is still sent.
+# With a telemetry state file, bin/dotfiles-telemetry does the cut
+# (cap-commands), because it owns the telemetry cursor: it moves the cursor
+# back by the number of dropped lines, under its lock, so a line that was not
+# sent yet is still sent.
+# With no state file nobody answered the question: there is no cursor and
+# nothing is ever sent. Then this hook cuts the log itself. So the cap also
+# works where cap-commands cannot run: on a machine without jq, and for root
+# (a container user). The copy (`cp -p`) keeps the owner and the mode of the
+# log, so a cut by root leaves a file the user can still write.
 _commands_log_cap() {
-  local lines
+  local lines drop tmp
   lines="$(wc -l <"$DOTFILES_COMMANDS_FILE" 2>/dev/null)" || return 0
   lines="${lines//[^0-9]/}"
   [ "${lines:-0}" -gt 20000 ] || return 0
-  _stats_repo_root
-  DOTFILES_COMMANDS_FILE="$DOTFILES_COMMANDS_FILE" bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" cap-commands >/dev/null 2>&1 || true
+  if [ -e "${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}" ]; then
+    _stats_repo_root
+    DOTFILES_COMMANDS_FILE="$DOTFILES_COMMANDS_FILE" bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" cap-commands >/dev/null 2>&1 || true
+    return 0
+  fi
+  drop=$((lines - 10000))
+  tmp="$DOTFILES_COMMANDS_FILE.tmp.$$"
+  if cp -p "$DOTFILES_COMMANDS_FILE" "$tmp" 2>/dev/null &&
+    tail -n "+$((drop + 1))" "$DOTFILES_COMMANDS_FILE" >"$tmp" 2>/dev/null &&
+    mv -f "$tmp" "$DOTFILES_COMMANDS_FILE" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null
   return 0
 }
 

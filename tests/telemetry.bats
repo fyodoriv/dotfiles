@@ -1500,3 +1500,51 @@ wait_for_last_send() {
   [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" -eq 2 ]
   [ ! -e "$TEST_DIR/telemetry.asked-until.now" ]
 }
+
+# ── The commands log cap without jq, and as root ────────────────────────
+
+# Seed a log one line under the cut limit plus one; the hook adds one more.
+over_limit_log() {
+  for ((i = 1; i <= 20001; i++)); do echo "{\"command\":\"status\",\"timestamp\":\"$NOW\",\"ok\":true,\"duration_ms\":$i}"; done >"$DOTFILES_COMMANDS_FILE"
+}
+
+@test "with no jq and no state file the commands log is still capped" {
+  export DOTFILES_STATS_LOG=1
+  over_limit_log
+  # A PATH with the plain tools only: no jq.
+  mkdir "$TEST_DIR/nojq"
+  for tool in bash date mkdir wc tail cp mv rm dirname; do ln -s "$(command -v "$tool")" "$TEST_DIR/nojq/$tool"; done
+  env PATH="$TEST_DIR/nojq" DOTFILES_COMMANDS_ROTATE_NOW=1 /bin/bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  [[ "$(tail -n 1 "$DOTFILES_COMMANDS_FILE")" == *'"command":"doctor"'* ]]
+  [ -z "$(ls "$TEST_DIR" | grep 'commands.jsonl.tmp' || true)" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+}
+
+@test "as root with no state file the commands log is still capped, and keeps its mode" {
+  export DOTFILES_STATS_LOG=1
+  over_limit_log
+  chmod 640 "$DOTFILES_COMMANDS_FILE"
+  DOTFILES_TELEMETRY_TEST_UID=0 DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  [[ "$(tail -n 1 "$DOTFILES_COMMANDS_FILE")" == *'"command":"doctor"'* ]]
+  [[ "$(ls -l "$DOTFILES_COMMANDS_FILE")" == -rw-r-----* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+}
+
+@test "with a state file the cap goes through cap-commands, never the plain cut" {
+  export DOTFILES_STATS_LOG=1
+  gate_root # its fake bin/dotfiles-telemetry only logs the call
+  over_limit_log
+  echo '{"consent":"no"}' >"$DOTFILES_TELEMETRY_STATE"
+  : >"$TEST_DIR/gate.calls"
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$GATE/lib/stats.sh'; log_command doctor ok 5"
+  [ "$(cat "$TEST_DIR/gate.calls")" = "cap-commands" ]
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 20002 ]
+  # With no state file the hook cuts by itself and starts no script.
+  rm -f "$DOTFILES_TELEMETRY_STATE"
+  : >"$TEST_DIR/gate.calls"
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$GATE/lib/stats.sh'; log_command doctor ok 5"
+  [ ! -s "$TEST_DIR/gate.calls" ]
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+}

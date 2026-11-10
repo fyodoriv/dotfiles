@@ -60,8 +60,9 @@ install question).
   like any web server; GeoIP lookup is off.
 - **Turn it off**: `dotfiles telemetry off`, `DOTFILES_TELEMETRY=0`,
   `DO_NOT_TRACK=1`, or `--no-telemetry` at install.
-- **The key**: the shipped key file `config/telemetry-key` is empty until the
-  owner fills it. Until then nobody is asked and nothing is sent.
+- **The key**: the shipped key file `config/telemetry-key` holds the
+  write-only project key. It can add events and cannot read them, so it is
+  safe to publish. With an empty file nobody is asked and nothing is sent.
 
 Detail: [docs/security-model.md](docs/security-model.md#what-this-repo-does-not-do)
 (the full statement) and [docs/observability.md](docs/observability.md#telemetry)

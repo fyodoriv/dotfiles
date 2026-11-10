@@ -1,0 +1,37 @@
+# Performance budget: the commands scripts/perf-gate.sh times (make perf-gate).
+#
+# Command rows are tab-separated:
+#   name <TAB> ceiling_ms <TAB> command <TAB> stdin (optional, one line)
+# - command runs from the tree root with no shell: words split on spaces.
+# - ceiling_ms is the hard limit for the fastest run on any machine. It is
+#   about 2x the value on the owner's Mac (2026-11-09) and stops slow drift
+#   across many PRs. Raise it only with a reason in the PR.
+# - Every command must be side-effect free and offline. It runs with an empty
+#   environment and a scratch HOME.
+# - `dotfiles help` is not here on purpose: it starts the update check, which
+#   can fetch from the network.
+#
+# A new hot-path command joins this file in the PR that adds it.
+dotfiles-version	250	bin/dotfiles --version
+dotfiles-config	150	bin/dotfiles config
+heavy-run-status	120	bin/heavy-run --status
+hook-require-heavy-run	120	agent-hooks/require-heavy-run.sh	{"tool_input":{"command":"git status"},"cwd":"/tmp"}
+hook-block-dangerous-git	120	agent-hooks/block-dangerous-git.sh	{"tool_input":{"command":"git status"},"cwd":"/tmp"}
+
+# Runtime paths: the gate times the commands only when the diff touches one.
+# The gate uses this list and the list at the merge-base together. config/ is
+# here because bin/dotfiles-config reads config/settings.yaml.
+PERF_GATE_PATH=bin/
+PERF_GATE_PATH=lib/
+PERF_GATE_PATH=agent-hooks/
+PERF_GATE_PATH=git-hooks/
+PERF_GATE_PATH=config/
+PERF_GATE_PATH=scripts/perf-gate.sh
+PERF_GATE_PATH=scripts/perf-gate.pl
+
+# Allow section: one line per intended slowdown above 10% in this PR.
+#   PERF_GATE_ALLOW=<name>:<reason>
+# The ceiling still applies. The next PR removes the line: the gate fails on
+# an allow line that the base already has.
+# A row removed from this file needs an allow line too. An allow line that
+# names no command is an error.

@@ -77,6 +77,9 @@ setup_file() {
 }
 
 setup() {
+  # The caller's base must not reach the fixture repo. A hosted push run sets
+  # BATS_AFFECTED_BASE to a commit that the fixture repo does not have.
+  unset BATS_AFFECTED_BASE
   # Reset index and working tree to the committed state (no per-test git init).
   # Unstaging matters: a file a test stages stays a changed file in every
   # later selector run, and each changed file costs a scan of every test.

@@ -104,10 +104,20 @@ DOTFILES_COMMANDS_FILE="${DOTFILES_COMMANDS_FILE:-${XDG_STATE_HOME:-$HOME/.local
 # ("" when there is none). bin/dotfiles-telemetry owns the file and writes it
 # as one line. Shell-variable scope: it lives for this script run only.
 _TELEMETRY_STATE_LINE=""
+_TELEMETRY_STATE_PATH=""
 _telemetry_read_state() {
-  local state="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
+  _TELEMETRY_STATE_PATH="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
   _TELEMETRY_STATE_LINE=""
-  if [ -r "$state" ]; then IFS= read -r _TELEMETRY_STATE_LINE <"$state" 2>/dev/null || true; fi
+  if [ -r "$_TELEMETRY_STATE_PATH" ]; then IFS= read -r _TELEMETRY_STATE_LINE <"$_TELEMETRY_STATE_PATH" 2>/dev/null || true; fi
+}
+
+# The repo root, from this file's own path, in plain bash (no new process).
+_stats_repo_root() {
+  _STATS_REPO_ROOT="${BASH_SOURCE[0]}"
+  case "$_STATS_REPO_ROOT" in
+    */*) _STATS_REPO_ROOT="${_STATS_REPO_ROOT%/*}/.." ;;
+    *) _STATS_REPO_ROOT=".." ;;
+  esac
 }
 
 # _telemetry_daily TIMESTAMP — after a run on a terminal, start the daily send
@@ -118,20 +128,23 @@ _telemetry_read_state() {
 # LaunchAgent com.dotfiles.telemetry instead.
 # It starts nothing (and no new process) unless the stored answer is yes,
 # no off switch is set (CI, DO_NOT_TRACK, DOTFILES_TELEMETRY=0), today has no
-# send yet, and this clock hour has no try yet.
+# send yet, and this clock hour has no try yet. Never as root (sudo): the
+# state file would become root-owned.
 # bin/dotfiles-telemetry checks every rule again; a send never fails a caller.
 # Never in a test, unless DOTFILES_TELEMETRY_SPAWN=1 asks for the real path.
 _telemetry_daily() {
   local tel day="${1%%T*}" hour="${1%%:*}"
   if [ -n "${BATS_TEST_FILENAME:-}" ] && [ -z "${DOTFILES_TELEMETRY_SPAWN:-}" ]; then return 0; fi
   [ -n "${DOTFILES_TELEMETRY_TTY:-}" ] || [ -n "${_DOTFILES_ON_TERMINAL:-}" ] || [ -t 0 ] || [ -t 2 ] || return 0
+  [ "$EUID" != "0" ] || return 0
   [ -z "${CI:-}" ] || return 0
   [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
   case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
   _telemetry_read_state
   case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'*) ;; *) return 0 ;; esac
   case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$day\""* | *"\"try_hour\":\"$hour\""*) return 0 ;; esac
-  tel="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/dotfiles-telemetry"
+  _stats_repo_root
+  tel="$_STATS_REPO_ROOT/bin/dotfiles-telemetry"
   [ -x "$tel" ] || return 0
   (
     set -m
@@ -150,11 +163,14 @@ _telemetry_daily() {
 # Never without a key (env or config/telemetry-key): nothing could be sent.
 # After 3 unanswered questions it stays silent, and after one it stays silent
 # for the rest of that day. All of this is plain bash: a run that does not
-# ask starts no new process, except one `date` on a Mac where a question was
-# dismissed and may come back.
+# ask starts no new process. bash 3.2 has no clock, so "dismissed today" is a
+# file time: bin/dotfiles-telemetry sets the marker telemetry.asked-until to
+# the next UTC midnight, this gate writes an empty file (its time is now) and
+# compares the two. Only with no marker (an older state file) or after that
+# midnight does it start one `date`. Never as root (sudo).
 # DOTFILES_TELEMETRY_TTY=1 is for tests only (bats has no terminal).
 dotfiles_telemetry_ask() {
-  local arg key_line="" root
+  local arg key_line="" marker
   case "$1" in telemetry | install | help | h | version | v | cd | actions | completion | completions | -* | __*) return 0 ;; esac
   for arg in "${@:2}"; do
     case "$arg" in --help | -h | --version | --json | --quiet | -q | --porcelain) return 0 ;; esac
@@ -163,12 +179,13 @@ dotfiles_telemetry_ask() {
     [ -z "${BATS_TEST_FILENAME:-}" ] || return 0
     { [ -t 0 ] && [ -t 1 ] && [ -t 2 ]; } || return 0
   fi
+  [ "$EUID" != "0" ] || return 0
   [ -z "${CI:-}" ] || return 0
   [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
   case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
-  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  _stats_repo_root
   if [ -z "${DOTFILES_POSTHOG_KEY:-}" ]; then
-    arg="${DOTFILES_TELEMETRY_KEY_FILE:-$root/config/telemetry-key}"
+    arg="${DOTFILES_TELEMETRY_KEY_FILE:-$_STATS_REPO_ROOT/config/telemetry-key}"
     if [ -r "$arg" ]; then IFS= read -r key_line <"$arg" 2>/dev/null || true; fi
     [ -n "$key_line" ] || return 0
   fi
@@ -177,25 +194,25 @@ dotfiles_telemetry_ask() {
   # A question was dismissed before: it may come back once on a later day.
   case "$_TELEMETRY_STATE_LINE" in
     *'"asked_day":"2'*)
+      marker="${_TELEMETRY_STATE_PATH%.json}.asked-until"
+      if [ -e "$marker" ] && { : >"$marker.now"; } 2>/dev/null && [ "$marker" -nt "$marker.now" ]; then return 0; fi
       case "$_TELEMETRY_STATE_LINE" in *"\"asked_day\":\"$(date -u +%F)\""*) return 0 ;; esac ;;
   esac
-  bash "$root/bin/dotfiles-telemetry" ask --first-run || true
+  bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" ask --first-run || true
   return 0
 }
 
 # Keep the commands log small: over 20,000 lines, keep the newest 10,000.
-# The telemetry cursor then points past the end, which the sender reads as
-# "the end of the log", so no line is sent twice.
+# bin/dotfiles-telemetry does the cut (cap-commands), because it owns the
+# telemetry cursor: it moves the cursor back by the number of dropped lines,
+# under its lock, so a line that was not sent yet is still sent.
 _commands_log_cap() {
-  local lines tmp="$DOTFILES_COMMANDS_FILE.tmp.$$"
+  local lines
   lines="$(wc -l <"$DOTFILES_COMMANDS_FILE" 2>/dev/null)" || return 0
   lines="${lines//[^0-9]/}"
   [ "${lines:-0}" -gt 20000 ] || return 0
-  if tail -n 10000 "$DOTFILES_COMMANDS_FILE" >"$tmp" 2>/dev/null; then
-    mv -f "$tmp" "$DOTFILES_COMMANDS_FILE" 2>/dev/null || rm -f "$tmp"
-  else
-    rm -f "$tmp"
-  fi
+  _stats_repo_root
+  DOTFILES_COMMANDS_FILE="$DOTFILES_COMMANDS_FILE" bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" cap-commands >/dev/null 2>&1 || true
   return 0
 }
 

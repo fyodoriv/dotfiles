@@ -51,8 +51,24 @@ say_yes() {
 consent() { if [ -e "$DOTFILES_TELEMETRY_STATE" ]; then jq -r .consent "$DOTFILES_TELEMETRY_STATE"; else echo unset; fi; }
 # Fakes for the two tools that install the LaunchAgent. The fake chezmoi
 # "renders" the template by copying it; the fake launchctl logs its arguments.
+# It keeps a marker file while the job is "loaded": print answers from it,
+# bootstrap sets it, bootout clears it. While $TEST_DIR/bootstrap-fail-once
+# exists, the next bootstrap fails with exit 5 (as launchd does right after a
+# bootout) and removes that file.
+refute() { if "$@"; then return 1; fi; }
 fake_agent_tools() {
-  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >>"%s/launchctl.log"\n' "$TEST_DIR" >"$TEST_DIR/fake-launchctl"
+  cat >"$TEST_DIR/fake-launchctl" <<SH
+#!/bin/bash
+printf '%s\\n' "\$*" >>"$TEST_DIR/launchctl.log"
+case "\$1" in
+  print) [ -e "$TEST_DIR/agent-loaded" ] ;;
+  bootout) rm -f "$TEST_DIR/agent-loaded" ;;
+  bootstrap)
+    if [ -e "$TEST_DIR/bootstrap-fail-once" ]; then rm -f "$TEST_DIR/bootstrap-fail-once"; exit 5; fi
+    [ ! -e "$TEST_DIR/bootstrap-fail-always" ] || exit 5
+    : >"$TEST_DIR/agent-loaded" ;;
+esac
+SH
   printf '#!/bin/bash\n[ "$1" = "execute-template" ] || exit 1\ncat\n' >"$TEST_DIR/fake-chezmoi"
   chmod +x "$TEST_DIR/fake-launchctl" "$TEST_DIR/fake-chezmoi"
   export DOTFILES_TELEMETRY_LAUNCHCTL="$TEST_DIR/fake-launchctl" DOTFILES_TELEMETRY_CHEZMOI="$TEST_DIR/fake-chezmoi"
@@ -442,14 +458,16 @@ PY
   [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" = "1" ]
   ask # the same day: silent
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
-  set_state '.asked_day = "2020-01-01"'
+  # A later day: the stored day is older, and the day marker's time has passed.
+  later_day() { set_state ".asked_day = \"$1\""; touch -t 202001010000 "$TEST_DIR/telemetry.asked-until"; }
+  later_day 2020-01-01
   ask
   [[ "$output" == *"Share anonymous performance numbers?"* ]]
-  set_state '.asked_day = "2020-01-02"'
+  later_day 2020-01-02
   ask
   [[ "$output" == *"dotfiles does not ask again"* ]]
   [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" = "3" ]
-  set_state '.asked_day = "2020-01-03"'
+  later_day 2020-01-03
   ask
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
   [ "$(consent)" = "unset" ]
@@ -488,6 +506,41 @@ ask_starts() {
   rm -f "$DOTFILES_TELEMETRY_STATE"
   run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
   [ "$(ask_starts)" -eq 0 ]
+}
+
+@test "after a dismissed question, a run on the same day starts no process at all" {
+  gate_root
+  # The real script dismisses once: it writes the state and the day marker.
+  run bash -c "DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask --first-run </dev/null"
+  [ "$(jq -r .asks "$DOTFILES_TELEMETRY_STATE")" -eq 1 ]
+  [ -e "$TEST_DIR/telemetry.asked-until" ]
+  # Every process start shows: PATH holds no command, so an external command
+  # prints "not found", and the trace marks a command substitution with "++".
+  trace() {
+    DOTFILES_TELEMETRY_TTY=1 /bin/bash -c "source '$GATE/lib/stats.sh'; PATH='$TEST_DIR/no-commands'; PS4='+ '; set -x; dotfiles_telemetry_ask stats; set +x" 2>&1
+  }
+  run trace
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"+ dotfiles_telemetry_ask stats"* ]]
+  [[ "$output" != *"++ "* ]]
+  [[ "$output" != *"not found"* ]]
+  [[ "$output" != *"No such file"* ]]
+  [ ! -s "$TEST_DIR/gate.calls" ]
+  # Positive control: after the marker's day ends the same trace shows starts.
+  touch -t 202001010000 "$TEST_DIR/telemetry.asked-until"
+  run trace
+  [[ "$output" == *"not found"* ]]
+  # With the real PATH the question comes back on the later day.
+  set_state '.asked_day = "2020-01-01"'
+  [ "$(ask_starts)" -eq 1 ]
+  # No marker (a state file from before it existed): the day is still checked.
+  rm -f "$TEST_DIR/telemetry.asked-until"
+  set_state ".asked_day = \"$(date -u +%F)\""
+  [ "$(ask_starts)" -eq 0 ]
+  # An answer removes the marker.
+  : >"$TEST_DIR/telemetry.asked-until"
+  bash "$TEL" off >/dev/null
+  [ ! -e "$TEST_DIR/telemetry.asked-until" ]
 }
 
 @test "with no key nobody is asked and nothing is printed; an opt-out is still recorded" {
@@ -1160,6 +1213,118 @@ wait_for_last_send() {
   [ -s "$PLIST" ]
 }
 
+@test "a repeat yes leaves a loaded, unchanged LaunchAgent alone" {
+  fake_agent_tools
+  bash "$TEL" on >/dev/null
+  [ -e "$TEST_DIR/agent-loaded" ]
+  : >"$TEST_DIR/launchctl.log"
+  bash "$TEL" on >/dev/null
+  # No bootout and no bootstrap: only the question "is it loaded".
+  refute grep -qE '^(bootout|bootstrap) ' "$TEST_DIR/launchctl.log"
+  [ -e "$TEST_DIR/agent-loaded" ]
+  [ -z "$(ls "$HOME/Library/LaunchAgents" | grep -v '^com.dotfiles.telemetry.plist$' || true)" ]
+  # A changed plist is loaded again.
+  echo "<!-- old -->" >>"$PLIST"
+  bash "$TEL" on >/dev/null
+  grep -q '^bootstrap ' "$TEST_DIR/launchctl.log"
+  refute grep -q 'old' "$PLIST"
+  # An unchanged plist whose job is not loaded is loaded again.
+  rm -f "$TEST_DIR/agent-loaded"
+  : >"$TEST_DIR/launchctl.log"
+  bash "$TEL" on >/dev/null
+  grep -q '^bootstrap ' "$TEST_DIR/launchctl.log"
+  [ -e "$TEST_DIR/agent-loaded" ]
+}
+
+@test "a bootstrap that fails right after the bootout is tried once more" {
+  fake_agent_tools
+  : >"$TEST_DIR/bootstrap-fail-once"
+  bash "$TEL" on >/dev/null
+  [ "$(grep -c '^bootstrap ' "$TEST_DIR/launchctl.log")" -eq 2 ]
+  [ -e "$TEST_DIR/agent-loaded" ]
+  [ ! -e "$TEST_DIR/telemetry.log" ]
+  # Two failures: logged, and the command still works.
+  bash "$TEL" off >/dev/null
+  : >"$TEST_DIR/launchctl.log"
+  : >"$TEST_DIR/bootstrap-fail-always"
+  run bash "$TEL" on
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^bootstrap ' "$TEST_DIR/launchctl.log")" -eq 2 ]
+  grep -q 'could not load the LaunchAgent' "$TEST_DIR/telemetry.log"
+}
+
+@test "as root nothing is saved, loaded, or sent, and one line says so" {
+  fake_agent_tools
+  root() { DOTFILES_TELEMETRY_TEST_UID=0 "$@"; }
+  run root bash "$TEL" on
+  [ "$status" -eq 1 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'as root')" -eq 1 ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE.wlock" ]
+  [ ! -e "$PLIST" ]
+  [ ! -s "$TEST_DIR/launchctl.log" ]
+  run root bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$TEL' ask"
+  [ "$(printf '%s\n' "$output" | grep -c 'as root')" -eq 1 ]
+  [[ "$output" != *"Share anonymous"* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+  # With a stored yes of the user: root changes nothing and sends nothing.
+  say_yes
+  before="$(cat "$DOTFILES_TELEMETRY_STATE")"
+  : >"$TEST_DIR/launchctl.log"
+  run root bash "$TEL" off
+  [ "$status" -eq 1 ]
+  run root bash "$TEL" send
+  [[ "$output" == *"not sent (running as root)"* ]]
+  root bash "$TEL" daily 2>/dev/null
+  root bash "$TEL" cap-commands 2>/dev/null
+  [ "$(cat "$DOTFILES_TELEMETRY_STATE")" = "$before" ]
+  [ "$(requests)" -eq 0 ]
+  [ ! -s "$TEST_DIR/launchctl.log" ]
+  [ ! -e "$TEST_DIR/telemetry.log" ]
+  [ -s "$PLIST" ]
+  # The hooks in lib/stats.sh start nothing for root (plain bash, EUID).
+  grep -q 'EUID' "$REPO/lib/stats.sh"
+}
+
+@test "apply runs the LaunchAgent script again when the telemetry answer changes" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  consent_line() {
+    # Only this header line is rendered, so the test needs no chezmoi data.
+    grep '^# telemetry consent:' "$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl" |
+      chezmoi execute-template --source "$REPO"
+  }
+  none="$(consent_line)"
+  bash "$TEL" off >/dev/null
+  no="$(consent_line)"
+  bash "$TEL" on >/dev/null
+  yes="$(consent_line)"
+  [ -n "$yes" ]
+  [ "$yes" != "$no" ]
+  [ "$no" = "$none" ] # both mean "not installed": no extra run
+  # A field that changes every hour does not change the line.
+  set_state '.try_hour = "2026-01-01T05" | .sent = 7'
+  [ "$(consent_line)" = "$yes" ]
+  # The default path (no test override) follows XDG_STATE_HOME.
+  mkdir -p "$TEST_DIR/xdg/dotfiles"
+  cp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/xdg/dotfiles/telemetry.json"
+  [ "$(env -u DOTFILES_TELEMETRY_STATE XDG_STATE_HOME="$TEST_DIR/xdg" bash -c "$(declare -f consent_line); REPO='$REPO' consent_line")" = "$yes" ]
+  [ "$(env -u DOTFILES_TELEMETRY_STATE XDG_STATE_HOME="$TEST_DIR/none" bash -c "$(declare -f consent_line); REPO='$REPO' consent_line")" = "$none" ]
+}
+
+@test "the LaunchAgent gets XDG_STATE_HOME when it is set at render time" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  plist="$REPO/launchagents/com.dotfiles.telemetry.plist.tmpl"
+  render() { { printf '{{- $_ := set . "dotfiles_dir" "apps/dotfiles" -}}\n'; cat "$plist"; } | chezmoi execute-template --source "$REPO"; }
+  XDG_STATE_HOME="$TEST_DIR/my state" render >"$TEST_DIR/with.plist"
+  (unset XDG_STATE_HOME; render >"$TEST_DIR/without.plist")
+  grep -A1 '<key>XDG_STATE_HOME</key>' "$TEST_DIR/with.plist" | grep -qF "<string>$TEST_DIR/my state</string>"
+  refute grep -q '<key>XDG_STATE_HOME</key>' "$TEST_DIR/without.plist"
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -lint "$TEST_DIR/with.plist"
+    plutil -lint "$TEST_DIR/without.plist"
+  fi
+}
+
 @test "a yes with no chezmoi data installs no broken plist; apply does it later" {
   fake_agent_tools
   printf '#!/bin/bash\nexit 1\n' >"$TEST_DIR/fake-chezmoi"
@@ -1182,7 +1347,7 @@ wait_for_last_send() {
   bash "$TEL" off >/dev/null
   should_skip_agent telemetry
   bash "$TEL" on >/dev/null
-  ! should_skip_agent telemetry
+  refute should_skip_agent telemetry
   # An installed copy is unloaded and removed when the answer is no longer yes.
   mkdir -p "$HOME/Library/LaunchAgents"
   echo plist >"$HOME/Library/LaunchAgents/com.dotfiles.telemetry.plist"
@@ -1206,6 +1371,39 @@ wait_for_last_send() {
   # A small log is left alone.
   DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
   [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10001 ]
+  # Nobody answered: the cap creates no state file.
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+}
+
+@test "the cap keeps unsent lines: the cursor moves back by the dropped lines" {
+  export DOTFILES_STATS_LOG=1
+  say_yes
+  : >"$DOTFILES_STATS_FILE"
+  line() { echo "{\"command\":\"$1\",\"timestamp\":\"$NOW\",\"ok\":true,\"duration_ms\":$2}"; }
+  # 20,000 lines; the first 19,997 are sent, the last 3 are not.
+  for ((i = 1; i <= 19997; i++)); do line status "$i"; done >"$DOTFILES_COMMANDS_FILE"
+  for i in 1 2 3; do line doctor "$i"; done >>"$DOTFILES_COMMANDS_FILE"
+  set_state '.sent_commands = 19997'
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command sync ok 5"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  # 10,001 lines were dropped, so the cursor is 19,997 - 10,001.
+  [ "$(jq -r .sent_commands "$DOTFILES_TELEMETRY_STATE")" -eq 9996 ]
+  [ "$(consent)" = "yes" ]
+  # The 3 unsent lines and the new one are sent, and nothing older.
+  bash "$TEL" send >/dev/null
+  [ "$(jq -s '[.[].batch[]] | length' "$FAKE_LOG")" -eq 4 ]
+  [ "$(jq -s -r '[.[].batch[].properties.command] | join(",")' "$FAKE_LOG")" = "doctor,doctor,doctor,sync" ]
+  # A cursor behind the dropped lines stops at the start of the kept log.
+  for ((i = 1; i <= 20001; i++)); do line status "$i"; done >"$DOTFILES_COMMANDS_FILE"
+  set_state '.sent_commands = 5'
+  bash "$TEL" cap-commands
+  [ "$(jq -r .sent_commands "$DOTFILES_TELEMETRY_STATE")" -eq 0 ]
+  # While a send runs, the log is left alone.
+  for ((i = 1; i <= 20001; i++)); do line status "$i"; done >"$DOTFILES_COMMANDS_FILE"
+  mkdir "$DOTFILES_TELEMETRY_STATE.lock"
+  bash "$TEL" cap-commands
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 20001 ]
+  rmdir "$DOTFILES_TELEMETRY_STATE.lock"
 }
 
 @test "the LaunchAgent runs the daily send and nothing else" {

@@ -357,20 +357,6 @@ them. -->
   - **Anchor**: review of PR #567 on 2026-11-10; Fagan (1976), Design and code inspections to reduce errors in program development.
   - **Competitive-goal**: none — correctness of an existing feature, not a scorecard metric.
 
-- [ ] Give the perf gate the two-rule estimator that agentbrew uses
-  - **ID**: perf-gate-paired-median-parity
-  - **Tags**: perf-gate, reliability
-  - **Details**: The agentbrew gate (PR fyodoriv/agentbrew#927) reports "slower" only when two rules agree: the minimum rule and a paired-median rule. Under load that cut false alarms from 2 in 20 runs to 0 in 20 runs, and it still caught 20 of 20 seeded slowdowns. That gate also prints JSON when a stale allow line stops it, and it shows the verdict `over-ceiling-at-base`. The dotfiles gate (`scripts/perf-gate.pl`) still uses the minimum rule alone. Under memory pressure it gave two false "slower" results in its own tests. Port the estimator and the two output items. This task is not the same as `perf-gate-cache-test-holder-race`: that task is about the lock in one cache test, and this one is about the timing verdict.
-  - **Files**: `scripts/perf-gate.pl`, `tests/perf-gate.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: failing tests first: a fixture where only the minimum rule fires gives "ok"; a fixture where both rules fire gives "slower". A stale allow line with JSON output on gives valid JSON and a non-zero exit. A command over its ceiling on the base too shows `over-ceiling-at-base`.
-  - **Hypothesis**: the two-rule estimator moves false "slower" verdicts on an unchanged tree under load from 2 known cases to 0 in 20 runs, while 20 of 20 seeded slowdowns of 25% are still caught.
-  - **Measurement**: 20 clean runs and 20 seeded runs of `heavy-run make perf-gate` in a normal slot (not `--exclusive`) while a second `heavy-run make check` holds another slot; count the "slower" verdicts in each set.
-  - **Success**: 0 "slower" in the 20 clean runs and 20 "slower" in the 20 seeded runs.
-  - **Pivot**: 1 or more false alarm in the clean set, or fewer than 19 caught in the seeded set -> do not port the estimator as is; measure the noise source first (paired order, warmups).
-  - **Anchor**: PR fyodoriv/agentbrew#927 (2 in 20 to 0 in 20); Kalibera and Jones (2013), Rigorous benchmarking in reasonable time.
-  - **Competitive-goal**: none — trust in an existing gate, not a scorecard metric.
-
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

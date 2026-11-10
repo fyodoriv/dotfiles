@@ -91,6 +91,7 @@ gate() {
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool got slower"* ]]
+  [[ "$output" == *"paired runs: +"* ]]
   [[ "$output" == *"perf gate: FAIL"* ]]
   [[ "$output" == *"Make the command faster"* ]]
   [[ "$output" == *"PERF_GATE_ALLOW=<name>:<reason>"* ]]
@@ -115,10 +116,48 @@ gate() {
 }
 
 @test "perf gate fails when the command is over its ceiling" {
-  budget 'tool	50	./tool.sh'
+  tool 0.20
+  budget 'tool	150	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool is over its ceiling"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*over-ceiling$'\n' ]]
+}
+
+@test "a command over its ceiling at the base too is over-ceiling-at-base, not a failure" {
+  # 100 ms at the base and 80 ms here, with a ceiling of 50 ms: this tree did not cause it.
+  quicker 0.08
+  budget 'tool	50	./tool.sh'
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool is over its ceiling"*"but so is the base"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*over-ceiling-at-base ]]
+  [[ "$output" == *"perf gate: pass (1 commands"*"; 1 over its ceiling at the base too)"* ]]
+
+  run bash -c 'cd "$1" && "$2" --json 2>/dev/null' _ "$FIX" "$GATE"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.ok == true and .over_ceiling_at_base == 1 and .problems == []
+    and (.commands[0] | .verdict == "over-ceiling-at-base" and .over_ceiling_at_base == true)'
+}
+
+@test "slower by the fastest runs only is load noise: the paired runs must agree" {
+  # The base tool is fast in one timed run only (its second run) and 300 ms in
+  # every other run. The head tool always takes 300 ms. So the minimums differ
+  # by far more than 10%, but run for run the two trees are equal. Seven runs:
+  # the median of seven pairs holds when load hits some of them.
+  cat > "$FIX/tool.sh" <<TOOL
+#!/bin/bash
+n=\$((\$(cat "$TEST_DIR/count" 2>/dev/null || echo 0) + 1))
+echo "\$n" > "$TEST_DIR/count"
+if [ "\$n" = 2 ]; then sleep 0.05; else sleep 0.30; fi
+TOOL
+  merge "a base with one fast run"
+  tool 0.30
+  PERF_GATE_RUNS=7 gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool: the fastest runs differ by +"*"but the paired runs do not"*"load noise, not a slowdown"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*ok ]]
+  [[ "$output" == *"perf gate: pass"* ]]
 }
 
 @test "a command that fails in this tree is a setup error" {
@@ -155,7 +194,9 @@ gate() {
   [ "$status" -eq 1 ]
   echo "$output" | jq -e '.skipped == false and .ok == false and (.base | length == 40)
     and .base_ref == "main" and (.base_ref_date | test("^20[0-9-]+$"))
-    and .limit_ratio == 1.10 and .limit_ms == 3
+    and .limit_ratio == 1.10 and .limit_ms == 3 and .estimator == "min-and-paired-median"
+    and (.problems | length == 1) and (.problems[0] | test("tool got slower"))
+    and .commands[0].paired_delta_ms > 50 and .commands[0].over_ceiling_at_base == false
     and (.commands | length == 1)
     and (.commands[0] | .name == "tool" and .verdict == "slower" and .base_min >= 100
       and .head_min >= 200 and .ratio > 1.1 and .ceiling_ms == 2000)'
@@ -588,6 +629,12 @@ old_unmarked() {
   [[ "$output" != *" ms "* ]]
   [[ "$output" != *"perf gate: FAIL"* ]]
 
+  # With --json a stale line still gives JSON on stdout.
+  run bash -c 'cd "$1" && "$2" --json 2>/dev/null' _ "$FIX" "$GATE"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.skipped == false and .ok == false and (.problems | length == 1)
+    and (.problems[0] | test("^stale allow line: remove this line from config/perf-budget.tsv: PERF_GATE_ALLOW=tool:"))'
+
   # A line counts again when its reason is this PR's own: name plus reason differ from the base.
   budget 'tool	2000	./tool.sh' 'PERF_GATE_ALLOW=tool:slower again, for the new index'
   gate
@@ -597,7 +644,7 @@ old_unmarked() {
 
 @test "an allow line does not lift the ceiling" {
   tool 0.20
-  budget 'tool	50	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
+  budget 'tool	150	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool is over its ceiling"* ]]

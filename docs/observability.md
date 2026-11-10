@@ -279,12 +279,19 @@ command slower. `scripts/perf-gate.sh` times each command in
 checkout of the merge-base with the default branch. It needs no stored
 baseline, so it works the same on every machine.
 
-- **Fails when** the fastest run in your tree is more than 10% and more than
-  3 ms slower than the fastest run at the base, or above the command's ceiling
-  in the budget file.
+- **Fails when** two rules agree that a command is slower, or when it is
+  above its ceiling in the budget file. Rule 1: the fastest run in your tree
+  is more than 10% and more than 3 ms slower than the fastest run at the
+  base. Rule 2: the median of the paired differences (your tree minus the
+  base, pass by pass) is over the same limit. Load noise moves one rule; a
+  real slowdown moves both. When only rule 1 fires, the gate passes and
+  prints `load noise, not a slowdown`.
+- **Ceiling at the base**: when the command is over its ceiling at the base
+  too, your tree did not cause it. The verdict is `over-ceiling-at-base`, the
+  gate prints a note, and it does not fail.
 - **How it times**: 2 warmups, then 15 runs per tree, base and head in turn,
-  with an empty environment and a scratch HOME. It compares the minimums. A
-  command that looks slower is timed again, up to two more rounds.
+  with an empty environment and a scratch HOME. A command that looks slower
+  by both rules is timed again, up to two more rounds.
 - **Skips** when the diff touches no runtime path: `perf gate: skipped (no
   runtime change)`. The path list is the `PERF_GATE_PATH` lines of the budget
   file at the base and in your tree together, so a PR cannot shrink its own
@@ -325,7 +332,10 @@ baseline, so it works the same on every machine.
   file or a wrapper. A row removed from the budget file fails the gate unless
   an allow line names it.
 - **Machine output**: `scripts/perf-gate.sh --json` prints `base_min`,
-  `head_min`, `ratio`, and `verdict` per command.
+  `head_min`, `ratio`, `paired_delta_ms`, `verdict`, and
+  `over_ceiling_at_base` per command, and `estimator`, `problems`, and the
+  `over_ceiling_at_base` count at the top. A stale allow line gives
+  `{"skipped":false,"ok":false,"problems":[…]}` and exit 1.
 - **Base checkouts**: detached worktrees under
   `~/.cache/dotfiles/perf-gate.noindex/<commit>`; the newest two are kept.
   Before each use the gate checks that a checkout is at its commit and has no

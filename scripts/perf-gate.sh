@@ -7,8 +7,11 @@
 # same verdict on any machine.
 #
 # A command fails when
-#   head_min > base_min * 1.10  AND  head_min - base_min > 3 ms   (slower), or
-#   head_min > its ceiling in the budget file                     (over-ceiling).
+#   head_min > base_min * 1.10  AND  head_min - base_min > 3 ms, AND
+#   the median of (head - base) over the paired passes is over that
+#   limit too                                                     (slower), or
+#   head_min > its ceiling in the budget file, and base_min is not
+#   over that ceiling too                                         (over-ceiling).
 # A command name that the base budget file does not have, and whose file the
 # base commit does not have, is "new": only the ceiling applies. A name that
 # the base budget file has always runs the base row's command at the base.
@@ -26,7 +29,8 @@
 # the gate stops before any timing, exit 1, and names the line to remove.
 #
 # Usage: scripts/perf-gate.sh [--json] [--force]
-#   --json   print one JSON object (per command: base_min, head_min, ratio, verdict)
+#   --json   print one JSON object (per command: base_min, head_min, ratio,
+#            paired_delta_ms, verdict; at the top: estimator, problems)
 #   --force  time the commands even when the diff touches no runtime path
 # Exit: 0 pass or skipped, 1 a command is slower or over its ceiling, 2 setup error.
 #
@@ -48,6 +52,10 @@
 #   would need one process per tree and per round to do that.
 # - The minimum of the runs, not the mean: noise only adds time, so the
 #   minimum is the most stable estimate (Chen and Revels 2016).
+# - Two rules must agree. Under load the minimums of two equal trees can
+#   differ by more than 10%, but then the paired passes do not: each pass
+#   times both trees one after the other, under the same load. So the gate
+#   also needs the median of the paired differences to be over the limit.
 # - A command that looks slower is timed again (up to two more rounds) and the
 #   minimums are merged. A real slowdown stays; a load spike does not.
 # - The base is a detached git worktree, not a `git archive` export: `dotfiles

@@ -17,8 +17,13 @@
 # 2. Times each command of config/perf-budget.tsv in both trees, in turn. A
 #    name that the base budget file has runs the BASE row's command at the
 #    base, so a PR cannot dodge the comparison by editing the row.
+#    "Slower" needs two rules to agree: the fastest head run is over the limit
+#    against the fastest base run, AND the median of the paired differences
+#    (head minus base, pass by pass) is over the limit too. Load noise moves
+#    one of them; a real slowdown moves both.
 # 3. Prints the verdicts. Exit: 0 pass, 1 slower or over a ceiling, 2 setup
-#    error (a command that fails in either tree is a setup error).
+#    error (a command that fails in either tree is a setup error). A command
+#    over its ceiling at the base too is "over-ceiling-at-base": not a failure.
 #
 # A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
 # tests/perf-gate.bats changes its own judge. The gate says so and needs
@@ -202,8 +207,18 @@ for my $name (sort keys %$allow) {
   die "perf gate: PERF_GATE_ALLOW=$name names no command of the budget file\n" unless $known{$name};
 }
 # A stale allow line stops the gate here, before any timing.
+# A JSON string, with no JSON module: the gate uses core perl only.
+sub json_str {
+  my ($s) = @_;
+  $s =~ s/(["\\])/\\$1/g;
+  $s =~ s/([\x00-\x1f])/sprintf("\\u%04x", ord $1)/ge;
+  return qq("$s");
+}
 my @stale = map { $allow->{$_} } grep { !fresh($_) } sort keys %$allow;
 if (@stale) {
+  # With --json the caller still gets JSON on stdout.
+  printf qq({"skipped":false,"ok":false,"problems":[%s]}\n),
+    join(",", map { json_str("stale allow line: remove this line from config/perf-budget.tsv: $_") } @stale) if $json;
   print STDERR "perf gate: an allow line covers one PR, and the base budget file already has this one.\n";
   print STDERR "remove this line from config/perf-budget.tsv: $_\n" for @stale;
   print STDERR "(If this PR needs the allow again, write the line with this PR's own reason.)\n";
@@ -234,6 +249,18 @@ sub run_once {
 }
 
 sub slower { my ($b, $h) = @_; return $h > $b * $RATIO && $h - $b > $FLOOR_MS; }
+sub median {
+  my @v = sort { $a <=> $b } @_;
+  return undef unless @v;
+  return @v % 2 ? $v[$#v / 2] : ($v[@v / 2 - 1] + $v[@v / 2]) / 2;
+}
+# The second rule: the median of (head - base) over the paired passes is over
+# the limit too. With no pair, the minimum rule decides alone.
+sub paired_slower {
+  my ($b, $delta) = @_;
+  my $limit = $b * ($RATIO - 1);
+  return !defined $delta || $delta > ($limit > $FLOOR_MS ? $limit : $FLOOR_MS);
+}
 
 my $started = time;
 my (@rows, @problems);
@@ -260,10 +287,11 @@ for my $c (@$cmds) {
     (my $prog = $c->{argv}[0]) =~ s{^\./}{};
     $has_base = $base ne "" && ($prog !~ m{/} && !-e "$head/$prog" || git_quiet($head, "cat-file", "-e", "$sha:$prog"));
   }
-  my ($bmin, $hmin, $count);
+  my ($bmin, $hmin, $count, @deltas);
   my $round = sub {
     my ($times, $timed) = @_;
     for my $i (1 .. $times) {
+      my %pass;
       # Swap the order each pass, so neither tree always runs first.
       for my $side ($i % 2 ? ("base", "head") : ("head", "base")) {
         next if $side eq "base" && !$has_base;
@@ -277,28 +305,45 @@ for my $c (@$cmds) {
         next unless $timed;
         if ($side eq "base") { $bmin = $ms if !defined $bmin || $ms < $bmin; }
         else { $hmin = $ms if !defined $hmin || $ms < $hmin; $count++; }
+        $pass{$side} = $ms;
       }
+      push @deltas, $pass{head} - $pass{base} if $timed && defined $pass{base} && defined $pass{head};
     }
   };
+  my $both = sub { $has_base && slower($bmin, $hmin) && paired_slower($bmin, median(@deltas)) };
   $round->($warmups || 1, 0);   # at least one untimed run: it also proves the command works
   $round->($runs, 1);
   for (1 .. 2) {
-    last if !$has_base || !slower($bmin, $hmin);
+    last if !$both->();
     $round->($runs, 1);
   }
-  my %r = (name => $c->{name}, ceiling => $c->{ceiling}, base => $bmin, head => $hmin, runs => $count // 0);
+  my $delta = median(@deltas);
+  my %r = (name => $c->{name}, ceiling => $c->{ceiling}, base => $bmin, head => $hmin, runs => $count // 0,
+    delta => $delta, at_base => 0);
   {
     $r{ratio} = $hmin / $bmin if $has_base && $bmin > 0;
     $r{verdict} = $has_base ? "ok" : "new";
-    if ($has_base && slower($bmin, $hmin)) {
-      my $msg = sprintf("%s got slower: %.1f ms -> %.1f ms (%+.1f%%; the limit is +%d%% and %d ms)",
-        $c->{name}, $bmin, $hmin, ($r{ratio} - 1) * 100, ($RATIO - 1) * 100 + 0.5, $FLOOR_MS);
+    if ($both->()) {
+      my $msg = sprintf("%s got slower: %.1f ms -> %.1f ms (%+.1f%%; the limit is +%d%% and %d ms%s)",
+        $c->{name}, $bmin, $hmin, ($r{ratio} - 1) * 100, ($RATIO - 1) * 100 + 0.5, $FLOOR_MS,
+        defined $delta ? sprintf("; paired runs: %+.1f ms", $delta) : "");
       if (fresh($c->{name})) { $r{verdict} = "allowed"; }
       else { $r{verdict} = "slower"; push @problems, $msg; }
+    } elsif ($has_base && slower($bmin, $hmin)) {
+      printf STDERR "perf gate: %s: the fastest runs differ by %+.1f%%, but the paired runs do not (median difference %+.1f ms): load noise, not a slowdown\n",
+        $c->{name}, ($r{ratio} - 1) * 100, $delta;
     }
     if ($hmin > $c->{ceiling}) {
-      $r{verdict} = "over-ceiling";
-      push @problems, sprintf("%s is over its ceiling: %.1f ms > %d ms", $c->{name}, $hmin, $c->{ceiling});
+      if ($has_base && $bmin > $c->{ceiling}) {
+        # The base is over the ceiling too, so this tree did not cause it.
+        printf STDERR "perf gate: %s is over its ceiling: %.1f ms > %d ms, but so is the base (%.1f ms): this machine is slow now, or the ceiling is too low. Not counted against this tree.\n",
+          $c->{name}, $hmin, $c->{ceiling}, $bmin;
+        $r{at_base} = 1;
+        $r{verdict} = "over-ceiling-at-base" if $r{verdict} eq "ok";
+      } else {
+        $r{verdict} = "over-ceiling";
+        push @problems, sprintf("%s is over its ceiling: %.1f ms > %d ms", $c->{name}, $hmin, $c->{ceiling});
+      }
     }
   }
   push @rows, \%r;
@@ -311,15 +356,18 @@ for my $b (@$base_cmds) {
 }
 
 my $ok = @problems ? 0 : 1;
+my $at_base = grep { $_->{at_base} } @rows;
 if ($json) {
   my $num = sub { defined $_[0] ? sprintf("%.3f", $_[0]) : "null" };
   my $str = sub { (my $s = $_[0]) =~ s/[^A-Za-z0-9_.\/:-]//g; $s ne "" ? qq("$s") : "null" };
   my @items = map {
-    sprintf(q({"name":"%s","base_min":%s,"head_min":%s,"ratio":%s,"ceiling_ms":%d,"runs":%d,"verdict":"%s"}),
-      $_->{name}, $num->($_->{base}), $num->($_->{head}), $num->($_->{ratio}), $_->{ceiling}, $_->{runs}, $_->{verdict})
+    sprintf(q({"name":"%s","base_min":%s,"head_min":%s,"ratio":%s,"paired_delta_ms":%s,"ceiling_ms":%d,"runs":%d,"verdict":"%s","over_ceiling_at_base":%s}),
+      $_->{name}, $num->($_->{base}), $num->($_->{head}), $num->($_->{ratio}), $num->($_->{delta}), $_->{ceiling},
+      $_->{runs}, $_->{verdict}, $_->{at_base} ? "true" : "false")
   } @rows;
-  printf qq({"skipped":false,"ok":%s,"base":%s,"base_ref":%s,"base_ref_date":%s,"limit_ratio":%.2f,"limit_ms":%d,"commands":[%s]}\n),
-    $ok ? "true" : "false", $str->($sha), $str->($ref), $str->($ref_date), $RATIO, $FLOOR_MS, join(",", @items);
+  printf qq({"skipped":false,"ok":%s,"base":%s,"base_ref":%s,"base_ref_date":%s,"limit_ratio":%.2f,"limit_ms":%d,"estimator":"min-and-paired-median","over_ceiling_at_base":%d,"problems":[%s],"commands":[%s]}\n),
+    $ok ? "true" : "false", $str->($sha), $str->($ref), $str->($ref_date), $RATIO, $FLOOR_MS, $at_base,
+    join(",", map { json_str($_) } @problems), join(",", @items);
 } else {
   for my $r (@rows) {
     printf "  %-24s base %s  head %s  %s  %s\n", $r->{name},
@@ -327,8 +375,9 @@ if ($json) {
       defined $r->{head} ? sprintf("%7.1f ms", $r->{head}) : "         -",
       defined $r->{ratio} ? sprintf("%+6.1f%%", ($r->{ratio} - 1) * 100) : "      -", $r->{verdict};
   }
-  printf "perf gate: %s (%d commands, base %s, %.1f s)\n", $ok ? "pass" : "FAIL", scalar @rows,
-    $sha ne "" ? substr($sha, 0, 12) : "none", time - $started;
+  printf "perf gate: %s (%d commands, base %s, %.1f s%s)\n", $ok ? "pass" : "FAIL", scalar @rows,
+    $sha ne "" ? substr($sha, 0, 12) : "none", time - $started,
+    $at_base ? "; $at_base over its ceiling at the base too" : "";
 }
 if (!$ok) {
   print STDERR "perf gate: $_\n" for @problems;

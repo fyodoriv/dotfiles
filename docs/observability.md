@@ -110,20 +110,25 @@ baseline, so it works the same on every machine.
   only), a command that fails in your tree or in the base checkout, a git
   failure, a budget file with no path line or no command, an allow line that
   names no command, a bad `PERF_GATE_RUNS`, an unknown argument, no perl, a
-  cache folder that is not an absolute path or cannot be written. The gate
+  cache folder that is not an absolute path or cannot be written, a folder
+  at the base checkout path that the gate did not build. The gate
   prints the base ref and the date of its last commit, so a stale ref shows.
-- **A change to the gate itself**: a PR that changes `scripts/perf-gate.sh`
-  or `scripts/perf-gate.pl` changes its own judge. The gate prints a warning
-  and exits 2 unless the budget file has a new line
-  `PERF_GATE_ALLOW=perf-gate:<reason>`. Review such a PR by hand; the next PR
-  removes the line.
+- **A change to the gate itself**: a PR that changes `scripts/perf-gate.sh`,
+  `scripts/perf-gate.pl`, or `tests/perf-gate.bats` changes its own judge.
+  The gate prints a warning and exits 2 unless the budget file has a new line
+  `PERF_GATE_ALLOW=perf-gate:<reason>`. Review such a PR by hand.
+- **Allow lines**: an allow line counts when the base budget file does not
+  have the same line (same name and same reason); a line that the base has
+  unchanged is stale. On a stale line the gate stops before any timing, exits
+  1, and prints `remove this line from config/perf-budget.tsv: <line>`. A PR
+  that needs the allow again writes the line with its own reason.
 - **Queue**: timing runs through `heavy-run --exclusive` and prints a line
   while it waits for the slot. Inside a heavy-run slot (`heavy-run make
   check`) it runs directly.
 - **On a failure**: make the command faster. If the cost is intended, raise
   the ceiling and give the reason in the PR. A step above 10% in one PR also
   needs a `PERF_GATE_ALLOW=<name>:<reason>` line in the budget file; the next
-  PR removes it.
+  PR removes it or gives its own reason.
 - **New hot-path command**: add its row to the budget file in the same PR.
   A new name whose file the base commit does not have gets the ceiling check
   only. A name that the base budget file has is never new: the base runs its
@@ -136,7 +141,9 @@ baseline, so it works the same on every machine.
   `~/.cache/dotfiles/perf-gate.noindex/<commit>`; the newest two are kept.
   Before each use the gate checks that a checkout is at its commit and has no
   changed, new, or ignored file; if not, it builds the checkout again. It
-  builds and removes checkouts under a lock, and removes only its own.
+  builds and removes checkouts under a lock, and removes only its own: a
+  folder with the marker `<commit>.ready` next to it. It unlinks a symlink
+  without following it.
 - **Field numbers**: the gate measures one machine before a merge. Numbers
   from real installs will be on the performance dashboard (link: to be added
   with the telemetry timing events).

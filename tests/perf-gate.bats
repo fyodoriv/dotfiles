@@ -102,6 +102,13 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [[ "$output" != *"perf gate: pass"* ]]
 }
 
+@test "a command that a signal kills is reported with the signal" {
+  printf '#!/bin/bash\nkill -TERM $$\n' > "$FIX/tool.sh"
+  gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"tool failed in this tree (signal 15)"* ]]
+}
+
 @test "the limits are 10% and 3 ms: a 20% step fails" {
   # 500 ms -> 600 ms. A limit of 20% or more would pass this; so would a
   # floor of 100 ms or more.
@@ -260,6 +267,65 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [ ! -e "$CACHE/$sha/extra.sh" ]
 }
 
+@test "an ignored file in the base checkout also makes it be built again" {
+  local sha
+  echo '*.cache' > "$FIX/.gitignore"
+  merge "ignore rule"
+  sha="$(git -C "$FIX" rev-parse main)"
+  printf '# touch\n' >> "$FIX/tool.sh"
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"not a clean copy"* ]]
+  mkdir "$CACHE/$sha/deep"
+  echo planted > "$CACHE/$sha/deep/x.cache"
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not a clean copy of the base commit"* ]]
+  [ ! -e "$CACHE/$sha/deep" ]
+}
+
+@test "a symlink at the base checkout path is unlinked, and its target is not touched" {
+  local sha
+  sha="$(git -C "$FIX" rev-parse main)"
+  # A real worktree of someone else, at another commit than the base.
+  tool 0.20
+  commit other
+  git -C "$FIX" worktree add -q --detach "$TEST_DIR/real" HEAD
+  echo "their work" > "$TEST_DIR/real/notes.txt"
+  mkdir -p "$CACHE"
+  ln -s "$TEST_DIR/real" "$CACHE/$sha"
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool got slower"* ]]
+  [ ! -L "$CACHE/$sha" ] && [ -x "$CACHE/$sha/tool.sh" ]
+  [ "$(cat "$TEST_DIR/real/notes.txt")" = "their work" ]
+  git -C "$FIX" worktree list | grep -qF "$TEST_DIR/real"
+}
+
+@test "a folder at the base checkout path that the gate did not build is a setup error" {
+  local sha
+  sha="$(git -C "$FIX" rev-parse main)"
+  mkdir -p "$CACHE/$sha"
+  echo keep > "$CACHE/$sha/mine.txt"
+  tool 0.20
+  gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"$CACHE/$sha is not a clean base checkout, and the gate did not build it"* ]]
+  [ "$(cat "$CACHE/$sha/mine.txt")" = keep ]
+}
+
+@test "the prune leaves an old folder alone when the gate did not build it" {
+  local a=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  mkdir -p "$CACHE/$a" "$CACHE/$b"
+  echo keep > "$CACHE/$a/mine.txt"
+  touch -t 202001010000 "$CACHE/$a"
+  printf '# touch\n' >> "$FIX/tool.sh"
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"left $CACHE/$a alone"* ]]
+  [ "$(cat "$CACHE/$a/mine.txt")" = keep ]
+}
+
 @test "a cache path with a space still prunes old checkouts" {
   export XDG_CACHE_HOME="$TEST_DIR/my cache"
   local spaced="$XDG_CACHE_HOME/dotfiles/perf-gate.noindex" first
@@ -409,12 +475,22 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [ "$status" -eq 0 ]
   [[ "$output" =~ tool.*allowed ]]
 
-  # After the merge the base has the line too: the next PR must remove it.
+  # After the merge the base has the same line: it is stale. The gate says
+  # which line to remove, before any timing and without the generic advice.
   merge allow
-  printf '# touch\n' >> "$FIX/tool.sh"
+  tool 0.40
   gate
   [ "$status" -eq 1 ]
-  [[ "$output" == *"PERF_GATE_ALLOW=tool is already in the base budget file"* ]]
+  [[ "$output" == *"remove this line from config/perf-budget.tsv: PERF_GATE_ALLOW=tool:does more work on purpose"* ]]
+  [[ "$output" != *"Make the command faster"* ]]
+  [[ "$output" != *" ms "* ]]
+  [[ "$output" != *"perf gate: FAIL"* ]]
+
+  # A line counts again when its reason is this PR's own: name plus reason differ from the base.
+  budget 'tool	2000	./tool.sh' 'PERF_GATE_ALLOW=tool:slower again, for the new index'
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ tool.*allowed ]]
 }
 
 @test "an allow line does not lift the ceiling" {
@@ -461,12 +537,30 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [[ "$output" == *"WARNING: this change edits the gate itself"* ]]
   [[ "$output" == *"allowed by PERF_GATE_ALLOW=perf-gate: fix a review finding"* ]]
 
-  # After the merge the base has the line: it does not cover the next change.
+  # After the merge the base has the same line: it does not cover the next change.
   merge "gate change"
   echo v3 > "$FIX/scripts/perf-gate.sh"
   gate
   [ "$status" -eq 2 ]
   [[ "$output" == *"scripts/perf-gate.sh differ from the base"* ]]
+  [[ "$output" == *"write this PR's own reason"* ]]
+
+  # Two gate PRs in a row: the second passes with its own reason on the line.
+  budget 'tool	2000	./tool.sh' 'PERF_GATE_ALLOW=perf-gate:second review round'
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allowed by PERF_GATE_ALLOW=perf-gate: second review round"* ]]
+
+  # The gate's test file counts as the gate too.
+  merge "second gate change"
+  budget 'tool	2000	./tool.sh'
+  mkdir -p "$FIX/tests"
+  echo t1 > "$FIX/tests/perf-gate.bats"
+  merge "gate tests at the base"
+  echo t2 > "$FIX/tests/perf-gate.bats"
+  gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"edits the gate itself (tests/perf-gate.bats)"* ]]
 }
 
 @test "the command name perf-gate is reserved" {

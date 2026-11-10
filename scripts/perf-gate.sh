@@ -16,9 +16,14 @@
 # no base commit, git fails) is a setup error, exit 2: the gate never passes
 # a comparison it could not make.
 #
-# A PR that changes scripts/perf-gate.sh or scripts/perf-gate.pl changes its own
-# judge. The gate prints a warning and exits 2 unless config/perf-budget.tsv
-# has a new line PERF_GATE_ALLOW=perf-gate:<reason>.
+# A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
+# tests/perf-gate.bats changes its own judge. The gate prints a warning and
+# exits 2 unless config/perf-budget.tsv has a new line
+# PERF_GATE_ALLOW=perf-gate:<reason>.
+#
+# An allow line counts when the base budget file does not have the same line
+# (same name and same reason). A line that the base has unchanged is stale:
+# the gate stops before any timing, exit 1, and names the line to remove.
 #
 # Usage: scripts/perf-gate.sh [--json] [--force]
 #   --json   print one JSON object (per command: base_min, head_min, ratio, verdict)
@@ -51,7 +56,9 @@
 #   ~/.cache/dotfiles/perf-gate.noindex/<commit> (Spotlight skips .noindex).
 #   The gate removes only its own checkouts there, under a lock, and never
 #   runs a repo-wide `git worktree prune`. A checkout with any changed, new,
-#   or ignored file is built again, not trusted.
+#   or ignored file is built again, not trusted. The gate removes a folder
+#   only when its marker <commit>.ready is there, and it unlinks a symlink
+#   without following it; a folder it did not build is a setup error.
 # - Scope comes from the path lists of the base AND the head budget file, so a
 #   PR cannot switch the gate off by editing its own list.
 # - Every run gets an empty environment plus a scratch HOME, so no telemetry,
@@ -138,7 +145,7 @@ if [ "$force" = 0 ] && [ -n "$base_sha" ]; then
     { cat "$budget"; git show "$base_sha:config/perf-budget.tsv" 2>/dev/null; } | sed -n 's/^PERF_GATE_PATH=\(..*\)$/\1/p'
   )"
   # The gate's own files always count, whatever the lists say.
-  paths="$paths"$'\n'"scripts/perf-gate.sh"$'\n'"scripts/perf-gate.pl"
+  paths="$paths"$'\n'"scripts/perf-gate.sh"$'\n'"scripts/perf-gate.pl"$'\n'"tests/perf-gate.bats"
   # Capture first: a git failure must stop the gate, not look like "no change".
   changed_files="$(git diff --no-renames --name-only "$base_sha")" \
     || { echo "perf gate: git diff against ${base_sha:0:12} failed; cannot tell what changed" >&2; exit 2; }

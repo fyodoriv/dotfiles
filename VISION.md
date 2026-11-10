@@ -91,7 +91,8 @@ performance numbers. It replaces the earlier rule that telemetry was off until
 the owner stored a key.
 
 - **Why.** One Mac cannot show whether a command got slower for everyone.
-  Numbers from all installs feed a public dashboard (p50 and p95 per command,
+  Numbers from all installs feed a dashboard that is private to the
+  maintainer (p50 and p95 per command,
   version, and runtime) and a regression gate.
 - **Asked at install; on only after you say yes** (Enter counts as yes). The
   installer shows what is sent, an example event, and the privacy
@@ -100,7 +101,10 @@ the owner stored a key.
 - **The promise.** Never a path, file name, host name, user name, argument,
   message, or content. No person profile. PostHog receives the request IP
   address, like any web server; GeoIP lookup is disabled and no location is
-  stored. A yes covers only later events.
+  stored. A yes covers only later events. One exception: the shell start
+  time before the install and the install day are a baseline, measured
+  before the yes. They leave in the `dotfiles.gains` event, next to the
+  `dotfiles.install` event (install time, ok or error, profile).
   `bin/dotfiles-telemetry` is the one sender and enforces it with an
   allowlist; `tests/telemetry.bats` pins it.
 - **Opting out is reliable.** `dotfiles telemetry off`,

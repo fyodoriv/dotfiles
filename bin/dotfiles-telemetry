@@ -38,45 +38,34 @@
 # off. PostHog receives the request IP address, like any web server; GeoIP
 # lookup is disabled and no location is stored.
 #
-# Consent has three values: unset, yes, no. Nothing is sent unless it is yes.
-# `bin/dotfiles-install run` asks on a terminal. With no terminal the answer
-# stays unset, and the first `dotfiles` command on a terminal asks; that
-# question needs a typed y or n (a stray Enter is not a yes). With no answer
-# it asks again at most once a day and 3 times in all, then stays silent
-# until `dotfiles telemetry ask`. It never asks before help, version, cd, or
-# machine-readable output. With no key nobody is asked: nothing could be sent.
-# Keys typed before the question shows are thrown away. A yes covers only later events: both
-# cursors move to the end of the logs, so nothing recorded before it is sent.
-# Opt out without a question: `dotfiles-install run --no-telemetry`,
-# DOTFILES_TELEMETRY=0, or DO_NOT_TRACK=1 at install record no, also over an
-# earlier yes. An answer is never asked again, and an install without one of
-# these opt-outs never changes it.
-#
-# The key is write-only (it can add events, never read them). Lookup order:
-# DOTFILES_POSTHOG_KEY, then the committed file config/telemetry-key, then
-# the macOS Keychain item service "dotfiles", account "posthog_key". The
-# committed file is the project's key for everyone. The env variable is the
-# override: a fork or a test sets it to send to its own PostHog project. The
-# Keychain item is the owner's key from before the file existed; it is read
-# only when the first two hold no key. A value that is not
-# `phc_` plus letters and digits is no key. No key means nothing is sent.
-#
-# It sends only when all hold: the answer is yes, a key is found, and
-# DO_NOT_TRACK, CI, and DOTFILES_TELEMETRY=0 are not set. A send never fails a
-# command. The cursor moves only after the endpoint answers 2xx. One send
-# takes at most the newest 2,000 events of the last 30 days per log, 500 per
-# request; older events are skipped for good. The automatic daily send stops
-# after 3 seconds in total; a request that hangs is killed. It runs from the
-# LaunchAgent com.dotfiles.telemetry (hourly; this script sends at most once
-# a day), and from a `dotfiles` run on a terminal as a fully detached child.
-# A scheduled job never starts it: launchd kills what a job leaves behind.
-# The LaunchAgent exists only while the stored answer is yes: a yes loads it,
-# `telemetry off` unloads it and removes its plist, and `dotfiles apply`
-# installs it only when the state file says yes.
-# A `telemetry off` during a send stops it before the next request.
+# Two more events come from the install receipt (lib/mac-baseline.sh,
+# install-receipt.json). With no receipt neither is sent.
+#   dotfiles.install  once per receipt: seconds (time to configured), ok, and
+#                     profile (only "core" or "full"). Its time is the end of
+#                     the install. Sent only when the install finished on or
+#                     after the day of the yes, and not more than
+#                     MAX_AGE_DAYS ago.
+#   dotfiles.gains    at most once a day: zsh_ms_before (the receipt's shell
+#                     start time before the install), zsh_ms_now (the same
+#                     measurement, taken in the send), and days_since_install.
+# Both shell numbers use one method: baseline_zsh_ms in lib/mac-baseline.sh,
+# the full run time of `zsh -i -c 'exit 0'`. The send measures the now value
+# at most once a day, and never on the path of a normal command. It may take
+# ZSH_LIMIT seconds at most; when it fails or takes longer the field is left
+# out and the send goes on. A dry run measures once. status never measures.
+# zsh_ms_before and days_since_install are a baseline from before the yes.
+# This is the one exception to "a yes covers only later events"; the consent
+# text says so. People who said yes before that text named the baseline did
+# not agree to it. So both events need a yes given on or after GAINS_SINCE,
+# the day they shipped. `dotfiles telemetry on` gives a new yes with today
+# as its day. Every receipt value is checked: a number must be a number, ok
+# a boolean, a time a real UTC time, and any other value is dropped. A
+# receipt over RECEIPT_MAX_BYTES is not read.
 #
 # Lifecycle: the install id, the answer and its day, the two cursors (log
-# lines already handled), the last send day, the last try time and hour, and
+# lines already handled), the install event cursor (the end time of the last
+# install that was sent), the last gains day, the last send day, the last try
+# time and hour, and
 # the count and day of unanswered questions live in one file, ${XDG_STATE_HOME:-~/.local/state}/dotfiles/telemetry.json (mode 600,
 # written with a temp file and a rename, under a short lock so two runs never
 # lose each other's change). Failures go to telemetry.log next to it. Delete the state file to reset: a new install id, the answer is unset
@@ -99,6 +88,7 @@ STATE="${DOTFILES_TELEMETRY_STATE:-$STATE_DIR/telemetry.json}"
 ERROR_LOG="${STATE%.json}.log"
 LOCK="$STATE.lock"
 ASKED_UNTIL="${STATE%.json}.asked-until"
+RECEIPT="${DOTFILES_INSTALL_RECEIPT:-$STATE_DIR/install-receipt.json}"
 KEY_FILE="${DOTFILES_TELEMETRY_KEY_FILE:-$DOTFILES_DIR/config/telemetry-key}"
 URL="${DOTFILES_TELEMETRY_URL:-https://eu.i.posthog.com}"
 URL="${URL%/}/batch/"
@@ -109,6 +99,14 @@ MAX_AGE_DAYS=30      # older events are never sent
 AUTO_TIMEOUT=3       # seconds in total for one automatic daily send
 MANUAL_TIMEOUT=10    # seconds per request for `telemetry send`
 RETRY_SECONDS=3600   # the daily path tries at most once in this time
+# The day the install and gains events shipped. A yes from before this day
+# was given to a text without the baseline exception, so it does not cover
+# them.
+GAINS_SINCE="2026-11-10"
+ZSH_LIMIT=5          # seconds the zsh_ms_now measurement may take
+RECEIPT_MAX_BYTES=65536  # a larger install receipt is not read
+# Every profile name an install event may carry.
+PROFILE_NAMES="core full"
 # Every task name a stats log line may carry (the log_run callers, the doctor,
 # and the shell start timer). A line with another name sends no name.
 # tests/telemetry.bats fails when a caller is missing here.
@@ -137,7 +135,7 @@ line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 # Script-scope copies of the state file fields. load_state fills them;
 # state_set changes some and writes the file.
 S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
-S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
+S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY=""
 # READ_FAILED: jq could not run on the file, so its content is unknown.
 # STATE_INVALID: jq ran and the content is not a state object.
 READ_FAILED=0 STATE_INVALID=0
@@ -171,9 +169,11 @@ save_state() {
       --argjson sent "$S_SENT" --argjson sent_commands "$S_SENT_COMMANDS" \
       --arg last_send "$S_LAST_SEND" --argjson last_try "$S_LAST_TRY" \
       --arg try_hour "$S_TRY_HOUR" --argjson asks "$S_ASKS" --arg asked_day "$S_ASKED_DAY" \
+      --arg install_sent "$S_INSTALL_SENT" --arg gains_day "$S_GAINS_DAY" \
       '{install_id: $id, consent: $consent, consent_at: $consent_at, sent: $sent,
         sent_commands: $sent_commands, last_send: $last_send, last_try: $last_try,
-        try_hour: $try_hour, asks: $asks, asked_day: $asked_day}' \
+        try_hour: $try_hour, asks: $asks, asked_day: $asked_day,
+        install_sent: $install_sent, gains_day: $gains_day}' \
       >"$tmp" && mv -f "$tmp" "$STATE"
   ) 2>/dev/null || rm -f "$tmp"
 }
@@ -195,7 +195,7 @@ load_state() {
   local fields="" rc=0
   READ_FAILED=0 STATE_INVALID=0
   S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
-  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY=""
+  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY=""
   [ -n "$S_ID" ] || S_ID="$(new_install_id)"
   [ -e "$STATE" ] || return 0
   # The file is read as raw text and parsed inside jq, so jq exits 0 for any
@@ -208,6 +208,7 @@ load_state() {
       else -1 end;
     def day: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") then . else "-" end;
     def hour: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$") then . else "-" end;
+    def stamp: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") then . else "-" end;
     (try fromjson catch null) as $state
     | if ($state | type) == "object" and ($state.install_id | type) == "string"
          and ($state.install_id | test("^[0-9a-f]{32}$"))
@@ -217,7 +218,8 @@ load_state() {
             elif .enabled == false then "no"
             else "unset" end),
            (.consent_at | day), (.last_send | day), (.last_try | count),
-           (.try_hour | hour), ([(.asks | count), 99] | min), (.asked_day | day)]
+           (.try_hour | hour), ([(.asks | count), 99] | min), (.asked_day | day),
+           (.install_sent | stamp), (.gains_day | day)]
         | map(tostring) | join(" ")
       else "invalid" end' "$STATE" 2>/dev/null)" || rc=$?
   if [ "$rc" -ne 0 ] || [ -z "$fields" ]; then
@@ -230,13 +232,15 @@ load_state() {
     S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
     return 0
   fi
-  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY <<<"$fields"
+  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY <<<"$fields"
   [ "$S_SENT" != "-1" ] || S_SENT="$(line_count "$STATS")"
   [ "$S_SENT_COMMANDS" != "-1" ] || S_SENT_COMMANDS="$(line_count "$COMMANDS")"
   [ "$S_CONSENT_AT" != "-" ] || S_CONSENT_AT=""
   [ "$S_LAST_SEND" != "-" ] || S_LAST_SEND=""
   [ "$S_TRY_HOUR" != "-" ] || S_TRY_HOUR=""
   [ "$S_ASKED_DAY" != "-" ] || S_ASKED_DAY=""
+  [ "$S_INSTALL_SENT" != "-" ] || S_INSTALL_SENT=""
+  [ "$S_GAINS_DAY" != "-" ] || S_GAINS_DAY=""
 }
 
 # One state change at a time, across runs: a mkdir lock held for the read,
@@ -374,9 +378,10 @@ interactive() {
 }
 
 # ── What to send ────────────────────────────────────────────────────────
-cutoff_time() {
-  date -u -v-"${MAX_AGE_DAYS}"d +%FT%TZ 2>/dev/null || date -u -d "$MAX_AGE_DAYS days ago" +%FT%TZ 2>/dev/null || true
+time_days_ago() {
+  date -u -v-"$1"d +%FT%TZ 2>/dev/null || date -u -d "$1 days ago" +%FT%TZ 2>/dev/null || true
 }
+cutoff_time() { time_days_ago "$MAX_AGE_DAYS"; }
 
 # plan FILE CURSOR prints "FROM TOTAL": send lines FROM+1..TOTAL of FILE.
 # FROM is the cursor after the caps: at most MAX_EVENTS newest lines, and no
@@ -444,10 +449,15 @@ events_body() {
       | if ($name | type) == "string" and any($allowed | split(" ")[]; length > 0 and . == $name)
         then {($field): $name} else {} end;
     def number_fields($line):
-      [("seconds_saved", "units", "pass", "fail", "fixed", "warn", "skip", "duration_ms") as $field
+      [("units", "pass", "fail", "fixed", "warn", "skip", "duration_ms") as $field
         | select($line[$field] | is_number)
         | {($field): $line[$field]}]
       | add // {};
+    # seconds_saved is an estimate (runs times the table in lib/stats.sh): it
+    # leaves as a whole number.
+    def saved_field($line):
+      if ($line.seconds_saved | is_number)
+      then {seconds_saved: ($line.seconds_saved | floor | if . == 0 then 0 else . end)} else {} end;
     def ok_field($line):
       if ($line.ok | type) == "boolean" then {ok: $line.ok} else {} end;
     def time_field($line):
@@ -465,6 +475,7 @@ events_body() {
            + name_field($line; "task"; $tasks)
            + name_field($line; "command"; $commands)
            + number_fields($line)
+           + saved_field($line)
            + ok_field($line))}
         + time_field($line)]
     | select(length > 0)
@@ -476,6 +487,131 @@ build_body() {
   tail -n "+$(($2 + 1))" "$1" 2>/dev/null | head -n "$3" | events_body "$4" "$5"
 }
 
+# ── Install and gains events ────────────────────────────────────────────
+# extras_plan: what the install receipt allows now. EXTRA_INSTALL is the end
+# time of an install that was not sent yet, or "". EXTRA_GAINS is 1 when a
+# gains event is due today. Both need a stored yes given on or after
+# GAINS_SINCE, no run-time switch, and a receipt of a sane size. An install
+# that finished before the day of the yes, more than MAX_AGE_DAYS ago, or in
+# the future is never sent. A time that is not a real date allows nothing.
+# DOTFILES_TELEMETRY_TEST_GAINS_SINCE is for tests only.
+EXTRA_INSTALL="" EXTRA_GAINS=0
+extras_plan() {
+  local fields="" finished="-" taken="-" since="$GAINS_SINCE"
+  EXTRA_INSTALL="" EXTRA_GAINS=0
+  [ -z "${BATS_TEST_FILENAME:-}" ] || since="${DOTFILES_TELEMETRY_TEST_GAINS_SINCE:-$GAINS_SINCE}"
+  [ "$S_CONSENT" = "yes" ] && [ -n "$S_CONSENT_AT" ] && [[ ! "$S_CONSENT_AT" < "$since" ]] || return 0
+  [ -z "$(blocked)" ] || return 0
+  [ -s "$RECEIPT" ] && [ "$(wc -c <"$RECEIPT" 2>/dev/null | tr -d ' ')" -le "$RECEIPT_MAX_BYTES" ] || return 0
+  fields="$(jq -R -s -r '
+    def obj: if type == "object" then . else {} end;
+    def stamp:
+      if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+         and (try fromdateiso8601 catch null) != null
+      then . else "-" end;
+    ((try fromjson catch null) | obj) as $receipt
+    | [(($receipt.run | obj).finished_at | stamp), (($receipt.before | obj).taken_at | stamp)]
+    | join(" ")' "$RECEIPT" 2>/dev/null)" || return 0
+  read -r finished taken <<<"$fields"
+  if [ "${finished:--}" != "-" ] && [ "$finished" != "$S_INSTALL_SENT" ] &&
+    [[ ! "${finished:0:10}" < "$S_CONSENT_AT" ]] && [[ ! "$finished" < "$(cutoff_time)" ]] &&
+    [[ ! "$finished" > "$(date -u +%FT%TZ)" ]]; then
+    EXTRA_INSTALL="$finished"
+  fi
+  if [ "${taken:--}" != "-" ] && [ "$S_GAINS_DAY" != "$(today)" ]; then
+    EXTRA_GAINS=1
+  fi
+  return 0
+}
+
+# The shell start time now, in ms, or nothing. The same measurement as the
+# install receipt's zsh_ms (baseline_zsh_ms in lib/mac-baseline.sh), so the
+# before and now numbers compare fairly. It runs in the background with a
+# hard limit: after ZSH_LIMIT seconds it is stopped with its child processes
+# and gives nothing. Never fails. Only extras_body calls it, so only a send
+# or a dry run that has a gains event to build pays for it.
+# SIGKILL, not SIGTERM: an interactive zsh ignores SIGTERM. The parent goes
+# first, so it cannot start a new child after the list is read.
+kill_tree() {
+  local child children
+  children="$(pgrep -P "$1" 2>/dev/null)"
+  kill -KILL "$1" 2>/dev/null
+  for child in $children; do kill_tree "$child"; done
+}
+shell_start_now() {
+  local out="$STATE.zsh.$$" pid ticks=0 ms=""
+  [ -f "$DOTFILES_DIR/lib/mac-baseline.sh" ] || return 0
+  # shellcheck source=../lib/mac-baseline.sh
+  source "$DOTFILES_DIR/lib/mac-baseline.sh" 2>/dev/null || return 0
+  (baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" >"$out" 2>/dev/null) </dev/null &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$ticks" -ge $((ZSH_LIMIT * 10)) ]; then
+      kill_tree "$pid"
+      wait "$pid" 2>/dev/null
+      rm -f "$out"
+      return 0
+    fi
+    sleep 0.1
+    ticks=$((ticks + 1))
+  done
+  wait "$pid" 2>/dev/null
+  if [ -f "$out" ]; then IFS= read -r ms <"$out" || true; fi
+  rm -f "$out"
+  [[ ! "$ms" =~ ^[0-9]{1,9}$ ]] || printf '%s\n' "$ms"
+  return 0
+}
+
+# extras_body KEY: the events extras_plan allows as one PostHog batch body, or
+# nothing. The same privacy boundary as events_body: a receipt value leaves
+# only as a checked number, a boolean, or a profile name on the fixed list.
+extras_body() {
+  local key="$1" zsh_now=""
+  [ -n "$EXTRA_INSTALL" ] || [ "$EXTRA_GAINS" -eq 1 ] || return 0
+  [ "$EXTRA_GAINS" -eq 0 ] || zsh_now="$(shell_start_now)"
+  app_version
+  DOTFILES_TELEMETRY_BODY_KEY="$key" jq -R -s -c \
+    --arg id "$S_ID" --arg install "$EXTRA_INSTALL" --argjson gains "$EXTRA_GAINS" \
+    --arg zsh_now "$zsh_now" --arg profiles "$PROFILE_NAMES" \
+    --arg version "$VERSION" --arg os "$(os_name)" --arg arch "$(arch_name)" '
+    def obj: if type == "object" then . else {} end;
+    # A negative zero passes ">= 0" and prints as -0: it leaves as 0.
+    def whole:
+      select(type == "number" and isinfinite == false and isnan == false and . >= 0 and . < 1000000000)
+      | floor | if . == 0 then 0 else . end;
+    def number_field($name; value): [value | whole] | if length > 0 then {($name): .[0]} else {} end;
+    def unix_time:
+      if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+      then (try fromdateiso8601 catch null) else null end;
+
+    ((try fromjson catch null) | obj) as $receipt
+    | ($receipt.run | obj) as $run
+    | ($receipt.before | obj) as $before
+    | {"$process_person_profile": false, "$geoip_disable": true,
+       app_version: $version, os: $os, arch: $arch, runtime: "shell"} as $common
+    | [(select($install != "" and $run.finished_at == $install)
+        | {event: "dotfiles.install", distinct_id: $id,
+           properties: (
+             $common
+             + number_field("seconds"; $run.seconds)
+             + (if ($run.ok | type) == "boolean" then {ok: $run.ok} else {} end)
+             + ($receipt.profile as $name
+                | if ($name | type) == "string" and any($profiles | split(" ")[]; . == $name)
+                  then {profile: $name} else {} end)),
+           timestamp: $install}),
+       (($before.taken_at | unix_time) as $taken
+        | select($gains == 1 and $taken != null)
+        | {event: "dotfiles.gains", distinct_id: $id,
+           properties: (
+             $common
+             + number_field("zsh_ms_before"; $before.zsh_ms)
+             + number_field("zsh_ms_now"; $zsh_now | select(test("^[0-9]{1,9}$")) | tonumber)
+             + {days_since_install:
+                 ([((now - $taken) / 86400 | floor), 0] | max)})})]
+    | select(length > 0)
+    | {api_key: env.DOTFILES_TELEMETRY_BODY_KEY, batch: .}' "$RECEIPT" 2>/dev/null
+}
+
 # An example event, built by the same code that builds a send.
 example_event() {
   printf '{"command":"doctor","timestamp":"%s","ok":true,"duration_ms":1840}\n' "$(date -u +%FT%TZ)" |
@@ -485,17 +621,20 @@ example_event() {
 what_is_sent() {
   echo "What is sent, at most once a day: the command or task name, its duration,"
   echo "ok or error, counts, the dotfiles version, OS, CPU type, and a random"
-  echo "install id. An example event:"
+  echo "install id. Also: how long the install took, and the shell start time"
+  echo "before the install and now. An example event:"
   echo ""
   example_event
   echo ""
   echo "The privacy promise: never a path, file name, host name, user name,"
   echo "argument, message, or content. No person profile. PostHog receives the"
   echo "request IP address, like any web server; GeoIP lookup is disabled and no"
-  echo "location is stored. Only events recorded after your yes are sent."
+  echo "location is stored. Only events recorded after your yes are sent. One"
+  echo "exception: the shell start time before the install and the install day"
+  echo "are a baseline, measured before your yes."
   echo "The code that enforces this is bin/dotfiles-telemetry; see"
   echo "$PRIVACY_URL"
-  echo "Where it goes: PostHog EU, for a public performance dashboard."
+  echo "Where it goes: PostHog EU. The maintainer reads the totals and averages."
   echo "Change your answer any time: dotfiles telemetry off (or on)."
 }
 
@@ -585,6 +724,48 @@ send_log() {
   done
 }
 
+# send_extras TIMEOUT: send the install and gains events that extras_plan
+# allows, in one request. The same rules as send_log: it stops when the answer
+# is no longer yes or the time is up, and the install cursor and the gains
+# day move only after the endpoint answers 2xx, each only when its event was
+# in the request. An empty body moves nothing. The zsh_ms_now measurement
+# (in extras_body) does not count against the time limit of the daily send.
+send_extras() {
+  local timeout="$1" body code left started names
+  local -a changes=()
+  [ -z "$STOPPED_WHY" ] || return 0
+  extras_plan
+  [ -n "$EXTRA_INSTALL" ] || [ "$EXTRA_GAINS" -eq 1 ] || return 0
+  if [ "$DEADLINE" -gt 0 ]; then
+    left=$((DEADLINE - SECONDS))
+    [ "$left" -gt 0 ] || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
+    [ "$timeout" -le "$left" ] || timeout="$left"
+  fi
+  started="$SECONDS"
+  body="$(extras_body "$KEY")"
+  [ -n "$body" ] || return 0
+  # The measurement took time: an off given meanwhile stops this request.
+  load_state
+  [ "$S_CONSENT" = "yes" ] || { STOPPED_WHY="turned off during the send"; return 0; }
+  if [ "$DEADLINE" -gt 0 ]; then
+    DEADLINE=$((DEADLINE + SECONDS - started))
+    left=$((DEADLINE - SECONDS))
+    [ "$timeout" -le "$left" ] || timeout="$left"
+    [ "$timeout" -ge 1 ] || timeout=1
+  fi
+  code="$(printf '%s' "$body" | post "$timeout")"
+  if [[ ! "$code" =~ ^2[0-9][0-9]$ ]]; then
+    [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
+    FAILED_CODE="$code"
+    return 1
+  fi
+  names="$(jq -r '[.batch[].event] | join(" ")' <<<"$body" 2>/dev/null || true)"
+  case " $names " in *" dotfiles.install "*) changes+=(S_INSTALL_SENT "$EXTRA_INSTALL"); SENT_COUNT=$((SENT_COUNT + 1)) ;; esac
+  case " $names " in *" dotfiles.gains "*) changes+=(S_GAINS_DAY "$(today)"); SENT_COUNT=$((SENT_COUNT + 1)) ;; esac
+  [ "${#changes[@]}" -eq 0 ] || state_set "${changes[@]}"
+  return 0
+}
+
 # send_all TIMEOUT: prints one result line. Never fails.
 send_all() {
   local timeout="$1" why skipped=""
@@ -597,7 +778,7 @@ send_all() {
   state_set S_LAST_TRY "$(date +%s)" S_TRY_HOUR "$(date -u +%FT%H)"
   resolve_key
   [ -n "$KEY" ] || { echo "telemetry: not sent (no key)"; unlock; return 0; }
-  if send_log "$STATS" S_SENT dotfiles.run "$timeout" && send_log "$COMMANDS" S_SENT_COMMANDS dotfiles.command "$timeout"; then
+  if send_log "$STATS" S_SENT dotfiles.run "$timeout" && send_log "$COMMANDS" S_SENT_COMMANDS dotfiles.command "$timeout" && send_extras "$timeout"; then
     [ "$SKIPPED_COUNT" -eq 0 ] || skipped=" (skipped $SKIPPED_COUNT older event(s))"
     if [ -n "$STOPPED_WHY" ]; then
       echo "telemetry: sent $SENT_COUNT event(s)$skipped, then stopped ($STOPPED_WHY)"
@@ -614,8 +795,9 @@ send_all() {
   unlock
 }
 
-# Print the first request of each log, exactly as a send would build it, with
-# the key hidden. Changes nothing and sends nothing.
+# Print the first request of each log, and the request with the install and
+# gains events, exactly as a send would build them, with the key hidden.
+# Changes nothing and sends nothing.
 dry_run() {
   local file cursor event from total count body pending=0
   for file in "$STATS" "$COMMANDS"; do
@@ -630,10 +812,18 @@ dry_run() {
     echo "POST $URL"
     jq . <<<"$body"
   done
+  extras_plan
+  body="$(extras_body "<posthog_key>")"
+  if [ -n "$body" ]; then
+    pending=$((pending + $(jq '.batch | length' <<<"$body" 2>/dev/null || echo 0)))
+    echo "POST $URL"
+    jq . <<<"$body"
+  fi
   echo "dry run: nothing sent. $pending event(s) pending, at most $BATCH_SIZE per request."
 }
 
-# Events a send would take now, and older ones it would skip: "PENDING SKIPPED".
+# Events a send would take now (log lines, and the install and gains events),
+# and older ones it would skip: "PENDING SKIPPED".
 pending_counts() {
   local from total pending=0 skipped=0 cursor
   read -r from total <<<"$(plan "$STATS" "$S_SENT")"
@@ -642,6 +832,9 @@ pending_counts() {
   read -r from total <<<"$(plan "$COMMANDS" "$S_SENT_COMMANDS")"
   cursor="$S_SENT_COMMANDS"; [ "$cursor" -le "$total" ] || cursor="$total"
   pending=$((pending + total - from)); skipped=$((skipped + from - cursor))
+  extras_plan
+  [ -z "$EXTRA_INSTALL" ] || pending=$((pending + 1))
+  pending=$((pending + EXTRA_GAINS))
   echo "$pending $skipped"
 }
 

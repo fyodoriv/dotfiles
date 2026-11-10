@@ -83,7 +83,9 @@ Ask these together, in one round:
    run `bash <DIR>/bin/dotfiles-telemetry example` and show the person its
    output: what is sent, an example event, and the privacy promise (never a
    path, file name, host name, user name, argument, message, or content; no
-   person profile; it goes to PostHog EU for a public dashboard; PostHog
+   person profile; it goes to PostHog EU, where the maintainer reads the totals
+   and averages; the shell start time before the install is a baseline
+   measured before the yes; PostHog
    receives the request IP address, like any web server, but GeoIP lookup is
    disabled and no location is stored). Yes (recommended) / No. Never answer for the person. With no
    answer, pass no flag: the install records nothing, nothing is sent, and

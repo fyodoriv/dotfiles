@@ -72,9 +72,11 @@ Asked at install; on only after you say yes (Enter counts as yes).
 
 `bin/dotfiles-telemetry` is the one sender. It can send two content-free
 local logs to PostHog EU (`https://eu.i.posthog.com/batch/`): the stats log
-and the commands log (see [Logs](#logs)). The numbers feed a public
-performance dashboard (p50 and p95 per command, version, and runtime) and a
-regression gate.
+and the commands log (see [Logs](#logs)). It also sends two events built
+from the install receipt (see [Gain events](#gain-events)). The numbers feed
+a performance dashboard (p50 and p95 per command, version, and runtime) and a
+regression gate. The dashboard is private to the maintainer, who reads the
+totals and averages.
 
 ### The question
 
@@ -94,7 +96,10 @@ the answer, then `Share anonymous performance numbers? [Y/n]`.
 - Keys typed before the question shows are thrown away, so a stray Enter is
   never an answer.
 - **A yes covers only later events.** Both cursors move to the end of the
-  logs, so nothing recorded before the yes is ever sent.
+  logs, so nothing recorded before the yes is ever sent. One exception: the
+  shell start time before the install and the install day are a baseline,
+  measured before the yes. They leave in the `dotfiles.gains` event (see
+  [Gain events](#gain-events)), next to the `dotfiles.install` event.
 - **No terminal** (an agent, a script, `CI` set): no question. The answer
   stays **unset** and nothing is sent. The first normal `dotfiles` command on
   a terminal asks. It asks only when stdin, stdout, and stderr are a
@@ -170,6 +175,58 @@ How the code enforces it:
 - `tests/telemetry.bats` seeds the logs with a home path, a user name, a
   plain lowercase word, a plain uppercase word, an email, a URL, and a long
   token, and fails if any reaches the request body.
+- `tests/telemetry-gains.bats` does the same for the install receipt: a path
+  where a number belongs, a profile name that is not on the list, and a time
+  that is not a UTC timestamp never reach the request body.
+
+### Gain events
+
+These events show how much dotfiles helps against the same Mac before the
+install. Both come from the install receipt
+(`~/.local/state/dotfiles/install-receipt.json`, written by
+`bin/dotfiles-install run`; see `lib/mac-baseline.sh`). With no receipt
+neither is sent.
+
+| Event | When | Properties (plus the common ones) |
+|---|---|---|
+| `dotfiles.install` | Once per receipt. A new install run writes a new end time, and that sends a new event. Never for an install that finished more than 30 days ago (the age cap of the logs) or in the future. | `seconds` (time to configured, measured), `ok`, `profile` (`core` or `full`; any other value is dropped). The event time is the end of the install. |
+| `dotfiles.gains` | At most once a day, with the daily send. | `zsh_ms_before` (receipt `.before.zsh_ms`, measured), `zsh_ms_now` (measured), `days_since_install` (days since receipt `.before.taken_at`). |
+
+- `dotfiles.run` carries `seconds_saved` as a whole number. It is an
+  estimate: runs times the per-task table in `lib/stats.sh`
+  (`_task_estimate`).
+- **One method for both shell numbers.** `zsh_ms_before` and `zsh_ms_now`
+  are the full run time of `zsh -i -c 'exit 0'`, the median of 3 runs
+  (`baseline_zsh_ms` in `lib/mac-baseline.sh`). So the two compare fairly.
+- **When `zsh_ms_now` is measured.** In the send that builds the gains event:
+  at most once a day, in the background daily send or a manual
+  `dotfiles telemetry send`. A normal command never measures.
+  `dotfiles telemetry status` never measures. A `send --dry-run` measures
+  once when a gains event is due. The measurement may take 5 seconds at
+  most. When it fails or takes longer, it is stopped, the field is left out,
+  and the send goes on. Its time does not count against the 3-second limit
+  of the daily send.
+- **Consent.** The install event is sent only when the install finished on or
+  after the day of the yes. `zsh_ms_before` and `days_since_install` are a
+  baseline from before the yes. This is the one exception to "a yes covers
+  only later events", and the consent text says so.
+- **Older yes answers.** Both events need a yes given on or after
+  `2026-11-10` (`GAINS_SINCE` in the sender), the day they shipped. A person
+  who said yes before that day agreed to a text without the baseline
+  exception, so that yes does not cover them. `dotfiles telemetry on` gives
+  a new yes: it shows the text again and records today as the day.
+- **Switches.** Without a stored yes, or with `CI`, `DO_NOT_TRACK`, or
+  `DOTFILES_TELEMETRY=0` set, the events are not built at all: not in a
+  send, not in a dry run, and not in the pending count.
+- **Checks.** A receipt number must be a number from 0 to 999,999,999 and
+  leaves as a whole number (a negative zero leaves as 0). `ok` must be a
+  boolean. A time must be a real UTC time; a day such as month 13 drops only
+  the event that needs it. Any other value is dropped. A receipt over 64 KB
+  is not read.
+- **Cursors.** The state file keeps `install_sent` (the end time of the last
+  install that was sent) and `gains_day`. Each moves only after the endpoint
+  answers 2xx for a request that held its event.
+- The local view is `dotfiles metrics --gains`. It sends nothing.
 
 ### Turn it off
 
@@ -189,9 +246,11 @@ the Mac. `DOTFILES_STATS_LOG=0` turns the logs off too.
 
 - `dotfiles telemetry status`: on or off and why, your answer and its day,
   the key source (`env`, `keychain`, `default`, or `none`; never the value),
-  pending events, the last send, and the last problem.
-- `dotfiles telemetry send --dry-run`: the exact request body, with the key
-  shown as `<posthog_key>`. It sends nothing and changes nothing.
+  pending events (log lines, and the install and gains events that are due),
+  the last send, and the last problem.
+- `dotfiles telemetry send --dry-run`: the exact request body of each log and
+  of the install and gains events, with the key shown as `<posthog_key>`. It
+  sends nothing and changes nothing.
 
 ### The key
 
@@ -279,7 +338,8 @@ nothing is sent. The key is never printed or logged.
 - The cursor moves only after the endpoint answers 2xx.
 - Recording a command costs a few milliseconds and never throws.
 - **State**: `~/.local/state/dotfiles/telemetry.json` (install id, answer and
-  its day, two cursors, last send day, last try; mode 600, written with a temp
+  its day, two log cursors, the install event cursor, the last gains day,
+  last send day, last try; mode 600, written with a temp
   file and a rename). A file whose content is not valid means unset, never
   yes, and the cursors start at the end of the logs. When `jq` itself fails,
   the file is left as it is and nothing is sent, so a stored no is never
@@ -370,8 +430,8 @@ baseline, so it works the same on every machine.
   commit, or with a changed file can hold your work), and the gate prints a note
   with its path.
 - **Field numbers**: the gate measures one machine before a merge. Numbers
-  from real installs will be on the performance dashboard (link: to be added
-  with the telemetry timing events).
+  from real installs go to the telemetry dashboard. That dashboard is private
+  to the maintainer.
 
 ## Health check
 

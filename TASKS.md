@@ -382,6 +382,34 @@ them. -->
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
 
+- [ ] Keep the time of the telemetry yes, not only its day
+  - **ID**: telemetry-consent-time-for-install-event
+  - **Tags**: telemetry, privacy
+  - **Details**: The state file keeps the day of the yes (`consent_at`). The `dotfiles.install` event is sent when the install finished on or after that day. So an install that finished some hours before a yes on the same UTC day is sent too. The owner accepted the day rule on 2026-11-10. A stored time would make the rule exact. `lib/stats.sh` reads the state line with string patterns, so keep the old field and add a new one.
+  - **Files**: `bin/dotfiles-telemetry`, `tests/telemetry-gains.bats`, `docs/observability.md`
+  - **Output**: code
+  - **Acceptance**: a bats test with an install that finished one hour before the yes on the same day sends no install event; a state file without the new field still works with the day rule.
+  - **Hypothesis**: the longest time before a yes from which an install event can still be sent goes from 24 hours to 0.
+  - **Measurement**: `heavy-run bats tests/telemetry-gains.bats tests/telemetry.bats`
+  - **Success**: the new test passes (red before the change), and every older test passes.
+  - **Pivot**: the new field breaks the string patterns in `lib/stats.sh` -> keep the day rule and close.
+  - **Anchor**: Munafò et al. 2017 (pre-registration); Basili, Caldiera and Rombach 1994 (GQM).
+  - **Competitive-goal**: none — consent precision, not a scorecard metric.
+
+- [ ] Show the gain events on the maintainer's private PostHog dashboard
+  - **ID**: telemetry-gains-dashboard-tiles
+  - **Tags**: telemetry, metrics, owner
+  - **Details**: The sender now sends `dotfiles.install` (`seconds`, `ok`, `profile`) and `dotfiles.gains` (`zsh_ms_before`, `zsh_ms_now`, `days_since_install`), and `dotfiles.run` carries `seconds_saved` (an estimate). Nothing reads them yet. Add tiles to the private dashboard: median time to configured and install success rate per profile; median shell start before and now, per install and over all installs; the sum of estimated saved seconds per install and in total. Label the saved seconds as an estimate. The README Proof row for the install is a separate task (`proof-install-field-outcome`); the install receipt can feed it.
+  - **Files**: the PostHog project (owner), `docs/observability.md`
+  - **Output**: dashboard, docs
+  - **Acceptance**: the dashboard shows each tile with data from one real install or more; `docs/observability.md` lists the tiles.
+  - **Hypothesis**: the gain questions that the dashboard answers (time to configured, shell start gain, saved time) go from 0 to 3.
+  - **Measurement**: the HogQL query `select event, count() from events where event in ('dotfiles.install', 'dotfiles.gains') group by event` returns both events.
+  - **Success**: all 3 questions have a tile with data.
+  - **Pivot**: no install sends a gains event in 30 days -> check the consent rate first and close this task.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Forsgren, Humble and Kim 2018 (*Accelerate*).
+  - **Competitive-goal**: none — proof of field gains, not a scorecard metric.
+
 - [ ] Telemetry notices an unusable state folder, and cuts the log beside an unreadable state file
   - **ID**: telemetry-state-folder-and-unreadable-cap
   - **Tags**: telemetry, doctor

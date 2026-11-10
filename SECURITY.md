@@ -47,6 +47,26 @@ slipped past the privacy gates documented below), please report it
 For a detailed description of trust boundaries, privilege escalation, secrets
 handling, and audit capabilities, see [docs/security-model.md](docs/security-model.md).
 
+## Telemetry
+
+Asked at install; on only after you say yes (Enter counts as yes at the
+install question).
+
+- **What is sent**: anonymous performance numbers, at most once a day. See
+  the [example event](README.md#telemetry) in the README.
+- **What is never sent**: a path, file name, host name, user name, argument,
+  message, or content. No person profile.
+- **Where it goes**: PostHog EU. PostHog receives the request IP address,
+  like any web server; GeoIP lookup is off.
+- **Turn it off**: `dotfiles telemetry off`, `DOTFILES_TELEMETRY=0`,
+  `DO_NOT_TRACK=1`, or `--no-telemetry` at install.
+- **The key**: the shipped key file `config/telemetry-key` is empty until the
+  owner fills it. Until then nobody is asked and nothing is sent.
+
+Detail: [docs/security-model.md](docs/security-model.md#what-this-repo-does-not-do)
+(the full statement) and [docs/observability.md](docs/observability.md#telemetry)
+(every rule).
+
 ## Built-in Security Checks
 
 This repo includes automated security auditing:

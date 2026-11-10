@@ -288,6 +288,11 @@ baseline, so it works the same on every machine.
   runtime change)`. The path list is the `PERF_GATE_PATH` lines of the budget
   file at the base and in your tree together, so a PR cannot shrink its own
   scope. `scripts/perf-gate.sh --force` times anyway.
+- **Exit codes**: `scripts/perf-gate.sh` exits 0 on a pass or a skip, 1 on a
+  slowdown (or a stale allow line), and 2 on a setup error. `make perf-gate`
+  and `make check` exit 2 for every failure: that is make's own code for a
+  failed step. So a caller of `make` reads "non-zero", and reads the printed
+  lines for the reason.
 - **Setup errors exit 2, never pass**: no base commit (run `git fetch origin`,
   or set `PERF_GATE_BASE=<ref>`; `PERF_GATE_NO_BASE=1` checks the ceilings
   only), a command that fails in your tree or in the base checkout, a git

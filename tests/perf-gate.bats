@@ -3,7 +3,8 @@
 # Each test builds a small git repo with one tracked script that sleeps, so the
 # times are known: 100 ms at the base, 200 ms in a slowed head. The seeded
 # slowdown is large on purpose: these tests run next to other bats jobs, and a
-# 20% step can drown in that load (the real 20% proof is in the PR).
+# 20% step of a 100 ms command can drown in that load. One test pins the 10%
+# limit with a 20% step of a 500 ms command, where the step is 100 ms.
 
 REPO_ROOT="$BATS_TEST_DIRNAME/.."
 GATE="$REPO_ROOT/scripts/perf-gate.sh"
@@ -93,11 +94,25 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [[ "$output" == *"tool is over its ceiling"* ]]
 }
 
-@test "a command that fails in this tree fails the gate" {
+@test "a command that fails in this tree is a setup error" {
   printf '#!/bin/bash\nexit 3\n' > "$FIX/tool.sh"
   gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"tool failed in this tree (status 3)"* ]]
+  [[ "$output" != *"perf gate: pass"* ]]
+}
+
+@test "the limits are 10% and 3 ms: a 20% step fails" {
+  # 500 ms -> 600 ms. A limit of 20% or more would pass this; so would a
+  # floor of 100 ms or more.
+  tool 0.50
+  merge "slow base"
+  tool 0.60
+  run bash -c 'cd "$1" && "$2" --json 2>/dev/null' _ "$FIX" "$GATE"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"tool: the command failed in this tree (status 3)"* ]]
+  echo "$output" | jq -e '.limit_ratio == 1.10 and .limit_ms == 3
+    and (.commands[0] | .verdict == "slower" and .ratio > 1.10 and .ratio < 1.25)'
+  grep -qF 'my ($RATIO, $FLOOR_MS) = (1.10, 3);' "$TIMER"
 }
 
 @test "perf gate --json prints base_min, head_min, ratio, and verdict per command" {
@@ -106,6 +121,7 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [ "$status" -eq 1 ]
   echo "$output" | jq -e '.skipped == false and .ok == false and (.base | length == 40)
     and .base_ref == "main" and (.base_ref_date | test("^20[0-9-]+$"))
+    and .limit_ratio == 1.10 and .limit_ms == 3
     and (.commands | length == 1)
     and (.commands[0] | .name == "tool" and .verdict == "slower" and .base_min >= 100
       and .head_min >= 200 and .ratio > 1.1 and .ceiling_ms == 2000)'
@@ -130,6 +146,26 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"fresh is over its ceiling"* ]]
+}
+
+@test "a row that points an existing name at another file is still compared with the base row" {
+  # The base budget has "tool". The head row names a file the base does not
+  # have, so the old rule called it "new" and checked the ceiling only.
+  tool 0.20 new.sh
+  budget 'tool	2000	./new.sh'
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool got slower"* ]]
+  [[ "$output" == *"the base runs its own row (./tool.sh)"* ]]
+  [[ "$output" != *" new"$'\n'* ]]
+}
+
+@test "a wrapper in front of an existing command is still compared with the base row" {
+  tool 0.20
+  budget 'tool	2000	/usr/bin/env ./tool.sh'
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool got slower"* ]]
 }
 
 @test "a command that the base has but that fails there is a setup error, not a new command" {
@@ -203,6 +239,42 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [ "$(git -C "$CACHE/$sha" rev-parse HEAD)" = "$sha" ]
 }
 
+@test "a base checkout with an edited or added file is built again, not trusted" {
+  local sha
+  sha="$(git -C "$FIX" rev-parse main)"
+  printf '# touch\n' >> "$FIX/tool.sh"
+  gate
+  [ "$status" -eq 0 ]
+  # Someone slows the tool inside the cached checkout, so a slow head looks equal.
+  printf '#!/bin/bash\nsleep 0.20\n' > "$CACHE/$sha/tool.sh"
+  tool 0.20
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"not a clean copy of the base commit"* ]]
+  [[ "$output" == *"tool got slower"* ]]
+
+  echo planted > "$CACHE/$sha/extra.sh"
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"not a clean copy of the base commit"* ]]
+  [ ! -e "$CACHE/$sha/extra.sh" ]
+}
+
+@test "a cache path with a space still prunes old checkouts" {
+  export XDG_CACHE_HOME="$TEST_DIR/my cache"
+  local spaced="$XDG_CACHE_HOME/dotfiles/perf-gate.noindex" first
+  first="$(git -C "$FIX" rev-parse main)"
+  for n in 1 2 3; do
+    printf '# touch %s\n' "$n" >> "$FIX/tool.sh"
+    gate
+    [ "$status" -eq 0 ]
+    merge "step $n"
+    sleep 1
+  done
+  [ ! -e "$spaced/$first" ]
+  [ "$(find "$spaced" -maxdepth 1 -type d -name '[0-9a-f]*' | wc -l | tr -d ' ')" = 2 ]
+}
+
 @test "the base checkout is cached by commit, two are kept, and one in use is not removed" {
   local first second third
   first="$(git -C "$FIX" rev-parse main)"
@@ -258,6 +330,22 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [ "$status" -eq 0 ]
   [[ "$output" == *"perf gate: skipped (no runtime change)" ]]
   [ ! -e "$CACHE" ]
+}
+
+@test "a git failure in the scope check is a setup error, not a skip" {
+  echo docs > "$FIX/README.md"
+  mkdir -p "$TEST_DIR/bin"
+  printf '#!/bin/bash\nfor a in "$@"; do [ "$a" = "%s" ] && exit 128; done\nexec "%s" "$@"\n' diff "$(command -v git)" > "$TEST_DIR/bin/git"
+  chmod +x "$TEST_DIR/bin/git"
+  run bash -c 'cd "$1" && PATH="$3:$PATH" "$2"' _ "$FIX" "$GATE" "$TEST_DIR/bin"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"git diff against"*"failed"* ]]
+  [[ "$output" != *"skipped"* ]]
+
+  printf '#!/bin/bash\nfor a in "$@"; do [ "$a" = "%s" ] && exit 128; done\nexec "%s" "$@"\n' ls-files "$(command -v git)" > "$TEST_DIR/bin/git"
+  run bash -c 'cd "$1" && PATH="$3:$PATH" "$2"' _ "$FIX" "$GATE" "$TEST_DIR/bin"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"git ls-files failed"* ]]
 }
 
 @test "perf gate --force times the commands with no runtime change" {
@@ -352,6 +440,98 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
   [[ "$output" == *"bad line"* ]]
 }
 
+# ── A change to the gate itself ──────────────────────────────────────
+
+@test "a PR that changes the gate's own files needs a new perf-gate allow line" {
+  mkdir -p "$FIX/scripts"
+  echo v1 > "$FIX/scripts/perf-gate.sh"
+  echo v1 > "$FIX/scripts/perf-gate.pl"
+  # The fixture path list does not name scripts/: the gate files count anyway.
+  merge "gate files at the base"
+  echo v2 > "$FIX/scripts/perf-gate.pl"
+  gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"WARNING: this change edits the gate itself (scripts/perf-gate.pl)"* ]]
+  [[ "$output" == *"Add PERF_GATE_ALLOW=perf-gate:<reason>"* ]]
+  [[ "$output" != *"perf gate: pass"* ]]
+
+  budget 'tool	2000	./tool.sh' 'PERF_GATE_ALLOW=perf-gate:fix a review finding'
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"WARNING: this change edits the gate itself"* ]]
+  [[ "$output" == *"allowed by PERF_GATE_ALLOW=perf-gate: fix a review finding"* ]]
+
+  # After the merge the base has the line: it does not cover the next change.
+  merge "gate change"
+  echo v3 > "$FIX/scripts/perf-gate.sh"
+  gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"scripts/perf-gate.sh differ from the base"* ]]
+}
+
+@test "the command name perf-gate is reserved" {
+  budget 'perf-gate	2000	./tool.sh'
+  gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"the name perf-gate is reserved"* ]]
+}
+
+# ── Setup errors exit 2 ──────────────────────────────────────────────
+
+@test "a bad PERF_GATE_RUNS or PERF_GATE_WARMUPS is a setup error" {
+  local bad
+  for bad in 0 abc -1 1.5; do
+    PERF_GATE_RUNS="$bad" gate
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"PERF_GATE_RUNS must be a number above 0"* ]]
+  done
+  PERF_GATE_WARMUPS=x gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"PERF_GATE_WARMUPS must be a number"* ]]
+}
+
+@test "an unknown argument is a setup error" {
+  gate --fast
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"unknown argument --fast"* ]]
+}
+
+@test "outside a git repository is a setup error" {
+  mkdir "$TEST_DIR/plain"
+  run bash -c 'cd "$1" && GIT_CEILING_DIRECTORIES="$1" "$2"' _ "$TEST_DIR/plain" "$GATE"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"not in a git repository"* ]]
+}
+
+@test "a cache folder that cannot be written is a setup error" {
+  tool 0.20
+  mkdir -p "$TEST_DIR/ro"
+  chmod 555 "$TEST_DIR/ro"
+  XDG_CACHE_HOME="$TEST_DIR/ro" gate
+  chmod 755 "$TEST_DIR/ro"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"cannot create or write the cache folder"* ]]
+}
+
+@test "no HOME and no XDG_CACHE_HOME, or a relative cache path, is a setup error" {
+  tool 0.20
+  run bash -c 'cd "$1" && env -u HOME -u XDG_CACHE_HOME "$2"' _ "$FIX" "$GATE"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"HOME and XDG_CACHE_HOME are both unset"* ]]
+
+  XDG_CACHE_HOME=relative/cache gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"must be an absolute path"* ]]
+  [ ! -e "$FIX/relative" ]
+}
+
+@test "a missing perl is a setup error" {
+  tool 0.20
+  PERF_GATE_PERL="$TEST_DIR/no-perl" gate
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"perl not found"* ]]
+}
+
 # ── How the commands run ─────────────────────────────────────────────
 
 @test "the commands run with a scratch HOME and without the caller's environment" {
@@ -400,6 +580,10 @@ gate() { run bash -c 'cd "$1" && shift && "$@"' _ "$FIX" "$GATE" "$@"; }
 @test "make check runs the perf gate as a timed step, and make perf-gate exists" {
   grep -qE 'gate-timed.sh perf-gate .*perf-gate$' "$REPO_ROOT/Makefile"
   grep -qE '^perf-gate: ## ' "$REPO_ROOT/Makefile"
+  # The recipe is the bare script: no env knob, no flag, no "|| true".
+  [ "$(awk '/^perf-gate:/ { on = 1; next } on && /^\t/ { print; next } on { exit }' "$REPO_ROOT/Makefile")" \
+    = "$(printf '\t@echo "═══ Performance gate ═══"\n\t@scripts/perf-gate.sh')" ]
+  grep -qxF "$(printf '\t@scripts/gate-timed.sh perf-gate $(MAKE) --no-print-directory perf-gate')" "$REPO_ROOT/Makefile"
   head -1 "$GATE" | grep -qx '#!/bin/bash'
   head -1 "$TIMER" | grep -qx '#!/usr/bin/perl'
   /usr/bin/perl -c "$TIMER"

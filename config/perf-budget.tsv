@@ -35,3 +35,6 @@ PERF_GATE_PATH=scripts/perf-gate.pl
 # an allow line that the base already has.
 # A row removed from this file needs an allow line too. An allow line that
 # names no command is an error.
+# A PR that changes scripts/perf-gate.sh or scripts/perf-gate.pl changes its
+# own judge. It needs the line PERF_GATE_ALLOW=perf-gate:<reason>.
+PERF_GATE_ALLOW=perf-gate:harden the gate after the final review of PR 561 (base row wins, clean base checkout, exit 2 on setup errors)

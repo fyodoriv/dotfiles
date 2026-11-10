@@ -10,8 +10,8 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 
 | Job | Runner | What it does |
 |-----|--------|-------------|
-| **lint** | ubuntu-latest | `make lint` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-latest | `make check` -- the local gate; then `make test-all` (full bats suite) when the run is not a pull request |
+| **lint** | ubuntu-latest | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
+| **test** | macos-latest | `make check` -- the local gate; then `make test-all` (full bats suite) on a manual run only, until task `full-suite-bats-argument-compatibility` lands |
 | **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (never on a pull request) |
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan |
 | **coverage** | ubuntu-latest | `bin/dotfiles-coverage` + bats -- shell coverage report artifact |
@@ -19,10 +19,11 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 ### Cost, limits, and what stays local
 
 - **Cost: zero.** Standard GitHub-hosted runners are free and unlimited for public repositories, macOS included ([GitHub docs](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)). Never switch a job to a larger runner: those are billed.
-- **Limits on the free plan** ([GitHub docs](https://docs.github.com/en/actions/reference/limits)): 20 jobs at a time, of which 5 on macOS; 6 hours per job; 10 GB of cache per repository. A pull request uses two macOS jobs (`test`, `audit`). A new push to a pull request cancels its older run.
+- **Limits on the free plan** ([GitHub docs](https://docs.github.com/en/actions/reference/limits)): 20 jobs at a time, of which 5 on macOS; 6 hours per job; 10 GB of cache per repository. A pull request uses two macOS jobs (`test`, `audit`). A new push to a pull request cancels its older `ci.yml` run.
 - **No secrets.** No workflow reads a secret. A pull request from a fork gets a read-only token.
 - **Leak gates stay local.** The private-pattern file lives only on the owner's machine and is never uploaded. A hosted runner cannot run that gate, so the pre-commit hook, the pre-push hook, and `bin/gh` stay the authority ([privacy-gates.md](privacy-gates.md)). No step prints the environment.
 - **Actions are pinned.** Every `uses:` names a full commit SHA, and only GitHub-owned actions are used. `tests/github-workflows.bats` enforces this. Dependabot proposes the SHA updates.
+- **Also armed when Actions is on**: `brew-audit.yml` runs on the 1st of each month and may open a public issue. `release.yml` creates a GitHub release when a `v*` tag is pushed.
 - **Local only**: the leak gates above, and anything that needs `sudo` or a login session.
 - **Turn it off**: `gh api -X PUT repos/fyodoriv/dotfiles/actions/permissions -F enabled=false`. `make check` is then the only gate again.
 

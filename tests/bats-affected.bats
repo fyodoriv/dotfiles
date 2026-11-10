@@ -410,6 +410,12 @@ assert_affected_includes() {
   assert_affected_includes ".github/workflows/ci.yml" "tasks-lint"
 }
 
+@test "any workflow change triggers the workflow safety tests" {
+  assert_affected_includes ".github/workflows/ci.yml" "github-workflows"
+  echo '# release workflow' > "$TEST_REPO/.github/workflows/release.yml"
+  assert_affected_includes ".github/workflows/release.yml" "github-workflows"
+}
+
 @test "Makefile changes trigger task lint focused tests" {
   assert_affected_includes "Makefile" "tasks-lint"
 }

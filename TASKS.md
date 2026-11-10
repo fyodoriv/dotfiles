@@ -371,20 +371,6 @@ them. -->
   - **Anchor**: PR #562 push block on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — correctness of an existing privacy gate, not a scorecard metric.
 
-- [ ] Make the perf gate cache test hold its lock before it goes on
-  - **ID**: perf-gate-cache-test-holder-race
-  - **Tags**: tests, reliability, perf-gate
-  - **Details**: On 2026-11-10 `heavy-run make check` failed once on a PR that did not change the gate code: `tests/perf-gate.bats` test 24 ("the base checkout is cached by commit, two are kept, and one in use is not removed"), line 386, `[ -d "$CACHE/$first" ]  # in use: kept`. The Mac was under memory pressure (heavy-run paused the run twice). Suspected cause, not proven: the test starts a perl process that takes a shared lock, and waits at most 2 seconds for its "held" line. When the holder starts later than that, the gate sees no lock and removes the checkout. The test goes on without a check that the lock is held.
-  - **Files**: `tests/perf-gate.bats`.
-  - **Output**: code
-  - **Acceptance**: the test fails with a clear message (or waits longer) when the holder did not report "held"; it passes 20 of 20 times with `stress`-style load from 10 parallel bats jobs.
-  - **Hypothesis**: a checked wait for the holder moves the failure rate of test 24 under load from 1 known failure to 0 of 20 runs.
-  - **Measurement**: `for i in $(seq 20); do bats -f 'cached by commit' tests/perf-gate.bats || echo FAIL; done` while a second shell runs `bats tests/telemetry.bats` with ten parallel jobs.
-  - **Success**: 0 FAIL lines in 20 runs.
-  - **Pivot**: if it still fails with the holder confirmed, the gate's pruning has a real race; fix `scripts/perf-gate.pl`, not the test.
-  - **Anchor**: Luo, Hariri, Eloussi and Marinov (2014), An Empirical Analysis of Flaky Tests.
-  - **Competitive-goal**: none — stability of an existing gate test, not a scorecard metric.
-
 - [ ] Cap the telemetry command log for root and for a machine without jq
   - **ID**: telemetry-commands-log-cap-without-jq-or-as-root
   - **Tags**: telemetry, reliability
@@ -426,34 +412,6 @@ them. -->
   - **Pivot**: if one item needs a design change (for example a root-owned "no" file), split it into its own task and ship the other four.
   - **Anchor**: review of PR #567 on 2026-11-10; Fagan (1976), Design and code inspections to reduce errors in program development.
   - **Competitive-goal**: none — correctness of an existing feature, not a scorecard metric.
-
-- [ ] Give the perf gate the two-rule estimator that agentbrew uses
-  - **ID**: perf-gate-paired-median-parity
-  - **Tags**: perf-gate, reliability
-  - **Details**: The agentbrew gate (PR fyodoriv/agentbrew#927) reports "slower" only when two rules agree: the minimum rule and a paired-median rule. Under load that cut false alarms from 2 in 20 runs to 0 in 20 runs, and it still caught 20 of 20 seeded slowdowns. That gate also prints JSON when a stale allow line stops it, and it shows the verdict `over-ceiling-at-base`. The dotfiles gate (`scripts/perf-gate.pl`) still uses the minimum rule alone. Under memory pressure it gave two false "slower" results in its own tests. Port the estimator and the two output items. This task is not the same as `perf-gate-cache-test-holder-race`: that task is about the lock in one cache test, and this one is about the timing verdict.
-  - **Files**: `scripts/perf-gate.pl`, `tests/perf-gate.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: failing tests first: a fixture where only the minimum rule fires gives "ok"; a fixture where both rules fire gives "slower". A stale allow line with JSON output on gives valid JSON and a non-zero exit. A command over its ceiling on the base too shows `over-ceiling-at-base`.
-  - **Hypothesis**: the two-rule estimator moves false "slower" verdicts on an unchanged tree under load from 2 known cases to 0 in 20 runs, while 20 of 20 seeded slowdowns of 25% are still caught.
-  - **Measurement**: 20 clean runs and 20 seeded runs of `heavy-run make perf-gate` in a normal slot (not `--exclusive`) while a second `heavy-run make check` holds another slot; count the "slower" verdicts in each set.
-  - **Success**: 0 "slower" in the 20 clean runs and 20 "slower" in the 20 seeded runs.
-  - **Pivot**: 1 or more false alarm in the clean set, or fewer than 19 caught in the seeded set -> do not port the estimator as is; measure the noise source first (paired order, warmups).
-  - **Anchor**: PR fyodoriv/agentbrew#927 (2 in 20 to 0 in 20); Kalibera and Jones (2013), Rigorous benchmarking in reasonable time.
-  - **Competitive-goal**: none — trust in an existing gate, not a scorecard metric.
-
-- [ ] Prune old perf gate cache folders that have no `.ready` marker
-  - **ID**: perf-gate-prune-unmarked-cache-folders
-  - **Tags**: perf-gate, cleanup
-  - **Details**: `scripts/perf-gate.pl` removes an old base checkout only when its `<sha>.ready` marker says the gate built it. A folder from before the marker existed has none. The gate never prunes it, and it prints "left ... alone: the gate did not build it" on every run. Idea: prune an unmarked folder when three things hold. Its name is 40 hex characters. `git worktree list` names it as a worktree of this repo. It is older than 7 days. Any other unmarked folder stays, with the note.
-  - **Files**: `scripts/perf-gate.pl`, `tests/perf-gate.bats`, `docs/observability.md`.
-  - **Output**: code
-  - **Acceptance**: failing tests first: an unmarked, registered, 8-day-old 40-hex folder is removed and no note is printed; the same folder at 6 days stays; an unmarked folder that is not a registered worktree stays at any age; a folder in use (lock held) stays.
-  - **Hypothesis**: the prune rule moves the note count on a run with one old unmarked folder from 1 to 0, with 0 removed folders that the gate cannot prove are its own.
-  - **Measurement**: `bats -f 'unmarked' tests/perf-gate.bats`, with the four new cases.
-  - **Success**: all four cases pass; every older cache test passes.
-  - **Pivot**: if a registered worktree check cannot tell a gate checkout from a user worktree, drop the prune and print the note once per day instead.
-  - **Anchor**: gate output on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — disk use and quiet output of an existing gate, not a scorecard metric.
 
 ## P3
 

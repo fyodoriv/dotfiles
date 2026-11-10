@@ -47,6 +47,18 @@ tool() {
 # sleeps less than at the base (50 ms against 100 ms by default).
 quicker() { tool "${1:-0.05}"; }
 
+# wait_for_holder <file> [tries]: wait until the lock holder wrote "held" to
+# the file (5 tries a second, 30 s by default). Fails with a clear message when
+# it did not, so a test never goes on without the lock.
+wait_for_holder() {
+  local n=0
+  until [ -s "$1" ]; do
+    n=$((n + 1))
+    [ "$n" -le "${2:-150}" ] || { echo "the lock holder did not report 'held' in time: the test cannot go on"; return 1; }
+    sleep 0.2
+  done
+}
+
 # budget <line>...: write the fixture budget file: the path list, then these lines.
 budget() {
   {
@@ -79,6 +91,7 @@ gate() {
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool got slower"* ]]
+  [[ "$output" == *"paired runs: +"* ]]
   [[ "$output" == *"perf gate: FAIL"* ]]
   [[ "$output" == *"Make the command faster"* ]]
   [[ "$output" == *"PERF_GATE_ALLOW=<name>:<reason>"* ]]
@@ -103,10 +116,62 @@ gate() {
 }
 
 @test "perf gate fails when the command is over its ceiling" {
-  budget 'tool	50	./tool.sh'
+  # 100 ms at the base, 400 ms here, ceiling 250 ms: wide margins on both sides.
+  tool 0.40
+  budget 'tool	250	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool is over its ceiling"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*over-ceiling$'\n' ]]
+}
+
+@test "a command over its ceiling at the base too is over-ceiling-at-base, not a failure" {
+  # 100 ms at the base and 80 ms here, with a ceiling of 50 ms: this tree did not cause it.
+  quicker 0.08
+  budget 'tool	50	./tool.sh'
+  gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool is over its ceiling"*"but so is the base"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*over-ceiling-at-base ]]
+  [[ "$output" == *"perf gate: pass (1 commands"*"; 1 over its ceiling at the base too)"* ]]
+
+  run bash -c 'cd "$1" && "$2" --json 2>/dev/null' _ "$FIX" "$GATE"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.ok == true and .over_ceiling_at_base == 1 and .problems == []
+    and (.commands[0] | .verdict == "over-ceiling-at-base" and .over_ceiling_at_base == true)'
+}
+
+@test "an allow line does not lift the ceiling when the base is over it too" {
+  # 100 ms at the base, 600 ms here, ceiling 50 ms. The allow line covers the
+  # slowdown rule only: the ceiling still fails this tree.
+  tool 0.60
+  budget 'tool	50	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
+  gate
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"perf gate: tool is over its ceiling: "* ]]
+  [[ "$output" != *"Not counted against this tree"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*over-ceiling$'\n' ]]
+}
+
+@test "slower by the fastest runs only is load noise: the paired runs must agree" {
+  # The base tool takes 200 ms in one timed run only (its second run) and
+  # 300 ms in every other run. The head tool always takes 300 ms. So the
+  # minimums differ by 50%, but run for run the two trees are equal. The limit
+  # for the paired runs is 20 ms (10% of 200 ms). Seven runs: the median of
+  # seven pairs holds when load hits some of them.
+  cat > "$FIX/tool.sh" <<TOOL
+#!/bin/bash
+n=\$((\$(cat "$TEST_DIR/count" 2>/dev/null || echo 0) + 1))
+echo "\$n" > "$TEST_DIR/count"
+if [ "\$n" = 2 ]; then sleep 0.20; else sleep 0.30; fi
+TOOL
+  merge "a base with one fast run"
+  tool 0.30
+  PERF_GATE_RUNS=7 gate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool: the fastest runs differ by +"*"but the paired runs do not"*"load noise, not a slowdown"* ]]
+  [[ "$output" =~ tool[[:space:]]+base.*head.*ok ]]
+  [[ "$output" == *"perf gate: pass"* ]]
 }
 
 @test "a command that fails in this tree is a setup error" {
@@ -143,7 +208,9 @@ gate() {
   [ "$status" -eq 1 ]
   echo "$output" | jq -e '.skipped == false and .ok == false and (.base | length == 40)
     and .base_ref == "main" and (.base_ref_date | test("^20[0-9-]+$"))
-    and .limit_ratio == 1.10 and .limit_ms == 3
+    and .limit_ratio == 1.10 and .limit_ms == 3 and .estimator == "min-and-paired-median"
+    and (.problems | length == 1) and (.problems[0] | test("tool got slower"))
+    and .commands[0].paired_delta_ms > 50 and .commands[0].over_ceiling_at_base == false
     and (.commands | length == 1)
     and (.commands[0] | .name == "tool" and .verdict == "slower" and .base_min >= 100
       and .head_min >= 200 and .ratio > 1.1 and .ceiling_ms == 2000)'
@@ -342,6 +409,97 @@ gate() {
   [ "$(cat "$CACHE/$a/mine.txt")" = keep ]
 }
 
+# old_unmarked <days>: an old gate checkout from before the marker existed: a
+# registered worktree at <cache>/<commit>, no .ready file, that many days old.
+# A second, new folder is there too, because the prune keeps the newest one.
+# Sets OLD to the path.
+old_unmarked() {
+  local sha
+  sha="$(git -C "$FIX" rev-parse main)"
+  quicker 0.07
+  merge "the base moves on"
+  mkdir -p "$CACHE/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  OLD="$CACHE/$sha"
+  git -C "$FIX" worktree add -q --detach "$OLD" "$sha"
+  /usr/bin/perl -e 'my $t = time - $ARGV[0] * 86400; utime($t, $t, $ARGV[1]) or die' "$1" "$OLD"
+  quicker 0.04
+}
+
+@test "an unmarked folder that is a registered worktree and 8 days old is pruned, with no note" {
+  old_unmarked 8
+  gate
+  [ "$status" -eq 0 ]
+  [ ! -e "$OLD" ]
+  [[ "$output" != *"left $OLD alone"* ]]
+  ! git -C "$FIX" worktree list --porcelain | grep -qF "$OLD"
+}
+
+@test "an unmarked folder that is a registered worktree but 6 days old stays" {
+  old_unmarked 6
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked folder that is not a registered worktree stays at any age" {
+  old_unmarked 8
+  git -C "$FIX" worktree remove --force "$OLD"
+  mkdir -p "$OLD"
+  echo keep > "$OLD/mine.txt"
+  /usr/bin/perl -e 'my $t = time - 400 * 86400; utime($t, $t, $ARGV[0]) or die' "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ "$(cat "$OLD/mine.txt")" = keep ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+# age <days> <path>: set the folder's time that many days back.
+age() {
+  /usr/bin/perl -e 'my $t = time - $ARGV[0] * 86400; utime($t, $t, $ARGV[1]) or die' "$1" "$2"
+}
+
+@test "an unmarked old worktree with uncommitted work stays" {
+  old_unmarked 8
+  echo mine > "$OLD/notes.txt"
+  age 8 "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ "$(cat "$OLD/notes.txt")" = mine ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked old worktree on a branch stays" {
+  old_unmarked 8
+  git -C "$OLD" checkout -q -b my-work
+  age 8 "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked old worktree at another commit than its name stays" {
+  old_unmarked 8
+  git -C "$OLD" checkout -q --detach main
+  age 8 "$OLD"
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+  [[ "$output" == *"left $OLD alone"* ]]
+}
+
+@test "an unmarked old folder that another gate uses stays" {
+  old_unmarked 8
+  /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH) or die; $| = 1; print "held\n"; sleep 60' \
+    "$OLD.use" > "$TEST_DIR/holder.out" &
+  HOLDER=$!
+  wait_for_holder "$TEST_DIR/holder.out"
+  gate
+  [ "$status" -eq 0 ]
+  [ -x "$OLD/tool.sh" ]
+}
+
 @test "a cache path with a space still prunes old checkouts" {
   export XDG_CACHE_HOME="$TEST_DIR/my cache"
   local spaced="$XDG_CACHE_HOME/dotfiles/perf-gate.noindex" first
@@ -369,10 +527,10 @@ gate() {
   [ -x "$CACHE/$first/tool.sh" ]
 
   # Another gate still times in the first checkout: it holds the shared lock.
-  /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH); print "held\n"; sleep 60' \
+  /usr/bin/perl -e 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_SH) or die; $| = 1; print "held\n"; sleep 60' \
     "$CACHE/$first.use" > "$TEST_DIR/holder.out" &
   HOLDER=$!
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$TEST_DIR/holder.out" ] && break; sleep 0.2; done
+  wait_for_holder "$TEST_DIR/holder.out"
 
   for n in 2 3; do
     merge "step $n"
@@ -395,6 +553,17 @@ gate() {
   [ ! -e "$CACHE/$first" ] && [ ! -e "$CACHE/$first.use" ]
   [ ! -e "$CACHE/$second" ]
   [ -d "$CACHE/$third" ] && [ -d "$CACHE/$(git -C "$FIX" rev-parse main)" ]
+}
+
+@test "a test stops with a clear message when the lock holder never reports" {
+  : > "$TEST_DIR/holder.out"
+  run wait_for_holder "$TEST_DIR/holder.out" 2
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"the lock holder did not report 'held' in time"* ]]
+
+  echo held > "$TEST_DIR/holder.out"
+  run wait_for_holder "$TEST_DIR/holder.out" 2
+  [ "$status" -eq 0 ]
 }
 
 @test "perf gate never prunes worktrees that are not its own" {
@@ -509,6 +678,12 @@ gate() {
   [[ "$output" != *" ms "* ]]
   [[ "$output" != *"perf gate: FAIL"* ]]
 
+  # With --json a stale line still gives JSON on stdout.
+  run bash -c 'cd "$1" && "$2" --json 2>/dev/null' _ "$FIX" "$GATE"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.skipped == false and .ok == false and (.problems | length == 1)
+    and (.problems[0] | test("^stale allow line: remove this line from config/perf-budget.tsv: PERF_GATE_ALLOW=tool:"))'
+
   # A line counts again when its reason is this PR's own: name plus reason differ from the base.
   budget 'tool	2000	./tool.sh' 'PERF_GATE_ALLOW=tool:slower again, for the new index'
   gate
@@ -517,8 +692,8 @@ gate() {
 }
 
 @test "an allow line does not lift the ceiling" {
-  tool 0.20
-  budget 'tool	50	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
+  tool 0.40
+  budget 'tool	250	./tool.sh' 'PERF_GATE_ALLOW=tool:on purpose'
   gate
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool is over its ceiling"* ]]

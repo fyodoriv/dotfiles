@@ -530,10 +530,13 @@ extras_plan() {
 # hard limit: after ZSH_LIMIT seconds it is stopped with its child processes
 # and gives nothing. Never fails. Only extras_body calls it, so only a send
 # or a dry run that has a gains event to build pays for it.
+# SIGKILL, not SIGTERM: an interactive zsh ignores SIGTERM. The parent goes
+# first, so it cannot start a new child after the list is read.
 kill_tree() {
-  local child
-  for child in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$child"; done
-  kill "$1" 2>/dev/null
+  local child children
+  children="$(pgrep -P "$1" 2>/dev/null)"
+  kill -KILL "$1" 2>/dev/null
+  for child in $children; do kill_tree "$child"; done
 }
 shell_start_now() {
   local out="$STATE.zsh.$$" pid ticks=0 ms=""
@@ -741,10 +744,14 @@ send_extras() {
   started="$SECONDS"
   body="$(extras_body "$KEY")"
   [ -n "$body" ] || return 0
+  # The measurement took time: an off given meanwhile stops this request.
+  load_state
+  [ "$S_CONSENT" = "yes" ] || { STOPPED_WHY="turned off during the send"; return 0; }
   if [ "$DEADLINE" -gt 0 ]; then
     DEADLINE=$((DEADLINE + SECONDS - started))
     left=$((DEADLINE - SECONDS))
     [ "$timeout" -le "$left" ] || timeout="$left"
+    [ "$timeout" -ge 1 ] || timeout=1
   fi
   code="$(printf '%s' "$body" | post "$timeout")"
   if [[ ! "$code" =~ ^2[0-9][0-9]$ ]]; then

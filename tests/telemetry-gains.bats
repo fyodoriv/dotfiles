@@ -43,12 +43,13 @@ SH
 #!/bin/bash
 echo start >>"$TEST_DIR/zsh.log"
 echo "\$\$" >"$TEST_DIR/zsh.pid"
+[ -z "\${FAKE_ZSH_DEAF:-}" ] || trap '' TERM
 [ -z "\${FAKE_ZSH_SLEEP:-}" ] || exec sleep "\$FAKE_ZSH_SLEEP"
 exit "\${FAKE_ZSH_EXIT:-0}"
 SH
   chmod +x "$TEST_DIR/bin/zsh"
   export PATH="$TEST_DIR/bin:$PATH" DOTFILES_BASELINE_ZSH_RUNS=1
-  unset FAKE_ZSH_SLEEP FAKE_ZSH_EXIT
+  unset FAKE_ZSH_SLEEP FAKE_ZSH_EXIT FAKE_ZSH_DEAF
 }
 refute() { if "$@" 2>/dev/null; then return 1; fi; }
 zsh_starts() { if [ -f "$TEST_DIR/zsh.log" ]; then wc -l <"$TEST_DIR/zsh.log" | tr -d ' '; else echo 0; fi; }
@@ -138,6 +139,28 @@ dry_events() {
   [ "$(zsh_starts)" = "2" ]
   # It is the helper of the install receipt (lib/mac-baseline.sh).
   grep -q 'baseline_zsh_ms' "$TEL"
+}
+
+@test "a hung zsh that ignores SIGTERM, like a real interactive zsh, is still stopped" {
+  receipt
+  say_yes
+  FAKE_ZSH_DEAF=1 FAKE_ZSH_SLEEP=90 run bash "$TEL" send
+  refute kill -0 "$(cat "$TEST_DIR/zsh.pid")"
+  [[ "$output" == *"sent 2 event(s)"* ]] || { echo "$output"; return 1; }
+}
+
+@test "telemetry off during the shell start measurement stops the send" {
+  receipt
+  say_yes
+  # The fake zsh records a no while the send measures it.
+  cat >"$TEST_DIR/bin/zsh" <<SH
+#!/bin/bash
+bash "$TEL" off >/dev/null 2>&1
+exit 0
+SH
+  run bash "$TEL" send
+  [ "$(sent_events dotfiles.gains | jq length)" = "0" ] || { cat "$FAKE_LOG"; return 1; }
+  [ "$(sent_events dotfiles.install | jq length)" = "0" ] || { cat "$FAKE_LOG"; return 1; }
 }
 
 @test "a zsh that fails or takes over 5 seconds leaves zsh_ms_now out; the send still works" {

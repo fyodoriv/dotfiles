@@ -91,7 +91,8 @@ lint-tasks-rule9: ## Fail when P0/P1 tasks lack the 5 rule-9 fields
 # dotfiles-profile.bats) share chezmoi state and would corrupt each other
 # under concurrent execution. Slow files that ARE safe to parallelize opt
 # in by setting `unset BATS_NO_PARALLELIZE_WITHIN_FILE` in their setup_file().
-# The doctor file runs alone after its peer files.
+# The doctor file runs alone after its peer files. So do the heavy-run and
+# perf-gate files: they time real sleeps, and busy peers add noise.
 JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # bats --jobs needs GNU parallel. The core Brewfile does not install it, so
 # without `parallel` on PATH the test targets run bats serially (slower, same
@@ -133,8 +134,8 @@ test: ## Run affected tests only (skips tests that passed with the same inputs)
 	else \
 	  count=$$(echo "$$affected" | wc -l | tr -d ' '); \
 	  echo "═══ Tests: $$count affected file(s) ($(JOBS_LABEL)) ═══"; \
-	  peers=$$(printf '%s\n' "$$affected" | grep -vxF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" -e tests/heavy-run.bats -e "$(CURDIR)/tests/heavy-run.bats" || true); \
-	  queue_test=$$(printf '%s\n' "$$affected" | grep -xF -e tests/heavy-run.bats -e "$(CURDIR)/tests/heavy-run.bats" || true); \
+	  peers=$$(printf '%s\n' "$$affected" | grep -vxF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" -e tests/heavy-run.bats -e "$(CURDIR)/tests/heavy-run.bats" -e tests/perf-gate.bats -e "$(CURDIR)/tests/perf-gate.bats" || true); \
+	  queue_test=$$(printf '%s\n' "$$affected" | grep -xF -e tests/heavy-run.bats -e "$(CURDIR)/tests/heavy-run.bats" -e tests/perf-gate.bats -e "$(CURDIR)/tests/perf-gate.bats" || true); \
 	  doctor=$$(printf '%s\n' "$$affected" | grep -xF -e tests/doctor.bats -e "$(CURDIR)/tests/doctor.bats" || true); \
 	  result=0; \
 	  if [ -n "$$peers" ]; then \

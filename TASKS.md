@@ -228,427 +228,78 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
-- [ ] Account for every executable before Rust migration
+- [ ] Cut the dotfiles hook wait on every agent Bash call by half
+  - **ID**: rust-agent-hooks
+  - **Tags**: migration, rust, performance
+  - **Mode**: AFK
+  - **Details**: Step 1 of the [Rust migration](docs/plans/rust-migration.md). Porting stays paused until the owner starts it. `agent-hooks/require-heavy-run.sh` and `agent-hooks/block-dangerous-git.sh` run on each agent Bash call and start Perl, `shfmt` or `jq`. First prove 20 A/A runs of the gate (base and head at the same commit) with 0 failures and commit the absolute baseline of both rows. The gate compares minimums only, so a failed A/A is a real risk. A port PR must not change a row's command path. If the PR adds Rust code, it also adds the cargo step to the Makefile, and `make check` must build Rust only when `rust/` changed. Then weigh a shell fast path that exits before any interpreter start for a command that cannot match. Port a hook to Rust only when the fast path misses the number. Keep every deny, allow and unknown verdict. The [agent-hook source receipt](docs/plans/agent-hook-source-receipt.md) lists the source boundaries.
+  - **Output**: code
+  - **Acceptance**: Gate G in the plan. The affected Bats tests pass with 0 changed verdicts. Hostile heredocs, substitutions and absent tools keep their result. The old script stays until rollback is proven. A Rust binary opens the deferred native delivery step first.
+  - **Hypothesis**: Removing the per-call interpreter starts cuts the fastest run of each of the two hook rows by at least 50% against the merge-base, with 100% verdict parity and 0 new false permits.
+  - **Measurement**: `scripts/perf-gate.sh --force --json` (rows `hook-require-heavy-run` and `hook-block-dangerous-git`) and `bin/bats-affected origin/feat/chezmoi | xargs heavy-run bats`; for peak RSS, the peak RSS command in the plan's "Commands that run today" (median of 15 runs of `/usr/bin/time -l` on the row's command), once at the base and once at the head.
+  - **Success**: 20 of 20 A/A runs pass first; `ratio` at most 0.50 for both rows; affected tests 100% green; R_M (candidate median peak RSS / baseline median) at most 1.10 after an A/A ratio from 0.95 to 1.05.
+  - **Pivot**: 1 or more A/A failures in 20 runs -> stop before any hook change; the result is inconclusive until task `perf-gate-paired-median-parity` lands or the run conditions are fixed, and the thresholds stay. `ratio` above 0.80 for a hook after the fast path and one port attempt -> abandon that hook's port and add it as a recorded exception row in the plan with its measured number. Any new false permit -> stop and change the parser boundary, never an allow rule.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
+  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
+
+- [ ] Cut the background cost of app-priority to under half a second per run
+  - **ID**: rust-app-priority
+  - **Tags**: migration, rust, performance
+  - **Mode**: AFK
+  - **Details**: Step 2 of the [Rust migration](docs/plans/rust-migration.md). Porting stays paused until the owner starts it. The `app-priority` LaunchAgent runs every 60 seconds. The window command gave a mean of 1,560 ms over 9,674 runs for the 7 days to 2026-11-10 and 990 ms over 8,654 runs for the 7 days before. The two windows differ by 37%, so the logged mean is inconclusive today. The script calls `ps` once per process and walks parents one call at a time. `log_run` rounds to whole seconds, and about a quarter of the samples are 0. So the first PR only makes the number usable: log real milliseconds for this run. Then compare two before windows (`--argjson to 0` and `--argjson to 7`); they must differ by at most 20% of the larger. Commit the baseline from the command, not from this text. Only then read the process table in one `ps` pass. Port the scan to Rust only when that pass misses the number. Keep the same nice and QoS decisions for the same processes. Each window needs at least 1,000 runs.
+  - **Output**: code
+  - **Acceptance**: Gate G in the plan. `bats tests/app-priority.bats` passes with the same priority decisions on the same fixture process table. No process outside the owned rules changes priority.
+  - **Hypothesis**: One process-table pass cuts the 7-day mean `app-priority` run time to at most 400 ms and at most 40% of the lower of two before windows that agree within 20%, with identical priority decisions on the fixture table.
+  - **Measurement**: `jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl` for the last 7 days; `--argjson to 7` gives the 7 days before. On 2026-11-10 it printed a mean of 1560.47 (9,674 runs) and, with `to` 7, 990.41 (8,654 runs).
+  - **Success**: the two before windows differ by at most 20% of the larger; then the after window's mean is at most 400 ms and at most 40% of the lower before window, with at least 1,000 runs per window; 0 changed priority decisions in the Bats fixture.
+  - **Pivot**: the before windows still differ by more than 20% after the millisecond log has 14 days of runs -> the mean is not a usable measure; stop and add a budget row for a fixture process table instead. After mean above 80% of the lower before window after the single `ps` pass -> build the Rust scan with its own committed number. Above 80% after that too -> abandon the port, lengthen the run interval instead, and add the slice as a recorded exception row in the plan with its measured number.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
+  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
+
+- [ ] Find out where doctor, apply and sync time goes before any port
+  - **ID**: rust-cold-path-profile
+  - **Tags**: migration, rust, performance, measurement
+  - **Mode**: AFK
+  - **Details**: Step 3 of the [Rust migration](docs/plans/rust-migration.md). The validation review did not profile doctor probes, apply, sync, upgrade or the queue. They are recorded exceptions until a profile shows owned code is the cost. Time each command on fixtures in a scratch HOME with wall-clock spans around child calls. Split wall time into owned shell, git, network and child tools. Put the result next to the command's local p50. Write the table into the plan. Port nothing.
+  - **Output**: measurement
+  - **Acceptance**: The plan has one row per profiled command: local p50, share of wall time in owned code, and the decision (stays an exception, or reopens with a number). Every reopened slice gets its own task block with the rule-9 fields.
+  - **Hypothesis**: Owned shell code is under 50% of wall time in at least 80% of the profiled command families, so those stay recorded exceptions and no port starts on a guess.
+  - **Measurement**: `jq -s '[.[] | select(.command == "doctor") | .duration_ms] | sort | .[length / 2 | floor]' ~/.local/state/dotfiles/commands.jsonl` per command for the local p50 (it printed `null` on 2026-11-10; it prints `null` until the command has logged runs), and the span timings from the registered fixture run for the share.
+  - **Success**: 100% of the listed command families have a profile row and a decision in the plan.
+  - **Pivot**: If spans cannot separate child-tool time from owned time in 2 or more families -> record those families as "not separable" exceptions and stop; do not estimate.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
+  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
+
+- [ ] Account for every executable with a manifest and a thin validator adapter
   - **ID**: rust-source-inventory
   - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Deliver the component manifest and a thin pinned Rust adapter to agentbrew's inventory validator. Account for every owned executable, embedded interpreter, generated mapping, test and caller without duplicating the shared engine. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). The [reviewed source collection](docs/plans/rust-source-inventory.md) records the completed families and remaining coverage.
+  - **Mode**: AFK
+  - **Details**: Step 4 of the [Rust migration](docs/plans/rust-migration.md). Porting stays paused until the owner starts it. Deliver the component manifest and a thin pinned Rust adapter to agentbrew's small inventory validator. No full harness. Each owned executable gets one of five states: `ported`, `exception` (with its row in the plan), `frozen`, `grandfathered` (the fixture crates that shipped before gate G) or `out-of-scope` (UI presentation and shell that must stay shell). Embedded interpreters, extensionless tools and generated code must not escape. Pin the shared crate by git `rev` and vendor it, as the plan's cross-repo rule says. This step ports nothing, so only the parity and safety clauses of gate G apply to it. The [reviewed source collection](docs/plans/rust-source-inventory.md) records the completed families and remaining coverage.
   - **Output**: code
-  - **Blocked**: needs-agentbrew-inventory — the reusable validator in agentbrew task `rust-source-inventory` must be delivered before this adapter can pass. Source collection can proceed independently.
-  - **Acceptance**: Unclassified owned executable components 0; unexplained exceptions 0; every component has one owner and a measured slice or a precise permitted exception. The runnable validator rejects every planted embedded, extensionless and generated-code omission before any production replacement.
+  - **Blocked**: needs-agentbrew-inventory — the validator in agentbrew task `rust-source-inventory` must merge before the adapter check can pass. Source collection proceeds now. No other dotfiles step waits for agentbrew.
+  - **Acceptance**: Unclassified owned executable components 0; every component has one owner and one of the five states. The validator rejects every planted embedded, extensionless and generated-code omission. `cargo build --locked --offline` works from the vendored copy.
   - **Hypothesis**: A source-and-caller inventory makes unclassified owned executable components reach 0, including extensionless and embedded code, without changing runtime behavior.
-  - **Measurement**: `heavy-run cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- inventory --check` — proposed exact command delivered by this preparation task through the pinned shared validator; not currently available and not deferred to the dependent measurement-harness task.
-  - **Success**: Unclassified owned executable components 0; unexplained exceptions 0; every component has one owner and a measured slice or a precise permitted exception.
+  - **Measurement**: `heavy-run cargo build --locked --offline --release --manifest-path rust/Cargo.toml --bin migration-check && heavy-run rust/target/release/migration-check inventory --check` — runnable after the agentbrew inventory step merges and this adapter pins it, not before.
+  - **Success**: Unclassified owned executable components 0; unrecorded exceptions 0; every planted omission rejected; cold build at most 120 s.
   - **Pivot**: Any missed component or blanket exception changes the inventory method to execution/caller analysis before a replacement starts.
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
+  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
 
-- [ ] Measure each Rust step against a sealed baseline
-  - **ID**: rust-measurement-harness
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Thin pinned adapter to agentbrew's engine; fixture registry, sealed baselines, planted-fault controls. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). Register the queue domain before engine code: [probe measurement preparation](docs/plans/queue-probe-measurement-preparation.md), with a sealed 32-case policy/fault matrix and separate instrument/subject deadlines. Its commands remain proposed until the shared engine and pinned Rust adapter ship.
-  - **Output**: code
-  - **Blocked by**: rust-source-inventory
-  - **Blocked**: needs-agentbrew-harness — the shared measuring engine in agentbrew task `rust-measurement-harness` must be delivered before this adapter. See the cross-repo dependency in the linked plan.
-  - **Acceptance**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged. Queue controls have zero false-safe verdicts and zero invalid timing samples reported green; preserve explicit first/exclusive resource allowances and disabled-check policies.
-  - **Hypothesis**: The shared engine and thin adapter detect 100% of planted compatibility/safety/measurement faults before replacing production code.
-  - **Measurement**: Preparation delivers and proves `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- harness-selftest` and `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- baseline --slice all --seal`; these commands do not exist yet. Production replacement starts only after this preparation is merged.
-  - **Success**: Planted-fault detection 100%; invalid/missing/contaminated baselines rejected 100%; valid sealed unchanged baselines for every registered slice; production behavior unchanged. Zero false-safe verdicts and zero invalid timing samples reported green in the sealed queue cohort.
-  - **Pivot**: Any missed planted fault, accepted invalid baseline or private payload retention changes the measuring approach before porting production.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Install and roll back native tools without extra setup
-  - **ID**: rust-native-delivery
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Locked build/artifact integrity, atomic dispatch/install, supported Mac targets and rollback; bin/dotfiles-install, lifecycle scripts. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-measurement-harness
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-native-delivery --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Run bounded processes and locks through Rust
-  - **ID**: rust-process-primitives
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Locks, bounded child groups, timeouts and caching; lib/lock.sh, lib/run-with-timeout.sh, bin/cached-run. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-native-delivery
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-process-primitives --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Run the shared resource queue safely through Rust
-  - **ID**: rust-shared-queue
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: CPU/memory admission, inner-worker budgets, exclusive timings; bin/heavy-run, app-priority, headless detection. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). Start only after the current queue safety work lands and its admission/lifetime/privacy/exclusivity contract has independent proof.
-  - **Output**: code
-  - **Blocked by**: rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review. Queue over-admissions, memory-pressure admissions, forged nested bypasses, starvation and exclusive overlaps must be 0 in controlled traces; measure useful CPU/memory throughput and interactive latency, not only sleeping jobs. Isolate admission state to fixture workers and scrub inherited nesting markers while retaining the outer machine reservation and resource budget.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-shared-queue --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Discover repositories and select work through Rust
-  - **ID**: rust-repository-discovery
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Inventory/fingerprints, workspace status, affected selection and tasks; learn-repos tools, bats-affected, check-all, add-task. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-native-delivery
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-repository-discovery --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Keep action discovery and configuration working through Rust
-  - **ID**: rust-cli-core
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: CLI/action registry, config/profile/enterprise precedence, output; bin/dotfiles*, lib/output.sh. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-native-delivery
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-cli-core --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Preserve doctor discovery and repair results through Rust
-  - **ID**: rust-doctor-core
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Discovery, budgets, overrides, result/fix/recheck semantics; bin/dotfiles-doctor. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-core --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check shell and editor health through Rust
-  - **ID**: rust-doctor-shell-editors
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: shell, terminal, prompt, local-bin, editor, vscode, jetbrains module behavior. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-shell-editors --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check security, Git and SSH health through Rust
-  - **ID**: rust-doctor-security
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: security, git, ssh module denial/repair behavior. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-security --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check workspace and sync health through Rust
-  - **ID**: rust-doctor-workflow
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: chezmoi, sync, workflow, workspace, plugins, enterprise modules. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core, rust-repository-discovery
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-workflow --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check browser and resilience health through Rust
-  - **ID**: rust-doctor-browsers
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: agent-browser, chrome, resilience checks and safe repair. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core, rust-shared-queue
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-browsers --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check agent and memory readiness through Rust
-  - **ID**: rust-doctor-agents
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: agentbrew, claude, codex, memory, minsky adapters; owner APIs and readiness. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-agents --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check macOS and machine profiles through Rust
-  - **ID**: rust-doctor-macos
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: macos, personal-machine, home-theater profile checks. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-macos --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check local AI and toolchain health through Rust
-  - **ID**: rust-doctor-local-ai
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: local-ai, local-llm, tools, upgrade discovery and opt-out behavior. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-local-ai --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Check remaining supported apps through Rust
-  - **ID**: rust-doctor-apps
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: extras, obsidian and any later inventory-discovered supported modules. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-doctor-core
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-doctor-apps --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Apply and maintain packages and settings through Rust
-  - **ID**: rust-apply-install
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Defaults/apply, package/cask installers, signing/shims, upgrades/uninstall; .chezmoiscripts, macos*.sh, apply-state/apply-defaults. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-apply-install --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Validate and manage signed plugins through Rust
-  - **ID**: rust-plugin-trust
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Signed plugin pins, sandbox/capabilities and transactional lifecycle; bin/dotfiles-plugin, lib/plugin*. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-plugin-trust --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Run sync, services and power orchestration through Rust
-  - **ID**: rust-services-power
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Sync/reload/drift, wake/keepawake/Amphetamine, watchdog and notices; launchagents, tooling-sync. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-services-power --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Preserve public-write and damage guards through Rust
-  - **ID**: rust-git-security-guards
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Git/GitHub and agent hooks, leak/secret/private-ref scans, attribution, git-safe. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-git-security-guards --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Automate browsers and native events through Rust
-  - **ID**: rust-browser-native
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: CDP/tab leases, temp browser, Slack, profiles, native quit/Dock events; bin/agent-tab, lib/*.swift. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-process-primitives, rust-shared-queue
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-browser-native --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Run local AI agent and loop orchestration through Rust
-  - **ID**: rust-local-ai-runtime
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Agent/loop retry/verify/rollback/warmup logic; lib/local-ai-*.py, bin/local-ai-*. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-local-ai-runtime --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Preserve metrics and checkup results through Rust
-  - **ID**: rust-metrics-checkup
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Checkup Python processors/exporter, stats/proof/scorecard/telemetry; UI unchanged. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). The [checkup recorder consumer](docs/plans/checkup-read-consumer.md) tests the pinned native read guard before publisher integration.
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-metrics-checkup --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Capture PTYs and measure latency through Rust
-  - **ID**: rust-pty-tools
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: First fixture/observer measurement, then PTY capture/echo logic in separate measured steps. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-pty-tools --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Run remaining developer utilities through Rust
-  - **ID**: rust-developer-utilities
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Scaffolds, notes/timers, status, snapshots, cleanup, PR/review and remaining assigned commands. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-cli-core, rust-repository-discovery
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-developer-utilities --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Prove and port the Python-host TLS adapter through Rust
-  - **ID**: rust-python-host-extension
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: In-process TLS adapter feasibility, ABI/signing and opt-in policy; lib/python/dotfiles_tls_relax.py. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-native-delivery, rust-process-primitives
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review. Prove host ABI/signing feasibility first; the external Python host may remain, but owned implementation is Rust. Preserve the existing opt-in and TLS validation boundary; unresolved non-Rust executable glue prevents completion.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-python-host-extension --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Move owned non-UI tests and gate tools to Rust
-  - **ID**: rust-test-build-tooling
-  - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Non-UI tests, fake services, coverage/build/gates, .github tooling; preserve independent negative controls. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md). Run alongside domain ports; retire an old oracle only after the new independent tests detect the same planted faults.
-  - **Output**: code
-  - **Blocked by**: rust-measurement-harness
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review. Detect 100% of retained planted faults; remove no negative/failure case to achieve conversion.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future harness gate, delivered before replacement: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-test-build-tooling --samples 60`. Seal actual B and commit the numerical prediction before code. Existing affected tests and `heavy-run make check` remain guards.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
-- [ ] Prove complete conversion and retire superseded runtimes
+- [ ] Prove every owned executable has one of the five audit states
   - **ID**: rust-final-audit
   - **Tags**: migration, rust
-  - **Mode**: AFK implementation — record any unavailable owner-only live proof as a linked blocked HITL child before claiming the slice; see the plan.
-  - **Details**: Residual/source/generated/install audit, runtime retirement and whole-tool evidence. Plan and boundary/rollback contract: [Rust migration](docs/plans/rust-migration.md).
-  - **Output**: code
-  - **Blocked by**: rust-source-inventory, rust-measurement-harness, rust-native-delivery, rust-process-primitives, rust-shared-queue, rust-repository-discovery, rust-cli-core, rust-doctor-core, rust-doctor-shell-editors, rust-doctor-security, rust-doctor-workflow, rust-doctor-browsers, rust-doctor-agents, rust-doctor-macos, rust-doctor-local-ai, rust-doctor-apps, rust-apply-install, rust-plugin-trust, rust-services-power, rust-git-security-guards, rust-browser-native, rust-local-ai-runtime, rust-metrics-checkup, rust-pty-tools, rust-developer-utilities, rust-python-host-extension, rust-test-build-tooling
-  - **Acceptance**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B. Preserve this boundary's exact approved protocols, file effects, failure controls and owner scope; retain per-step evidence and independent review. Unexplained owned non-Rust non-UI/nonessential-shell components 0; temporary implementation adapters 0; narrow exception ledger complete. Frozen/unresolved residue prevents a full conversion claim.
-  - **Hypothesis**: Remove the legacy implementation for this boundary while preserving observable behavior and resource cost. Expected result: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Measurement**: Future gate: `heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- final-audit`; also `heavy-run make check` and the supported install/update/uninstall/rollback matrix. Compare each slice against its own sealed baseline; never substitute an aggregate benchmark.
-  - **Success**: G: approved behavior parity 100%; unauthorized writes, disclosures, false permits and orphaned owned processes 0; native-only success for converted owned logic 100%; upper 95% paired-CI execution-p95 and peak-RSS ratios <=1.10 versus sealed B.
-  - **Pivot**: Any behavior/safety failure stops rollout; resource upper bound >1.10 changes architecture or slice boundary before retry. Missing or inconclusive evidence leaves the task open and the old implementation active.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — native runtime independence; existing scorecard behavior is a guard and speed claims require separate evidence.
-
+  - **Mode**: AFK
+  - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) are a default adopted on 2026-11-10; the owner has not ruled on them. A slice that ended at its Pivot counts as `exception`. The audit claims "all measured hot paths ported". It never claims "all code is Rust".
+  - **Output**: measurement
+  - **Blocked by**: rust-agent-hooks, rust-app-priority, rust-cold-path-profile, rust-source-inventory
+  - **Blocked**: needs-owner — the owner rules on the defaults in the plan's "Decisions (2026-11-10)" and on the five audit states. The agentbrew task `rust-owner-rules-on-replan-defaults` (HITL) tracks that ruling for both plans.
+  - **Acceptance**: Every owned component in the manifest has one of the five states; `ported` has receipts and `exception` has a plan row. Every ported slice still meets its number on the current tree. No temporary bridge remains without a deletion condition.
+  - **Hypothesis**: Reconciling the manifest with the tree exposes every gap: 0 unrecorded owned components, and 100% of ported slices still at or under their registered number.
+  - **Measurement**: `heavy-run rust/target/release/migration-check inventory --check` (runnable after the inventory step merges), `scripts/perf-gate.sh --force --json` and `heavy-run make check`.
+  - **Success**: 0 unrecorded components; 100% of ported rows pass the gate; `heavy-run make check` green.
+  - **Pivot**: Any unrecorded component or failed ported row -> the migration stays open; fix that boundary. Do not change the goal to converted lines.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
+  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
 
 - [ ] Stop the pre-push leak check flagging a public github.com URL pattern as a private ssh host
   - **ID**: pre-push-ssh-host-false-alarm-escaped-regex

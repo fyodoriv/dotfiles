@@ -68,8 +68,9 @@ blob 2f6036c88c979bc5aa5f2fe0bf3fe4f766710c7c.
 - No reset, stash, deletion, commit or salvage rewrite in the old privacy
   worktree. Keep its useful staged work and frozen fixtures intact.
 - No session/history transfer, historical-record purge or unowned process kill.
-- No full queue language port or second benchmark framework. Use the existing
-  rust-shared-queue, rust-native-delivery and rust-measurement-harness tasks.
+- No full queue language port or second benchmark framework. Those slices are
+  [recorded exceptions](rust-migration.md#recorded-exceptions) and deferred
+  steps in the Rust plan; they have no task now.
 
 ## GET before IMPLEMENT
 

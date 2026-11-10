@@ -1,66 +1,108 @@
 # Measured Rust migration plan
 
+**Status (2026-11-10): porting stays paused until the owner starts it.**
+This plan was rewritten on 2026-11-10 after the
+[validation review](#validation-review-2026-11-09). No code is ported yet.
+The re-plan Pivot did not apply: gate G stays. A first independent review of
+this rewrite found five of the seven MUST findings only partly resolved. This
+revision applies its fixes. A second independent review on 2026-11-10 graded all
+seven findings resolved in both plans. The
+owner has not ruled on the defaults in
+[Decisions](#decisions-2026-11-10); the agentbrew task
+`rust-owner-rules-on-replan-defaults` tracks that. The measured hot paths
+(agent hooks and `app-priority`) now come first.
+
 ## Overall goal and vision
 
-Convert dotfiles-owned executable logic to Rust in small, measured steps. Keep
-UI code and necessary shell scripts in their current languages, as requested on
-2026-11-01. Preserve self-healing, one-command setup, privacy and agentbrew's
-ownership of generated agent configuration (VISION.md G1–G4; US01/03/05/06/08).
+Make the things users wait for faster, and prove it with numbers. Move
+dotfiles-owned executable logic to Rust only where a slice names a
+user-benefit metric. Keep UI code and necessary shell scripts in their
+current languages, as requested on 2026-11-01. Preserve self-healing,
+one-command setup, privacy and agentbrew's ownership of generated agent
+configuration (VISION.md G1–G4; US01/03/05/06/08).
 
-This plan adds tasks. It does not implement Rust or claim a speedup. Per-slice
-runtime, CPU, RSS and build baselines are **unmeasured**. Continue current queue
-and correctness fixes independently; consume their delivered behavior as the
-migration baseline. Use one behavior boundary per implementation PR.
+A slice with no measured user benefit is a
+[recorded exception](#recorded-exceptions). It reopens when field numbers
+and a profile show a gain. Runtime independence alone is not a reason to
+port. Current queue and correctness fixes continue on their own.
 
 ## Decision and alternatives
 
-Land instrumentation, then replace one owned implementation behind its existing
-command or protocol. Reuse maintained Rust libraries and external tools. Keep
-upstream chezmoi, Homebrew, Git, browser engines, Ollama and the memory service.
-Their owned adapters remain in scope.
+Replace one owned implementation per PR behind its existing command or
+protocol. Start with the code that runs most often. Weigh a cheaper fix
+first in every slice. Port to Rust only when the cheaper fix misses the
+pre-registered number.
 
-A single rewrite prevents attribution and risks losing failure cases. Permanent
-dual implementations double maintenance. Use temporary measured dispatch bridges
-with explicit deletion conditions and tested rollback instead.
+A single rewrite prevents attribution and risks losing failure cases.
+Porting every slice in dependency order put the hot paths late. Both are
+rejected. Permanent dual implementations double maintenance; a temporary
+bridge needs a deletion condition and a tested rollback.
 
-Agentbrew owns the reusable measurement engine and versioned receipt protocol.
-Dotfiles adds a thin Rust adapter pinned to an exact tested source revision.
-Do not duplicate that engine or depend on a sibling checkout's relative path.
+Two existing tools measure each slice:
+
+- **Performance gate:** `make perf-gate` times the rows of
+  `config/perf-budget.tsv` against the merge-base in the same run
+  ([details](../observability.md#performance-gate)).
+- **Local logs and field telemetry:** each `dotfiles` command and each
+  automation run writes one content-free line with `duration_ms`. Telemetry
+  sends it with `runtime` (`shell` now, `rust` after a port)
+  ([details](../observability.md#telemetry)). The owner's dashboard
+  ("Tooling performance: agentbrew + dotfiles", private since 2026-11-10)
+  shows p50 and p95 of `duration_ms` by command, version and runtime. It
+  is in the owner's PostHog project and needs a login. It cannot be
+  verified from the repository. A public link is to be added. The local
+  logs are the fallback.
 
 ## Evidence and current state
+
+Reviewed at revision `788d43d` on 2026-11-10.
 
 | Claim | Current source of truth / delivery | Status |
 |---|---|---|
 | The task backend is TASKS.md; make check is the local gate | Agentfile.yaml, AGENTS.md, Makefile | fact |
-| The reviewed revision has no Rust workspace | Tracked source at 1063ca76; Cargo manifest absent | fact |
+| Production code has no Rust; no `rust/Cargo.toml` and no `migration-check` binary exist | Tracked source | fact |
+| The Makefile has no cargo step | Makefile | fact |
+| Rust exists only as test fixture crates | `tests/fixtures/` (`checkup-read-consumer`, `compiler-queue-observer`, `connector-credentials`, `queue-privacy-cutover`) | fact |
+| Two agent hooks run on each agent Bash call and start Perl, `shfmt` or `jq` | agent-hooks/require-heavy-run.sh, agent-hooks/block-dangerous-git.sh | fact |
+| The performance gate tracks both hooks and three commands; it compares minimums only | config/perf-budget.tsv, scripts/perf-gate.sh | fact |
+| `app-priority` runs every 60 seconds and logs each run in whole seconds | launchagents/com.dotfiles.app-priority.plist.tmpl; `log_run app-priority` | fact |
+| `app-priority` mean run time: 1,560 ms over 9,674 runs in the last 7 days; 990 ms over 8,654 runs in the 7 days before; 926 ms over all logged runs | The window command below, run on 2026-11-10 | measured |
+| Commands and runs log `duration_ms`; telemetry adds `runtime` | lib/stats.sh; bin/dotfiles-telemetry | fact |
 | Shell embeds Perl/Python/Node; some programs lack an extension | bin/heavy-run, bin/agent-tab, bin/learn-repos-inventory, lib/ | fact |
-| Doctor discovers module entrypoints | bin/dotfiles-doctor, modules/*/doctor.sh | fact |
-| Dashboard UI and export processing are separate | skills/tooling-checkup/dashboard/index.html; skills/tooling-checkup/scripts/dashboard_export.py | fact |
-| Swift helpers contain native application-event logic | lib/quit-watcher.swift; lib/chrome-dock-guard.swift | fact |
-| Existing timings lack complete per-slice CPU/RSS data | scripts/gate-timed.sh; scripts/benchmark-run.sh; scripts/heavy-run-bench.sh | fact |
-| A shared Rust harness and incremental dispatch bridge | Preparation tasks below | proposed |
-| Native target/host-ABI matrix and baseline values | Inventory, installation contract and sealed receipts | verify |
+| Source collection covers several families | [source inventory](rust-source-inventory.md) | fact |
+| Where doctor, apply and sync time goes | Step 3 below | unmeasured |
+
+**Existing Rust code is grandfathered.** The fixture crates shipped before
+gate G existed. They are test fixtures, not ports. They stay with their
+tests and do not count as migrated slices. The manifest gives them the
+state `grandfathered`. A later change that makes Rust replace a production
+path must pass G.
 
 Read live source again when claiming a task. Newly merged behavior and newly
 discovered code enter the inventory; this dated snapshot is not a scope limit.
 
 ## Scope and exceptions
 
-- Migrate owned runtime, embedded code, extensionless tools, executable templates,
-  generators, hooks, native event logic, workflow helpers, non-UI tests and tooling.
-- Keep actual UI presentation/rendering assets. A directory named UI, dashboard
-  or browser, or a .swift suffix, does not justify an exception. Exporters and
-  CDP policy remain backend work. Classify UI-test glue by its responsibility.
-- Keep shell only when its execution context is required: sourced environment,
-  shell functions/completions, first bootstrap before a binary exists, or a tiny
-  external-protocol entrypoint. Move its business logic to Rust. Existing .sh
-  scripts and Bats test logic are not blanket exceptions.
-- Keep declarative YAML/JSON/plists, prompts, docs, data fixtures and lockfiles.
-  Inspect any template that generates executable code separately.
-- Keep upstream implementation upstream. Owned generators/adapters and generated
-  owned runtime still need inventory entries.
-- Preserve frozen support without fixes/features. Record conflicting residue as
-  unresolved; it cannot silently pass the final conversion audit.
+In scope: owned code on a measured hot path. Today that is the two agent
+hooks and `app-priority`.
+
+Out of scope until reopened: every slice in
+[Recorded exceptions](#recorded-exceptions).
+
+Never in scope (manifest state `out-of-scope`):
+
+- UI presentation and rendering assets. Exporters and CDP policy are backend
+  work, not UI.
+- Shell that must stay shell: sourced environment, shell functions and
+  completions, first bootstrap before a binary exists, or a tiny
+  external-protocol entrypoint. Move its business logic out when its slice
+  is ported.
+- Declarative YAML/JSON/plists, prompts, docs, data fixtures and lockfiles.
+- Upstream chezmoi, Homebrew, Git, browser engines, Ollama and the memory
+  service.
+
+Frozen agent support stays as it is. The manifest marks it `frozen`. It
+needs no port and no task.
 
 ## Boundary contracts and state lifetimes
 
@@ -75,155 +117,335 @@ documents creation, refresh, crash cleanup and deletion. Agentbrew remains the
 writer of generated agent config and semantic-memory lifecycle. Preserve privacy
 opt-ins and deduplication. Do not import, clone or sync conversation histories.
 
-The Python TLS adapter needs a feasibility proof for a Rust host extension.
-A standalone executable is not equivalent to an in-process import. The external
-Python host can remain; owned implementation must be Rust. Unsupported ABI or
-signing, or unavoidable executable non-Rust glue, remains an explicit unresolved
-scope decision. Never weaken TLS validation to complete the migration.
+Raw outputs stay private. Commit only content-free workload IDs, hashes,
+numeric results, validity fields and decisions. Never keep credentials, raw
+transcripts, private paths, memory payloads or customer data in fixtures or
+public receipts.
+
+### Cross-repo rule
+
+This is the one rule for both repositories. The other plan holds the same
+bullets, byte for byte.
+
+- Hot-path slices and source collection in dotfiles do not wait for
+  agentbrew. They use the dotfiles performance gate and local logs.
+- A dotfiles step that runs `migration-check inventory` waits until the
+  agentbrew task `rust-source-inventory` merges.
+- A dotfiles step that runs `migration-check compare` also waits until
+  agentbrew's deferred measurement runner merges. No other dotfiles step
+  waits.
+- Dotfiles pins the shared crate as a git dependency with an exact `rev`.
+  It commits `Cargo.lock` and a `cargo vendor` copy, with a
+  `.cargo/config.toml` source replacement. `cargo build --locked --offline`
+  then works with no network and no sibling checkout.
+- The vendored copy is a pinned snapshot of agentbrew's crate. Dotfiles
+  never edits it and never writes a second engine.
 
 ## Measurement contract
 
-These commands are **proposed preparation deliverables**, not existing tools.
-The inventory task first delivers the manifest and runnable inventory checker
-through a pinned adapter to agentbrew's reusable validator. It rejects planted
-embedded, extensionless and generated-code omissions. Source collection can run
-independently, but automated acceptance waits for that upstream validator.
-The dependent harness task delivers the remaining commands and proves them
-before a production replacement:
+### Commands that run today
+
+Each command below was started once on the owner's Mac on 2026-11-10. The
+text after each one says what it printed. One of them, the performance
+gate, did not finish; its text says so.
 
 ```sh
-heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- inventory --check
-heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- harness-selftest
-heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- baseline --slice all --seal
-heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- compare --slice rust-cli-core --samples 60
-heavy-run --exclusive cargo run --locked --release --manifest-path rust/Cargo.toml --bin migration-check -- final-audit
+scripts/perf-gate.sh --force --json
 ```
 
-Each slice seals an unchanged source/fixture/toolchain/cache/platform baseline B.
-Commit the actual numbers and numerical prediction **before implementation**.
-If measurement is missing, land instrumentation first and keep the port blocked.
-Queue wait, workload execution, external tools, build/install, cold startup and
-warm work are distinct measurements. Do not attribute one to another.
+**Result not verified here.** The run printed
+`perf gate: base ref origin/feat/chezmoi (last commit 2026-11-10), merge-base 788d43d5591a`.
+Then it waited for an exclusive slot in the shared `heavy-run` queue. It had
+printed no JSON when this revision was committed. The
+[gate docs](../observability.md#performance-gate) say `--json` prints
+`base_min` and `ratio` per row; this plan did not confirm that by a
+finished run. The task `rust-agent-hooks` runs the gate before any change.
 
-Use paired, order-balanced trials in isolated homes. Seal sample counts and the
-analysis recipe before trials. The default is 60 pairs per workload/cache
-condition with an upper 95% paired confidence bound for p95 execution time and
-peak RSS ratios. Pin the estimator, seed and resampling method in the harness;
-validate it with planted controls. Near-zero/unstable baselines require an
-absolute budget committed before replacement. Bounded retries are specified in
-advance. Keep unfavorable runs. Missing or contaminated data is inconclusive.
+```sh
+jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl
+```
 
-Record contract results, file mutations/modes, CPU, execution wall time, RSS with
-platform-correct units, process cleanup, native-only execution, artifact size
-and install/build cost. Observe the owned process group, not just its direct
-child. Resource-probe unknowns and contaminants are explicit validity fields.
+This is the **window command**. It printed
+`{"runs":9674,"mean":1560.47,"zeros":2562}` (mean shortened here) for the
+last 7 days. With `--argjson to 7` it printed
+`{"runs":8654,"mean":990.41,"zeros":3531}` for the 7 days before. `to` is
+the number of days back where the 7-day window ends. `zeros` counts runs
+that `log_run` rounded down to 0. `mean` is `null` for an empty window.
 
-**Common gate G:** approved contract parity is 100%; unauthorized writes,
-credential disclosures, false permits and orphaned owned processes are 0;
-converted owned logic passes 100% with its former implementation absent.
-Define R_T as candidate execution-p95 divided by baseline execution-p95, and
-R_M as candidate peak RSS divided by baseline peak RSS. Their upper 95% paired
-confidence bounds must each be <=1.10. This targets runtime independence, not a speed claim. A speed
-claim additionally needs a pre-registered p95 reduction of at least 10% with the
-same safety/memory guards. Commit numeric build/install budgets too; a faster
-hot path cannot hide slower installation or development.
+```sh
+jq -s '[.[] | select(.task == "app-priority") | .duration_ms] | add / length' ~/.dotfiles-stats.jsonl
+```
 
-Any safety/contract failure stops rollout. A resource bound above 1.10 changes
-architecture or slice boundary before retry. Inconclusive results keep the old
-implementation active and the task open. Never adjust thresholds after results.
-Queue proof measures real CPU/memory workload throughput, worker-budget safety
-and interactive latency; sleeping-job overlap alone does not prove capacity.
+It printed `926.47`: the mean over all logged runs, with no time window.
+Use it only as a sanity check, never as the 7-day number.
 
-The queue under test uses a separate per-fixture admission directory shared only
-by its fixture workers. Scrub inherited lease/nesting markers at that test
-boundary, as tests/heavy-run.bats already does for HEAVY_RUN_DIR and HEAVY_RUN_HELD.
-This prevents the outer exclusive reservation from causing a nested bypass or
-deadlock in the queue being measured. Keep the outer machine reservation and
-its worker/resource budget intact; synthetic state never authorizes extra real
-machine capacity. Never test by changing the live admission directory.
+```sh
+jq -s '[.[] | select(.command == "doctor") | .duration_ms] | sort | .[length / 2 | floor]' ~/.local/state/dotfiles/commands.jsonl
+```
 
-Raw outputs stay private. Commit only content-free workload IDs, hashes, numeric
-results, validity fields and decisions. Never retain credentials, raw transcripts,
-private paths, memory payloads or customer data in fixtures or public receipts.
-An independent reviewer checks the evidence and each keep/pivot decision.
+It printed `null`. The commands log on this Mac has a few lines and no
+`doctor` line yet. The command prints `null` until that command has logged
+runs; then it prints the local p50 in ms.
+
+```sh
+bin/bats-affected origin/feat/chezmoi
+```
+
+It printed one path, `tests/verify-counts.bats`, for this docs-only branch.
+A port branch pipes the list into Bats under the queue:
+`bin/bats-affected origin/feat/chezmoi | xargs heavy-run bats`. Those tests
+are the behavior oracle.
+
+```sh
+for i in $(seq 15); do printf '%s' '{"tool_input":{"command":"git status"},"cwd":"/tmp"}' | /usr/bin/time -l agent-hooks/require-heavy-run.sh 2>&1 >/dev/null | awk '/maximum resident set size/ {print $1}'; done | sort -n | sed -n 8p
+```
+
+It printed `4636672`: the median peak RSS in bytes of 15 runs of one hook
+row. This is the **peak RSS command**. Change the hook path to the row's
+command. The agent sandbox blocks `/usr/bin/time -l`; run it outside the
+sandbox.
+
+### Commands that run after the agentbrew inventory step merges
+
+`rust/Cargo.toml` and `migration-check` do not exist yet. These commands are
+**runnable after the agentbrew task `rust-source-inventory` merges** and the
+dotfiles adapter pins it. Until then no task may cite one as a command that
+runs now.
+
+```sh
+heavy-run cargo build --locked --offline --release --manifest-path rust/Cargo.toml --bin migration-check
+heavy-run rust/target/release/migration-check inventory --check
+```
+
+### Command that runs after the deferred measurement runner merges
+
+```sh
+heavy-run --exclusive rust/target/release/migration-check compare --slice <task ID> --pairs 30
+```
+
+No task builds the runner today (see
+[Deferred preparation steps](#deferred-preparation-steps)). It is agentbrew's
+to build. No task may cite `compare` until a reopened slice opens that step
+and it merges.
+
+Build with plain `heavy-run` first. Time only the built binary under
+`heavy-run --exclusive`. Compile time never counts as workload time.
+
+### Rules
+
+- Register workloads, fixtures and thresholds before production changes.
+- Measure unchanged source first. Keep every sample and every failure.
+  Missing or contaminated data is inconclusive. It is never zero or passing.
+- Commit the baseline number and the numeric prediction before the
+  replacement code.
+- Queue wait, workload execution, external tools, build, install, cold
+  startup and warm work are distinct measurements.
+- Never cancel other sessions or bypass admission to get a number. Never
+  test by changing the live admission directory.
+- Publish negative results too. An independent reviewer checks each
+  keep/pivot decision.
+
+### Statistic and noise floor
+
+The plan no longer uses a confidence bound on a p95 ratio. Sixty pairs give
+about three tail samples, and measured noise on this Mac was 19-50%.
+
+- **Time, for a row in the budget file (R_T):** the performance gate
+  decides. It compares the fastest of 15 runs per tree and times a
+  slower-looking row again, up to two more rounds. R_T is the `ratio` it
+  prints. The gate compares minimums only; task
+  `perf-gate-paired-median-parity` adds the paired-median rule.
+- **The row must keep its command path.** A row whose file the base commit
+  does not have gets the ceiling check only. A port PR must not change the
+  row's command path. The row keeps calling the same entry file, and that
+  file calls the new code.
+- **Time, for a logged run (R_T):** the mean `duration_ms` of a 7-day
+  window from the window command above, with at least 1,000 runs in each
+  window. R_T is the after window divided by the lower of the two before
+  windows.
+- **Time, for a workload with no row and no log (R_T):** the median of the
+  paired ratios candidate time / baseline time, from at least 30
+  order-balanced pairs. Take a percentile bootstrap of the median with
+  10,000 resamples and a committed seed. Use its upper 95% bound. This
+  needs the deferred measurement runner.
+- **Memory (R_M), one definition for every slice:** run the peak RSS
+  command above once on the baseline tree and once on the candidate tree.
+  Each run gives the median of 15 runs. R_M is the candidate median divided
+  by the baseline median.
+- **Noise floor first.** Each kind of number has its own floor:
+  - Gate row: 20 A/A runs (base and head at the same commit) must pass 20
+    times.
+  - Logged run: two before windows (`to` 0 and `to` 7) must differ by at
+    most 20% of the larger. On 2026-11-10 they differ by 37% (990 against
+    1,560 ms), so the logged mean is **inconclusive today**.
+  - R_M: two baseline medians must give a ratio from 0.95 to 1.05.
+  - Workload with no row: the A/A upper bound must be at most 1.05.
+
+  If a floor fails, the result is inconclusive. Fix the measure or the run
+  conditions; never the thresholds.
+- **p95** is a field number. Read it from the owner's dashboard, where the
+  sample count is large. It is not a merge gate.
+
+### Gate G
+
+**Common gate G** for every port slice:
+
+- Approved contract parity is 100%.
+- Unauthorized writes, credential disclosures, false permits and orphaned
+  owned processes are 0.
+- The converted logic passes 100% with its former implementation absent.
+- R_T and R_M are each at most **1.10** by the statistic above.
+- The slice meets its own user-benefit number.
+- The build budget holds: a cold `cargo build --locked --release` of the
+  slice's crate takes at most 120 s and a warm build at most 15 s under
+  `heavy-run`. `make check` must build Rust only when `rust/` changed. The
+  Makefile has no cargo step today. The first port task that adds Rust code
+  (`rust-agent-hooks` or `rust-app-priority`) adds that step with this
+  condition.
+
+**Named exemptions.** G as a whole applies to port slices only: steps 1
+and 2. Steps 3, 4 and 5 and the two deferred preparation steps (the
+measurement runner and native delivery) port nothing. Only the first two
+clauses apply to them: contract parity and the safety counts. The
+"former implementation absent" clause, R_T, R_M and the user-benefit number
+do not apply to them. The build budget applies to any of them that builds
+Rust.
+
+**Pivot:** any safety or contract failure stops rollout. A resource bound
+above 1.10 changes the architecture or slice boundary before a retry. A
+missed user-benefit number ends the slice; it does not lower the number. An
+ended slice becomes a row in [Recorded exceptions](#recorded-exceptions)
+with its measured number, in the same PR that ends it. Inconclusive results
+keep the old implementation active and the task open. Never adjust
+thresholds after results.
 
 ## Numbered work breakdown
 
-The linked TASKS.md blocks are the execution queue. Implementation in isolated
-fixtures and already-authorized interfaces is AFK. Live acceptance can require
-HITL evidence for physical power/lid tests, endpoint signing or owner-only
-credentials. Before claiming that work, list the real required evidence and
-record unavailable owner-only proof as an explicitly blocked HITL child linked
-to the relevant slice and final audit. Reuse existing matching proof tasks;
-do not fabricate a human blocker for a check an authorized agent can run.
-Each block lists dependencies, acceptance, hypothesis, command, success and pivot. Sources
-below define engineering guidance, not immutable filenames. Every component in
-the inventory must map to a slice or a permitted narrow exception.
+The linked TASKS.md blocks are the execution queue. Work in isolated
+fixtures and already-authorized interfaces is AFK. One implementation PR
+changes one behavior boundary. Tests move with their slice: a port keeps
+the old Bats tests until the new ones catch the same planted faults. There
+is no separate "move tests to Rust" step.
 
-| Step / task suffix (all IDs start rust-) | Why / concrete change and owner boundary | Dependencies / parallel lane |
+| Step / task ID | Why and change | User-benefit metric, number and command | Depends on |
+|---|---|---|---|
+| 1. `rust-agent-hooks` | Two hooks run on each agent Bash call and start Perl, `shfmt` or `jq`. Remove those starts. Weigh a shell fast path first. | `hook-require-heavy-run` and `hook-block-dangerous-git` `ratio` at most 0.50 each, from `scripts/perf-gate.sh --force --json`, after 20 clean A/A runs. The rows keep their command paths. | none |
+| 2. `rust-app-priority` | `app-priority` runs every 60 seconds at about 1 to 1.6 s mean. First make the number usable: log real milliseconds. Then weigh one `ps` pass. | 7-day mean `duration_ms` at most 400 ms and at most 40% of the lower before window, from the window command, after the before windows agree within 20%. | none; parallel with 1 |
+| 3. `rust-cold-path-profile` | Doctor, apply, sync and the queue were never profiled. Measure where their time goes before any port. | Recorded exception: measurement only. Output is the share of wall time in owned code per command, next to its local p50. | none; parallel with 1-2 |
+| 4. `rust-source-inventory` | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
+| 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the owner ruling |
+
+Each hot-path task commits its absolute baseline number before any
+replacement code. The ratio or mean above is the decision rule.
+
+The owner ruling is the agentbrew task `rust-owner-rules-on-replan-defaults`
+(HITL). It blocks step 5 only.
+
+Existing runnable guards: `heavy-run make check`; installation paths also
+use `heavy-run make e2e`. Do not describe a future command as having passed.
+
+### Deferred preparation steps
+
+These steps have no task now. Open one when a recorded exception reopens
+and needs it.
+
+- **Measurement runner:** a thin pinned adapter to agentbrew's
+  `migration-check compare`, for workloads that have no budget row and no
+  logged run. It applies the statistic above. It waits for agentbrew's
+  runner, as the cross-repo rule says.
+- **Native delivery:** locked build, artifact integrity, atomic dispatch and
+  rollback for a Rust binary on supported Mac targets. The first port that
+  ships a binary opens this step.
+
+### Recorded exceptions
+
+A recorded exception has no user-benefit metric today. It stays in its
+current language. It reopens only when both conditions hold: the owner's
+dashboard, a local log or `rust-cold-path-profile` shows a user-visible
+cost, and a profile puts at least half of that cost in owned code. A
+reopened slice gets a task with its own number first. The task blocks that
+this re-plan removed remain in git history at `788d43d`. The
+[source ledger](rust-source-inventory-evidence.json) keeps the old slice
+names as classification labels; this table gives each label its state.
+
+| Slice (old task suffix) | Reason | Cheaper option to weigh first |
 |---|---|---|
-| 1. source-inventory | Account for every owned executable, embedded interpreter, generated mapping, test and caller; deliver manifest and pinned validator adapter | agentbrew:rust-source-inventory for automated acceptance; independent source-collection lane |
-| 2. measurement-harness | Thin pinned adapter to agentbrew's engine; fixture registry, sealed baselines, planted-fault controls | source-inventory; agentbrew:rust-measurement-harness |
-| 3. native-delivery | Locked build/artifact integrity, atomic dispatch/install, supported Mac targets and rollback; bin/dotfiles-install, lifecycle scripts | measurement-harness |
-| 4. process-primitives | Locks, bounded child groups, timeouts and caching; lib/lock.sh, lib/run-with-timeout.sh, bin/cached-run | native-delivery |
-| 5. shared-queue | CPU/memory admission, inner-worker budgets, exclusive timings; bin/heavy-run, app-priority, headless detection | process-primitives; delivered current queue safety contract |
-| 6. repository-discovery | Inventory/fingerprints, workspace status, affected selection and tasks; learn-repos tools, bats-affected, check-all, add-task | native-delivery; parallel pure lane |
-| 7. cli-core | CLI/action registry, config/profile/enterprise precedence, output; bin/dotfiles*, lib/output.sh | native-delivery; parallel CLI lane |
-| 8. doctor-core | Discovery, budgets, overrides, result/fix/recheck semantics; bin/dotfiles-doctor | cli-core; process-primitives |
-| 9. doctor-shell-editors | shell, terminal, prompt, local-bin, editor, vscode, jetbrains module behavior | doctor-core; module lane |
-| 10. doctor-security | security, git, ssh module denial/repair behavior | doctor-core; module lane |
-| 11. doctor-workflow | chezmoi, sync, workflow, workspace, plugins, enterprise modules | doctor-core; repository-discovery |
-| 12. doctor-browsers | agent-browser, chrome, resilience checks and safe repair | doctor-core; shared-queue |
-| 13. doctor-agents | agentbrew, claude, codex, memory, minsky adapters; owner APIs and readiness | doctor-core; module lane |
-| 14. doctor-macos | macos, personal-machine, home-theater profile checks | doctor-core; module lane |
-| 15. doctor-local-ai | local-ai, local-llm, tools, upgrade discovery and opt-out behavior | doctor-core; module lane |
-| 16. doctor-apps | extras, obsidian and any later inventory-discovered supported modules | doctor-core; module lane |
-| 17. apply-install | Defaults/apply, package/cask installers, signing/shims, upgrades/uninstall; .chezmoiscripts, macos*.sh, apply-state/apply-defaults | cli-core; process-primitives |
-| 18. plugin-trust | Signed plugin pins, sandbox/capabilities and transactional lifecycle; bin/dotfiles-plugin, lib/plugin* | cli-core; process-primitives |
-| 19. services-power | Sync/reload/drift, wake/keepawake/Amphetamine, watchdog and notices; launchagents, tooling-sync | cli-core; process-primitives |
-| 20. git-security-guards | Git/GitHub and agent hooks, leak/secret/private-ref scans, attribution, git-safe | cli-core; process-primitives |
-| 21. browser-native | CDP/tab leases, temp browser, Slack, profiles, native quit/Dock events; bin/agent-tab, lib/*.swift | process-primitives; shared-queue |
-| 22. local-ai-runtime | Agent/loop retry/verify/rollback/warmup logic; lib/local-ai-*.py, bin/local-ai-* | cli-core; process-primitives |
-| 23. metrics-checkup | Checkup Python processors/exporter, stats/proof/scorecard/telemetry; UI unchanged | cli-core; process-primitives |
-| 24. pty-tools | First fixture/observer measurement, then PTY capture/echo logic in separate measured steps | process-primitives |
-| 25. developer-utilities | Scaffolds, notes/timers, status, snapshots, cleanup, PR/review and remaining assigned commands | cli-core; repository-discovery |
-| 26. python-host-extension | In-process TLS adapter feasibility, ABI/signing and opt-in policy; lib/python/dotfiles_tls_relax.py | native-delivery; process-primitives |
-| 27. test-build-tooling | Non-UI tests, fake services, coverage/build/gates, .github tooling; preserve independent negative controls | measurement-harness; per-domain ports before old oracle retirement |
-| 28. final-audit | Residual/source/generated/install audit, runtime retirement and whole-tool evidence | all preceding slices |
-
-Verification for each port is the exact `compare --slice <task-ID> --samples 60`
-command above with the row's ID, plus G and its queue-block acceptance criteria.
-Inventory and harness tasks have their own commands. A row spanning several
-behaviors is a task series: split into measured substeps before coding. No
-single aggregate benchmark may justify unrelated substep changes.
-
-Existing runnable guards: `heavy-run make check`; installation paths also use
-`heavy-run make e2e`. Existing focused Bats tests remain independent oracles
-until their Rust replacements prove the same planted failures. Do not describe
-future harness commands as having passed now.
+| process-primitives | No measured cost of its own. | None needed. |
+| shared-queue | The wrapped command dominates queue time. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
+| repository-discovery | Rare, agent-driven tools. | None needed. |
+| cli-core | `dotfiles --version` takes about 64 ms. Startup is not the hot path. | The `dotfiles-version` and `dotfiles-config` budget rows guard it. |
+| doctor-core and the doctor module groups (shell-editors, security, workflow, browsers, agents, macos, local-ai, apps) | Doctor probes are cold paths that wait on child tools. Not profiled. | Parallel or cached probes; profile first (step 3). |
+| apply-install | Dominated by chezmoi, Homebrew and installers. | Profile first (step 3). |
+| plugin-trust | Rare actions; trust rules gain nothing from a port. | None needed. |
+| services-power | Launchd jobs wait on system tools. `app-priority` moved to step 2. | Profile first (step 3). |
+| git-security-guards | The two agent hooks moved to step 1. Git hooks run once per commit or push. | A budget row per git hook before any port. |
+| browser-native | Time is in the browser and in macOS events. | None needed. |
+| local-ai-runtime | Time is in the model. | None needed. |
+| metrics-checkup | Runs every few days. | None needed. |
+| pty-tools | No measured cost. | None needed. |
+| developer-utilities | Rare commands. | None needed. |
+| python-host-extension | A Rust in-process TLS adapter is unproven, and it has no speed goal. Never weaken TLS validation to port it. | None. |
+| test-build-tooling | Tests move with their slice. The Bats `test` step is 74% of gate time. | `bats --jobs`; tasks `speed-up-make-check` and `make-check-one-job-bats`. |
 
 ## Rollout, security and regression coverage
 
-Land inventory and instrumentation before replacement. Land native delivery,
-then process/pure leaves. Doctor module groups may run in parallel after the
-doctor contract. Isolate worktrees, fixture homes and outputs. Heavy work uses
-the shared admission queue and bounded inner workers; timings use --exclusive.
-Never cancel other sessions or bypass admission to obtain benchmark results.
+Each port PR carries the baseline commit, the prediction, the result and a
+rollback proof. Isolate worktrees, fixture homes and outputs. Heavy work
+uses the shared admission queue and bounded inner workers; timings use
+`--exclusive`.
 
-Each boundary gets a baseline/prediction commit, measured implementation PR,
-matching docs and rollback proof. Keep original negative cases. Test migrations
-must first detect the same planted faults against an independent oracle.
-Switch dispatch atomically; rollback only owned binary/dispatch/state and keep
-user edits and unknown keys. Delete temporary bridges only with recorded proof.
+Keep the original negative cases. Switch dispatch atomically. Roll back only
+the owned binary, dispatch and state; keep user edits and unknown keys.
+Delete a temporary bridge only with recorded proof.
 
 Retain required Bash 3.2 and UI checks. Separate fake CDP/service results from
 authorized throwaway-app proof. Physical lid/power, signed endpoint and real
 credential paths need their own evidence; unavailable proof remains a blocker.
 Never use owner tabs, real drafts, elevated changes or public posts as fixtures.
 
-The final audit covers generated and installed entrypoints, all declared Mac
-targets and install/update/uninstall/rollback. A language percentage or lower
-line count is coverage, not a user benefit. Preserve failed measurements too.
+**14-day field check.** Within 14 days after a switch, the slice must show
+its gain outside the PR. For a logged run, use the window command: the
+after window against the before windows, by the logged-run statistic. For a
+hook row, the hooks write no log line; run the gate again with
+`PERF_GATE_BASE` set to the commit before the switch (a documented gate
+setting). The owner's dashboard shows the same comparison by version for
+all installs; it is private and has no public link yet. No gain rolls the
+slice back.
+
+**Final audit rule.** The audit passes when every owned executable
+component in the manifest has one of five states:
+
+- `ported`, with receipts.
+- `exception`, with a row in the table above. This includes a slice that
+  ended at its Pivot.
+- `frozen`: frozen agent support.
+- `grandfathered`: Rust code that shipped before gate G (the fixture
+  crates).
+- `out-of-scope`: UI presentation and shell that must stay shell, as listed
+  in [Scope and exceptions](#scope-and-exceptions).
+
+Unrecorded components must be 0. The audit claims "all measured hot paths
+ported". It never claims "all code is Rust". A language percentage or a
+lower line count is coverage, not a user benefit.
+
+## Decisions (2026-11-10)
+
+The owner chose to fix the plan and to ship it without another question
+round. The choices below were **adopted by default on the reviewer's
+recommendation**. The owner did not decide them one by one. **The owner can
+reverse any of them.** The agentbrew task
+`rust-owner-rules-on-replan-defaults` asks the owner to rule on them; until
+then they are defaults, not decisions.
+
+| Choice | Adopted default |
+|---|---|
+| Order | The per-call hook slice comes first, with a pre-registered cut per agent Bash call. It needs no native delivery task and no full harness. |
+| Cold paths | Doctor probes, sync orchestration and the other slices in the table above are recorded exceptions. |
+| Test tasks | The separate "move tests to Rust" task is gone. Tests move with their slice. |
+| Inventory | The inventory step is a manifest and a thin adapter to a small validator. |
+| Cheaper options | Each slice weighs a cheaper fix first: one `ps` pass for `app-priority`, parallel or cached doctor probes, `bats --jobs` for the gate. |
+| Existing Rust code | Fixture crates are `grandfathered`. Rust passes G only when it replaces a production path. The review asked for a statement; this is the default. |
+| Final audit states | The audit accepts `ported`, `exception`, `frozen`, `grandfathered` and `out-of-scope`. The review said the audit needs an owner decision; this default makes the audit passable until the owner rules. |
 
 ## Validation review (2026-11-09)
 
@@ -231,7 +453,11 @@ An independent reviewer checked this plan against measured timings on
 2026-11-09. Verdict: **re-plan before any port**. Zero of the 48 tasks in the
 two repositories are done. The owner paused porting the same day and asked
 for field metrics and a speed gate first
-([Telemetry](../observability.md), performance gate).
+([Telemetry](../observability.md#telemetry),
+[performance gate](../observability.md#performance-gate)).
+
+The text in this section is the reviewer's, as written. Each resolution
+stands beside it.
 
 Measured on one loaded Mac; treat the numbers as a ranking, not a benchmark:
 
@@ -242,36 +468,38 @@ Measured on one loaded Mac; treat the numbers as a ranking, not a benchmark:
   fired about 8 hooks of 125-483 ms; `bash -c true` takes about 7 ms.
 - In dotfiles, `app-priority` ran 17,488 times (1.3 s mean), and the Bats
   `test` step is 74% of gate time.
+  *Note (2026-11-10): the window command now gives 1,560 ms for the last 7
+  days and 990 ms for the 7 days before. See
+  [Evidence and current state](#evidence-and-current-state).*
 - Sync, git maintenance, upgrade, catalog, MCP lifecycle and doctor probes
   are likely dominated by git, network and child tools. They were not
   profiled; a port there needs a profile first.
 - Rust compiles are already the largest agent Bash cost in other
   repositories. This plan has no build-time budget.
+  *Resolution (2026-11-10): [Gate G](#gate-g) now has a build budget.*
 
-Findings to fix before work resumes (MUST):
+### Findings to fix
 
-1. **Stale evidence.** The evidence table reviews an old revision. The
-   repository now has Rust code that never passed gate G. State whether it is
-   grandfathered or must pass G.
-2. **Commands cannot run.** Every measurement command needs
-   `rust/Cargo.toml` and `migration-check`. Both exist only in an unmerged
-   draft. Mark them "runnable after the inventory step merges". Build with
-   plain `heavy-run` first; time only the built binary under `--exclusive`.
-3. **Gate G contradicts the preparation steps.** Inventory, harness and
-   native delivery still dispatch to the old runtime, so they cannot run
-   "without the legacy runtime". Exempt them by name.
-4. **The statistic is not usable.** An upper 95% bound on a p95 ratio from 60
-   pairs rests on about three tail samples, and measured noise was 19-50%.
-   Name the estimator (for example a bootstrap of the median ratio) and
-   measure the noise floor first, or every result is "inconclusive".
-5. **The final audit cannot pass.** Frozen agent support stays, exclusions
-   are forbidden, and the audit needs zero unexplained legacy components.
-   This needs an owner decision.
-6. **One cross-repo rule.** Say once whether dotfiles work waits for the
-   agentbrew validator, and how the shared crate is pinned (git revision plus
-   vendoring) so `--locked` builds work offline.
-7. **No user benefit metric.** Each slice needs one (for example p95 hook
-   time per agent Bash call). A slice with none becomes a recorded exception.
+No MUST finding is open in this text. The table below keeps each finding as
+the reviewer wrote it.
+
+Status on 2026-11-10: a first review of the re-plan graded findings 1, 2
+and 6 resolved and findings 3, 4, 5 and 7 partly resolved in this
+repository. This revision applies the fixes it asked for. A second
+independent review on 2026-11-10 graded all seven findings resolved in both
+plans.
+
+### Resolved findings (2026-11-10)
+
+| Finding, as the reviewer wrote it | What changed | Where |
+|---|---|---|
+| **Stale evidence.** The evidence table reviews an old revision. The repository now has Rust code that never passed gate G. State whether it is grandfathered or must pass G. | The evidence table reviews revision `788d43d`. Rust exists only as fixture crates. They are `grandfathered`; Rust passes G only when it replaces a production path. | [Evidence and current state](#evidence-and-current-state) |
+| **Commands cannot run.** Every measurement command needs `rust/Cargo.toml` and `migration-check`. Both exist only in an unmerged draft. Mark them "runnable after the inventory step merges". Build with plain `heavy-run` first; time only the built binary under `--exclusive`. | Commands are split into three blocks: run today (each was run once, with its output stated), run after the agentbrew inventory step merges, and run after the deferred runner merges. Build uses plain `heavy-run`. | [Measurement contract](#measurement-contract) |
+| **Gate G contradicts the preparation steps.** Inventory, harness and native delivery still dispatch to the old runtime, so they cannot run "without the legacy runtime". Exempt them by name. | G applies in full to port slices only. The named non-port steps keep only the parity and safety clauses. | [Gate G](#gate-g) |
+| **The statistic is not usable.** An upper 95% bound on a p95 ratio from 60 pairs rests on about three tail samples, and measured noise was 19-50%. Name the estimator (for example a bootstrap of the median ratio) and measure the noise floor first, or every result is "inconclusive". | The p95 bound is gone. Gate rows, logged runs and memory each have one definition, one command and a noise floor. The logged `app-priority` mean fails its floor today and says so. A bootstrap of the median ratio covers workloads with no row. | [Statistic and noise floor](#statistic-and-noise-floor) |
+| **The final audit cannot pass.** Frozen agent support stays, exclusions are forbidden, and the audit needs zero unexplained legacy components. This needs an owner decision. | The audit accepts five named states and needs 0 unrecorded components. This is a default. The agentbrew task `rust-owner-rules-on-replan-defaults` tracks the owner's ruling and blocks the audit. | [Rollout](#rollout-security-and-regression-coverage), [Decisions](#decisions-2026-11-10) |
+| **One cross-repo rule.** Say once whether dotfiles work waits for the agentbrew validator, and how the shared crate is pinned (git revision plus vendoring) so `--locked` builds work offline. | One rule with the same bullets in both plans: who waits for the inventory, who waits for the runner, and git `rev` pin plus `cargo vendor`. | [Cross-repo rule](#cross-repo-rule) |
+| **No user benefit metric.** Each slice needs one (for example p95 hook time per agent Bash call). A slice with none becomes a recorded exception. | Every step names a metric, a number and a command, or is a recorded exception with its reason. The `app-priority` number uses a 7-day window. | [Numbered work breakdown](#numbered-work-breakdown), [Recorded exceptions](#recorded-exceptions) |
 
 Proposed changes (SHOULD, owner decides):
 
@@ -284,26 +512,28 @@ Proposed changes (SHOULD, owner decides):
   compile cache for CLI startup; one `ps` pass for `app-priority`; parallel
   or cached doctor probes; `bats --jobs` for the gate.
 
+*Resolution (2026-11-10): each one is adopted by default in
+[Decisions](#decisions-2026-11-10). The owner has not ruled yet. One
+difference: the pre-registered cut is on the gate's fastest-run `ratio`, not
+on p95, because p95 is not a usable merge statistic here.*
+
 Every later port must show its gain on the field dashboard and pass the
 performance gate. Events carry a `runtime` field (`ts`, `shell`, `rust`) for
 that comparison.
 
-## Open decisions and references
+*Resolution (2026-11-10): see the 14-day field check in
+[Rollout](#rollout-security-and-regression-coverage). It names a local
+command for each kind of slice.*
 
-Inventory/preparation settle crate versions, target and host-ABI matrices,
-analysis method, absolute near-zero budgets and reviewable substep boundaries
-from live source. Choose reuse candidates only after checking their contracts.
-Extra executable-language exceptions need an explicit scope decision; an agent
-cannot invent one to pass the final audit. Current queue fixes take priority
-over porting that queue. This migration covers these named repos' owned code;
-other repositories remain consumers of the shared runner.
+## References
 
 Metric anchors: Basili, Caldiera, Rombach (1994), Goal-Question-Metric; Munafò et
-al. (2017), pre-registration; Kohavi, Tang, Xu (2020), experiment design;
-Forsgren, Humble, Kim (2018), performance/stability outcomes.
+al. (2017), pre-registration; Kohavi, Tang, Xu (2020), A/A checks and guard
+metrics; Efron and Tibshirani (1993), bootstrap intervals; Forsgren, Humble,
+Kim (2018), performance/stability outcomes.
 
-Primary implementation references: [Cargo build](https://doc.rust-lang.org/cargo/commands/cargo-build.html),
-[Cargo test](https://doc.rust-lang.org/cargo/commands/cargo-test.html), and
+Implementation references: [Cargo build](https://doc.rust-lang.org/cargo/commands/cargo-build.html),
+[cargo vendor](https://doc.rust-lang.org/cargo/commands/cargo-vendor.html), and
 [PyO3 building/distribution](https://pyo3.rs/main/building-and-distribution).
-Rust Python extension and embedding are distinct choices; PyO3 is a reuse
-candidate requiring an ABI/signing proof, not an already selected dependency.
+PyO3 is a reuse candidate for the Python host extension if that exception
+reopens. It needs an ABI and signing proof first.

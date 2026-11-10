@@ -671,8 +671,9 @@ agent, a script, CI) it asks nothing and nothing is sent; the first `dotfiles`
 command you run in a terminal asks, and there only a typed `y` or `n` is an
 answer. That question never shows before help, version, `cd`, or
 machine-readable output. With no answer it comes back at most once a day and
-3 times in all. While the repo ships no key (`config/telemetry-key` is empty)
-nobody is asked and nothing is sent. A yes covers only later events: nothing recorded before it is
+3 times in all. The repo ships the write-only project key in
+`config/telemetry-key`; in a fork that empties that file nobody is asked and
+nothing is sent. A yes covers only later events: nothing recorded before it is
 sent.
 
 **What is sent**, at most once a day: the command or task name, its duration,

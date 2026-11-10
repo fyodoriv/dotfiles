@@ -14,6 +14,9 @@ setup() {
   export DOTFILES_COMMANDS_FILE="$TEST_DIR/commands.jsonl"
   export DOTFILES_TELEMETRY_STATE="$TEST_DIR/telemetry.json"
   export DOTFILES_INSTALL_RECEIPT="$TEST_DIR/install-receipt.json"
+  # The gains event (tests/telemetry-gains.bats) would add a request and time
+  # a real zsh in every send here: a ship day far away turns it off.
+  export DOTFILES_TELEMETRY_TEST_GAINS_SINCE="9999-12-31"
   export DOTFILES_TELEMETRY_URL="http://127.0.0.1:9/fake"
   export DOTFILES_TELEMETRY_KEY_FILE="$TEST_DIR/key"
   export DOTFILES_POSTHOG_KEY="phc_testFakeKey1"

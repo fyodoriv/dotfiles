@@ -138,3 +138,46 @@ no_perl_tools() {
   echo "$ms"
   [[ "$ms" =~ ^[0-9]+$ ]] && [ "$ms" -ge 1 ]
 }
+
+# ── The default-Mac number: the same measure with an empty zsh config ──────
+# stock <runs>: baseline_zsh_stock_ms under /bin/bash (3.2).
+stock() {
+  PATH="$TEST_DIR/bin:/usr/bin:/bin" /bin/bash -c 'source "$1/lib/mac-baseline.sh"; baseline_zsh_stock_ms "$2"' _ "$REPO_ROOT" "$1"
+}
+# A fake zsh that logs its ZDOTDIR and how many entries that folder holds.
+logging_zsh() {
+  cat > "$TEST_DIR/bin/zsh" <<SH
+#!/bin/sh
+echo "\${ZDOTDIR:-none} \$(ls -A "\${ZDOTDIR:-/nonexistent}" 2>/dev/null | wc -l | tr -d ' ')" >> "$TEST_DIR/zsh.log"
+exit "\${FAKE_ZSH_EXIT:-0}"
+SH
+  chmod +x "$TEST_DIR/bin/zsh"
+}
+
+@test "the stock measure runs zsh with a new empty ZDOTDIR and removes the folder" {
+  logging_zsh
+  ms="$(ZDOTDIR="$TEST_DIR/mine" stock 3)"
+  [[ "$ms" =~ ^[0-9]+$ ]] && [ "$ms" -ge 1 ]
+  # The same run count as baseline_zsh_ms, each with the same empty folder.
+  [ "$(wc -l < "$TEST_DIR/zsh.log" | tr -d ' ')" = "3" ]
+  dir="$(head -n 1 "$TEST_DIR/zsh.log" | sed 's/ [0-9]*$//')"
+  [ "$dir" != "none" ] && [ "$dir" != "$TEST_DIR/mine" ]
+  [ "$(sort -u "$TEST_DIR/zsh.log")" = "$dir 0" ]
+  [ ! -e "$dir" ]
+}
+
+@test "baseline_zsh_ms with a folder uses it as ZDOTDIR; without one it keeps the caller's" {
+  logging_zsh
+  mkdir "$TEST_DIR/empty"
+  PATH="$TEST_DIR/bin:/usr/bin:/bin" /bin/bash -c 'source "$1/lib/mac-baseline.sh"; baseline_zsh_ms 1 "$2"; unset ZDOTDIR; baseline_zsh_ms 1' _ "$REPO_ROOT" "$TEST_DIR/empty" >/dev/null
+  [ "$(cat "$TEST_DIR/zsh.log")" = "$TEST_DIR/empty 0
+none 0" ]
+}
+
+@test "a stock run that fails gives no measure and still removes the folder" {
+  logging_zsh
+  run env FAKE_ZSH_EXIT=1 PATH="$TEST_DIR/bin:/usr/bin:/bin" /bin/bash -c 'source "$1/lib/mac-baseline.sh"; baseline_zsh_stock_ms 1' _ "$REPO_ROOT"
+  [ -z "$output" ]
+  dir="$(sed 's/ [0-9]*$//' "$TEST_DIR/zsh.log")"
+  [ ! -e "$dir" ]
+}

@@ -701,14 +701,17 @@ id. One event:
 }
 ```
 
-Two more events come from the install receipt. With no receipt neither is
-sent.
+Two more events show how much dotfiles helps. The install event needs the
+install receipt. The gains event is sent with or without a receipt.
 
 - `dotfiles.install`, once per install: `seconds` (time to configured), `ok`,
   and `profile` (`core` or `full`). Sent only when the install finished on or
   after the day of your yes, and not more than 30 days ago.
-- `dotfiles.gains`, at most once a day: `zsh_ms_before`, `zsh_ms_now`, and
-  `days_since_install`.
+- `dotfiles.gains`, at most once a day: `zsh_ms_before`, `zsh_ms_now`,
+  `zsh_ms_stock`, and `days_since_install`. A Mac with no install receipt
+  sends `zsh_ms_now` and `zsh_ms_stock` only. `zsh_ms_stock` is the shell
+  start of this Mac with an empty zsh config. It is measured in the send, so
+  it is not a baseline from before your yes.
 
 Both events need a yes given on or after 2026-11-10, the day they shipped. An
 older yes was given to a text that did not name the baseline, so it does not
@@ -745,22 +748,34 @@ and sends nothing. Full rules: [docs/observability.md](docs/observability.md#tel
 
 ### How much it helps
 
-The numbers compare this Mac with itself before the install.
+The numbers compare this Mac with itself: before the install, and with a
+default shell.
 
-- **Baseline**: the same Mac before the install. `bin/dotfiles-install run`
-  measures it once, before it changes anything, and saves it in the install
-  receipt (`~/.local/state/dotfiles/install-receipt.json`).
+- **Baseline before the install**: the same Mac before the install.
+  `bin/dotfiles-install run` measures it once, before it changes anything,
+  and saves it in the install receipt
+  (`~/.local/state/dotfiles/install-receipt.json`). A Mac installed before
+  receipts existed has none.
+- **Default-Mac baseline**: the same Mac with an empty zsh config
+  (`zsh_ms_stock`). zsh gets a new empty temp folder as its config folder
+  (`ZDOTDIR`), and the folder is removed afterwards. `/etc/zshrc` still
+  loads, as on a default Mac. It needs no receipt, so every install has it.
+- **The cost, stated plainly**: dotfiles adds shell features (prompt,
+  completions, tools). So the shell start with dotfiles can be slower than
+  the default one. `zsh_ms_now` next to `zsh_ms_stock` shows that cost.
 - **Measured**: shell start (`zsh_ms_before` from the receipt, `zsh_ms_now`
-  from the send), and time to configured (`seconds` of the install run).
-  Both shell numbers use one method: the full run time of
+  and `zsh_ms_stock` from the send), and time to configured (`seconds` of
+  the install run). All shell numbers use one method: the full run time of
   `zsh -i -c 'exit 0'`, the median of 3 runs. The daily send measures the
-  now value in the background, at most once a day. It may take 5 seconds at
-  most; when it fails or takes longer the number is left out.
+  now and stock values in the background, at most once a day. Each may take
+  5 seconds at most, so both add at most 10 seconds to that send. When one
+  fails or takes longer, that number is left out.
 - **Estimated**: saved seconds (`seconds_saved`). It is the number of
   automation runs times the per-task table in
   [`lib/stats.sh`](lib/stats.sh) (`_task_estimate`). No clock measures it.
-- **Local view**: `dotfiles metrics --gains` prints before and now on this
-  Mac. It sends nothing.
+- **Local view**: `dotfiles metrics --gains` prints before, now, and the
+  default shell start on this Mac. With no receipt it prints now and the
+  default shell start. It sends nothing.
 
 ## Proof
 
@@ -1372,7 +1387,7 @@ dotfiles install plan|run|restore                 One-step install with backup a
 dotfiles metrics [--days N] [--share FILE]        Agent time, hook blocks, MCP health, machine load (local only)
 dotfiles metrics --table                         Every docs/metrics.md metric: value, goal, pivot ((stub) if no data)
 dotfiles metrics --baseline                      zsh start median, free disk, LaunchAgent count (same lines as install plan)
-dotfiles metrics --gains                         Before vs now from the install receipt, time to configured, minutes saved (estimate)
+dotfiles metrics --gains                         Before vs now from the install receipt, the default shell start, time to configured, minutes saved (estimate)
 dotfiles contribute [--repo agentbrew|PATH] [--yes] Open a PR upstream from your branch; forks the repo for you; asks first
 dotfiles edit                                     Open dotfiles repo in $EDITOR
 dotfiles cheat                                    Command reference card

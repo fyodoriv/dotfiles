@@ -9,12 +9,37 @@
 # the status of the last startup line (macOS's /etc/zshrc ends with a test
 # that is false outside Terminal.app), so only "zsh could not run or
 # crashed" makes a run fail, and only runs that exit 0 count.
+# baseline_zsh_ms [runs] [zdotdir]: with a second argument, zsh reads its
+# config from that folder (ZDOTDIR) and not from the home folder. This is how
+# the stock number is measured, so both numbers use this one function.
 baseline_zsh_ms() {
-  local runs="${1:-3}" i
+  local runs="${1:-3}" zdotdir="${2:-}" i
   command -v zsh >/dev/null 2>&1 || return 1
   for ((i = 0; i < runs; i++)); do
-    _baseline_run_ms zsh -i -c 'exit 0'
+    if [ -n "$zdotdir" ]; then
+      (export ZDOTDIR="$zdotdir"; _baseline_run_ms zsh -i -c 'exit 0')
+    else
+      _baseline_run_ms zsh -i -c 'exit 0'
+    fi
   done | sort -n | awk '{ v[NR] = $1 } END { if (NR) print v[int((NR + 1) / 2)]; else exit 1 }'
+}
+
+# The default-Mac number: the shell start time of this Mac with an empty zsh
+# config. zsh gets a new empty folder as ZDOTDIR, so it reads no user file.
+# /etc/zshrc still loads, as on a default Mac. dotfiles adds shell features,
+# so the start with dotfiles can be slower than this number.
+# baseline_zsh_stock_dir prints a new empty folder; the caller removes it.
+baseline_zsh_stock_dir() {
+  mktemp -d "${TMPDIR:-/tmp}/dotfiles-zsh-stock.XXXXXX" 2>/dev/null
+}
+# baseline_zsh_stock_ms [runs]: the median in ms; the folder is removed.
+baseline_zsh_stock_ms() {
+  local dir ms="" status=0
+  dir="$(baseline_zsh_stock_dir)" && [ -d "$dir" ] || return 1
+  ms="$(baseline_zsh_ms "${1:-3}" "$dir")" || status=1
+  rm -rf -- "${dir:?}"
+  [ "$status" -eq 0 ] && [ -n "$ms" ] || return 1
+  printf '%s\n' "$ms"
 }
 
 # _baseline_run_ms <command...>: the wall time of one run in whole ms,
@@ -171,11 +196,17 @@ receipt_finish() {
 
 # gains_report: before (from the receipt) vs now, time to configured, and the
 # automation minutes since the install. Needs jq, which the install adds.
+# It also prints the stock shell start (an empty zsh config, measured now).
+# With no receipt it prints the now and stock shell start only.
 gains_report() {
-  local receipt stats before_ms before_gb before_la now_ms now_gb now_la secs ok finished saved
+  local receipt stats before_ms before_gb before_la now_ms stock_ms now_gb now_la secs ok finished saved
   receipt="$(receipt_dir)/install-receipt.json"
   if [ ! -s "$receipt" ]; then
     printf 'No install receipt yet. dotfiles-install run saves one; then run this again.\n'
+    now_ms="$(baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || now_ms=""
+    stock_ms="$(baseline_zsh_stock_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || stock_ms=""
+    printf '%-44s %7s\n' "zsh start now:" "${now_ms:+$now_ms ms}${now_ms:-n/a}"
+    printf '%-44s %7s\n' "zsh start, empty zsh config (a default Mac):" "${stock_ms:+$stock_ms ms}${stock_ms:-n/a}"
     return 0
   fi
   command -v jq >/dev/null 2>&1 || { printf 'dotfiles metrics --gains needs jq (brew install jq).\n'; return 1; }
@@ -198,6 +229,8 @@ gains_report() {
   printf '%-22s %10s %10s\n' "Claude hooks" "$(jq -r '.before.claude_hooks // "n/a"' "$receipt")" "$(baseline_claude_hooks)"
   printf '%-22s %10s %10s\n' "CLAUDE.md (bytes)" "$(jq -r '.before.claude_md_bytes // "n/a"' "$receipt")" "$(baseline_claude_md_bytes)"
   printf '%-22s %10s %10s\n' "Claude permissions" "$(jq -r '.before.claude_permissions // "n/a"' "$receipt")" "$(baseline_claude_permissions)"
+  stock_ms="$(baseline_zsh_stock_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || stock_ms=""
+  printf 'zsh start, empty zsh config (a default Mac): %s\n' "${stock_ms:+$stock_ms ms}${stock_ms:-n/a}"
   if [ -n "$secs" ]; then
     if [ "$secs" -ge 60 ]; then printf 'Time to configured: %s min' "$(((secs + 30) / 60))"; else printf 'Time to configured: %s s' "$secs"; fi
     [ "$ok" = "true" ] && printf '\n' || printf ' (the run did not finish: %s)\n' "$(jq -r '.run.failed_step // "unknown step"' "$receipt")"

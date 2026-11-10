@@ -22,7 +22,9 @@
 #   --gains       Compare this Mac now with the install receipt that
 #                 `dotfiles-install run` saved: zsh start, free disk,
 #                 LaunchAgents, time to configured, and automation minutes
-#                 since the install (an estimate).
+#                 since the install (an estimate). It also prints the
+#                 zsh start with an empty zsh config (a default Mac). With
+#                 no receipt it prints the now and empty-config start only.
 #   --help, -h    Print this message.
 set -euo pipefail
 

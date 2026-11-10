@@ -182,34 +182,49 @@ How the code enforces it:
 ### Gain events
 
 These events show how much dotfiles helps against the same Mac before the
-install. Both come from the install receipt
+install, and against the same Mac with a default shell. The install receipt
 (`~/.local/state/dotfiles/install-receipt.json`, written by
-`bin/dotfiles-install run`; see `lib/mac-baseline.sh`). With no receipt
-neither is sent.
+`bin/dotfiles-install run`; see `lib/mac-baseline.sh`) holds the numbers from
+before the install. With no receipt the install event is not sent, and the
+gains event carries `zsh_ms_now` and `zsh_ms_stock` only. A receipt that is
+too large, is not JSON, or has no real before time counts as no receipt for
+the gains event.
 
 | Event | When | Properties (plus the common ones) |
 |---|---|---|
 | `dotfiles.install` | Once per receipt. A new install run writes a new end time, and that sends a new event. Never for an install that finished more than 30 days ago (the age cap of the logs) or in the future. | `seconds` (time to configured, measured), `ok`, `profile` (`core` or `full`; any other value is dropped). The event time is the end of the install. |
-| `dotfiles.gains` | At most once a day, with the daily send. | `zsh_ms_before` (receipt `.before.zsh_ms`, measured), `zsh_ms_now` (measured), `days_since_install` (days since receipt `.before.taken_at`). |
+| `dotfiles.gains` | At most once a day, with the daily send. | `zsh_ms_before` (receipt `.before.zsh_ms`, measured), `zsh_ms_now` (measured), `zsh_ms_stock` (measured: an empty zsh config), `days_since_install` (days since receipt `.before.taken_at`). With no receipt: `zsh_ms_now` and `zsh_ms_stock` only. With no number at all: no event. |
 
 - `dotfiles.run` carries `seconds_saved` as a whole number. It is an
   estimate: runs times the per-task table in `lib/stats.sh`
   (`_task_estimate`).
-- **One method for both shell numbers.** `zsh_ms_before` and `zsh_ms_now`
-  are the full run time of `zsh -i -c 'exit 0'`, the median of 3 runs
-  (`baseline_zsh_ms` in `lib/mac-baseline.sh`). So the two compare fairly.
-- **When `zsh_ms_now` is measured.** In the send that builds the gains event:
-  at most once a day, in the background daily send or a manual
-  `dotfiles telemetry send`. A normal command never measures.
+- **One method for all shell numbers.** `zsh_ms_before`, `zsh_ms_now`, and
+  `zsh_ms_stock` are the full run time of `zsh -i -c 'exit 0'`, the median
+  of 3 runs (`baseline_zsh_ms` in `lib/mac-baseline.sh`). So they compare
+  fairly.
+- **The default-Mac baseline.** `zsh_ms_stock` is the shell start of the
+  same Mac with an empty zsh config. zsh gets a new empty temp folder as
+  `ZDOTDIR`, so it reads no user file. The folder is removed afterwards,
+  also when the run is stopped. `/etc/zshrc` still loads, as on a default
+  Mac. dotfiles adds shell features, so `zsh_ms_now` can be higher than
+  `zsh_ms_stock`. The number shows that cost honestly.
+- **When `zsh_ms_now` and `zsh_ms_stock` are measured.** In the send that
+  builds the gains event: at most once a day, in the background daily send
+  or a manual `dotfiles telemetry send`. A normal command never measures.
   `dotfiles telemetry status` never measures. A `send --dry-run` measures
-  once when a gains event is due. The measurement may take 5 seconds at
-  most. When it fails or takes longer, it is stopped, the field is left out,
-  and the send goes on. Its time does not count against the 3-second limit
-  of the daily send.
+  each once when a gains event is due. Each measurement has its own limit of
+  5 seconds, so a gains event adds at most 10 seconds. When one fails or
+  takes longer, it is stopped, that field is left out, and the send goes on.
+  This time does not count against the 3-second limit of the daily send.
+- **No number, no event.** With no receipt and no measurement there is no
+  gains event. The gains day is still set, so the measurements are tried at
+  most once a day. The pending count of `status` counts a gains event that
+  is due before it is known whether a number can be measured.
 - **Consent.** The install event is sent only when the install finished on or
   after the day of the yes. `zsh_ms_before` and `days_since_install` are a
   baseline from before the yes. This is the one exception to "a yes covers
-  only later events", and the consent text says so.
+  only later events", and the consent text says so. `zsh_ms_stock` is not
+  part of that exception: it is measured at send time, after the yes.
 - **Older yes answers.** Both events need a yes given on or after
   `2026-11-10` (`GAINS_SINCE` in the sender), the day they shipped. A person
   who said yes before that day agreed to a text without the baseline
@@ -226,7 +241,9 @@ neither is sent.
 - **Cursors.** The state file keeps `install_sent` (the end time of the last
   install that was sent) and `gains_day`. Each moves only after the endpoint
   answers 2xx for a request that held its event.
-- The local view is `dotfiles metrics --gains`. It sends nothing.
+- The local view is `dotfiles metrics --gains`. It prints the default shell
+  start next to before and now. With no receipt it prints now and the
+  default shell start. It sends nothing.
 
 ### Turn it off
 

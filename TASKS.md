@@ -388,11 +388,11 @@ them. -->
   - **Details**: Two leftovers from the 2026-11-10 review of the telemetry follow-ups. (1) The doctor check `chezmoi.telemetry_state_readable` passes when the state folder itself is root-owned with mode 700: the file test then says "absent", while telemetry can read and write nothing. (2) With a state file that exists but cannot be read, `_commands_log_cap` starts `dotfiles-telemetry cap-commands`, which cuts nothing, so `commands.jsonl` grows until the user fixes the file.
   - **Files**: `modules/chezmoi/doctor.sh`, `lib/stats.sh`, `tests/telemetry.bats`, `docs/observability.md`
   - **Output**: code
-  - **Acceptance**: a bats test with a state folder the user cannot enter makes the doctor check fail with the fix command; a bats test with an unreadable state file and a 20,002-line log leaves at most 10,000 lines.
+  - **Acceptance**: a bats test with a state folder the user cannot enter makes the doctor check fail with the fix command; a bats test with an unreadable state file and a log over the cap ends with a log at the cap.
   - **Hypothesis**: the two cases where telemetry state is unusable without a report or a log cut go from 2 to 0.
   - **Measurement**: `heavy-run bats tests/telemetry.bats`
   - **Success**: both new tests pass (red before the fix), and every older test passes.
-  - **Pivot**: the folder check needs more than 10 lines or a root-only fixture -> document the case in `docs/observability.md` and close.
+  - **Pivot**: the folder check needs a root-only fixture or grows past a small helper -> document the case in `docs/observability.md` and close.
   - **Anchor**: review of the telemetry follow-ups, 2026-11-10; Basili, Caldiera and Rombach 1994 (GQM).
   - **Competitive-goal**: none — telemetry robustness, not a scorecard metric.
 

@@ -1524,7 +1524,8 @@ make lint-tasks     # validate TASKS.md queue format + P0/P1 rule-9 fields
 make test           # affected tests only; skips a test that passed with the same inputs
 make test-all       # full suite (cached)
 make test-force     # full suite, no cache
-make check          # lint + TASKS.md lint + test + e2e when needed (run once before committing)
+make check          # lint + TASKS.md lint + perf gate + test + e2e when needed (run once before committing)
+make perf-gate      # fail when a tracked command got over 10% slower than the merge-base (part of make check)
 make install-deps   # install dev dependencies (required + optional tools)
 make fmt            # format shell scripts with shfmt
 make count          # show test, module, and check counts

@@ -248,6 +248,50 @@ nothing is sent. The key is never printed or logged.
   hourly wake never do. A log that was cut moves the
   cursor to its end, not to zero. Delete the file to reset.
 
+## Performance gate
+
+`make perf-gate` (also a step of `make check`) stops a PR that makes a tracked
+command slower. `scripts/perf-gate.sh` times each command in
+`config/perf-budget.tsv` in two trees in the same run: your working tree and a
+checkout of the merge-base with the default branch. It needs no stored
+baseline, so it works the same on every machine.
+
+- **Fails when** the fastest run in your tree is more than 10% and more than
+  3 ms slower than the fastest run at the base, or above the command's ceiling
+  in the budget file.
+- **How it times**: 2 warmups, then 15 runs per tree, base and head in turn,
+  with an empty environment and a scratch HOME. It compares the minimums. A
+  command that looks slower is timed again, up to two more rounds.
+- **Skips** when the diff touches no runtime path: `perf gate: skipped (no
+  runtime change)`. The path list is the `PERF_GATE_PATH` lines of the budget
+  file at the base and in your tree together, so a PR cannot shrink its own
+  scope. `scripts/perf-gate.sh --force` times anyway.
+- **Setup errors exit 2, never pass**: no base commit (run `git fetch origin`,
+  or set `PERF_GATE_BASE=<ref>`; `PERF_GATE_NO_BASE=1` checks the ceilings
+  only), a command that fails in the base checkout, a budget file with no
+  path line or no command, an allow line that names no command. The gate
+  prints the base ref and the date of its last commit, so a stale ref shows.
+- **Queue**: timing runs through `heavy-run --exclusive` and prints a line
+  while it waits for the slot. Inside a heavy-run slot (`heavy-run make
+  check`) it runs directly.
+- **On a failure**: make the command faster. If the cost is intended, raise
+  the ceiling and give the reason in the PR. A step above 10% in one PR also
+  needs a `PERF_GATE_ALLOW=<name>:<reason>` line in the budget file; the next
+  PR removes it.
+- **New hot-path command**: add its row to the budget file in the same PR.
+  A command whose file the base commit does not have gets the ceiling check
+  only. A row removed from the budget file fails the gate unless an allow
+  line names it.
+- **Machine output**: `scripts/perf-gate.sh --json` prints `base_min`,
+  `head_min`, `ratio`, and `verdict` per command.
+- **Base checkouts**: detached worktrees under
+  `~/.cache/dotfiles/perf-gate.noindex/<commit>`; the newest two are kept.
+  The gate checks that a checkout is at its commit before each use, builds
+  and removes checkouts under a lock, and removes only its own.
+- **Field numbers**: the gate measures one machine before a merge. Numbers
+  from real installs will be on the performance dashboard (link: to be added
+  with the telemetry timing events).
+
 ## Health check
 
 `dotfiles doctor` is the health check. It runs every module's checks and

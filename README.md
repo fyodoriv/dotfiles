@@ -772,7 +772,8 @@ default shell.
   its pair. The daily send measures in the background, at most once a day.
   Each of the three may take 5 seconds at most, so they add at most 15
   seconds to that send. When one
-  fails or takes longer, that number is left out.
+  fails, that number is left out. At the limit, a fastest-of-7 number uses
+  the runs that finished.
 - **Estimated**: saved seconds (`seconds_saved`). It is the number of
   automation runs times the per-task table in
   [`lib/stats.sh`](lib/stats.sh) (`_task_estimate`). No clock measures it.

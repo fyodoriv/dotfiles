@@ -203,6 +203,7 @@ receipt_finish() {
 # automation minutes since the install. Needs jq, which the install adds.
 # It also prints the stock shell start (an empty zsh config, measured now).
 # With no receipt it prints the now and stock shell start only.
+_ms_or_na() { if [ -n "${1:-}" ]; then printf '%s ms' "$1"; else printf 'n/a'; fi; }
 gains_report() {
   local receipt stats before_ms before_gb before_la now_ms stock_ms now_gb now_la secs ok finished saved
   receipt="$(receipt_dir)/install-receipt.json"
@@ -210,8 +211,8 @@ gains_report() {
     printf 'No install receipt yet. dotfiles-install run saves one; then run this again.\n'
     now_ms="$(baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || now_ms=""
     stock_ms="$(baseline_zsh_stock_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || stock_ms=""
-    printf '%-44s %7s\n' "zsh start now:" "${now_ms:+$now_ms ms}${now_ms:-n/a}"
-    printf '%-44s %7s\n' "zsh start, empty zsh config (a default Mac):" "${stock_ms:+$stock_ms ms}${stock_ms:-n/a}"
+    printf '%-44s %7s\n' "zsh start now:" "$(_ms_or_na "$now_ms")"
+    printf '%-44s %7s\n' "zsh start, empty zsh config (a default Mac):" "$(_ms_or_na "$stock_ms")"
     return 0
   fi
   command -v jq >/dev/null 2>&1 || { printf 'dotfiles metrics --gains needs jq (brew install jq).\n'; return 1; }
@@ -235,7 +236,7 @@ gains_report() {
   printf '%-22s %10s %10s\n' "CLAUDE.md (bytes)" "$(jq -r '.before.claude_md_bytes // "n/a"' "$receipt")" "$(baseline_claude_md_bytes)"
   printf '%-22s %10s %10s\n' "Claude permissions" "$(jq -r '.before.claude_permissions // "n/a"' "$receipt")" "$(baseline_claude_permissions)"
   stock_ms="$(baseline_zsh_stock_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" 2>/dev/null)" || stock_ms=""
-  printf 'zsh start, empty zsh config (a default Mac): %s\n' "${stock_ms:+$stock_ms ms}${stock_ms:-n/a}"
+  printf 'zsh start, empty zsh config (a default Mac): %s\n' "$(_ms_or_na "$stock_ms")"
   if [ -n "$secs" ]; then
     if [ "$secs" -ge 60 ]; then printf 'Time to configured: %s min' "$(((secs + 30) / 60))"; else printf 'Time to configured: %s s' "$secs"; fi
     [ "$ok" = "true" ] && printf '\n' || printf ' (the run did not finish: %s)\n' "$(jq -r '.run.failed_step // "unknown step"' "$receipt")"

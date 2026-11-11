@@ -172,7 +172,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   [[ "$output" == *"zsh start"*"400"* ]] || { echo "$output"; return 1; }
   # The default-Mac number: the same Mac with an empty zsh config.
-  [[ "$output" == *"empty zsh config"*" ms"* ]] || { echo "$output"; return 1; }
+  [[ "$output" =~ empty\ zsh\ config[^$'\n']*:\ [0-9]+\ ms($'\n'|$) ]] || { echo "$output"; return 1; }
   [[ "$output" == *"LaunchAgents"*"3"* ]]
   [[ "$output" == *"Claude skills"*"5"* ]] || { echo "$output"; return 1; }
   [[ "$output" == *"Claude permissions"*"default"* ]]
@@ -187,8 +187,8 @@ teardown() { rm -rf "$TEST_DIR"; }
   run bash "$REPO/bin/dotfiles-metrics" --gains
   [ "$status" -eq 0 ]
   [[ "$output" == *"No install receipt yet"*"dotfiles-install run"* ]]
-  [[ "$output" =~ zsh\ start\ now:\ +[0-9]+\ ms ]] || { echo "$output"; return 1; }
-  [[ "$output" =~ empty\ zsh\ config[^$'\n']*:\ +[0-9]+\ ms ]] || { echo "$output"; return 1; }
+  [[ "$output" =~ zsh\ start\ now:\ +[0-9]+\ ms($'\n'|$) ]] || { echo "$output"; return 1; }
+  [[ "$output" =~ empty\ zsh\ config[^$'\n']*:\ +[0-9]+\ ms($'\n'|$) ]] || { echo "$output"; return 1; }
   [[ "$output" != *"Before"* ]]
 }
 

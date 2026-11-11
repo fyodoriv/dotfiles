@@ -207,6 +207,9 @@ the gains event.
   Measured on 2026-11-10: 9 medians of 3 at a load of 20 to 30 ran from 13
   to 54 ms for the stock shell. 9 minimums of 7 at a load of 12 ran from 12
   to 14 ms (stock, spread 15%) and from 136 to 159 ms (now, spread 16%).
+  A very busy Mac still raises the fastest run: one send taken while a test
+  suite ran measured 234 ms (now) and 23 ms (stock). So the dashboard tile
+  takes, for each install, the lowest value of its last 14 days.
 - **The default-Mac baseline.** `zsh_min_ms_stock` is the shell start of the
   same Mac with an empty zsh config. zsh gets a new empty temp folder as
   `ZDOTDIR`, so it reads no user file. The folder is removed afterwards,
@@ -219,7 +222,8 @@ the gains event.
   `dotfiles telemetry status` never measures. A `send --dry-run` measures
   each once when a gains event is due. Each measurement has its own limit of
   5 seconds, so a gains event adds at most 15 seconds. When one fails or
-  takes longer, it is stopped, that field is left out, and the send goes on.
+  takes longer, it is stopped. A fastest-of-7 number then uses the runs that
+  finished; with none, that field is left out. The send goes on.
   This time does not count against the 3-second limit of the daily send.
 - **No number, no event.** With no receipt and no measurement there is no
   gains event. The gains day is still set, so the measurements are tried at
@@ -245,7 +249,8 @@ the gains event.
   is not read.
 - **Cursors.** The state file keeps `install_sent` (the end time of the last
   install that was sent) and `gains_day`. Each moves only after the endpoint
-  answers 2xx for a request that held its event.
+  answers 2xx for a request that held its event. One exception: when a gains
+  event was due and no number could be measured, the gains day is still set.
 - The local view is `dotfiles metrics --gains`. It prints the default shell
   start next to before and now. With no receipt it prints now and the
   default shell start. It sends nothing.
@@ -263,7 +268,7 @@ HogQL query over the anonymous events. Tool names come from the event name
 | Week-1 retention | Which share of installs is seen again in days 7 to 13? | counted |
 | Time to configured | Median and p95 of `seconds` on `dotfiles.install` | measured |
 | Saved minutes, last 30 days | Sum of `seconds_saved`, in total and per install | estimated |
-| Shell start: default Mac, before, and now | Median over installs of `zsh_min_ms_stock` and `zsh_min_ms_now` (the default-Mac pair), and of `zsh_ms_before` and `zsh_ms_now`; latest `dotfiles.gains` per install | measured |
+| Shell start: default Mac, before, and now | Median over installs of `zsh_min_ms_stock` and `zsh_min_ms_now` (the default-Mac pair; per install the lowest value of the last 14 days), and of `zsh_ms_before` and `zsh_ms_now` (latest `dotfiles.gains` per install) | measured |
 
 Known gaps on 2026-11-10: the retention tile is empty until an install is 14
 days old. The time-to-configured tile and the before column of the shell tile are empty

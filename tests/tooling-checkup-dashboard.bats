@@ -54,3 +54,29 @@ setup() {
   DASH_DROP=load run node "$GATE" "$PAGE" nodata
   [ "$status" -eq 0 ]
 }
+
+@test "dashboard draws 168 distinct hours through spring-forward" {
+  DASH_DST=spring run node "$GATE" "$PAGE" spring
+  [ "$status" -eq 0 ]
+}
+
+@test "the gate fails when ArrowLeft stops changing the tooltip" {
+  sed 's/ArrowLeft: at - 1/ArrowLeft: at/' "$PAGE" > "$BATS_TEST_TMPDIR/no-arrow.html"
+  run node "$GATE" "$BATS_TEST_TMPDIR/no-arrow.html" noarrow
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ FAIL\ [a-z]+-[a-z]+\ interaction.*ArrowLeft ]]
+}
+
+@test "the gate fails when a phone tooltip ignores touch input" {
+  sed 's/showAt(nearest(e));/if (e.pointerType !== "touch") showAt(nearest(e));/g' "$PAGE" > "$BATS_TEST_TMPDIR/no-touch.html"
+  run node "$GATE" "$BATS_TEST_TMPDIR/no-touch.html" notouch
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ FAIL\ [a-z]+-phone\ interaction.*tap ]]
+}
+
+@test "the gate fails on a chart line below three to one contrast" {
+  DASH_PLANT=chartcontrast run node "$GATE" "$PAGE" chartcontrast
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ FAIL\ light-[a-z]+\ chartContrast ]]
+  [[ "$output" =~ FAIL\ dark-[a-z]+\ chartContrast ]]
+}

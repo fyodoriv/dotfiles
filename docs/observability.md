@@ -229,8 +229,12 @@ the gains event.
   gains event. The gains day is still set, so the measurements are tried at
   most once a day. The pending count of `status` counts a gains event that
   is due before it is known whether a number can be measured.
-- **Consent.** The install event is sent only when the install finished on or
-  after the day of the yes. `zsh_ms_before` and `days_since_install` are a
+- **Consent.** The install event is sent only when the install finished at or
+  after the exact time of the yes. The state file keeps that time as
+  `consent_time`, next to the day (`consent_at`). The time stays on the Mac
+  and is never sent. A state file from before `consent_time` existed has the
+  day only, so for that file the install must have finished on or after the
+  day of the yes. `zsh_ms_before` and `days_since_install` are a
   baseline from before the yes. This is the one exception to "a yes covers
   only later events", and the consent text says so. `zsh_min_ms_now` and `zsh_min_ms_stock` are not
   part of that exception: they are measured at send time, after the yes.
@@ -238,7 +242,8 @@ the gains event.
   `2026-11-10` (`GAINS_SINCE` in the sender), the day they shipped. A person
   who said yes before that day agreed to a text without the baseline
   exception, so that yes does not cover them. `dotfiles telemetry on` gives
-  a new yes: it shows the text again and records today as the day.
+  a new yes: it shows the text again and records today as the day, and now as
+  the time.
 - **Switches.** Without a stored yes, or with `CI`, `DO_NOT_TRACK`, or
   `DOTFILES_TELEMETRY=0` set, the events are not built at all: not in a
   send, not in a dry run, and not in the pending count.
@@ -324,7 +329,9 @@ nothing is sent. The key is never printed or logged.
   run. With no state file (nobody answered the question) there is no cursor,
   so `lib/stats.sh` cuts the log by itself with `tail` and `mv`. That path
   needs no jq and works for root, and the log keeps its owner and mode. With
-  a state file and no jq the log is not cut until jq is back.
+  a state file and no jq the log is not cut until jq is back. A state file
+  that you cannot read is treated like no state file: `lib/stats.sh` cuts the
+  log by itself, because `cap-commands` could not read the cursor.
 - **Never as root.** With `sudo`, the state file, the lock, and the plist
   would become root-owned, and your own runs could not read them afterwards.
   So as root nothing is saved, loaded, or sent, and one line says so. A
@@ -365,7 +372,10 @@ nothing is sent. The key is never printed or logged.
   and goes on: it never fails on that file, and the agent stays off. The
   doctor check `chezmoi.telemetry_state_readable` reports a state file that
   another user owns or that you cannot read or write, and prints the fix
-  (`sudo chown` and `chmod 600`).
+  (`sudo chown` and `chmod 600`). It also fails when the state folder itself
+  cannot be entered (for example mode 000): the file then looks absent, but
+  telemetry can read and write nothing. The fix is `chmod 700` on the folder
+  (with `sudo chown` first when another user owns it).
 - **Custom state folder.** The job gets `XDG_STATE_HOME` only when that
   variable is set where its plist is rendered (`dotfiles telemetry on` or
   `dotfiles apply`). Set it in the shell that runs them. A background apply

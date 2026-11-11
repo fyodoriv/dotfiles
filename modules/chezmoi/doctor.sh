@@ -28,24 +28,39 @@
 # bin/dotfiles-telemetry reads and writes it. A file that another user owns
 # (for example root, after an old `sudo` run) or that has no read or write bit cannot
 # be used: apply then reads the answer as "not yes", and the answer cannot be
-# changed. No file is fine: nobody answered yet. The owner is read with `ls`,
-# which prints the same on macOS and Linux. DOTFILES_TELEMETRY_TEST_UID is for
+# changed. The same holds for a state folder that cannot be entered: the file
+# then looks absent, but telemetry can read and write nothing. No file is
+# fine: nobody answered yet. The owner is read with `ls`, which prints the
+# same on macOS and Linux. DOTFILES_TELEMETRY_TEST_UID is for
 # tests only.
 _telemetry_state_file="${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}"
+_telemetry_state_dir="${_telemetry_state_file%/*}"
 _telemetry_state_mine() {
   local uid owner
   uid="$(id -u)"
   [ -z "${BATS_TEST_FILENAME:-}" ] || uid="${DOTFILES_TELEMETRY_TEST_UID:-$uid}"
   # shellcheck disable=SC2012  # one fixed path, read for its numeric owner
-  owner="$(ls -ldn "$_telemetry_state_file" 2>/dev/null | awk '{print $3}')"
+  owner="$(ls -ldn "${1:-$_telemetry_state_file}" 2>/dev/null | awk '{print $3}')"
   [ "$owner" = "$uid" ]
 }
+# A state folder that exists but cannot be entered. An absent folder is fine.
+_telemetry_dir_blocked() {
+  [ -d "$_telemetry_state_dir" ] && [ ! -x "$_telemetry_state_dir" ]
+}
 _telemetry_state_usable() {
+  ! _telemetry_dir_blocked || return 1
   [ -e "$_telemetry_state_file" ] || [ -L "$_telemetry_state_file" ] || return 0
   _telemetry_state_mine && [ -r "$_telemetry_state_file" ] && [ -w "$_telemetry_state_file" ]
 }
 printf -v _telemetry_state_q '%q' "$_telemetry_state_file"
-if [ -e "$_telemetry_state_file" ] && ! _telemetry_state_mine; then
+printf -v _telemetry_dir_q '%q' "$_telemetry_state_dir"
+if _telemetry_dir_blocked; then
+  if _telemetry_state_mine "$_telemetry_state_dir"; then
+    _telemetry_state_help="telemetry state folder cannot be entered. You: open Terminal and run chmod 700 $_telemetry_dir_q"
+  else
+    _telemetry_state_help="telemetry state folder belongs to another user and cannot be entered. You: open Terminal and run sudo chown \"\$(id -un)\" $_telemetry_dir_q && chmod 700 $_telemetry_dir_q"
+  fi
+elif [ -e "$_telemetry_state_file" ] && ! _telemetry_state_mine; then
   _telemetry_state_help="telemetry state file belongs to another user. You: open Terminal and run sudo chown \"\$(id -un)\" $_telemetry_state_q && chmod 600 $_telemetry_state_q"
 else
   _telemetry_state_help="telemetry state file is not readable or not writable. You: open Terminal and run chmod 600 $_telemetry_state_q"
@@ -53,9 +68,9 @@ fi
 check "chezmoi.telemetry_state_readable" \
   "telemetry state file is yours and readable (or absent)" \
   "_telemetry_state_usable" \
-  "[ -O $_telemetry_state_q ] && chmod 600 $_telemetry_state_q" \
+  "{ [ ! -d $_telemetry_dir_q ] || [ -x $_telemetry_dir_q ] || { [ -O $_telemetry_dir_q ] && chmod 700 $_telemetry_dir_q; }; } && { [ ! -e $_telemetry_state_q ] || { [ -O $_telemetry_state_q ] && chmod 600 $_telemetry_state_q; }; }" \
   "$_telemetry_state_help"
-unset _telemetry_state_q _telemetry_state_help
+unset _telemetry_state_q _telemetry_dir_q _telemetry_state_help
 
 # ── Managed symlinks ────────────────────────────────────────────────────
 if ! command -v chezmoi >/dev/null 2>&1; then

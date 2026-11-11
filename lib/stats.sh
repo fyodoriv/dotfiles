@@ -219,7 +219,9 @@ dotfiles_telemetry_ask() {
 # back by the number of dropped lines, under its lock, so a line that was not
 # sent yet is still sent.
 # With no state file nobody answered the question: there is no cursor and
-# nothing is ever sent. Then this hook cuts the log itself. So the cap also
+# nothing is ever sent. Then this hook cuts the log itself. It does the same
+# for a state file that this user cannot read: cap-commands could not read the
+# cursor and would cut nothing. So the cap also
 # works where cap-commands cannot run: on a machine without jq, and for root
 # (a container user). The copy (`cp -p`) keeps the owner and the mode of the
 # log, so a cut by root leaves a file the user can still write.
@@ -228,7 +230,7 @@ _commands_log_cap() {
   lines="$(wc -l <"$DOTFILES_COMMANDS_FILE" 2>/dev/null)" || return 0
   lines="${lines//[^0-9]/}"
   [ "${lines:-0}" -gt 20000 ] || return 0
-  if [ -e "${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}" ]; then
+  if [ -r "${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}" ]; then
     _stats_repo_root
     DOTFILES_COMMANDS_FILE="$DOTFILES_COMMANDS_FILE" bash "$_STATS_REPO_ROOT/bin/dotfiles-telemetry" cap-commands >/dev/null 2>&1 || true
     return 0

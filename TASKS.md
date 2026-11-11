@@ -396,24 +396,10 @@ them. -->
   - **Anchor**: Munafò et al. 2017 (pre-registration); Basili, Caldiera and Rombach 1994 (GQM).
   - **Competitive-goal**: none — consent precision, not a scorecard metric.
 
-- [ ] Re-measure the default-Mac shell baseline on an idle Mac, then ship or drop it
-  - **ID**: telemetry-gains-stock-baseline-idle-remeasure
-  - **Tags**: telemetry, metrics
-  - **Details**: Draft PR fyodoriv/dotfiles#579 adds `zsh_ms_stock` to `dotfiles.gains`: the shell start of the same Mac with an empty zsh config (`ZDOTDIR` set to an empty folder). Every install can send it, also a Mac with no install receipt, which today sends no gains event. The first measurement, on 2026-11-10 at a load of 20 to 30, hit the pivot line: medians of 3 runs were 39, 25, 16, 17, 13, 21, 54, 37 and 17 ms. `zsh_ms_now` spread 38% in the same runs. Measure again when the 1-minute load is under 4.
-  - **Files**: `lib/mac-baseline.sh`, `bin/dotfiles-telemetry`, `tests/telemetry-gains.bats`
-  - **Output**: code, or a closed draft with the numbers
-  - **Acceptance**: the PR is merged with the idle spread in its body, or closed with the numbers and this task removed.
-  - **Hypothesis**: on an idle Mac the median-of-3 stock shell start has a spread of 30% or less over 9 measurements.
-  - **Measurement**: `source lib/mac-baseline.sh; for i in 1 2 3 4 5 6 7 8 9; do baseline_zsh_stock_ms 3; done` on the draft branch, with `uptime` before and after.
-  - **Success**: spread (max minus min, over the median) of 30% or less.
-  - **Pivot**: over 30% when idle -> try the minimum of 5 runs once; if that also fails, close the draft.
-  - **Anchor**: Mytkowicz et al. 2009 (Producing Wrong Data Without Doing Anything Obviously Wrong!).
-  - **Competitive-goal**: none — proof of field gains, not a scorecard metric.
-
 - [ ] Show the gain events on the maintainer's private PostHog dashboard
   - **ID**: telemetry-gains-dashboard-tiles
   - **Tags**: telemetry, metrics, owner
-  - **Details**: The sender now sends `dotfiles.install` (`seconds`, `ok`, `profile`) and `dotfiles.gains` (`zsh_ms_before`, `zsh_ms_now`, `zsh_min_ms_now`, `zsh_min_ms_stock`, `days_since_install`; with no install receipt only the three numbers measured in the send), and `dotfiles.run` carries `seconds_saved` (an estimate). The tiles exist since 2026-11-10 and `docs/observability.md` lists them ("Product tiles on the dashboard"); the saved-minutes tile has data, and the time-to-configured and shell-start tiles are empty because no install with a receipt has sent an event yet. What is left: read the two tiles after the first such install; add the install success rate per profile (the time-to-configured tile counts `finished_ok` over all profiles only); change the shell-start tile from an average to a median; then close this task. Original plan: add tiles to the private dashboard: median time to configured and install success rate per profile; median shell start before and now, per install and over all installs; the sum of estimated saved seconds per install and in total. Label the saved seconds as an estimate. The README Proof row for the install is a separate task (`proof-install-field-outcome`); the install receipt can feed it.
+  - **Details**: The sender now sends `dotfiles.install` (`seconds`, `ok`, `profile`) and `dotfiles.gains` (`zsh_ms_before`, `zsh_ms_now`, `zsh_min_ms_now`, `zsh_min_ms_stock`, `days_since_install`; with no install receipt only the three numbers measured in the send), and `dotfiles.run` carries `seconds_saved` (an estimate). The tiles exist since 2026-11-10 and `docs/observability.md` lists them ("Product tiles on the dashboard"); the saved-minutes tile has data, and the time-to-configured and shell-start tiles are empty because no install with a receipt has sent an event yet. What is left: read the two tiles after the first such install; add the install success rate per profile (the time-to-configured tile counts `finished_ok` over all profiles only); then close this task. The shell-start tile reads medians and the default-Mac pair since 2026-11-10. Original plan: add tiles to the private dashboard: median time to configured and install success rate per profile; median shell start before and now, per install and over all installs; the sum of estimated saved seconds per install and in total. Label the saved seconds as an estimate. The README Proof row for the install is a separate task (`proof-install-field-outcome`); the install receipt can feed it.
   - **Files**: the PostHog project (owner), `docs/observability.md`
   - **Output**: dashboard, docs
   - **Acceptance**: the dashboard shows each tile with data from one real install or more; `docs/observability.md` lists the tiles.

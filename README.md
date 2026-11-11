@@ -708,10 +708,10 @@ install receipt. The gains event is sent with or without a receipt.
   and `profile` (`core` or `full`). Sent only when the install finished on or
   after the day of your yes, and not more than 30 days ago.
 - `dotfiles.gains`, at most once a day: `zsh_ms_before`, `zsh_ms_now`,
-  `zsh_ms_stock`, and `days_since_install`. A Mac with no install receipt
-  sends `zsh_ms_now` and `zsh_ms_stock` only. `zsh_ms_stock` is the shell
-  start of this Mac with an empty zsh config. It is measured in the send, so
-  it is not a baseline from before your yes.
+  `zsh_min_ms_now`, `zsh_min_ms_stock`, and `days_since_install`. A Mac with
+  no install receipt sends only the three numbers measured in the send.
+  `zsh_min_ms_stock` is the shell start of this Mac with an empty zsh config.
+  It is measured in the send, so it is not a baseline from before your yes.
 
 Both events need a yes given on or after 2026-11-10, the day they shipped. An
 older yes was given to a text that did not name the baseline, so it does not
@@ -757,18 +757,21 @@ default shell.
   (`~/.local/state/dotfiles/install-receipt.json`). A Mac installed before
   receipts existed has none.
 - **Default-Mac baseline**: the same Mac with an empty zsh config
-  (`zsh_ms_stock`). zsh gets a new empty temp folder as its config folder
+  (`zsh_min_ms_stock`). zsh gets a new empty temp folder as its config folder
   (`ZDOTDIR`), and the folder is removed afterwards. `/etc/zshrc` still
   loads, as on a default Mac. It needs no receipt, so every install has it.
 - **The cost, stated plainly**: dotfiles adds shell features (prompt,
   completions, tools). So the shell start with dotfiles can be slower than
-  the default one. `zsh_ms_now` next to `zsh_ms_stock` shows that cost.
-- **Measured**: shell start (`zsh_ms_before` from the receipt, `zsh_ms_now`
-  and `zsh_ms_stock` from the send), and time to configured (`seconds` of
-  the install run). All shell numbers use one method: the full run time of
-  `zsh -i -c 'exit 0'`, the median of 3 runs. The daily send measures the
-  now and stock values in the background, at most once a day. Each may take
-  5 seconds at most, so both add at most 10 seconds to that send. When one
+  the default one. `zsh_min_ms_now` next to `zsh_min_ms_stock` shows that cost.
+- **Measured**: shell start (`zsh_ms_before` from the receipt; `zsh_ms_now`,
+  `zsh_min_ms_now` and `zsh_min_ms_stock` from the send), and time to
+  configured (`seconds` of the install run). All shell numbers are the full
+  run time of `zsh -i -c 'exit 0'`. Before and now are the median of 3 runs.
+  The default-Mac pair (`zsh_min_ms_now`, `zsh_min_ms_stock`) is the fastest
+  of 7 runs, because a busy Mac only adds time. Compare a number only inside
+  its pair. The daily send measures in the background, at most once a day.
+  Each of the three may take 5 seconds at most, so they add at most 15
+  seconds to that send. When one
   fails or takes longer, that number is left out.
 - **Estimated**: saved seconds (`seconds_saved`). It is the number of
   automation runs times the per-task table in

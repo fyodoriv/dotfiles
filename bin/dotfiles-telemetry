@@ -40,7 +40,7 @@
 #
 # Two more events use the install receipt (lib/mac-baseline.sh,
 # install-receipt.json). With no receipt the install event is not sent, and
-# the gains event carries only the two numbers measured in the send.
+# the gains event carries only the three numbers measured in the send.
 #   dotfiles.install  once per receipt: seconds (time to configured), ok, and
 #                     profile (only "core" or "full"). Its time is the end of
 #                     the install. Sent only when the install finished on or
@@ -48,20 +48,25 @@
 #                     MAX_AGE_DAYS ago.
 #   dotfiles.gains    at most once a day: zsh_ms_before (the receipt's shell
 #                     start time before the install), zsh_ms_now (the same
-#                     measurement, taken in the send), zsh_ms_stock (the same
-#                     measurement with an empty zsh config, taken in the
+#                     measurement, taken in the send), the pair
+#                     zsh_min_ms_now and zsh_min_ms_stock (the fastest of 7
+#                     runs, now and with an empty zsh config, taken in the
 #                     send), and days_since_install. With no receipt, or a
-#                     receipt with no real before time: zsh_ms_now and
-#                     zsh_ms_stock only. With no number at all: no event.
-# All shell numbers use one method: baseline_zsh_ms in lib/mac-baseline.sh,
-# the full run time of `zsh -i -c 'exit 0'`. For zsh_ms_stock, ZDOTDIR is a
+#                     receipt with no real before time: the three numbers
+#                     from the send only. With no number at all: no event.
+# All shell numbers come from baseline_zsh_ms in lib/mac-baseline.sh, the
+# full run time of `zsh -i -c 'exit 0'`. zsh_ms_before and zsh_ms_now are the
+# median of 3 runs. zsh_min_ms_now and zsh_min_ms_stock are the fastest of 7
+# runs: load on the Mac only adds time, so the fastest run moves least.
+# Compare a number only inside its pair. For zsh_min_ms_stock, ZDOTDIR is a
 # new empty temp folder, removed afterwards; /etc/zshrc still loads, as on a
-# default Mac. The send measures the now and stock values at most once a
-# day, and never on the path of a normal command. Each of the two has its
-# own limit of ZSH_LIMIT seconds, so a gains event adds at most two times
+# default Mac. The send measures the three values at most once a
+# day, and never on the path of a normal command. Each of the three has its
+# own limit of ZSH_LIMIT seconds, so a gains event adds at most three times
 # ZSH_LIMIT. When one fails or takes longer, that field is left out and the
 # send goes on. A dry run measures each once. status never measures.
-# zsh_ms_stock is not a baseline from before the yes: it is measured now.
+# zsh_min_ms_now and zsh_min_ms_stock are not a baseline from before the yes:
+# they are measured now.
 # zsh_ms_before and days_since_install are a baseline from before the yes.
 # This is the one exception to "a yes covers only later events"; the consent
 # text says so. People who said yes before that text named the baseline did
@@ -112,7 +117,7 @@ RETRY_SECONDS=3600   # the daily path tries at most once in this time
 # was given to a text without the baseline exception, so it does not cover
 # them.
 GAINS_SINCE="2026-11-10"
-ZSH_LIMIT=5          # seconds each shell start measurement (now, stock) may take
+ZSH_LIMIT=5          # seconds each shell start measurement may take
 RECEIPT_MAX_BYTES=65536  # a larger install receipt is not read
 # Every profile name an install event may carry.
 PROFILE_NAMES="core full"
@@ -532,12 +537,14 @@ extras_plan() {
   return 0
 }
 
-# shell_start now|stock: a shell start time in ms, or nothing. "now" is this
-# Mac as it is. "stock" is this Mac with an empty zsh config: zsh gets a new
-# empty temp folder as its config folder, and this function removes the
-# folder, also after a stop. Both are the same measurement as the install
-# receipt's zsh_ms (baseline_zsh_ms in lib/mac-baseline.sh), so the before,
-# now, and stock numbers compare fairly. It runs in the background with a
+# shell_start now|now_min|stock: a shell start time in ms, or nothing. "now"
+# is this Mac as it is, the median of 3 runs: the same measurement as the
+# install receipt's zsh_ms (baseline_zsh_ms in lib/mac-baseline.sh), so before
+# and now compare fairly. "now_min" and "stock" are a pair of their own: the
+# fastest of 7 runs, which moves least when the Mac is busy. "stock" is this
+# Mac with an empty zsh config: zsh gets a new empty temp folder as its
+# config folder, and this function removes the folder, also after a stop.
+# Compare stock only with now_min. It runs in the background with a
 # hard limit: after ZSH_LIMIT seconds it is stopped with its child processes
 # and gives nothing. Each call has its own limit. Never fails. Only
 # extras_body calls it, so only a send or a dry run that has a gains event to
@@ -551,14 +558,16 @@ kill_tree() {
   for child in $children; do kill_tree "$child"; done
 }
 shell_start() {
-  local mode="$1" out="$STATE.zsh.$$" dir="" pid ticks=0 ms=""
+  local mode="$1" out="$STATE.zsh.$$" dir="" pid ticks=0 ms="" runs stat="median"
   [ -f "$DOTFILES_DIR/lib/mac-baseline.sh" ] || return 0
   # shellcheck source=../lib/mac-baseline.sh
   source "$DOTFILES_DIR/lib/mac-baseline.sh" 2>/dev/null || return 0
   if [ "$mode" = "stock" ]; then
     dir="$(baseline_zsh_stock_dir)" && [ -n "$dir" ] && [ -d "$dir" ] || return 0
   fi
-  (baseline_zsh_ms "${DOTFILES_BASELINE_ZSH_RUNS:-3}" "$dir" >"$out" 2>/dev/null) </dev/null &
+  if [ "$mode" = "now" ]; then runs="${DOTFILES_BASELINE_ZSH_RUNS:-3}"
+  else runs="${DOTFILES_BASELINE_ZSH_MIN_RUNS:-7}" stat="min"; fi
+  (baseline_zsh_ms "$runs" "$dir" "$stat" >"$out" 2>/dev/null) </dev/null &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$ticks" -ge $((ZSH_LIMIT * 10)) ]; then
@@ -582,16 +591,17 @@ shell_start() {
 # The gains event carries the receipt's fields only when the receipt has a
 # real before time, and it is built only when it has at least one number.
 extras_body() {
-  local key="$1" zsh_now="" zsh_stock=""
+  local key="$1" zsh_now="" zsh_now_min="" zsh_stock=""
   [ -n "$EXTRA_INSTALL" ] || [ "$EXTRA_GAINS" -eq 1 ] || return 0
   if [ "$EXTRA_GAINS" -eq 1 ]; then
     zsh_now="$(shell_start now)"
+    zsh_now_min="$(shell_start now_min)"
     zsh_stock="$(shell_start stock)"
   fi
   app_version
   DOTFILES_TELEMETRY_BODY_KEY="$key" jq -R -s -c \
     --arg id "$S_ID" --arg install "$EXTRA_INSTALL" --argjson gains "$EXTRA_GAINS" \
-    --arg zsh_now "$zsh_now" --arg zsh_stock "$zsh_stock" --arg profiles "$PROFILE_NAMES" \
+    --arg zsh_now "$zsh_now" --arg zsh_now_min "$zsh_now_min" --arg zsh_stock "$zsh_stock" --arg profiles "$PROFILE_NAMES" \
     --arg version "$VERSION" --arg os "$(os_name)" --arg arch "$(arch_name)" '
     def obj: if type == "object" then . else {} end;
     # A negative zero passes ">= 0" and prints as -0: it leaves as 0.
@@ -624,7 +634,8 @@ extras_body() {
                  + {days_since_install: ([((now - $taken) / 86400 | floor), 0] | max)}
             else {} end)
            + number_field("zsh_ms_now"; $zsh_now | select(test("^[0-9]{1,9}$")) | tonumber)
-           + number_field("zsh_ms_stock"; $zsh_stock | select(test("^[0-9]{1,9}$")) | tonumber)) as $numbers
+           + number_field("zsh_min_ms_now"; $zsh_now_min | select(test("^[0-9]{1,9}$")) | tonumber)
+           + number_field("zsh_min_ms_stock"; $zsh_stock | select(test("^[0-9]{1,9}$")) | tonumber)) as $numbers
         | select($gains == 1 and ($numbers | length) > 0)
         | {event: "dotfiles.gains", distinct_id: $id, properties: ($common + $numbers)})]
     | select(length > 0)

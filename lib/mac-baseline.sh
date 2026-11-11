@@ -12,8 +12,13 @@
 # baseline_zsh_ms [runs] [zdotdir]: with a second argument, zsh reads its
 # config from that folder (ZDOTDIR) and not from the home folder. This is how
 # the stock number is measured, so both numbers use this one function.
+# A third argument "min" prints the fastest run and not the median. Other
+# work on the Mac only ever adds time to a run, so the fastest of several
+# runs moves least with load (measured 2026-11-10 at a load of 12: 9 times
+# the minimum of 7 runs spread 15%; the median of 3 at a load of 20 to 30
+# spread over 100%).
 baseline_zsh_ms() {
-  local runs="${1:-3}" zdotdir="${2:-}" i
+  local runs="${1:-3}" zdotdir="${2:-}" stat="${3:-median}" i
   command -v zsh >/dev/null 2>&1 || return 1
   for ((i = 0; i < runs; i++)); do
     if [ -n "$zdotdir" ]; then
@@ -21,7 +26,7 @@ baseline_zsh_ms() {
     else
       _baseline_run_ms zsh -i -c 'exit 0'
     fi
-  done | sort -n | awk '{ v[NR] = $1 } END { if (NR) print v[int((NR + 1) / 2)]; else exit 1 }'
+  done | sort -n | awk -v stat="$stat" '{ v[NR] = $1 } END { if (!NR) exit 1; print (stat == "min") ? v[1] : v[int((NR + 1) / 2)] }'
 }
 
 # The default-Mac number: the shell start time of this Mac with an empty zsh

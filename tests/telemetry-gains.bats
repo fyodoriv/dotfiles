@@ -37,7 +37,7 @@ SH
   # use older days, so they move that day back (a seam for tests only).
   export DOTFILES_TELEMETRY_TEST_GAINS_SINCE="2000-01-01"
   # A fake zsh, first on PATH: the send times it for zsh_ms_now and, with
-  # ZDOTDIR set, for zsh_ms_stock. It logs each start: "start" for a now run,
+  # ZDOTDIR set, for zsh_min_ms_stock. It logs each start: "start" for a now run,
   # and "stock <ZDOTDIR> <entries in it>" for a stock run. FAKE_ZSH_SLEEP and
   # FAKE_ZSH_EXIT make it slow or make it fail; FAKE_ZSH_STOCK_SLEEP makes
   # only the stock run slow.
@@ -57,7 +57,7 @@ echo "\$\$" >"$TEST_DIR/zsh.pid"
 exit "\${FAKE_ZSH_EXIT:-0}"
 SH
   chmod +x "$TEST_DIR/bin/zsh"
-  export PATH="$TEST_DIR/bin:$PATH" DOTFILES_BASELINE_ZSH_RUNS=1
+  export PATH="$TEST_DIR/bin:$PATH" DOTFILES_BASELINE_ZSH_RUNS=1 DOTFILES_BASELINE_ZSH_MIN_RUNS=1
   unset FAKE_ZSH_SLEEP FAKE_ZSH_EXIT FAKE_ZSH_DEAF FAKE_ZSH_STOCK_SLEEP
 }
 refute() { if "$@" 2>/dev/null; then return 1; fi; }
@@ -120,7 +120,7 @@ dry_events() {
   [ "$(jq -c '.[0].properties | keys' <<<"$output")" = '["$geoip_disable","$process_person_profile","app_version","arch","ok","os","profile","runtime","seconds"]' ] || { echo "$output"; return 1; }
 }
 
-@test "with a receipt the gains event carries zsh_ms_before, zsh_ms_now, zsh_ms_stock, and days_since_install" {
+@test "with a receipt the gains event carries zsh_ms_before, zsh_ms_now, the min-of-7 pair, and days_since_install" {
   receipt
   # A stored shell-start sample is never the now value: the send measures it.
   shell_sample "$NOW" 99999
@@ -130,11 +130,21 @@ dry_events() {
   [ "$(jq 'length' <<<"$output")" = "1" ] || { echo "$output"; return 1; }
   [ "$(jq -c '.[0].properties | [.zsh_ms_before, .days_since_install]' <<<"$output")" = "[412,12]" ] || { echo "$output"; return 1; }
   [ "$(jq -c '.[0].properties.zsh_ms_now | type == "number" and . >= 1 and . < 5000 and . == floor' <<<"$output")" = "true" ] || { echo "$output"; return 1; }
-  [ "$(jq -c '.[0].properties.zsh_ms_stock | type == "number" and . >= 1 and . < 5000 and . == floor' <<<"$output")" = "true" ] || { echo "$output"; return 1; }
-  [ "$(jq -c '.[0].properties | keys' <<<"$output")" = '["$geoip_disable","$process_person_profile","app_version","arch","days_since_install","os","runtime","zsh_ms_before","zsh_ms_now","zsh_ms_stock"]' ] || { echo "$output"; return 1; }
+  [ "$(jq -c '.[0].properties.zsh_min_ms_stock | type == "number" and . >= 1 and . < 5000 and . == floor' <<<"$output")" = "true" ] || { echo "$output"; return 1; }
+  [ "$(jq -c '.[0].properties | keys' <<<"$output")" = '["$geoip_disable","$process_person_profile","app_version","arch","days_since_install","os","runtime","zsh_min_ms_now","zsh_min_ms_stock","zsh_ms_before","zsh_ms_now"]' ] || { echo "$output"; return 1; }
 }
 
-@test "with no receipt the gains event carries zsh_ms_stock and zsh_ms_now only" {
+@test "the default-Mac pair asks for the fastest of 7 runs; before and now keep the median of 3" {
+  grep -q 'DOTFILES_BASELINE_ZSH_MIN_RUNS:-7' "$TEL"
+  grep -q 'stat="min"' "$TEL"
+  grep -q 'DOTFILES_BASELINE_ZSH_RUNS:-3' "$TEL"
+  # With the real run counts a send starts zsh 3 + 7 times, and 7 times stock.
+  say_yes
+  DOTFILES_BASELINE_ZSH_RUNS=3 DOTFILES_BASELINE_ZSH_MIN_RUNS=7 bash "$TEL" send
+  [ "$(zsh_starts) $(stock_starts)" = "10 7" ] || { echo "$(zsh_starts) $(stock_starts)"; return 1; }
+}
+
+@test "with no receipt the gains event carries only the three numbers measured in the send" {
   printf '%s\n' "{\"task\":\"sync\",\"timestamp\":\"$NOW\",\"seconds_saved\":3,\"units\":1}" >"$DOTFILES_STATS_FILE"
   say_yes
   run bash "$TEL" status
@@ -147,19 +157,19 @@ dry_events() {
   [[ "$output" == *"2 event(s) pending"* ]] || { echo "$output"; return 1; }
   [ "$(cat "$DOTFILES_TELEMETRY_STATE")" = "$before" ]
   # A dry run measures each number once.
-  [ "$(zsh_starts)$(stock_starts)" = "11" ]
+  [ "$(zsh_starts)$(stock_starts)" = "21" ]
   run bash "$TEL" send
   [[ "$output" == *"sent 2 event(s)"* ]] || { echo "$output"; return 1; }
   run sent_events dotfiles.gains
   [ "$(jq 'length' <<<"$output")" = "1" ] || { echo "$output"; return 1; }
-  [ "$(jq -c '.[0].properties | keys' <<<"$output")" = '["$geoip_disable","$process_person_profile","app_version","arch","os","runtime","zsh_ms_now","zsh_ms_stock"]' ] || { echo "$output"; return 1; }
-  [ "$(jq -c '.[0].properties | [.zsh_ms_now, .zsh_ms_stock] | all(type == "number" and . >= 1 and . < 5000 and . == floor)' <<<"$output")" = "true" ]
+  [ "$(jq -c '.[0].properties | keys' <<<"$output")" = '["$geoip_disable","$process_person_profile","app_version","arch","os","runtime","zsh_min_ms_now","zsh_min_ms_stock","zsh_ms_now"]' ] || { echo "$output"; return 1; }
+  [ "$(jq -c '.[0].properties | [.zsh_ms_now, .zsh_min_ms_now, .zsh_min_ms_stock] | all(type == "number" and . >= 1 and . < 5000 and . == floor)' <<<"$output")" = "true" ]
   [ "$(sent_events dotfiles.install)" = "[]" ]
   [ "$(jq -r .gains_day "$DOTFILES_TELEMETRY_STATE")" = "$TODAY" ]
   # At most once a day: a second send measures nothing and sends nothing.
   run bash "$TEL" send
   [[ "$output" == *"nothing new"* ]] || { echo "$output"; return 1; }
-  [ "$(zsh_starts)$(stock_starts)" = "22" ]
+  [ "$(zsh_starts)$(stock_starts)" = "42" ]
   run bash "$TEL" status
   [[ "$output" == *"pending: 0 event(s)"* ]]
 }
@@ -201,7 +211,7 @@ dry_events() {
   grep -q "^stock $dir 0\$" "$TEST_DIR/zsh.log" || { cat "$TEST_DIR/zsh.log"; return 1; }
   [ ! -e "$dir" ]
   # The now run has no ZDOTDIR from the stock run.
-  [ "$(zsh_starts)" = "1" ]
+  [ "$(zsh_starts)" = "2" ]
   # The folder never leaves the Mac.
   refute grep -q -e "$dir" -e ZDOTDIR "$FAKE_LOG"
   # Both numbers use one code path in lib/mac-baseline.sh.
@@ -210,14 +220,14 @@ dry_events() {
   refute grep -q 'ZDOTDIR=' "$TEL"
 }
 
-@test "a hung stock run is stopped, its folder is removed, and only zsh_ms_stock is left out" {
+@test "a hung stock run is stopped, its folder is removed, and only zsh_min_ms_stock is left out" {
   say_yes
   FAKE_ZSH_DEAF=1 FAKE_ZSH_STOCK_SLEEP=90 run bash "$TEL" send
   [[ "$output" == *"sent 1 event(s)"* ]] || { echo "$output"; return 1; }
   refute kill -0 "$(cat "$TEST_DIR/zsh.pid")"
   [ ! -e "$(stock_dir)" ]
   run sent_events dotfiles.gains
-  [ "$(jq -c '.[0].properties | [has("zsh_ms_stock"), (.zsh_ms_now | type == "number")]' <<<"$output")" = "[false,true]" ] || { echo "$output"; return 1; }
+  [ "$(jq -c '.[0].properties | [has("zsh_min_ms_stock"), (.zsh_ms_now | type == "number")]' <<<"$output")" = "[false,true]" ] || { echo "$output"; return 1; }
 }
 
 @test "with no receipt and no measurement there is no gains event, and it is tried once a day" {
@@ -225,12 +235,12 @@ dry_events() {
   FAKE_ZSH_EXIT=1 run bash "$TEL" send
   [[ "$output" == *"nothing new"* ]] || { echo "$output"; return 1; }
   [ ! -e "$FAKE_LOG" ]
-  [ "$(zsh_starts)$(stock_starts)" = "11" ]
+  [ "$(zsh_starts)$(stock_starts)" = "21" ]
   [ ! -e "$(stock_dir)" ]
   # The day is marked, so the next send on this day measures nothing.
   [ "$(jq -r .gains_day "$DOTFILES_TELEMETRY_STATE")" = "$TODAY" ]
   FAKE_ZSH_EXIT=1 bash "$TEL" send
-  [ "$(zsh_starts)$(stock_starts)" = "11" ]
+  [ "$(zsh_starts)$(stock_starts)" = "21" ]
   # A zsh that prints text gives no number: nothing it prints can leave.
   cat >"$TEST_DIR/bin/zsh" <<SH
 #!/bin/bash
@@ -243,22 +253,22 @@ SH
   [[ "$output" != *canary* ]] && [[ "$output" != *dotfiles.gains* ]] || { echo "$output"; return 1; }
 }
 
-@test "zsh_ms_now is measured with the method of the receipt: one timed zsh start per send" {
+@test "zsh_ms_now uses the method of the receipt; a send starts zsh once for it and once for zsh_min_ms_now" {
   receipt
   say_yes
   # status and the consent text start no zsh.
   bash "$TEL" status >/dev/null
   bash "$TEL" example >/dev/null
   [ "$(zsh_starts)" = "0" ]
-  # A dry run measures once.
+  # A dry run measures each number once (DOTFILES_BASELINE_ZSH_MIN_RUNS=1 here).
   bash "$TEL" send --dry-run >/dev/null
-  [ "$(zsh_starts)" = "1" ] || { echo "starts: $(zsh_starts)"; return 1; }
+  [ "$(zsh_starts)" = "2" ] || { echo "starts: $(zsh_starts)"; return 1; }
   bash "$TEL" send
-  [ "$(zsh_starts)" = "2" ]
+  [ "$(zsh_starts)" = "4" ]
   # Nothing is due on the same day: no measurement.
   bash "$TEL" send
   bash "$TEL" send --dry-run >/dev/null
-  [ "$(zsh_starts)" = "2" ]
+  [ "$(zsh_starts)" = "4" ]
   # It is the helper of the install receipt (lib/mac-baseline.sh).
   grep -q 'baseline_zsh_ms' "$TEL"
 }
@@ -291,7 +301,7 @@ SH
   FAKE_ZSH_EXIT=1 bash "$TEL" send
   run sent_events dotfiles.gains
   [ "$(jq -c '.[0].properties | [has("zsh_ms_now"), .zsh_ms_before]' <<<"$output")" = "[false,412]" ] || { echo "$output"; return 1; }
-  [ "$(zsh_starts)" = "1" ]
+  [ "$(zsh_starts)" = "2" ]
   rm -f "$FAKE_LOG"
   set_state '.gains_day = "" | .last_send = ""'
   # The slow zsh is stopped at the limit: the send does not wait for it.
@@ -321,7 +331,7 @@ SH
   run bash "$TEL" send
   [[ "$output" == *"sent 2 event(s)"* ]] || { echo "$output"; return 1; }
   [ "$(sent_events dotfiles.install | jq length)" = "1" ]
-  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), has("days_since_install"), has("zsh_ms_now"), has("zsh_ms_stock")]')" = "[false,false,true,true]" ] || { cat "$FAKE_LOG"; return 1; }
+  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), has("days_since_install"), has("zsh_ms_now"), has("zsh_min_ms_stock")]')" = "[false,false,true,true]" ] || { cat "$FAKE_LOG"; return 1; }
   [ "$(jq -r .install_sent "$DOTFILES_TELEMETRY_STATE")" = "$NOW" ]
   set_state '.gains_day = ""'
   # A bad end time: no install event and no cursor move; gains still goes.
@@ -388,7 +398,7 @@ SH
   [[ "$output" != *dotfiles.install* ]] && [[ "$output" != *zsh_ms_before* ]] && [[ "$output" != *days_since_install* ]] || { echo "${output:0:600}"; return 1; }
   [[ "$output" == *"1 event(s) pending"* ]] || { echo "${output:0:900}"; return 1; }
   run bash "$TEL" send
-  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), has("zsh_ms_stock")]')" = "[false,true]" ]
+  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), has("zsh_min_ms_stock")]')" = "[false,true]" ]
   [ "$(sent_events dotfiles.install)" = "[]" ]
 }
 
@@ -504,7 +514,7 @@ JSON
   refute_in_body() { ! grep -q -e canary -e "$HOME" -e /tmp/ "$FAKE_LOG"; }
   refute_in_body || { cat "$FAKE_LOG"; return 1; }
   [ "$(sent_events dotfiles.install | jq -c '.[0].properties | [has("seconds"), has("ok"), has("profile")]')" = "[false,false,false]" ]
-  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), (.zsh_ms_now | type == "number"), (.zsh_ms_stock | type == "number"), .days_since_install]')" = "[false,true,true,3]" ]
+  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), (.zsh_ms_now | type == "number"), (.zsh_min_ms_stock | type == "number"), .days_since_install]')" = "[false,true,true,3]" ]
   # A number that is negative, huge, or an array is dropped. A fraction
   # leaves as a whole number, and a negative zero leaves as 0.
   hostile_numbers() {
@@ -536,13 +546,13 @@ JSON
   set_state '.gains_day = "" | .install_sent = "" | .last_send = ""'
   run bash "$TEL" send --dry-run
   [[ "$output" != *canary* ]] && [[ "$output" != *dotfiles.install* ]] && [[ "$output" != *zsh_ms_before* ]] && [[ "$output" != *days_since_install* ]] || { echo "$output"; return 1; }
-  [[ "$output" == *zsh_ms_stock* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *zsh_min_ms_stock* ]] || { echo "$output"; return 1; }
   # A receipt that is not JSON at all breaks nothing: gains as with no receipt.
   printf 'canary not json\n' >"$DOTFILES_INSTALL_RECEIPT"
   run bash "$TEL" send
   [ "$status" -eq 0 ]
   refute grep -q -e canary -e "$HOME" "$FAKE_LOG"
-  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), has("days_since_install"), has("zsh_ms_stock")]')" = "[false,false,true]" ]
+  [ "$(sent_events dotfiles.gains | jq -c '.[0].properties | [has("zsh_ms_before"), has("days_since_install"), has("zsh_min_ms_stock")]')" = "[false,false,true]" ]
   [ "$(sent_events dotfiles.install)" = "[]" ]
 }
 

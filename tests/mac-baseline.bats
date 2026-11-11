@@ -181,3 +181,18 @@ none 0" ]
   dir="$(sed 's/ [0-9]*$//' "$TEST_DIR/zsh.log")"
   [ ! -e "$dir" ]
 }
+
+@test "the min estimator prints the fastest run; the default stays the median" {
+  # Two slow starts and one fast one: the median is a slow run, the min is not.
+  cat >"$TEST_DIR/bin/zsh" <<SH
+#!/bin/bash
+n="\$(cat "$TEST_DIR/n" 2>/dev/null || echo 0)"; echo "\$((n + 1))" >"$TEST_DIR/n"
+[ "\$((n % 3))" -eq 2 ] || sleep 0.3
+exit 0
+SH
+  chmod +x "$TEST_DIR/bin/zsh"
+  both="$(PATH="$TEST_DIR/bin:/usr/bin:/bin" /bin/bash -c 'source "$1/lib/mac-baseline.sh"; baseline_zsh_ms 3; baseline_zsh_ms 3 "" min' _ "$REPO_ROOT" | tr '\n' ' ')"
+  read -r median min <<<"$both"
+  [ "$median" -ge 300 ] || { echo "median $median min $min"; return 1; }
+  [ "$min" -lt "$median" ] && [ "$min" -ge 1 ] || { echo "median $median min $min"; return 1; }
+}

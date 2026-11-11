@@ -186,34 +186,39 @@ install, and against the same Mac with a default shell. The install receipt
 (`~/.local/state/dotfiles/install-receipt.json`, written by
 `bin/dotfiles-install run`; see `lib/mac-baseline.sh`) holds the numbers from
 before the install. With no receipt the install event is not sent, and the
-gains event carries `zsh_ms_now` and `zsh_ms_stock` only. A receipt that is
+gains event carries only the three numbers measured in the send. A receipt that is
 too large, is not JSON, or has no real before time counts as no receipt for
 the gains event.
 
 | Event | When | Properties (plus the common ones) |
 |---|---|---|
 | `dotfiles.install` | Once per receipt. A new install run writes a new end time, and that sends a new event. Never for an install that finished more than 30 days ago (the age cap of the logs) or in the future. | `seconds` (time to configured, measured), `ok`, `profile` (`core` or `full`; any other value is dropped). The event time is the end of the install. |
-| `dotfiles.gains` | At most once a day, with the daily send. | `zsh_ms_before` (receipt `.before.zsh_ms`, measured), `zsh_ms_now` (measured), `zsh_ms_stock` (measured: an empty zsh config), `days_since_install` (days since receipt `.before.taken_at`). With no receipt: `zsh_ms_now` and `zsh_ms_stock` only. With no number at all: no event. |
+| `dotfiles.gains` | At most once a day, with the daily send. | `zsh_ms_before` (receipt `.before.zsh_ms`, measured), `zsh_ms_now` (measured), `zsh_min_ms_now` and `zsh_min_ms_stock` (measured: the fastest of 7 runs, now and with an empty zsh config), `days_since_install` (days since receipt `.before.taken_at`). With no receipt: `zsh_ms_now`, `zsh_min_ms_now` and `zsh_min_ms_stock` only. With no number at all: no event. |
 
 - `dotfiles.run` carries `seconds_saved` as a whole number. It is an
   estimate: runs times the per-task table in `lib/stats.sh`
   (`_task_estimate`).
-- **One method for all shell numbers.** `zsh_ms_before`, `zsh_ms_now`, and
-  `zsh_ms_stock` are the full run time of `zsh -i -c 'exit 0'`, the median
-  of 3 runs (`baseline_zsh_ms` in `lib/mac-baseline.sh`). So they compare
-  fairly.
-- **The default-Mac baseline.** `zsh_ms_stock` is the shell start of the
+- **Two pairs of shell numbers.** All are the full run time of
+  `zsh -i -c 'exit 0'` (`baseline_zsh_ms` in `lib/mac-baseline.sh`).
+  `zsh_ms_before` and `zsh_ms_now` are the median of 3 runs, as in the
+  receipt. `zsh_min_ms_now` and `zsh_min_ms_stock` are the fastest of 7
+  runs. Compare a number only inside its pair.
+- **Why the fastest run.** Other work on the Mac only adds time to a run.
+  Measured on 2026-11-10: 9 medians of 3 at a load of 20 to 30 ran from 13
+  to 54 ms for the stock shell. 9 minimums of 7 at a load of 12 ran from 12
+  to 14 ms (stock, spread 15%) and from 136 to 159 ms (now, spread 16%).
+- **The default-Mac baseline.** `zsh_min_ms_stock` is the shell start of the
   same Mac with an empty zsh config. zsh gets a new empty temp folder as
   `ZDOTDIR`, so it reads no user file. The folder is removed afterwards,
   also when the run is stopped. `/etc/zshrc` still loads, as on a default
-  Mac. dotfiles adds shell features, so `zsh_ms_now` can be higher than
-  `zsh_ms_stock`. The number shows that cost honestly.
-- **When `zsh_ms_now` and `zsh_ms_stock` are measured.** In the send that
+  Mac. dotfiles adds shell features, so `zsh_min_ms_now` can be higher than
+  `zsh_min_ms_stock`. The number shows that cost honestly.
+- **When the three send-time numbers are measured.** In the send that
   builds the gains event: at most once a day, in the background daily send
   or a manual `dotfiles telemetry send`. A normal command never measures.
   `dotfiles telemetry status` never measures. A `send --dry-run` measures
   each once when a gains event is due. Each measurement has its own limit of
-  5 seconds, so a gains event adds at most 10 seconds. When one fails or
+  5 seconds, so a gains event adds at most 15 seconds. When one fails or
   takes longer, it is stopped, that field is left out, and the send goes on.
   This time does not count against the 3-second limit of the daily send.
 - **No number, no event.** With no receipt and no measurement there is no
@@ -223,8 +228,8 @@ the gains event.
 - **Consent.** The install event is sent only when the install finished on or
   after the day of the yes. `zsh_ms_before` and `days_since_install` are a
   baseline from before the yes. This is the one exception to "a yes covers
-  only later events", and the consent text says so. `zsh_ms_stock` is not
-  part of that exception: it is measured at send time, after the yes.
+  only later events", and the consent text says so. `zsh_min_ms_now` and `zsh_min_ms_stock` are not
+  part of that exception: they are measured at send time, after the yes.
 - **Older yes answers.** Both events need a yes given on or after
   `2026-11-10` (`GAINS_SINCE` in the sender), the day they shipped. A person
   who said yes before that day agreed to a text without the baseline
@@ -258,11 +263,12 @@ HogQL query over the anonymous events. Tool names come from the event name
 | Week-1 retention | Which share of installs is seen again in days 7 to 13? | counted |
 | Time to configured | Median and p95 of `seconds` on `dotfiles.install` | measured |
 | Saved minutes, last 30 days | Sum of `seconds_saved`, in total and per install | estimated |
-| Shell start, before and now | Average `zsh_ms_before` and `zsh_ms_now`, latest `dotfiles.gains` per install | measured |
+| Shell start: default Mac, before, and now | Median over installs of `zsh_min_ms_stock` and `zsh_min_ms_now` (the default-Mac pair), and of `zsh_ms_before` and `zsh_ms_now`; latest `dotfiles.gains` per install | measured |
 
 Known gaps on 2026-11-10: the retention tile is empty until an install is 14
-days old. The two measured tiles are empty until a Mac with an install receipt
-sends its events: a Mac installed before receipts existed sends neither event.
+days old. The time-to-configured tile and the before column of the shell tile are empty
+until a Mac with an install receipt sends its events. The default-Mac pair
+needs no receipt, so every install fills it.
 
 ### Turn it off
 

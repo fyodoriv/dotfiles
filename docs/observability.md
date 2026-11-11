@@ -272,13 +272,16 @@ HogQL query over the anonymous events. Tool names come from the event name
 | New installs per week | How many installs sent their first event each week? | counted |
 | Week-1 retention | Which share of installs is seen again in days 7 to 13? | counted |
 | Time to configured and success rate | Per `profile`: median and p95 of `seconds` on `dotfiles.install`, and the share of installs with `ok` true | measured |
+| agentbrew time to a clean status, first installs | Median and p95 of `duration_ms` on `agentbrew.install` where `ok` is true, and the share of first installs with `ok` true | measured |
 | Saved minutes, last 30 days | Sum of `seconds_saved`, in total and per install | estimated |
 | Shell start: default Mac, before, and now | Median over installs of `zsh_min_ms_stock` and `zsh_min_ms_now` (the default-Mac pair; per install the lowest value of the last 14 days), and of `zsh_ms_before` and `zsh_ms_now` (latest `dotfiles.gains` per install) | measured |
 
 Known gaps on 2026-11-10: the retention tile is empty until an install is 14
 days old. The time-to-configured tile and the before column of the shell tile are empty
 until a Mac with an install receipt sends its events. The default-Mac pair
-needs no receipt, so every install fills it.
+needs no receipt, so every install fills it. The agentbrew install tile is empty
+until a first real agentbrew install with a yes; a re-run of its installer
+sends no install event.
 
 ### Turn it off
 

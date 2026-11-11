@@ -70,7 +70,7 @@ check "chezmoi.telemetry_state_readable" \
   "_telemetry_state_usable" \
   "{ [ ! -d $_telemetry_dir_q ] || [ -x $_telemetry_dir_q ] || { [ -O $_telemetry_dir_q ] && chmod 700 $_telemetry_dir_q; }; } && { [ ! -e $_telemetry_state_q ] || { [ -O $_telemetry_state_q ] && chmod 600 $_telemetry_state_q; }; }" \
   "$_telemetry_state_help"
-unset _telemetry_state_q _telemetry_dir_q _telemetry_state_help
+unset _telemetry_state_q _telemetry_dir_q _telemetry_state_dir _telemetry_state_help
 
 # ── Managed symlinks ────────────────────────────────────────────────────
 if ! command -v chezmoi >/dev/null 2>&1; then

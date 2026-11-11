@@ -500,9 +500,13 @@ SH
   say_yes "$TODAY"
   set_state 'del(.consent_time)'
   [ "$(jq -r 'has("consent_time")' "$DOTFILES_TELEMETRY_STATE")" = "false" ]
+  # The time of the yes never leaves the machine, and no command prints it.
+  run bash "$TEL" send --dry-run
+  [[ "$output" != *consent_time* ]]
+  run bash "$TEL" status
+  [[ "$output" != *consent_time* ]]
   bash "$TEL" send
   [ "$(sent_events dotfiles.install | jq length)" = "1" ]
-  # The time of the yes never leaves the machine.
   [[ "$(cat "$FAKE_LOG")" != *consent_time* ]]
 }
 

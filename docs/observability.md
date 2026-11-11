@@ -280,8 +280,8 @@ Known gaps on 2026-11-10: the retention tile is empty until an install is 14
 days old. The time-to-configured tile and the before column of the shell tile are empty
 until a Mac with an install receipt sends its events. The default-Mac pair
 needs no receipt, so every install fills it. The agentbrew install tile is empty
-until a first real agentbrew install with a yes; a re-run of its installer
-sends no install event.
+until a first real agentbrew install whose user said yes to telemetry; a
+re-run of its installer sends no install event.
 
 ### Turn it off
 

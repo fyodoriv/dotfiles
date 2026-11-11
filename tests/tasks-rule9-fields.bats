@@ -2,7 +2,7 @@
 # Tests for the rule-9 / Hypothesis-Driven-Development field lint.
 #
 # Child task 1 of `per-module-rule9-hdd-audit` decomposition (blocking
-# PR #104). The lint walks TASKS.md, finds P0/P1 entries, and exits
+# PR #104). The lint walks TASKS.md, checks every task, and exits
 # nonzero for any missing the 5 fields.
 
 DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -191,7 +191,7 @@ TASKS
   [[ "$output" != *"rule-9-fail: P0 ok-p0"* ]]
 }
 
-@test "fails when any P0/P1 task is non-compliant" {
+@test "fails when any task is non-compliant" {
   cat > "$TASKS_RULE9_FILE" <<'TASKS'
 # Tasks
 

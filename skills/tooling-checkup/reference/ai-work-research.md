@@ -56,7 +56,7 @@ metric, its baseline, and the command that measures it.
 
 - Small and inside a tooling repo: ship it with `/ship-it`.
 - Bigger, or it needs a choice: a task in that repo's `TASKS.md` with the
-  P0/P1 fields (Hypothesis, Success, Pivot, Measurement, Anchor; the post is
+  five rule-9 fields (Hypothesis, Success, Pivot, Measurement, Anchor; the post is
   the Anchor), or a Phase 11 question.
 - An idea seen in two runs that still has no home: a Phase 11 question.
 

@@ -77,11 +77,11 @@ lint-tasks-freshness: ## Warn if .tasks-lint-version is behind npm
 	@echo "═══ tasks-lint freshness ═══"
 	@.github/scripts/check-tasks-lint-freshness.sh
 
-# ── Lint: rule-9 fields on P0/P1 ─────────────────────────────────────
-# Walks TASKS.md and fails when any P0/P1 entry lacks one of the 5
+# ── Lint: rule-9 fields on every task ────────────────────────────────
+# Walks TASKS.md and fails when any entry, at any priority, lacks one of the 5
 # Hypothesis-Driven-Development fields (Hypothesis/Success/Pivot/
 # Measurement/Anchor).
-lint-tasks-rule9: ## Fail when P0/P1 tasks lack the 5 rule-9 fields
+lint-tasks-rule9: ## Fail when a task lacks the 5 rule-9 fields
 	@echo "═══ tasks-rule9 fields ═══"
 	@TASKS_RULE9_FILE="$(TASKS_FILE)" .github/scripts/check-tasks-rule9-fields.sh
 

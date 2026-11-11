@@ -69,7 +69,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 8. **Agent config is managed by agentbrew.** Edit sources and run `agentbrew sync`; never hand-edit generated agent config.
 9. **Open a PR by default**; never commit straight to `feat/chezmoi`, never `--no-verify`, never `git add -A`/`.`/`-u`. **Approved-family standing approval**: `/ship-it` means verify, commit, push, PR, and merge when green; verify the author before admin/bypass PR merges; never plain `--force`, someone else's PR, or out-of-scope publishing.
 10. **Prefer user-dir version managers** (uv, fnm, rustup, mise); no `#!/usr/bin/env` shebangs in dotfiles executables.
-11. **Every task needs** single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, `Anchor`, at every priority. A change that users see names the event, dashboard tile, or `dotfiles metrics` command that shows its effect in use.
+11. **Every task needs** single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, `Anchor`, and names the number that shows its effect in use.
 12. **Proactive healing**: a recurring error becomes a same-session fix or a task with its blocker.
 13. **Default by default**: safe, useful behavior is the default; opt-outs are narrow and documented.
 14. **Performance is a gate**: `make perf-gate` must pass (a tracked command gets at most 10% slower per PR); new hot-path commands join `config/perf-budget.tsv`. [Details](docs/observability.md#performance-gate).

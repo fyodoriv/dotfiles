@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# Walk TASKS.md and fail when P0 or P1 entries lack any
+# Walk TASKS.md and fail when a task at any priority lacks any
 # of the 5 rule-9 / Hypothesis-Driven-Development fields:
 #
 #   **Hypothesis**, **Success**, **Pivot**, **Measurement**, **Anchor**
 #
 # Rule-9 (per `agentbrew/templates/AGENTS.md` § "Stability Is P0" + Minsky
 # `vision.md` § 9 "Pre-registered hypothesis-driven development") makes
-# these 5 fields mandatory on P0/P1 tasks.
+# these 5 fields mandatory. Since 2026-11-10 they are mandatory at every
+# priority (ADR 0006): every task carries its measurement.
 #
 # Stubs for tests (no network / repo dependency):
 #   TASKS_RULE9_FILE — override the TASKS.md path (default: $DOTFILES_DIR/TASKS.md)
 #
 # Exit semantics:
 #   0 — compliant or skipped because TASKS.md is missing.
-#   1 — at least one P0/P1 task lacks a required rule-9 field.
+#   1 — at least one task lacks a required rule-9 field.
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -53,12 +54,6 @@ awk '
     if (!has_pivot)       missing = missing " Pivot"
     if (!has_measurement) missing = missing " Measurement"
     if (!has_anchor)      missing = missing " Anchor"
-    # P2/P3 only warn (ADR 0005): quick captures land in P2 without fields,
-    # and the warning keeps every gap visible until the fields are added.
-    if (priority != "P0" && priority != "P1") {
-      if (missing != "") printf("rule-9-warn: %s %s missing:%s\n", priority, task_id, missing) > "/dev/stderr"
-      return
-    }
     if (missing != "") {
       printf("rule-9-fail: %s %s missing:%s\n", priority, task_id, missing)
       non_compliant++

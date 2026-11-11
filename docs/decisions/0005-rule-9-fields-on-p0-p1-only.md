@@ -1,6 +1,6 @@
 # 0005. Rule-9 hypothesis fields are required on P0/P1 only
 
-- **Status**: Accepted
+- **Status**: Superseded by [0006](0006-rule-9-fields-on-every-task.md) on 2026-11-10
 - **Date**: 2026-10-16
 
 ## Context

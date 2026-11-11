@@ -1578,7 +1578,7 @@ See [AGENTS.md](AGENTS.md) for the detailed repo layout with ownership boundarie
 ```bash
 make lint           # shellcheck all scripts (skips scripts that passed unchanged)
 make lint-full      # shellcheck all scripts, no cache
-make lint-tasks     # validate TASKS.md queue format + P0/P1 rule-9 fields
+make lint-tasks     # validate TASKS.md queue format + rule-9 fields on every task
 make test           # affected tests only; skips a test that passed with the same inputs
 make test-all       # full suite (cached)
 make test-force     # full suite, no cache
@@ -1613,7 +1613,7 @@ percentage with at most a 1.0 point buffer, then raise it only in changes that
 add or strengthen tests. `make lint-tasks` uses the pinned
 `@tasks-md/lint` version from `.tasks-lint-version` and then enforces
 single-line `Hypothesis`, `Success`, `Pivot`, `Measurement`, and `Anchor`
-fields on every P0/P1 task, so keep Node/npm available through your normal
+fields on every task, so keep Node/npm available through your normal
 Node manager.
 
 The monthly Brew manifest audit can be rerun locally without installing every

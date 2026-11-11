@@ -360,9 +360,14 @@ too.
 
 **Sink change.** The state file keeps a fingerprint of the sink (kind plus
 URL host or file path, never the token). When it differs from the stored one
-(the first send under a policy, a changed policy, a removed one), the send
+(the first sight of a policy, a changed policy, a removed one), the send
 cursors move to the end of the logs first. Events recorded under one
-destination never go to another.
+destination never go to another. Every run of `dotfiles-telemetry` except
+`status`, `example`, and `send --dry-run` notes the change, also when the
+policy says `off` or is invalid (an invalid policy has the fingerprint
+`invalid`). So events recorded while the policy said `off` are not sent after
+the file is removed. `dotfiles apply` is such a run. One limit: a policy that
+was added and removed with no run in between leaves no trace.
 
 **Error logs** (`error_logs: true`, org sinks only). New lines of two local
 files that dotfiles itself writes are forwarded, one event per line, named
@@ -393,7 +398,10 @@ kind only (`keychain`, `file`, or `env`). The Keychain read is
 `com.dotfiles.telemetry` LaunchAgent is installed and sends (unless a stored
 no); with `kind: off` or an invalid policy it is not installed. The agent does
 not see your shell env, so the policy is read from the file
-(`dotfiles-telemetry agent-wanted`, used by `dotfiles apply`).
+(`dotfiles-telemetry agent-wanted`, used by `dotfiles apply`). For now a
+managed Mac with no stored answer sends from this hourly agent only: the
+shell-side daily send still looks at the stored yes (task
+`telemetry-sink-managed-shell-gates`).
 
 **Check it.** `dotfiles telemetry status` shows the sink (kind and host, or
 the file path with `~`), the consent source, error logs on or off, and the

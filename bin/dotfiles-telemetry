@@ -509,7 +509,9 @@ SINK_JQ='
         end
     end'
 
-sink_invalid() { SINK_STATE=invalid SINK_REASON="$1" SINK_KIND=posthog SINK_CONSENT=ask SINK_ERRLOGS=0; }
+# An invalid policy has its own fingerprint, so events recorded under it are
+# never sent later (see sink_track).
+sink_invalid() { SINK_STATE=invalid SINK_REASON="$1" SINK_KIND=posthog SINK_CONSENT=ask SINK_ERRLOGS=0 SINK_FP=invalid; }
 
 load_sink() {
   local out="" mode rc=0 code="" kind="" consent="" errlogs="" url="" host="" tkind="" ta="" tb="" index="" stype="" source="" path="" reason
@@ -617,6 +619,16 @@ sink_sync() {
   sink_changed || return 0
   state_set S_SENT "$(line_count "$STATS")" S_SENT_COMMANDS "$(line_count "$COMMANDS")" \
     S_SINK "$SINK_FP" S_ERR_CURSORS "$(err_cursors_at_end)"
+}
+
+# sink_track: every run of this script notes a changed sink, also when the
+# policy says off or is invalid and no send follows. Without it, events
+# recorded while the policy said off would go out once the file is removed.
+# It never makes a state file: with none there is no cursor to protect, and
+# a later yes moves the cursors to the end anyway. Never fails.
+sink_track() {
+  [ -f "$STATE" ] && [ "$READ_FAILED" -eq 0 ] && ! is_root || return 0
+  sink_sync || true
 }
 
 # sink_shape SOURCETYPE: a PostHog batch body on stdin, as org events on
@@ -1662,6 +1674,11 @@ if [ "$STATE_INVALID" -eq 1 ] && [ "${1:-}" != "agent-wanted" ]; then
   log_error "state file content was not valid; reset, answer unset"
   state_set || true
 fi
+# status, a dry run, and the example only read.
+case "${1:-status} ${2:-}" in
+  "status "* | "example "* | "send --dry-run") ;;
+  *) sink_track ;;
+esac
 case "${1:-status}" in
   status) cmd_status ;;
   on) cmd_on ;;

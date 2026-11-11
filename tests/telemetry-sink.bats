@@ -403,6 +403,52 @@ EOF
   refute grep -q "$ORG_TEST_TOKEN" "$DOTFILES_TELEMETRY_STATE"
 }
 
+@test "rule 9: events recorded while the policy says off never go to the public default" {
+  say_yes
+  write_policy '{"version":1,"kind":"off"}'
+  # Any run of the script while the policy is in place sees the change.
+  bash "$TEL" daily
+  printf '{"task":"sync","timestamp":"%s","units":1}\n' "$NOW" >>"$DOTFILES_STATS_FILE"
+  rm -f "$DOTFILES_TELEMETRY_SINK_FILE"
+  run bash "$TEL" send
+  [[ "$output" == *"nothing new"* ]]
+  [ "$(public_requests)" -eq 0 ]
+  [ "$(request_count)" -eq 0 ]
+}
+
+@test "rule 9: events recorded under an invalid policy never go to the public default" {
+  say_yes
+  write_policy '{'
+  bash "$TEL" daily
+  [ "$(jq -r .sink "$DOTFILES_TELEMETRY_STATE")" = "invalid" ]
+  printf '{"task":"sync","timestamp":"%s","units":1}\n' "$NOW" >>"$DOTFILES_STATS_FILE"
+  rm -f "$DOTFILES_TELEMETRY_SINK_FILE"
+  run bash "$TEL" send
+  [[ "$output" == *"nothing new"* ]]
+  [ "$(public_requests)" -eq 0 ]
+  [ "$(request_count)" -eq 0 ]
+}
+
+@test "rule 9: events recorded while off do not go to the org sink when it comes back" {
+  say_yes
+  hec_policy
+  bash "$TEL" send >/dev/null
+  write_policy '{"version":1,"kind":"off"}'
+  bash "$TEL" agent-wanted >/dev/null
+  printf '{"task":"sync","timestamp":"%s","units":1}\n' "$NOW" >>"$DOTFILES_STATS_FILE"
+  hec_policy
+  run bash "$TEL" send
+  [[ "$output" == *"nothing new"* ]]
+  [ "$(request_count)" -eq 0 ]
+}
+
+@test "rule 9: a run with no state file makes none, whatever the policy says" {
+  write_policy '{"version":1,"kind":"off"}'
+  bash "$TEL" daily
+  bash "$TEL" agent-wanted >/dev/null
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+}
+
 @test "rule 9: no policy and an old state file with no fingerprint still send everything pending" {
   say_yes
   run bash "$TEL" send

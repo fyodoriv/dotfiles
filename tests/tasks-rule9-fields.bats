@@ -2,7 +2,7 @@
 # Tests for the rule-9 / Hypothesis-Driven-Development field lint.
 #
 # Child task 1 of `per-module-rule9-hdd-audit` decomposition (blocking
-# PR #104). The lint walks TASKS.md, finds P0/P1 entries, and exits
+# PR #104). The lint walks TASKS.md, checks every task, and exits
 # nonzero for any missing the 5 fields.
 
 DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -94,7 +94,7 @@ TASKS
   [[ "$output" != *"missing: Hypothesis"* ]]
 }
 
-@test "P2 / P3 tasks are NOT enforced even when missing all 5 fields" {
+@test "P2 / P3 tasks fail too when they miss the 5 fields (ADR 0006)" {
   cat > "$TASKS_RULE9_FILE" <<'TASKS'
 # Tasks
 
@@ -104,23 +104,22 @@ TASKS
 
 ## P2
 
-- [ ] P2 task should not trigger warning
+- [ ] P2 task with no fields
   - **ID**: p2-task
   - **Tags**: test
 
 ## P3
 
-- [ ] P3 task should not trigger warning
+- [ ] P3 task with no fields
   - **ID**: p3-task
   - **Tags**: test
 TASKS
   run "$SCRIPT"
-  [ "$status" -eq 0 ]
-  # P2/P3 gaps only warn (ADR 0005); nothing fails.
-  [[ "$output" != *"rule-9-fail:"* ]]
-  [[ "$output" == *"rule-9-warn: P2 p2-task missing: Hypothesis"* ]]
-  [[ "$output" == *"rule-9-warn: P3 p3-task missing: Hypothesis"* ]]
-  [[ "$output" == *"total=0 non_compliant=0"* ]]
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"rule-9-fail: P2 p2-task missing: Hypothesis Success Pivot Measurement Anchor"* ]]
+  [[ "$output" == *"rule-9-fail: P3 p3-task missing: Hypothesis Success Pivot Measurement Anchor"* ]]
+  [[ "$output" != *"rule-9-warn:"* ]]
+  [[ "$output" == *"total=2 non_compliant=2"* ]]
 }
 
 @test "claimed task (@agent-id) still requires rule-9 fields" {
@@ -192,7 +191,7 @@ TASKS
   [[ "$output" != *"rule-9-fail: P0 ok-p0"* ]]
 }
 
-@test "fails when any P0/P1 task is non-compliant" {
+@test "fails when any task is non-compliant" {
   cat > "$TASKS_RULE9_FILE" <<'TASKS'
 # Tasks
 

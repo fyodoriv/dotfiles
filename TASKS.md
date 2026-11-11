@@ -240,8 +240,13 @@ them. -->
   - **Files**: `bin/dotfiles-install`, `lib/stats.sh`, `scripts/proof.sh`, `tests/proof.bats`
   - **Output**: code
   - **Acceptance**: after one real install, `scripts/proof.sh` fills the row with `real use` and the README test passes.
+  - **Hypothesis**: README Proof rows for one-command setup that hold a number from real use go from 0 to 1.
+  - **Measurement**: `scripts/proof.sh` on a Mac after one real install; and the PostHog tile "Product: dotfiles time to configured and success rate, per profile" returns one row or more.
+  - **Success**: the row says `real use` and the tile shows one profile row or more.
+  - **Pivot**: no real install in 60 days -> keep the row as `not measured yet` and close this task.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Forsgren, Humble and Kim 2018 (*Accelerate*).
   - **Competitive-goal**: `manual_bootstrap_steps` (docs/competition/scorecard.md).
-  - **Blocked**: needs-time — 2026-10-27: shipped the recording part. `bin/dotfiles-install run` writes one `install` stats line (ok, `duration_ms`, the heal doctor's `fail` count) and `scripts/proof.sh` fills the row from `install_clean_minutes`. No real install has run since. Unblock: after the next real install on any Mac, run `scripts/proof.sh` there and check the row says `real use`; then close.
+  - **Blocked**: needs-time — 2026-10-27: shipped the recording part. `bin/dotfiles-install run` writes one `install` stats line (ok, `duration_ms`, the heal doctor's `fail` count) and `scripts/proof.sh` fills the row from `install_clean_minutes`. No real install has run since. Unblock: after the next real install on any Mac, run `scripts/proof.sh` there and check the row says `real use`; also read the time-to-configured tile and the before column of the shell-start tile on the private dashboard (`docs/observability.md`, "Product tiles on the dashboard"); then close.
 
 - [ ] Skip unchanged chezmoi scripts inside a full apply
   - **ID**: apply-skip-unchanged-scripts
@@ -250,6 +255,11 @@ them. -->
   - **Files**: `bin/dotfiles`, `.chezmoiscripts/`, `bin/dotfiles-doctor`
   - **Output**: code
   - **Acceptance**: a second full apply with no source change spends under 60 s in `chezmoi apply`, per the timing line.
+  - **Hypothesis**: the time in `chezmoi apply` of a second full apply with no source change drops from minutes to under 60 s.
+  - **Measurement**: the per-step timing line of two `dotfiles apply` runs in a row with no source change; in use, the `duration_ms` of the `apply` command on `dotfiles.command` events.
+  - **Success**: under 60 s in `chezmoi apply` on the second run.
+  - **Pivot**: the timed apply shows no `run_after_*` script over 10 s -> the time is elsewhere; close this task and file one for the real cost.
+  - **Anchor**: Gregg 2020 (*Systems Performance*: measure before you optimise); Forsgren, Humble and Kim 2018 (*Accelerate*).
   - **Competitive-goal**: `reproducibility_pct` (docs/competition/scorecard.md).
   - **Blocked**: needs-real-machine-data — 2026-10-27: the 537 s apply was measured on a managed Mac, and the apply timing line shows only pull, chezmoi apply, and doctor. Finding the slow `run_after_*` scripts needs a timed full apply there (for example `chezmoi apply -v` with each script start and end time noted, or `DOTFILES_DEBUG` per-script timing). A guess at which scripts to hash-key, without that data, could skip real work. Unblock: one timed full apply on that Mac, with the per-script seconds pasted into this task.
 
@@ -381,20 +391,12 @@ them. -->
   - **Files**: `skills/tooling-checkup/scripts/dashboard_export.py`, `skills/tooling-checkup/dashboard/index.html`, `skills/tooling-checkup/scripts/dashboard_comfort.cjs`, `tests/tooling-checkup-dashboard.bats`
   - **Output**: code
   - **Acceptance**: a fixture with a spring-forward and a fall-back week draws 168 distinct hours; the gate taps with `touchscreen.tap`, asserts the tooltip text changes after ArrowLeft, and fails on a chart line under 3:1 against the panel in light and dark.
+  - **Hypothesis**: chart defects that the dashboard gate can catch go from 0 of 4 to 4 of 4 (daylight-saving hours, real taps, tooltip movement, line contrast).
+  - **Measurement**: `bats tests/tooling-checkup-dashboard.bats` with one fixture per defect; each fixture fails the gate before the fix.
+  - **Success**: 4 of 4 fixtures fail the old gate and pass the new one.
+  - **Pivot**: no deployed test dashboard in 60 days -> ship the exporter fix (1) alone with unit proof and close the rest.
+  - **Anchor**: WCAG 2.2 success criterion 1.4.11 (non-text contrast); Nielsen 1994 (usability heuristics).
 
-- [ ] Show the gain events on the maintainer's private PostHog dashboard
-  - **ID**: telemetry-gains-dashboard-tiles
-  - **Tags**: telemetry, metrics, owner
-  - **Details**: The sender now sends `dotfiles.install` (`seconds`, `ok`, `profile`) and `dotfiles.gains` (`zsh_ms_before`, `zsh_ms_now`, `zsh_min_ms_now`, `zsh_min_ms_stock`, `days_since_install`; with no install receipt only the three numbers measured in the send), and `dotfiles.run` carries `seconds_saved` (an estimate). The tiles exist since 2026-11-10 and `docs/observability.md` lists them ("Product tiles on the dashboard"); the saved-minutes tile has data, and the default-Mac pair of the shell-start tile fills from every install. The time-to-configured tile and the before column of the shell-start tile are empty because no install with a receipt has sent an event yet. What is left: read those two after the first such install; add the install success rate per profile (the time-to-configured tile counts `finished_ok` over all profiles only); then close this task. The shell-start tile reads medians and the default-Mac pair since 2026-11-10. Original plan: add tiles to the private dashboard: median time to configured and install success rate per profile; median shell start before and now, per install and over all installs; the sum of estimated saved seconds per install and in total. Label the saved seconds as an estimate. The README Proof row for the install is a separate task (`proof-install-field-outcome`); the install receipt can feed it.
-  - **Files**: the PostHog project (owner), `docs/observability.md`
-  - **Output**: dashboard, docs
-  - **Acceptance**: the dashboard shows each tile with data from one real install or more; `docs/observability.md` lists the tiles.
-  - **Hypothesis**: the gain questions that the dashboard answers (time to configured, shell start gain, saved time) go from 0 to 3.
-  - **Measurement**: the HogQL query `select event, count() from events where event in ('dotfiles.install', 'dotfiles.gains') group by event` returns both events.
-  - **Success**: all 3 questions have a tile with data.
-  - **Pivot**: no install sends a gains event in 30 days -> check the consent rate first and close this task.
-  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Forsgren, Humble and Kim 2018 (*Accelerate*).
-  - **Competitive-goal**: none — proof of field gains, not a scorecard metric.
 
 - [ ] `hotfix` finds the default branch of a repo whose default is not `main`
   - **ID**: hotfix-default-branch-without-origin-head
@@ -575,3 +577,23 @@ them. -->
   - **Pivot**: If the success rate is below 80%, pause feature work and fix the top recurring failure in the run CSV.
   - **Measurement**: `docs/audits/local-ai-runs.csv` rows for the run.
   - **Anchor**: docs/local-ai-roadmap.md; docs/user-stories/09-run-local-models-fast.md.
+
+- [ ] Apply to open-source AI maintainer programs when dotfiles has traction
+  - **ID**: oss-ai-maintainer-programs
+  - **Tags**: funding, ai-cost, owner-action
+  - **Details**: Some vendors give open-source maintainers free AI. Research on 2026-11-10 found that dotfiles misses every published threshold, so applying now is a long shot. Recheck when the repo grows. Programs and rules as read on 2026-11-10 (reread each page before acting):
+    - Claude for Open Source (https://claude.com/contact-sales/claude-for-oss): 6 months of the top Claude plan, paid billing pauses. Any one of: 20 or more external contributors with merged PRs in 12 months, 200,000 or more monthly downloads, 500 or more dependent repos, OpenSSF criticality 0.4 or above. It also has a discretionary "apply anyway" track.
+    - OpenAI Codex for Open Source (https://developers.openai.com/codex/community/codex-for-oss): 6 months of ChatGPT Pro plus API credits. No numeric rule; it wants a "widely used public project".
+    - Greptile for open source (https://www.greptile.com/pricing/open-source): free AI review, automatic at 50 stars.
+    - Atlas Cloud OSS program (https://atlascloud.ai/docs/en/oss-program): monthly credits from about 100 stars.
+    - GitHub Copilot Pro for maintainers: automatic for a "popular" repo; check https://github.com/settings/copilot.
+    - No application needed on a public repo: CodeRabbit and Sourcery free AI review, Sentry for Open Source (includes Seer).
+  - **Hypothesis**: once dotfiles passes one threshold, one accepted application removes 6 months of AI subscription cost for the owner.
+  - **Measurement**: `gh api repos/fyodoriv/dotfiles -q .stargazers_count` and `gh api repos/fyodoriv/dotfiles/contributors -q length`
+  - **Success**: at least one program accepts and the benefit is active on the owner's account.
+  - **Pivot**: if two applications made after a threshold is met are both rejected, close this task and stop applying.
+  - **Anchor**: Anthropic Claude for Open Source program terms (https://www.anthropic.com/claude-for-oss-terms); Basili, Caldiera and Rombach (1994), GQM.
+  - **Files**: none (owner fills web forms); this task records the outcome
+  - **Output**: decision
+  - **Acceptance**: the owner has applied to each program whose threshold dotfiles meets, and this task records each answer, or records why no application was made.
+  - **Blocked**: needs-traction-and-owner-application — 2026-11-10: dotfiles is below every threshold. Agents never submit applications or forms; the owner applies. Unblock when the measurement shows 50 or more stars or 20 or more contributors, or when the owner chooses to try the discretionary tracks.

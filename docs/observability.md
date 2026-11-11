@@ -271,7 +271,7 @@ HogQL query over the anonymous events. Tool names come from the event name
 | Active installs per week | How many installs sent an event each week? | counted |
 | New installs per week | How many installs sent their first event each week? | counted |
 | Week-1 retention | Which share of installs is seen again in days 7 to 13? | counted |
-| Time to configured | Median and p95 of `seconds` on `dotfiles.install` | measured |
+| Time to configured and success rate | Per `profile`: median and p95 of `seconds` on `dotfiles.install`, and the share of installs with `ok` true | measured |
 | Saved minutes, last 30 days | Sum of `seconds_saved`, in total and per install | estimated |
 | Shell start: default Mac, before, and now | Median over installs of `zsh_min_ms_stock` and `zsh_min_ms_now` (the default-Mac pair; per install the lowest value of the last 14 days), and of `zsh_ms_before` and `zsh_ms_now` (latest `dotfiles.gains` per install) | measured |
 

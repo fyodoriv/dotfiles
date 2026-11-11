@@ -3,6 +3,8 @@
 # TASKS.md entries from the command line.
 
 setup() {
+  # The five measurement fields, required at every priority (ADR 0006).
+  RULE9=(--hypothesis h --success s --pivot p --measurement m --anchor a)
   REPO_ROOT="$BATS_TEST_DIRNAME/.."
   WORKDIR="$BATS_TEST_TMPDIR/add-task-test"
   mkdir -p "$WORKDIR/bin"
@@ -55,7 +57,7 @@ EOF
 
 @test "auto-derives ID from title via slugification" {
   cd "$WORKDIR"
-  run bin/add-task --title "Hello World, Part 2!" --priority P2 --dry-run
+  run bin/add-task --title "Hello World, Part 2!" --priority P2 "${RULE9[@]}" --dry-run
   [ "$status" -eq 0 ]
   [[ "$output" == *"hello-world-part-2"* ]]
 }
@@ -63,7 +65,7 @@ EOF
 @test "dry-run does not modify TASKS.md" {
   cd "$WORKDIR"
   cp TASKS.md TASKS.md.before
-  bin/add-task --title "Dry test" --priority P3 --dry-run >/dev/null
+  bin/add-task --title "Dry test" --priority P3 "${RULE9[@]}" --dry-run >/dev/null
   diff TASKS.md TASKS.md.before
 }
 
@@ -74,9 +76,20 @@ EOF
   [[ "$output" == *"P1 tasks require --hypothesis, --success, --pivot, --measurement, and --anchor"* ]]
 }
 
+@test "P2 and P3 tasks without the five fields are rejected too" {
+  cd "$WORKDIR"
+  cp TASKS.md TASKS.md.before
+  for prio in P2 P3; do
+    run bin/add-task --title "No fields $prio" --priority "$prio"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"$prio tasks require --hypothesis, --success, --pivot, --measurement, and --anchor"* ]]
+  done
+  diff TASKS.md TASKS.md.before
+}
+
 @test "writes entry under the chosen priority section" {
   cd "$WORKDIR"
-  run bin/add-task --title "New P3 task" --priority P3 --tags foo,bar
+  run bin/add-task --title "New P3 task" --priority P3 "${RULE9[@]}" --tags foo,bar
   [ "$status" -eq 0 ]
   # The new entry should appear after the `## P3` header.
   awk '/^## P3/{flag=1; next} flag' TASKS.md | grep -q "New P3 task"
@@ -84,7 +97,7 @@ EOF
 
 @test "writes only the optional fields that are non-empty" {
   cd "$WORKDIR"
-  run bin/add-task --title "Minimal task" --priority P2
+  run bin/add-task --title "Minimal task" --priority P2 "${RULE9[@]}"
   [ "$status" -eq 0 ]
   # Should have ID but NOT Tags, Details, Files, Acceptance lines.
   run grep -c "minimal-task" TASKS.md
@@ -99,7 +112,7 @@ EOF
 
 @test "writes optional fields when provided" {
   cd "$WORKDIR"
-  run bin/add-task --title "Full task" --priority P2 --tags a,b --details "Some details" --files "x.sh" --acceptance "It works"
+  run bin/add-task --title "Full task" --priority P2 "${RULE9[@]}" --tags a,b --details "Some details" --files "x.sh" --acceptance "It works"
   [ "$status" -eq 0 ]
   awk '/Full task/{found=1; next} found && /^- \[ \]/{exit} found' TASKS.md > /tmp/entry-body.$$
   grep -q '\*\*Tags\*\*: a,b' /tmp/entry-body.$$
@@ -124,7 +137,7 @@ EOF
 
 @test "output mentions next-steps git commands" {
   cd "$WORKDIR"
-  run bin/add-task --title "Output test" --priority P3
+  run bin/add-task --title "Output test" --priority P3 "${RULE9[@]}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"git add TASKS.md"* ]]
   [[ "$output" == *"git commit"* ]]

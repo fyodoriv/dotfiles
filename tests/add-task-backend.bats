@@ -2,6 +2,8 @@
 # Tests for bin/add-task backend support (github-issues vs tasks-md)
 
 setup() {
+  # The five measurement fields, required at every priority (ADR 0006).
+  RULE9=(--hypothesis h --success s --pivot p --measurement m --anchor a)
   REPO_ROOT="$BATS_TEST_DIRNAME/.."
   WORKDIR="$BATS_TEST_TMPDIR/add-task-backend-test"
   
@@ -54,7 +56,7 @@ teardown() {
 }
 
 @test "detects tasks-md backend when .tasksmd.json is absent" {
-  run "$TARGET_REPO_TASKS_MD/bin/add-task" --title "Test task" --priority P2 --dry-run
+  run "$TARGET_REPO_TASKS_MD/bin/add-task" --title "Test task" --priority P2 "${RULE9[@]}" --dry-run
   [ "$status" -eq 0 ]
   [[ "$output" == *"Would insert under ## P2"* ]]
 }
@@ -82,7 +84,7 @@ JQMOCK
 }
 
 @test "tasks-md backend writes to TASKS.md" {
-  run "$TARGET_REPO_TASKS_MD/bin/add-task" --title "TASKS.md task" --priority P2
+  run "$TARGET_REPO_TASKS_MD/bin/add-task" --title "TASKS.md task" --priority P2 "${RULE9[@]}"
   [ "$status" -eq 0 ]
   grep -q "TASKS.md task" "$TARGET_REPO_TASKS_MD/TASKS.md"
 }

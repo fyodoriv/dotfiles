@@ -24,11 +24,11 @@
 #   --details <text>    free-form description (escape newlines as \n)
 #   --files <csv>       comma-separated file paths the task touches
 #   --acceptance <text> acceptance criteria
-#   --hypothesis <text> required for P0/P1
-#   --success <text>    required for P0/P1
-#   --pivot <text>      required for P0/P1
-#   --measurement <text> required for P0/P1
-#   --anchor <text>     required for P0/P1
+#   --hypothesis <text> required at every priority
+#   --success <text>    required at every priority
+#   --pivot <text>      required at every priority
+#   --measurement <text> required at every priority
+#   --anchor <text>     required at every priority
 #   --dry-run           preview the entry without modifying TASKS.md
 #   --help              this message
 #
@@ -127,16 +127,15 @@ if grep -qE "^\s+- \*\*ID\*\*:\s+${ID}\s*$" "$TASKS_FILE" 2>/dev/null; then
   exit 2
 fi
 
-if [ "$PRIORITY" = "P0" ] || [ "$PRIORITY" = "P1" ]; then
-  if [ -z "$HYPOTHESIS" ] && [ -t 0 ]; then read -r -p "Hypothesis: " HYPOTHESIS; fi
-  if [ -z "$SUCCESS" ] && [ -t 0 ]; then read -r -p "Success: " SUCCESS; fi
-  if [ -z "$PIVOT" ] && [ -t 0 ]; then read -r -p "Pivot: " PIVOT; fi
-  if [ -z "$MEASUREMENT" ] && [ -t 0 ]; then read -r -p "Measurement: " MEASUREMENT; fi
-  if [ -z "$ANCHOR" ] && [ -t 0 ]; then read -r -p "Anchor: " ANCHOR; fi
-  if [ -z "$HYPOTHESIS" ] || [ -z "$SUCCESS" ] || [ -z "$PIVOT" ] || [ -z "$MEASUREMENT" ] || [ -z "$ANCHOR" ]; then
-    echo "$PRIORITY tasks require --hypothesis, --success, --pivot, --measurement, and --anchor" >&2
-    exit 2
-  fi
+# Every task carries its measurement (ADR 0006), at every priority.
+if [ -z "$HYPOTHESIS" ] && [ -t 0 ]; then read -r -p "Hypothesis: " HYPOTHESIS; fi
+if [ -z "$SUCCESS" ] && [ -t 0 ]; then read -r -p "Success: " SUCCESS; fi
+if [ -z "$PIVOT" ] && [ -t 0 ]; then read -r -p "Pivot: " PIVOT; fi
+if [ -z "$MEASUREMENT" ] && [ -t 0 ]; then read -r -p "Measurement: " MEASUREMENT; fi
+if [ -z "$ANCHOR" ] && [ -t 0 ]; then read -r -p "Anchor: " ANCHOR; fi
+if [ -z "$HYPOTHESIS" ] || [ -z "$SUCCESS" ] || [ -z "$PIVOT" ] || [ -z "$MEASUREMENT" ] || [ -z "$ANCHOR" ]; then
+  echo "$PRIORITY tasks require --hypothesis, --success, --pivot, --measurement, and --anchor" >&2
+  exit 2
 fi
 
 # Build the entry (dotfiles format: nested - **Field**:).

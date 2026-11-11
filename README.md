@@ -742,6 +742,11 @@ gate.
 A no is never asked again, and a later install never changes it. An opt-out
 flag or variable at a later install records no, also over an earlier yes.
 
+**Org log sink**: an org overlay can route the events (and, when it turns
+it on, new error log lines) to its own log system with one settings file,
+instead of PostHog. Without that file nothing changes. See
+[Org log sink](docs/observability.md#org-log-sink).
+
 **Inspect it**: `dotfiles telemetry status` shows your answer and what is
 pending. `dotfiles telemetry send --dry-run` prints the exact request body
 and sends nothing. Full rules: [docs/observability.md](docs/observability.md#telemetry).
@@ -1029,7 +1034,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |
-| `com.dotfiles.telemetry` | `dotfiles-telemetry daily` | Every hour, and at load | Send the anonymous performance numbers at most once a day. Installed only while your telemetry answer is yes: `dotfiles telemetry on` loads it, `off` removes it ([telemetry](#telemetry)) |
+| `com.dotfiles.telemetry` | `dotfiles-telemetry daily` | Every hour, and at load | Send the anonymous performance numbers at most once a day. Installed only while your telemetry answer is yes (or an org policy manages consent): `dotfiles telemetry on` loads it, `off` removes it ([telemetry](#telemetry)) |
 | `com.dotfiles.agent-scratch-prune` | `agent-scratch-prune` | Every 6 hours, and at load | Remove what AI agents leave behind: idle build output (2 days), clean pushed agent worktrees (7 days), old scratch folders (`agent_scratch_idle_days`, 30), temp-folder entries (3 days), Ollama models no app reserves (`local_models_prune_days`, 14) (`logs/agent-scratch-prune.log`) |
 | `com.dotfiles.dotfiles-upgrade` | `dotfiles-upgrade` | Sunday 9:00 AM | Topgrade: Homebrew, casks, tools; company plugins to their newest signed release (opt-in: `auto_upgrade: true`) |
 

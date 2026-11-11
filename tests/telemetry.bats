@@ -1342,6 +1342,7 @@ wait_for_last_send() {
 @test "dotfiles apply installs the telemetry LaunchAgent only when the state says yes" {
   apply="$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$apply")"
+  SOURCE_DIR="$REPO"
   eval "$(sed -n '/^remove_skipped_agent() {/,/^}/p' "$apply")"
   self_reload_should_defer() { return 1; }
   launchctl() { echo "$*" >>"$TEST_DIR/launchctl.log"; }
@@ -1573,6 +1574,7 @@ over_limit_log() {
   # The script body agrees: the agent stays off for that file.
   apply="$REPO/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   eval "$(sed -n '/^should_skip_agent() {/,/^}/p' "$apply")"
+  SOURCE_DIR="$REPO"
   PROFILE=full
   chmod 000 "$DOTFILES_TELEMETRY_STATE"
   run should_skip_agent telemetry

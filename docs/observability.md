@@ -62,9 +62,11 @@ jq -s 'group_by(.story) | map({story: .[0].story, failures: length})' ~/.local/s
 jq -r 'select(.source == "doctor") | .check' ~/.local/state/dotfiles/errors.jsonl | sort | uniq -c | sort -rn | head
 ```
 
-There is no external error reporter. dotfiles is a local tool, and its
-privacy contract keeps machine data on the machine (accepted push back,
-agentbrew new-project requirements map, 2026-10-16).
+There is no external error reporter by default. dotfiles is a local tool, and
+its privacy contract keeps machine data on the machine (accepted push back,
+agentbrew new-project requirements map, 2026-10-16). One opt-in exception: an
+org overlay can forward new error log lines to its own log system (see
+[Org log sink](#org-log-sink)); never to a public service.
 
 ## Telemetry
 
@@ -283,6 +285,121 @@ needs no receipt, so every install fills it. The agentbrew install tile is empty
 until a first real agentbrew install whose user said yes to telemetry; a
 re-run of its installer sends no install event.
 
+### Org log sink
+
+An org overlay can send the same events to a company log system instead of
+PostHog. The overlay drops one settings file. The base repo holds only this
+generic setting. With no file, nothing changes: the request is the same as
+before.
+
+**Not tested against a real Splunk server.** The tests use a fake receiver
+and follow Splunk's public HTTP Event Collector (HEC) format.
+
+The file is `~/.config/dotfiles/telemetry-sink.json`. It must not be writable
+by group or others. Example:
+
+```json
+{
+  "version": 1,
+  "kind": "splunk-hec",
+  "consent": "managed",
+  "error_logs": true,
+  "url": "https://splunk.example.com:8088/services/collector/event",
+  "token": { "keychain": { "service": "org-telemetry", "account": "hec_token" } },
+  "index": "devtools",
+  "sourcetype": "dotfiles:telemetry",
+  "source": "dotfiles"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `version` | Must be `1`. |
+| `kind` | `posthog` (the public default), `splunk-hec`, `file`, or `off`. |
+| `consent` | `ask` (default) or `managed`. `managed` needs `splunk-hec` or `file`. |
+| `error_logs` | `true` forwards error log lines (see below). Default `false`. Needs `splunk-hec` or `file`. |
+| `url` | `splunk-hec` only, required. `https`, no user info in it. |
+| `token` | `splunk-hec` only, required. Exactly one of `{"keychain":{"service","account"}}`, `{"file":"~/path"}`, `{"env":"NAME"}`. 1 to 512 characters, no space or control character. A token file must be a regular file that group and others cannot read. |
+| `index`, `sourcetype`, `source` | Optional. Each matches `^[A-Za-z0-9_:.-]{1,64}$`. Defaults: sourcetype `dotfiles:telemetry`, source `dotfiles`, no index. |
+| `path` | `file` only, required. Absolute or `~/`-relative, inside your home folder, no `..`, and neither the file nor a folder on the way is a symlink. |
+
+An unknown key, a missing field, a bad value, invalid JSON, or a file that
+group or others can write makes the policy **invalid**. Then nothing is sent
+anywhere (not to PostHog either), no question is asked, and
+`dotfiles telemetry status` says `off (sink policy invalid: <reason code>)`.
+It never prints the file content. `kind: off` sends nothing and asks
+nothing; status says `off by org policy`.
+
+**`splunk-hec`.** One POST to `url` with `Authorization: Splunk <token>` and
+`content-type: application/json`. The body is one JSON object per event,
+joined by newlines (the HEC batch format):
+
+```json
+{"time":1794402251,"source":"dotfiles","sourcetype":"dotfiles:telemetry","index":"devtools","event":{"event":"dotfiles.command","install_id":"0f3c9a1e5b7d4c2a8e6f1b3d5a7c9e0f","app_version":"f6006d0","os":"darwin","arch":"arm64","runtime":"shell","command":"doctor","duration_ms":1840,"ok":true}}
+```
+
+The event carries the same event name and properties as the PostHog body (the
+same fixed lists), without the PostHog-only `$` flags, plus the install id.
+A 2xx answer is success. The PostHog key is never read on this path, and no
+request goes to the public default.
+
+**`file`.** One JSON line per event is appended to `path`: the same `event`
+object, plus `time` as an ISO string and `sourcetype`. The folder gets mode
+700 and the file mode 600. A file over 10 MB is renamed to `<path>.1`
+(replacing an old one) and a new file starts. No network request.
+
+**Consent.** With `consent: ask` the stored answer decides, as before, and
+the question names the destination ("to your organization's log system at
+splunk.example.com") instead of the public dashboard. With
+`consent: managed` the tool sends with no stored answer and never asks;
+status says `managed by org policy`. A stored no (`dotfiles telemetry off`)
+still stops it, and `dotfiles telemetry on` clears that no. The
+`dotfiles.install` and `dotfiles.gains` events still need a real stored yes.
+`DO_NOT_TRACK`, `CI`, and `DOTFILES_TELEMETRY=0` stop every sink, managed
+too.
+
+**Sink change.** The state file keeps a fingerprint of the sink (kind plus
+URL host or file path, never the token). When it differs from the stored one
+(the first send under a policy, a changed policy, a removed one), the send
+cursors move to the end of the logs first. Events recorded under one
+destination never go to another.
+
+**Error logs** (`error_logs: true`, org sinks only). New lines of two local
+files that dotfiles itself writes are forwarded, one event per line, named
+`dotfiles.error_log`, with sourcetype `dotfiles:error_log` and the fields
+`file` and `line`:
+
+| `file` | Path |
+|---|---|
+| `telemetry.log` | `~/.local/state/dotfiles/telemetry.log` (the sender's own failure lines) |
+| `errors.jsonl` | `~/.local/state/dotfiles/errors.jsonl` (the [errors log](#errors)) |
+
+Before a line leaves, URL credentials and anything the repo's secret
+patterns cover (`lib/secret-scan.sh`) are replaced by `REDACTED`, your home
+path becomes `~`, and a line is cut at 2000 characters. One send takes at
+most 200 lines. A cursor per file lives in the state file; a file that shrank
+(the tool trimmed it) restarts at its top, and a file seen for the first time
+(or after a sink change) starts at its end, so old history never leaves. With
+`kind: posthog` or no policy this path does not run: error lines never go to
+the public default.
+
+**Token safety.** The token never appears in `status`, `--dry-run` (it shows
+`<token>`), the log, an error line, or a process argument list: curl reads the
+header from a config on a file descriptor. Status shows the token source
+kind only (`keychain`, `file`, or `env`). The Keychain read is
+`security find-generic-password -s <service> -a <account> -w`.
+
+**The apply and scheduled path.** With `consent: managed` the
+`com.dotfiles.telemetry` LaunchAgent is installed and sends (unless a stored
+no); with `kind: off` or an invalid policy it is not installed. The agent does
+not see your shell env, so the policy is read from the file
+(`dotfiles-telemetry agent-wanted`, used by `dotfiles apply`).
+
+**Check it.** `dotfiles telemetry status` shows the sink (kind and host, or
+the file path with `~`), the consent source, error logs on or off, and the
+token source. `dotfiles telemetry send --dry-run` prints the exact request
+(URL, `Authorization: Splunk <token>`, body) and sends nothing.
+
 ### Turn it off
 
 - `dotfiles telemetry off` records no. `dotfiles telemetry on` records yes
@@ -405,7 +522,9 @@ nothing is sent. The key is never printed or logged.
   the file is left as it is and nothing is sent, so a stored no is never
   lost. Only an answer or a question creates the file; `status` and the
   hourly wake never do. A log that was cut moves the
-  cursor to its end, not to zero. Delete the file to reset.
+  cursor to its end, not to zero. With an org policy the file also keeps the
+  sink fingerprint (`sink`) and the error log cursors (`err_cursors`); see
+  [Org log sink](#org-log-sink). Delete the file to reset.
 
 ## Performance gate
 

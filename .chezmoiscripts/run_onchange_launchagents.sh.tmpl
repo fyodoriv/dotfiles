@@ -12,6 +12,7 @@
 # cannot be read (root-owned after an old sudo run) then means "not yes" and
 # never fails the render.
 # telemetry consent: {{ $telemetryState := env "DOTFILES_TELEMETRY_STATE" | default (joinPath (env "XDG_STATE_HOME" | default (joinPath .chezmoi.homeDir ".local/state")) "dotfiles" "telemetry.json") }}{{ output "/bin/sh" "-c" "if grep -q '\"consent\":\"yes\"' \"$1\" 2>/dev/null; then echo yes; else echo 'not yes'; fi" "sh" $telemetryState | trim }}
+# telemetry agent wanted: {{ output "/bin/sh" "-c" "bash \"$1\" agent-wanted 2>/dev/null || echo no" "sh" (joinPath .chezmoi.sourceDir "bin" "dotfiles-telemetry") | trim }}
 # plugins.lock: {{ $lock := joinPath .chezmoi.homeDir ".config/dotfiles/plugins.lock" }}{{ if stat $lock }}{{ include $lock | sha256sum }}{{ end }}
 set -euo pipefail
 
@@ -77,10 +78,12 @@ should_skip_agent() {
     # Scheduled syncs can be turned off; run dotfiles-sync by hand instead
     dotfiles-sync|tooling-sync)
       [ "${AUTO_SYNC:-true}" = "false" ] && return 0 ;;
-    # Only after a yes to the telemetry question. `dotfiles telemetry on`
-    # and `off` also load and remove it at once.
+    # Only after a yes to the telemetry question, or with an org policy that
+    # manages consent (and no stored no). Kind off and an invalid policy never
+    # install it. The script reads the state and the policy file itself.
+    # `dotfiles telemetry on` and `off` also load and remove it at once.
     telemetry)
-      ! grep -q '"consent":"yes"' "${DOTFILES_TELEMETRY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/telemetry.json}" 2>/dev/null && return 0 ;;
+      [ "$(bash "$SOURCE_DIR/bin/dotfiles-telemetry" agent-wanted 2>/dev/null)" != "yes" ] && return 0 ;;
     # Silent system-wide upgrades require explicit opt-in
     dotfiles-upgrade)
       [ "$AUTO_UPGRADE" != "true" ] && return 0 ;;

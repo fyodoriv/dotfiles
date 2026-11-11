@@ -705,8 +705,8 @@ Two more events show how much dotfiles helps. The install event needs the
 install receipt. The gains event is sent with or without a receipt.
 
 - `dotfiles.install`, once per install: `seconds` (time to configured), `ok`,
-  and `profile` (`core` or `full`). Sent only when the install finished on or
-  after the day of your yes, and not more than 30 days ago.
+  and `profile` (`core` or `full`). Sent only when the install finished at or
+  after the time of your yes, and not more than 30 days ago.
 - `dotfiles.gains`, at most once a day: `zsh_ms_before`, `zsh_ms_now`,
   `zsh_min_ms_now`, `zsh_min_ms_stock`, and `days_since_install`. A Mac with
   no install receipt sends only the three numbers measured in the send.

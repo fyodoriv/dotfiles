@@ -43,9 +43,10 @@
 # the gains event carries only the three numbers measured in the send.
 #   dotfiles.install  once per receipt: seconds (time to configured), ok, and
 #                     profile (only "core" or "full"). Its time is the end of
-#                     the install. Sent only when the install finished on or
-#                     after the day of the yes, and not more than
-#                     MAX_AGE_DAYS ago.
+#                     the install. Sent only when the install finished at or
+#                     after the time of the yes (a state file from before that
+#                     time was stored: on or after the day of the yes), and
+#                     not more than MAX_AGE_DAYS ago.
 #   dotfiles.gains    at most once a day: zsh_ms_before (the receipt's shell
 #                     start time before the install), zsh_ms_now (the same
 #                     measurement, taken in the send), the pair
@@ -76,7 +77,8 @@
 # a boolean, a time a real UTC time, and any other value is dropped. A
 # receipt over RECEIPT_MAX_BYTES is not read.
 #
-# Lifecycle: the install id, the answer and its day, the two cursors (log
+# Lifecycle: the install id, the answer, its day and its exact time (the
+# time stays in this file and is never sent), the two cursors (log
 # lines already handled), the install event cursor (the end time of the last
 # install that was sent), the last gains day, the last send day, the last try
 # time and hour, and
@@ -148,7 +150,7 @@ line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 # ── State ───────────────────────────────────────────────────────────────
 # Script-scope copies of the state file fields. load_state fills them;
 # state_set changes some and writes the file.
-S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
+S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_CONSENT_TIME="" S_LAST_SEND="" S_LAST_TRY=0
 S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY=""
 # READ_FAILED: jq could not run on the file, so its content is unknown.
 # STATE_INVALID: jq ran and the content is not a state object.
@@ -180,11 +182,12 @@ save_state() {
     umask 077
     jq -n -c \
       --arg id "$S_ID" --arg consent "$S_CONSENT" --arg consent_at "$S_CONSENT_AT" \
+      --arg consent_time "$S_CONSENT_TIME" \
       --argjson sent "$S_SENT" --argjson sent_commands "$S_SENT_COMMANDS" \
       --arg last_send "$S_LAST_SEND" --argjson last_try "$S_LAST_TRY" \
       --arg try_hour "$S_TRY_HOUR" --argjson asks "$S_ASKS" --arg asked_day "$S_ASKED_DAY" \
       --arg install_sent "$S_INSTALL_SENT" --arg gains_day "$S_GAINS_DAY" \
-      '{install_id: $id, consent: $consent, consent_at: $consent_at, sent: $sent,
+      '{install_id: $id, consent: $consent, consent_at: $consent_at, consent_time: $consent_time, sent: $sent,
         sent_commands: $sent_commands, last_send: $last_send, last_try: $last_try,
         try_hour: $try_hour, asks: $asks, asked_day: $asked_day,
         install_sent: $install_sent, gains_day: $gains_day}' \
@@ -208,7 +211,7 @@ save_state() {
 load_state() {
   local fields="" rc=0
   READ_FAILED=0 STATE_INVALID=0
-  S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_LAST_SEND="" S_LAST_TRY=0
+  S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_CONSENT_TIME="" S_LAST_SEND="" S_LAST_TRY=0
   S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY=""
   [ -n "$S_ID" ] || S_ID="$(new_install_id)"
   [ -e "$STATE" ] || return 0
@@ -233,7 +236,7 @@ load_state() {
             else "unset" end),
            (.consent_at | day), (.last_send | day), (.last_try | count),
            (.try_hour | hour), ([(.asks | count), 99] | min), (.asked_day | day),
-           (.install_sent | stamp), (.gains_day | day)]
+           (.install_sent | stamp), (.gains_day | day), (.consent_time | stamp)]
         | map(tostring) | join(" ")
       else "invalid" end' "$STATE" 2>/dev/null)" || rc=$?
   if [ "$rc" -ne 0 ] || [ -z "$fields" ]; then
@@ -246,7 +249,7 @@ load_state() {
     S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
     return 0
   fi
-  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY <<<"$fields"
+  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY S_CONSENT_TIME <<<"$fields"
   [ "$S_SENT" != "-1" ] || S_SENT="$(line_count "$STATS")"
   [ "$S_SENT_COMMANDS" != "-1" ] || S_SENT_COMMANDS="$(line_count "$COMMANDS")"
   [ "$S_CONSENT_AT" != "-" ] || S_CONSENT_AT=""
@@ -255,6 +258,7 @@ load_state() {
   [ "$S_ASKED_DAY" != "-" ] || S_ASKED_DAY=""
   [ "$S_INSTALL_SENT" != "-" ] || S_INSTALL_SENT=""
   [ "$S_GAINS_DAY" != "-" ] || S_GAINS_DAY=""
+  [ "$S_CONSENT_TIME" != "-" ] || S_CONSENT_TIME=""
 }
 
 # One state change at a time, across runs: a mkdir lock held for the read,
@@ -507,7 +511,8 @@ build_body() {
 # is due today; it needs no receipt. EXTRA_RECEIPT is the receipt to read, or
 # /dev/null when there is none of a sane size. Both events need a stored yes
 # given on or after GAINS_SINCE and no run-time switch. An install that
-# finished before the day of the yes, more than MAX_AGE_DAYS ago, or in the
+# finished before the time of the yes (before its day, when the state file has
+# no time), more than MAX_AGE_DAYS ago, or in the
 # future is never sent. A time that is not a real date allows no install
 # event. DOTFILES_TELEMETRY_TEST_GAINS_SINCE is for tests only.
 EXTRA_INSTALL="" EXTRA_GAINS=0 EXTRA_RECEIPT=/dev/null
@@ -530,7 +535,8 @@ extras_plan() {
     | (($receipt.run | obj).finished_at | stamp)' "$RECEIPT" 2>/dev/null)" || return 0
   read -r finished <<<"$fields"
   if [ "${finished:--}" != "-" ] && [ "$finished" != "$S_INSTALL_SENT" ] &&
-    [[ ! "${finished:0:10}" < "$S_CONSENT_AT" ]] && [[ ! "$finished" < "$(cutoff_time)" ]] &&
+    [[ ! "${finished:0:10}" < "$S_CONSENT_AT" ]] && [[ ! "$finished" < "${S_CONSENT_TIME:-0}" ]] &&
+    [[ ! "$finished" < "$(cutoff_time)" ]] &&
     [[ ! "$finished" > "$(date -u +%FT%TZ)" ]]; then
     EXTRA_INSTALL="$finished"
   fi
@@ -947,7 +953,7 @@ record_consent() {
     if [ "$1" = "yes" ] && [ "$S_CONSENT" != "yes" ]; then
       S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
     fi
-    S_CONSENT="$1" S_CONSENT_AT="$(today)"
+    S_CONSENT="$1" S_CONSENT_AT="$(today)" S_CONSENT_TIME="$(date -u +%FT%TZ)"
     if state_owned; then
       save_state
       rm -f "$ASKED_UNTIL" "$ASKED_UNTIL.now" 2>/dev/null

@@ -75,7 +75,8 @@ set_state() { jq -c "$1" "$DOTFILES_TELEMETRY_STATE" >"$TEST_DIR/state.new" && m
 say_yes() {
   local day="${1:-$(days_ago 40)}"
   bash "$TEL" on >/dev/null
-  set_state ".sent = 0 | .sent_commands = 0 | .consent_at = \"${day:0:10}\""
+  # The time of the yes is the start of DAY, so an install on DAY counts as after it.
+  set_state ".sent = 0 | .sent_commands = 0 | .consent_at = \"${day:0:10}\" | .consent_time = \"${day:0:10}T00:00:00Z\""
 }
 # receipt [FINISHED_AT] [TAKEN_AT]: a receipt as lib/mac-baseline.sh writes it.
 receipt() {
@@ -385,6 +386,8 @@ SH
   set_state '.consent_at = "2026-11-09"'
   bash "$TEL" on >/dev/null
   [ "$(jq -r .consent_at "$DOTFILES_TELEMETRY_STATE")" = "$TODAY" ]
+  # The new yes covers an install that finishes after it, not one from before.
+  receipt "$(date -u +%FT%TZ)"
   bash "$TEL" send
   [ "$(sent_events dotfiles.install | jq length)" = "1" ]
   [ "$(sent_events dotfiles.gains | jq length)" = "1" ]
@@ -469,6 +472,42 @@ SH
   set_state '.last_send = ""'
   bash "$TEL" send
   [ "$(sent_events dotfiles.install | jq length)" = "1" ]
+}
+
+@test "an install that finished an hour before the yes on the same day is never sent" {
+  # Needs a yes at least 1 hour into the UTC day, so the install is on the same day.
+  yes_time="$(date -u +%FT%TZ)"
+  before="$(date -u -v-1H +%FT%TZ 2>/dev/null || date -u -d '1 hour ago' +%FT%TZ)"
+  [ "${before:0:10}" = "${yes_time:0:10}" ] || skip "the hour before the yes is on the previous UTC day"
+  receipt "$before"
+  bash "$TEL" on >/dev/null
+  set_state ".sent = 0 | .sent_commands = 0"
+  run bash "$TEL" send --dry-run
+  [[ "$output" != *dotfiles.install* ]] || { echo "$output"; return 1; }
+  bash "$TEL" send
+  [ "$(sent_events dotfiles.install)" = "[]" ]
+  # An install that finished after the yes is sent.
+  receipt "$(date -u +%FT%TZ)"
+  set_state '.last_send = ""'
+  bash "$TEL" send
+  [ "$(sent_events dotfiles.install | jq length)" = "1" ]
+}
+
+@test "a state file without the time of the yes keeps the day rule" {
+  before="$(date -u -v-1H +%FT%TZ 2>/dev/null || date -u -d '1 hour ago' +%FT%TZ)"
+  [ "${before:0:10}" = "$TODAY" ] || skip "the hour before now is on the previous UTC day"
+  receipt "$before"
+  say_yes "$TODAY"
+  set_state 'del(.consent_time)'
+  [ "$(jq -r 'has("consent_time")' "$DOTFILES_TELEMETRY_STATE")" = "false" ]
+  # The time of the yes never leaves the machine, and no command prints it.
+  run bash "$TEL" send --dry-run
+  [[ "$output" != *consent_time* ]]
+  run bash "$TEL" status
+  [[ "$output" != *consent_time* ]]
+  bash "$TEL" send
+  [ "$(sent_events dotfiles.install | jq length)" = "1" ]
+  [[ "$(cat "$FAKE_LOG")" != *consent_time* ]]
 }
 
 @test "no receipt event without a yes, with CI set, or with an opt-out variable" {

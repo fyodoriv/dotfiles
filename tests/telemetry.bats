@@ -1611,3 +1611,41 @@ over_limit_log() {
   [ "$output" = "pass chezmoi.telemetry_state_readable" ]
   [ "$(consent)" = "no" ]
 }
+
+# ── A state folder that cannot be entered ───────────────────────────────
+
+@test "the doctor fails, with the fix command, when the state folder cannot be entered" {
+  check() {
+    if eval "$3" >/dev/null 2>&1; then echo "pass $1"; else echo "fail $1 | fix: $4 | $5"; fi
+  }
+  doctor() { eval "$(sed -n '/^# ── Telemetry state file/,/^# ── /p' "$REPO/modules/chezmoi/doctor.sh")"; }
+  state_dir="$TEST_DIR/state-dir"
+  mkdir "$state_dir"
+  export DOTFILES_TELEMETRY_STATE="$state_dir/telemetry.json"
+  run doctor
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ] # a folder you can enter, no file
+  bash "$TEL" off >/dev/null
+  chmod 000 "$state_dir"
+  run doctor
+  [[ "$output" == "fail chezmoi.telemetry_state_readable"* ]] || { chmod 700 "$state_dir"; echo "$output"; return 1; }
+  [[ "$output" == *"chmod 700"* ]]
+  [[ "$output" == *"$state_dir"* ]]
+  # The automatic fix repairs a folder of your own.
+  fix="$(doctor | sed 's/.*| fix: \(.*\) | .*/\1/')"
+  bash -c "$fix"
+  run doctor
+  chmod 700 "$state_dir"
+  [ "$output" = "pass chezmoi.telemetry_state_readable" ]
+  [ "$(consent)" = "no" ]
+}
+
+@test "with a state file that cannot be read the commands log is still cut to its cap" {
+  export DOTFILES_STATS_LOG=1
+  over_limit_log
+  echo '{"consent":"yes"}' >"$DOTFILES_TELEMETRY_STATE"
+  chmod 000 "$DOTFILES_TELEMETRY_STATE"
+  DOTFILES_COMMANDS_ROTATE_NOW=1 bash -c "source '$REPO/lib/stats.sh'; log_command doctor ok 5"
+  chmod 600 "$DOTFILES_TELEMETRY_STATE"
+  [ "$(wc -l <"$DOTFILES_COMMANDS_FILE" | tr -d ' ')" -eq 10000 ]
+  [[ "$(tail -n 1 "$DOTFILES_COMMANDS_FILE")" == *'"command":"doctor"'* ]]
+}

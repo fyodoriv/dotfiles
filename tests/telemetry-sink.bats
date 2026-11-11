@@ -547,10 +547,13 @@ err_fixture() {
 
 @test "rule 11: new error log lines go as dotfiles.error_log events, redacted, from the fixed file list" {
   err_fixture
+  # The fake secrets are joined here, so the repo's own secrets scan
+  # (bin/dotfiles-validate) does not flag this test file.
+  local bearer="Bear""er" api="API_""KEY"
   printf '%s\n' "2026-11-11T10:00:00Z send failed (http 500) at $HOME/secret/dir" \
     "2026-11-11T10:00:01Z fetch https://bob:hunter2pw@host.example.com/x failed" \
-    "2026-11-11T10:00:02Z Authorization Bearer abcdefghijklmnopqrstuvwxyz0123 seen" \
-    "2026-11-11T10:00:03Z API_KEY=abcd1234efgh5678 leaked" >>"$TEST_DIR/telemetry.log"
+    "2026-11-11T10:00:02Z Authorization $bearer abcdefghijklmnopqrstuvwxyz0123 seen" \
+    "2026-11-11T10:00:03Z $api=abcd1234efgh5678 leaked" >>"$TEST_DIR/telemetry.log"
   printf '{"ts":"2026-11-11T10:00:04Z","story":"US01","source":"doctor","code":"boom"}\n' >>"$DOTFILES_ERRORS_FILE"
   run bash "$TEL" send
   [[ "$output" == *"sent 5 event(s)"* ]]

@@ -615,11 +615,11 @@ them. -->
     - Atlas Cloud OSS program (https://atlascloud.ai/docs/en/oss-program): monthly credits from about 100 stars.
     - GitHub Copilot Pro for maintainers: automatic for a "popular" repo; check https://github.com/settings/copilot.
     - No application needed on a public repo: CodeRabbit and Sourcery free AI review, Sentry for Open Source (includes Seer).
-    - **Hypothesis**: once dotfiles passes one threshold, one accepted application removes 6 months of AI subscription cost for the owner.
-    - **Measurement**: `gh api repos/fyodoriv/dotfiles -q .stargazers_count` and `gh api repos/fyodoriv/dotfiles/contributors -q length`
-    - **Success**: at least one program accepts and the benefit is active on the owner's account.
-    - **Pivot**: if two applications made after a threshold is met are both rejected, close this task and stop applying.
-    - **Anchor**: Anthropic Claude for Open Source program terms (https://www.anthropic.com/claude-for-oss-terms); Basili, Caldiera and Rombach (1994), GQM.
+  - **Hypothesis**: once dotfiles passes one threshold, one accepted application removes 6 months of AI subscription cost for the owner.
+  - **Measurement**: `gh api repos/fyodoriv/dotfiles -q .stargazers_count` and `gh api repos/fyodoriv/dotfiles/contributors -q length`
+  - **Success**: at least one program accepts and the benefit is active on the owner's account.
+  - **Pivot**: if two applications made after a threshold is met are both rejected, close this task and stop applying.
+  - **Anchor**: Anthropic Claude for Open Source program terms (https://www.anthropic.com/claude-for-oss-terms); Basili, Caldiera and Rombach (1994), GQM.
   - **Files**: none (owner fills web forms); this task records the outcome
   - **Output**: decision
   - **Acceptance**: the owner has applied to each program whose threshold dotfiles meets, and this task records each answer, or records why no application was made.

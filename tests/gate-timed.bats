@@ -35,8 +35,52 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 2 ]
 }
 
+@test "gate-timed binds every step to an invocation and prints a final receipt" {
+  export DOTFILES_GATE_INVOCATION="2ba7ad64-9a70-4f5f-9152-9b0c2dd9ee11"
+  run "$GT" lint true
+  [ "$status" -eq 0 ]
+  jq -e '.invocation == env.DOTFILES_GATE_INVOCATION' "$DOTFILES_GATE_TIMINGS_FILE"
+  run "$GT" total bash -c 'exit 7'
+  [ "$status" -eq 7 ]
+  [[ "$output" == "gate-receipt: $DOTFILES_GATE_INVOCATION status=7" ]]
+  jq -e 'select(.step == "total") | .invocation == env.DOTFILES_GATE_INVOCATION and .status == 7' "$DOTFILES_GATE_TIMINGS_FILE"
+}
+
+@test "gate-timed rejects an unsafe invocation label without running the command" {
+  export DOTFILES_GATE_INVOCATION="private command text"
+  run "$GT" total touch "$TEST_DIR/ran"
+  [ "$status" -eq 2 ]
+  [ ! -e "$TEST_DIR/ran" ]
+  [[ "$output" != *"private command text"* ]]
+}
+
+@test "make check propagates one invocation to real step rows and its receipt" {
+  local fixture="$TEST_DIR/repo"
+  mkdir -p "$fixture/scripts"
+  cp "$GT" "$fixture/scripts/gate-timed.sh"
+  awk '/^check: ##/{copy=1} copy{print} copy && /Iterating\? Use/{exit}' \
+    "$REPO_ROOT/Makefile" > "$fixture/Makefile"
+  cat >> "$fixture/Makefile" <<'MAKE'
+check-steps:
+	@scripts/gate-timed.sh lint true
+	@scripts/gate-timed.sh lint-tasks true
+	@scripts/gate-timed.sh test true
+	@scripts/gate-timed.sh plugins-bash32 true
+	@scripts/gate-timed.sh e2e true
+MAKE
+  export DOTFILES_GATE_TIMINGS_FILE="$TEST_DIR/real-gate.jsonl"
+  run env PATH="/usr/bin:/bin" make -C "$fixture" --no-print-directory check
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  jq -s -e 'length == 6 and ([.[].invocation] | unique | length == 1) and .[-1].step == "total"' \
+    "$DOTFILES_GATE_TIMINGS_FILE"
+  local invocation
+  invocation="$(jq -r 'select(.step == "total") | .invocation' "$DOTFILES_GATE_TIMINGS_FILE")"
+  [[ "$output" == *"gate-receipt: $invocation status=0"* ]]
+}
+
 @test "make check times every gate step and the total" {
   for step in total lint lint-tasks perf-gate test plugins-bash32 e2e; do
     grep -qE "gate-timed.sh $step " "$REPO_ROOT/Makefile" || { echo "untimed step: $step"; return 1; }
   done
+  grep -q 'DOTFILES_GATE_INVOCATION=.*uuidgen' "$REPO_ROOT/Makefile"
 }

@@ -397,7 +397,6 @@ them. -->
   - **Pivot**: no deployed test dashboard in 60 days -> ship the exporter fix (1) alone with unit proof and close the rest.
   - **Anchor**: WCAG 2.2 success criterion 1.4.11 (non-text contrast); Nielsen 1994 (usability heuristics).
 
-
 - [ ] `hotfix` finds the default branch of a repo whose default is not `main`
   - **ID**: hotfix-default-branch-without-origin-head
   - **Tags**: git, workflow

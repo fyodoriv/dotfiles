@@ -245,6 +245,25 @@ the gains event.
   start next to before and now. With no receipt it prints now and the
   default shell start. It sends nothing.
 
+### Product tiles on the dashboard
+
+The private dashboard has one tile for each product question. Each tile is a
+HogQL query over the anonymous events. Tool names come from the event name
+(`dotfiles.*` or `agentbrew.*`).
+
+| Tile | Question | Kind |
+|---|---|---|
+| Active installs per week | How many installs sent an event each week? | counted |
+| New installs per week | How many installs sent their first event each week? | counted |
+| Week-1 retention | Which share of installs is seen again in days 7 to 13? | counted |
+| Time to configured | Median and p95 of `seconds` on `dotfiles.install` | measured |
+| Saved minutes, last 30 days | Sum of `seconds_saved`, in total and per install | estimated |
+| Shell start, before and now | Average `zsh_ms_before` and `zsh_ms_now`, latest `dotfiles.gains` per install | measured |
+
+Known gaps on 2026-11-10: the retention tile is empty until an install is 14
+days old. The two measured tiles are empty until a Mac with an install receipt
+sends its events: a Mac installed before receipts existed sends neither event.
+
 ### Turn it off
 
 - `dotfiles telemetry off` records no. `dotfiles telemetry on` records yes

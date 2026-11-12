@@ -7,8 +7,9 @@ registered status fast path without treating the earlier baseline's source
 closure as proof of the new helper. It can reject missing, changed or
 unverified inputs before making a performance claim.
 
-Measurement: under exclusive `heavy-run` admissions, measure 15 candidate
-peak-RSS samples using the registered payload and wrapper, and four separate
+Measurement: under exclusive `heavy-run` admissions, measure two windows of
+15 candidate peak-RSS samples using the registered payload, direct source path
+and wrapper, and four separate
 sets of 15 order-balanced old/candidate timing pairs. Check status, stdout and
 stderr parity for each pair. Record all samples privately. Separately run the
 unchanged registered performance gate.
@@ -24,7 +25,8 @@ untracked, missing, altered or unverifiable effective inputs. Handle
 interruption so no sample outlives its queue owner. This is trusted local
 correlation, not kernel attestation or protection from same-user interference.
 
-Success: exactly 15 positive candidate RSS samples and 15 valid timing pairs
+Success: exactly two windows of 15 positive candidate RSS samples, agreeing
+within the baseline's 0.95–1.05 A/A range, and 15 valid timing pairs
 for each of the four preregistered status cases; zero parity failures; all
 input, admission and noise checks pass. Candidate RSS median is at most
 5,262,540 bytes; each timing median ratio is at most 0.80; the unchanged gate

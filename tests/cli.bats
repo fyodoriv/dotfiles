@@ -25,6 +25,47 @@ readme_doctor_reference_block() {
   ' "$DOTFILES_DIR/README.md"
 }
 
+stale_fetch_fixture() {
+  local root="$BATS_TEST_TMPDIR/stale-fetch"
+  mkdir -p "$root/bin" "$root/lib" "$root/.git" "$root/mock" "$root/home"
+  cp "$CLI" "$root/bin/dotfiles"
+  cp "$DOTFILES_DIR/lib/stats.sh" "$DOTFILES_DIR/lib/colors.sh" "$root/lib/"
+  touch "$root/.git/FETCH_HEAD"
+  cat > "$root/mock/git" <<'MOCK'
+#!/bin/bash
+case " $* " in
+  *" remote get-url "*) exit 0 ;;
+  *" branch --show-current "*) echo work ;;
+  *" rev-parse HEAD "*) echo local ;;
+  *" rev-parse origin/work "*) echo remote ;;
+  *" rev-list --count "*) echo "${FAKE_BEHIND:-0}" ;;
+  *" fetch "*) exit 0 ;;
+  *) exit 1 ;;
+esac
+MOCK
+  printf '#!/bin/bash\necho 0\n' > "$root/mock/stat"
+  chmod +x "$root/mock/git" "$root/mock/stat"
+}
+
+@test "dotfiles --help works when the fetch is stale and the branch is ahead" {
+  stale_fetch_fixture
+  local root="$BATS_TEST_TMPDIR/stale-fetch"
+  run env -i HOME="$root/home" PATH="$root/mock:/usr/bin:/bin" DOTFILES_STATS_LOG=0 \
+    /bin/bash "$root/bin/dotfiles" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Usage: dotfiles'* ]]
+}
+
+@test "dotfiles --help retains the update hint when the branch is behind" {
+  stale_fetch_fixture
+  local root="$BATS_TEST_TMPDIR/stale-fetch"
+  run env -i HOME="$root/home" PATH="$root/mock:/usr/bin:/bin" DOTFILES_STATS_LOG=0 FAKE_BEHIND=1 \
+    /bin/bash "$root/bin/dotfiles" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Update available'* ]]
+  [[ "$output" == *'Usage: dotfiles'* ]]
+}
+
 @test "dotfiles --help exits 0 and shows usage" {
   run bash "$CLI" --help
   [ "$status" -eq 0 ]

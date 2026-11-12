@@ -459,10 +459,12 @@ dotfiles apply --if-changed # skip the apply when nothing changed and chezmoi st
 dotfiles diff               # preview pending changes without writing
 ```
 
-Every `dotfiles` command auto-checks for updates (fetches at most once/hour). When behind:
+Commands such as `dotfiles --help` check for updates (fetching at most once per
+hour). When behind:
 ```
 ⬆ Update available (3 commit(s) behind). Run: dotfiles update
 ```
+Help still opens when your local branch is ahead and the last fetch is old.
 
 ### Health checks
 

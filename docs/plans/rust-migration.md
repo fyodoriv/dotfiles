@@ -65,7 +65,7 @@ Reviewed at revision `788d43d` on 2026-11-10.
 | Rust exists only as test fixture crates | `tests/fixtures/` (`checkup-read-consumer`, `compiler-queue-observer`, `connector-credentials`, `queue-privacy-cutover`) | fact |
 | Two agent hooks run on each agent Bash call and start Perl, `shfmt` or `jq` | agent-hooks/require-heavy-run.sh, agent-hooks/block-dangerous-git.sh | fact |
 | The performance gate tracks both hooks and three commands; it checks minimums and paired median differences | config/perf-budget.tsv, scripts/perf-gate.pl; #573 | fact |
-| `app-priority` runs every 60 seconds and logs each run in whole seconds | launchagents/com.dotfiles.app-priority.plist.tmpl; `log_run app-priority` | fact |
+| `app-priority` runs every 60 seconds; valid new timing records use monotonic milliseconds | launchagents/com.dotfiles.app-priority.plist.tmpl; [timing deployment](app-priority-timing.md) | fact |
 | `app-priority` mean run time: 1,560 ms over 9,674 runs in the last 7 days; 990 ms over 8,654 runs in the 7 days before; 926 ms over all logged runs | The earlier whole-second window command, run on 2026-11-10 | measured, not a millisecond baseline |
 | Commands and runs log `duration_ms`; telemetry adds `runtime` | lib/stats.sh; bin/dotfiles-telemetry | fact |
 | Shell embeds Perl/Python/Node; some programs lack an extension | bin/heavy-run, bin/agent-tab, bin/learn-repos-inventory, lib/ | fact |
@@ -342,6 +342,8 @@ Each hot-path task commits its absolute baseline number before any
 replacement code. The ratio or mean above is the decision rule.
 The first instrumentation prediction is in
 [app-priority timing](app-priority-timing.md).
+The [hook baseline](rust-hook-baseline-2026-11-11.md) records both sets of
+20 A/A runs and the absolute linked-checkout observations.
 
 The owner ruling is the agentbrew task `rust-owner-rules-on-replan-defaults`
 (HITL). It blocks step 5 only.

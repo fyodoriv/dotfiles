@@ -95,7 +95,11 @@ to exact blob IDs and modes for the two full revisions, and every planted
 invalid response is rejected. Pivot: unavailable, oversized, ambiguous or
 unverifiable responses leave the mapping inconclusive and block timing.
 
-Fetch only the fixed public repository and exact commit and tree IDs. Use
+Before fetch, reserve a private request with the independently chosen run ID,
+exact revisions, fixed origin, limits and audited directory identity. Retain
+its digest independently. The request is correlation evidence, not proof of
+network provenance. Fetch only the fixed public repository and exact commit
+and tree IDs. Use
 non-recursive trees, system-trust TLS, disabled proxies, restricted hosts and
 redirects, bounded response sizes and socket inactivity timeouts. A final
 over-limit detection read can consume one extra byte, then stops the fetcher. Send no

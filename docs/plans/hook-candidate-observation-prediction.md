@@ -96,11 +96,13 @@ invalid response is rejected. Pivot: unavailable, oversized, ambiguous or
 unverifiable responses leave the mapping inconclusive and block timing.
 
 Fetch only the fixed public repository and exact commit and tree IDs. Use
-non-recursive trees, TLS, restricted hosts and redirects, bounded response
-sizes and connection/read deadlines. Send no local paths or credentials.
+non-recursive trees, system-trust TLS, disabled proxies, restricted hosts and
+redirects, bounded response sizes and socket inactivity timeouts. A final
+over-limit detection read can consume one extra byte, then stops the fetcher. Send no
+local paths or credentials.
 Retain the reviewed mapping and response provenance privately and bind it to
 the run and source audit. Compare each mapped blob with the bounded local
-source snapshot. The network and filesystem may still defeat a strict
-wall-time bound. This does not establish checkout HEAD, installed behavior,
+source snapshot. DNS, slow streams and filesystem operations can defeat a strict wall-time
+bound; the inactivity timeout is not a total deadline. This does not establish checkout HEAD, installed behavior,
 tool closure or protection against transient same-user changes. Anchor:
 [object-reader pivot](hook-object-reader-pivot.md).

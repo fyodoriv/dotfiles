@@ -1,7 +1,10 @@
 import copy
+from http.client import IncompleteRead
+import os
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).parent / "helpers"))
@@ -50,6 +53,75 @@ class MappingControls(unittest.TestCase):
             self.assertIsNone(mapping.decode_record(invalid, len(raw)))
         self.assertIsNone(mapping.decode_record(raw, len(raw) - 1))
         self.assertIsNone(mapping.decode_record(raw, True))
+
+    def test_bounded_fetch_rejects_wrong_origins_and_responses(self):
+        class Response:
+            def __init__(self, url, data, status=200):
+                self.url, self.data, self.status = url, data, status
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def geturl(self): return self.url
+            def read(self, limit): return self.data[:limit]
+        url = mapping.API_ROOT + "/commits/" + "a" * 40
+        good = b'{"sha":"' + b'a' * 40 + b'"}'
+        def opener(request, timeout):
+            self.assertEqual(request.full_url, url)
+            self.assertGreater(timeout, 0)
+            return Response(url, good)
+        fetcher = mapping.RecordFetcher(opener, per_record=100, total=len(good))
+        self.assertEqual(fetcher.fetch("commits", "a" * 40), good)
+        self.assertIsNone(fetcher.fetch("commits", "a" * 40))
+        self.assertIsNone(mapping.RecordFetcher(opener).fetch("commits/../trees", "a" * 40))
+        self.assertIsNone(mapping.RecordFetcher(opener).fetch("commits", "a" * 39))
+        for response in (Response("https://example.com", good), Response(url, good, 302),
+                         Response(url, b"x" * 101), Response(url, b'{"x":1,"x":2}')):
+            with self.subTest(response=response):
+                self.assertIsNone(mapping.RecordFetcher(lambda request, timeout: response, per_record=100).fetch("commits", "a" * 40))
+
+    def test_fetcher_is_direct_and_fails_closed(self):
+        from urllib.request import ProxyHandler, HTTPSHandler
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://127.0.0.1:1234", "https_proxy": "http://127.0.0.1:1234"}):
+            opener = mapping.restricted_opener().__self__
+            self.assertFalse(any(isinstance(h, ProxyHandler) and h.proxies for h in opener.handlers))
+            self.assertTrue(any(isinstance(h, HTTPSHandler) and h._context.check_hostname for h in opener.handlers))
+        calls = []
+        def fail(request, timeout):
+            calls.append(request)
+            self.assertIsNone(request.get_header("Proxy-authorization"))
+            raise OSError("injected")
+        fetcher = mapping.RecordFetcher(fail)
+        self.assertIsNone(fetcher.fetch("trees", "a" * 40))
+        self.assertIsNone(fetcher.fetch("trees", "a" * 40))
+        self.assertEqual(len(calls), 1)
+        for timeout in (float("nan"), float("inf"), 0, 11, True):
+            with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                mapping.RecordFetcher(fail, timeout=timeout)
+
+    def test_fetcher_bounds_calls_and_stops_after_truncation(self):
+        class Response:
+            status = 200
+            def __init__(self, url, data): self.url, self.data = url, data
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def geturl(self): return self.url
+            def read(self, size): return self.data[:size]
+        calls = []
+        def opener(request, timeout):
+            calls.append(request.full_url)
+            return Response(request.full_url, b"{}")
+        fetcher = mapping.RecordFetcher(opener, per_record=10, total=24)
+        for _ in range(12): self.assertEqual(fetcher.fetch("trees", "a" * 40), b"{}")
+        self.assertIsNone(fetcher.fetch("trees", "a" * 40))
+        self.assertEqual(len(calls), 12)
+        short = mapping.RecordFetcher(opener, per_record=10, total=3)
+        self.assertEqual(short.fetch("trees", "a" * 40), b"{}")
+        self.assertIsNone(short.fetch("trees", "a" * 40))
+        self.assertIsNone(short.fetch("trees", "a" * 40))
+        def truncated(request, timeout): raise IncompleteRead(b"{")
+        broken = mapping.RecordFetcher(truncated)
+        self.assertIsNone(broken.fetch("trees", "a" * 40))
+        self.assertTrue(broken.failed)
+        self.assertIsNone(mapping.decode_record(b"[" * 2000 + b"]" * 2000, 5000))
 
     def test_rejects_unverified_commit_and_tree_responses(self):
         for mutation in ("commit_sha", "root", "tree_sha", "truncated", "missing_tree", "duplicate", "missing_path", "mode", "type", "blob", "bad_path", "bool_truncated", "branch_type", "branch_mode", "bad_revision", "missing_commit", "branch_sha", "row_type", "null_root"):

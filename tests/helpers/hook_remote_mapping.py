@@ -3,6 +3,9 @@ import base64
 import binascii
 import hashlib
 import json
+import os
+from pathlib import Path
+import stat
 import re
 import ssl
 from http.client import HTTPException
@@ -10,6 +13,8 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 from hook_source_snapshot import EXPECTED, parse_manifest
+from hook_pair_private import read_private
+from hook_pair_receipts import private_dir
 from hook_trusted_launch import strict_json
 
 
@@ -216,4 +221,60 @@ def decode_archive(raw, expected_sha256, run_id, old, candidate):
             return None
         return records
     except (KeyError, TypeError, UnicodeError, ValueError, binascii.Error, RecursionError):
+        return None
+
+
+def read_archive(root, expected_identity, expected_sha256, run_id, old, candidate):
+    try:
+        root = Path(root)
+        if (not private_dir(root) or type(expected_identity) is not tuple or len(expected_identity) != 2 or
+                any(type(value) is not int or value <= 0 for value in expected_identity)):
+            return None
+        before = root.lstat()
+        if (before.st_dev, before.st_ino) != expected_identity:
+            return None
+        raw = read_private(root / "mapping.json", 11_000_000)
+        after = root.lstat()
+        if not private_dir(root) or (after.st_dev, after.st_ino) != expected_identity:
+            return None
+        return decode_archive(raw, expected_sha256, run_id, old, candidate)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def store_archive(root, expected_identity, run_id, old, candidate, records):
+    """Write once in a private directory; caller retains the digest independently."""
+    try:
+        root = Path(root)
+        if (not private_dir(root) or type(expected_identity) is not tuple or len(expected_identity) != 2 or
+                any(type(value) is not int or value <= 0 for value in expected_identity)):
+            return None
+        raw = encode_archive(run_id, old, candidate, records)
+        rootfd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            held, current = os.fstat(rootfd), root.lstat()
+            if (not stat.S_ISDIR(held.st_mode) or held.st_uid != os.geteuid() or
+                    stat.S_IMODE(held.st_mode) != 0o700 or
+                    (held.st_dev, held.st_ino) != (current.st_dev, current.st_ino) or
+                    (held.st_dev, held.st_ino) != expected_identity):
+                return None
+            fd = os.open("mapping.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                         0o600, dir_fd=rootfd)
+            try:
+                remaining = memoryview(raw)
+                while remaining:
+                    count = os.write(fd, remaining)
+                    if count <= 0:
+                        raise OSError("short write")
+                    remaining = remaining[count:]
+            finally:
+                os.close(fd)
+            current = root.lstat()
+            if (held.st_dev, held.st_ino) != (current.st_dev, current.st_ino):
+                return None
+        finally:
+            os.close(rootfd)
+        digest = hashlib.sha256(raw).hexdigest()
+        return digest if read_archive(root, expected_identity, digest, run_id, old, candidate) == records else None
+    except (OSError, TypeError, ValueError):
         return None

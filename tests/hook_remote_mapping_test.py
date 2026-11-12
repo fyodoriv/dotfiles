@@ -5,6 +5,7 @@ from http.client import IncompleteRead
 import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -157,6 +158,61 @@ class MappingControls(unittest.TestCase):
             self.assertIsNone(mapping.decode_archive(raw, hashlib.sha256(raw).hexdigest(), run_id, old, new))
         for raw in (archive + b" ", b'{"format":1,' + archive[1:]):
             self.assertIsNone(mapping.decode_archive(raw, hashlib.sha256(raw).hexdigest(), run_id, old, new))
+
+    def test_archive_storage_requires_private_exclusive_file(self):
+        old, new, commits, trees = self.fixture()
+        records = {(kind, key): json.dumps(value).encode() for kind, group in
+                   (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        run_id = "9" * 32
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertIsNone(mapping.store_archive(root, (1, 1), run_id, old, new, records))
+            self.assertIsNone(mapping.store_archive(root, (True, 1.0), run_id, old, new, records))
+            self.assertEqual(list(root.iterdir()), [])
+            digest = mapping.store_archive(root, (root.stat().st_dev, root.stat().st_ino), run_id, old, new, records)
+            self.assertIsNotNone(digest)
+            self.assertIsNone(mapping.read_archive(root, (1, 1), digest, run_id, old, new))
+            self.assertEqual(mapping.read_archive(root, (root.stat().st_dev, root.stat().st_ino), digest, run_id, old, new), records)
+            self.assertIsNone(mapping.store_archive(root, (root.stat().st_dev, root.stat().st_ino), run_id, old, new, records))
+            self.assertIsNone(mapping.read_archive(root, (root.stat().st_dev, root.stat().st_ino), "0" * 64, run_id, old, new))
+            archive = root / "mapping.json"
+            archive.chmod(0o644)
+            self.assertIsNone(mapping.read_archive(root, (root.stat().st_dev, root.stat().st_ino), digest, run_id, old, new))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "other"
+            target.write_bytes(b"keep")
+            (root / "mapping.json").symlink_to(target)
+            self.assertIsNone(mapping.store_archive(root, (root.stat().st_dev, root.stat().st_ino), run_id, old, new, records))
+            self.assertEqual(target.read_bytes(), b"keep")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o755)
+            self.assertIsNone(mapping.store_archive(root, (root.stat().st_dev, root.stat().st_ino), run_id, old, new, records))
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_archive_write_failure_and_directory_changes_never_qualify(self):
+        old, new, commits, trees = self.fixture()
+        records = {(kind, key): json.dumps(value).encode() for kind, group in
+                   (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        for mutation in ("zero", "error", "chmod", "replace"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                outer = Path(directory)
+                root = outer / "run"
+                root.mkdir(mode=0o700)
+                real_write = mapping.os.write
+                def inject(fd, data):
+                    if mutation == "zero": return 0
+                    if mutation == "error": raise OSError("injected")
+                    if mutation == "chmod": root.chmod(0o755)
+                    else:
+                        root.rename(outer / "displaced")
+                        root.mkdir(mode=0o700)
+                    return real_write(fd, data)
+                with patch.object(mapping.os, "write", side_effect=inject):
+                    self.assertIsNone(mapping.store_archive(root, (root.stat().st_dev, root.stat().st_ino), "9" * 32, old, new, records))
+                if mutation == "replace": self.assertEqual(list(root.iterdir()), [])
+                else: self.assertTrue((root / "mapping.json").exists())
 
     def test_bounded_strict_record_decoder(self):
         raw = b'{"sha":"' + b'a' * 40 + b'","tree":{"sha":"' + b'b' * 40 + b'"}}'

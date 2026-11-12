@@ -101,7 +101,10 @@ redirects, bounded response sizes and socket inactivity timeouts. A final
 over-limit detection read can consume one extra byte, then stops the fetcher. Send no
 local paths or credentials.
 Retain the reviewed mapping and response provenance privately and bind it to
-the run and source audit. Compare each mapped blob with the bounded local
+the run and source audit. The archive writer requires an independently
+supplied directory identity, uses exclusive creation and checks readback.
+A failed write leaves an unusable partial file; never derive an accepted digest
+from it or overwrite it. The archive origin field is not proof of acquisition. Compare each mapped blob with the bounded local
 source snapshot. DNS, slow streams and filesystem operations can defeat a strict wall-time
 bound; the inactivity timeout is not a total deadline. This does not establish checkout HEAD, installed behavior,
 tool closure or protection against transient same-user changes. Anchor:

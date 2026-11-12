@@ -23,6 +23,23 @@ line-alignment ranges without copying source text. Run
 `python3 docs/plans/stale-lifecycle-ranges.py --check`. These ranges do not
 establish semantic changes, runtime conditions, generated outputs or ownership.
 
+An independent source review of those ranges found three changes at the
+candidate revision `94eef66`:
+
+- `run_after_claude-settings-env.sh` expands the desired environment object
+  and adds a JSON-processing child call to its completion message. The existing
+  settings update owns the write; the review did not inspect installed values.
+- `run_onchange_brew.sh.tmpl` adds template conditions around an optional
+  desktop package check and installation. An installation failure is reported
+  without making it fatal.
+- `run_onchange_launchagents.sh.tmpl` adds telemetry-related template helper
+  calls and a generated condition that can skip agent installation. Template
+  expressions in comments still execute when the template renders.
+
+These are source-level relationships. They do not prove a template rendered,
+a condition passed, a script ran, or an external change occurred. The earlier
+ledger does not yet record the new relationships.
+
 LaunchAgent property lists remain declarative config. Owned shell bodies
 and native logic named in their arguments belong to the migration. The
 two retired memory templates carry inactive relationships. Agentbrew owns

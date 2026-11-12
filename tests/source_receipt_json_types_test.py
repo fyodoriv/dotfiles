@@ -20,6 +20,7 @@ CHECKERS = {
     "tooling-checkup-callers": "OUTPUT",
     "stale-lifecycle-ranges": "OUTPUT",
     "non-test-source-classification": "OUTPUT",
+    "stale-hook-bin-ranges": "OUTPUT",
 }
 
 

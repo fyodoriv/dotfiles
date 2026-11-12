@@ -88,6 +88,17 @@ fail_once_jq() {
 }
 requests() { if [ -f "$FAKE_LOG" ]; then jq -s 'length' "$FAKE_LOG"; else echo 0; fi; }
 set_state() { jq -c "$1" "$DOTFILES_TELEMETRY_STATE" >"$TEST_DIR/state.new" && mv "$TEST_DIR/state.new" "$DOTFILES_TELEMETRY_STATE"; }
+# Print only bounded counts and fixed completion labels, never transport data.
+assert_request_count() {
+  local expected="$1" actual="$2" returned="$3" command_status="$4"
+  [[ "$expected" =~ ^[0-9]{1,4}$ ]] || expected=unknown
+  [[ "$actual" =~ ^[0-9]{1,4}$ ]] || actual=unknown
+  case "$returned" in yes|no) ;; *) returned=unknown ;; esac
+  [[ "$command_status" =~ ^[0-9]{1,3}$ ]] || command_status=unknown
+  if [ "$expected" != unknown ] && [ "$actual" = "$expected" ] && [ "$returned" = yes ] && [ "$command_status" = 0 ]; then return 0; fi
+  printf 'expected=%s observed=%s foreground_returned=%s status=%s\n' "$expected" "$actual" "$returned" "$command_status" >&2
+  return 1
+}
 # bin/dotfiles writes its timing line in the background: wait for line $1.
 wait_for_command_lines() {
   local tries=0
@@ -428,6 +439,8 @@ PY
 # any normal `dotfiles <command>` on a terminal asks, and a yes unlocks the
 # daily send, which takes only the capped newest events.
 @test "a normal command on a terminal asks once, then the daily send works and is small" {
+  unset DOTFILES_TELEMETRY_SPAWN
+  [ -n "${BATS_TEST_FILENAME:-}" ]
   seed_lines 2600
   export DOTFILES_STATS_LOG=1
   run bash -c "printf 'y\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
@@ -437,13 +450,42 @@ PY
   wait_for_command_lines 1
   # The 2,600 events from before the yes are never sent; only later ones are.
   printf '{"task":"sync","timestamp":"%s","units":9001}\n' "$NOW" >>"$DOTFILES_STATS_FILE"
-  bash "$TEL" daily
-  [ "$(requests)" -eq 2 ]
+  local daily_status count
+  unset DOTFILES_TELEMETRY_SPAWN
+  if bash "$TEL" daily; then daily_status=0; else daily_status=$?; fi
+  count="$(requests)" || count=unknown
+  assert_request_count 2 "$count" yes "$daily_status"
   [ "$(jq -s -c '[.[].batch[].properties | (.units // .command)]' "$FAKE_LOG")" = '[9001,"stats"]' ]
   [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "$(date -u +%F)" ]
   run bash -c "printf 'n\n' | DOTFILES_TELEMETRY_TTY=1 bash '$REPO/bin/dotfiles' stats"
   [[ "$output" != *"Share anonymous performance numbers?"* ]]
   [ "$(consent)" = "yes" ]
+}
+
+@test "request count diagnostic is bounded and hides canaries" {
+  local count
+  for count in 0 1 3; do
+    run assert_request_count 2 "$count" yes 0
+    [ "$status" -eq 1 ]
+    [ "$output" = "expected=2 observed=$count foreground_returned=yes status=0" ]
+  done
+  run assert_request_count 2 PRIVATE_CANARY_123 PRIVATE_CANARY_123 PRIVATE_CANARY_123
+  [ "$status" -eq 1 ]
+  [ "$output" = 'expected=2 observed=unknown foreground_returned=unknown status=unknown' ]
+  [[ "$output" != *PRIVATE_CANARY_123* ]]
+  run assert_request_count 2 2 yes 0
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "request count diagnostic reads the fake transport without leaking payload" {
+  local count
+  printf '{"canary":"PRIVATE_CANARY_123"}' | "$FAKE" >/dev/null
+  count="$(requests)"
+  run assert_request_count 2 "$count" yes 0
+  [ "$status" -eq 1 ]
+  [ "$output" = 'expected=2 observed=1 foreground_returned=yes status=0' ]
+  [[ "$output" != *PRIVATE_CANARY_123* ]]
 }
 
 @test "the first-run question does not nag: not before help, version, cd, or machine output" {
@@ -490,6 +532,28 @@ gate_root() {
   printf '#!/bin/bash\necho "$*" >>"%s/gate.calls"\n' "$TEST_DIR" >"$GATE/bin/dotfiles-telemetry"
   chmod +x "$GATE/bin/dotfiles-telemetry"
 }
+@test "test-owned detached sender reaches its final marker" {
+  gate_root
+  say_yes
+  set_state '.last_send = "" | .try_hour = ""'
+  cat > "$GATE/bin/dotfiles-telemetry" <<'SH'
+#!/bin/bash
+[ "$1" = daily ] || exit 1
+printf 'done\n' > "$TEST_SENDER_MARKER"
+SH
+  chmod +x "$GATE/bin/dotfiles-telemetry"
+  export TEST_SENDER_MARKER="$TEST_DIR/sender-finished"
+  export DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1 DOTFILES_TELEMETRY_TEST_UID=1000
+  bash -c 'source "$1/lib/stats.sh"; _telemetry_daily "$2"' _ "$GATE" "$NOW"
+  local tries=0
+  until [ -f "$TEST_SENDER_MARKER" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 100 ] || { echo 'sender marker not observed'; return 1; }
+    sleep 0.05
+  done
+  [ "$(cat "$TEST_SENDER_MARKER")" = done ]
+}
+
 ask_starts() {
   gate_root
   : >"$TEST_DIR/gate.calls"

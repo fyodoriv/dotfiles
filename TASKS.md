@@ -34,7 +34,7 @@ them. -->
   - **ID**: telemetry-terminal-request-count-diagnostic
   - **Tags**: telemetry, testing, stability
   - **Mode**: AFK
-  - **Details**: A local full gate failed `tests/telemetry.bats` at the assertion that two requests were recorded. The test did not report the actual count; it passed when run alone. The cause is unknown. Use only synthetic events and a local fake transport to reveal the count and producer state before changing timing or send behavior.
+  - **Details**: A local full gate failed `tests/telemetry.bats` at the assertion that two requests were recorded. The test did not report the actual count; it passed when run alone. The cause is unknown. The [registered diagnostic](docs/plans/telemetry-count-diagnostic.md) uses synthetic events and a fake transport to report bounded counts and foreground return. It disables the detached sender in this case; a separate owned fixture observes a final marker. A marker does not prove process exit. Investigate any future mismatch before changing timing or send behavior.
   - **Output**: instrumentation
   - **Acceptance**: A planted count mismatch produces a bounded numeric receipt without payloads, credentials or user data. The test proves whether its detached sender finished before checking requests. Production consent and send behavior stay unchanged.
   - **Hypothesis**: A content-free receipt and explicit sender-completion observation identify every planted count mismatch without disclosing synthetic canaries.

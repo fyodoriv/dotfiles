@@ -53,6 +53,9 @@ The scratch service started, its client reached the authenticated API, and the
 listener and registration were absent after stop. The same test also denied
 signals to the outside parent and blocked access to the synthetic network
 control. It did not exercise the installed user's service, alias, or memory.
+The installed binary's SHA-256 matches the executable from the verified
+upstream archive used by the hosted trial. The hosted and local macOS versions
+differ, so the installed-machine trial remains necessary.
 
 ## Version-aware launcher prediction
 

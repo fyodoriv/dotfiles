@@ -54,6 +54,25 @@ listener and registration were absent after stop. The same test also denied
 signals to the outside parent and blocked access to the synthetic network
 control. It did not exercise the installed user's service, alias, or memory.
 
+## Version-aware launcher prediction
+
+- **Hypothesis:** Route `oc` and the login job through the upstream managed
+  service on OpenCode 2, while keeping the existing attach path for OpenCode 1.
+  This removes the startup loop and avoids writing service credentials to logs.
+- **Measurement:** Run `bats tests/opencode-service.bats tests/module-local-ai.bats`
+  with synthetic version 1 and 2 binaries, the isolated service trial, then
+  `dotfiles doctor --full --module local-ai` and one synthetic Kimi
+  shared-memory recall after deployment.
+- **Success:** All version 1 and 2 fixture cases pass; the installed version 2
+  service is healthy, the old failing loop is gone, no credential enters logs,
+  and 1 of 1 synthetic Kimi memory recalls succeeds.
+- **Pivot:** If either version loses its supported path, the service cannot be
+  stopped safely, any credential is logged, or Kimi recall fails, do not deploy
+  the migration; keep the current configuration and diagnose the failure.
+- **Anchor:** `home/zshrc.ai-tools`, `modules/local-ai/doctor.sh`,
+  `launchagents/com.dotfiles.opencode-serve.plist.tmpl`, and the upstream
+  [OpenCode CLI service documentation](https://opencode.ai/docs/cli/).
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

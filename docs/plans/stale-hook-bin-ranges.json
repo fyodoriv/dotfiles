@@ -1,0 +1,301 @@
+{
+  "format": 1,
+  "pin": "b3bc770aa64bc94668bd4ba9dd6bf376a726c2f5",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "files": [
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_revision": "fb319879feb3f036fe1243fbb22821b9be69c5df",
+      "old_mode": "100755",
+      "old_blob": "707535f119447e360aaa40fd87cc31cff7db0b94",
+      "current_mode": "100755",
+      "current_blob": "a00ac6b6d92bf84a17bb21b15cbb7dd4663d614e"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_revision": "fb319879feb3f036fe1243fbb22821b9be69c5df",
+      "old_mode": "100755",
+      "old_blob": "3385121a5b325b0941acbe95ddff60a80d984d88",
+      "current_mode": "100755",
+      "current_blob": "28c43fa598c36bced1068bf09d317d417c114638"
+    },
+    {
+      "path": "bin/kimi-goal",
+      "old_revision": "c5ed285bbd51278501536bc40602761f779d24d2",
+      "old_mode": "100755",
+      "old_blob": "f10daca4d19b652efb0ff39639b3459697d83e2c",
+      "current_mode": "100755",
+      "current_blob": "31a61eaebabeb220dd7d14ddb17e6495079ae45a"
+    }
+  ],
+  "ranges": [
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "op": "replace",
+      "old_start": 178,
+      "old_end": 179,
+      "new_start": 178,
+      "new_end": 196
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "op": "replace",
+      "old_start": 180,
+      "old_end": 190,
+      "new_start": 197,
+      "new_end": 225
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "op": "delete",
+      "old_start": 191,
+      "old_end": 195,
+      "new_start": 226,
+      "new_end": 226
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "op": "insert",
+      "old_start": 415,
+      "old_end": 415,
+      "new_start": 446,
+      "new_end": 495
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "op": "insert",
+      "old_start": 64,
+      "old_end": 64,
+      "new_start": 64,
+      "new_end": 80
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "op": "replace",
+      "old_start": 74,
+      "old_end": 75,
+      "new_start": 90,
+      "new_end": 95
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "op": "insert",
+      "old_start": 164,
+      "old_end": 164,
+      "new_start": 184,
+      "new_end": 186
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "op": "replace",
+      "old_start": 216,
+      "old_end": 217,
+      "new_start": 238,
+      "new_end": 240
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "op": "replace",
+      "old_start": 222,
+      "old_end": 230,
+      "new_start": 245,
+      "new_end": 264
+    },
+    {
+      "path": "bin/kimi-goal",
+      "op": "insert",
+      "old_start": 60,
+      "old_end": 60,
+      "new_start": 60,
+      "new_end": 64
+    },
+    {
+      "path": "bin/kimi-goal",
+      "op": "replace",
+      "old_start": 72,
+      "old_end": 73,
+      "new_start": 76,
+      "new_end": 77
+    },
+    {
+      "path": "bin/kimi-goal",
+      "op": "replace",
+      "old_start": 77,
+      "old_end": 78,
+      "new_start": 81,
+      "new_end": 82
+    },
+    {
+      "path": "bin/kimi-goal",
+      "op": "replace",
+      "old_start": 79,
+      "old_end": 80,
+      "new_start": 83,
+      "new_end": 84
+    }
+  ],
+  "anchors": [
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 1,
+      "current_lines": [
+        1
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 12,
+      "current_lines": [
+        12
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 24,
+      "current_lines": [
+        24
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 25,
+      "current_lines": [
+        25
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 36,
+      "current_lines": [
+        36
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 124,
+      "current_lines": [
+        124
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 166,
+      "current_lines": [
+        154,
+        166,
+        461,
+        465
+      ],
+      "status": "ambiguous"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 284,
+      "current_lines": [
+        315
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/block-dangerous-git.sh",
+      "old_line": 416,
+      "current_lines": [
+        22,
+        496
+      ],
+      "status": "ambiguous"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 1,
+      "current_lines": [
+        1
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 10,
+      "current_lines": [
+        10
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 47,
+      "current_lines": [
+        47
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 190,
+      "current_lines": [
+        212
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 191,
+      "current_lines": [
+        213
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 195,
+      "current_lines": [
+        217
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 214,
+      "current_lines": [
+        236
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 219,
+      "current_lines": [
+        242
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 220,
+      "current_lines": [
+        243
+      ],
+      "status": "unique"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "old_line": 230,
+      "current_lines": [],
+      "status": "missing"
+    },
+    {
+      "path": "bin/kimi-goal",
+      "old_line": 1,
+      "current_lines": [
+        1
+      ],
+      "status": "unique"
+    }
+  ]
+}

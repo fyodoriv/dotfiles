@@ -53,6 +53,14 @@ The categories do not establish ownership, execution, or generated output
 behavior. The 383 absent test-tree candidates and six stale-only candidates
 remain separate; this review does not complete the inventory.
 
+The [stale hook and bin receipt](stale-hook-bin-ranges.json) compares the
+other three stale-only paths with their earlier family receipts. It records
+13 changed alignment ranges and the current match positions of 20 old
+anchors. Check it with `python3 docs/plans/stale-hook-bin-ranges.py --check`.
+Missing and ambiguous anchors stay unresolved; matching text does not prove
+equivalent behavior or current caller coverage. The comparison is pinned to
+the candidate revision and does not describe later source changes.
+
 LaunchAgent property lists remain declarative config. Owned shell bodies
 and native logic named in their arguments belong to the migration. The
 two retired memory templates carry inactive relationships. Agentbrew owns

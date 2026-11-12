@@ -44,3 +44,19 @@ the candidate helper.
 
 Anchor: [hook status experiment](rust-hook-status-experiment.md) and
 [trusted launch](hook-rss-provenance.md).
+
+## Retained publication protocol
+
+Registered before implementation. Verify the private pending record first.
+Publish by creating an exclusive hard link named `launch.json` to that record.
+Keep both names as intentional evidence. The link creation is the publication
+point; do not remove either name as cleanup. The reader must verify two stable,
+owner-only no-follow handles for the same inode and exactly two links. A
+pending-only prepublication check requires one link.
+
+Success: pending-only, complete two-link and every planted missing, extra,
+changed, unsafe or mismatched-link case produce the expected decision. A crash
+after publication can leave the controller exit status unknown; publication
+does not prove a normal exit. The protocol does not claim fsync durability or
+protection from same-user tampering. Any unverified or partial pair is
+inconclusive.

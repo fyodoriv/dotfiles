@@ -21,8 +21,9 @@ First collect two baseline peak-RSS medians: 15 invocations each under
 `/usr/bin/time -l`, with the gate row's JSON input and an exclusive
 `heavy-run` slot. The A/A ratio must be 0.95 to 1.05. Record every result and
 failure in a private scratch file. A missing value makes the result
-inconclusive. Compare a candidate's 15-run median to the baseline; R_M must be
-at most 1.10.
+inconclusive. Compare a candidate's 15-run median to the lower baseline median; R_M
+must be at most 1.10. If any trial is invalid, stop and mark the run
+inconclusive; report the first invalid trial rather than claiming 30 samples.
 
 Compare old and candidate hook status, stdout and stderr in a scratch fixture
 for `git status`, `git status --short`, `git status -s -b`, and

@@ -81,7 +81,7 @@ while [ "$i" -le "$rounds" ]; do
   if $dry; then
     printf 'round %s: cd %q && %s' "$i" "$dir" "$OC"; printf ' %q' "${args[@]}"; printf ' <prompt>\n'
   else
-    out="$(cd "$dir" && "$OC" "${args[@]}" "$msg" 2>&1 | tee /dev/stderr)" || true
+    out="$(cd "$dir" && "$OC" "${args[@]}" "$msg" 2>&1 | tee /dev/stderr)" || exit $?
     # Only a line that starts with the marker counts; the prompt itself names it.
     if grep -qE '^[[:space:]]*GOAL (MET|BLOCKED)' <<<"$out"; then exit 0; fi
   fi

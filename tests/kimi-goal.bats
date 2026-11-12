@@ -14,6 +14,7 @@ echo "KEY=${KIMI_API_KEY:-unset}"
 echo "ARGS=$*"
 echo "DIR=$(pwd -P)"
 echo "${FAKE_REPLY:-working}"
+exit "${FAKE_EXIT:-0}"
 STUB
   cat > "$TEST_DIR/security" <<'STUB'
 #!/bin/bash
@@ -69,6 +70,11 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -ne 0 ]
   [[ "$output" == *"directory"* ]]
   [[ "$output" != *"ARGS="* ]]
+}
+
+@test "OpenCode failure returns a nonzero status" {
+  FAKE_KEY=k FAKE_EXIT=23 run bash "$KG" "fix x"
+  [ "$status" -eq 23 ]
 }
 
 @test "missing key fails with both fixes" {

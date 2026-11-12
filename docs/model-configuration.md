@@ -31,7 +31,7 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 
 ## Kimi Code plan in OpenCode
 
-The local OpenCode launch agent uses the lowercase `warn` log level required by OpenCode 2.2.6. `kimi-goal` starts OpenCode in the requested directory.
+The local OpenCode launch agent uses the lowercase `warn` log level required by OpenCode 2.2.6. `kimi-goal` starts OpenCode in the requested directory and reports a failed OpenCode invocation to its caller.
 
 OpenCode Desktop (cask `opencode-desktop`) and the `opencode` CLI run Kimi through the built-in `kimi-code-plan-global` provider (endpoint `https://api.kimi.ai/coding/v1`, billed to the Kimi Code membership). The desktop cask is opt-in: run `dotfiles config set opencode_desktop true` and then `dotfiles apply`. A failed optional cask install does not stop apply. agentbrew syncs the same rules, skills, commands, and MCP servers (memory included) to OpenCode as to Claude Code.
 

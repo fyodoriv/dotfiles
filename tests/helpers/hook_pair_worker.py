@@ -4,7 +4,8 @@ import re
 
 from hook_pair_receipts import private_dir
 from hook_rss_provenance import identity
-from hook_trusted_launch import read_private, strict_json
+from hook_pair_private import read_private
+from hook_trusted_launch import strict_json
 
 HOOK = "agent-hooks/block-dangerous-git.sh"
 BOOTSTRAP = "agent-hooks/bootstrap-endpoint-path.sh"
@@ -19,6 +20,8 @@ def identity_ok(root, run_dir, environ, parent_pid):
         run_id = environ["HOOK_PAIR_RUN_ID"]
         revisions = [environ[key] for key in ("HOOK_PAIR_CANDIDATE", "HOOK_PAIR_OLD", "HOOK_PAIR_HARNESS_REVISION")]
         audit = environ["HOOK_PAIR_AUDIT_SHA256"]
+        source_audit = environ["HOOK_PAIR_SOURCE_AUDIT_SHA256"]
+        source_manifest = environ["HOOK_PAIR_MANIFEST_SHA256"]
         expected_dir = Path(environ["HOME"]) / ".local/state/dotfiles/rust-migration" / ("hook-rss-" + run_id)
         if (not root.is_absolute() or not private_dir(run_dir) or run_dir != expected_dir or
                 environ["HOOK_PAIR_RUN_DIR"] != str(run_dir) or environ["DOTFILES_DIR"] != str(root) or
@@ -27,10 +30,12 @@ def identity_ok(root, run_dir, environ, parent_pid):
                 type(parent_pid) is not int or parent_pid <= 0 or
                 type(run_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", run_id) or
                 any(type(revision) is not str or not re.fullmatch(r"[0-9a-f]{40}", revision) for revision in revisions) or
-                type(audit) is not str or not re.fullmatch(r"[0-9a-f]{64}", audit)):
+                any(type(value) is not str or not re.fullmatch(r"[0-9a-f]{64}", value)
+                    for value in (audit, source_audit, source_manifest))):
             return False
         expected = {"format": 1, "run_id": run_id, "candidate_revision": revisions[0],
-                    "old_revision": revisions[1], "harness_revision": revisions[2], "audit_sha256": audit}
+                    "old_revision": revisions[1], "harness_revision": revisions[2], "audit_sha256": audit,
+                    "source_audit_sha256": source_audit, "source_manifest_sha256": source_manifest}
         intent = strict_json(read_private(run_dir / "intent.json", 4096))
         if type(intent) is not dict or intent != expected or type(intent.get("format")) is not int:
             return False

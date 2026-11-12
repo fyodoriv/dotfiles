@@ -5,7 +5,8 @@ import re
 import stat
 
 from hook_status_pairs import CASES
-from hook_trusted_launch import read_private, strict_json, write_private_json
+from hook_pair_private import read_private
+from hook_trusted_launch import strict_json, write_private_json
 
 
 def private_dir(path):

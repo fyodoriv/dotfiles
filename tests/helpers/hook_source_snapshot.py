@@ -4,7 +4,8 @@ from pathlib import Path
 import re
 
 from hook_pair_receipts import private_dir
-from hook_trusted_launch import read_private, strict_json
+from hook_pair_private import read_private
+from hook_trusted_launch import strict_json
 
 HOOK = "agent-hooks/block-dangerous-git.sh"
 BOOTSTRAP = "agent-hooks/bootstrap-endpoint-path.sh"

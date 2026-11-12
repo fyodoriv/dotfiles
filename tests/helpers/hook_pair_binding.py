@@ -4,15 +4,43 @@ The attempt digest covers normalized, validated JSON records, not file bytes.
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
 
 from hook_pair_receipts import private_dir, read_attempts
+from hook_source_audit import parse_source_audit
+from hook_source_snapshot import read_snapshot
 from hook_status_pairs import CASES, FLAGS, summarize
-from hook_trusted_launch import parse_audit, read_private, strict_json
+from hook_pair_private import read_private
+from hook_trusted_launch import parse_audit, strict_json
 
 
-def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, parent_pid, final_name="launch.json"):
+def read_published_pair(root):
+    """Read the two intentional, private links to one published record."""
+    pending, final = root / "launch.pending", root / "launch.json"
+    def fingerprint(info):
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_nlink,
+                info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    with os.fdopen(os.open(pending, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as first, \
+            os.fdopen(os.open(final, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as second:
+        left, right = os.fstat(first.fileno()), os.fstat(second.fileno())
+        if (not stat.S_ISREG(left.st_mode) or left.st_uid != os.geteuid() or
+                stat.S_IMODE(left.st_mode) != 0o600 or left.st_nlink != 2 or left.st_size > 4096 or
+                fingerprint(left) != fingerprint(right)):
+            raise ValueError("invalid published pair")
+        one, two = first.read(4097), second.read(4097)
+        if (len(one) != left.st_size or one != two or
+                fingerprint(os.fstat(first.fileno())) != fingerprint(left) or
+                fingerprint(os.fstat(second.fileno())) != fingerprint(left) or
+                fingerprint(os.stat(pending, follow_symlinks=False)) != fingerprint(left) or
+                fingerprint(os.stat(final, follow_symlinks=False)) != fingerprint(left)):
+            raise ValueError("published pair changed")
+        return one
+
+
+def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, source_audit, source_manifest, parent_pid, final_name="launch.json"):
     try:
         root = Path(root)
         if (final_name not in ("launch.json", "launch.pending") or
@@ -22,17 +50,24 @@ def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, parent_
                     for revision in (candidate, old, harness))):
             return None
         parse_audit(audit_bytes)
+        if parse_source_audit(source_audit, source_manifest, run_id, old, candidate) is None:
+            return None
         intent_bytes = read_private(root / "intent.json", 4096)
         parent_bytes = read_private(root / "parent", 64)
         wait_bytes = read_private(root / "wait.log", 4096)
         receipt_bytes = read_private(root / "receipt.json", 65536)
         intent = strict_json(intent_bytes)
         receipt = strict_json(receipt_bytes)
-        final = strict_json(read_private(root / final_name, 4096))
+        final_bytes = read_published_pair(root) if final_name == "launch.json" else read_private(root / final_name, 4096)
+        final = strict_json(final_bytes)
         expected_intent = {"format": 1, "run_id": run_id, "candidate_revision": candidate,
                            "old_revision": old, "harness_revision": harness,
-                           "audit_sha256": hashlib.sha256(audit_bytes).hexdigest()}
+                           "audit_sha256": hashlib.sha256(audit_bytes).hexdigest(),
+                           "source_audit_sha256": hashlib.sha256(source_audit).hexdigest(),
+                           "source_manifest_sha256": hashlib.sha256(source_manifest).hexdigest()}
         if type(intent) is not dict or intent != expected_intent or type(intent.get("format")) is not int:
+            return None
+        if read_snapshot(root / "source", source_manifest, run_id, old, candidate) is None:
             return None
         if parent_bytes != f"{parent_pid}\n".encode("ascii"):
             return None
@@ -67,6 +102,8 @@ def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, parent_
         ratios = receipt["median_ratios"]
         if (not summary["valid"] or receipt["passed"] is not summary["passed"] or type(ratios) is not dict or
                 set(ratios) != set(CASES) or any(type(ratios[name]) is not float or ratios[name] != summary["median_ratios"][name] for name in CASES)):
+            return None
+        if read_snapshot(root / "source", source_manifest, run_id, old, candidate) is None:
             return None
         return summary
     except (KeyError, OSError, TypeError, UnicodeError, ValueError):

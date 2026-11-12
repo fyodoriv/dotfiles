@@ -1,15 +1,18 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).parent / "helpers"))
 import hook_pair_binding as binding
 import hook_pair_receipts as records
 import hook_status_pairs as pairs
+import hook_source_snapshot as snapshots
 from hook_trusted_launch import write_private_json
 
 
@@ -27,8 +30,31 @@ class BindingControls(unittest.TestCase):
         sink = records.AttemptSink(root, run_id)
         result = pairs.capture(lambda _case, side: (100 if side == "old" else candidate_ns, 0, b"", b""),
                                lambda: True, lambda: True, sink.record)
+        source = root / "source"
+        source.mkdir(mode=0o700)
+        rows = []
+        for index, (side, path, mode) in enumerate(snapshots.EXPECTED):
+            data = ("hook-" + side if path == snapshots.HOOK else "shared-" + path).encode()
+            name = f"{index:03}.src"
+            file = source / name
+            file.write_bytes(data)
+            file.chmod(0o600)
+            oid = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data, usedforsecurity=False).hexdigest()
+            rows.append({"side": side, "path": path, "mode": mode, "file": name,
+                         "blob": oid, "sha256": hashlib.sha256(data).hexdigest()})
+        manifest = {"format": 1, "run_id": run_id, "old_revision": old,
+                    "candidate_revision": candidate, "files": rows}
+        source_manifest = json.dumps(manifest, sort_keys=True).encode()
+        (source / "manifest.json").write_bytes(source_manifest)
+        (source / "manifest.json").chmod(0o600)
+        source_audit = json.dumps({"format": 1, "run_id": run_id, "old_revision": old,
+                                   "candidate_revision": candidate, "manifest_sha256": hashlib.sha256(source_manifest).hexdigest(),
+                                   "local_filesystems": True, "roots": {"old": {"path": "/scratch/old", "dev": 1, "ino": 2},
+                                                                          "new": {"path": "/scratch/new", "dev": 1, "ino": 3}}}).encode()
         intent = {"format": 1, "run_id": run_id, "candidate_revision": candidate,
-                  "old_revision": old, "harness_revision": harness, "audit_sha256": hashlib.sha256(audit).hexdigest()}
+                  "old_revision": old, "harness_revision": harness, "audit_sha256": hashlib.sha256(audit).hexdigest(),
+                  "source_audit_sha256": hashlib.sha256(source_audit).hexdigest(),
+                  "source_manifest_sha256": hashlib.sha256(source_manifest).hexdigest()}
         write_private_json(root / "intent.json", intent)
         for name, content in (("parent", "123\n"), ("wait.log", "waited=1 pid=123 slot=exclusive\n")):
             path = root / name
@@ -42,8 +68,9 @@ class BindingControls(unittest.TestCase):
         final = {"format": 1, "intent_sha256": digest("intent.json"), "parent_pid": 123,
                  "parent_sha256": digest("parent"), "wait_sha256": digest("wait.log"),
                  "receipt_sha256": digest("receipt.json"), "attempts_sha256": attempt_digest, "verdict": "qualified"}
-        write_private_json(root / "launch.json", final)
-        return run_id, candidate, old, harness, audit
+        write_private_json(root / "launch.pending", final)
+        os.link(root / "launch.pending", root / "launch.json")
+        return run_id, candidate, old, harness, audit, source_audit, source_manifest
 
     def test_independent_binding_and_threshold(self):
         for candidate_ns, expected in ((75, True), (81, False)):
@@ -72,10 +99,72 @@ class BindingControls(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             args = self.build(root)
-            (root / "launch.json").rename(root / "launch.pending")
+            (root / "launch.json").unlink()
             self.assertIsNone(binding.verify_pair_link(root, *args, 123))
             self.assertIsNotNone(binding.verify_pair_link(root, *args, 123, final_name="launch.pending"))
             self.assertIsNone(binding.verify_pair_link(root, *args, 123, final_name="../launch.pending"))
+
+    def test_missing_extra_or_unsafe_publication_link_never_qualifies(self):
+        for mutation in ("missing_pending", "different_inode", "extra_link", "symlink", "mode", "fifo_pending", "fifo_final"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                args = self.build(root)
+                pending, final = root / "launch.pending", root / "launch.json"
+                if mutation == "missing_pending": pending.unlink()
+                elif mutation == "different_inode":
+                    content = pending.read_bytes()
+                    pending.unlink()
+                    pending.write_bytes(content)
+                    pending.chmod(0o600)
+                elif mutation == "extra_link": os.link(final, root / "extra-link")
+                elif mutation == "symlink":
+                    final.unlink()
+                    final.symlink_to(pending)
+                elif mutation in ("fifo_pending", "fifo_final"):
+                    target = pending if mutation == "fifo_pending" else final
+                    target.unlink()
+                    os.mkfifo(target, 0o600)
+                else: final.chmod(0o644)
+                self.assertIsNone(binding.verify_pair_link(root, *args, 123))
+
+    def test_published_record_opens_are_nonblocking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pending, final = root / "launch.pending", root / "launch.json"
+            pending.write_bytes(b"fixture")
+            pending.chmod(0o600)
+            os.link(pending, final)
+            original_open = os.open
+            def checked_open(path, flags, *args, **kwargs):
+                self.assertTrue(flags & os.O_NONBLOCK)
+                return original_open(path, flags, *args, **kwargs)
+            with patch.object(binding.os, "open", side_effect=checked_open):
+                self.assertEqual(binding.read_published_pair(root), b"fixture")
+
+    def test_missing_changed_or_wrong_snapshot_never_qualifies(self):
+        for mutation in ("missing", "changed", "wrong_manifest"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                args = self.build(root)
+                if mutation == "missing":
+                    (root / "source/000.src").unlink()
+                elif mutation == "changed":
+                    (root / "source/000.src").write_bytes(b"changed")
+                else:
+                    args = (*args[:6], args[6] + b" ")
+                self.assertIsNone(binding.verify_pair_link(root, *args, 123))
+
+    def test_snapshot_changed_during_verification_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.build(root)
+            original = binding.read_attempts
+            def change_after_read(*read_args):
+                result = original(*read_args)
+                (root / "source/000.src").write_bytes(b"changed")
+                return result
+            with patch.object(binding, "read_attempts", side_effect=change_after_read):
+                self.assertIsNone(binding.verify_pair_link(root, *args, 123))
 
     def test_missing_or_false_flags_never_qualify(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -97,10 +186,13 @@ class BindingControls(unittest.TestCase):
                 wrong = list(args)
                 wrong[position] = "f" * 40
                 self.assertIsNone(binding.verify_pair_link(root, *wrong, 123))
-            self.assertIsNone(binding.verify_pair_link(root, *args[:4], b"{}", 123))
+            self.assertIsNone(binding.verify_pair_link(root, *args[:4], b"{}", args[5], args[6], 123))
             audit = json.loads(args[4])
             audit["launcher"] = "f" * 64
-            self.assertIsNone(binding.verify_pair_link(root, *args[:4], json.dumps(audit).encode(), 123))
+            self.assertIsNone(binding.verify_pair_link(root, *args[:4], json.dumps(audit).encode(), args[5], args[6], 123))
+            source_audit = json.loads(args[5])
+            source_audit["roots"]["old"]["ino"] += 1
+            self.assertIsNone(binding.verify_pair_link(root, *args[:5], json.dumps(source_audit).encode(), args[6], 123))
 
     def test_changed_or_duplicated_admission_never_qualifies(self):
         for wait in ("", "waited=1 pid=123 slot=shared\n", "pid=123 slot=exclusive\npid=123 slot=exclusive\n"):

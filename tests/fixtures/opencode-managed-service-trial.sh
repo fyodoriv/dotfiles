@@ -15,6 +15,10 @@ isolated() {
 }
 cleanup() {
   isolated "$binary" service stop || true
+  if /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo 'FAIL scratch listener remains after cleanup' >&2
+    return 1
+  fi
   rm -rf -- "$root"
 }
 trap cleanup EXIT
@@ -34,6 +38,7 @@ if ! isolated "$binary" service start; then
   echo 'FAIL scratch service start'; exit 1
 fi
 if ! isolated "$binary" api get /api/info; then
+  env -i HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" XDG_CACHE_HOME="$root/cache" TMPDIR="$root" PATH=/usr/bin:/bin /usr/bin/sandbox-exec -p "$profile" "$binary" api get /api/info 2>&1 | /usr/bin/python3 tests/fixtures/opencode-error-category.py || true
   echo 'FAIL scratch authenticated API'; exit 1
 fi
 if ! isolated "$binary" service stop; then

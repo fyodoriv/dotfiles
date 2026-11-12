@@ -49,6 +49,12 @@ invokes the absolute tracked launcher, and binds its selected Perl and child
 relationship. Independently bind the expected startup-file digests to the
 audited files. Caller-supplied values alone do not establish that binding.
 
+The [retained-provenance contract](hook-retained-provenance-prediction.md)
+requires a caller-selected private run ID and independently retained expected
+revision and audit bytes. The verifier recomputes the sample medians and A/A
+ratio. Load and source/tool flags remain assertions from the measurement
+process; the retained files do not independently reconstruct those inputs.
+
 Anchor: `rust-hook-status-experiment.md`, `rust-agent-hooks`, the heavy-run
 queue contract, Basili, Caldiera and Rombach 1994 (GQM), and Munafò et al.
 2017 (pre-registration).

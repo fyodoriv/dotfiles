@@ -1,0 +1,338 @@
+{
+  "format": 1,
+  "revision": "3d3b904ea144b3b49fac3130d3f28c9ddcd205c1",
+  "files": [
+    {
+      "path": "modules/agent-browser/doctor.sh",
+      "mode": "100644",
+      "blob": "818238e478fd7b5b68d5a6ee6fa28db12c6b7538"
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "mode": "100644",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131"
+    },
+    {
+      "path": "modules/chezmoi/doctor.sh",
+      "mode": "100644",
+      "blob": "c1a266047059406fadab5f39ebd948511ff11a9b"
+    },
+    {
+      "path": "modules/chrome/doctor.sh",
+      "mode": "100644",
+      "blob": "85ad0782be811c40b1795799f6b1d5f1e60559fc"
+    },
+    {
+      "path": "modules/claude/doctor.sh",
+      "mode": "100644",
+      "blob": "3d9e76778d7dbe5f666aa949a7f40cb03cda7954"
+    },
+    {
+      "path": "modules/codex/doctor.sh",
+      "mode": "100644",
+      "blob": "b20075717a219c097fca9c5e41b66a8edb4b901c"
+    },
+    {
+      "path": "modules/editor/doctor.sh",
+      "mode": "100644",
+      "blob": "78b24189d39edfdd70501713d7741cb3b9743b34"
+    },
+    {
+      "path": "modules/enterprise/doctor.sh",
+      "mode": "100644",
+      "blob": "f51e0d75185c5c14e5c785c891cc5384992c3c42"
+    },
+    {
+      "path": "modules/extras/doctor.sh",
+      "mode": "100644",
+      "blob": "daeecdfcbcefefbfba63e574ccbe8db97b948571"
+    },
+    {
+      "path": "modules/git/doctor.sh",
+      "mode": "100644",
+      "blob": "35258e1f0fad208da737ca495aca8e574a8e53af"
+    },
+    {
+      "path": "modules/home-theater/doctor.sh",
+      "mode": "100644",
+      "blob": "20b976e1e4620d4d347b3b7e311accda17d02298"
+    },
+    {
+      "path": "modules/jetbrains/doctor.sh",
+      "mode": "100644",
+      "blob": "106ca0116287ff8966ac0406bb3598003a0f69be"
+    },
+    {
+      "path": "modules/local-ai/doctor.sh",
+      "mode": "100644",
+      "blob": "eef5475fd559eb465183c8072333a01676eb272f"
+    },
+    {
+      "path": "modules/local-bin/doctor.sh",
+      "mode": "100755",
+      "blob": "8b036ff0fec6e6da43c9403a355b0b959ed13528"
+    },
+    {
+      "path": "modules/local-llm/doctor.sh",
+      "mode": "100755",
+      "blob": "ae55111aca558e74ef539330cb32f0511f50d6a4"
+    },
+    {
+      "path": "modules/macos/doctor.sh",
+      "mode": "100644",
+      "blob": "9bb3308d34a044ef4e8e854c35d3b232695876e0"
+    },
+    {
+      "path": "modules/memory/doctor.sh",
+      "mode": "100644",
+      "blob": "4f25e144c15dea2c28a27913c00e07c5c8da2884"
+    },
+    {
+      "path": "modules/minsky/doctor.sh",
+      "mode": "100755",
+      "blob": "9105603d787b5c45211bdf3b65454f91c34a5cf7"
+    },
+    {
+      "path": "modules/obsidian/doctor.sh",
+      "mode": "100644",
+      "blob": "ec99bab88189198d0e4695906715842a6df9386e"
+    },
+    {
+      "path": "modules/personal-machine/doctor.sh",
+      "mode": "100755",
+      "blob": "223336ba37ffdadc502e943345b4a17d27183838"
+    },
+    {
+      "path": "modules/plugins/doctor.sh",
+      "mode": "100644",
+      "blob": "8d9f58d15b6bc7b917decfd20fd7163d6a5704cd"
+    },
+    {
+      "path": "modules/prompt/doctor.sh",
+      "mode": "100644",
+      "blob": "0374dd1d651ee7d2b34075b63bb98c4875fa3aac"
+    },
+    {
+      "path": "modules/resilience/doctor.sh",
+      "mode": "100755",
+      "blob": "98e2c17ba4105da2ae8019aec4d66ce832fce486"
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "mode": "100644",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4"
+    },
+    {
+      "path": "modules/shell/doctor.sh",
+      "mode": "100644",
+      "blob": "92d5ba3164c3998dc480c28ce4187d154b1ee5c8"
+    },
+    {
+      "path": "modules/ssh/doctor.sh",
+      "mode": "100644",
+      "blob": "470363ef9658e1235c1f177c5877319668ceffb6"
+    },
+    {
+      "path": "modules/sync/doctor.sh",
+      "mode": "100644",
+      "blob": "c4375ba9673eac45ff95e481d5d44e577997ad9a"
+    },
+    {
+      "path": "modules/terminal/doctor.sh",
+      "mode": "100644",
+      "blob": "28cabb31b840ff758fe60c6090fb4cf12ccad0c4"
+    },
+    {
+      "path": "modules/tools/doctor.sh",
+      "mode": "100644",
+      "blob": "383fdc630cbca021094412445f4fe044a68c7630"
+    },
+    {
+      "path": "modules/upgrade/doctor.sh",
+      "mode": "100644",
+      "blob": "7e95c8bcd150fec1063f4c476b8b1efd1b652c9d"
+    },
+    {
+      "path": "modules/vscode/doctor.sh",
+      "mode": "100755",
+      "blob": "825a5a6f0ee6f5498e9f9f5fc6b33aa1cbf04096"
+    },
+    {
+      "path": "modules/workflow/doctor.sh",
+      "mode": "100644",
+      "blob": "7906eb10c8dd4db77cbdcf8e386ba0c506d883a9"
+    },
+    {
+      "path": "modules/workspace/doctor.sh",
+      "mode": "100755",
+      "blob": "4e0726ceaee952b4ceb4593880fecc4a64dfe399"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "modules/agent-browser/doctor.sh",
+      "line": 10,
+      "text": "check \"agent-browser.installed\" \"agent-browser CLI installed\" \\"
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "line": 8,
+      "text": "_agentbrew_cli_available() {"
+    },
+    {
+      "path": "modules/chezmoi/doctor.sh",
+      "line": 80,
+      "text": "  check_advisory \"chezmoi.installed\" \"chezmoi on PATH\" \\"
+    },
+    {
+      "path": "modules/chrome/doctor.sh",
+      "line": 46,
+      "text": "_chrome_default_profile_matches() {"
+    },
+    {
+      "path": "modules/claude/doctor.sh",
+      "line": 10,
+      "text": "check \"claude.model_wrapper\" \"\\$HOME/bin/claude strips ANTHROPIC_MODEL and defaults permission mode\" \\"
+    },
+    {
+      "path": "modules/codex/doctor.sh",
+      "line": 16,
+      "text": "_codex_cli_available() {"
+    },
+    {
+      "path": "modules/editor/doctor.sh",
+      "line": 3,
+      "text": "check_managed \"managed.editorconfig\" \"$DOTFILES_DIR/dot_editorconfig\" \"$HOME/.editorconfig\""
+    },
+    {
+      "path": "modules/enterprise/doctor.sh",
+      "line": 15,
+      "text": "  check \"enterprise.$tool\" \"$tool installed\" \"command -v $tool\" \"$fix_cmd\""
+    },
+    {
+      "path": "modules/extras/doctor.sh",
+      "line": 9,
+      "text": "check \"tool.dockutil\" \"dockutil installed\" \"command -v dockutil\" \"brew install dockutil 2>/dev/null\""
+    },
+    {
+      "path": "modules/git/doctor.sh",
+      "line": 5,
+      "text": "check_managed \"managed.gitconfig\"       \"$DOTFILES_DIR/dot_gitconfig.tmpl\"      \"$HOME/.gitconfig\""
+    },
+    {
+      "path": "modules/home-theater/doctor.sh",
+      "line": 18,
+      "text": "check \"tool.plex-media-server\" \\"
+    },
+    {
+      "path": "modules/jetbrains/doctor.sh",
+      "line": 21,
+      "text": "_jb_desired_disabled() {"
+    },
+    {
+      "path": "modules/local-ai/doctor.sh",
+      "line": 18,
+      "text": "_lmstudio_installed() { [ -d \"/Applications/LM Studio.app\" ] && [ -x \"$HOME/.lmstudio/bin/lms\" ]; }"
+    },
+    {
+      "path": "modules/local-bin/doctor.sh",
+      "line": 8,
+      "text": "check \"local_bin.dir_exists\" \".local/bin exists\" \\"
+    },
+    {
+      "path": "modules/local-llm/doctor.sh",
+      "line": 38,
+      "text": "_ll_check() {"
+    },
+    {
+      "path": "modules/macos/doctor.sh",
+      "line": 4,
+      "text": "pmset_custom_value_is() {"
+    },
+    {
+      "path": "modules/memory/doctor.sh",
+      "line": 5,
+      "text": "  check \"memory.agentbrew_available\" \\"
+    },
+    {
+      "path": "modules/minsky/doctor.sh",
+      "line": 43,
+      "text": "_minsky_repo_is_git() {"
+    },
+    {
+      "path": "modules/obsidian/doctor.sh",
+      "line": 18,
+      "text": "check \"tool.obsidian\" \\"
+    },
+    {
+      "path": "modules/personal-machine/doctor.sh",
+      "line": 30,
+      "text": "_global_email_is_personal() {"
+    },
+    {
+      "path": "modules/plugins/doctor.sh",
+      "line": 15,
+      "text": "    check \"plugins.$_plugin_name.verified\" \\"
+    },
+    {
+      "path": "modules/prompt/doctor.sh",
+      "line": 3,
+      "text": "check \"tool.starship\" \"starship installed\" \"command -v starship\" \"brew install starship 2>/dev/null\""
+    },
+    {
+      "path": "modules/resilience/doctor.sh",
+      "line": 22,
+      "text": "check \"resilience.tmux_installed\" \"tmux installed (session persistence for agents)\" \\"
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "line": 32,
+      "text": "  check \"security.ssh_dir_perms\" \".ssh directory permissions\" \\"
+    },
+    {
+      "path": "modules/shell/doctor.sh",
+      "line": 3,
+      "text": "check_symlink \"symlink.zshenv\"  \"$DOTFILES_DIR/home/zshenv\"   \"$HOME/.zshenv\""
+    },
+    {
+      "path": "modules/ssh/doctor.sh",
+      "line": 3,
+      "text": "check_managed \"managed.ssh\" \"$DOTFILES_DIR/private_dot_ssh/config.tmpl\" \"$HOME/.ssh/config\""
+    },
+    {
+      "path": "modules/sync/doctor.sh",
+      "line": 10,
+      "text": "  check \"sync.launchagent\" \"sync launchagent loaded\" \\"
+    },
+    {
+      "path": "modules/terminal/doctor.sh",
+      "line": 12,
+      "text": "  check \"tool.tmux\" \"tmux installed\" \"command -v tmux\" \"brew install tmux 2>/dev/null\""
+    },
+    {
+      "path": "modules/tools/doctor.sh",
+      "line": 11,
+      "text": "  check \"tool.$tool\" \"$tool installed\" \"command -v $tool\" \"brew install $brew_pkg 2>/dev/null\""
+    },
+    {
+      "path": "modules/upgrade/doctor.sh",
+      "line": 16,
+      "text": "  check \"upgrade.launchagent\" \"upgrade launchagent loaded\" \\"
+    },
+    {
+      "path": "modules/vscode/doctor.sh",
+      "line": 27,
+      "text": "check \"vscode.installed\" \\"
+    },
+    {
+      "path": "modules/workflow/doctor.sh",
+      "line": 13,
+      "text": "  check \"launchagents.no_duplicate_jobs\" \"no LaunchAgent duplicates a managed dotfiles job\" \\"
+    },
+    {
+      "path": "modules/workspace/doctor.sh",
+      "line": 22,
+      "text": "_workspace_lib_loads() {"
+    }
+  ]
+}

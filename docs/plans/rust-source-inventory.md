@@ -185,6 +185,14 @@ python3 docs/plans/doctor-source-receipt-check.py
 These anchors are entry points for review, not a full list of executable
 boundaries or dynamic callers. The shared Rust validator is still required.
 
+The [current doctor receipt](current-doctor-anchors.json) maps the same 33
+selected historical anchor texts to source at `3d3b904`, including the five
+doctor paths whose earlier identity evidence was stale. The
+[registered check](current-doctor-anchors-prediction.md) validates both
+historical and current blobs and requires one unique mapping per path. Run
+`python3 docs/plans/doctor-source-receipt-check.py --current-doctor`. This does
+not establish body equivalence, runtime execution or complete boundaries.
+
 ## Continue the inventory
 
 Use the pinned Git blob IDs to compare the ledger with the current tree.

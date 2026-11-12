@@ -85,9 +85,14 @@ if sys.argv[1:] in (["--library-callers"], ["--generate-library-callers"]):
     raise SystemExit(0)
 
 
+CURRENT_DOCTOR = sys.argv[1:] in (["--current-doctor"], ["--generate-current-doctor"])
 if sys.argv[1:] == []:
     REVISION = "a846166aa1a14158cb6a5fef9a1c06ed3c0711f1"
     RECEIPT = Path("docs/plans/doctor-source-receipt.json")
+    FAMILY, EXPECTED = "modules/", 33
+elif CURRENT_DOCTOR:
+    REVISION = "3d3b904ea144b3b49fac3130d3f28c9ddcd205c1"
+    RECEIPT = Path("docs/plans/current-doctor-anchors.json")
     FAMILY, EXPECTED = "modules/", 33
 elif sys.argv[1:] in (["--libraries"], ["--generate-libraries"]):
     REVISION = "57a4b14da82ad42c47bceebfc4e051d8bb9541d3"
@@ -110,7 +115,7 @@ elif sys.argv[1:] in (["--bin-sources"], ["--generate-bin-sources"]):
     RECEIPT = Path("docs/plans/rust-current-bin-source-receipt.json")
     FAMILY, EXPECTED = "bin/", 135
 else:
-    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks|--scripts|--generate-scripts|--root-sources|--generate-root-sources|--bin-sources|--generate-bin-sources]")
+    raise SystemExit("usage: doctor-source-receipt-check.py [--current-doctor|--generate-current-doctor|--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks|--scripts|--generate-scripts|--root-sources|--generate-root-sources|--bin-sources|--generate-bin-sources]")
 tree_command = ["git", "ls-tree", "-z", REVISION] if FAMILY == "root" else ["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY]
 raw = subprocess.check_output(tree_command)
 tree = {}
@@ -136,6 +141,37 @@ if len(tree) != EXPECTED:
 contents = read_blobs([source["blob"] for source in tree.values()])
 lines = {path: content.decode("utf-8").splitlines() for path, content in zip(tree, contents)}
 
+doctor_current_anchors = {}
+if CURRENT_DOCTOR:
+    historical = json.loads(subprocess.check_output(["git", "show", f"{REVISION}:docs/plans/doctor-source-receipt.json"]))
+    old_revision = historical["revision"]
+    old_tree = {}
+    old_raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", old_revision, "--", "modules/"])
+    for record in old_raw.split(b"\0"):
+        if not record:
+            continue
+        meta, path = record.split(b"\t", 1)
+        mode, kind, blob = meta.decode("ascii").split()
+        if kind == "blob":
+            old_tree[path.decode("utf-8")] = {"mode": mode, "blob": blob}
+    old_files = {row["path"]: {"mode": row["mode"], "blob": row["blob"]} for row in historical["files"]}
+    if (len(historical["files"]) != 33 or len(historical["anchors"]) != 33 or len(old_files) != 33 or
+            set(old_files) != set(tree) or any(old_tree.get(path) != identity for path, identity in old_files.items())):
+        raise SystemExit("historical doctor identities differ")
+    old_contents = read_blobs([old_files[path]["blob"] for path in old_files])
+    old_lines = {path: content.decode("utf-8").splitlines() for path, content in zip(old_files, old_contents)}
+    for row in historical["anchors"]:
+        path, number, text = row["path"], row["line"], row["text"]
+        if (path not in old_lines or path in doctor_current_anchors or type(number) is not int or
+                not 1 <= number <= len(old_lines[path]) or old_lines[path][number - 1] != text):
+            raise SystemExit("invalid historical doctor anchor")
+        matches = [index + 1 for index, line in enumerate(lines[path]) if line == text]
+        if len(matches) != 1:
+            raise SystemExit("ambiguous current doctor anchor")
+        doctor_current_anchors[path] = matches
+    if set(doctor_current_anchors) != set(tree):
+        raise SystemExit("missing current doctor anchor")
+
 
 git_hook_anchors = {
     "git-hooks/commit-msg": [1, 95, 100],
@@ -160,8 +196,9 @@ root_anchors = {
     "modify_private_dot_npmrc": [1, 19, 48],
     "snapshot.sh": [1, 15, 60],
 }
-if sys.argv[1:] in (["--generate-libraries"], ["--generate-git-hooks"], ["--generate-scripts"], ["--generate-root-sources"], ["--generate-bin-sources"]):
-    selected = ({path: [1] for path in tree} if FAMILY in ("lib/", "bin/") else
+if sys.argv[1:] in (["--generate-current-doctor"], ["--generate-libraries"], ["--generate-git-hooks"], ["--generate-scripts"], ["--generate-root-sources"], ["--generate-bin-sources"]):
+    selected = (doctor_current_anchors if CURRENT_DOCTOR else
+                {path: [1] for path in tree} if FAMILY in ("lib/", "bin/") else
                 git_hook_anchors if FAMILY == "git-hooks/" else
                 script_anchors if FAMILY == "scripts/" else root_anchors)
     generated = {
@@ -208,6 +245,8 @@ def valid(data):
             if lines[path][number - 1] != text or (path, number) in seen:
                 return False
             seen.add((path, number))
+        if CURRENT_DOCTOR:
+            return seen == {(path, number) for path, numbers in doctor_current_anchors.items() for number in numbers}
         if FAMILY in ("lib/", "bin/"):
             return len(anchors) == len(tree) and seen == {(path, 1) for path in tree}
         if FAMILY in ("git-hooks/", "scripts/", "root"):

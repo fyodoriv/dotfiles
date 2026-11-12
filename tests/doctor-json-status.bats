@@ -16,6 +16,7 @@
 # fails — expected status: `fail`, not `fixed`.
 
 REPO_ROOT="$BATS_TEST_DIRNAME/.."
+source "$BATS_TEST_DIRNAME/helpers/doctor-status-diagnostic.bash"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
@@ -120,7 +121,7 @@ DOCTOR
 
   export DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra"
   local out
-  out="$("$REPO_ROOT/bin/dotfiles-doctor" --module defaults-bool-module --json --fix 2>/dev/null)"
+  out="$(DOTFILES_CI=false "$REPO_ROOT/bin/dotfiles-doctor" --module defaults-bool-module --json --fix 2>/dev/null)"
 
   local status
   if command -v jq >/dev/null 2>&1; then
@@ -128,6 +129,19 @@ DOCTOR
   else
     status="$(printf '%s' "$out" | grep -oE '"id":"defaults-bool-module[^}]*"status":"[^"]+"' | grep -oE '"status":"[^"]+"$' | sed 's/"status":"\([^"]*\)"/\1/')"
   fi
-  [ "$status" = "fixed" ]
+  doctor_require_fixed "$status"
   [ "$(defaults read "$domain" TestBool)" = "0" ]
+}
+
+@test "json-fix-status: boolean failure diagnostic is bounded" {
+  [ "$(doctor_status_category fixed)" = fixed ]
+  [ "$(doctor_status_category fail)" = fail ]
+  [ "$(doctor_status_category skipped)" = skipped ]
+  [ "$(doctor_status_category skip)" = skip ]
+  [ "$(doctor_status_category pass)" = pass ]
+  [ "$(doctor_status_category '')" = empty ]
+  [ "$(doctor_status_category PRIVATE_CANARY_123)" = unexpected ]
+  run doctor_require_fixed PRIVATE_CANARY_123
+  [ "$status" -eq 1 ]
+  [ "$output" = 'doctor boolean status category: unexpected' ]
 }

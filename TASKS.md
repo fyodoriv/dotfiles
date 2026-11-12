@@ -30,6 +30,20 @@ them. -->
 
 ## P1
 
+- [ ] Diagnose the hosted doctor boolean-status failure
+  - **ID**: doctor-json-boolean-status-diagnostic
+  - **Tags**: doctor, testing, stability
+  - **Mode**: AFK
+  - **Details**: PR #600's hosted test expected `fixed` in `tests/doctor-json-status.bats`. Hosted `DOTFILES_CI=1` makes `check_defaults` skip the check; the isolated test reproduced this with the same setting. The [registered fixture correction](docs/plans/doctor-json-boolean-diagnostic.md) disables CI mode only for the scratch-domain invocation. Confirm the corrected test runs and passes in hosted CI before closing this task.
+  - **Output**: instrumentation
+  - **Acceptance**: Synthetic failure cases report bounded categories without paths or raw JSON. Identify the root cause before claiming the hosted failure is fixed.
+  - **Hypothesis**: Bounded status categories distinguish every registered synthetic failure with zero private-canary disclosures.
+  - **Measurement**: `bats --filter boolean tests/doctor-json-status.bats`, followed by the hosted required gate.
+  - **Success**: All registered cases pass and zero canaries or fixture paths appear in diagnostics.
+  - **Pivot**: Any private output or unknown result blocks the diagnosis; preserve the original assertion and investigate further.
+  - **Anchor**: PR #600 hosted test log; Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+  - **Competitive-goal**: none — test stability, not a scorecard metric.
+
 - [ ] Diagnose the terminal telemetry test's request-count failure
   - **ID**: telemetry-terminal-request-count-diagnostic
   - **Tags**: telemetry, testing, stability

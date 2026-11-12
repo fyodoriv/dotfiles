@@ -175,7 +175,11 @@ snapshot. Before live use, derive the root identity from the independently
 retained audit and check the environment after shell startup. Audit actual
 selected wrappers and their interpreter chains. Recheck the effective inputs
 after capture. Boundary checks do not prove that inputs were
-unchanged between them. An unresolved selection or dependency blocks timing.
+unchanged between them. The existing snapshot probe itself starts Bash,
+executes startup and bootstrap code, and may run selected tools. It has no
+qualified timeout or descendant cleanup and does not report the resolved
+helper path. Do not treat it as a passive or bounded audit. An unresolved
+selection or dependency blocks timing.
 
 ## Effective endpoint helper prediction
 

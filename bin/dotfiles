@@ -61,6 +61,7 @@ _check_for_updates() {
     behind=$(git -C "$DOTFILES_DIR" rev-list --count "HEAD..origin/$branch" 2>/dev/null) || return 0
     [ "$behind" -gt 0 ] && echo -e "\033[1;33m⬆ Update available ($behind commit(s) behind). Run: dotfiles update\033[0m" >&2
   fi
+  return 0
 }
 
 # bin/dotfiles-actions reads this text: one line per usage form, at a

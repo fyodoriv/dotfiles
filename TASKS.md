@@ -30,6 +30,63 @@ them. -->
 
 ## P1
 
+- [ ] Diagnose the terminal telemetry test's request-count failure
+  - **ID**: telemetry-terminal-request-count-diagnostic
+  - **Tags**: telemetry, testing, stability
+  - **Mode**: AFK
+  - **Details**: A local full gate failed `tests/telemetry.bats` at the assertion that two requests were recorded. The test did not report the actual count; it passed when run alone. The cause is unknown. Use only synthetic events and a local fake transport to reveal the count and producer state before changing timing or send behavior.
+  - **Output**: instrumentation
+  - **Acceptance**: A planted count mismatch produces a bounded numeric receipt without payloads, credentials or user data. The test proves whether its detached sender finished before checking requests. Production consent and send behavior stay unchanged.
+  - **Hypothesis**: A content-free receipt and explicit sender-completion observation identify every planted count mismatch without disclosing synthetic canaries.
+  - **Measurement**: Register the fake-transport cases and focused Bats command before instrumentation; run those cases and `heavy-run bats tests/telemetry.bats`.
+  - **Success**: 100% of planted mismatches report the expected count and completion state; zero canary disclosures; the existing suite passes.
+  - **Pivot**: Any unowned process action, raw payload or missing completion evidence stops the approach; keep the cause unknown and redesign the fixture.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+  - **Competitive-goal**: none — telemetry test stability, not a scorecard metric.
+
+- [ ] Diagnose the intermittent custom keyboard-layout test failure
+  - **ID**: glove80-custom-layout-test-diagnostic
+  - **Tags**: testing, stability
+  - **Mode**: AFK
+  - **Details**: The local full gate reported a nonzero exit in `tests/glove80.bats` at the custom-layout pairing assertion. The test did not print the command output; separate focused runs later passed, failed, and passed. The cause is unknown. Add a content-free diagnostic or a fully synthetic reproduction before changing a timeout or behavior.
+  - **Output**: instrumentation
+  - **Acceptance**: A controlled failure identifies its outcome class without personal paths, device data or secrets. The fixture never opens real Bluetooth settings. Existing pairing and keymap contracts remain unchanged.
+  - **Hypothesis**: A bounded diagnostic distinguishes the fixture's failure classes in all planted cases while leaking zero synthetic canaries.
+  - **Measurement**: Register the exact failure cases and focused Bats command before changing the diagnostic; run those cases and `heavy-run bats tests/glove80.bats`.
+  - **Success**: 100% of registered cases report the correct class; zero private canaries appear; the existing suite passes.
+  - **Pivot**: Any raw output, unverified failure cause or real-device access stops the approach; keep the cause unknown and redesign the fixture.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+  - **Competitive-goal**: none — test stability, not a scorecard metric.
+
+- [ ] Verify queued runs leave when their caller is interrupted
+  - **ID**: heavy-run-interrupted-caller-cleanup
+  - **Tags**: stability, testing, queue
+  - **Mode**: AFK
+  - **Details**: During the Rust migration a queued check's caller reported exit 130, but a later process still held the same log open. Two invocations reused that log, so their identities are not conclusively linked. Reproduce with distinct private logs and an isolated queue; do not signal or alter other sessions. Establish whether an interrupted caller leaves a waiting ticket or owned child before changing the controller.
+  - **Output**: instrumentation
+  - **Acceptance**: A reviewed fixture distinguishes caller exit, ticket retirement and child completion by owned identity. A cancelled waiter cannot later start work; unrelated jobs remain untouched.
+  - **Hypothesis**: A bounded cancellation contract yields zero started-after-cancel jobs and zero signals to unowned processes across 20 controlled trials.
+  - **Measurement**: Register the isolated queue fixture and exact Bats command before changing the controller; run 20 controlled interruptions and the existing queue tests.
+  - **Success**: 20/20 cancelled waiters retire without starting; zero unrelated processes receive a signal; all existing queue tests pass.
+  - **Pivot**: Any uncertain identity or live-queue access stops the experiment; retain unknown status and redesign the fixture.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+  - **Competitive-goal**: none — queue cancellation stability, not a scorecard metric.
+
+- [ ] Isolate the doctor override test from host health checks
+  - **ID**: doctor-override-fixture-isolation
+  - **Tags**: testing, stability
+  - **Mode**: AFK
+  - **Details**: PR #586's hosted override test failed twice at the exit-status assertion and passed on the next run. Its cause is unconfirmed. The test invokes real chezmoi health checks even when it selects the fake module; a synthetic chezmoi failure reproduces a nonzero doctor exit. Isolate this fixture from host health while keeping real integration coverage separate. The content-free receipt added in #586 must remain private.
+  - **Output**: test
+  - **Acceptance**: The override test checks the fake module independently of host chezmoi state. A planted external health failure cannot change its verdict. Real doctor failures are not suppressed in production or integration tests.
+  - **Hypothesis**: A controlled fixture removes host-health dependence: the override case passes with both a healthy and a failing simulated host check, with zero private-canary disclosures.
+  - **Measurement**: `heavy-run bats tests/doctor-validate-overrides.bats` plus 20 repetitions of the planted healthy and failing host cases.
+  - **Success**: 100% of the suite passes; 20/20 repetitions per host condition pass; zero canary disclosures.
+  - **Pivot**: Any hidden real doctor failure, changed production behavior or disclosure stops the approach; isolate the fixture boundary without changing doctor behavior.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+  - **Competitive-goal**: none — test stability, not a scorecard metric.
+
+
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability
@@ -105,6 +162,7 @@ them. -->
   - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
 
 ## P2
+
 
 - [ ] Decide whether pull requests must carry a Vision trace block
   - **ID**: decide-pr-vision-trace-gate
@@ -372,7 +430,7 @@ them. -->
   - **ID**: rust-final-audit
   - **Tags**: migration, rust
   - **Mode**: AFK
-  - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) are a default adopted on 2026-11-10; the owner has not ruled on them. A slice that ended at its Pivot counts as `exception`. The audit claims "all measured hot paths ported". It never claims "all code is Rust".
+  - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) are a default adopted on 2026-11-10; the owner has not ruled on them. A slice that ended at its Pivot counts as `exception`. The audit reports each measured hot path as ported or as a supported exception. It never claims "all code is Rust".
   - **Output**: measurement
   - **Blocked by**: rust-agent-hooks, rust-app-priority, rust-cold-path-profile, rust-source-inventory
   - **Blocked**: needs-owner — the owner rules on the defaults in the plan's "Decisions (2026-11-10)" and on the five audit states. The agentbrew task `rust-owner-rules-on-replan-defaults` (HITL) tracks that ruling for both plans.

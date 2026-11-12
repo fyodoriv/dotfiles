@@ -13,3 +13,12 @@ whole-second durations, so those values cannot measure a subsecond change.
   is invalid, keep the old behavior and repair the measurement before using
   it as a baseline. Do not mix old whole-second samples into new windows.
 - **Anchor:** [Rust migration measurement contract](rust-migration.md#measurement-contract).
+
+## Deployment evidence
+
+PR #586 merged at `57a4b14`. Its timing code was present in the live
+checkout by 2026-11-12 02:12:39 UTC. A tagged sample was recorded at
+02:13:04 UTC; the record does not identify its triggering process. The two
+seven-day before windows must both start
+after that deployment time. They cannot be complete before 2026-11-26
+02:12:39 UTC, and still need the plan's sample-count and stability checks.

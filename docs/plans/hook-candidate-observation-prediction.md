@@ -206,10 +206,18 @@ child. They only mark interruption. Retain at most 4,096 bytes per output
 stream and drain any excess without keeping it; any excess invalidates the
 sample. The preparation accumulator bounds retained bytes only. The future
 selector must also bound each read, continue draining after overflow and prove
-stream completion; an empty buffer alone is not proof. Reap that direct child, retain its invalid attempt and run postflight before
-releasing the queue slot. An indefinitely hung child cannot be safely killed
-by this protocol; keep the slot and treat cleanup as unresolved. Hard kill,
-parent death, descendants and host failure remain outside this guarantee.
+stream completion; an empty buffer alone is not proof. Reap that direct child, retain its invalid attempt and run postflight. Direct
+child exit and pipe EOF do not prove that all descendants have exited. Do not
+start a live paired worker until independently reviewed containment or an
+equally strong proof establishes that no sample can outlive its queue owner.
+If cleanup is uncertain after launch, do not voluntarily release the slot;
+indefinite waiting may be necessary. Hard kill, parent death and host failure
+remain outside this protocol's control.
 Physical interruption or descendant tests require separate preregistration
 and an independent safety review. Anchor: the retained publication and
 observation controls above.
+
+The lifecycle review found that direct-child wait, pipe EOF and a new process
+group cannot by themselves prove that descendants have exited. A descendant
+can close its pipes or leave a group. Do not weaken the original no-outliving
+requirement or treat the bounded-output preparation as a completed lifecycle.

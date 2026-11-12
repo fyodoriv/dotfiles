@@ -344,6 +344,8 @@ The first instrumentation prediction is in
 [app-priority timing](app-priority-timing.md).
 The [hook baseline](rust-hook-baseline-2026-11-11.md) records both sets of
 20 A/A runs and the absolute linked-checkout observations.
+The [cold-path fixture audit](rust-cold-profile-fixture-audit.md) records
+safety boundaries and unknowns before any profile runs.
 
 The owner ruling is the agentbrew task `rust-owner-rules-on-replan-defaults`
 (HITL). It blocks step 5 only.

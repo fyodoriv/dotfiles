@@ -118,6 +118,15 @@ and Python imports depend on their runtime context. The adjacent Python import
 is a candidate relationship: import hooks or interpreter settings can select
 another module. These declarations do not prove which code ran or establish ownership or complete caller coverage.
 
+Two referenced doctor fixtures have conditional source routes in the
+[fixture relationship receipt](doctor-fixture-relationships.json). Their tests
+set a fixture root and request module names. The loader admits that root only
+when the Bats marker is set and the fixture directory exists. It searches core
+modules first and sources a selected doctor file.
+These source relationships do not establish that either fixture ran, that a
+same-name core module was absent at runtime, or that all callers are known.
+The exact-path references themselves are file checks, not calls.
+
 The remaining unmatched plugin doctor fixture stays unresolved. Its own
 comment and sibling manifest describe a fixture, but the reviewed manifest
 names no doctor path. A bounded literal search found no external reference

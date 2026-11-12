@@ -6,7 +6,7 @@ on:
     paths:
       - .github/workflows/opencode-managed-trial.yml
       - tests/fixtures/opencode-managed-service-trial.sh
-      - tests/fixtures/opencode-error-category.py
+      - tests/fixtures/opencode-error-category.sh
       - tests/test_opencode_error_category.py
       - launchagents/com.dotfiles.opencode-serve.plist.tmpl
   workflow_dispatch:

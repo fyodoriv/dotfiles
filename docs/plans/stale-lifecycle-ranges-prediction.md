@@ -12,7 +12,7 @@ three paths, without copying source contents into the receipt.
 Measurement: validate each path's historical and candidate blob and mode
 against its pinned tree and the existing ledger/index. Use Python's
 `difflib.SequenceMatcher` with `autojunk=False` on the two source line lists;
-record every non-equal opcode and its half-open old and new line ranges.
+record every non-equal opcode and its zero-based, half-open old and new line ranges.
 Regenerate byte for byte and plant omissions, duplicates, identity, opcode and
 range errors. Run focused tests and hosted CI. Do not execute the source.
 

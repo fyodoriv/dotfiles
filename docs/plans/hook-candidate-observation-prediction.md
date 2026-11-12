@@ -253,3 +253,14 @@ inconclusive. It is provisional and cannot be used as a qualified decision
 bound. Do not reuse that baseline. Establish a fresh qualified baseline before
 calculating a candidate bound; see [the corrected experiment record](rust-hook-status-experiment.md).
 The original prediction remains above for the historical record.
+
+## Process completion source review (2026-11-12)
+
+The reviewed literal-status path uses synchronous shell commands and command
+substitutions; its visible source does not declare background jobs. Startup,
+the selected helper and external tools can still run other code or leave
+descendants. Direct-child waits and closed pipes do not prove all descendants
+have ended. A future constrained model must bind the actual selection and
+independently establish the behavior of every reachable executable under an
+explicit system trust boundary, or use a documented containment primitive.
+Neither method is established. This source review did not run a hook or timer.

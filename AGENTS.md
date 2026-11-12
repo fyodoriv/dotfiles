@@ -97,6 +97,8 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 
 ## Gotchas
 
+- OpenCode 2 owns its shared service. Its old attach command is gone; do not
+  run `serve` into a log, because it prints a generated password.
 - Root helpers need .chezmoiignore entries.
 - [Declared skills](docs/user-stories/README.md#agent-workflow-acceptance).
 - **Worktrees**: use `~/apps/tooling/wt/<name>`. Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.

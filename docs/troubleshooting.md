@@ -768,7 +768,7 @@ arm64) and reopen terminals.
 
 ## opencode silently 404s every call (Rosetta-mode shell, MLX server missing)
 
-You see `oc` (the `opencode attach http://127.0.0.1:4096` alias) connect
+You see `oc` connect
 but every prompt returns a 404 / empty response. `~/.config/opencode/opencode.json`
 points at `http://127.0.0.1:8080/v1` (MLX) but nothing is listening there.
 

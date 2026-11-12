@@ -1,0 +1,30 @@
+#!/bin/bash
+# Keep `oc` on the supported shared-service interface for each major version.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd -P)"
+# shellcheck source=/dev/null
+source "$root/lib/opencode-version.sh"
+binary="$(command -v opencode)" || { echo 'OpenCode is not installed' >&2; exit 1; }
+major="$(opencode_major_version "$binary")" || { echo 'Unsupported OpenCode version' >&2; exit 1; }
+case "$major" in
+  1) exec "$binary" attach http://127.0.0.1:4096 "$@" ;;
+  2)
+    args=()
+    has_directory=false
+    directory=''
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --dir)
+          [ "$#" -ge 2 ] || { echo 'The --dir option needs a directory' >&2; exit 1; }
+          directory="$2"; has_directory=true; shift 2 ;;
+        --dir=*) directory="${1#--dir=}"; has_directory=true; shift ;;
+        --) args+=("$@"); break ;;
+        *) args+=("$1"); shift ;;
+      esac
+    done
+    if "$has_directory"; then
+      exec "$binary" ${args[@]+"${args[@]}"} "$directory"
+    fi
+    exec "$binary" ${args[@]+"${args[@]}"} ;;
+  *) echo 'Unsupported OpenCode version' >&2; exit 1 ;;
+esac

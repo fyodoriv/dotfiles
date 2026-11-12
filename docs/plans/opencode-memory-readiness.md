@@ -59,8 +59,9 @@ control. It did not exercise the installed user's service, alias, or memory.
 - **Hypothesis:** Route `oc` and the login job through the upstream managed
   service on OpenCode 2, while keeping the existing attach path for OpenCode 1.
   This removes the startup loop and avoids writing service credentials to logs.
-- **Measurement:** Run `bats tests/opencode-service.bats tests/module-local-ai.bats`
-  with synthetic version 1 and 2 binaries, the isolated service trial, then
+- **Measurement:** Run `bats tests/opencode-service.bats` and
+  `bats tests/module-local-ai.bats` with synthetic version 1 and 2 binaries,
+  the isolated service trial, then
   `dotfiles doctor --full --module local-ai` and one synthetic Kimi
   shared-memory recall after deployment.
 - **Success:** All version 1 and 2 fixture cases pass; the installed version 2
@@ -72,6 +73,9 @@ control. It did not exercise the installed user's service, alias, or memory.
 - **Anchor:** `home/zshrc.ai-tools`, `modules/local-ai/doctor.sh`,
   `launchagents/com.dotfiles.opencode-serve.plist.tmpl`, and the upstream
   [OpenCode CLI service documentation](https://opencode.ai/docs/cli/).
+
+The local command hook treats a multi-file Bats invocation as a full suite.
+The two commands above run the same named files separately.
 
 ## Prediction before the fix
 

@@ -27,6 +27,8 @@ if [ "${1:-}" = '--inside' ]; then
   if ! "$binary" service start >/dev/null 2>&1; then
     echo 'FAIL scratch service start'; exit 1
   fi
+  service_url="$("$binary" service status 2>/dev/null)" || { echo 'FAIL scratch service status'; exit 1; }
+  case "$service_url" in http://*|https://*) ;; *) echo 'FAIL scratch service discovery'; exit 1 ;; esac
   if ! "$binary" api get /api/info >/dev/null 2>&1; then
     "$binary" api get /api/info 2>&1 | /bin/bash "$classifier" || true
     echo 'FAIL scratch authenticated API'; exit 1
@@ -34,6 +36,8 @@ if [ "${1:-}" = '--inside' ]; then
   if ! "$binary" service stop >/dev/null 2>&1; then
     echo 'FAIL scratch service stop'; exit 1
   fi
+  service_url="$("$binary" service status 2>/dev/null)" || { echo 'FAIL stopped service status'; exit 1; }
+  [ "$service_url" = stopped ] || { echo 'FAIL stopped service discovery'; exit 1; }
   trap - EXIT
   echo 'PASS isolated service and client'
   exit 0

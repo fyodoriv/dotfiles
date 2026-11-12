@@ -1,0 +1,179 @@
+#!/usr/bin/env bats
+
+setup() {
+  unset BASH_ENV ENV
+  repo="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  scratch="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$scratch"
+  cat > "$scratch/opencode" <<'SH'
+#!/bin/bash
+if [ "${1:-}" = '--version' ]; then
+  printf '%s\n' "$FAKE_OPENCODE_VERSION"
+  exit 0
+fi
+if [ -n "${FAKE_OPENCODE_TRACE:-}" ]; then printf '%s\n' "$*" >> "$FAKE_OPENCODE_TRACE"; fi
+if [ "${1:-}" = service ] && [ "${2:-}" = status ]; then
+  if [ "${FAKE_SERVICE_STOPPED:-0}" = 1 ] || [ "${FAKE_API_FAIL:-0}" = 1 ]; then printf 'stopped\n'; else printf 'http://127.0.0.1:49374\n'; fi
+  exit 0
+fi
+if [ "${1:-}" = api ] && [ "${FAKE_API_FAIL:-0}" = 1 ]; then exit 1; fi
+printf '<%s>\n' "$@"
+SH
+  chmod +x "$scratch/opencode"
+  mkdir -p "$BATS_TEST_TMPDIR/home/.opencode/bin"
+  cp "$scratch/opencode" "$BATS_TEST_TMPDIR/home/.opencode/bin/opencode"
+  export PATH="$scratch:/usr/bin:/bin"
+}
+
+@test "OpenCode 2 oc uses the upstream managed service" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash "$repo/bin/dotfiles-opencode" -c
+  [ "$status" -eq 0 ]
+  [ "$output" = '<-c>' ]
+}
+
+@test "OpenCode 2 oc preserves the old directory option" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash "$repo/bin/dotfiles-opencode" --dir '/tmp/synthetic project' -c
+  [ "$status" -eq 0 ]
+  [ "$output" = $'<-c>\n</tmp/synthetic project>' ]
+}
+
+@test "OpenCode 2 oc accepts the directory option after other flags" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash "$repo/bin/dotfiles-opencode" -c --dir '/tmp/synthetic project'
+  [ "$status" -eq 0 ]
+  [ "$output" = $'<-c>\n</tmp/synthetic project>' ]
+}
+
+@test "OpenCode 1 oc keeps the existing attach interface" {
+  export FAKE_OPENCODE_VERSION='1.14.2'
+  run /bin/bash "$repo/bin/dotfiles-opencode" -c
+  [ "$status" -eq 0 ]
+  [ "$output" = $'<attach>\n<http://127.0.0.1:4096>\n<-c>' ]
+}
+
+@test "an unrecognized OpenCode version fails without starting a client" {
+  export FAKE_OPENCODE_VERSION='unknown'
+  run /bin/bash "$repo/bin/dotfiles-opencode" -c
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Unsupported OpenCode version'* ]]
+  [[ "$output" != *'<-c>'* ]]
+}
+
+@test "only OpenCode 1 requires the legacy launch agent" {
+  export FAKE_OPENCODE_VERSION='1.14.2'
+  run /bin/bash -c 'source "$1"; opencode_legacy_service_required "$2"' _ "$repo/lib/opencode-version.sh" "$scratch/opencode"
+  [ "$status" -eq 0 ]
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash -c 'source "$1"; opencode_legacy_service_required "$2"' _ "$repo/lib/opencode-version.sh" "$scratch/opencode"
+  [ "$status" -ne 0 ]
+  export FAKE_OPENCODE_VERSION='unknown'
+  run /bin/bash -c 'source "$1"; opencode_legacy_service_required "$2"' _ "$repo/lib/opencode-version.sh" "$scratch/opencode"
+  [ "$status" -ne 0 ]
+}
+
+@test "oc points to the version-aware launcher" {
+  run grep -F "alias oc='dotfiles-opencode'" "$repo/home/zshrc.ai-tools"
+  [ "$status" -eq 0 ]
+}
+
+@test "installer retires the old server only for supported newer versions" {
+  local selector='source "$1"; eval "$(awk '\''/^should_skip_agent\(\) \{/{p=1} p{print} p && /^\}/{exit}'\'' "$2")"; LOCAL_AI_AGENTS=true; should_skip_agent opencode-serve'
+  export FAKE_OPENCODE_VERSION='1.14.2'
+  run env HOME="$BATS_TEST_TMPDIR/home" /bin/bash -c "$selector" _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  [ "$status" -ne 0 ]
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run env HOME="$BATS_TEST_TMPDIR/home" /bin/bash -c "$selector" _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  [ "$status" -eq 0 ]
+  export FAKE_OPENCODE_VERSION='unknown'
+  run env HOME="$BATS_TEST_TMPDIR/home" /bin/bash -c "$selector" _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "OpenCode 2 unloads an installed legacy launch agent" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  export FAKE_LAUNCHCTL_TRACE="$BATS_TEST_TMPDIR/launchctl-trace"
+  cat > "$scratch/launchctl" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >> "$FAKE_LAUNCHCTL_TRACE"
+SH
+  chmod +x "$scratch/launchctl"
+  mkdir -p "$BATS_TEST_TMPDIR/home/Library/LaunchAgents"
+  touch "$BATS_TEST_TMPDIR/home/Library/LaunchAgents/com.dotfiles.opencode-serve.plist"
+  run env HOME="$BATS_TEST_TMPDIR/home" /bin/bash -c '
+    source "$1"
+    eval "$(awk '\''/^should_skip_agent\(\) \{/{p=1} p{print} p && /^\}/{exit}'\'' "$2")"
+    eval "$(awk '\''/^remove_skipped_agent\(\) \{/{p=1} p{print} p && /^\}/{exit}'\'' "$2")"
+    self_reload_should_defer() { return 1; }
+    LOCAL_AI_AGENTS=true
+    should_skip_agent opencode-serve && remove_skipped_agent opencode-serve com.dotfiles.opencode-serve.plist
+  ' _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/home/Library/LaunchAgents/com.dotfiles.opencode-serve.plist" ]
+  [[ "$(cat "$FAKE_LAUNCHCTL_TRACE")" == unload*com.dotfiles.opencode-serve.plist ]]
+}
+
+@test "managed service health uses upstream status without starting a client" {
+  export FAKE_OPENCODE_TRACE="$BATS_TEST_TMPDIR/trace"
+  run /bin/bash -c 'source "$1"; opencode_managed_service_healthy "$2"' _ "$repo/lib/opencode-version.sh" "$scratch/opencode"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$FAKE_OPENCODE_TRACE")" = 'service status' ]
+  export FAKE_API_FAIL=1
+  run /bin/bash -c 'source "$1"; opencode_managed_service_healthy "$2"' _ "$repo/lib/opencode-version.sh" "$scratch/opencode"
+  [ "$status" -ne 0 ]
+}
+
+@test "a stopped managed service is unhealthy and does not start through the API check" {
+  export FAKE_SERVICE_STOPPED=1
+  export FAKE_OPENCODE_TRACE="$BATS_TEST_TMPDIR/trace"
+  run /bin/bash -c 'source "$1"; opencode_managed_service_healthy "$2"' _ "$repo/lib/opencode-version.sh" "$scratch/opencode"
+  [ "$status" -ne 0 ]
+  [ "$(cat "$FAKE_OPENCODE_TRACE")" = 'service status' ]
+}
+
+@test "doctor uses the managed service checks for OpenCode 2" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  export FAKE_OPENCODE_TRACE="$BATS_TEST_TMPDIR/trace"
+  run env HOME="$BATS_TEST_TMPDIR/home" DOTFILES_DIR="$repo" LIST_MODE=true /bin/bash -c '
+    check() {
+      case "$1" in
+        local-ai.opencode_serve_agent_loaded|local-ai.opencode_serve_api)
+          if eval "$3"; then printf "PASS:%s\n" "$1"; else printf "FAIL:%s\n" "$1"; fi ;;
+      esac
+    }
+    check_advisory() { :; }
+    source "$DOTFILES_DIR/modules/local-ai/doctor.sh"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS:local-ai.opencode_serve_agent_loaded'* ]]
+  [[ "$output" == *'PASS:local-ai.opencode_serve_api'* ]]
+  [[ "$(cat "$FAKE_OPENCODE_TRACE")" == *'service status'* ]]
+  [[ "$(cat "$FAKE_OPENCODE_TRACE")" != *'api get'* ]]
+}
+
+@test "doctor keeps the legacy service checks for OpenCode 1" {
+  export FAKE_OPENCODE_VERSION='1.14.2'
+  export FAKE_LEGACY_TRACE="$BATS_TEST_TMPDIR/legacy-trace"
+  for tool in launchctl curl; do
+    cat > "$scratch/$tool" <<'SH'
+#!/bin/bash
+printf '%s\n' "${0##*/} $*" >> "$FAKE_LEGACY_TRACE"
+SH
+    chmod +x "$scratch/$tool"
+  done
+  run env HOME="$BATS_TEST_TMPDIR/home" DOTFILES_DIR="$repo" LIST_MODE=true /bin/bash -c '
+    check() {
+      case "$1" in
+        local-ai.opencode_serve_agent_loaded|local-ai.opencode_serve_api)
+          if eval "$3"; then printf "PASS:%s\n" "$1"; else printf "FAIL:%s\n" "$1"; fi ;;
+      esac
+    }
+    check_advisory() { :; }
+    source "$DOTFILES_DIR/modules/local-ai/doctor.sh"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS:local-ai.opencode_serve_agent_loaded'* ]]
+  [[ "$output" == *'PASS:local-ai.opencode_serve_api'* ]]
+  [[ "$(cat "$FAKE_LEGACY_TRACE")" == *'http://127.0.0.1:4096/'* ]]
+}

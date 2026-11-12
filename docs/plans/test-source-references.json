@@ -1,0 +1,667 @@
+{
+  "format": 1,
+  "pin": "025f0a0473f9f60d27d07d8a1ef47fcc1ec1787b",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "candidate_count": 40,
+  "referenced_count": 24,
+  "reference_count": 98,
+  "location_count": 88,
+  "records": [
+    {
+      "path": "tests/bash32/bash",
+      "mode": "100755",
+      "blob": "db1b81f7dc339d0270d3d89cd9567d856c6004ca",
+      "references": [
+        {
+          "file": "Makefile",
+          "line": 173
+        },
+        {
+          "file": "Makefile",
+          "line": 180
+        },
+        {
+          "file": "docs/constitution.md",
+          "line": 191
+        },
+        {
+          "file": "tests/plugin-bash32.bats",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "path": "tests/e2e/hermetic-exec.sh",
+      "mode": "100755",
+      "blob": "238e39fa0c19747e5ead6d6971fe0b2d2161f963",
+      "references": [
+        {
+          "file": ".agents/requirements.yaml",
+          "line": 12
+        },
+        {
+          "file": "tests/e2e/hermetic-exec.sh",
+          "line": 6
+        },
+        {
+          "file": "tests/e2e/stories-e2e.bats",
+          "line": 26
+        }
+      ]
+    },
+    {
+      "path": "tests/e2e/hermetic-install.sh",
+      "mode": "100755",
+      "blob": "eae0fb167b45d5142612777e40db6d126164f3b9",
+      "references": [
+        {
+          "file": ".agents/requirements.yaml",
+          "line": 5
+        },
+        {
+          "file": ".agents/requirements.yaml",
+          "line": 12
+        },
+        {
+          "file": "tests/e2e/dotfiles-install-e2e.bats",
+          "line": 23
+        },
+        {
+          "file": "tests/e2e/dotfiles-install-e2e.bats",
+          "line": 55
+        },
+        {
+          "file": "tests/e2e/hermetic-install.sh",
+          "line": 15
+        },
+        {
+          "file": "tests/e2e/stories-e2e.bats",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "path": "tests/e2e/needs-e2e.sh",
+      "mode": "100755",
+      "blob": "e7f34293ddc7fd08b3fef35be55c2735a2864567",
+      "references": [
+        {
+          "file": ".agents/requirements.yaml",
+          "line": 26
+        },
+        {
+          "file": ".agents/requirements.yaml",
+          "line": 32
+        },
+        {
+          "file": "CONTRIBUTING.md",
+          "line": 367
+        },
+        {
+          "file": "Makefile",
+          "line": 201
+        },
+        {
+          "file": "Makefile",
+          "line": 205
+        },
+        {
+          "file": "bin/bats-affected",
+          "line": 398
+        },
+        {
+          "file": "docs/plans/speed-up-make-check.md",
+          "line": 28
+        },
+        {
+          "file": "tests/cached-run.bats",
+          "line": 668
+        },
+        {
+          "file": "tests/e2e/needs-e2e.sh",
+          "line": 5
+        },
+        {
+          "file": "tests/e2e/needs-e2e.sh",
+          "line": 6
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 20
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 22
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 26
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 28
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 33
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 41
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 44
+        },
+        {
+          "file": "tests/install-e2e-guard.bats",
+          "line": 56
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/checkup-read-consumer/src/main.rs",
+      "mode": "100644",
+      "blob": "35d7f70ec53c888b51ee801e2167700c99d13f15",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/checkup-read-consumer/tests/read_guard.rs",
+      "mode": "100644",
+      "blob": "1bcc10548621e6da0379d8a621f30eab14f4a03d",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/epoch.rs",
+      "mode": "100644",
+      "blob": "e8da096291bf74ff8ae22eb86a14760a8fb15873",
+      "references": [
+        {
+          "file": "docs/plans/compiler-oracle-harness.md",
+          "line": 74
+        },
+        {
+          "file": "docs/plans/compiler-queue-decision-model.md",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/harness.rs",
+      "mode": "100644",
+      "blob": "97fac1d52e1e1660f9cea5cdbbbf9e153068f3a2",
+      "references": [
+        {
+          "file": "docs/plans/compiler-queue-decision-model.md",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/receipts.rs",
+      "mode": "100644",
+      "blob": "70fc6d10cb4b4480ff445863a679e147c8234769",
+      "references": [
+        {
+          "file": "docs/plans/compiler-oracle-harness.md",
+          "line": 74
+        },
+        {
+          "file": "docs/plans/compiler-queue-decision-model.md",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/connector-credentials/src/connector_credentials.rs",
+      "mode": "100644",
+      "blob": "299b0aae0e57dd6c2ef54417984cffa804340402",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/connector-credentials/tests/connector_credentials_contracts.rs",
+      "mode": "100644",
+      "blob": "1aa16f77ab6d244a9657c41b69140cb807016e2d",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/fake-cdp-dom-ws.mjs",
+      "mode": "100644",
+      "blob": "200c1afe69e04fe386e290e8f557122c9bc7242e",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/fake-cdp-eval-ws.mjs",
+      "mode": "100644",
+      "blob": "4842f530e5475ac16b234c6bb6a2641819120f6c",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/fake-cdp-ws.mjs",
+      "mode": "100644",
+      "blob": "60d7655f09963887c251c348608ee8229c0a4f78",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/fake-slack-page.mjs",
+      "mode": "100644",
+      "blob": "04ddcb47ecbe7e38efca63aa43f99e9370d62985",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/gate-attribution/controls.py",
+      "mode": "100644",
+      "blob": "5607c80f7fbdfb1bc5e04473567cb6737f0ae0f1",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/gate-attribution/join.py",
+      "mode": "100644",
+      "blob": "d75f9acf9bdef19dac4a143a36eb0328215116c9",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/heavy-run-429",
+      "mode": "100755",
+      "blob": "f7c345a9c6fd4eac7bec36a36e918cddc740c5c5",
+      "references": [
+        {
+          "file": "docs/plans/heavy-run-private-metadata.md",
+          "line": 259
+        },
+        {
+          "file": "docs/plans/heavy-run-private-metadata.md",
+          "line": 260
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 109
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 113
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 203
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 244
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/heavy-run-430",
+      "mode": "100755",
+      "blob": "32e591a590f56d4a4c1d8c7784082cbd125c2f05",
+      "references": [
+        {
+          "file": "docs/plans/heavy-run-private-metadata.md",
+          "line": 259
+        },
+        {
+          "file": "docs/plans/heavy-run-private-metadata.md",
+          "line": 260
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 110
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 114
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 202
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 204
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 245
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/heavy-run-discovery-json-model.py",
+      "mode": "100644",
+      "blob": "cbb00c14c95277ac2fac32a38d5c8f9756b39d3c",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/json-fail-fix-module/doctor.sh",
+      "mode": "100755",
+      "blob": "8e566f0272dfb9abfe5faf1c534aa922d214fefb",
+      "references": [
+        {
+          "file": "tests/doctor-json-status.bats",
+          "line": 39
+        },
+        {
+          "file": "tests/doctor-json-status.bats",
+          "line": 42
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/mock-npm-registry.py",
+      "mode": "100644",
+      "blob": "aede5f7b802dda620838ee25fac52c0f91bf7bbe",
+      "references": [
+        {
+          "file": "tests/fixtures/mock-npm-registry.py",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/mock-ollama.py",
+      "mode": "100644",
+      "blob": "76143ac99eebe8970c4524226148d500db82a183",
+      "references": [
+        {
+          "file": "docs/audits/local-ai-session-retro-2026-05-11.md",
+          "line": 8
+        },
+        {
+          "file": "tests/fixtures/mock-ollama.py",
+          "line": 19
+        },
+        {
+          "file": "tests/fixtures/mock-ollama.py",
+          "line": 32
+        },
+        {
+          "file": "tests/local-ai-agent-done-precondition.bats",
+          "line": 8
+        },
+        {
+          "file": "tests/local-ai-bench.bats",
+          "line": 48
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/notification-fail-module/doctor.sh",
+      "mode": "100755",
+      "blob": "69d7deaec83fec81b8a7de6091264cc78e64ac4e",
+      "references": [
+        {
+          "file": "tests/doctor-notification.bats",
+          "line": 45
+        },
+        {
+          "file": "tests/doctor-notification.bats",
+          "line": 47
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/plugin-fixtures/simple-plugin/plugins/dotfiles/doctor/test-plugin/doctor.sh",
+      "mode": "100644",
+      "blob": "de01a7bfe70829a332861838278e62826ffd7b2a",
+      "references": []
+    },
+    {
+      "path": "tests/fixtures/queue-privacy-cutover/activation.rs",
+      "mode": "100644",
+      "blob": "540cab2ec2d2ec149336f932fb45446028830be6",
+      "references": []
+    },
+    {
+      "path": "tests/git_blob_batch_test.py",
+      "mode": "100644",
+      "blob": "22a806c6a9cdb337e60e8ce607f65ff13e73e1ac",
+      "references": [
+        {
+          "file": "tests/git-blob-batch.bats",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/doctor-status-diagnostic.bash",
+      "mode": "100644",
+      "blob": "504745341f11502fa470d926a406f286155c8ea9",
+      "references": []
+    },
+    {
+      "path": "tests/helpers/duplicate_identity.py",
+      "mode": "100644",
+      "blob": "b11d9c3cbb8b53c5f0c60a431956663890af08f0",
+      "references": [
+        {
+          "file": "docs/plans/heavy-run-private-metadata.md",
+          "line": 259
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 107
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/heavy-run-project-interop.py",
+      "mode": "100644",
+      "blob": "2a313996c9355e7e4e703c4215ef57d81d175948",
+      "references": [
+        {
+          "file": "docs/plans/heavy-run-private-metadata.md",
+          "line": 260
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 111
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 190
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 201
+        },
+        {
+          "file": "docs/plans/queue-project-reader-preparation.md",
+          "line": 242
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/hook_rss_provenance.py",
+      "mode": "100644",
+      "blob": "f4471e40dc1866aa84dfbcdfb1ec6e1636ac27e9",
+      "references": [
+        {
+          "file": "tests/helpers/hook_rss_provenance.py",
+          "line": 22
+        },
+        {
+          "file": "tests/helpers/hook_trusted_launch.py",
+          "line": 156
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/hook_trusted_launch.py",
+      "mode": "100644",
+      "blob": "cb05bd3a2ea5a18247fad321b7bc3c5f8c9245f1",
+      "references": [
+        {
+          "file": "tests/helpers/hook_rss_provenance.py",
+          "line": 21
+        },
+        {
+          "file": "tests/helpers/hook_trusted_launch.py",
+          "line": 157
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/realtime-probe.bash",
+      "mode": "100644",
+      "blob": "47d609d6968a62fc66a0ae5bec1f75ddc88e66d6",
+      "references": []
+    },
+    {
+      "path": "tests/hook_rss_provenance_test.py",
+      "mode": "100644",
+      "blob": "d5bc154dfcc176d3f8a996cb5eda6a933aa6812e",
+      "references": [
+        {
+          "file": "tests/hook-rss-provenance.bats",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "path": "tests/hook_trusted_launch_test.py",
+      "mode": "100644",
+      "blob": "159cc872e3fe9abba1b3df6008f26d412155c208",
+      "references": [
+        {
+          "file": "tests/hook-trusted-launch.bats",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "path": "tests/host-load.bash",
+      "mode": "100644",
+      "blob": "c7863c179266fe72a1a08e6811499a8edf41ffe6",
+      "references": [
+        {
+          "file": "Makefile",
+          "line": 180
+        },
+        {
+          "file": "docs/plans/final-hook-timing.md",
+          "line": 39
+        },
+        {
+          "file": "tests/agent-keepawake.bats",
+          "line": 8
+        },
+        {
+          "file": "tests/brew-audit.bats",
+          "line": 8
+        },
+        {
+          "file": "tests/test_helper.bash",
+          "line": 74
+        }
+      ]
+    },
+    {
+      "path": "tests/setup_suite.bash",
+      "mode": "100644",
+      "blob": "5ddb7bc9c7cd54a7e951829fea6d3f1f3c31e7da",
+      "references": [
+        {
+          "file": "docs/constitution.md",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "path": "tests/test_helper.bash",
+      "mode": "100644",
+      "blob": "ded26137bacfb7892a1539918113211431382214",
+      "references": [
+        {
+          "file": "CONTRIBUTING.md",
+          "line": 118
+        },
+        {
+          "file": "Makefile",
+          "line": 180
+        },
+        {
+          "file": "bin/bats-affected",
+          "line": 103
+        },
+        {
+          "file": "docs/audits/local-ai-failure-modes.md",
+          "line": 153
+        },
+        {
+          "file": "docs/observability.md",
+          "line": 39
+        },
+        {
+          "file": "lib/errors-log.sh",
+          "line": 16
+        },
+        {
+          "file": "lib/stats.sh",
+          "line": 46
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 48
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 347
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 701
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 707
+        },
+        {
+          "file": "tests/errors-log.bats",
+          "line": 36
+        },
+        {
+          "file": "tests/errors-log.bats",
+          "line": 38
+        }
+      ]
+    },
+    {
+      "path": "tests/verify-counts-doc-paths.sh",
+      "mode": "100644",
+      "blob": "2bc116c90723b8142d1cd83b309a317aec16f2f8",
+      "references": [
+        {
+          "file": "bin/bats-affected",
+          "line": 24
+        },
+        {
+          "file": "bin/bats-affected",
+          "line": 25
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 73
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 74
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 496
+        },
+        {
+          "file": "tests/bats-affected.bats",
+          "line": 500
+        }
+      ]
+    },
+    {
+      "path": "tests/verify-counts-exemptions.sh",
+      "mode": "100644",
+      "blob": "1c81265b991a98389f00f087815228d0b71871e4",
+      "references": []
+    }
+  ]
+}

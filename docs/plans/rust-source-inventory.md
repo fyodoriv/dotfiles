@@ -61,6 +61,22 @@ Missing and ambiguous anchors stay unresolved; matching text does not prove
 equivalent behavior or current caller coverage. The comparison is pinned to
 the candidate revision and does not describe later source changes.
 
+Independent source review found these changes in the compared ranges:
+
+- The dangerous-Git hook expands its branch-command scanning and adds a
+  constrained literal-search bypass. Review of the text does not prove that
+  the bypass is safe for every input or that every caller runs the hook.
+- The heavy-run hook adds limited command-lookup and Bats help/version
+  exemptions, with conditions for nested or output-feeding commands. This is
+  a caller-classification boundary, not proof of complete shell parsing.
+- `kimi-goal` adds a directory precondition and changes how it selects the
+  working directory before invoking its tool. This changes orchestration;
+  source review does not establish the tool's external behavior.
+
+These three executable candidates still need current boundary anchors,
+parity and negative cases, and caller or installation evidence before a port
+can be assessed. The range receipt alone does not establish ownership.
+
 LaunchAgent property lists remain declarative config. Owned shell bodies
 and native logic named in their arguments belong to the migration. The
 two retired memory templates carry inactive relationships. Agentbrew owns

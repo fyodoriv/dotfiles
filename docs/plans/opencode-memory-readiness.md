@@ -19,6 +19,16 @@ subsequent authenticated API command returned nonzero. The test suppressed
 service output, so the failure cause is not yet known. Reproduce it locally and
 investigate the isolation boundary before changing the installed launcher.
 
+- **Diagnostic hypothesis:** Classifying the synthetic API command's output in
+  memory can distinguish connection, access, and HTTP failures without writing
+  raw output or credentials to a log.
+- **Measurement:** Run the isolated hosted check and inspect its category only.
+- **Success:** The failing command emits one bounded category; raw service
+  output and credentials appear in zero log lines.
+- **Pivot:** If the category is unknown, or cannot be emitted safely, keep the
+  failure unclassified and do not deploy a launcher change.
+- **Anchor:** The first hosted isolated-service run in dotfiles PR 641.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

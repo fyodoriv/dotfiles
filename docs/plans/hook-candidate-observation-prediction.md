@@ -230,3 +230,14 @@ service ends. The [waitpid manual](https://developer.apple.com/library/archive/d
 describes waiting for child processes. From these sources, we cannot infer a
 recursive descendant-completion guarantee. This is a bounded documentation
 search, not proof that no other API exists.
+
+## Unchanged gate pre-run review
+
+A read-only review found that the current base cache is absent and the gate's
+retention policy could remove an older marked cache entry. Its marker alone
+does not establish that the entry is disposable current-session work. The
+gate also waits for direct children without a reviewed descendant-completion
+guarantee. Do not run it until both conditions are resolved. An isolated
+cache would need a separately registered and validated comparison because
+changing paths can affect timing. Earlier A/A results do not prove the
+current run is safe or that the candidate meets the speed gate.

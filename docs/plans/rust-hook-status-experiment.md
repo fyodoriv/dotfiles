@@ -42,6 +42,10 @@ must be at most 0.80 for each variant. Run the unchanged performance gate for
 its registered row; its ratio must be at most 0.50. Queue wait is not execution
 time. Preserve the raw samples and validity outcomes privately.
 
+These four variants are supplementary checks of the same hook slice. They do
+not establish independent gate-qualified results for the non-row workloads.
+The unchanged `git status` budget row remains the benefit decision.
+
 ## Qualified peak-RSS baseline (2026-11-12)
 
 The second retained baseline used source revision
@@ -64,7 +68,7 @@ improvement or relax the parity and gate requirements above.
 ## Success and pivot
 
 Success requires all parity and safety checks, the RSS floor and bound, the
-three representative ratios, and the registered gate ratio. If any check
+four representative ratios, and the registered gate ratio. If any check
 fails, or the measurements are contaminated or unavailable, retain the old
 hook. A narrow win on the benchmark alone is not enough. The second hook and
 native delivery remain separate work.

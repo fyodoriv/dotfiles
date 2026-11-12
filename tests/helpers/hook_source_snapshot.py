@@ -16,38 +16,47 @@ EXPECTED = tuple((side, path, mode) for side in ("old", "new") for path, mode in
                  (SHARED + (((STATUS, "100755"),) if side == "new" else ())))
 
 
-def read_snapshot(root, expected_manifest, run_id, old_revision, candidate_revision):
+def parse_manifest(raw, run_id, old_revision, candidate_revision):
     try:
-        root = Path(root)
-        if (not private_dir(root) or type(expected_manifest) is not bytes or len(expected_manifest) > 65536 or
-                type(run_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", run_id) or
+        if (type(raw) is not bytes or len(raw) > 65536 or type(run_id) is not str or
+                not re.fullmatch(r"[0-9a-f]{32}", run_id) or
                 any(type(value) is not str or not re.fullmatch(r"[0-9a-f]{40}", value)
                     for value in (old_revision, candidate_revision))):
             return None
-        if read_private(root / "manifest.json", 65536) != expected_manifest:
-            return None
-        manifest = strict_json(expected_manifest)
+        manifest = strict_json(raw)
         if (type(manifest) is not dict or set(manifest) != {"format", "run_id", "old_revision", "candidate_revision", "files"} or
                 type(manifest["format"]) is not int or manifest["format"] != 1 or manifest["run_id"] != run_id or
                 manifest["old_revision"] != old_revision or manifest["candidate_revision"] != candidate_revision or
                 type(manifest["files"]) is not list or len(manifest["files"]) != len(EXPECTED)):
             return None
-        if {entry.name for entry in root.iterdir()} != {"manifest.json", *(f"{i:03}.src" for i in range(len(EXPECTED)))}:
-            return None
-        result = {}
         for index, (row, (side, path, mode)) in enumerate(zip(manifest["files"], EXPECTED)):
             if (type(row) is not dict or set(row) != {"side", "path", "mode", "file", "blob", "sha256"} or
                     row["side"] != side or row["path"] != path or row["mode"] != mode or row["file"] != f"{index:03}.src" or
                     type(row["blob"]) is not str or not re.fullmatch(r"[0-9a-f]{40}", row["blob"]) or
                     type(row["sha256"]) is not str or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])):
                 return None
+        return manifest["files"]
+    except (KeyError, TypeError, UnicodeError, ValueError):
+        return None
+
+
+def read_snapshot(root, expected_manifest, run_id, old_revision, candidate_revision):
+    try:
+        root = Path(root)
+        rows = parse_manifest(expected_manifest, run_id, old_revision, candidate_revision)
+        if not private_dir(root) or rows is None or read_private(root / "manifest.json", 65536) != expected_manifest:
+            return None
+        if {entry.name for entry in root.iterdir()} != {"manifest.json", *(f"{i:03}.src" for i in range(len(EXPECTED)))}:
+            return None
+        result = {}
+        for row in rows:
             data = read_private(root / row["file"], 2_000_000)
             # Git object IDs identify repository bytes; SHA-256 adds a separate digest.
             oid = hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data,
                                usedforsecurity=False).hexdigest()
             if oid != row["blob"] or hashlib.sha256(data).hexdigest() != row["sha256"]:
                 return None
-            result[(side, path)] = data
+            result[(row["side"], row["path"])] = data
         if any(result[("old", path)] != result[("new", path)] for path in (BOOTSTRAP, PARSER, ENDPOINT)):
             return None
         return result

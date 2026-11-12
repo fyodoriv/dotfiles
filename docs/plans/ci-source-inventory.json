@@ -1,0 +1,101 @@
+{
+  "format": 1,
+  "revision": "d70f8f0143857bff55eb3460b7a20a05bc1fd1cc",
+  "files": [
+    {
+      "path": ".github/scripts/brew-audit-manifest.sh",
+      "mode": "100755",
+      "blob": "1bbb603b3b0b4e5dbf8aaa4a1bb7440fc0b21921",
+      "first_line": "#!/bin/bash"
+    },
+    {
+      "path": ".github/scripts/check-shell-coverage.sh",
+      "mode": "100755",
+      "blob": "9afb896f1d4d11498c68b70913ac42f38ea6a538",
+      "first_line": "#!/bin/bash"
+    },
+    {
+      "path": ".github/scripts/check-tasks-lint-freshness.sh",
+      "mode": "100755",
+      "blob": "b437a590d236404d315ba8288fc00e8ad69b080c",
+      "first_line": "#!/usr/bin/env bash"
+    },
+    {
+      "path": ".github/scripts/check-tasks-rule9-fields.sh",
+      "mode": "100755",
+      "blob": "80fd95e99fd0f716b5a6b35491833712ae623f7f",
+      "first_line": "#!/usr/bin/env bash"
+    },
+    {
+      "path": ".github/scripts/check-tasks-stability.sh",
+      "mode": "100755",
+      "blob": "86e069c72a63423573594dfeaab35b38bc79e533",
+      "first_line": "#!/usr/bin/env bash"
+    }
+  ],
+  "references": [
+    {
+      "path": ".github/workflows/brew-audit.yml",
+      "blob": "f04334b5613715397171ad9bbd17a76bdd623a67",
+      "line": 27,
+      "text": "          .github/scripts/brew-audit-manifest.sh .chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "names": [
+        "brew-audit-manifest.sh"
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "blob": "fc701e508475c62924a804a74adec6ffbc309bf3",
+      "line": 192,
+      "text": "            .github/scripts/check-shell-coverage.sh coverage/bats/coverage.json .shell-coverage-floor",
+      "names": [
+        "check-shell-coverage.sh"
+      ]
+    },
+    {
+      "path": "Makefile",
+      "blob": "7912b9c431e1bb5fd1a51d6c2d72172b5bf6b4f9",
+      "line": 71,
+      "text": "\t@.github/scripts/check-tasks-stability.sh",
+      "names": [
+        "check-tasks-stability.sh"
+      ]
+    },
+    {
+      "path": "Makefile",
+      "blob": "7912b9c431e1bb5fd1a51d6c2d72172b5bf6b4f9",
+      "line": 73,
+      "text": "\t@TASKS_RULE9_FILE=\"$(TASKS_FILE)\" .github/scripts/check-tasks-rule9-fields.sh",
+      "names": [
+        "check-tasks-rule9-fields.sh"
+      ]
+    },
+    {
+      "path": "Makefile",
+      "blob": "7912b9c431e1bb5fd1a51d6c2d72172b5bf6b4f9",
+      "line": 78,
+      "text": "\t@.github/scripts/check-tasks-lint-freshness.sh",
+      "names": [
+        "check-tasks-lint-freshness.sh"
+      ]
+    },
+    {
+      "path": "Makefile",
+      "blob": "7912b9c431e1bb5fd1a51d6c2d72172b5bf6b4f9",
+      "line": 86,
+      "text": "\t@TASKS_RULE9_FILE=\"$(TASKS_FILE)\" .github/scripts/check-tasks-rule9-fields.sh",
+      "names": [
+        "check-tasks-rule9-fields.sh"
+      ]
+    },
+    {
+      "path": "Makefile",
+      "blob": "7912b9c431e1bb5fd1a51d6c2d72172b5bf6b4f9",
+      "line": 290,
+      "text": "\t@.github/scripts/check-shell-coverage.sh coverage/bats/coverage.json .shell-coverage-floor",
+      "names": [
+        "check-shell-coverage.sh"
+      ]
+    }
+  ]
+}

@@ -12,3 +12,13 @@
 
 This test does not establish that OpenCode or any memory provider is the best.
 It checks one required path before a broader memory comparison.
+
+## Kimi launcher prediction
+
+- **Root cause:** The launcher passes `--dir` to `opencode run`; OpenCode 2.2.6 rejects that option before a model call.
+- **Hypothesis:** Starting the command in the requested directory instead will preserve project scope and let the Kimi launcher reach OpenCode 2.2.6.
+- **Measurement:** Run the Kimi launcher tests with a fake OpenCode executable that records its working directory and arguments, then run one real Kimi memory recall after deployment.
+- **Success:** Every launcher test passes, the child process uses the requested directory, no `--dir` argument is sent, and the Kimi recall test calls the memory tool and returns its expected public fact.
+- **Pivot:** If the real recall does not pass, preserve the failure and investigate provider, permissions, and MCP activation before calling the path repaired.
+- **Stability guard:** Existing dry-run, credential-source, and model-selection tests pass.
+- **Anchor:** `opencode run --help` and the actual 2.2.6 `Unrecognized flag: --dir` error.

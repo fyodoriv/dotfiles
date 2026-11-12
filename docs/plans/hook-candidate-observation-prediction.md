@@ -150,6 +150,8 @@ Measurement: focused synthetic local/nonlocal/error cases, followed by an
 independent audit of the macOS filesystem API. Success: every local fixture
 is admitted and every nonlocal, unsupported or failed check is rejected.
 Pivot: an unknown ABI, unavailable flag or mismatch blocks the measurement;
-do not infer locality from the parent alone. This check does not prove
-durability or prevent transient same-user changes. Anchor: the source-audit
+do not infer locality from the parent alone. The preparation guard defaults
+to rejection and accepts only a caller-audited inspector; no real macOS
+inspector is implemented yet. Check again after capture before qualifying a
+run. This check does not prove durability or prevent transient same-user changes. Anchor: the source-audit
 local-filesystem assertion above.

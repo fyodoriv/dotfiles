@@ -14,12 +14,13 @@ from hook_pair_receipts import read_attempts
 from hook_rss_provenance import installed_root, source_clean
 from hook_pair_private import expected_parent_valid, read_private
 from hook_remote_mapping import decode_archive, store_archive, verify_source_binding
+from hook_run_locality import check as run_locality_check
 from hook_snapshot_acquire import acquire
 from hook_source_audit import parse_source_audit
 from hook_trusted_launch import (audited_inputs_valid, create_private_log, launch_and_wait, matches_digest,
                                  parse_audit, reserve_run, resolve_perl, write_private_json)
 
-PAIR_TRACKED = ("tests/helpers/hook_remote_mapping.py", "tests/helpers/hook_pair_private.py", "tests/helpers/hook_pair_launcher.py", "tests/helpers/hook_pair_binding.py",
+PAIR_TRACKED = ("tests/helpers/hook_run_locality.py", "tests/helpers/hook_remote_mapping.py", "tests/helpers/hook_pair_private.py", "tests/helpers/hook_pair_launcher.py", "tests/helpers/hook_pair_binding.py",
                 "tests/helpers/hook_pair_receipts.py", "tests/helpers/hook_status_pairs.py",
                 "tests/helpers/hook_pair_worker.py", "tests/helpers/hook_source_snapshot.py",
                 "tests/helpers/hook_snapshot_acquire.py", "tests/helpers/hook_source_audit.py",
@@ -51,7 +52,7 @@ def pair_source_clean(root, revision):
 
 def run_qualified(root, candidate, old, harness_revision, audit_path, environ, run_id,
                   source_audit_path=None, source_manifest_path=None, mapping_path=None, expected_mapping_sha256=None,
-                  expected_source_audit_sha256=None):
+                  expected_source_audit_sha256=None, locality_inspector=None):
     if (type(run_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", run_id) or
             any(type(revision) is not str or not re.fullmatch(r"[0-9a-f]{40}", revision)
                 for revision in (candidate, old, harness_revision))):
@@ -80,6 +81,8 @@ def run_qualified(root, candidate, old, harness_revision, audit_path, environ, r
         identities = {side: (source_audit["roots"][side]["dev"], source_audit["roots"][side]["ino"])
                       for side in ("old", "new")}
         info = run_dir.stat()
+        if not run_locality_check(run_dir, (info.st_dev, info.st_ino), locality_inspector):
+            return False
         if not acquire(run_dir, source_manifest, run_id, old, candidate, roots, identities, (info.st_dev, info.st_ino)):
             return False
         records = decode_archive(mapping_archive, expected_mapping_sha256, run_id, old, candidate)

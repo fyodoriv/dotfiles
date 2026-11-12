@@ -78,6 +78,13 @@ SH
   [ "$status" -eq 0 ]
 }
 
+@test "oc also works in a noninteractive agent shell" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run env PATH="$repo/bin:$PATH" /bin/bash -c 'oc -c'
+  [ "$status" -eq 0 ]
+  [ "$output" = '<-c>' ]
+}
+
 @test "installer retires the old server only for supported newer versions" {
   local selector='source "$1"; eval "$(awk '\''/^should_skip_agent\(\) \{/{p=1} p{print} p && /^\}/{exit}'\'' "$2")"; LOCAL_AI_AGENTS=true; should_skip_agent opencode-serve'
   export FAKE_OPENCODE_VERSION='1.14.2'

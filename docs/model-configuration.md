@@ -40,7 +40,9 @@ service; version 1 keeps the existing local attach path. On the next
 `dotfiles apply`, the obsolete version 1 launch agent is removed for version 2.
 The local-AI doctor checks the matching service and its API. An unrecognized
 major version fails instead of guessing an interface. `oc --dir <path>` remains
-available for opening a project.
+available for opening a project. The `oc` executable also works in
+noninteractive shells when the dotfiles `bin` directory is on `PATH`. It takes
+precedence over another program named `oc` when that directory comes first.
 
 1. Buy the Kimi Code plan and create a key in the Kimi Code Console. A platform API key bills per token instead.
 2. Store the key: `opencode auth login` (pick Kimi Code Plan). For headless or LaunchAgent runs, also save it to the Keychain: `security add-generic-password -a "$USER" -s kimi-code-api-key -w`.

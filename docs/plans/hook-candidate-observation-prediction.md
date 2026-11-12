@@ -60,3 +60,13 @@ after publication can leave the controller exit status unknown; publication
 does not prove a normal exit. The protocol does not claim fsync durability or
 protection from same-user tampering. Any unverified or partial pair is
 inconclusive.
+
+## Fixture input boundary
+
+The preparation worker checks the private intent and manifest digest before it
+reads the fixed source snapshot and creates the scratch hook links. It is not a runnable worker. Before wiring
+it into one, reserve the scratch directory exclusively and use held directory
+handles and no-follow, exclusive writes; reject partial fixtures. A scratch
+fixture does not prove installed behavior: bootstrap can still select helpers
+and executables from the live installation and home directory. Audit those
+choices and their unchanged inputs before collecting any timing samples.

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import unittest
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).parent / "helpers"))
 import hook_pair_worker as worker
+import hook_source_snapshot_test as snapshot_tests
 from hook_trusted_launch import write_private_json
 
 
@@ -98,6 +100,53 @@ class WorkerControls(unittest.TestCase):
             (root / "new/hooks/literal-status-only.sh").unlink()
             os.symlink("../source/block-dangerous-git.sh", root / "new/hooks/literal-status-only.sh")
             self.assertFalse(worker.fixture_unchanged(fixture))
+
+    def test_verified_snapshot_is_required_before_fixture_writes(self):
+        for mutation in ("none", "digest", "manifest", "revision", "changed", "missing", "mode", "scratch"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                run_dir, env = self.fixture(root)
+                source = run_dir / "source"
+                source.mkdir(mode=0o700)
+                raw = snapshot_tests.SnapshotControls().fixture(source)
+                env.update({"HOOK_PAIR_OLD": "b" * 40, "HOOK_PAIR_CANDIDATE": "c" * 40,
+                            "HOOK_PAIR_MANIFEST_SHA256": hashlib.sha256(raw).hexdigest()})
+                intent_path = run_dir / "intent.json"
+                intent = json.loads(intent_path.read_text())
+                intent.update({"old_revision": env["HOOK_PAIR_OLD"],
+                               "candidate_revision": env["HOOK_PAIR_CANDIDATE"],
+                               "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"]})
+                intent_path.write_text(json.dumps(intent))
+                scratch = run_dir / "scratch"
+                scratch.mkdir(mode=0o700)
+                if mutation == "digest": env["HOOK_PAIR_MANIFEST_SHA256"] = "1" * 64
+                elif mutation == "manifest": raw += b" "
+                elif mutation == "scratch":
+                    scratch = run_dir / "other"
+                    scratch.mkdir(mode=0o700)
+                elif mutation == "revision": env["HOOK_PAIR_OLD"] = "f" * 40
+                elif mutation == "changed": (source / "000.src").write_bytes(b"changed")
+                elif mutation == "missing": (source / "000.src").unlink()
+                elif mutation == "mode": (source / "000.src").chmod(0o644)
+                fixture = worker.materialize_verified(root, run_dir, scratch, env, 123, raw)
+                if mutation == "none":
+                    self.assertIsNotNone(fixture)
+                    self.assertEqual((scratch / "old/source/block-dangerous-git.sh").read_bytes(), b"hook-old")
+                    self.assertEqual((scratch / "new/source/block-dangerous-git.sh").read_bytes(), b"hook-new")
+                    for side in ("old", "new"):
+                        for name in ("block-dangerous-git.sh", "bootstrap-endpoint-path.sh", "plain-document-write.jq"):
+                            self.assertEqual(os.readlink(scratch / side / "hooks" / name), "../source/" + name)
+                            expected = ("hook-" + side if name == "block-dangerous-git.sh" else
+                                        "shared-agent-hooks/" + name).encode()
+                            self.assertEqual((scratch / side / "source" / name).read_bytes(), expected)
+                    self.assertEqual((scratch / "new/source/literal-status-only.sh").read_bytes(),
+                                     b"shared-agent-hooks/literal-status-only.sh")
+                    self.assertTrue(worker.fixture_unchanged(fixture))
+                    (scratch / "new/source/block-dangerous-git.sh").write_bytes(b"mutated")
+                    self.assertFalse(worker.fixture_unchanged(fixture))
+                else:
+                    self.assertIsNone(fixture)
+                    self.assertEqual(list(scratch.iterdir()), [])
 
     def test_changed_shared_helper_stops_before_materialization(self):
         with tempfile.TemporaryDirectory() as directory:

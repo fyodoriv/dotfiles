@@ -1,10 +1,12 @@
 """Preflight controls for a future exclusive hook pair worker."""
+import hashlib
 from pathlib import Path
 import re
 
 from hook_pair_receipts import private_dir
 from hook_rss_provenance import identity
 from hook_pair_private import read_private
+from hook_source_snapshot import EXPECTED, read_snapshot
 from hook_trusted_launch import strict_json
 
 HOOK = "agent-hooks/block-dangerous-git.sh"
@@ -91,3 +93,25 @@ def fixture_unchanged(fixture):
                 fixture["snapshot"] == tuple(identity(path) for path in fixture["paths"]))
     except (KeyError, OSError, TypeError, ValueError):
         return False
+
+
+def materialize_verified(root, run_dir, scratch, environ, parent_pid, manifest):
+    """Create a fixture only from a privately verified source snapshot."""
+    try:
+        if (Path(scratch) != Path(run_dir) / "scratch" or
+                not identity_ok(root, run_dir, environ, parent_pid) or type(manifest) is not bytes or
+                hashlib.sha256(manifest).hexdigest() != environ["HOOK_PAIR_MANIFEST_SHA256"]):
+            return None
+        old, new = environ["HOOK_PAIR_OLD"], environ["HOOK_PAIR_CANDIDATE"]
+        if old == new:
+            return None
+        data = read_snapshot(Path(run_dir) / "source", manifest, environ["HOOK_PAIR_RUN_ID"], old, new)
+        if data is None:
+            return None
+        modes = {(side, path): mode for side, path, mode in EXPECTED}
+        def fetch(revision, path):
+            side = "old" if revision == old else "new" if revision == new else None
+            return modes[(side, path)], data[(side, path)]
+        return materialize(scratch, old, new, fetch)
+    except (KeyError, OSError, TypeError, ValueError):
+        return None

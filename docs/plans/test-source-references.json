@@ -5,6 +5,7 @@
   "candidate_count": 40,
   "referenced_count": 24,
   "reference_count": 98,
+  "location_count": 88,
   "records": [
     {
       "path": "tests/bash32/bash",

@@ -58,7 +58,9 @@ def generate():
                for row in candidates]
     return {"format": 1, "pin": PIN, "candidate_revision": revision,
             "candidate_count": len(records), "referenced_count": sum(bool(row["references"]) for row in records),
-            "reference_count": sum(len(row["references"]) for row in records), "records": records}
+            "reference_count": sum(len(row["references"]) for row in records),
+            "location_count": len({(ref["file"], ref["line"]) for row in records for ref in row["references"]}),
+            "records": records}
 
 
 def main():

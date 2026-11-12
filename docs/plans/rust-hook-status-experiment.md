@@ -41,6 +41,25 @@ must be at most 0.80 for each variant. Run the unchanged performance gate for
 its registered row; its ratio must be at most 0.50. Queue wait is not execution
 time. Preserve the raw samples and validity outcomes privately.
 
+## Qualified peak-RSS baseline (2026-11-12)
+
+The second retained baseline used source revision
+`2b531529bb9bc6b787363aa96afc689b8940ff4e`. The two 15-sample
+windows each had a median peak RSS of 4,784,128 bytes. Their ratio was
+1.000, within the registered 0.95–1.05 A/A range. The candidate's median
+must be at most 5,262,540 bytes to meet the 1.10 bound.
+
+A separately retained request and startup audit were checked against the
+private launch, wait and sample receipts. Independent review confirmed the
+15 + 15 counts, medians, ratio and retained validation flags. This is trusted
+local correlation, not kernel lock attestation. It does not rule out
+same-user tampering or transient changes; source, tool and load flags remain
+controller observations. Raw samples and launch evidence stay private.
+
+An earlier 15 + 15 run lacked this retained binding and remains provisional.
+Do not use it as the baseline. This record does not establish a performance
+improvement or relax the parity and gate requirements above.
+
 ## Success and pivot
 
 Success requires all parity and safety checks, the RSS floor and bound, the

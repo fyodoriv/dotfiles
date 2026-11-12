@@ -166,8 +166,9 @@ EOF
 @test "queued checks preserve hosted and local evidence" {
   local agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
   grep -q 'While queued checks wait, continue independent work' "$agentfile"
-  grep -q 'required equivalent checks on the exact commit and is' "$agentfile"
-  grep -q 'Pending, failed, skipped, or missing CI is not a pass' "$agentfile"
+  grep -q 'required equivalent checks for the current change and' "$agentfile"
+  grep -q 'target base, and is green' "$agentfile"
+  grep -q 'Pending, failed, skipped, or missing CI is not a' "$agentfile"
   grep -q 'local-only checks queued and finish them' "$agentfile"
   grep -q 'not bypass the queue, required gates' "$agentfile"
 }

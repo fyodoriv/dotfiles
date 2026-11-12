@@ -109,6 +109,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - Hooks: [execute access](docs/plugins.md#migrating-from-the-v1-overlay).
 - Pin Claude fixture IDs.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.
+- **Doctor fixtures**: put the fixture `chezmoi` first on PATH before doctor starts. It resolves the source path before it adjusts PATH.
 - **Global gitignore lists `TASKS.md`**: fixture git repos in tests need `GIT_CONFIG_GLOBAL=/dev/null`.
 - **Agent perf `project`** is the session start repo, not a `cd` target; use `--all` across repos.
 - **Install e2e** (`tests/e2e/`): call OS-changing tools (`brew`, `defaults`, …) by name; writes outside `$HOME` fail it.

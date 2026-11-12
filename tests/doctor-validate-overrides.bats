@@ -58,6 +58,17 @@ MODEOF
 check "other.gamma" "Gamma check" "true" ""
 MODEOF
 
+  # Keep this module fixture independent of the host's chezmoi health.
+  cat > "$TEST_DOTFILES/bin/chezmoi" <<'MOCK'
+#!/bin/bash
+case "$1" in
+  doctor) printf 'ok fixture fixture\n' ;;
+  *) exit 1 ;;
+esac
+MOCK
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  export PATH="$TEST_DOTFILES/bin:$PATH"
+
   # Copy the real doctor script
   cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/dotfiles-doctor"
   chmod +x "$TEST_DOTFILES/bin/dotfiles-doctor"
@@ -260,6 +271,35 @@ MOCK
   run assert_doctor_succeeded "$doctor_status" "$doctor_output"
   [ "$status" -eq 1 ]
   [[ "$output" == *'chezmoi failures: 1'* ]]
+}
+
+@test "override fixture ignores simulated host health" {
+  local host_mode i doctor_status doctor_output
+  mkdir -p "$TEST_DIR/host-bin" "$TEST_HOME/.config/dotfiles"
+  export HOST_CHEZMOI_LOG="$TEST_DIR/host-calls"
+  export PATH="$TEST_DOTFILES/bin:$TEST_DIR/host-bin:$PATH"
+  cat > "$TEST_DIR/host-bin/chezmoi" <<'MOCK'
+#!/bin/bash
+printf 'called\n' >> "$HOST_CHEZMOI_LOG"
+case "$1:$HOST_CHEZMOI_MODE" in
+  doctor:healthy) printf 'ok synthetic synthetic\n' ;;
+  doctor:failing) printf 'error synthetic synthetic\n' ;;
+  *) exit 1 ;;
+esac
+MOCK
+  chmod +x "$TEST_DIR/host-bin/chezmoi"
+  printf 'fake.alpha\n' > "$TEST_HOME/.config/dotfiles/overrides"
+  for host_mode in healthy failing; do
+    export HOST_CHEZMOI_MODE="$host_mode"
+    for ((i=0; i<20; i++)); do
+      run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --module fake --json
+      doctor_status="$status"; doctor_output="$output"
+      assert_doctor_succeeded "$doctor_status" "$doctor_output"
+      [ "$(printf '%s' "$doctor_output" | jq -r '.[] | select(.id == "fake.alpha") | .status')" = skip ]
+      [ "$(printf '%s' "$doctor_output" | jq -r '.[] | select(.id == "chezmoi.fixture") | .status')" = pass ]
+      [ ! -e "$HOST_CHEZMOI_LOG" ]
+    done
+  done
 }
 
 @test "a per-machine override skips its check in a doctor run" {

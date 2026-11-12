@@ -14,3 +14,11 @@ only. No selected runtime tool is claimed to match those bytes.
 
 Anchor: [future input audit](hook-effective-input-audit.md) and
 `docs/plans/rust-hook-status-experiment.md`.
+
+The decoder checks only supplied header bytes. It does not read a selected
+file, follow links, verify an interpreter, or prove which executable ran.
+The tracked `bin/git` header is a source-only example, not runtime evidence.
+The focused tests reject ten malformed or unsupported examples.
+A `not_script` result only says the supplied bytes lack a shebang. It is not
+a native-binary identity or trust decision. Future readers must bind bounded
+bytes to a stable selected file without following unreviewed links.

@@ -9,6 +9,14 @@ upstream managed service and its client authentication before changing the
 launch agent or `oc` alias. The live launch agent remains unverified and fails
 on the uppercase log level.
 
+Upstream says OpenCode v2 can start and authenticate to its own shared
+background service. The old `oc` alias uses the removed `attach` interface,
+and the dotfiles doctor checks the old port without authentication. A safe
+migration must account for the alias, launch agent, and doctor together. The
+upstream path is documented at <https://opencode.ai/docs/cli/web> and
+<https://opencode.ai/docs/troubleshooting/>. This is source research, not a
+live verification of Kimi or memory.
+
 - **Hypothesis:** OpenCode 2.2.6 rejects the launch agent's uppercase log level. Using its supported lowercase value will let the agent start and make a Kimi session able to retrieve the shared memory service.
 - **Baseline:** `opencode serve --hostname 127.0.0.1 --port 4096 --log-level WARN` exits 1 with an invalid-value error. The loaded job reports exit 1.
 - **Measurement:** Run `bats tests/module-local-ai.bats`, check `launchctl print gui/$(id -u)/com.dotfiles.opencode-serve`, and run a Kimi session that retrieves a known public test fact through the shared memory tool. Check the tool invocation and returned fact.

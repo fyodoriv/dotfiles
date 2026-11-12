@@ -70,3 +70,15 @@ handles and no-follow, exclusive writes; reject partial fixtures. A scratch
 fixture does not prove installed behavior: bootstrap can still select helpers
 and executables from the live installation and home directory. Audit those
 choices and their unchanged inputs before collecting any timing samples.
+
+## Scratch write prediction
+
+Hypothesis: an exclusively created scratch child and directory-relative,
+no-follow writes prevent fixture preparation from redirecting writes outside
+the private run. Measurement: `python3 tests/hook_pair_worker_test.py` with
+planted existing directories, links, replaced entries and write failures.
+Success: every planted redirect is rejected, zero outside files change, and
+both sides match the verified snapshot. Pivot: any uncontained write or
+unverifiable partial fixture blocks worker integration. The scratch snapshot
+must be rechecked before and after capture. Anchor: the fixture input boundary
+and trusted-local-correlation limits above.

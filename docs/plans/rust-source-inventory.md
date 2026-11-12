@@ -97,6 +97,16 @@ Run `python3 docs/plans/doctor-source-receipt-check.py --git-hooks`. These
 anchors do not establish installed hook settings, downstream ownership or
 complete executable behavior.
 
+## CI script sources
+
+The [CI source receipt](ci-source-inventory.json) pins the five tracked
+`.github/scripts/` blobs and literal basename references in the pinned
+Makefile and workflow files. The [registered check](ci-source-inventory-prediction.md)
+regenerates the receipt and rejects planted errors. Run
+`python3 docs/plans/ci-source-inventory.py --check`. Literal references do not
+prove execution or cover dynamically constructed calls and embedded workflow
+bodies.
+
 ## Library source identities
 
 The [library source receipt](rust-library-source-receipt.json) pins all 63

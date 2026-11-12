@@ -18,6 +18,20 @@ failure case. A synthetic pre-timing handshake must reject a wrong parent
 before it can start the synthetic timed child. Check one valid fixture end to
 end, then request independent review before any live timing.
 
+The child first writes its own private PID record, then replaces itself with
+the absolute launcher. This keeps the PID stable and ensures a record-creation
+error occurs before the child enters the shared queue. The receipt checks the
+record before any timed sample.
+
+Interruption correction, registered before changing the wait logic: an
+interruption must not terminate the queue owner while its sample may still be
+running. A synthetic parent, child and grandchild will receive an interruption;
+success requires the child to finish before the queue owner exits, with no
+signal sent to the sample. The launch result stays inconclusive. Pivot if this
+cannot be shown with owned fixture processes. Interruption may wait for an
+already queued or running fixture to finish; forced process death remains an
+unproved boundary.
+
 Success: the valid fixture passes, all seven planted invalid cases fail closed,
 no rejected case starts a timed child, and zero private canaries or digests
 appear in public output. The resulting evidence is a trusted-launch correlation,

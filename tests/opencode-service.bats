@@ -17,6 +17,7 @@ if [ "${1:-}" = service ] && [ "${2:-}" = status ]; then
   exit 0
 fi
 if [ "${1:-}" = api ] && [ "${FAKE_API_FAIL:-0}" = 1 ]; then exit 1; fi
+if [ "$#" -eq 0 ]; then printf '<no-args>\n'; exit 0; fi
 printf '<%s>\n' "$@"
 SH
   chmod +x "$scratch/opencode"
@@ -31,6 +32,13 @@ SH
   run /bin/bash "$repo/bin/dotfiles-opencode" -c
   [ "$status" -eq 0 ]
   [ "$output" = '<-c>' ]
+}
+
+@test "OpenCode 2 oc works with no arguments under macOS Bash" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash "$repo/bin/dotfiles-opencode"
+  [ "$status" -eq 0 ]
+  [ "$output" = '<no-args>' ]
 }
 
 @test "OpenCode 2 oc preserves the old directory option" {

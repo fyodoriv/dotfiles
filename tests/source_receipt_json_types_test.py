@@ -19,6 +19,7 @@ CHECKERS = {
     "source-evidence-join": "OUTPUT",
     "tooling-checkup-callers": "OUTPUT",
     "stale-lifecycle-ranges": "OUTPUT",
+    "non-test-source-classification": "OUTPUT",
 }
 
 

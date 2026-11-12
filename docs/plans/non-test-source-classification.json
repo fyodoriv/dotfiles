@@ -1,0 +1,279 @@
+{
+  "format": 1,
+  "pin": "9e12006246eab25962be0a94311bc4d2a1f3e9fb",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "records": [
+    {
+      "path": ".chezmoi.yaml.tmpl",
+      "mode": "100644",
+      "blob": "8aa8543034ffdef05f51b6ea5068a797980bd1ec",
+      "category": "unresolved",
+      "start_line": 38,
+      "end_line": 38
+    },
+    {
+      "path": "data/plugin-template/doctor/example/doctor.sh",
+      "mode": "100644",
+      "blob": "1b55b3a67c61310a9cefca24ce0d2afd97f870a5",
+      "category": "executable-source",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "path": "data/plugin-template/tests/plugin.bats",
+      "mode": "100644",
+      "blob": "4a03984629c22e39175cb53e2894ea5ba5b01efc",
+      "category": "executable-source",
+      "start_line": 4,
+      "end_line": 4
+    },
+    {
+      "path": "data/plugin-template/validate/example.sh",
+      "mode": "100644",
+      "blob": "05290d7bcef926b663d76343cedc5e3c86252d0d",
+      "category": "executable-source",
+      "start_line": 2,
+      "end_line": 2
+    },
+    {
+      "path": "docs/plans/ci-source-inventory.py",
+      "mode": "100644",
+      "blob": "73888dd62ebd0b0ab9ee12589605ed721fb860eb",
+      "category": "executable-source",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "path": "docs/plans/current-bin-boundaries.py",
+      "mode": "100644",
+      "blob": "df8b02eca89b731b1c3f223633d396a7a898e34f",
+      "category": "executable-source",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "path": "docs/plans/doctor-source-receipt-check.py",
+      "mode": "100644",
+      "blob": "b419a4374169062d401b8635b8c4cdd4eda22929",
+      "category": "executable-source",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "path": "docs/plans/git_blob_batch.py",
+      "mode": "100644",
+      "blob": "73465e3783c37005583dc44f3ab26ab8607d6fc1",
+      "category": "executable-source",
+      "start_line": 6,
+      "end_line": 6
+    },
+    {
+      "path": "docs/plans/workflow-source-inventory.py",
+      "mode": "100644",
+      "blob": "2fab683399900a0d374f8e4e27c726936478891a",
+      "category": "executable-source",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "path": "dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl",
+      "mode": "100755",
+      "blob": "cc5aa46e54c08741a7b4043e1c45ebc9a2bc61a7",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "dot_config/dotfiles/bash-env.sh.tmpl",
+      "mode": "100644",
+      "blob": "9e3dcf6557f6ef06382188b906b02fab7f280461",
+      "category": "executable-source",
+      "start_line": 4,
+      "end_line": 4
+    },
+    {
+      "path": "dot_config/dotfiles/env.sh.tmpl",
+      "mode": "100644",
+      "blob": "67a1e270dfbb3ee467a2997811ced1c62cefe5af",
+      "category": "executable-source",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "path": "dot_config/topgrade.toml.tmpl",
+      "mode": "100644",
+      "blob": "bb28cba2d767d084416b62f090f7e840e5e0d1a9",
+      "category": "unresolved",
+      "start_line": 116,
+      "end_line": 116
+    },
+    {
+      "path": "dot_gitconfig.personal.tmpl",
+      "mode": "100644",
+      "blob": "3dfaeb748f9e6f76c85a22c77f502172b5103f19",
+      "category": "generated-input",
+      "start_line": 6,
+      "end_line": 6
+    },
+    {
+      "path": "dot_gitconfig.tmpl",
+      "mode": "100644",
+      "blob": "f39d550a00251d12d9fc21edb47b007de364beff",
+      "category": "unresolved",
+      "start_line": 108,
+      "end_line": 108
+    },
+    {
+      "path": "home/git-editor",
+      "mode": "100755",
+      "blob": "86a9784dc1a00bb5649cd1c39042a6924ee41c6d",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "home/sleep",
+      "mode": "100755",
+      "blob": "4eaeb63769e4ab75a76ffda51c6aa0d557987cfb",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "home/wakeup",
+      "mode": "100755",
+      "blob": "b49f84fe8c1a6a4bb781ace1c8279149e283d7d0",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "launchagents/com.dotfiles.agent-scratch-prune.plist.tmpl",
+      "mode": "100644",
+      "blob": "3c7a532f7d56c1ecd9bddaef2909f8c541326365",
+      "category": "generated-input",
+      "start_line": 13,
+      "end_line": 13
+    },
+    {
+      "path": "launchagents/com.dotfiles.telemetry.plist.tmpl",
+      "mode": "100644",
+      "blob": "5ac9428ffed53205a4236f8dc27875adf0cdeb81",
+      "category": "generated-input",
+      "start_line": 21,
+      "end_line": 21
+    },
+    {
+      "path": "private_dot_agent-browser/executable_ensure-chrome.sh",
+      "mode": "100644",
+      "blob": "0fbca3a56c9d646fab804eb02467f4755e829bd6",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "private_dot_agent-browser/executable_launch-chrome.sh",
+      "mode": "100644",
+      "blob": "e99ce0d25743a23d862eb38d5ce853e23340fb0a",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "private_dot_agent-browser/modify_config.json",
+      "mode": "100644",
+      "blob": "6fdb467685edcf632a59468e73dd0e648e738e85",
+      "category": "executable-source",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "private_dot_ssh/private_config.tmpl",
+      "mode": "100644",
+      "blob": "e0d6dfa5530c56fbe72c28756972d0b3a47d6618",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_git-editor.tmpl",
+      "mode": "100644",
+      "blob": "4f48bf2c105df1ed5a2b80ba37462aab787f34b9",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_gitcommit_template.tmpl",
+      "mode": "100644",
+      "blob": "7d98d1a1e923d2c5bc145856fa4dee41d4124c83",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_gitignore_global.tmpl",
+      "mode": "100644",
+      "blob": "b79b38f9a073749276417f8697bf761427da7343",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_ideavimrc.tmpl",
+      "mode": "100644",
+      "blob": "59a5eeb112b49a1a0d4183f78c946f7a17580fd3",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_sleep.tmpl",
+      "mode": "100644",
+      "blob": "4a31d52afc7c13d693dabb9987ae96c6fdba3c25",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_tmux.conf.tmpl",
+      "mode": "100644",
+      "blob": "26f78c989770571d53cb0d767669add9e43af9da",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_wakeup.tmpl",
+      "mode": "100644",
+      "blob": "51830e98170b1caa088491fdd5e7f3d94a781957",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_zshenv.tmpl",
+      "mode": "100644",
+      "blob": "fb37ae1a4aafe9dc7aba476a64447538d0de01b0",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_zshrc.ai-tools.tmpl",
+      "mode": "100644",
+      "blob": "f25918f67be784a97cc0497a2bde1061f5a78169",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    },
+    {
+      "path": "symlink_dot_zshrc.tmpl",
+      "mode": "100644",
+      "blob": "e973d379cb848eefb39eafedaa1940a3f0c09a09",
+      "category": "generated-input",
+      "start_line": 1,
+      "end_line": 1
+    }
+  ]
+}

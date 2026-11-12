@@ -40,6 +40,19 @@ These are source-level relationships. They do not prove a template rendered,
 a condition passed, a script ran, or an external change occurred. The earlier
 ledger does not yet record the new relationships.
 
+The [non-test classification receipt](non-test-source-classification.json)
+reviews the 34 candidates outside `tests/` that were absent from the joined
+receipts at candidate revision `94eef66`. It records 17 executable-source
+candidates, 14 declarative or generated inputs, and three unresolved inputs.
+Check the pinned identities and source spans with
+`python3 docs/plans/non-test-source-classification.py --check`; the
+[prediction](non-test-source-classification-prediction.md) gives the limits.
+The checker verifies identity and line bounds. Independent source review
+supports the categories; the checker does not infer them from the spans.
+The categories do not establish ownership, execution, or generated output
+behavior. The 383 absent test-tree candidates and six stale-only candidates
+remain separate; this review does not complete the inventory.
+
 LaunchAgent property lists remain declarative config. Owned shell bodies
 and native logic named in their arguments belong to the migration. The
 two retired memory templates carry inactive relationships. Agentbrew owns

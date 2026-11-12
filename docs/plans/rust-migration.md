@@ -334,7 +334,7 @@ is no separate "move tests to Rust" step.
 |---|---|---|---|
 | 1. `rust-agent-hooks` | Two hooks run on each agent Bash call and start Perl, `shfmt` or `jq`. Remove those starts. Weigh a shell fast path first. | `hook-require-heavy-run` and `hook-block-dangerous-git` `ratio` at most 0.50 each, from `scripts/perf-gate.sh --force --json`, after 20 clean A/A runs. The rows keep their command paths. | none |
 | 2. `rust-app-priority` | `app-priority` runs every 60 seconds at about 1 to 1.6 s mean. First make the number usable: log real milliseconds. Then weigh one `ps` pass. | 7-day mean `duration_ms` at most 400 ms and at most 40% of the lower before window, from the window command, after the before windows agree within 20%. | none; parallel with 1 |
-| 3. `rust-cold-path-profile` | Doctor, apply, sync and the queue were never profiled. Measure where their time goes before any port. | Recorded exception: measurement only. Output is the share of wall time in owned code per command, next to its local p50. | none; parallel with 1-2 |
+| 3. `rust-cold-path-profile` | Doctor, apply, sync, upgrade and the queue lack qualified child-span coverage. The registered pivot retains them as exceptions. | Not separable with the currently evidenced method; local p50 and owned share are unknown. Reopen only with a qualified measurement. | none; pivot recorded |
 | 4. `rust-source-inventory` | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
 | 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the owner ruling |
 
@@ -345,7 +345,31 @@ The first instrumentation prediction is in
 The [hook baseline](rust-hook-baseline-2026-11-11.md) records both sets of
 20 A/A runs and the absolute linked-checkout observations.
 The [cold-path fixture audit](rust-cold-profile-fixture-audit.md) records
-safety boundaries and unknowns before any profile runs.
+safety boundaries, unknowns and the registered pivot criteria. No profile ran.
+
+### Cold-path pivot (2026-11-12)
+
+The registered pivot applies because the current method cannot establish
+complete child-span coverage for at least two families. Independent review
+found the same gap in all five. The provider probe required more privileges;
+PATH wrappers and parent timing alone miss some child and background work, and
+adding child durations can count overlapping time twice. No owned-time share
+was estimated. The command-log check found no matching local samples on
+2026-11-11, so local p50 is unknown for every row below.
+
+| Family | Local p50 | Owned wall-time share | Decision |
+|---|---|---|---|
+| Doctor | Unknown | Not separable | Retain exception |
+| Apply | Unknown | Not separable | Retain exception |
+| Sync | Unknown | Not separable | Retain exception |
+| Upgrade | Unknown | Not separable | Retain exception |
+| Queue | Unknown | Not separable | Retain exception |
+
+This is a limit of the current evidence, not proof that measurement is
+impossible. Reopen a family only after a separately registered scratch-only
+method proves isolation, complete child and background coverage, overlap
+handling and calibration. The [fixture audit](rust-cold-profile-fixture-audit.md)
+records the family-specific gaps.
 
 The owner ruling is the agentbrew task `rust-owner-rules-on-replan-defaults`
 (HITL). It blocks step 5 only.
@@ -380,11 +404,11 @@ names as classification labels; this table gives each label its state.
 | Slice (old task suffix) | Reason | Cheaper option to weigh first |
 |---|---|---|
 | process-primitives | No measured cost of its own. | None needed. |
-| shared-queue | The wrapped command dominates queue time. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
+| shared-queue | The owned share is not separable with the current method. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
 | repository-discovery | Rare, agent-driven tools. | None needed. |
 | cli-core | `dotfiles --version` takes about 64 ms. Startup is not the hot path. | The `dotfiles-version` and `dotfiles-config` budget rows guard it. |
 | doctor-core and the doctor module groups (shell-editors, security, workflow, browsers, agents, macos, local-ai, apps) | Doctor probes are cold paths that wait on child tools. Not profiled. | Parallel or cached probes; profile first (step 3). |
-| apply-install | Dominated by chezmoi, Homebrew and installers. | Profile first (step 3). |
+| apply-install | The owned share is not separable with the current method. | Qualify a profile before reopening (step 3). |
 | plugin-trust | Rare actions; trust rules gain nothing from a port. | None needed. |
 | services-power | Launchd jobs wait on system tools. `app-priority` moved to step 2. | Profile first (step 3). |
 | git-security-guards | The two agent hooks moved to step 1. Git hooks run once per commit or push. | A budget row per git hook before any port. |

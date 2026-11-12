@@ -382,20 +382,6 @@ them. -->
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
   - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
 
-- [ ] Find out where doctor, apply and sync time goes before any port
-  - **ID**: rust-cold-path-profile
-  - **Tags**: migration, rust, performance, measurement
-  - **Mode**: AFK
-  - **Details**: Step 3 of the [Rust migration](docs/plans/rust-migration.md). The validation review did not profile doctor probes, apply, sync, upgrade or the queue. They are recorded exceptions until a profile shows owned code is the cost. Time each command on fixtures in a scratch HOME with wall-clock spans around child calls. Split wall time into owned shell, git, network and child tools. Put the result next to the command's local p50. Write the table into the plan. Port nothing.
-  - **Output**: measurement
-  - **Acceptance**: The plan has one row per profiled command: local p50, share of wall time in owned code, and the decision (stays an exception, or reopens with a number). Every reopened slice gets its own task block with the rule-9 fields.
-  - **Hypothesis**: Owned shell code is under 50% of wall time in at least 80% of the profiled command families, so those stay recorded exceptions and no port starts on a guess.
-  - **Measurement**: `jq -s '[.[] | select(.command == "doctor") | .duration_ms] | sort | .[length / 2 | floor]' ~/.local/state/dotfiles/commands.jsonl` per command for the local p50 (it printed `null` on 2026-11-10; it prints `null` until the command has logged runs), and the span timings from the registered fixture run for the share.
-  - **Success**: 100% of the listed command families have a profile row and a decision in the plan.
-  - **Pivot**: If spans cannot separate child-tool time from owned time in 2 or more families -> record those families as "not separable" exceptions and stop; do not estimate.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
-
 - [ ] Account for every executable with a manifest and a thin validator adapter
   - **ID**: rust-source-inventory
   - **Tags**: migration, rust
@@ -417,7 +403,7 @@ them. -->
   - **Mode**: AFK
   - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) are a default adopted on 2026-11-10; the owner has not ruled on them. A slice that ended at its Pivot counts as `exception`. The audit reports each measured hot path as ported or as a supported exception. It never claims "all code is Rust".
   - **Output**: measurement
-  - **Blocked by**: rust-agent-hooks, rust-app-priority, rust-cold-path-profile, rust-source-inventory
+  - **Blocked by**: rust-agent-hooks, rust-app-priority, rust-source-inventory
   - **Blocked**: needs-owner — the owner rules on the defaults in the plan's "Decisions (2026-11-10)" and on the five audit states. The agentbrew task `rust-owner-rules-on-replan-defaults` (HITL) tracks that ruling for both plans.
   - **Acceptance**: Every owned component in the manifest has one of the five states; `ported` has receipts and `exception` has a plan row. Every ported slice still meets its number on the current tree. No temporary bridge remains without a deletion condition.
   - **Hypothesis**: Reconciling the manifest with the tree exposes every gap: 0 unrecorded owned components, and 100% of ported slices still at or under their registered number.

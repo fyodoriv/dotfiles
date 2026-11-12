@@ -33,6 +33,21 @@ setup() {
 
 teardown() { rm -rf "$TEST_DIR"; }
 
+@test "local-ai: OpenCode service uses a supported log level" {
+  run python3 - "$BATS_TEST_DIRNAME/../launchagents/com.dotfiles.opencode-serve.plist.tmpl" <<'PY'
+import plistlib
+import re
+import sys
+
+with open(sys.argv[1], 'rb') as source:
+    template = re.sub(rb'<!--.*?-->', b'', source.read(), flags=re.S)
+args = plistlib.loads(template)['ProgramArguments']
+level = args[args.index('--log-level') + 1]
+assert level in {'all', 'trace', 'debug', 'info', 'warn', 'warning', 'error', 'fatal', 'none'}, level
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "local-ai: module file exists" {
   [ -f "$TEST_DOTFILES/modules/local-ai/doctor.sh" ]
 }

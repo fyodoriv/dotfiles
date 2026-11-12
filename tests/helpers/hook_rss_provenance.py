@@ -15,13 +15,16 @@ import time
 
 TRACKED = (
     "agent-hooks/block-dangerous-git.sh",
+    "agent-hooks/literal-status-only.sh",
     "agent-hooks/bootstrap-endpoint-path.sh",
+    ".chezmoiscripts/run_after_agent-hooks.sh",
     "lib/dotfiles-endpoint-paths.sh",
     "bin/heavy-run",
     "tests/helpers/hook_trusted_launch.py",
     "tests/helpers/hook_rss_provenance.py",
 )
 PAYLOAD = b'{"tool_input":{"command":"git status"},"cwd":"/tmp"}'
+HOOK_LINKS = ("block-dangerous-git.sh", "bootstrap-endpoint-path.sh", "literal-status-only.sh")
 
 
 def admission_valid(text, parent, slot):
@@ -95,7 +98,21 @@ def identity(path):
         return (str(candidate), info.st_mode, info.st_ino, info.st_mtime_ns, info.st_size, target, "dangling")
 
 
+def scratch_links_valid(root, links):
+    try:
+        return all((links / name).is_symlink() and
+                   os.readlink(links / name) == str(root / "agent-hooks" / name) and
+                   (links / name).is_file() for name in HOOK_LINKS)
+    except OSError:
+        return False
+
+
 def source_clean(root, revision):
+    for path in TRACKED:
+        present = subprocess.run(["git", "cat-file", "-e", f"{revision}:{path}"], cwd=root,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if present.returncode or (root / path).is_symlink() or not (root / path).is_file():
+            return False
     result = subprocess.run(["git", "diff", "--quiet", revision, "--", *TRACKED], cwd=root,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return result.returncode == 0
@@ -185,6 +202,7 @@ def collect(root, revision, expected_digest, run_id, wait_log, executing=None):
     before_tools = tool_snapshot(root)
     windows, loads = [], []
     output_ok = True
+    links_ok = False
     failure = None
     cpus = os.cpu_count()
     if not admitted or not before_source or not harness_before:
@@ -195,6 +213,13 @@ def collect(root, revision, expected_digest, run_id, wait_log, executing=None):
     window_index, sample_index = 0, 0
     try:
         with tempfile.TemporaryDirectory(prefix="hook-rss-") as scratch:
+            links = Path(scratch) / "hooks"
+            links.mkdir()
+            for name in HOOK_LINKS:
+                (links / name).symlink_to(root / "agent-hooks" / name)
+            link_before = tuple(identity(links / name) for name in HOOK_LINKS)
+            if not scratch_links_valid(root, links):
+                raise ValueError("invalid scratch hook links")
             for window_index in range(2):
                 sample_index = 0
                 loads.append(os.getloadavg()[0])
@@ -223,12 +248,14 @@ def collect(root, revision, expected_digest, run_id, wait_log, executing=None):
                     break
                 if not output_ok:
                     break
+            links_ok = (scratch_links_valid(root, links) and
+                        link_before == tuple(identity(links / name) for name in HOOK_LINKS))
     except (OSError, ValueError, subprocess.SubprocessError):
         output_ok = False
         failure = failure or {"class": "observation", "window": window_index, "index": sample_index}
     flags = {"admission": admitted, "source": False, "harness": False, "tools": False, "output": output_ok}
     try:
-        flags["source"] = before_source and source_clean(root, revision) and installed_root(root)
+        flags["source"] = before_source and links_ok and source_clean(root, revision) and installed_root(root)
         flags["harness"] = harness_before and harness_matches(executing, harness, expected_digest)
         flags["tools"] = before_tools == tool_snapshot(root)
     except (OSError, UnicodeError, ValueError, subprocess.SubprocessError):

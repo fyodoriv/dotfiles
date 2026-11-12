@@ -13,7 +13,7 @@ source "$_hook_dir/bootstrap-endpoint-path.sh"
 
 input=$(cat)
 command="$(printf '%s' "$input" \
-  | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"
+  | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"; if [ -r "$_hook_dir/literal-status-only.sh" ] && source "$_hook_dir/literal-status-only.sh"; then literal_status_only "$command" && exit 0; fi
 hook_cwd="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract cwd raw -o - -- - 2>/dev/null || true)"
 

@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -17,6 +18,103 @@ spec.loader.exec_module(provenance)
 
 
 class ReceiptControls(unittest.TestCase):
+    def make_hook_sources(self, root):
+        source = root / "agent-hooks"
+        source.mkdir(exist_ok=True)
+        for name in provenance.HOOK_LINKS:
+            (source / name).write_text("fixture\n")
+
+    def test_scratch_hook_links_require_exact_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "repo"
+            source = root / "agent-hooks"
+            links = Path(directory) / "hooks"
+            source.mkdir(parents=True)
+            links.mkdir()
+            for name in ("block-dangerous-git.sh", "bootstrap-endpoint-path.sh", "literal-status-only.sh"):
+                (source / name).write_text("fixture\n")
+                (links / name).symlink_to(source / name)
+            self.assertTrue(provenance.scratch_links_valid(root, links))
+            (links / "literal-status-only.sh").unlink()
+            (links / "literal-status-only.sh").symlink_to(source / "block-dangerous-git.sh")
+            self.assertFalse(provenance.scratch_links_valid(root, links))
+
+    def test_source_check_refuses_paths_missing_from_pinned_revision(self):
+        with patch.object(provenance, "TRACKED", ("agent-hooks/literal-status-only.sh",)), \
+                patch.object(provenance.subprocess, "run") as run:
+            run.side_effect = lambda command, **_kwargs: SimpleNamespace(
+                returncode=1 if command[1] == "cat-file" else 0
+            )
+            self.assertFalse(provenance.source_clean(Path("/scratch"), "a" * 40))
+
+    def test_source_check_refuses_dirty_tracked_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "helper.sh").write_text("fixture\n")
+            with patch.object(provenance, "TRACKED", ("helper.sh",)), \
+                    patch.object(provenance.subprocess, "run") as run:
+                run.side_effect = lambda command, **_kwargs: SimpleNamespace(
+                    returncode=1 if command[1] == "diff" else 0
+                )
+                self.assertFalse(provenance.source_clean(root, "a" * 40))
+
+    def test_real_untracked_and_dirty_candidate_are_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "empty-template"
+            template.mkdir()
+            env = {"PATH": os.environ["PATH"], "HOME": str(root),
+                   "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull}
+
+            def git(*args):
+                return subprocess.run(["git", "-c", f"init.templateDir={template}",
+                                       "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+                                       "-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", *args],
+                                      cwd=root, env=env, check=True, capture_output=True, text=True).stdout.strip()
+
+            git("init", "--quiet")
+            (root / "marker").write_text("base\n")
+            git("add", "marker")
+            git("commit", "--quiet", "-m", "fixture")
+            base = git("rev-parse", "HEAD")
+            helper = root / "helper.sh"
+            helper.write_text("candidate\n")
+            with patch.object(provenance, "TRACKED", ("helper.sh",)):
+                self.assertFalse(provenance.source_clean(root, base))
+                git("add", "helper.sh")
+                git("commit", "--quiet", "-m", "fixture helper")
+                candidate = git("rev-parse", "HEAD")
+                self.assertTrue(provenance.source_clean(root, candidate))
+                helper.write_text("changed\n")
+                self.assertFalse(provenance.source_clean(root, candidate))
+
+    def test_changed_source_or_link_invalidates_collection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_hook_sources(root)
+            harness = root / provenance.TRACKED[-1]
+            harness.parent.mkdir(parents=True)
+            harness.write_text("fixture")
+            digest = hashlib.sha256(harness.read_bytes()).hexdigest()
+            wait = root / "wait.log"
+            wait.write_text(f"waited=1 pid={os.getppid()} slot=exclusive\n")
+
+            def fake_run(argv, **_kwargs):
+                Path(argv[-1]).write_text("")
+                return SimpleNamespace(returncode=0, stdout=b"", stderr=b" 100 maximum resident set size\n")
+
+            for changed in ("source", "link"):
+                with self.subTest(changed=changed), patch.dict(os.environ, {"HEAVY_RUN_SLOT": "exclusive"}), \
+                        patch.object(provenance, "source_clean", side_effect=[True, changed != "source"]), \
+                        patch.object(provenance, "scratch_links_valid", side_effect=[True, changed != "link"]), \
+                        patch.object(provenance, "installed_root", return_value=True), \
+                        patch.object(provenance, "tool_snapshot", return_value=("fixture",)), \
+                        patch.object(provenance.os, "getloadavg", return_value=(1.0, 1.0, 1.0)), \
+                        patch.object(provenance.os, "cpu_count", return_value=4), \
+                        patch.object(provenance.subprocess, "run", side_effect=fake_run):
+                    receipt = provenance.collect(root, "a" * 40, digest, "b" * 32, wait, executing=harness)
+                self.assertFalse(receipt["valid"])
+
     def test_private_expected_parent_must_match(self):
         with tempfile.TemporaryDirectory() as directory:
             parent_file = Path(directory) / "parent"
@@ -78,6 +176,7 @@ class ReceiptControls(unittest.TestCase):
     def test_bad_admission_stops_before_any_timed_command(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")
@@ -114,6 +213,7 @@ class ReceiptControls(unittest.TestCase):
     def test_bad_source_or_harness_stops_before_timed_commands(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")
@@ -132,6 +232,7 @@ class ReceiptControls(unittest.TestCase):
     def test_unknown_tools_or_wrong_executing_path_never_time(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")
@@ -154,6 +255,7 @@ class ReceiptControls(unittest.TestCase):
     def test_high_load_stops_before_timed_commands(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")
@@ -174,6 +276,7 @@ class ReceiptControls(unittest.TestCase):
     def test_midrun_failure_retains_only_bounded_samples(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")
@@ -217,6 +320,7 @@ class ReceiptControls(unittest.TestCase):
     def test_exceptions_preserve_partial_and_completed_samples(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")
@@ -250,6 +354,7 @@ class ReceiptControls(unittest.TestCase):
     def test_changed_tools_invalidate_complete_samples(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            self.make_hook_sources(root)
             harness = root / provenance.TRACKED[-1]
             harness.parent.mkdir(parents=True)
             harness.write_text("fixture")

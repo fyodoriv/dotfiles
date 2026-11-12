@@ -57,6 +57,12 @@ The installed binary's SHA-256 matches the executable from the verified
 upstream archive used by the hosted trial. The hosted and local macOS versions
 differ, so the installed-machine trial remains necessary.
 
+The installed binary also passed the isolated local trial: the managed service
+started, its authenticated client succeeded, and no scratch listener or
+registration remained. The sandboxed shell printed a working-directory warning
+before entering the scratch home. The test did not change the live service,
+run Kimi, or recall shared memory.
+
 ## Version-aware launcher prediction
 
 - **Hypothesis:** Route `oc` and the login job through the upstream managed

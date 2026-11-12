@@ -29,6 +29,25 @@ investigate the isolation boundary before changing the installed launcher.
   failure unclassified and do not deploy a launcher change.
 - **Anchor:** The first hosted isolated-service run in dotfiles PR 641.
 
+The hosted diagnostic reported a permission error and a listener left after
+cleanup. A focused local sandbox probe reproduced the cleanup boundary: a
+process could not signal its child under the original policy. With a single
+sandbox and `target same-sandbox`, one child could signal another, while it
+could not signal its outside parent. This explains the unsafe cleanup boundary;
+it does not yet prove the cause of the API failure.
+
+- **Cleanup hypothesis:** Running the scratch service and client in one
+  sandbox with same-sandbox signals permits safe shutdown without letting the
+  trial signal outside processes.
+- **Measurement:** Repeat the focused signal probe and the hosted service
+  trial, including listener and registration cleanup checks.
+- **Success:** Both inside signal checks pass, the outside signal check is
+  denied, and zero scratch listeners or registrations remain after the trial.
+- **Pivot:** If the sandbox cannot enforce that boundary, or cleanup leaves
+  state, do not run the service trial against the installed Mac.
+- **Anchor:** The focused macOS `sandbox-exec` signal probe and upstream
+  `packages/client/src/effect/service.ts` service-stop implementation.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

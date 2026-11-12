@@ -20,7 +20,7 @@ recovering from an `agentbrew sync` failure.
 | `~/.zshenv.secrets` | you | Local tokens used by MCP servers |
 | `~/.config/agentbrew/hooks-overlay/manifest.yaml` | you, plus dotfiles | Per-machine hook overlay. Your `disabled:` list and unrelated comments stay. The modify template adds missing owner-workflow hooks (`gh-pr-body-requires-docs`, `perf-task-review`, `poll-loop-hint`, `no-home-crawl`, and others) only when `owner_machine` is true. It also removes the retired `usage-tip` ID from existing enabled lists and refuses to restore it through a custom override. This retires usage-tips, not ordinary compaction. List a supported hook under `disabled:` to opt out on one machine. |
 
-The shared rules ask agents to measure iteration time, use affected checks, bind relevant external state without exposing values, and keep the required final gate.
+The shared rules ask agents to measure iteration time, use affected checks, bind relevant external state without exposing values, and keep the required final gate. While local checks wait, agents continue independent work and can use green hosted CI for equivalent checks on the current change and target base. Checks that require the local machine still need their own results.
 
 ### Agent time skills
 

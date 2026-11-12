@@ -17,6 +17,17 @@ spec.loader.exec_module(provenance)
 
 
 class ReceiptControls(unittest.TestCase):
+    def test_private_expected_parent_must_match(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent_file = Path(directory) / "parent"
+            parent_file.write_text("123\n")
+            parent_file.chmod(0o600)
+            verify = getattr(provenance, "expected_parent_valid", lambda *_: False)
+            self.assertTrue(verify(parent_file, 123))
+            self.assertFalse(verify(parent_file, 124))
+            parent_file.chmod(0o644)
+            self.assertFalse(verify(parent_file, 123))
+
     def test_admission_requires_one_matching_exclusive_parent(self):
         line = "waited=1 pid=123 slot=exclusive\n"
         self.assertTrue(provenance.admission_valid(line, 123, "exclusive"))

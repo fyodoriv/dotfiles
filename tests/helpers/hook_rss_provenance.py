@@ -11,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 TRACKED = (
     "agent-hooks/block-dangerous-git.sh",
@@ -25,6 +26,18 @@ PAYLOAD = b'{"tool_input":{"command":"git status"},"cwd":"/tmp"}'
 def admission_valid(text, parent, slot):
     rows = re.findall(r"\bpid=(\d+)\s+slot=(\S+)", text)
     return slot == "exclusive" and rows == [(str(parent), "exclusive")]
+
+
+def expected_parent_valid(path, parent):
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, "rb") as handle:
+            info = os.fstat(handle.fileno())
+            return (stat.S_ISREG(info.st_mode) and info.st_uid == os.geteuid() and
+                    stat.S_IMODE(info.st_mode) == 0o600 and info.st_nlink == 1 and
+                    handle.read(32) == (str(parent) + "\n").encode("ascii"))
+    except OSError:
+        return False
 
 
 def summary(windows, flags, loads, cpus):
@@ -226,6 +239,12 @@ def main():
         raise ValueError("installed checkout not bound")
     if not installed_root(root):
         raise ValueError("installed checkout not verified")
+    parent_file = run_dir / "parent"
+    deadline = time.monotonic() + 5
+    while not expected_parent_valid(parent_file, os.getppid()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if not expected_parent_valid(parent_file, os.getppid()):
+        raise ValueError("trusted parent not bound")
     wait_log = run_dir / "wait.log"
     if os.environ.get("HEAVY_RUN_WAIT_LOG") != str(wait_log):
         raise ValueError("private admission log not bound")

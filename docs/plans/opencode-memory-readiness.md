@@ -1,5 +1,14 @@
 # OpenCode memory readiness
 
+## Managed service trial prediction
+
+- **Root cause:** The legacy launch agent uses a log-level value rejected by OpenCode 2. Its former `attach` client interface was removed. The obvious log-level correction exposes a generated password in the existing stdout log.
+- **Hypothesis:** OpenCode 2's maintained shared service can start, authenticate its own CLI client, and stop inside an isolated synthetic home without printing its generated credential to our logs.
+- **Measurement:** Run `heavy-run bash /tmp/opencode-managed-service-trial/run.sh` with synthetic paths, a scratch port, denied external network, and stdout discarded; check only exit codes and service cleanup.
+- **Success:** The start, authenticated API check, and stop each exit zero in 1 of 1 trials; the scratch listener is gone afterward; no generated credential is captured.
+- **Pivot:** If any check fails or the isolation boundary permits access to the live memory service, do not alter the installed launcher or alias; inspect upstream behavior first.
+- **Anchor:** [OpenCode shared service documentation](https://opencode.ai/docs/cli/web/) and `launchagents/com.dotfiles.opencode-serve.plist.tmpl`.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

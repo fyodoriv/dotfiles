@@ -395,6 +395,20 @@ them. -->
   - **Anchor**: Luo, Hariri, Eloussi and Marinov (2014), An Empirical Analysis of Flaky Tests; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — test stability, not a scorecard metric.
 
+- [ ] Make the shell-side telemetry gates follow a managed org sink
+  - **ID**: telemetry-sink-managed-shell-gates
+  - **Tags**: telemetry, org-sink
+  - **Details**: The org log sink (`bin/dotfiles-telemetry`, rule 14) installs the `com.dotfiles.telemetry` LaunchAgent for `consent: managed`, so the hourly agent sends. Two gates in `lib/stats.sh` still read the stored answer or the PostHog key only: `_telemetry_daily` (the detached send after a terminal run) needs `"consent":"yes"` in the state line, and `dotfiles_telemetry_ask` returns with no PostHog key even when an org sink does not use one. So a managed Mac with no stored answer gets sends only from the agent, and a fork that empties `config/telemetry-key` never asks the consent question for `consent: ask` with an org sink. Make both gates read the policy file the same way `agent-wanted` does, in plain bash, with no new process on the common path.
+  - **Files**: `lib/stats.sh`, `bin/dotfiles-telemetry`, `tests/telemetry-sink.bats`, `tests/stats.bats`.
+  - **Output**: code
+  - **Acceptance**: with a managed policy and no stored answer, a terminal run starts the detached daily send; with an org sink and an empty key file, the first-run question is asked; a run with no policy file starts no extra process.
+  - **Hypothesis**: managed Macs whose events leave within one day of a terminal run, without relying on the hourly agent, go from 0 to all.
+  - **Measurement**: `heavy-run bats tests/telemetry-sink.bats tests/stats.bats`, with new cases for both gates and the existing no-new-process cases.
+  - **Success**: all cases pass and the no-policy path keeps its process count.
+  - **Pivot**: if the policy read adds more than 1 ms to a command with no policy file, drop the gate change and document that the agent is the only managed sender.
+  - **Anchor**: Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — org-overlay support, not a scorecard metric.
+
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

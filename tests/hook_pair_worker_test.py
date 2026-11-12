@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).parent / "helpers"))
@@ -102,7 +103,7 @@ class WorkerControls(unittest.TestCase):
             self.assertFalse(worker.fixture_unchanged(fixture))
 
     def test_verified_snapshot_is_required_before_fixture_writes(self):
-        for mutation in ("none", "digest", "manifest", "revision", "changed", "missing", "mode", "scratch"):
+        for mutation in ("none", "digest", "manifest", "revision", "changed", "missing", "mode", "scratch", "existing", "symlink", "write_failure", "zero_write", "rename", "delete", "replace", "chmod"):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 run_dir, env = self.fixture(root)
@@ -118,17 +119,37 @@ class WorkerControls(unittest.TestCase):
                                "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"]})
                 intent_path.write_text(json.dumps(intent))
                 scratch = run_dir / "scratch"
-                scratch.mkdir(mode=0o700)
                 if mutation == "digest": env["HOOK_PAIR_MANIFEST_SHA256"] = "1" * 64
                 elif mutation == "manifest": raw += b" "
                 elif mutation == "scratch":
                     scratch = run_dir / "other"
+                elif mutation == "existing":
                     scratch.mkdir(mode=0o700)
+                elif mutation == "symlink":
+                    scratch.symlink_to(root, target_is_directory=True)
                 elif mutation == "revision": env["HOOK_PAIR_OLD"] = "f" * 40
                 elif mutation == "changed": (source / "000.src").write_bytes(b"changed")
                 elif mutation == "missing": (source / "000.src").unlink()
                 elif mutation == "mode": (source / "000.src").chmod(0o644)
-                fixture = worker.materialize_verified(root, run_dir, scratch, env, 123, raw)
+                if mutation in ("write_failure", "zero_write"):
+                    with patch.object(worker.os, "write", side_effect=OSError("injected") if mutation == "write_failure" else None,
+                                      return_value=0):
+                        fixture = worker.materialize_verified(root, run_dir, scratch, env, 123, raw)
+                elif mutation in ("rename", "delete", "replace", "chmod"):
+                    real_identity = worker.identity
+                    def alter(path):
+                        target = scratch / "old/source/block-dangerous-git.sh"
+                        if mutation == "chmod": run_dir.chmod(0o755)
+                        elif mutation == "rename":
+                            (scratch / "old").rename(scratch / "displaced")
+                            (scratch / "old").symlink_to(scratch / "displaced")
+                        elif mutation == "delete": target.unlink()
+                        else: target.write_bytes(b"replacement")
+                        return real_identity(path)
+                    with patch.object(worker, "identity", side_effect=alter):
+                        fixture = worker.materialize_verified(root, run_dir, scratch, env, 123, raw)
+                else:
+                    fixture = worker.materialize_verified(root, run_dir, scratch, env, 123, raw)
                 if mutation == "none":
                     self.assertIsNotNone(fixture)
                     self.assertEqual((scratch / "old/source/block-dangerous-git.sh").read_bytes(), b"hook-old")
@@ -146,7 +167,10 @@ class WorkerControls(unittest.TestCase):
                     self.assertFalse(worker.fixture_unchanged(fixture))
                 else:
                     self.assertIsNone(fixture)
-                    self.assertEqual(list(scratch.iterdir()), [])
+                    if mutation == "existing": self.assertEqual(list(scratch.iterdir()), [])
+                    elif mutation == "symlink": self.assertTrue(scratch.is_symlink())
+                    elif mutation in ("write_failure", "zero_write", "rename", "delete", "replace", "chmod"): self.assertTrue(scratch.is_dir())
+                    else: self.assertFalse(scratch.exists())
 
     def test_changed_shared_helper_stops_before_materialization(self):
         with tempfile.TemporaryDirectory() as directory:

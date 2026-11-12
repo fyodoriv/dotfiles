@@ -1,5 +1,8 @@
 """Preflight controls for a future exclusive hook pair worker."""
+from contextlib import ExitStack
 import hashlib
+import os
+import stat
 from pathlib import Path
 import re
 
@@ -112,6 +115,97 @@ def materialize_verified(root, run_dir, scratch, environ, parent_pid, manifest):
         def fetch(revision, path):
             side = "old" if revision == old else "new" if revision == new else None
             return modes[(side, path)], data[(side, path)]
-        return materialize(scratch, old, new, fetch)
+        return materialize_exclusive(Path(run_dir), fetch, old, new)
     except (KeyError, OSError, TypeError, ValueError):
         return None
+
+
+def materialize_exclusive(run_dir, fetch, old_revision, candidate_revision):
+    """Create a private fixture using held directories and exclusive writes."""
+    if not private_dir(run_dir):
+        raise ValueError("private run required")
+    entries = {}
+    for side, revision in (("old", old_revision), ("new", candidate_revision)):
+        paths = (HOOK, BOOTSTRAP, PARSER, ENDPOINT) + ((STATUS,) if side == "new" else ())
+        for path in paths:
+            mode, data = fetch(revision, path)
+            expected = "100644" if path in (PARSER, ENDPOINT) else "100755"
+            if mode != expected or type(data) is not bytes or len(data) > 2_000_000:
+                raise ValueError("invalid source blob")
+            entries[side, path] = (mode, data)
+    if any(entries["old", path] != entries["new", path] for path in (BOOTSTRAP, PARSER, ENDPOINT)):
+        raise ValueError("shared source differs")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    paths, hooks, directories, files = [], {}, [], []
+    with ExitStack() as stack:
+        def hold(fd):
+            stack.callback(os.close, fd)
+            return fd
+        rootfd = hold(os.open(run_dir, directory_flags))
+        info = os.fstat(rootfd)
+        current = os.stat(run_dir, follow_symlinks=False)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or
+                stat.S_IMODE(info.st_mode) != 0o700 or
+                (info.st_dev, info.st_ino) != (current.st_dev, current.st_ino)):
+            raise ValueError("run changed")
+        os.mkdir("scratch", 0o700, dir_fd=rootfd)
+        scratchfd = hold(os.open("scratch", directory_flags, dir_fd=rootfd))
+        directories.append((rootfd, "scratch", scratchfd))
+        for side in ("old", "new"):
+            os.mkdir(side, 0o700, dir_fd=scratchfd)
+            sidefd = hold(os.open(side, directory_flags, dir_fd=scratchfd))
+            directories.append((scratchfd, side, sidefd))
+            for name in ("source", "hooks"):
+                os.mkdir(name, 0o700, dir_fd=sidefd)
+            sourcefd = hold(os.open("source", directory_flags, dir_fd=sidefd))
+            linksfd = hold(os.open("hooks", directory_flags, dir_fd=sidefd))
+            directories.extend(((sidefd, "source", sourcefd), (sidefd, "hooks", linksfd)))
+            base = run_dir / "scratch" / side
+            for path in (HOOK, BOOTSTRAP, PARSER) + ((STATUS,) if side == "new" else ()):
+                name = Path(path).name
+                mode, data = entries[side, path]
+                fd = hold(os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                  0o600, dir_fd=sourcefd))
+                remaining = memoryview(data)
+                while remaining:
+                    count = os.write(fd, remaining)
+                    if count <= 0:
+                        raise OSError("short fixture write")
+                    remaining = remaining[count:]
+                os.fchmod(fd, 0o755 if mode == "100755" else 0o644)
+                os.symlink("../source/" + name, name, dir_fd=linksfd)
+                files.append((sourcefd, linksfd, name, fd, mode, data))
+                paths.extend((base / "source" / name, base / "hooks" / name))
+            hooks[side] = base / "hooks" / Path(HOOK).name
+        current = os.stat(run_dir, follow_symlinks=False)
+        if (info.st_dev, info.st_ino) != (current.st_dev, current.st_ino):
+            raise ValueError("run changed")
+        def unchanged():
+            root_now = os.stat(run_dir, follow_symlinks=False)
+            if (not stat.S_ISDIR(root_now.st_mode) or root_now.st_uid != os.geteuid() or
+                    stat.S_IMODE(root_now.st_mode) != 0o700 or
+                    (info.st_dev, info.st_ino) != (root_now.st_dev, root_now.st_ino)):
+                return False
+            for parentfd, name, fd in directories:
+                held = os.fstat(fd)
+                linked = os.stat(name, dir_fd=parentfd, follow_symlinks=False)
+                if (not stat.S_ISDIR(held.st_mode) or held.st_uid != os.geteuid() or
+                        stat.S_IMODE(held.st_mode) != 0o700 or
+                        (held.st_dev, held.st_ino) != (linked.st_dev, linked.st_ino)):
+                    return False
+            for sourcefd, linksfd, name, fd, mode, data in files:
+                held = os.fstat(fd)
+                linked = os.stat(name, dir_fd=sourcefd, follow_symlinks=False)
+                if (not stat.S_ISREG(held.st_mode) or held.st_uid != os.geteuid() or held.st_nlink != 1 or
+                        stat.S_IMODE(held.st_mode) != (0o755 if mode == "100755" else 0o644) or
+                        held.st_size != len(data) or (held.st_dev, held.st_ino) != (linked.st_dev, linked.st_ino) or
+                        os.pread(fd, len(data) + 1, 0) != data or
+                        os.readlink(name, dir_fd=linksfd) != "../source/" + name):
+                    return False
+            return True
+        if not unchanged():
+            raise ValueError("fixture changed")
+        snapshot = tuple(identity(path) for path in paths)
+        if not unchanged():
+            raise ValueError("fixture changed")
+        return {"paths": paths, "snapshot": snapshot, "hooks": hooks}

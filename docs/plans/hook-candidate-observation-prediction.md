@@ -97,8 +97,10 @@ unverifiable responses leave the mapping inconclusive and block timing.
 
 Before fetch, reserve a private request with the independently chosen run ID,
 exact revisions, fixed origin, limits and audited directory identity. Retain
-its digest independently. The request is correlation evidence, not proof of
-network provenance. Fetch only the fixed public repository and exact commit
+its digest independently. The preparation controller checks this request
+before and after collection and before accepting the archive. Its injectable
+fetch callback is test-only and does not establish network provenance. The
+request is correlation evidence, not proof of origin. Fetch only the fixed public repository and exact commit
 and tree IDs. Use
 non-recursive trees, system-trust TLS, disabled proxies, restricted hosts and
 redirects, bounded response sizes and socket inactivity timeouts. A final

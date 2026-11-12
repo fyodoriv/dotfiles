@@ -24,7 +24,9 @@ runs the affected suite. Never inspect, pause, or signal the live queue or an
 unowned process.
 
 Success: 20/20 signaled waiters exit 130 and leave the queue; zero cancelled
-commands start after release; no unrelated process is signaled. Pivot: any
+commands start through the one-second post-sentinel observation; no unrelated
+process is signaled. If a waiter or sentinel hangs, the hosted test job
+timeout bounds the run and the result is inconclusive. Pivot: any
 uncertain identity, live-queue access, stale ticket or started command stops
 the experiment. Preserve the original observation as inconclusive. Do not
 change orphan retention or infer a production bug from this fixture alone.

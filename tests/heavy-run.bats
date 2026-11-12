@@ -345,6 +345,40 @@ fake_live_ticket() {
   wait
 }
 
+@test "heavy-run: interrupted file-output waiters retire before release" {
+  local i pid rc live owned ticket
+  local -a matches
+  start_fifo_holder
+  INCOMPLETE_HOLDER=$!
+  wait_held
+  for ((i=1; i<=20; i++)); do
+    kill -0 "$INCOMPLETE_HOLDER"
+    "$SCRIPT" touch "$BATS_TEST_TMPDIR/cancelled-$i" >"$BATS_TEST_TMPDIR/interrupted-$i.log" 2>&1 &
+    pid=$!
+    INCOMPLETE_WAITER="$pid"
+    wait_queued 1
+    matches=("$HEAVY_RUN_DIR/queue/"*-"$pid")
+    [ "${#matches[@]}" -eq 1 ] && [ -f "${matches[0]}" ]
+    ticket="${matches[0]}"
+    owned=no
+    for live in $(jobs -p); do [ "$live" != "$pid" ] || owned=yes; done
+    [ "$owned" = yes ]
+    kill -INT "$pid"
+    rc=0; wait "$pid" || rc=$?
+    INCOMPLETE_WAITER=""
+    [ "$rc" -eq 130 ]
+    [ ! -e "$ticket" ] && [ ! -e "$ticket.why" ] && [ ! -e "$ticket.grant" ]
+  done
+  kill -0 "$INCOMPLETE_HOLDER"
+  release_fifo_holder
+  wait "$INCOMPLETE_HOLDER"
+  INCOMPLETE_HOLDER="" FIFO_RELEASE=""
+  "$SCRIPT" touch "$BATS_TEST_TMPDIR/sentinel"
+  [ -e "$BATS_TEST_TMPDIR/sentinel" ]
+  sleep 1
+  for ((i=1; i<=20; i++)); do [ ! -e "$BATS_TEST_TMPDIR/cancelled-$i" ]; done
+}
+
 @test "heavy-run: each run appends a waited=<seconds> line to the wait log" {
   "$SCRIPT" true
   "$SCRIPT" true

@@ -1,5 +1,6 @@
 import copy
 import json
+import hashlib
 from http.client import IncompleteRead
 import os
 from pathlib import Path
@@ -128,6 +129,34 @@ class MappingControls(unittest.TestCase):
                                    "candidate_revision": new, "files": changed}).encode()
                 self.assertFalse(mapping.verify_retained(old, "0" * 40 if mutation == "wrong_revision" else new,
                                                          "0" * 32 if mutation == "wrong_run" else run_id, data, retained))
+
+    def test_private_archive_requires_external_digest_and_identity(self):
+        old, new, commits, trees = self.fixture()
+        run_id = "9" * 32
+        records = {(kind, key): json.dumps(value).encode() for kind, group in
+                   (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        archive = mapping.encode_archive(run_id, old, new, records)
+        digest = hashlib.sha256(archive).hexdigest()
+        self.assertEqual(mapping.decode_archive(archive, digest, run_id, old, new), records)
+        self.assertIsNone(mapping.decode_archive(archive + b" ", digest, run_id, old, new))
+        self.assertIsNone(mapping.decode_archive(archive, "0" * 64, run_id, old, new))
+        self.assertIsNone(mapping.decode_archive(archive, digest, "0" * 32, old, new))
+        self.assertIsNone(mapping.decode_archive(archive, digest, run_id, old, "0" * 40))
+        obj = json.loads(archive)
+        for mutation in ("duplicate", "origin", "bad_base64", "padding", "extra", "wrong_format", "missing_record", "extra_record"):
+            value = copy.deepcopy(obj)
+            if mutation == "duplicate": value["records"].append(copy.deepcopy(value["records"][0]))
+            elif mutation == "origin": value["origin"] = "https://example.com"
+            elif mutation == "bad_base64": value["records"][0]["body"] = "!"
+            elif mutation == "padding": value["records"][0]["body"] = "YQ="
+            elif mutation == "missing_record": value["records"].pop()
+            elif mutation == "extra_record": value["records"].append({"kind": "trees", "sha": "0" * 40, "body": "e30="})
+            elif mutation == "extra": value["unexpected"] = True
+            else: value["format"] = True
+            raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            self.assertIsNone(mapping.decode_archive(raw, hashlib.sha256(raw).hexdigest(), run_id, old, new))
+        for raw in (archive + b" ", b'{"format":1,' + archive[1:]):
+            self.assertIsNone(mapping.decode_archive(raw, hashlib.sha256(raw).hexdigest(), run_id, old, new))
 
     def test_bounded_strict_record_decoder(self):
         raw = b'{"sha":"' + b'a' * 40 + b'","tree":{"sha":"' + b'b' * 40 + b'"}}'

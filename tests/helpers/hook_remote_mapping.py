@@ -1,4 +1,8 @@
 """Resolve fixed source entries from independently supplied GitHub records."""
+import base64
+import binascii
+import hashlib
+import json
 import re
 import ssl
 from http.client import HTTPException
@@ -168,3 +172,48 @@ def verify_retained(old, candidate, run_id, manifest, records):
                    for row in rows)
     except (KeyError, TypeError, ValueError):
         return False
+
+
+def encode_archive(run_id, old, candidate, records):
+    """Encode records for private retention; this does not attest origin."""
+    if (type(run_id) is not str or re.fullmatch(r"[0-9a-f]{32}", run_id) is None or type(records) is not dict or
+            len(records) > 12 or any(type(raw) is not bytes or len(raw) > 1_000_000 for raw in records.values()) or
+            sum(len(raw) for raw in records.values()) > 8_000_000):
+        raise ValueError("invalid archive")
+    replay = collect(old, candidate, lambda kind, oid: records.get((kind, oid)))
+    if replay is None or set(replay["records"]) != set(records):
+        raise ValueError("incomplete archive")
+    rows = [{"kind": kind, "sha": oid, "body": base64.b64encode(records[(kind, oid)]).decode("ascii")}
+            for kind, oid in sorted(records)]
+    value = {"format": 1, "run_id": run_id, "old_revision": old, "candidate_revision": candidate,
+             "origin": API_ROOT, "records": rows}
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode("ascii")
+
+
+def decode_archive(raw, expected_sha256, run_id, old, candidate):
+    try:
+        if (type(raw) is not bytes or len(raw) > 11_000_000 or type(expected_sha256) is not str or
+                re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None or
+                hashlib.sha256(raw).hexdigest() != expected_sha256):
+            return None
+        value = strict_json(raw)
+        if (type(value) is not dict or set(value) != {"format", "run_id", "old_revision", "candidate_revision", "origin", "records"} or
+                type(value["format"]) is not int or value["format"] != 1 or value["run_id"] != run_id or
+                value["old_revision"] != old or value["candidate_revision"] != candidate or value["origin"] != API_ROOT or
+                type(value["records"]) is not list or len(value["records"]) > 12):
+            return None
+        records = {}
+        for row in value["records"]:
+            if (type(row) is not dict or set(row) != {"kind", "sha", "body"} or
+                    row["kind"] not in ("commits", "trees") or not object_id(row["sha"]) or
+                    type(row["body"]) is not str or len(row["body"]) > 1_333_336):
+                return None
+            key = (row["kind"], row["sha"])
+            if key in records:
+                return None
+            records[key] = base64.b64decode(row["body"], validate=True)
+        if encode_archive(run_id, old, candidate, records) != raw:
+            return None
+        return records
+    except (KeyError, TypeError, UnicodeError, ValueError, binascii.Error, RecursionError):
+        return None

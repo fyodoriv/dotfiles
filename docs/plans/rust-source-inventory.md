@@ -43,11 +43,14 @@ manifest or proof of execution. Embedded code, generated outputs, dynamic
 callers, untracked files and nonmatching executable logic remain open.
 
 The [source evidence join](source-evidence-join.json) compares these candidates
-with nine pinned family receipts. At the indexed revision, 305 candidates have
-at least one exact path, blob and mode match; 11 have only stale same-path
-evidence; and 428 have no match in those nine receipts. The join retains stale
-links alongside exact links. The [registered check](source-evidence-reconciliation-prediction.md)
-validates the input identities and rejects planted receipt errors. Run
+with 11 pinned family receipts. At the indexed revision, 321 candidates have
+at least one exact path, blob and mode match; six have only stale same-path
+evidence; and 417 have no match in those receipts. The earlier nine-receipt
+join had 305, 11 and 428 respectively. The [refresh prediction](source-evidence-refresh-prediction.md)
+registered the expected change before the two new inputs were added. The join
+retains stale links alongside exact links. The
+[registered check](source-evidence-reconciliation-prediction.md) validates
+the input identities and rejects planted receipt errors. Run
 `python3 docs/plans/source-evidence-join.py --check`.
 
 These counts describe correspondence with the listed receipts, not ownership,

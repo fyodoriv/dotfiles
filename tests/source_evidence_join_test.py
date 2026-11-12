@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
 import sys
 import unittest
 
@@ -69,6 +71,24 @@ class EvidenceJoin(unittest.TestCase):
         self.assertEqual(module.strict_json('{"a": 1}'), {"a": 1})
         with self.assertRaises(ValueError):
             module.strict_json('{"a": 1, "a": 2}')
+
+    def test_literal_reference_receipt_uses_standard_identity_rows(self):
+        name = "docs/plans/tooling-checkup-callers.json"
+        row = {"path": "a", "mode": "100755", "blob": "x"}
+        receipt = {"format": 1, "revision": "a" * 40, "files": [row], "references": []}
+        tree = {"a": {"mode": "100755", "blob": "x"}}
+        self.assertEqual(module.extract_records(name, receipt, tree)[0]["path"], "a")
+
+    def test_refresh_preserves_prior_links_and_expected_partition(self):
+        old = json.loads(subprocess.check_output(["git", "show", "3d3b904ea144b3b49fac3130d3f28c9ddcd205c1:docs/plans/source-evidence-join.json"]))
+        new = json.loads((Path(__file__).parents[1] / "docs/plans/source-evidence-join.json").read_text())
+        self.assertTrue(module.prior_links_preserved(old["candidates"], new["candidates"]))
+        counts = {status: sum(row["status"] == status for row in new["candidates"]) for status in ("exact", "stale", "absent")}
+        self.assertEqual(counts, {"exact": 321, "stale": 6, "absent": 417})
+        changed = [dict(row) for row in new["candidates"]]
+        index = next(i for i, row in enumerate(old["candidates"]) if row["evidence"])
+        changed[index] = {**changed[index], "evidence": []}
+        self.assertFalse(module.prior_links_preserved(old["candidates"], changed))
 
 
 if __name__ == "__main__":

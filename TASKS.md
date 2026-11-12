@@ -62,7 +62,7 @@ them. -->
   - **ID**: heavy-run-interrupted-caller-cleanup
   - **Tags**: stability, testing, queue
   - **Mode**: AFK
-  - **Details**: During the Rust migration a queued check's caller reported exit 130, but a later process still held the same log open. Two invocations reused that log, so their identities are not conclusively linked. Reproduce with distinct private logs and an isolated queue; do not signal or alter other sessions. Establish whether an interrupted caller leaves a waiting ticket or owned child before changing the controller.
+  - **Details**: During the Rust migration a queued check's caller reported exit 130, but a later process still held the same log open. Two invocations reused that log, so their identities are not conclusively linked. The [registered isolated check](docs/plans/heavy-run-interruption.md) tests a waiter directly sent SIGINT with a distinct log. A caller dying without signaling the waiter is different: file-output orphans intentionally keep their place. Do not signal or alter other sessions. The original observation remains unlinked; establish identity before changing the controller.
   - **Output**: instrumentation
   - **Acceptance**: A reviewed fixture distinguishes caller exit, ticket retirement and child completion by owned identity. A cancelled waiter cannot later start work; unrelated jobs remain untouched.
   - **Hypothesis**: A bounded cancellation contract yields zero started-after-cancel jobs and zero signals to unowned processes across 20 controlled trials.

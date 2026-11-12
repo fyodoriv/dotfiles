@@ -32,6 +32,11 @@ duplicate keys and unsafe files, and recomputes the numeric sample checks. It
 does not claim crash durability or that an unkeyed record proves the controller
 ran. Incomplete records remain inconclusive.
 
+The caller chooses and privately retains a fresh 128-bit run ID before
+invocation. The launcher reserves its run directory exclusively before the
+worker starts. A later verifier requires that independently retained ID,
+revision and audit bytes. Reuse of an existing run directory is rejected.
+
 Anchor: `hook-rss-provenance.md`, the independent 2026-11-12 run review,
 Basili, Caldiera and Rombach 1994 (GQM), and Munafò et al. 2017
 (pre-registration).

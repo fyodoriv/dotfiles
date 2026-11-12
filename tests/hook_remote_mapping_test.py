@@ -1,4 +1,5 @@
 import copy
+import json
 from http.client import IncompleteRead
 import os
 from pathlib import Path
@@ -45,6 +46,55 @@ class MappingControls(unittest.TestCase):
             expected[(side, "lib/dotfiles-endpoint-paths.sh")] = ("100644", "7" * 40)
         expected[("new", "agent-hooks/literal-status-only.sh")] = ("100755", "6" * 40)
         self.assertEqual(result, expected)
+
+    def test_collection_binds_each_requested_record(self):
+        old, new, commits, trees = self.fixture()
+        records = {(kind, key): json.dumps(value).encode() for kind, group in
+                   (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        requests = []
+        def fetch(kind, key):
+            requests.append((kind, key))
+            return records.get((kind, key))
+        result = mapping.collect(old, new, fetch)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result["mapping"]), 9)
+        self.assertEqual(set(result["records"]), set(requests))
+        self.assertEqual(result["records"], {key: records[key] for key in requests})
+        self.assertEqual(result["mapping"], mapping.resolve(old, new, commits, trees))
+        self.assertEqual(len(requests), 8)
+        for key in list(records):
+            changed = records.pop(key)
+            self.assertIsNone(mapping.collect(old, new, fetch))
+            records[key] = changed
+        first = ("trees", "e" * 40)
+        records[first] = json.dumps(trees["f" * 40]).encode()
+        self.assertIsNone(mapping.collect(old, new, fetch))
+
+    def test_collection_reuses_shared_trees_and_rejects_bad_records(self):
+        old, new, commits, trees = self.fixture()
+        trees["c" * 40]["tree"][0]["sha"] = "f" * 40
+        trees["c" * 40]["tree"][1]["sha"] = "2" * 40
+        records = {(kind, key): json.dumps(value).encode() for kind, group in
+                   (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        calls = []
+        def fetch(kind, oid):
+            calls.append((kind, oid))
+            return records.get((kind, oid))
+        self.assertIsNotNone(mapping.collect(old, new, fetch))
+        self.assertEqual(len(calls), 6)
+        for key, bad in ((("commits", old), b'{"sha":1,"sha":2}'),
+                         (("trees", "f" * 40), b'{'),
+                         (("commits", new), json.dumps(commits[old]).encode()),
+                         (("trees", "c" * 40), json.dumps(trees["d" * 40]).encode())):
+            original = records[key]
+            records[key] = bad
+            self.assertIsNone(mapping.collect(old, new, fetch))
+            records[key] = original
+        duplicate = copy.deepcopy(trees["c" * 40])
+        duplicate["tree"].append(copy.deepcopy(duplicate["tree"][0]))
+        records[("trees", "c" * 40)] = json.dumps(duplicate).encode()
+        self.assertIsNone(mapping.collect(old, new, fetch))
+        self.assertIsNone(mapping.collect(old, new, lambda *args: (_ for _ in ()).throw(RuntimeError("private"))))
 
     def test_bounded_strict_record_decoder(self):
         raw = b'{"sha":"' + b'a' * 40 + b'","tree":{"sha":"' + b'b' * 40 + b'"}}'
@@ -109,7 +159,7 @@ class MappingControls(unittest.TestCase):
         def opener(request, timeout):
             calls.append(request.full_url)
             return Response(request.full_url, b"{}")
-        fetcher = mapping.RecordFetcher(opener, per_record=10, total=24)
+        fetcher = mapping.RecordFetcher(opener, per_record=10, total=30)
         for _ in range(12): self.assertEqual(fetcher.fetch("trees", "a" * 40), b"{}")
         self.assertIsNone(fetcher.fetch("trees", "a" * 40))
         self.assertEqual(len(calls), 12)
@@ -117,7 +167,10 @@ class MappingControls(unittest.TestCase):
         self.assertEqual(short.fetch("trees", "a" * 40), b"{}")
         self.assertIsNone(short.fetch("trees", "a" * 40))
         self.assertIsNone(short.fetch("trees", "a" * 40))
-        def truncated(request, timeout): raise IncompleteRead(b"{")
+        def truncated(request, timeout):
+            class BrokenResponse(Response):
+                def read(self, size): raise IncompleteRead(b"{")
+            return BrokenResponse(request.full_url, b"")
         broken = mapping.RecordFetcher(truncated)
         self.assertIsNone(broken.fetch("trees", "a" * 40))
         self.assertTrue(broken.failed)

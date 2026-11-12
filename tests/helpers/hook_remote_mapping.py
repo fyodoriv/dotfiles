@@ -111,3 +111,43 @@ class RecordFetcher:
         except (OSError, HTTPException, HTTPError, URLError, TypeError, ValueError):
             self.failed = True
             return None
+
+
+def collect(old, candidate, fetch):
+    """Associate fetched records with fixed requests; caller retains raw bytes."""
+    try:
+        if not callable(fetch) or not object_id(old) or not object_id(candidate) or old == candidate:
+            return None
+        raw_records, commits, trees = {}, {}, {}
+        def get(kind, oid):
+            key = (kind, oid)
+            if key not in raw_records:
+                raw = fetch(kind, oid)
+                value = decode_record(raw, 1_000_000)
+                if value is None:
+                    raise ValueError("record unavailable")
+                raw_records[key] = raw
+                (commits if kind == "commits" else trees)[oid] = value
+            return (commits if kind == "commits" else trees)[oid]
+        for revision in (old, candidate):
+            commit = get("commits", revision)
+            if commit.get("sha") != revision or type(commit.get("tree")) is not dict:
+                return None
+            root = commit["tree"].get("sha")
+            if not object_id(root):
+                return None
+            tree = get("trees", root)
+            if tree.get("sha") != root or tree.get("truncated") is not False or type(tree.get("tree")) is not list:
+                return None
+            for name in ("agent-hooks", "lib"):
+                matches = [row for row in tree["tree"] if type(row) is dict and row.get("path") == name]
+                if len(matches) != 1:
+                    return None
+                row = matches[0]
+                if row.get("type") != "tree" or row.get("mode") != "040000" or not object_id(row.get("sha")):
+                    return None
+                get("trees", row["sha"])
+        result = resolve(old, candidate, commits, trees)
+        return None if result is None else {"mapping": result, "records": raw_records}
+    except Exception:
+        return None

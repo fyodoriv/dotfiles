@@ -1,0 +1,50 @@
+{
+  "format": 1,
+  "pin": "025f0a0473f9f60d27d07d8a1ef47fcc1ec1787b",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "manifests": [
+    {
+      "path": "tests/fixtures/checkup-read-consumer/Cargo.toml",
+      "mode": "100644",
+      "blob": "cfa94a8dba4b249c1f572c3397237b8e9a144b1f"
+    },
+    {
+      "path": "tests/fixtures/connector-credentials/Cargo.toml",
+      "mode": "100644",
+      "blob": "1f150f777766a3a78c92516e32ea2051029d46b0"
+    }
+  ],
+  "module_anchor": {
+    "file": "tests/fixtures/connector-credentials/tests/connector_credentials_contracts.rs",
+    "lines": [
+      2,
+      3
+    ]
+  },
+  "records": [
+    {
+      "path": "tests/fixtures/checkup-read-consumer/src/main.rs",
+      "mode": "100644",
+      "blob": "35d7f70ec53c888b51ee801e2167700c99d13f15",
+      "kind": "default_binary"
+    },
+    {
+      "path": "tests/fixtures/checkup-read-consumer/tests/read_guard.rs",
+      "mode": "100644",
+      "blob": "1bcc10548621e6da0379d8a621f30eab14f4a03d",
+      "kind": "default_integration_test"
+    },
+    {
+      "path": "tests/fixtures/connector-credentials/src/connector_credentials.rs",
+      "mode": "100644",
+      "blob": "299b0aae0e57dd6c2ef54417984cffa804340402",
+      "kind": "test_module"
+    },
+    {
+      "path": "tests/fixtures/connector-credentials/tests/connector_credentials_contracts.rs",
+      "mode": "100644",
+      "blob": "1aa16f77ab6d244a9657c41b69140cb807016e2d",
+      "kind": "explicit_integration_test"
+    }
+  ]
+}

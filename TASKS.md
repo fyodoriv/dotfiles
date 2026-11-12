@@ -48,7 +48,7 @@ them. -->
   - **ID**: glove80-custom-layout-test-diagnostic
   - **Tags**: testing, stability
   - **Mode**: AFK
-  - **Details**: The local full gate reported a nonzero exit in `tests/glove80.bats` at the custom-layout pairing assertion. The test did not print the command output; separate focused runs later passed, failed, and passed. The cause is unknown. Add a content-free diagnostic or a fully synthetic reproduction before changing a timeout or behavior.
+  - **Details**: The local full gate reported a nonzero exit in `tests/glove80.bats` at the custom-layout pairing assertion. The test did not print the command output; separate focused runs later passed, failed, and passed. The cause is unknown. The [registered diagnostic](docs/plans/glove80-layout-diagnostic.md) reports bounded status and observed output flags from the synthetic fixture. A flag does not establish the cause. Investigate a recurrence before changing a timeout or behavior.
   - **Output**: instrumentation
   - **Acceptance**: A controlled failure identifies its outcome class without personal paths, device data or secrets. The fixture never opens real Bluetooth settings. Existing pairing and keymap contracts remain unchanged.
   - **Hypothesis**: A bounded diagnostic distinguishes the fixture's failure classes in all planted cases while leaking zero synthetic canaries.

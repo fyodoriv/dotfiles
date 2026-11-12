@@ -58,6 +58,19 @@ EXPECT
 
 teardown() { rm -rf "$TEST_DIR"; }
 
+# Report only bounded facts about fixture output, never the output itself.
+assert_pair_succeeded() {
+  local result="$1" text="$2" prompt=no connected=no saved=no timeout=no
+  [[ "$result" =~ ^[0-9]{1,3}$ ]] || result=unknown
+  [ "$result" = 0 ] && return 0
+  [[ "$text" == *'Continue? [y/N]'* ]] && prompt=yes
+  [[ "$text" == *'Glove80: connected'* ]] && connected=yes
+  [[ "$text" == *'Saved user-asserted BT Profile 2'* ]] && saved=yes
+  [[ "$text" == *'connection was not confirmed'* ]] && timeout=yes
+  printf 'status=%s prompt=%s connected=%s saved=%s timeout=%s\n' "$result" "$prompt" "$connected" "$saved" "$timeout" >&2
+  return 1
+}
+
 @test "pair stops when the user says no" {
   run confirm_pair n
   [ "$status" -eq 1 ]
@@ -317,11 +330,44 @@ MOCK
   done
 }
 
+@test "pairing diagnostic reports only fixed observations" {
+  run assert_pair_succeeded 1 'PRIVATE_CANARY_123'
+  [ "$status" -eq 1 ]
+  [ "$output" = 'status=1 prompt=no connected=no saved=no timeout=no' ]
+  run assert_pair_succeeded 4 'Continue? [y/N] connection was not confirmed PRIVATE_CANARY_123'
+  [ "$status" -eq 1 ]
+  [ "$output" = 'status=4 prompt=yes connected=no saved=no timeout=yes' ]
+  run assert_pair_succeeded 5 'Continue? [y/N] Glove80: connected PRIVATE_CANARY_123'
+  [ "$status" -eq 1 ]
+  [ "$output" = 'status=5 prompt=yes connected=yes saved=no timeout=no' ]
+  run assert_pair_succeeded PRIVATE_CANARY_123 'Saved user-asserted BT Profile 2 PRIVATE_CANARY_123'
+  [ "$status" -eq 1 ]
+  [ "$output" = 'status=unknown prompt=no connected=no saved=yes timeout=no' ]
+  [[ "$output" != *PRIVATE_CANARY_123* ]]
+  run assert_pair_succeeded 0 PRIVATE_CANARY_123
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "pairing diagnostic reads a synthetic connection failure" {
+  local pair_status pair_output
+  printf '#!/bin/bash\nprintf "opened\\n" >> "$OPEN_LOG"\n' > "$TEST_DIR/bin/open"
+  export GLOVE80_WAIT_SECONDS=1
+  run confirm_pair y
+  pair_status="$status"; pair_output="$output"
+  [ "$pair_status" -ne 0 ]
+  run assert_pair_succeeded "$pair_status" "$pair_output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'timeout=yes'* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ -s "$OPEN_LOG" ]
+}
+
 @test "custom keymap survives interactive pairing and save" {
   export TEST_KEYMAP="$TEST_DIR/custom.keymap"
   sed 's/\&kp LSHFT/\&kp TAB/' "$GLOVE80_KEYMAP" > "$TEST_KEYMAP"
   run confirm_pair y
-  [ "$status" -eq 0 ]
+  assert_pair_succeeded "$status" "$output"
   [[ "$output" == *"Saved user-asserted BT Profile 2 (Magic + TAB"* ]]
 }
 

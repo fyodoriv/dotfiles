@@ -22,3 +22,13 @@ It checks one required path before a broader memory comparison.
 - **Pivot:** If the real recall does not pass, preserve the failure and investigate provider, permissions, and MCP activation before calling the path repaired.
 - **Stability guard:** Existing dry-run, credential-source, and model-selection tests pass.
 - **Anchor:** `opencode run --help` and the actual 2.2.6 `Unrecognized flag: --dir` error.
+
+## Failed launcher status prediction
+
+- **Root cause:** The launcher discards the OpenCode pipeline's exit status with `|| true`, so a failed invocation can return success.
+- **Hypothesis:** Preserving that status makes a failed OpenCode run visible to the caller.
+- **Measurement:** `bats tests/kimi-goal.bats` uses a fake OpenCode command that exits 23.
+- **Success:** The launcher returns a nonzero status for that failure and every existing launcher test passes.
+- **Pivot:** If either condition fails, retain the red test and investigate status propagation before delivery.
+- **Stability guard:** Successful goal and dry-run cases keep their current output and exit status.
+- **Anchor:** `bin/kimi-goal` at commit `9c9c292`, where the pipeline is followed by `|| true`.

@@ -1,6 +1,7 @@
 """Resolve fixed source entries from independently supplied GitHub records."""
 import re
 from hook_source_snapshot import EXPECTED
+from hook_trusted_launch import strict_json
 
 
 def object_id(value):
@@ -45,4 +46,15 @@ def resolve(old, candidate, commits, trees):
             result[side, path] = (mode, tree_id)
         return result
     except (KeyError, TypeError, ValueError):
+        return None
+
+
+def decode_record(raw, limit):
+    """Decode one bounded record while rejecting duplicate JSON keys."""
+    try:
+        if type(raw) is not bytes or type(limit) is not int or limit < 0 or len(raw) > limit:
+            return None
+        value = strict_json(raw)
+        return value if type(value) is dict else None
+    except (TypeError, UnicodeError, ValueError):
         return None

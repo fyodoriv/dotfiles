@@ -43,6 +43,14 @@ class MappingControls(unittest.TestCase):
         expected[("new", "agent-hooks/literal-status-only.sh")] = ("100755", "6" * 40)
         self.assertEqual(result, expected)
 
+    def test_bounded_strict_record_decoder(self):
+        raw = b'{"sha":"' + b'a' * 40 + b'","tree":{"sha":"' + b'b' * 40 + b'"}}'
+        self.assertEqual(mapping.decode_record(raw, len(raw))["sha"], "a" * 40)
+        for invalid in (raw + b" ", b'{"sha":1,"sha":2}', b'[]', b'\xff', b'{'):
+            self.assertIsNone(mapping.decode_record(invalid, len(raw)))
+        self.assertIsNone(mapping.decode_record(raw, len(raw) - 1))
+        self.assertIsNone(mapping.decode_record(raw, True))
+
     def test_rejects_unverified_commit_and_tree_responses(self):
         for mutation in ("commit_sha", "root", "tree_sha", "truncated", "missing_tree", "duplicate", "missing_path", "mode", "type", "blob", "bad_path", "bool_truncated", "branch_type", "branch_mode", "bad_revision", "missing_commit", "branch_sha", "row_type", "null_root"):
             with self.subTest(mutation=mutation):

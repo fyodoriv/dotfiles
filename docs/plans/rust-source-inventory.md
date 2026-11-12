@@ -49,6 +49,11 @@ This index includes overlaps with the family receipts. It is not an ownership
 manifest or proof of execution. Embedded code, generated outputs, dynamic
 callers, untracked files and nonmatching executable logic remain open.
 
+The seven checkers listed in the [JSON type-safety prediction](source-receipt-json-types-prediction.md)
+share a strict reader and type-sensitive comparison. They reject duplicate JSON
+keys and boolean/number substitutions. This guards the receipts; it does not
+change the scope of any source claim.
+
 The [source evidence join](source-evidence-join.json) compares these candidates
 with 11 pinned family receipts. At the indexed revision, 321 candidates have
 at least one exact path, blob and mode match; six have only stale same-path

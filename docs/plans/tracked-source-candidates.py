@@ -5,6 +5,9 @@ from pathlib import Path
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True
+from strict_receipt_json import same_json, strict_json
+
 REVISION = "94eef660b9d531b401f1f78c7c788101eb3e7bfb"
 RECEIPT = Path("docs/plans/tracked-source-candidates.json")
 SUFFIXES = {".sh", ".bash", ".zsh", ".py", ".pl", ".awk", ".rs", ".swift", ".mjs", ".cjs", ".js", ".ts", ".tsx", ".bats", ".tmpl"}
@@ -64,8 +67,8 @@ def main():
             print(f"    {json.dumps(row)}{suffix}")
         print('  ]\n}')
         return
-    receipt = json.loads(RECEIPT.read_text())
-    if receipt != expected:
+    receipt = strict_json(RECEIPT.read_text())
+    if not same_json(receipt, expected):
         raise SystemExit("candidate index does not match pinned sources")
     rows = receipt["files"]
     expected_rows = expected["files"]

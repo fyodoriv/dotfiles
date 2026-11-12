@@ -6,6 +6,9 @@ from pathlib import Path
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True
+from strict_receipt_json import same_json, strict_json
+
 CURRENT = "0490b7b981c976c03cde98e064fffb6e38623622"
 RECEIPT = Path("docs/plans/current-bin-boundaries.json")
 
@@ -15,7 +18,7 @@ def git(*args):
 
 
 def generate():
-    historical = json.loads(git("show", CURRENT + ":docs/plans/rust-bin-source-inventory-evidence.json"))
+    historical = strict_json(git("show", CURRENT + ":docs/plans/rust-bin-source-inventory-evidence.json"))
     old = historical["revision"]
     boundaries = historical["embedded_boundaries"]
     if len(boundaries) != 7 or sum(len(row["call_lines"]) for row in boundaries) != 8:
@@ -53,8 +56,8 @@ def main():
     if sys.argv[1:] == ["--generate"]:
         print(json.dumps(expected, indent=2))
         return
-    receipt = json.loads(RECEIPT.read_text())
-    if receipt != expected:
+    receipt = strict_json(RECEIPT.read_text())
+    if not same_json(receipt, expected):
         raise SystemExit("boundary receipt does not match pinned sources")
     count = 0
     for index in range(len(receipt["boundaries"])):

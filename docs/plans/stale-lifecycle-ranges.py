@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 sys.dont_write_bytecode = True
+from strict_receipt_json import same_json, strict_json
 from git_blob_batch import read_blobs
 
 PIN = "ac38709703dc51b8e34e62728dccdcad6f9d83e3"
@@ -20,21 +21,6 @@ PATHS = (
 
 def git(*args):
     return subprocess.check_output(["git", *args])
-
-
-def strict_json(data):
-    def unique(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate JSON field")
-            result[key] = value
-        return result
-    return json.loads(data, object_pairs_hook=unique)
-
-
-def same_json(left, right):
-    return json.dumps(left, sort_keys=True) == json.dumps(right, sort_keys=True)
 
 
 def tree(revision):

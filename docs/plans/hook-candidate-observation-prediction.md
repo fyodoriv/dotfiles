@@ -99,8 +99,10 @@ Before fetch, reserve a private request with the independently chosen run ID,
 exact revisions, fixed origin, limits and audited directory identity. Retain
 its digest independently. The preparation controller checks this request
 before and after collection and before accepting the archive. Its injectable
-fetch callback is test-only and does not establish network provenance. The
-request is correlation evidence, not proof of origin. Fetch only the fixed public repository and exact commit
+fetch callback is test-only and does not establish network provenance. A
+separate entry point constructs the restricted fetcher with the registered
+limits; independently review its exact inputs before live use. The request is
+correlation evidence, not proof of origin. Fetch only the fixed public repository and exact commit
 and tree IDs. Use
 non-recursive trees, system-trust TLS, disabled proxies, restricted hosts and
 redirects, bounded response sizes and socket inactivity timeouts. A final

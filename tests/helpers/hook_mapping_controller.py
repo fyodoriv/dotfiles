@@ -24,3 +24,13 @@ def collect_private(root, identity, run_id, old, candidate, request_digest, fetc
         return archive_digest
     except (OSError, TypeError, ValueError):
         return None
+
+
+def collect_public(root, identity, run_id, old, candidate, request_digest):
+    """Use only the fixed public API and registered default bounds."""
+    try:
+        fetcher = remote.RecordFetcher(remote.restricted_opener(), per_record=1_000_000,
+                                       total=8_000_000, timeout=10)
+        return collect_private(root, identity, run_id, old, candidate, request_digest, fetcher.fetch)
+    except (OSError, TypeError, ValueError):
+        return None

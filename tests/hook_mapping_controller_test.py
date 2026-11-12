@@ -59,5 +59,36 @@ class ControllerControls(unittest.TestCase):
                     if mutation != "archive_tamper": self.assertFalse((root / "mapping.json").exists())
                     if mutation in ("missing", "wrong_digest", "extra"): self.assertEqual(calls, [])
 
+    def test_public_entry_uses_restricted_bounded_fetcher(self):
+        class Response:
+            status = 200
+            def __init__(self, url, data): self.url, self.data = url, data
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def geturl(self): return self.url
+            def read(self, size): return self.data[:size]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            info = root.stat()
+            identity = (info.st_dev, info.st_ino)
+            old, new, commits, trees = mapping_tests.MappingControls().fixture()
+            records = {(kind, key): json.dumps(value).encode() for kind, group in
+                       (("commits", commits), ("trees", trees)) for key, value in group.items()}
+            calls = []
+            def open_record(request, timeout):
+                kind, oid = request.full_url.rsplit("/", 2)[-2:]
+                calls.append((kind, oid, timeout))
+                return Response(request.full_url, records[(kind, oid)])
+            digest = intent.reserve(root, identity, "9" * 32, old, new)
+            with patch.object(controller.remote, "restricted_opener", return_value=open_record), \
+                    patch.object(controller.remote, "RecordFetcher", wraps=controller.remote.RecordFetcher) as factory:
+                self.assertIsNone(controller.collect_public(root, identity, "9" * 32, old, new, "0" * 64))
+                self.assertEqual(calls, [])
+                result = controller.collect_public(root, identity, "9" * 32, old, new, digest)
+            self.assertEqual(factory.call_args.kwargs, {"per_record": 1_000_000, "total": 8_000_000, "timeout": 10})
+            self.assertIsNotNone(result)
+            self.assertEqual(len(calls), 8)
+            self.assertTrue(all(timeout == 10 for _, _, timeout in calls))
+
 if __name__ == "__main__":
     unittest.main()

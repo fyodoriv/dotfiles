@@ -1,6 +1,6 @@
 doctor_status_category() {
   case "$1" in
-    fixed|fail|skipped) printf '%s\n' "$1" ;;
+    fixed|fail|skipped|skip|pass) printf '%s\n' "$1" ;;
     '') printf '%s\n' empty ;;
     *) printf '%s\n' unexpected ;;
   esac

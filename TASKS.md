@@ -34,7 +34,7 @@ them. -->
   - **ID**: doctor-json-boolean-status-diagnostic
   - **Tags**: doctor, testing, stability
   - **Mode**: AFK
-  - **Details**: PR #600's hosted test expected `fixed` in `tests/doctor-json-status.bats`, but did not print the actual status. The isolated test passed on the owner Mac. The cause is unknown. The [registered diagnostic](docs/plans/doctor-json-boolean-diagnostic.md) reports a bounded category on a future failure. Investigate that evidence before changing production behavior.
+  - **Details**: PR #600's hosted test expected `fixed` in `tests/doctor-json-status.bats`. Hosted `DOTFILES_CI=1` makes `check_defaults` skip the check; the isolated test reproduced this with the same setting. The [registered fixture correction](docs/plans/doctor-json-boolean-diagnostic.md) disables CI mode only for the scratch-domain invocation. Confirm the corrected test runs and passes in hosted CI before closing this task.
   - **Output**: instrumentation
   - **Acceptance**: Synthetic failure cases report bounded categories without paths or raw JSON. Identify the root cause before claiming the hosted failure is fixed.
   - **Hypothesis**: Bounded status categories distinguish every registered synthetic failure with zero private-canary disclosures.

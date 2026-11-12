@@ -2,7 +2,7 @@
 
 Registered before implementing the receipt on 2026-11-11. A read-only search at
 `57a4b14da82ad42c47bceebfc4e051d8bb9541d3` found 277 path-and-line rows in
-123 files. It searched tracked text for lines starting with `source` or `.`
+123 tracked paths. It searched tracked text for lines starting with `source` or `.`
 followed by whitespace and containing a tracked `lib/` basename. It excludes
 binary matches and the existing inventory-evidence JSON. These are lexical
 candidates, not proven callers: a line may be a fixture, template, heredoc or
@@ -19,7 +19,7 @@ duplicate, wrong blob, wrong line, wrong text and wrong names; the checker must
 reject every case. Run the existing library and doctor receipt checks too.
 Independently review the search scope, count, receipt and mutation controls.
 
-Success: 277 rows in 123 files regenerate exactly; every registered mutation is
+Success: 277 rows across 123 tracked paths regenerate exactly; every registered mutation is
 rejected; the earlier receipt checks remain green; no candidate is represented
 as a proven runtime call. Pivot: an omitted search result, accepted mutation,
 changed previous check or unsupported completeness claim rejects the method.

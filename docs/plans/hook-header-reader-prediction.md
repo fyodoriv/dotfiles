@@ -13,3 +13,11 @@ claim executable or native-binary trust. Run only synthetic fixtures.
 
 Anchor: `tests/helpers/hook_snapshot_acquire.py` and
 [the input evidence requirements](hook-effective-input-audit.md).
+
+The adapter accepts only two ordinary relative path components and a supplied
+root identity and an owned root with mode 0700. It reads owned, executable regular files without following the
+final links, then checks root and file identities again. The tests use private
+synthetic files only. A missing shebang is not proof of a native or trusted
+executable. This does not audit root ancestors, filesystem locality, symlink
+chains, root-owned system files, transient changes, dynamic libraries or
+process completion. Bounded bytes do not imply bounded filesystem latency.

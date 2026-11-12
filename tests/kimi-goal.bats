@@ -12,7 +12,9 @@ setup() {
 if [ "$1" = auth ]; then echo "${FAKE_AUTH:-0 credentials}"; exit 0; fi
 echo "KEY=${KIMI_API_KEY:-unset}"
 echo "ARGS=$*"
+echo "DIR=$(pwd -P)"
 echo "${FAKE_REPLY:-working}"
+exit "${FAKE_EXIT:-0}"
 STUB
   cat > "$TEST_DIR/security" <<'STUB'
 #!/bin/bash
@@ -27,11 +29,12 @@ STUB
 teardown() { rm -rf "$TEST_DIR"; }
 
 @test "runs opencode on the Kimi Code plan model with the Keychain key" {
-  FAKE_KEY=sk-test-placeholder FAKE_REPLY="GOAL MET" run bash "$KG" --dir /tmp "fix x"
+  FAKE_KEY=sk-test-placeholder FAKE_REPLY="GOAL MET" run bash "$KG" --dir "$TEST_DIR" "fix x"
   [ "$status" -eq 0 ]
   [[ "$output" == *"KEY=sk-test-placeholder"* ]]
   [[ "$output" == *"-m kimi-code-plan-global/k3.1-pro-highspeed"* ]]
-  [[ "$output" == *"--dir /tmp"* ]]
+  [[ "$output" == *"DIR=$(cd "$TEST_DIR" && pwd -P)"* ]]
+  [[ "$output" != *"--dir "* ]]
 }
 
 @test "later rounds continue the session and stop on GOAL MET" {
@@ -60,6 +63,18 @@ teardown() { rm -rf "$TEST_DIR"; }
   [[ "$output" == *"round 1:"*"kimi-code-plan-global/k3.1-pro-highspeed"* ]]
   [[ "$output" == *"round 2:"*"--continue"* ]]
   [[ "$output" != *"KEY="* ]]
+}
+
+@test "missing working directory fails instead of reporting success" {
+  FAKE_KEY=k run bash "$KG" --dir "$TEST_DIR/missing" "fix x"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"directory"* ]]
+  [[ "$output" != *"ARGS="* ]]
+}
+
+@test "OpenCode failure returns a nonzero status" {
+  FAKE_KEY=k FAKE_EXIT=23 run bash "$KG" "fix x"
+  [ "$status" -eq 23 ]
 }
 
 @test "missing key fails with both fixes" {

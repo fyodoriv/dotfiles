@@ -58,6 +58,10 @@ if $check; then
 fi
 
 if [ -z "$goal" ]; then echo "kimi-goal: give a goal" >&2; exit 64; fi
+if [ ! -d "$dir" ]; then
+  echo "kimi-goal: working directory does not exist: $dir" >&2
+  exit 1
+fi
 if [ "$key_source" = none ] && ! $dry; then
   echo "kimi-goal: no Kimi Code key found." >&2
   echo "Run: opencode auth login   (pick Kimi Code Plan), or save it to the Keychain:" >&2
@@ -70,14 +74,14 @@ Work autonomously in $dir until the goal is met. Follow AGENTS.md and the run-go
 
 i=1
 while [ "$i" -le "$rounds" ]; do
-  args=(run -m "$model" --dir "$dir" --title "kimi-goal: ${goal:0:60}")
+  args=(run -m "$model" --title "kimi-goal: ${goal:0:60}")
   [ "$i" -gt 1 ] && args+=(--continue)
   $auto && args+=(--auto)
   msg="$prompt"; [ "$i" -gt 1 ] && msg="Continue the goal. Print GOAL MET or GOAL BLOCKED when it applies."
   if $dry; then
-    printf 'round %s: %s' "$i" "$OC"; printf ' %q' "${args[@]}"; printf ' <prompt>\n'
+    printf 'round %s: cd %q && %s' "$i" "$dir" "$OC"; printf ' %q' "${args[@]}"; printf ' <prompt>\n'
   else
-    out="$("$OC" "${args[@]}" "$msg" 2>&1 | tee /dev/stderr)" || true
+    out="$(cd "$dir" && "$OC" "${args[@]}" "$msg" 2>&1 | tee /dev/stderr)" || exit $?
     # Only a line that starts with the marker counts; the prompt itself names it.
     if grep -qE '^[[:space:]]*GOAL (MET|BLOCKED)' <<<"$out"; then exit 0; fi
   fi

@@ -61,6 +61,13 @@ local correlation, not kernel lock attestation. It does not rule out
 same-user tampering or transient changes; source, tool and load flags remain
 controller observations. Raw samples and launch evidence stay private.
 
+The candidate retry then passed the same two-window check. Each of its two
+15-sample windows had a median of 4,767,744 bytes, below the registered
+5,262,540-byte bound; their A/A ratio was 1.000. Independent review checked
+the retained request, audit, admission, samples and flags. The first candidate
+attempt had no samples because its initial load gate failed and remains
+inconclusive. This memory result does not establish parity or speed.
+
 An earlier 15 + 15 run lacked this retained binding and remains provisional.
 Do not use it as the baseline. This record does not establish a performance
 improvement or relax the parity and gate requirements above.

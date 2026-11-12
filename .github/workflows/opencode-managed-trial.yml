@@ -1,0 +1,44 @@
+name: OpenCode managed service trial
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - .github/workflows/opencode-managed-trial.yml
+      - tests/fixtures/opencode-managed-service-trial.sh
+      - launchagents/com.dotfiles.opencode-serve.plist.tmpl
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-service:
+    runs-on: macos-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fetch and verify the pinned upstream binary
+        shell: bash
+        run: |
+          case "$(uname -m)" in
+            arm64) asset=opencode-darwin-arm64.zip; digest=15491608f6b0bc4debe5eac35eab629a2b07ea9a1fbac68ad53bcea59fcc4b45 ;;
+            x86_64) asset=opencode-darwin-x64.zip; digest=b2962dc445d873df56ae7d3ba7e66502b046bbc4dafa820eca18d0303a98a29c ;;
+            *) exit 1 ;;
+          esac
+          curl --fail --silent --show-error --location "https://github.com/anomalyco/opencode/releases/download/v2.2.6/$asset" -o "$RUNNER_TEMP/opencode.zip"
+          echo "$digest  $RUNNER_TEMP/opencode.zip" | shasum -a 256 -c
+          mkdir -p "$RUNNER_TEMP/opencode-trial-bin"
+          unzip -q "$RUNNER_TEMP/opencode.zip" -d "$RUNNER_TEMP/opencode-trial-bin"
+      - name: Test the isolated service without logging credentials
+        shell: bash
+        run: |
+          binary="$(python3 -c 'import pathlib,sys; p=list(pathlib.Path(sys.argv[1]).rglob("opencode")); assert len(p)==1; print(p[0])' "$RUNNER_TEMP/opencode-trial-bin")"
+          python3 -m http.server 18765 --bind 127.0.0.1 > /dev/null 2>&1 &
+          control_pid=$!
+          trap 'kill "$control_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..50}; do
+            nc -z -w 1 127.0.0.1 18765 >/dev/null 2>&1 && break
+            sleep 0.1
+          done
+          OPENCODE_TRIAL_BINARY="$binary" bash tests/fixtures/opencode-managed-service-trial.sh

@@ -30,6 +30,20 @@ them. -->
 
 ## P1
 
+- [ ] Stop an exclusive heavy-run from waiting forever behind one long run
+  - **ID**: heavy-run-exclusive-starvation
+  - **Tags**: heavy-run, speed, stability
+  - **Mode**: AFK
+  - **Details**: On 2026-11-12 a sidequest full gate (`heavy-run --exclusive`) waited about 2 hours behind one shared comic-studio `pytest` that ran at 99% CPU for 115 minutes. Three more runs queued behind the exclusive one, so one long run stalled four sessions. `decide` in `bin/heavy-run` grants an exclusive run only when nothing is busy, with no limit on how long it waits and no note to the owner. Options to weigh: a "running far past its usual time" line in `--status`; letting an exclusive waiter take a shared slot while memory pressure is normal; showing each waiter's wait time. Never stop another session's run automatically.
+  - **Output**: code
+  - **Acceptance**: `heavy-run --status` names a run that has blocked an exclusive waiter past a threshold, with its runtime. An exclusive waiter does not wait without limit while memory pressure is normal. Existing exclusive, FIFO and memory-pressure contracts still pass.
+  - **Hypothesis**: An exclusive run's longest wait behind one shared run drops from unbounded (about 2 h seen) to at most the chosen threshold, with no more paused or frozen runs.
+  - **Measurement**: A Bats case with a fake long shared run, an exclusive waiter and a fake clock measures time to grant or to a status warning; then `heavy-run bats tests/heavy-run*.bats`.
+  - **Success**: The waiter is granted or warned within the threshold in 100% of planted cases; the full heavy-run suite passes.
+  - **Pivot**: If any case lets two heavy runs share the Mac under memory pressure, drop the shared-slot fallback and keep only the warning.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Courtois, Heymans and Parnas 1971 (readers-writers starvation).
+  - **Competitive-goal**: none: local queue fairness.
+
 - [ ] Diagnose the terminal telemetry test's request-count failure
   - **ID**: telemetry-terminal-request-count-diagnostic
   - **Tags**: telemetry, testing, stability

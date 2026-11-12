@@ -126,3 +126,18 @@ inactivity timeout is not a total deadline. This does not establish checkout
 HEAD, installed behavior,
 tool closure or protection against transient same-user changes. Anchor:
 [object-reader pivot](hook-object-reader-pivot.md).
+
+## Acquisition provenance correction
+
+The first retained archive replayed but its result held only the archive
+digest. It did not bind that archive to the reviewed invocation, request and
+runtime audit. Treat it as inconclusive. Do not retrofit that missing link.
+
+Before a new fetch, retain a fresh request and independently review the exact
+invocation and runtime audit. A successful result must bind the archive digest
+to the request, control, invocation, runtime audit and independent pre-use
+review. Recheck those inputs after collection and before publishing the
+result. A separate reviewer then verifies the retained links and replays the
+records. Any missing, changed or ambiguous link is inconclusive. This remains
+trusted local correlation, not protection from same-user interference or a
+cryptographic proof of remote origin.

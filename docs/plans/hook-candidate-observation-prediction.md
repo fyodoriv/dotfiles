@@ -169,8 +169,11 @@ shebang interpreter or intermediate symlink of selected wrappers.
 
 Before capture, bind the hook-resolved dotfiles root and live endpoint helper
 to the independently audited source, including fallback and absence cases.
-Audit actual selected wrappers and their interpreter chains. Recheck the
-effective inputs after capture. Boundary checks do not prove that inputs were
+The preparation worker can compare that helper with its verified source
+snapshot. Before live use, derive the root identity from the independently
+retained audit and check the environment after shell startup. Audit actual
+selected wrappers and their interpreter chains. Recheck the effective inputs
+after capture. Boundary checks do not prove that inputs were
 unchanged between them. An unresolved selection or dependency blocks timing.
 
 ## Effective endpoint helper prediction

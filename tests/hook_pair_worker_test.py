@@ -190,6 +190,48 @@ class WorkerControls(unittest.TestCase):
                     elif mutation in ("write_failure", "zero_write", "rename", "delete", "replace", "chmod"): self.assertTrue(scratch.is_dir())
                     else: self.assertFalse(scratch.exists())
 
+    def test_effective_helper_requires_verified_snapshot_and_root_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_dir, env = self.fixture(root)
+            source = run_dir / "source"
+            source.mkdir(mode=0o700)
+            raw = snapshot_tests.SnapshotControls().fixture(source)
+            env.update({"HOOK_PAIR_OLD": "b" * 40, "HOOK_PAIR_CANDIDATE": "c" * 40,
+                        "HOOK_PAIR_MANIFEST_SHA256": hashlib.sha256(raw).hexdigest()})
+            path = run_dir / "intent.json"
+            intent = json.loads(path.read_text())
+            intent.update({"old_revision": env["HOOK_PAIR_OLD"], "candidate_revision": env["HOOK_PAIR_CANDIDATE"],
+                           "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"]})
+            path.write_text(json.dumps(intent))
+            (root / "bin").mkdir()
+            (root / "lib").mkdir()
+            helper = root / "lib/dotfiles-endpoint-paths.sh"
+            helper.write_bytes(b"shared-lib/dotfiles-endpoint-paths.sh")
+            helper.chmod(0o644)
+            info = root.stat()
+            identity = (info.st_dev, info.st_ino)
+            before = worker.effective_snapshot(root, run_dir, env, 123, raw, identity)
+            self.assertIsNotNone(before)
+            self.assertIsNone(worker.effective_snapshot(root, run_dir, env, 123, raw, (1, 1)))
+            self.assertIsNone(worker.effective_snapshot(root, run_dir, {**env, "DOTFILES_DIR": "/other"}, 123, raw, identity))
+            missing = source / "000.src"
+            saved = missing.read_bytes()
+            missing.unlink()
+            self.assertIsNone(worker.effective_snapshot(root, run_dir, env, 123, raw, identity))
+            missing.write_bytes(saved)
+            missing.chmod(0o600)
+            altered = raw + b" "
+            env["HOOK_PAIR_MANIFEST_SHA256"] = hashlib.sha256(altered).hexdigest()
+            intent["source_manifest_sha256"] = env["HOOK_PAIR_MANIFEST_SHA256"]
+            path.write_text(json.dumps(intent))
+            self.assertIsNone(worker.effective_snapshot(root, run_dir, env, 123, altered, identity))
+            env["HOOK_PAIR_MANIFEST_SHA256"] = hashlib.sha256(raw).hexdigest()
+            intent["source_manifest_sha256"] = env["HOOK_PAIR_MANIFEST_SHA256"]
+            path.write_text(json.dumps(intent))
+            helper.write_bytes(b"changed")
+            self.assertIsNone(worker.effective_snapshot(root, run_dir, env, 123, raw, identity))
+
     def test_changed_shared_helper_stops_before_materialization(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

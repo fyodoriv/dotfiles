@@ -20,7 +20,7 @@ from hook_source_audit import parse_source_audit
 from hook_trusted_launch import (audited_inputs_valid, create_private_log, launch_and_wait, matches_digest,
                                  parse_audit, reserve_run, resolve_perl, write_private_json)
 
-PAIR_TRACKED = ("tests/helpers/hook_run_locality.py", "tests/helpers/hook_remote_mapping.py", "tests/helpers/hook_pair_private.py", "tests/helpers/hook_pair_launcher.py", "tests/helpers/hook_pair_binding.py",
+PAIR_TRACKED = ("tests/helpers/hook_effective_helper.py", "tests/helpers/hook_run_locality.py", "tests/helpers/hook_remote_mapping.py", "tests/helpers/hook_pair_private.py", "tests/helpers/hook_pair_launcher.py", "tests/helpers/hook_pair_binding.py",
                 "tests/helpers/hook_pair_receipts.py", "tests/helpers/hook_status_pairs.py",
                 "tests/helpers/hook_pair_worker.py", "tests/helpers/hook_source_snapshot.py",
                 "tests/helpers/hook_snapshot_acquire.py", "tests/helpers/hook_source_audit.py",

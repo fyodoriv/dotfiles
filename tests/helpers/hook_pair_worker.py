@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from hook_pair_receipts import private_dir
+from hook_effective_helper import snapshot as endpoint_snapshot
 from hook_rss_provenance import identity
 from hook_pair_private import read_private
 from hook_source_snapshot import EXPECTED, read_snapshot
@@ -212,3 +213,18 @@ def materialize_exclusive(run_dir, fetch, old_revision, candidate_revision):
         if not unchanged():
             raise ValueError("fixture changed")
         return {"paths": paths, "snapshot": snapshot, "hooks": hooks}
+
+
+def effective_snapshot(root, run_dir, environ, parent_pid, manifest, root_identity):
+    """Bind the configured live helper to independently verified source bytes."""
+    try:
+        if (not identity_ok(root, run_dir, environ, parent_pid) or type(manifest) is not bytes or
+                hashlib.sha256(manifest).hexdigest() != environ["HOOK_PAIR_MANIFEST_SHA256"]):
+            return None
+        data = read_snapshot(Path(run_dir) / "source", manifest, environ["HOOK_PAIR_RUN_ID"],
+                             environ["HOOK_PAIR_OLD"], environ["HOOK_PAIR_CANDIDATE"])
+        if data is None:
+            return None
+        return endpoint_snapshot(root, root_identity, environ, data[("new", ENDPOINT)])
+    except (KeyError, OSError, TypeError, ValueError):
+        return None

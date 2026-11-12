@@ -9,7 +9,6 @@ import signal
 import stat
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 
@@ -78,19 +77,112 @@ def create_private_log(run_dir):
     return log
 
 
-def read_audit(path):
+def reserve_run(parent, run_id):
+    info = parent.lstat()
+    if (not parent.is_absolute() or not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or
+            stat.S_IMODE(info.st_mode) & 0o077 or not re.fullmatch(r"[0-9a-f]{32}", run_id)):
+        raise ValueError("private run reservation required")
+    run_dir = parent / ("hook-rss-" + run_id)
+    run_dir.mkdir(mode=0o700)
+    return run_dir.resolve()
+
+
+def read_private(path, limit=1_000_000):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(fd, "rb") as handle:
         info = os.fstat(handle.fileno())
         if (not path.is_absolute() or not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or
-                stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1 or info.st_size > 4096):
-            raise ValueError("private audit required")
-        audit = json.load(handle)
+                stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1 or info.st_size > limit):
+            raise ValueError("private file required")
+        data = handle.read(limit + 1)
+        after = os.fstat(handle.fileno())
+        if len(data) != info.st_size or after.st_size != info.st_size or after.st_mtime_ns != info.st_mtime_ns:
+            raise ValueError("private file changed")
+        return data
+
+
+def strict_json(data):
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate field")
+            result[key] = value
+        return result
+    return json.loads(data, object_pairs_hook=unique)
+
+
+def parse_audit(data):
+    audit = strict_json(data)
     keys = {"launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"}
     if (type(audit) is not dict or set(audit) != keys or
             any(type(value) is not str or not re.fullmatch(r"[0-9a-f]{64}", value) for value in audit.values())):
         raise ValueError("invalid audit")
     return audit
+
+
+def read_audit(path):
+    return parse_audit(read_private(path, 4096))
+
+
+def write_private_json(path, value):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        json.dump(value, handle, sort_keys=True)
+        handle.write("\n")
+
+
+def verify_retained_link(run_dir, revision, audit_bytes, parent_pid, expected_run_id, final_name="launch.json"):
+    try:
+        parse_audit(audit_bytes)
+        info = run_dir.lstat()
+        if (not run_dir.is_absolute() or not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or
+                stat.S_IMODE(info.st_mode) != 0o700 or type(parent_pid) is not int or parent_pid <= 0):
+            return False
+        intent_bytes = read_private(run_dir / "intent.json", 4096)
+        parent_bytes = read_private(run_dir / "parent", 64)
+        wait_bytes = read_private(run_dir / "wait.log", 4096)
+        receipt_bytes = read_private(run_dir / "receipt.json", 65536)
+        final = strict_json(read_private(run_dir / final_name, 4096))
+        intent = strict_json(intent_bytes)
+        receipt = strict_json(receipt_bytes)
+        if (type(intent) is not dict or set(intent) != {"format", "run_id", "revision", "audit_sha256"} or
+                type(intent["format"]) is not int or intent["format"] != 1 or
+                not re.fullmatch(r"[0-9a-f]{32}", intent["run_id"]) or
+                intent["run_id"] != expected_run_id or
+                not re.fullmatch(r"[0-9a-f]{40}", revision) or intent["revision"] != revision or
+                intent["audit_sha256"] != hashlib.sha256(audit_bytes).hexdigest()):
+            return False
+        expected = {"format": 1, "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
+                    "parent_pid": parent_pid, "parent_sha256": hashlib.sha256(parent_bytes).hexdigest(),
+                    "wait_sha256": hashlib.sha256(wait_bytes).hexdigest(),
+                    "receipt_sha256": hashlib.sha256(receipt_bytes).hexdigest(), "verdict": "qualified"}
+        if type(final) is not dict or final != expected or type(final.get("format")) is not int or type(final.get("parent_pid")) is not int:
+            return False
+        if parent_bytes != f"{parent_pid}\n".encode("ascii"):
+            return False
+        rows = re.findall(rb"\bpid=(\d+)\s+slot=(\S+)", wait_bytes)
+        if len(wait_bytes.splitlines()) != 1 or rows != [(str(parent_pid).encode("ascii"), b"exclusive")]:
+            return False
+        keys = {"valid", "samples", "medians", "aa_ratio", "aa_pass", "flags", "load_ok", "run_id", "failure"}
+        if type(receipt) is not dict or set(receipt) != keys or receipt["run_id"] != intent["run_id"]:
+            return False
+        windows = receipt["samples"]
+        if (type(windows) is not list or len(windows) != 2 or
+                any(type(window) is not list or len(window) != 15 or
+                    any(type(value) is not int or not 0 < value <= (2**63 - 1) for value in window) for window in windows)):
+            return False
+        medians = [sorted(window)[7] for window in windows]
+        ratio = medians[1] / medians[0]
+        flags = receipt["flags"]
+        return (receipt["valid"] is True and receipt["aa_pass"] is True and receipt["load_ok"] is True and
+                receipt["failure"] is None and type(receipt["medians"]) is list and
+                all(type(value) is int for value in receipt["medians"]) and receipt["medians"] == medians and
+                type(receipt["aa_ratio"]) in (int, float) and
+                receipt["aa_ratio"] == ratio and 0.95 <= ratio <= 1.05 and type(flags) is dict and
+                set(flags) == {"admission", "source", "harness", "tools", "output"} and all(value is True for value in flags.values()))
+    except (KeyError, OSError, TypeError, UnicodeError, ValueError):
+        return False
 
 
 def spawn_with_parent(launcher, command, run_dir, environ, workdir=None):
@@ -149,14 +241,15 @@ def bootstrap(run_dir, command):
     os.execv(command[0], command)
 
 
-def run_qualified(root, revision, audit_path, environ):
-    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+def run_qualified(root, revision, audit_path, environ, run_id):
+    if not re.fullmatch(r"[0-9a-f]{40}", revision) or not re.fullmatch(r"[0-9a-f]{32}", run_id):
         return False
     launcher = root / "bin/heavy-run"
     harness = root / "tests/helpers/hook_rss_provenance.py"
     wrapper = root / "tests/helpers/hook_trusted_launch.py"
     try:
-        audit = read_audit(audit_path)
+        audit_bytes = read_private(audit_path, 4096)
+        audit = parse_audit(audit_bytes)
         if (Path(__file__).resolve() != wrapper.resolve() or not matches_digest(wrapper, audit["wrapper"]) or
                 not audited_inputs_valid(launcher, harness, environ, audit)):
             return False
@@ -167,13 +260,11 @@ def run_qualified(root, revision, audit_path, environ):
         if not provenance.installed_root(root) or not provenance.source_clean(root, revision):
             return False
         parent = Path(environ["HOME"]) / ".local/state/dotfiles/rust-migration"
-        info = parent.lstat()
-        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or
-                stat.S_IMODE(info.st_mode) & 0o077):
-            return False
-        run_dir = Path(tempfile.mkdtemp(prefix="hook-rss-", dir=parent)).resolve()
+        run_dir = reserve_run(parent, run_id)
         wait_log = create_private_log(run_dir)
-        run_id = os.urandom(16).hex()
+        intent = {"format": 1, "run_id": run_id, "revision": revision,
+                  "audit_sha256": hashlib.sha256(audit_bytes).hexdigest()}
+        write_private_json(run_dir / "intent.json", intent)
         child_env = dict(environ)
         child_env.update({"DOTFILES_DIR": str(root), "HEAVY_RUN_WAIT_LOG": str(wait_log),
                           "HOOK_RSS_RUN_DIR": str(run_dir), "HOOK_RSS_REVISION": revision,
@@ -187,11 +278,25 @@ def run_qualified(root, revision, audit_path, environ):
                 not provenance.source_clean(root, revision) or
                 not matches_digest(wrapper, audit["wrapper"]) or
                 not audited_inputs_valid(launcher, harness, environ, audit) or
-                resolve_perl(child_env, str(wait_log)) != selected_perl):
+                resolve_perl(child_env, str(wait_log)) != selected_perl or
+                read_private(audit_path, 4096) != audit_bytes):
             return False
-        receipt = json.loads((run_dir / "receipt.json").read_text())
-        return (type(receipt) is dict and receipt.get("run_id") == run_id and
-                receipt.get("valid") is True and receipt.get("aa_pass") is True)
+        intent_bytes = read_private(run_dir / "intent.json", 4096)
+        parent_bytes = read_private(run_dir / "parent", 64)
+        wait_bytes = read_private(wait_log, 4096)
+        receipt_bytes = read_private(run_dir / "receipt.json", 65536)
+        final = {"format": 1, "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
+                 "parent_pid": process.pid, "parent_sha256": hashlib.sha256(parent_bytes).hexdigest(),
+                 "wait_sha256": hashlib.sha256(wait_bytes).hexdigest(),
+                 "receipt_sha256": hashlib.sha256(receipt_bytes).hexdigest(), "verdict": "qualified"}
+        staging = run_dir / "launch.pending"
+        write_private_json(staging, final)
+        if not verify_retained_link(run_dir, revision, audit_bytes, process.pid, run_id, "launch.pending"):
+            staging.unlink()
+            return False
+        os.link(staging, run_dir / "launch.json")
+        staging.unlink()
+        return True
     except (KeyError, OSError, UnicodeError, ValueError, subprocess.SubprocessError, json.JSONDecodeError):
         return False
 
@@ -200,9 +305,9 @@ if __name__ == "__main__":
     try:
         if len(sys.argv) >= 4 and sys.argv[1] == "--bootstrap":
             bootstrap(Path(sys.argv[2]), sys.argv[3:])
-        if len(sys.argv) != 4 or sys.argv[1] != "--run":
+        if len(sys.argv) != 5 or sys.argv[1] != "--run":
             raise ValueError("invalid launch")
-        valid = run_qualified(Path.cwd().resolve(), sys.argv[2], Path(sys.argv[3]), dict(os.environ))
+        valid = run_qualified(Path.cwd().resolve(), sys.argv[2], Path(sys.argv[3]), dict(os.environ), sys.argv[4])
         print("hook launch: " + ("qualified" if valid else "inconclusive"))
         raise SystemExit(0 if valid else 1)
     except CleanupIncomplete:

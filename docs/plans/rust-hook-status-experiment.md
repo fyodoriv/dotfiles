@@ -35,8 +35,9 @@ heredocs, quotes, malformed and missing JSON fields, and missing or spoofed
 helper tools. Retain the existing dangerous-Git tests. Require zero changed
 verdicts and zero new false permits.
 
-Measure the three status variants above with 15 order-balanced old/candidate
-pairs each under an exclusive `heavy-run` slot. The median candidate/old ratio
+Measure all four status variants listed above with 15 order-balanced
+old/candidate pairs each under an exclusive `heavy-run` slot. The earlier
+wording said three although it listed four; all four must pass. The median candidate/old ratio
 must be at most 0.80 for each variant. Run the unchanged performance gate for
 its registered row; its ratio must be at most 0.50. Queue wait is not execution
 time. Preserve the raw samples and validity outcomes privately.

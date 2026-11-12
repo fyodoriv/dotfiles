@@ -7,9 +7,9 @@ The re-plan Pivot did not apply: gate G stays. A first independent review of
 this rewrite found five of the seven MUST findings only partly resolved. This
 revision applies its fixes. A second independent review on 2026-11-10 graded all
 seven findings resolved in both plans. The
-owner has not ruled on the defaults in
-[Decisions](#decisions-2026-11-10); the agentbrew task
-`rust-owner-rules-on-replan-defaults` tracks that. The measured hot paths
+owner confirmed all seven defaults on 2026-11-12; see
+[Decisions](#decisions-2026-11-10). The agentbrew plan still needs the same
+ruling recorded after this migration. The measured hot paths
 (agent hooks and `app-priority`) now come first.
 
 ## Overall goal and vision
@@ -336,7 +336,7 @@ is no separate "move tests to Rust" step.
 | 2. `rust-app-priority` | `app-priority` runs every 60 seconds at about 1 to 1.6 s mean. First make the number usable: log real milliseconds. Then weigh one `ps` pass. | 7-day mean `duration_ms` at most 400 ms and at most 40% of the lower before window, from the window command, after the before windows agree within 20%. | none; parallel with 1 |
 | 3. `rust-cold-path-profile` | Doctor, apply, sync, upgrade and the queue lack qualified child-span coverage. The registered pivot retains them as exceptions. | Not separable with the currently evidenced method; local p50 and owned share are unknown. Reopen only with a qualified measurement. | none; pivot recorded |
 | 4. `rust-source-inventory` | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
-| 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the owner ruling |
+| 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the confirmed owner ruling |
 
 Each hot-path task commits its absolute baseline number before any
 replacement code. The ratio or mean above is the decision rule.
@@ -371,8 +371,9 @@ method proves isolation, complete child and background coverage, overlap
 handling and calibration. The [fixture audit](rust-cold-profile-fixture-audit.md)
 records the family-specific gaps.
 
-The owner ruling is the agentbrew task `rust-owner-rules-on-replan-defaults`
-(HITL). It blocks step 5 only.
+On 2026-11-12 the owner confirmed all seven defaults. The agentbrew task
+`rust-owner-rules-on-replan-defaults` still tracks recording the ruling in
+the other plan; the technical dependencies of step 5 remain.
 
 Existing runnable guards: `heavy-run make check`; installation paths also
 use `heavy-run make e2e`. Do not describe a future command as having passed.
@@ -457,18 +458,17 @@ component in the manifest has one of five states:
 - `out-of-scope`: UI presentation and shell that must stay shell, as listed
   in [Scope and exceptions](#scope-and-exceptions).
 
-Unrecorded components must be 0. The audit claims "all measured hot paths
-ported". It never claims "all code is Rust". A language percentage or a
+Unrecorded components must be 0. The audit reports each measured hot path
+as ported or as a supported exception. It never claims "all code is Rust". A language percentage or a
 lower line count is coverage, not a user benefit.
 
 ## Decisions (2026-11-10)
 
-The owner chose to fix the plan and to ship it without another question
-round. The choices below were **adopted by default on the reviewer's
-recommendation**. The owner did not decide them one by one. **The owner can
-reverse any of them.** The agentbrew task
-`rust-owner-rules-on-replan-defaults` asks the owner to rule on them; until
-then they are defaults, not decisions.
+The choices below were adopted on the reviewer's recommendation on
+2026-11-10. On 2026-11-12 the owner confirmed all seven as a group. The
+owner can reverse any of them. The agentbrew task
+`rust-owner-rules-on-replan-defaults` tracks recording the same ruling in
+the other plan.
 
 | Choice | Adopted default |
 |---|---|
@@ -478,7 +478,7 @@ then they are defaults, not decisions.
 | Inventory | The inventory step is a manifest and a thin adapter to a small validator. |
 | Cheaper options | Each slice weighs a cheaper fix first: one `ps` pass for `app-priority`, parallel or cached doctor probes, `bats --jobs` for the gate. |
 | Existing Rust code | Fixture crates are `grandfathered`. Rust passes G only when it replaces a production path. The review asked for a statement; this is the default. |
-| Final audit states | The audit accepts `ported`, `exception`, `frozen`, `grandfathered` and `out-of-scope`. The review said the audit needs an owner decision; this default makes the audit passable until the owner rules. |
+| Final audit states | The audit accepts `ported`, `exception`, `frozen`, `grandfathered` and `out-of-scope`. The review said the audit needs an owner decision; the owner confirmed these states on 2026-11-12. |
 
 ## Validation review (2026-11-09)
 
@@ -530,7 +530,7 @@ plans.
 | **Commands cannot run.** Every measurement command needs `rust/Cargo.toml` and `migration-check`. Both exist only in an unmerged draft. Mark them "runnable after the inventory step merges". Build with plain `heavy-run` first; time only the built binary under `--exclusive`. | Commands are split into three blocks: run today (each was run once, with its output stated), run after the agentbrew inventory step merges, and run after the deferred runner merges. Build uses plain `heavy-run`. | [Measurement contract](#measurement-contract) |
 | **Gate G contradicts the preparation steps.** Inventory, harness and native delivery still dispatch to the old runtime, so they cannot run "without the legacy runtime". Exempt them by name. | G applies in full to port slices only. The named non-port steps keep only the parity and safety clauses. | [Gate G](#gate-g) |
 | **The statistic is not usable.** An upper 95% bound on a p95 ratio from 60 pairs rests on about three tail samples, and measured noise was 19-50%. Name the estimator (for example a bootstrap of the median ratio) and measure the noise floor first, or every result is "inconclusive". | The p95 bound is gone. Gate rows, logged runs and memory each have one definition, one command and a noise floor. The logged `app-priority` mean fails its floor today and says so. A bootstrap of the median ratio covers workloads with no row. | [Statistic and noise floor](#statistic-and-noise-floor) |
-| **The final audit cannot pass.** Frozen agent support stays, exclusions are forbidden, and the audit needs zero unexplained legacy components. This needs an owner decision. | The audit accepts five named states and needs 0 unrecorded components. This is a default. The agentbrew task `rust-owner-rules-on-replan-defaults` tracks the owner's ruling and blocks the audit. | [Rollout](#rollout-security-and-regression-coverage), [Decisions](#decisions-2026-11-10) |
+| **The final audit cannot pass.** Frozen agent support stays, exclusions are forbidden, and the audit needs zero unexplained legacy components. This needs an owner decision. | The audit accepts five named states and needs 0 unrecorded components. The owner confirmed the states on 2026-11-12. The agentbrew task `rust-owner-rules-on-replan-defaults` tracks the corresponding update to its plan. | [Rollout](#rollout-security-and-regression-coverage), [Decisions](#decisions-2026-11-10) |
 | **One cross-repo rule.** Say once whether dotfiles work waits for the agentbrew validator, and how the shared crate is pinned (git revision plus vendoring) so `--locked` builds work offline. | One rule with the same bullets in both plans: who waits for the inventory, who waits for the runner, and git `rev` pin plus `cargo vendor`. | [Cross-repo rule](#cross-repo-rule) |
 | **No user benefit metric.** Each slice needs one (for example p95 hook time per agent Bash call). A slice with none becomes a recorded exception. | Every step names a metric, a number and a command, or is a recorded exception with its reason. The `app-priority` number uses a 7-day window. | [Numbered work breakdown](#numbered-work-breakdown), [Recorded exceptions](#recorded-exceptions) |
 
@@ -546,7 +546,8 @@ Proposed changes (SHOULD, owner decides):
   or cached doctor probes; `bats --jobs` for the gate.
 
 *Resolution (2026-11-10): each one is adopted by default in
-[Decisions](#decisions-2026-11-10). The owner has not ruled yet. One
+[Decisions](#decisions-2026-11-10). The owner confirmed all seven on
+2026-11-12. One
 difference: the pre-registered cut is on the gate's fastest-run `ratio`, not
 on p95, because p95 is not a usable merge statistic here.*
 

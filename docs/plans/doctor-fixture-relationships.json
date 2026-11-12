@@ -1,0 +1,52 @@
+{
+  "revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "candidates": [
+    {
+      "path": "tests/fixtures/json-fail-fix-module/doctor.sh",
+      "mode": "100755",
+      "blob": "8e566f0272dfb9abfe5faf1c534aa922d214fefb"
+    },
+    {
+      "path": "tests/fixtures/notification-fail-module/doctor.sh",
+      "mode": "100755",
+      "blob": "69d7deaec83fec81b8a7de6091264cc78e64ac4e"
+    }
+  ],
+  "anchors": {
+    "tests/doctor-json-status.bats": [
+      18,
+      23,
+      50
+    ],
+    "tests/doctor-notification.bats": [
+      15,
+      33,
+      55
+    ],
+    "bin/dotfiles-doctor": [
+      106,
+      109,
+      110,
+      265,
+      267,
+      271,
+      272,
+      273,
+      274,
+      795,
+      797,
+      801,
+      802,
+      805,
+      806,
+      890,
+      894,
+      906,
+      909,
+      914,
+      915
+    ]
+  },
+  "relationship": "conditional fixture-root module selection and source",
+  "limits": "Bats marker and fixture directory required; earlier matching core module wins; no execution or caller coverage inferred"
+}

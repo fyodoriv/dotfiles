@@ -118,6 +118,12 @@ and Python imports depend on their runtime context. The adjacent Python import
 is a candidate relationship: import hooks or interpreter settings can select
 another module. These declarations do not prove which code ran or establish ownership or complete caller coverage.
 
+The remaining unmatched plugin doctor fixture stays unresolved. Its own
+comment and sibling manifest describe a fixture, but the reviewed manifest
+names no doctor path. A bounded literal search found no external reference
+binding that exact doctor file. Generic plugin discovery and possible dynamic
+or generated references remain unproved; no fixture was run.
+
 The [stale hook and bin receipt](stale-hook-bin-ranges.json) compares the
 other three stale-only paths with their earlier family receipts. It records
 13 changed alignment ranges and the current match positions of 20 old

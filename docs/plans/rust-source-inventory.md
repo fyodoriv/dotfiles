@@ -71,6 +71,13 @@ This is an identity receipt, not a full caller or execution inventory. It does
 not classify the libraries, establish dynamic calls, or account for generated
 files. The manifest and pinned agentbrew validator remain open.
 
+The [source-syntax receipt](rust-library-caller-receipt.json) records 277
+matching lines from 123 tracked files at the same revision. Its
+[registered check](rust-library-caller-receipt.md) covers a bounded lexical
+search, including tests and templates. It does not establish that any line
+executes, find dynamic names, or prove complete caller coverage. Run
+`python3 docs/plans/doctor-source-receipt-check.py --library-callers`.
+
 ## Doctor module sources
 
 The [doctor source receipt](doctor-source-receipt.json) pins the tracked

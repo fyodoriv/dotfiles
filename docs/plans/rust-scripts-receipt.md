@@ -2,8 +2,8 @@
 
 Registered before implementation on 2026-11-11. The tracked `scripts/`
 family has eight files at `8a2cb8ce664277d54c5b4a93cde20d360fb940fa`.
-It includes shell, Node and Perl entrypoints and selected inline interpreter
-or child-command boundaries. A source anchor proves text at a revision; it
+It includes shell, Node and Perl entrypoints and selected inline interpreter, command-preparation or child-command
+boundaries. A source anchor proves text at a revision; it
 does not prove execution, complete embedded code, dynamic targets or ownership.
 
 Hypothesis: extending the existing receipt checker can pin all eight file

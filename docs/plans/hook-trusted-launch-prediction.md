@@ -25,12 +25,13 @@ record before any timed sample.
 
 Interruption correction, registered before changing the wait logic: an
 interruption must not terminate the queue owner while its sample may still be
-running. A synthetic parent, child and grandchild will receive an interruption;
-success requires the child to finish before the queue owner exits, with no
+running. A synthetic controller receives a process-group interruption while
+its queue owner and sample run in a separate session. Success requires the
+sample to finish before the queue owner exits, with no
 signal sent to the sample. The launch result stays inconclusive. Pivot if this
 cannot be shown with owned fixture processes. Interruption may wait for an
-already queued or running fixture to finish; forced process death remains an
-unproved boundary.
+already queued or running fixture to finish. Direct signals to the queue owner
+and forced process death remain unproved boundaries.
 
 Success: the valid fixture passes, all seven planted invalid cases fail closed,
 no rejected case starts a timed child, and zero private canaries or digests

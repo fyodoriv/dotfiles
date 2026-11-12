@@ -18,6 +18,7 @@ TRACKED = (
     "agent-hooks/bootstrap-endpoint-path.sh",
     "lib/dotfiles-endpoint-paths.sh",
     "bin/heavy-run",
+    "tests/helpers/hook_trusted_launch.py",
     "tests/helpers/hook_rss_provenance.py",
 )
 PAYLOAD = b'{"tool_input":{"command":"git status"},"cwd":"/tmp"}'
@@ -38,6 +39,16 @@ def expected_parent_valid(path, parent):
                     handle.read(32) == (str(parent) + "\n").encode("ascii"))
     except OSError:
         return False
+
+
+def wait_expected_parent(path, parent, timeout=5):
+    deadline = time.monotonic() + timeout
+    while True:
+        if expected_parent_valid(path, parent):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
 
 
 def summary(windows, flags, loads, cpus):
@@ -240,10 +251,7 @@ def main():
     if not installed_root(root):
         raise ValueError("installed checkout not verified")
     parent_file = run_dir / "parent"
-    deadline = time.monotonic() + 5
-    while not expected_parent_valid(parent_file, os.getppid()) and time.monotonic() < deadline:
-        time.sleep(0.01)
-    if not expected_parent_valid(parent_file, os.getppid()):
+    if not wait_expected_parent(parent_file, os.getppid()):
         raise ValueError("trusted parent not bound")
     wait_log = run_dir / "wait.log"
     if os.environ.get("HEAVY_RUN_WAIT_LOG") != str(wait_log):

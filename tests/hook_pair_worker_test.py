@@ -25,12 +25,17 @@ class WorkerControls(unittest.TestCase):
                "HOOK_PAIR_RUN_DIR": str(run_dir), "HOOK_PAIR_RUN_ID": run_id,
                "HOOK_PAIR_CANDIDATE": "b" * 40, "HOOK_PAIR_OLD": "c" * 40,
                "HOOK_PAIR_HARNESS_REVISION": "d" * 40, "HOOK_PAIR_AUDIT_SHA256": "e" * 64,
-               "HOOK_PAIR_SOURCE_AUDIT_SHA256": "f" * 64, "HOOK_PAIR_MANIFEST_SHA256": "0" * 64}
+               "HOOK_PAIR_SOURCE_AUDIT_SHA256": "f" * 64, "HOOK_PAIR_MANIFEST_SHA256": "0" * 64,
+               "HOOK_PAIR_MAPPING_SHA256": hashlib.sha256(b"fixture mapping").hexdigest()}
         intent = {"format": 1, "run_id": run_id, "candidate_revision": env["HOOK_PAIR_CANDIDATE"],
                   "old_revision": env["HOOK_PAIR_OLD"], "harness_revision": env["HOOK_PAIR_HARNESS_REVISION"],
                   "audit_sha256": env["HOOK_PAIR_AUDIT_SHA256"],
                   "source_audit_sha256": env["HOOK_PAIR_SOURCE_AUDIT_SHA256"],
-                  "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"]}
+                  "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"],
+                  "mapping_sha256": env["HOOK_PAIR_MAPPING_SHA256"]}
+        mapping_path = run_dir / "mapping.json"
+        mapping_path.write_bytes(b"fixture mapping")
+        mapping_path.chmod(0o600)
         write_private_json(run_dir / "intent.json", intent)
         for name, text in (("parent", "123\n"), ("wait.log", "waited=1 pid=123 slot=exclusive\n")):
             p = run_dir / name
@@ -51,6 +56,7 @@ class WorkerControls(unittest.TestCase):
             self.assertFalse(worker.identity_ok(root, run_dir, {**env, "HOOK_PAIR_HARNESS_REVISION": "f" * 40}, 123))
             self.assertFalse(worker.identity_ok(root, run_dir, {**env, "HOOK_PAIR_SOURCE_AUDIT_SHA256": "1" * 64}, 123))
             self.assertFalse(worker.identity_ok(root, run_dir, {**env, "HOOK_PAIR_MANIFEST_SHA256": "1" * 64}, 123))
+            self.assertFalse(worker.identity_ok(root, run_dir, {**env, "HOOK_PAIR_MAPPING_SHA256": "2" * 64}, 123))
             self.assertFalse(worker.identity_ok(root, run_dir, {**env, "HOOK_PAIR_OLD": "f" * 40}, 123))
             (run_dir / "wait.log").write_text("pid=123 slot=exclusive\npid=123 slot=exclusive\n")
             self.assertFalse(worker.identity_ok(root, run_dir, env, 123))
@@ -89,6 +95,17 @@ class WorkerControls(unittest.TestCase):
                         path.symlink_to(target)
                     self.assertFalse(worker.identity_ok(root, run_dir, env, 123))
 
+    def test_mapping_must_remain_private_and_unchanged(self):
+        for mutation in ("missing", "changed", "mode"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                run_dir, env = self.fixture(root)
+                path = run_dir / "mapping.json"
+                if mutation == "missing": path.unlink()
+                elif mutation == "changed": path.write_bytes(b"changed")
+                else: path.chmod(0o644)
+                self.assertFalse(worker.identity_ok(root, run_dir, env, 123))
+
     def test_materialization_binds_old_and_candidate_sources(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -116,7 +133,8 @@ class WorkerControls(unittest.TestCase):
                 intent = json.loads(intent_path.read_text())
                 intent.update({"old_revision": env["HOOK_PAIR_OLD"],
                                "candidate_revision": env["HOOK_PAIR_CANDIDATE"],
-                               "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"]})
+                               "source_manifest_sha256": env["HOOK_PAIR_MANIFEST_SHA256"],
+                  "mapping_sha256": env["HOOK_PAIR_MAPPING_SHA256"]})
                 intent_path.write_text(json.dumps(intent))
                 scratch = run_dir / "scratch"
                 if mutation == "digest": env["HOOK_PAIR_MANIFEST_SHA256"] = "1" * 64

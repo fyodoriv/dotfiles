@@ -103,12 +103,18 @@ local paths or credentials.
 Retain the reviewed mapping and response provenance privately and bind it to
 the run and source audit. A standalone verifier checks the independent audit
 and archive digests, then compares all manifest modes and blob IDs. It is not
-yet wired into the launcher, and it does not verify source bytes or origin.
-The archive writer requires an independently
-supplied directory identity, uses exclusive creation and checks readback.
+a source-byte or origin check. The preparation launcher and final verifier
+require this binding, retain the archive and bind its digest in intent. The
+non-runnable worker checks that digest at preflight; it still needs to recheck
+the archive after capture. The independent audit must establish origin and
+check the actual source bytes. The archive writer
+requires an independently supplied directory identity, uses exclusive creation
+and checks readback.
 A failed write leaves an unusable partial file; never derive an accepted digest
-from it or overwrite it. The archive origin field is not proof of acquisition. Compare each mapped blob with the bounded local
-source snapshot. DNS, slow streams and filesystem operations can defeat a strict wall-time
-bound; the inactivity timeout is not a total deadline. This does not establish checkout HEAD, installed behavior,
+from it or overwrite it. The archive origin field is not proof of acquisition.
+Compare each mapped blob with the bounded local source snapshot. DNS, slow
+streams and filesystem operations can defeat a strict wall-time bound; the
+inactivity timeout is not a total deadline. This does not establish checkout
+HEAD, installed behavior,
 tool closure or protection against transient same-user changes. Anchor:
 [object-reader pivot](hook-object-reader-pivot.md).

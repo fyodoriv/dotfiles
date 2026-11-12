@@ -14,6 +14,7 @@ import hook_trusted_launch as trusted
 import hook_pair_receipts as records
 import hook_status_pairs as pairs
 import hook_source_snapshot as snapshots
+import hook_fake_mapping
 
 MODULE = Path(__file__).parent / "helpers/hook_pair_launcher.py"
 spec = importlib.util.spec_from_file_location("hook_pair_launcher", MODULE)
@@ -49,7 +50,11 @@ class LaunchControls(unittest.TestCase):
                  "local_filesystems": True, "roots": identities}
         audit_path = root / "source-audit.json"
         trusted.write_private_json(audit_path, audit)
-        return audit_path, manifest_path
+        archive = hook_fake_mapping.archive("e" * 32, "c" * 40, "b" * 40, manifest_path.read_bytes())
+        archive_path = root / "mapping.json"
+        archive_path.write_bytes(archive)
+        archive_path.chmod(0o600)
+        return audit_path, manifest_path, archive_path, hashlib.sha256(archive).hexdigest(), hashlib.sha256(audit_path.read_bytes()).hexdigest()
 
     def test_invalid_identity_never_starts_a_child(self):
         with patch.object(launcher, "launch_and_wait", side_effect=AssertionError("child started")):
@@ -67,7 +72,7 @@ class LaunchControls(unittest.TestCase):
             script.write_text("fixture")
             audit = root / "audit.json"
             trusted.write_private_json(audit, dict.fromkeys(("launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"), "a" * 64))
-            source_audit, source_manifest = self.source_inputs(root)
+            source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest = self.source_inputs(root)
             seen = []
             def fake_launch(_launcher, _command, run_dir, _env, _workdir):
                 intent = trusted.strict_json(trusted.read_private(run_dir / "intent.json", 4096))
@@ -83,10 +88,39 @@ class LaunchControls(unittest.TestCase):
                     patch.object(launcher, "installed_root", return_value=True), \
                     patch.object(launcher, "launch_and_wait", side_effect=fake_launch):
                 valid = launcher.run_qualified(root, "b" * 40, "c" * 40, "d" * 40,
-                                               audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest)
+                                               audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest)
             self.assertFalse(valid)
             self.assertEqual(seen, ["e" * 32])
             self.assertFalse((parent / ("hook-rss-" + "e" * 32) / "launch.json").exists())
+
+    def test_missing_or_changed_mapping_never_starts_a_child(self):
+        for mutation in ("missing", "changed", "wrong_digest", "different_audit"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                script = root / "tests/helpers/hook_pair_launcher.py"
+                script.parent.mkdir(parents=True)
+                script.write_text("fixture")
+                audit = root / "audit.json"
+                trusted.write_private_json(audit, dict.fromkeys(("launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"), "a" * 64))
+                source_audit, source_manifest, archive, digest, source_audit_digest = self.source_inputs(root)
+                if mutation == "missing": archive.unlink()
+                elif mutation == "changed": archive.write_bytes(b"{}")
+                elif mutation == "different_audit":
+                    value = json.loads(source_audit.read_text())
+                    value["roots"]["old"]["ino"] += 1
+                    source_audit.write_text(json.dumps(value))
+                else: digest = "0" * 64
+                with patch.object(launcher, "__file__", str(script)), \
+                        patch.object(launcher, "audited_inputs_valid", return_value=True), \
+                        patch.object(launcher, "matches_digest", return_value=True), \
+                        patch.object(launcher, "source_clean", return_value=True), \
+                        patch.object(launcher, "pair_source_clean", return_value=True), \
+                        patch.object(launcher, "old_source_available", return_value=True), \
+                        patch.object(launcher, "installed_root", return_value=True), \
+                        patch.object(launcher, "launch_and_wait", side_effect=AssertionError("child started")):
+                    self.assertFalse(launcher.run_qualified(root, "b" * 40, "c" * 40, "d" * 40, audit,
+                                                           {"HOME": str(root)}, "e" * 32,
+                                                           source_audit, source_manifest, archive, digest, source_audit_digest))
 
     def test_unavailable_old_source_never_starts_a_child(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -99,7 +133,7 @@ class LaunchControls(unittest.TestCase):
             script.write_text("fixture")
             audit = root / "audit.json"
             trusted.write_private_json(audit, dict.fromkeys(("launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"), "a" * 64))
-            source_audit, source_manifest = self.source_inputs(root)
+            source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest = self.source_inputs(root)
             with patch.object(launcher, "__file__", str(script)), \
                     patch.object(launcher, "audited_inputs_valid", return_value=True), \
                     patch.object(launcher, "matches_digest", return_value=True), \
@@ -110,7 +144,7 @@ class LaunchControls(unittest.TestCase):
                     patch.object(launcher, "resolve_perl", return_value="/scratch/perl"), \
                     patch.object(launcher, "launch_and_wait", side_effect=AssertionError("child started")):
                 self.assertFalse(launcher.run_qualified(root, "b" * 40, "c" * 40, "d" * 40,
-                                                        audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest))
+                                                        audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest))
 
     def test_complete_synthetic_run_publishes_only_verified_record(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -123,7 +157,7 @@ class LaunchControls(unittest.TestCase):
             script.write_text("fixture")
             audit = root / "audit.json"
             trusted.write_private_json(audit, dict.fromkeys(("launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"), "a" * 64))
-            source_audit, source_manifest = self.source_inputs(root)
+            source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest = self.source_inputs(root)
             def fake_launch(_launcher, _command, run_dir, _env, _workdir):
                 parent_file = run_dir / "parent"
                 parent_file.write_text("123\n")
@@ -148,7 +182,7 @@ class LaunchControls(unittest.TestCase):
                     patch.object(Path, "unlink", side_effect=AssertionError("unexpected cleanup")), \
                     patch.object(launcher, "launch_and_wait", side_effect=fake_launch):
                 self.assertTrue(launcher.run_qualified(root, "b" * 40, "c" * 40, "d" * 40,
-                                                       audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest))
+                                                       audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest))
             run_dir = parent / ("hook-rss-" + "e" * 32)
             self.assertTrue((run_dir / "launch.json").is_file())
             self.assertEqual((run_dir / "launch.json").stat().st_ino, (run_dir / "launch.pending").stat().st_ino)
@@ -165,10 +199,11 @@ class LaunchControls(unittest.TestCase):
             script.write_text("fixture")
             audit = root / "audit.json"
             trusted.write_private_json(audit, dict.fromkeys(("launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"), "a" * 64))
-            source_audit, source_manifest = self.source_inputs(root)
+            source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest = self.source_inputs(root)
             value = json.loads(source_audit.read_text())
             value["roots"]["old"]["ino"] += 1
             source_audit.write_text(json.dumps(value))
+            source_audit_digest = hashlib.sha256(source_audit.read_bytes()).hexdigest()
             with patch.object(launcher, "__file__", str(script)), \
                     patch.object(launcher, "audited_inputs_valid", return_value=True), \
                     patch.object(launcher, "matches_digest", return_value=True), \
@@ -178,10 +213,10 @@ class LaunchControls(unittest.TestCase):
                     patch.object(launcher, "installed_root", return_value=True), \
                     patch.object(launcher, "launch_and_wait", side_effect=AssertionError("child started")):
                 self.assertFalse(launcher.run_qualified(root, "b" * 40, "c" * 40, "d" * 40,
-                                                        audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest))
+                                                        audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest))
 
     def test_synthetic_failures_never_publish_a_final_record(self):
-        for mode in ("wrong_parent", "shared_wait", "partial", "forged_flag", "rejected_pending", "source_changed", "audit_changed", "source_audit_changed", "manifest_changed", "link_failure"):
+        for mode in ("wrong_parent", "shared_wait", "partial", "forged_flag", "rejected_pending", "source_changed", "audit_changed", "source_audit_changed", "manifest_changed", "mapping_changed", "retained_mapping_changed", "link_failure"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 parent = root / ".local/state/dotfiles/rust-migration"
@@ -192,7 +227,7 @@ class LaunchControls(unittest.TestCase):
                 script.write_text("fixture")
                 audit = root / "audit.json"
                 trusted.write_private_json(audit, dict.fromkeys(("launcher", "harness", "perl", "BASH_ENV", "ENV", "wrapper"), "a" * 64))
-                source_audit, source_manifest = self.source_inputs(root)
+                source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest = self.source_inputs(root)
                 def fake_launch(_launcher, _command, run_dir, _env, _workdir):
                     parent_file = run_dir / "parent"
                     parent_file.write_text("999\n" if mode == "wrong_parent" else "123\n")
@@ -216,6 +251,10 @@ class LaunchControls(unittest.TestCase):
                         source_audit.write_text("{}")
                     elif mode == "manifest_changed":
                         source_manifest.write_text("{}")
+                    elif mode == "mapping_changed":
+                        mapping_archive.write_text("{}")
+                    elif mode == "retained_mapping_changed":
+                        (run_dir / "mapping.json").write_text("{}")
                     return SimpleNamespace(pid=123), 0
                 original_verify = launcher.verify_pair_link
                 original_link = launcher.os.link
@@ -237,7 +276,7 @@ class LaunchControls(unittest.TestCase):
                         patch.object(launcher.os, "link", side_effect=link), \
                         patch.object(launcher, "verify_pair_link", side_effect=verify):
                     self.assertFalse(launcher.run_qualified(root, "b" * 40, "c" * 40, "d" * 40,
-                                                            audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest))
+                                                            audit, {"HOME": str(root)}, "e" * 32, source_audit, source_manifest, mapping_archive, mapping_digest, source_audit_digest))
                 run_dir = parent / ("hook-rss-" + "e" * 32)
                 self.assertFalse((run_dir / "launch.json").exists())
                 if mode != "link_failure":

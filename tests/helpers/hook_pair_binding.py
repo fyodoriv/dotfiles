@@ -12,6 +12,7 @@ import stat
 from hook_pair_receipts import private_dir, read_attempts
 from hook_source_audit import parse_source_audit
 from hook_source_snapshot import read_snapshot
+from hook_remote_mapping import verify_source_binding
 from hook_status_pairs import CASES, FLAGS, summarize
 from hook_pair_private import read_private
 from hook_trusted_launch import parse_audit, strict_json
@@ -40,7 +41,8 @@ def read_published_pair(root):
         return one
 
 
-def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, source_audit, source_manifest, parent_pid, final_name="launch.json"):
+def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, source_audit, source_manifest,
+                     mapping_archive, mapping_digest, expected_source_audit_sha256, parent_pid, final_name="launch.json"):
     try:
         root = Path(root)
         if (final_name not in ("launch.json", "launch.pending") or
@@ -50,7 +52,9 @@ def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, source_
                     for revision in (candidate, old, harness))):
             return None
         parse_audit(audit_bytes)
-        if parse_source_audit(source_audit, source_manifest, run_id, old, candidate) is None:
+        if (parse_source_audit(source_audit, source_manifest, run_id, old, candidate) is None or
+                not verify_source_binding(run_id, old, candidate, source_manifest, source_audit, mapping_archive,
+                                          expected_source_audit_sha256, mapping_digest)):
             return None
         intent_bytes = read_private(root / "intent.json", 4096)
         parent_bytes = read_private(root / "parent", 64)
@@ -63,11 +67,13 @@ def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, source_
         expected_intent = {"format": 1, "run_id": run_id, "candidate_revision": candidate,
                            "old_revision": old, "harness_revision": harness,
                            "audit_sha256": hashlib.sha256(audit_bytes).hexdigest(),
-                           "source_audit_sha256": hashlib.sha256(source_audit).hexdigest(),
-                           "source_manifest_sha256": hashlib.sha256(source_manifest).hexdigest()}
+                           "source_audit_sha256": expected_source_audit_sha256,
+                           "source_manifest_sha256": hashlib.sha256(source_manifest).hexdigest(),
+                           "mapping_sha256": mapping_digest}
         if type(intent) is not dict or intent != expected_intent or type(intent.get("format")) is not int:
             return None
-        if read_snapshot(root / "source", source_manifest, run_id, old, candidate) is None:
+        if (read_private(root / "mapping.json", 11_000_000) != mapping_archive or
+                read_snapshot(root / "source", source_manifest, run_id, old, candidate) is None):
             return None
         if parent_bytes != f"{parent_pid}\n".encode("ascii"):
             return None
@@ -103,7 +109,8 @@ def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, source_
         if (not summary["valid"] or receipt["passed"] is not summary["passed"] or type(ratios) is not dict or
                 set(ratios) != set(CASES) or any(type(ratios[name]) is not float or ratios[name] != summary["median_ratios"][name] for name in CASES)):
             return None
-        if read_snapshot(root / "source", source_manifest, run_id, old, candidate) is None:
+        if (read_private(root / "mapping.json", 11_000_000) != mapping_archive or
+                read_snapshot(root / "source", source_manifest, run_id, old, candidate) is None):
             return None
         return summary
     except (KeyError, OSError, TypeError, UnicodeError, ValueError):

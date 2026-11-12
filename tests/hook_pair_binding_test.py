@@ -10,6 +10,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).parent / "helpers"))
 import hook_pair_binding as binding
+import hook_fake_mapping
 import hook_pair_receipts as records
 import hook_status_pairs as pairs
 import hook_source_snapshot as snapshots
@@ -51,10 +52,15 @@ class BindingControls(unittest.TestCase):
                                    "candidate_revision": candidate, "manifest_sha256": hashlib.sha256(source_manifest).hexdigest(),
                                    "local_filesystems": True, "roots": {"old": {"path": "/scratch/old", "dev": 1, "ino": 2},
                                                                           "new": {"path": "/scratch/new", "dev": 1, "ino": 3}}}).encode()
+        mapping_archive = hook_fake_mapping.archive(run_id, old, candidate, source_manifest)
+        mapping_digest = hashlib.sha256(mapping_archive).hexdigest()
+        (root / "mapping.json").write_bytes(mapping_archive)
+        (root / "mapping.json").chmod(0o600)
         intent = {"format": 1, "run_id": run_id, "candidate_revision": candidate,
                   "old_revision": old, "harness_revision": harness, "audit_sha256": hashlib.sha256(audit).hexdigest(),
                   "source_audit_sha256": hashlib.sha256(source_audit).hexdigest(),
-                  "source_manifest_sha256": hashlib.sha256(source_manifest).hexdigest()}
+                  "source_manifest_sha256": hashlib.sha256(source_manifest).hexdigest(),
+                  "mapping_sha256": mapping_digest}
         write_private_json(root / "intent.json", intent)
         for name, content in (("parent", "123\n"), ("wait.log", "waited=1 pid=123 slot=exclusive\n")):
             path = root / name
@@ -70,7 +76,7 @@ class BindingControls(unittest.TestCase):
                  "receipt_sha256": digest("receipt.json"), "attempts_sha256": attempt_digest, "verdict": "qualified"}
         write_private_json(root / "launch.pending", final)
         os.link(root / "launch.pending", root / "launch.json")
-        return run_id, candidate, old, harness, audit, source_audit, source_manifest
+        return run_id, candidate, old, harness, audit, source_audit, source_manifest, mapping_archive, mapping_digest, hashlib.sha256(source_audit).hexdigest()
 
     def test_independent_binding_and_threshold(self):
         for candidate_ns, expected in ((75, True), (81, False)):
@@ -151,7 +157,7 @@ class BindingControls(unittest.TestCase):
                 elif mutation == "changed":
                     (root / "source/000.src").write_bytes(b"changed")
                 else:
-                    args = (*args[:6], args[6] + b" ")
+                    args = (*args[:6], args[6] + b" ", *args[7:])
                 self.assertIsNone(binding.verify_pair_link(root, *args, 123))
 
     def test_snapshot_changed_during_verification_is_rejected(self):
@@ -186,13 +192,40 @@ class BindingControls(unittest.TestCase):
                 wrong = list(args)
                 wrong[position] = "f" * 40
                 self.assertIsNone(binding.verify_pair_link(root, *wrong, 123))
-            self.assertIsNone(binding.verify_pair_link(root, *args[:4], b"{}", args[5], args[6], 123))
+            self.assertIsNone(binding.verify_pair_link(root, *args[:4], b"{}", *args[5:], 123))
             audit = json.loads(args[4])
             audit["launcher"] = "f" * 64
-            self.assertIsNone(binding.verify_pair_link(root, *args[:4], json.dumps(audit).encode(), args[5], args[6], 123))
+            self.assertIsNone(binding.verify_pair_link(root, *args[:4], json.dumps(audit).encode(), *args[5:], 123))
             source_audit = json.loads(args[5])
             source_audit["roots"]["old"]["ino"] += 1
-            self.assertIsNone(binding.verify_pair_link(root, *args[:5], json.dumps(source_audit).encode(), args[6], 123))
+            self.assertIsNone(binding.verify_pair_link(root, *args[:5], json.dumps(source_audit).encode(), *args[6:], 123))
+
+    def test_missing_changed_or_wrong_mapping_never_qualifies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.build(root)
+            self.assertIsNotNone(binding.verify_pair_link(root, *args, 123))
+            (root / "mapping.json").unlink()
+            self.assertIsNone(binding.verify_pair_link(root, *args, 123))
+            (root / "mapping.json").write_bytes(args[7])
+            (root / "mapping.json").chmod(0o600)
+            for archive, digest in ((b"{}", args[8]), (args[7], "0" * 64),
+                                    (args[7] + b" ", hashlib.sha256(args[7] + b" ").hexdigest())):
+                self.assertIsNone(binding.verify_pair_link(root, *args[:7], archive, digest, args[9], 123))
+
+    def test_resealed_intent_cannot_replace_independent_audit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.build(root)
+            changed_audit = json.loads(args[5])
+            changed_audit["roots"]["old"]["ino"] += 1
+            changed_bytes = json.dumps(changed_audit).encode()
+            intent_path = root / "intent.json"
+            intent = json.loads(intent_path.read_text())
+            intent["source_audit_sha256"] = hashlib.sha256(changed_bytes).hexdigest()
+            intent_path.write_text(json.dumps(intent))
+            self.reseal(root, "intent.json", "intent_sha256")
+            self.assertIsNone(binding.verify_pair_link(root, *args[:5], changed_bytes, *args[6:], 123))
 
     def test_changed_or_duplicated_admission_never_qualifies(self):
         for wait in ("", "waited=1 pid=123 slot=shared\n", "pid=123 slot=exclusive\npid=123 slot=exclusive\n"):

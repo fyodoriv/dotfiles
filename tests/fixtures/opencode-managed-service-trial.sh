@@ -56,7 +56,7 @@ mkdir -p "$root/home" "$root/config" "$root/data" "$root/cache" "$root/state"
 profile="(version 1)(deny default)(allow process*)(allow signal (target same-sandbox))(allow sysctl-read)(allow file-read* (literal \"/\") (literal \"/private\") (literal \"/private/tmp\") (literal \"$binary\") (literal \"$script\") (literal \"$classifier\") (subpath \"$root\") (subpath \"/usr\") (subpath \"/bin\") (subpath \"/System\") (subpath \"/dev\"))(allow file-write* (subpath \"$root\") (literal \"/dev/null\"))(allow network-bind (local ip \"localhost:$port\"))(allow network-inbound (local ip \"localhost:$port\"))(allow network-outbound (remote ip \"localhost:$port\"))"
 status=0
 env -i HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" XDG_CACHE_HOME="$root/cache" XDG_STATE_HOME="$root/state" TMPDIR="$root" PATH=/usr/bin:/bin OPENCODE_TRIAL_BINARY="$binary" OPENCODE_TRIAL_CLASSIFIER="$classifier" OPENCODE_TRIAL_CONTROL_PORT="$control_port" /usr/bin/sandbox-exec -p "$profile" /bin/bash "$script" --inside || status=$?
-if /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1 || [ -e "$root/state/opencode/service.json" ]; then
+if /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1 || compgen -G "$root/state/opencode/service*.json" >/dev/null; then
   echo 'FAIL scratch service state remains after cleanup' >&2
   exit 1
 fi

@@ -48,6 +48,12 @@ it does not yet prove the cause of the API failure.
 - **Anchor:** The focused macOS `sandbox-exec` signal probe and upstream
   `packages/client/src/effect/service.ts` service-stop implementation.
 
+The revised hosted macOS trial passed with checksum-verified OpenCode 2.2.6.
+The scratch service started, its client reached the authenticated API, and the
+listener and registration were absent after stop. The same test also denied
+signals to the outside parent and blocked access to the synthetic network
+control. It did not exercise the installed user's service, alias, or memory.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

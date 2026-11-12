@@ -6,6 +6,10 @@ How to enable and configure CI (continuous integration) on your team's fork of t
 
 ## How CI works in this repo
 
+Use hosted CI for the gate. Run focused local reproductions when needed.
+The hosted guard tests need `shfmt` and trusted Homebrew `rg`. A scratch
+doctor fixture that tests security checks must disable CI-only skips.
+
 The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/chezmoi`, on every push to `feat/chezmoi`, and by hand (`gh workflow run ci.yml`):
 
 | Job | Runner | What it does |

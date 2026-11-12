@@ -14,6 +14,10 @@ sets of 15 order-balanced old/candidate timing pairs. Check status, stdout and
 stderr parity for each pair. Record all samples privately. Separately run the
 unchanged registered performance gate.
 
+Alternate the first version within each case. Start cases one and three with
+the old version, and cases two and four with the candidate. This yields 30
+old-first and 30 candidate-first pairs across the four cases.
+
 Before use, independently review the exact launcher, harness, startup files,
 effective tool selections and scratch installation. Bind private intent,
 admission, wait and receipt records to a fresh caller-selected run ID, pinned

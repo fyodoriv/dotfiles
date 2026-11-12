@@ -1,0 +1,118 @@
+{
+  "format": 1,
+  "revision": "81bcb6879d481d2ba3dedde256db278255b6e1ee",
+  "files": [
+    {
+      "path": "git-hooks/commit-msg",
+      "mode": "100755",
+      "blob": "819e06fe06118ac7bc1a6cabc3a0c8ae976b4bcf"
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "mode": "100755",
+      "blob": "424e95f557ab537e0c84b024c75ad7f2e824f35a"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "mode": "100755",
+      "blob": "4f98de9702b69642d61ebfea4007aef6c8cec8d3"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "git-hooks/commit-msg",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "git-hooks/commit-msg",
+      "line": 95,
+      "text": "  . \"$strip_lib\""
+    },
+    {
+      "path": "git-hooks/commit-msg",
+      "line": 100,
+      "text": "  (cd \"$REPO_DIR\" && \"$REPO_DIR/hooks/commit-msg\" \"$1\")"
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "line": 1,
+      "text": "#!/opt/homebrew/bin/bash"
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "line": 38,
+      "text": "  source \"$DOTFILES_DIR/lib/oss-readiness.sh\""
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "line": 49,
+      "text": "    source \"$DOTFILES_DIR/lib/oss-readiness.sh\""
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "line": 55,
+      "text": "    exec \"$CURRENT_REPO/hooks/pre-commit\" \"$@\""
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "line": 93,
+      "text": "  source \"$DOTFILES_DIR/lib/oss-readiness.sh\""
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "line": 304,
+      "text": "    awk '/^\\+\\+\\+ b\\// { file = substr($0, 7); next }"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 1,
+      "text": "#!/opt/homebrew/bin/bash"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 38,
+      "text": "source \"$DOTFILES_DIR/lib/oss-readiness.sh\""
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 53,
+      "text": "run_chained_hooks() {"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 124,
+      "text": "  run_chained_hooks \"$@\""
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 159,
+      "text": "gh_hosts=\"$(awk '/^[^[:space:]#][^:]*:/ { h = $0; sub(/:.*/, \"\", h); gsub(/[\"'\"'\"']/, \"\", h); print tolower(h) }' \\"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 286,
+      "text": "        ALLOW_RE=\"$allow_re\" awk '"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 299,
+      "text": "      awk -v home=\"${HOME:-}\" -v me=\"${HOME##*/}\" -v ent=\"$gh_hosts\" \\"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 333,
+      "text": "  source \"$DOTFILES_DIR/lib/leak-allow.sh\""
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 336,
+      "text": "  if leak_allow_consume $(awk '{ print $2 }' \"$payload\" 2>/dev/null); then"
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "line": 353,
+      "text": "run_chained_hooks \"$@\""
+    }
+  ]
+}

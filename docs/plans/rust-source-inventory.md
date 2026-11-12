@@ -72,6 +72,14 @@ fixtures, mocks, tests and helpers contain process or server code. Keep their
 actual discovery, callers, ownership and execution conditions unresolved
 until those relationships are verified.
 
+The [literal reference receipt](test-source-references.json) checks the same
+40 pinned candidates against exact path mentions at that revision. It records
+98 reference locations for 24 candidates; 16 have no exact path mention. Run
+`python3 docs/plans/test-source-references.py --check` to reopen the pinned
+source and compare the receipt. The search skips binary files and requires
+UTF-8 paths; unsupported paths stop the check. Matches can be comments,
+fixtures or data. They do not prove execution, ownership, dynamic references or complete callers.
+
 The [stale hook and bin receipt](stale-hook-bin-ranges.json) compares the
 other three stale-only paths with their earlier family receipts. It records
 13 changed alignment ranges and the current match positions of 20 old

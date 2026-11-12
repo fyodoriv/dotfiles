@@ -16,6 +16,13 @@ It links the families without counting a template again when it calls a
 script. References to other tracked files carry source blobs and remain
 outside this reviewed slice.
 
+The [stale lifecycle range receipt](stale-lifecycle-ranges.json) compares
+three changed lifecycle sources with the ledger's earlier revision. Its
+[registered check](stale-lifecycle-ranges-prediction.md) records six
+line-alignment ranges without copying source text. Run
+`python3 docs/plans/stale-lifecycle-ranges.py --check`. These ranges do not
+establish semantic changes, runtime conditions, generated outputs or ownership.
+
 LaunchAgent property lists remain declarative config. Owned shell bodies
 and native logic named in their arguments belong to the migration. The
 two retired memory templates carry inactive relationships. Agentbrew owns

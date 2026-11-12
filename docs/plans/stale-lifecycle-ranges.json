@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "pin": "ac38709703dc51b8e34e62728dccdcad6f9d83e3",
+  "old_revision": "24d7f41f65eb3c542553f41acacc07bf93619b45",
+  "current_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "files": [
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "old_blob": "e5fb877b6e4ea2a29c0abaa7e05c7fa24052dceb",
+      "old_mode": "100755",
+      "current_blob": "fc2d8e5dd63301428461d7c013b9516500d91960",
+      "current_mode": "100755"
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "old_blob": "26cb7cfb88c3b3dac6433ad8372284de1c58210e",
+      "old_mode": "100644",
+      "current_blob": "1c924cfea92c672e1f23e9dd5d460624fd26639a",
+      "current_mode": "100644"
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "old_blob": "66c7339438c29db1c139a9d839f57d40fa98bf5f",
+      "old_mode": "100644",
+      "current_blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "current_mode": "100644"
+    }
+  ],
+  "ranges": [
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "op": "insert",
+      "old_start": 6,
+      "old_end": 6,
+      "new_start": 6,
+      "new_end": 20
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "op": "replace",
+      "old_start": 21,
+      "old_end": 22,
+      "new_start": 35,
+      "new_end": 36
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "op": "replace",
+      "old_start": 71,
+      "old_end": 72,
+      "new_start": 85,
+      "new_end": 86
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "op": "insert",
+      "old_start": 192,
+      "old_end": 192,
+      "new_start": 192,
+      "new_end": 208
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "op": "insert",
+      "old_start": 10,
+      "old_end": 10,
+      "new_start": 10,
+      "new_end": 15
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "op": "insert",
+      "old_start": 75,
+      "old_end": 75,
+      "new_start": 80,
+      "new_end": 86
+    }
+  ]
+}

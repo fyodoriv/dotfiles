@@ -1,0 +1,2499 @@
+{
+  "format": 1,
+  "revision": "57a4b14da82ad42c47bceebfc4e051d8bb9541d3",
+  "rows": [
+    {
+      "path": ".chezmoiscripts/run_after_agentbrew-sync.sh",
+      "blob": "ce9c81159ed2be5be49602c8726d9a48a13d6558",
+      "line": 101,
+      "text": "source \"$DOTFILES_DIR/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_after_agentbrew-sync.sh",
+      "blob": "ce9c81159ed2be5be49602c8726d9a48a13d6558",
+      "line": 126,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_after_agentbrew-sync.sh",
+      "blob": "ce9c81159ed2be5be49602c8726d9a48a13d6558",
+      "line": 139,
+      "text": "  source \"$DOTFILES_DIR/lib/agentfile-layers.sh\"",
+      "names": [
+        "agentfile-layers.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_after_agentbrew-sync.sh",
+      "blob": "ce9c81159ed2be5be49602c8726d9a48a13d6558",
+      "line": 173,
+      "text": "source \"$DOTFILES_DIR/lib/agentfile-layers.sh\"",
+      "names": [
+        "agentfile-layers.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-model.sh",
+      "blob": "9ddd2b11bb11660dc655f55957be839324cd2376",
+      "line": 28,
+      "text": "  source \"$_script_dir/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_before_10-gitconfig-user-migrate.sh",
+      "blob": "f0518387e6e5c058d2521022f0a0d5c9ee3735b3",
+      "line": 10,
+      "text": "source \"$src/lib/gitconfig-user-migrate.sh\" || exit 0",
+      "names": [
+        "gitconfig-user-migrate.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "blob": "1c924cfea92c672e1f23e9dd5d460624fd26639a",
+      "line": 183,
+      "text": "  source \"{{ .chezmoi.sourceDir }}/lib/brew-cask-adoption.sh\"",
+      "names": [
+        "brew-cask-adoption.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "blob": "1c924cfea92c672e1f23e9dd5d460624fd26639a",
+      "line": 233,
+      "text": "  source \"{{ .chezmoi.sourceDir }}/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "blob": "1c924cfea92c672e1f23e9dd5d460624fd26639a",
+      "line": 242,
+      "text": "  source \"{{ .chezmoi.sourceDir }}/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "blob": "1c924cfea92c672e1f23e9dd5d460624fd26639a",
+      "line": 244,
+      "text": "  source \"{{ .chezmoi.sourceDir }}/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_brew.sh.tmpl",
+      "blob": "1c924cfea92c672e1f23e9dd5d460624fd26639a",
+      "line": 246,
+      "text": "  source \"{{ .chezmoi.sourceDir }}/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 54,
+      "text": "  source \"$SOURCE_DIR/lib/chrome-purpose-options.sh\"",
+      "names": [
+        "chrome-purpose-options.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 151,
+      "text": "source \"$SOURCE_DIR/lib/self-reload.sh\"",
+      "names": [
+        "self-reload.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 211,
+      "text": "    source \"$SOURCE_DIR/lib/chrome-purpose-options.sh\"",
+      "names": [
+        "chrome-purpose-options.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 309,
+      "text": "source \"$SOURCE_DIR/lib/launchagent-duplicates.sh\"",
+      "names": [
+        "launchagent-duplicates.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 317,
+      "text": "  source \"$SOURCE_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 319,
+      "text": "  source \"$SOURCE_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": ".chezmoiscripts/run_onchange_launchagents.sh.tmpl",
+      "blob": "c538e9a07c76c4300d0313e1909e250d2ce90e3d",
+      "line": 321,
+      "text": "  source \"$SOURCE_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": ".github/scripts/check-tasks-stability.sh",
+      "blob": "86e069c72a63423573594dfeaab35b38bc79e533",
+      "line": 19,
+      "text": "source \"$REPO_ROOT/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "blob": "4f69f2138ccddfc6cefc31958833f0bc37938f98",
+      "line": 285,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "agent-hooks/bootstrap-endpoint-path.sh",
+      "blob": "16139a7bc922c1a68d9a7bd8a0df9c47c848712b",
+      "line": 51,
+      "text": "  source \"$lib_root/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "agent-hooks/session-endpoint-path.sh",
+      "blob": "c8603e87e37aa6bdb387281f20a3b13b6686c1fe",
+      "line": 39,
+      "text": "  source \"$_lib_root/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/agent-browser-singleton-preflight",
+      "blob": "e20b739e9c383a7305b80c320cd03c6931d6d7b8",
+      "line": 7,
+      "text": "  source \"$_dotfiles_dir/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/agentbrew",
+      "blob": "e8c0e76a616e157140906f94d8acaf97bfadc24b",
+      "line": 22,
+      "text": "source \"$DOTFILES_DIR/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "bin/agentbrew",
+      "blob": "e8c0e76a616e157140906f94d8acaf97bfadc24b",
+      "line": 24,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-agent-node.sh\"",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "bin/app-priority",
+      "blob": "5c29fc3f69568b9689b02218fd7f6bfc3dd1bc05",
+      "line": 15,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/cheat",
+      "blob": "8bb1ec07501fdfb8b155907dbaaab1b937b5e183",
+      "line": 12,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/cleanup",
+      "blob": "80e984bcd86f55170d5e0f410a18bc9b28e21e32",
+      "line": 28,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/cleanup",
+      "blob": "80e984bcd86f55170d5e0f410a18bc9b28e21e32",
+      "line": 30,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles",
+      "blob": "77e487cbf4c865a39042396254c4504e2a383482",
+      "line": 13,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles",
+      "blob": "77e487cbf4c865a39042396254c4504e2a383482",
+      "line": 18,
+      "text": "  source \"$DOTFILES_DIR/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles",
+      "blob": "77e487cbf4c865a39042396254c4504e2a383482",
+      "line": 270,
+      "text": "    source \"$DOTFILES_DIR/lib/lock.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles",
+      "blob": "77e487cbf4c865a39042396254c4504e2a383482",
+      "line": 281,
+      "text": "    source \"$DOTFILES_DIR/lib/apply-state.sh\"",
+      "names": [
+        "apply-state.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles",
+      "blob": "77e487cbf4c865a39042396254c4504e2a383482",
+      "line": 337,
+      "text": "    source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-bottles",
+      "blob": "2fff5dcb039c140ef3ac8877589e817dc23aa1e2",
+      "line": 38,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-bottles",
+      "blob": "2fff5dcb039c140ef3ac8877589e817dc23aa1e2",
+      "line": 40,
+      "text": "source \"$DOTFILES_DIR/lib/brew-bottle-audit.sh\"",
+      "names": [
+        "brew-bottle-audit.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-curl",
+      "blob": "8f69d95f4d22801063717780bc36a702295d45fc",
+      "line": 16,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-uv-pythons",
+      "blob": "2a8116aad151fe84f30ca1cb7be04a2f29d16d2e",
+      "line": 37,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-agent-keepawake",
+      "blob": "8ca720a467c8f78e2c33dc7b57b8604d9af44a99",
+      "line": 21,
+      "text": "source \"$DOTFILES_DIR/lib/agent-keepawake.sh\"",
+      "names": [
+        "agent-keepawake.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-agent-wake-recover",
+      "blob": "59c8c6817e2f42b55a873d43d7927226cc2e4b6b",
+      "line": 9,
+      "text": "source \"$DOTFILES_DIR/lib/agent-keepawake.sh\"",
+      "names": [
+        "agent-keepawake.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-agent-wake-recover",
+      "blob": "59c8c6817e2f42b55a873d43d7927226cc2e4b6b",
+      "line": 11,
+      "text": "source \"$DOTFILES_DIR/lib/heal-stuck-agents.sh\"",
+      "names": [
+        "heal-stuck-agents.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-amphetamine-sync",
+      "blob": "6303ced88d85ca7d96a9cd572fc6fc1b60ff02b6",
+      "line": 46,
+      "text": "source \"$DOTFILES_DIR/lib/run-with-timeout.sh\"",
+      "names": [
+        "run-with-timeout.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-audit",
+      "blob": "de8d6b11458d11cf0f8228cdbc23b777b13ff701",
+      "line": 20,
+      "text": "source \"$DOTFILES_DIR/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-audit",
+      "blob": "de8d6b11458d11cf0f8228cdbc23b777b13ff701",
+      "line": 23,
+      "text": "source \"$DOTFILES_DIR/lib/output.sh\"",
+      "names": [
+        "output.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-config",
+      "blob": "2e84f65b8f3c2ce4f3dee2fb5fe801e9d2585cc4",
+      "line": 20,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-config",
+      "blob": "2e84f65b8f3c2ce4f3dee2fb5fe801e9d2585cc4",
+      "line": 302,
+      "text": "  source \"$DOTFILES_DIR/lib/lock.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-contribute",
+      "blob": "4540f80f742de2fe68ad1122eaaf60aa9dcd464b",
+      "line": 36,
+      "text": "    source \"$DOTFILES_DIR/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-contribute",
+      "blob": "4540f80f742de2fe68ad1122eaaf60aa9dcd464b",
+      "line": 44,
+      "text": "source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-defaults-preview",
+      "blob": "291b47f8254cf2a1d7c2e538d2b94bc959a4c002",
+      "line": 18,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-disable-blocked-node-automation",
+      "blob": "0d74e8fbef8f99afc187286cf855cfc2c51bd763",
+      "line": 11,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-disable-blocked-node-automation",
+      "blob": "0d74e8fbef8f99afc187286cf855cfc2c51bd763",
+      "line": 13,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/dotfiles-agent-node.sh\"",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 40,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 51,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 56,
+      "text": "  source \"$DOTFILES_DIR/lib/dotfiles-agent-node.sh\"",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 102,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 163,
+      "text": "source \"$DOTFILES_DIR/lib/lock.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 166,
+      "text": "source \"$DOTFILES_DIR/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 168,
+      "text": "source \"$DOTFILES_DIR/lib/errors-log.sh\"",
+      "names": [
+        "errors-log.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 170,
+      "text": "source \"$DOTFILES_DIR/lib/weekly-metrics.sh\"",
+      "names": [
+        "weekly-metrics.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "line": 329,
+      "text": "source \"$DOTFILES_DIR/lib/output.sh\"",
+      "names": [
+        "output.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-fix-launchagent-endpoint-path",
+      "blob": "3e63d0006aeaef91c7e1bb7fdb8fd64f9a85fb53",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-fix-launchagent-endpoint-path",
+      "blob": "3e63d0006aeaef91c7e1bb7fdb8fd64f9a85fb53",
+      "line": 17,
+      "text": "source \"$DOTFILES_DIR/lib/launchctl-timeout.sh\"",
+      "names": [
+        "launchctl-timeout.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-fix-launchagent-endpoint-path",
+      "blob": "3e63d0006aeaef91c7e1bb7fdb8fd64f9a85fb53",
+      "line": 19,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-glove80",
+      "blob": "f9cf714306cef9ed6e13071b60e03cf8119afe64",
+      "line": 26,
+      "text": "source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-heal-stuck-agents",
+      "blob": "ee68ee5d76eb69e8b7bb509201d3b3368c6f855c",
+      "line": 19,
+      "text": "source \"$DOTFILES_DIR/lib/heal-stuck-agents.sh\"",
+      "names": [
+        "heal-stuck-agents.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-install",
+      "blob": "b69633d516c4fee8e25f51712145732d39385282",
+      "line": 43,
+      "text": "source \"$REPO_DIR/lib/mac-baseline.sh\"",
+      "names": [
+        "mac-baseline.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-install",
+      "blob": "b69633d516c4fee8e25f51712145732d39385282",
+      "line": 45,
+      "text": "source \"$REPO_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-install",
+      "blob": "b69633d516c4fee8e25f51712145732d39385282",
+      "line": 47,
+      "text": "source \"$REPO_DIR/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-launchagent-drift",
+      "blob": "106b877f23c16871c7da2ebbe6af6f1c7e0291d9",
+      "line": 44,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/launchagent-args.sh\"",
+      "names": [
+        "launchagent-args.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-leak",
+      "blob": "ab6bf760983b66439f4b3e56e2e2d61bb8ab81cd",
+      "line": 8,
+      "text": "source \"$DOTFILES_DIR/lib/leak-allow.sh\"",
+      "names": [
+        "leak-allow.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-metrics",
+      "blob": "ce41d48b1064139672d20f4ddc03f76a1e95d872",
+      "line": 45,
+      "text": "      source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd -P)/lib/mac-baseline.sh\"",
+      "names": [
+        "mac-baseline.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-metrics",
+      "blob": "ce41d48b1064139672d20f4ddc03f76a1e95d872",
+      "line": 49,
+      "text": "      source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd -P)/lib/mac-baseline.sh\"",
+      "names": [
+        "mac-baseline.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-node-upgrade",
+      "blob": "55d5b94ec104ac1d1abf7b2c2e800d7bc995bf34",
+      "line": 29,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-node-upgrade",
+      "blob": "55d5b94ec104ac1d1abf7b2c2e800d7bc995bf34",
+      "line": 31,
+      "text": "source \"$DOTFILES_DIR/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-node-upgrade",
+      "blob": "55d5b94ec104ac1d1abf7b2c2e800d7bc995bf34",
+      "line": 33,
+      "text": "source \"$DOTFILES_DIR/lib/node-pin.sh\"",
+      "names": [
+        "node-pin.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 38,
+      "text": "source \"$DOTFILES_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 40,
+      "text": "source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 95,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 97,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 136,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 138,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 427,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 429,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 581,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 583,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 698,
+      "text": "  source \"$DOTFILES_DIR/lib/lock.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 743,
+      "text": "    source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 745,
+      "text": "    source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 751,
+      "text": "    source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8",
+      "line": 753,
+      "text": "    source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-quickstart",
+      "blob": "c6e270b4020259e4b4ee50482801bacdd371d75c",
+      "line": 17,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-reload-launchagents",
+      "blob": "0184024d314608961073be0d5f04aba1859a7929",
+      "line": 26,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-reload-launchagents",
+      "blob": "0184024d314608961073be0d5f04aba1859a7929",
+      "line": 28,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-reload-launchagents",
+      "blob": "0184024d314608961073be0d5f04aba1859a7929",
+      "line": 30,
+      "text": "source \"$DOTFILES_DIR/lib/self-reload.sh\"",
+      "names": [
+        "self-reload.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-reload-launchagents",
+      "blob": "0184024d314608961073be0d5f04aba1859a7929",
+      "line": 73,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/launchagent-args.sh\"",
+      "names": [
+        "launchagent-args.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-resilience-setup",
+      "blob": "931cd3bba8d5f5cd2524c5d204b31f3e77c4b933",
+      "line": 28,
+      "text": "source \"$DOTFILES_DIR/lib/agent-keepawake.sh\"",
+      "names": [
+        "agent-keepawake.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-start",
+      "blob": "ee0524c63405773e8b587e98a783090c5eabbf2b",
+      "line": 20,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-start",
+      "blob": "ee0524c63405773e8b587e98a783090c5eabbf2b",
+      "line": 22,
+      "text": "source \"$DOTFILES_DIR/lib/apply-state.sh\"",
+      "names": [
+        "apply-state.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-start",
+      "blob": "ee0524c63405773e8b587e98a783090c5eabbf2b",
+      "line": 24,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-stats",
+      "blob": "3ba0070542e3cc5c2d009a0992c61865f470b73b",
+      "line": 24,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 31,
+      "text": "source \"$DOTFILES_DIR/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 33,
+      "text": "source \"$DOTFILES_DIR/lib/errors-log.sh\"",
+      "names": [
+        "errors-log.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 35,
+      "text": "source \"$DOTFILES_DIR/lib/lock.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 37,
+      "text": "source \"$DOTFILES_DIR/lib/self-reload.sh\"",
+      "names": [
+        "self-reload.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 39,
+      "text": "source \"$DOTFILES_DIR/lib/push-error-classify.sh\"",
+      "names": [
+        "push-error-classify.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 41,
+      "text": "source \"$DOTFILES_DIR/lib/zshrc-appends.sh\"",
+      "names": [
+        "zshrc-appends.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "line": 43,
+      "text": "source \"$DOTFILES_DIR/lib/apply-state.sh\"",
+      "names": [
+        "apply-state.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-telemetry",
+      "blob": "26082e9775eaa95fc4d7e4450e3e87bcd1ea2273",
+      "line": 670,
+      "text": "    source \"$DOTFILES_DIR/lib/secret-scan.sh\" 2>/dev/null",
+      "names": [
+        "secret-scan.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-telemetry",
+      "blob": "26082e9775eaa95fc4d7e4450e3e87bcd1ea2273",
+      "line": 886,
+      "text": "  source \"$DOTFILES_DIR/lib/mac-baseline.sh\" 2>/dev/null || return 0",
+      "names": [
+        "mac-baseline.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-uninstall",
+      "blob": "de2d50a177b854e7ad3a8c6e86f08808db361a18",
+      "line": 40,
+      "text": "  source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-update",
+      "blob": "bb59408f9220b1223853f3faefdbfc827701c1fb",
+      "line": 6,
+      "text": "  source \"$DOTFILES_DIR/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-update",
+      "blob": "bb59408f9220b1223853f3faefdbfc827701c1fb",
+      "line": 85,
+      "text": "  source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-updates-landed",
+      "blob": "2c113cc97bd47d2c8b0e3499f4e0cb37372f2ab6",
+      "line": 14,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/updates-landed.sh\"",
+      "names": [
+        "updates-landed.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "line": 52,
+      "text": "source \"$DOTFILES_DIR/lib/confirm.sh\"",
+      "names": [
+        "confirm.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "line": 80,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "line": 82,
+      "text": "source \"$DOTFILES_DIR/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "line": 84,
+      "text": "source \"$DOTFILES_DIR/lib/updates-landed.sh\"",
+      "names": [
+        "updates-landed.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "line": 86,
+      "text": "source \"$DOTFILES_DIR/lib/lock.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b",
+      "line": 244,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-validate",
+      "blob": "19eac1cdd93f24cb28ecb6d99e40da7391d207ee",
+      "line": 35,
+      "text": "source \"$DOTFILES_DIR/lib/output.sh\"",
+      "names": [
+        "output.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-validate",
+      "blob": "19eac1cdd93f24cb28ecb6d99e40da7391d207ee",
+      "line": 39,
+      "text": "  source \"$DOTFILES_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-validate",
+      "blob": "19eac1cdd93f24cb28ecb6d99e40da7391d207ee",
+      "line": 43,
+      "text": "source \"$DOTFILES_DIR/lib/secret-scan.sh\"",
+      "names": [
+        "secret-scan.sh"
+      ]
+    },
+    {
+      "path": "bin/dotfiles-workspace",
+      "blob": "da306ddebff0cd69e7af1203d55d469d3869f1d0",
+      "line": 19,
+      "text": "source \"$DOTFILES_DIR/lib/workspace-discovery.sh\"",
+      "names": [
+        "workspace-discovery.sh"
+      ]
+    },
+    {
+      "path": "bin/git-maintain",
+      "blob": "09df9f32f91b0ae339a770d08a6ad9a9e9a3aa89",
+      "line": 16,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/git-safe",
+      "blob": "95da872ddb3735f65d95a8cf2965422b06538e6a",
+      "line": 22,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/graceful-restart",
+      "blob": "7cd31b951eb5f6f6ffd1e637cdc8056605256751",
+      "line": 10,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/hotfix",
+      "blob": "90695163f820b20acbab72b2b62a2f7fe51f69a5",
+      "line": 8,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/local-ai-agent",
+      "blob": "c48412629935417172e91f43e9ff1a17e8eaa21e",
+      "line": 22,
+      "text": "source \"$SCRIPT_DIR/../lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/local-ai-bench",
+      "blob": "bfdee822a043d6ed86050e750139b60f88115c57",
+      "line": 21,
+      "text": "source \"$SCRIPT_DIR/../lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/local-ai-loop",
+      "blob": "e669bca5bed90e797852a9040155e4256abefdb1",
+      "line": 41,
+      "text": "source \"$SCRIPT_DIR/../lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/local-ai-warmup",
+      "blob": "4d19b4c784d8541af69945010cd959d3ff5ab9c9",
+      "line": 27,
+      "text": "source \"$_warmup_dir/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/morning",
+      "blob": "55011ac3762306570b0af702911923d234943f64",
+      "line": 14,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/morning",
+      "blob": "55011ac3762306570b0af702911923d234943f64",
+      "line": 16,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/errors-log.sh\"",
+      "names": [
+        "errors-log.sh"
+      ]
+    },
+    {
+      "path": "bin/network-watchdog",
+      "blob": "c39bbee73a28ce21d48482abf10de27b48a87a86",
+      "line": 12,
+      "text": "source \"$_watchdog_dir/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/network-watchdog",
+      "blob": "c39bbee73a28ce21d48482abf10de27b48a87a86",
+      "line": 83,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/new-project",
+      "blob": "7e62d7e18fb1fd442ce6de77e38ac6954acdd4f7",
+      "line": 11,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/ollama-launchagent",
+      "blob": "4e89ccb3882415bc6910082a5d979e8bc59d4a61",
+      "line": 10,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "bin/pr",
+      "blob": "e7e37fac1d59d0b412065d6cace1a49966038340",
+      "line": 9,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/review",
+      "blob": "7f0b1e3078c90f8b89abdcfadbcb385ed368984e",
+      "line": 9,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/setup-chrome",
+      "blob": "e77b8e940c1124f3b253d13f7af03da2f264c2c4",
+      "line": 11,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/setup-dock",
+      "blob": "71772e3b4dac98c41f7bd81cdea4133a0d090d95",
+      "line": 9,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "bin/status",
+      "blob": "0e07475d9e25cc479c1a0b26f7fd886372019ea6",
+      "line": 8,
+      "text": "source \"$(cd \"$(dirname \"$0\")/..\" && pwd)/lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "bin/tooling-sync",
+      "blob": "4a2ba82725addff1c69af0778d4e92ab3aadc625",
+      "line": 49,
+      "text": "source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)/lib/updates-landed.sh\"",
+      "names": [
+        "updates-landed.sh"
+      ]
+    },
+    {
+      "path": "dot_config/dotfiles/env.sh.tmpl",
+      "blob": "67a1e270dfbb3ee467a2997811ced1c62cefe5af",
+      "line": 18,
+      "text": "  . \"$DOTFILES_DIR/lib/agent-browser-session-env.sh\"",
+      "names": [
+        "agent-browser-session-env.sh"
+      ]
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "blob": "424e95f557ab537e0c84b024c75ad7f2e824f35a",
+      "line": 38,
+      "text": "  source \"$DOTFILES_DIR/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "blob": "424e95f557ab537e0c84b024c75ad7f2e824f35a",
+      "line": 49,
+      "text": "    source \"$DOTFILES_DIR/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "git-hooks/pre-commit",
+      "blob": "424e95f557ab537e0c84b024c75ad7f2e824f35a",
+      "line": 93,
+      "text": "  source \"$DOTFILES_DIR/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "blob": "4f98de9702b69642d61ebfea4007aef6c8cec8d3",
+      "line": 38,
+      "text": "source \"$DOTFILES_DIR/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "git-hooks/pre-push",
+      "blob": "4f98de9702b69642d61ebfea4007aef6c8cec8d3",
+      "line": 333,
+      "text": "  source \"$DOTFILES_DIR/lib/leak-allow.sh\"",
+      "names": [
+        "leak-allow.sh"
+      ]
+    },
+    {
+      "path": "home/zshrc.ai-tools",
+      "blob": "378257f6ac24af83c3d2c7c0b8ce488895f3fdf3",
+      "line": 46,
+      "text": "  . \"${DOTFILES_DIR:-$HOME/apps/tooling/dotfiles}/lib/agent-browser-session-env.sh\"",
+      "names": [
+        "agent-browser-session-env.sh"
+      ]
+    },
+    {
+      "path": "lib/agentfile-layers.sh",
+      "blob": "dedce6bfde55c8ed0fb5961190517549640b54d2",
+      "line": 538,
+      "text": "    source \"${BASH_SOURCE[0]%/*}/agentbrew-locate.sh\" 2>/dev/null && dir=\"$(agentbrew_locate 2>/dev/null)\" || return 1",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "lib/dotfiles-endpoint-paths.sh",
+      "blob": "115e579cf48f28e7f3f7b10f0d079f213dcf1a6b",
+      "line": 32,
+      "text": "  source \"$dotfiles_dir/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "lib/gh-public-leak.sh",
+      "blob": "1835ffdb076c35a2c01f3e18a035a43843acfc81",
+      "line": 755,
+      "text": "  . \"$_ghpl_dir/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "lib/gh-public-leak.sh",
+      "blob": "1835ffdb076c35a2c01f3e18a035a43843acfc81",
+      "line": 856,
+      "text": "    . \"$_ghpl_dir/leak-allow.sh\"",
+      "names": [
+        "leak-allow.sh"
+      ]
+    },
+    {
+      "path": "lib/oss-readiness.sh",
+      "blob": "8287b7b06d7b786bf4b2a03be6944ef2d9652668",
+      "line": 65,
+      "text": "  source \"$lib_dir/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "lib/oss-readiness.sh",
+      "blob": "8287b7b06d7b786bf4b2a03be6944ef2d9652668",
+      "line": 122,
+      "text": "    source \"$lib_dir/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "lib/oss-readiness.sh",
+      "blob": "8287b7b06d7b786bf4b2a03be6944ef2d9652668",
+      "line": 124,
+      "text": "    source \"$lib_dir/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "lib/output.sh",
+      "blob": "73dfdb65fbb64d4a044653a0ec977b09a8206917",
+      "line": 30,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "lib/plugin.sh",
+      "blob": "c0004f17fc48f7000948dda8d6fc95b968bf2ae8",
+      "line": 33,
+      "text": "  source \"$(dirname \"${BASH_SOURCE[0]}\")/plugin-signers.sh\"",
+      "names": [
+        "plugin-signers.sh"
+      ]
+    },
+    {
+      "path": "lib/stats.sh",
+      "blob": "f0f470ee6534e72759c8663470422974c5b42194",
+      "line": 8,
+      "text": "  source \"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "macos-apps.sh",
+      "blob": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574",
+      "line": 13,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "macos-apps.sh",
+      "blob": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "macos-apps.sh",
+      "blob": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574",
+      "line": 17,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-arch.sh\"",
+      "names": [
+        "dotfiles-arch.sh"
+      ]
+    },
+    {
+      "path": "macos-apps.sh",
+      "blob": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574",
+      "line": 19,
+      "text": "source \"$DOTFILES_DIR/lib/login-apps.sh\"",
+      "names": [
+        "login-apps.sh"
+      ]
+    },
+    {
+      "path": "macos-visual.sh",
+      "blob": "9d018e9cea89074ec221f55004b4a0b7edb092d8",
+      "line": 13,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "macos-visual.sh",
+      "blob": "9d018e9cea89074ec221f55004b4a0b7edb092d8",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "macos.sh",
+      "blob": "510e75f257e139447d965073654068ddc529497d",
+      "line": 20,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "macos.sh",
+      "blob": "510e75f257e139447d965073654068ddc529497d",
+      "line": 22,
+      "text": "source \"$DOTFILES_DIR/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "modules/agent-browser/doctor.sh",
+      "blob": "818238e478fd7b5b68d5a6ee6fa28db12c6b7538",
+      "line": 99,
+      "text": "source \"$DOTFILES_DIR/lib/spotlight-probe.sh\"",
+      "names": [
+        "spotlight-probe.sh"
+      ]
+    },
+    {
+      "path": "modules/agent-browser/doctor.sh",
+      "blob": "818238e478fd7b5b68d5a6ee6fa28db12c6b7538",
+      "line": 134,
+      "text": "source \"$DOTFILES_DIR/lib/focus-steal-audit.sh\"",
+      "names": [
+        "focus-steal-audit.sh"
+      ]
+    },
+    {
+      "path": "modules/agent-browser/doctor.sh",
+      "blob": "818238e478fd7b5b68d5a6ee6fa28db12c6b7538",
+      "line": 194,
+      "text": "  source \"$DOTFILES_DIR/lib/chrome-purpose-options.sh\"",
+      "names": [
+        "chrome-purpose-options.sh"
+      ]
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "line": 33,
+      "text": "    source \"$DOTFILES_DIR/lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "line": 103,
+      "text": "    source \"$DOTFILES_DIR/lib/agentfile-layers.sh\"",
+      "names": [
+        "agentfile-layers.sh"
+      ]
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "line": 115,
+      "text": "    source \"$DOTFILES_DIR/lib/claude-model-layer.sh\"",
+      "names": [
+        "claude-model-layer.sh"
+      ]
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "line": 163,
+      "text": "  source \"$DOTFILES_DIR/lib/agentfile-layers.sh\"",
+      "names": [
+        "agentfile-layers.sh"
+      ]
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "line": 359,
+      "text": "  source \"$DOTFILES_DIR/lib/agentbrew-memory-readiness.sh\"",
+      "names": [
+        "agentbrew-memory-readiness.sh"
+      ]
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "blob": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "line": 408,
+      "text": "source \"$DOTFILES_DIR/lib/node-pin.sh\"",
+      "names": [
+        "node-pin.sh"
+      ]
+    },
+    {
+      "path": "modules/git/doctor.sh",
+      "blob": "35258e1f0fad208da737ca495aca8e574a8e53af",
+      "line": 271,
+      "text": "  source \"$DOTFILES_DIR/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "modules/git/doctor.sh",
+      "blob": "35258e1f0fad208da737ca495aca8e574a8e53af",
+      "line": 290,
+      "text": "source \"$DOTFILES_DIR/lib/xcode-license.sh\"",
+      "names": [
+        "xcode-license.sh"
+      ]
+    },
+    {
+      "path": "modules/plugins/doctor.sh",
+      "blob": "8d9f58d15b6bc7b917decfd20fd7163d6a5704cd",
+      "line": 7,
+      "text": "source \"$DOTFILES_DIR/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "modules/plugins/doctor.sh",
+      "blob": "8d9f58d15b6bc7b917decfd20fd7163d6a5704cd",
+      "line": 22,
+      "text": "      source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "modules/plugins/doctor.sh",
+      "blob": "8d9f58d15b6bc7b917decfd20fd7163d6a5704cd",
+      "line": 24,
+      "text": "      source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "modules/plugins/doctor.sh",
+      "blob": "8d9f58d15b6bc7b917decfd20fd7163d6a5704cd",
+      "line": 35,
+      "text": "      source \"$DOTFILES_DIR/lib/blocked-software.sh\"",
+      "names": [
+        "blocked-software.sh"
+      ]
+    },
+    {
+      "path": "modules/resilience/doctor.sh",
+      "blob": "98e2c17ba4105da2ae8019aec4d66ce832fce486",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/agent-keepawake.sh\"",
+      "names": [
+        "agent-keepawake.sh"
+      ]
+    },
+    {
+      "path": "modules/resilience/doctor.sh",
+      "blob": "98e2c17ba4105da2ae8019aec4d66ce832fce486",
+      "line": 17,
+      "text": "source \"$DOTFILES_DIR/lib/run-with-timeout.sh\"",
+      "names": [
+        "run-with-timeout.sh"
+      ]
+    },
+    {
+      "path": "modules/resilience/doctor.sh",
+      "blob": "98e2c17ba4105da2ae8019aec4d66ce832fce486",
+      "line": 19,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-arch.sh\"",
+      "names": [
+        "dotfiles-arch.sh"
+      ]
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "line": 8,
+      "text": "  source \"$DOTFILES_MODULE_DIR/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "line": 11,
+      "text": "  source \"$DOTFILES_MODULE_DIR/lib/brew-bottle-audit.sh\"",
+      "names": [
+        "brew-bottle-audit.sh"
+      ]
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "line": 13,
+      "text": "source \"$DOTFILES_MODULE_DIR/lib/secret-scan.sh\"",
+      "names": [
+        "secret-scan.sh"
+      ]
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "line": 438,
+      "text": "    source \"$DOTFILES_DIR/lib/dotfiles-agent-node.sh\"",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "line": 476,
+      "text": "  source \"$DOTFILES_DIR/lib/dotfiles-agent-node.sh\"",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "blob": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "line": 1442,
+      "text": "source \"$DOTFILES_MODULE_DIR/lib/heal-stuck-agents.sh\"",
+      "names": [
+        "heal-stuck-agents.sh"
+      ]
+    },
+    {
+      "path": "modules/terminal/doctor.sh",
+      "blob": "28cabb31b840ff758fe60c6090fb4cf12ccad0c4",
+      "line": 4,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-arch.sh\"",
+      "names": [
+        "dotfiles-arch.sh"
+      ]
+    },
+    {
+      "path": "modules/vscode/doctor.sh",
+      "blob": "825a5a6f0ee6f5498e9f9f5fc6b33aa1cbf04096",
+      "line": 80,
+      "text": "    source \"$DOTFILES_DIR/lib/plugin-capabilities.sh\"",
+      "names": [
+        "plugin-capabilities.sh"
+      ]
+    },
+    {
+      "path": "modules/vscode/doctor.sh",
+      "blob": "825a5a6f0ee6f5498e9f9f5fc6b33aa1cbf04096",
+      "line": 82,
+      "text": "    source \"$DOTFILES_DIR/lib/plugin-extensions.sh\"",
+      "names": [
+        "plugin-extensions.sh"
+      ]
+    },
+    {
+      "path": "modules/workflow/doctor.sh",
+      "blob": "7906eb10c8dd4db77cbdcf8e386ba0c506d883a9",
+      "line": 10,
+      "text": "  source \"$DOTFILES_DIR/lib/launchagent-duplicates.sh\"",
+      "names": [
+        "launchagent-duplicates.sh"
+      ]
+    },
+    {
+      "path": "modules/workflow/doctor.sh",
+      "blob": "7906eb10c8dd4db77cbdcf8e386ba0c506d883a9",
+      "line": 36,
+      "text": "    source \"$DOTFILES_DIR/lib/chrome-purpose-options.sh\"",
+      "names": [
+        "chrome-purpose-options.sh"
+      ]
+    },
+    {
+      "path": "modules/workflow/doctor.sh",
+      "blob": "7906eb10c8dd4db77cbdcf8e386ba0c506d883a9",
+      "line": 69,
+      "text": "source \"$DOTFILES_DIR/lib/spotlight-probe.sh\"",
+      "names": [
+        "spotlight-probe.sh"
+      ]
+    },
+    {
+      "path": "modules/workflow/doctor.sh",
+      "blob": "7906eb10c8dd4db77cbdcf8e386ba0c506d883a9",
+      "line": 82,
+      "text": "  source \"$DOTFILES_DIR/lib/agent-worktrees-noindex.sh\"",
+      "names": [
+        "agent-worktrees-noindex.sh"
+      ]
+    },
+    {
+      "path": "private_dot_agent-browser/executable_ensure-chrome.sh",
+      "blob": "0fbca3a56c9d646fab804eb02467f4755e829bd6",
+      "line": 7,
+      "text": "  source \"$_dotfiles_dir/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "skills/dotfiles-new-module/SKILL.md",
+      "blob": "5bef9b46448bd0c8d5bc49d6bc9cc7e650b4ea43",
+      "line": 179,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/output.sh\"",
+      "names": [
+        "output.sh"
+      ]
+    },
+    {
+      "path": "snapshot.sh",
+      "blob": "5bde1a90bf1b76ac5d231113ce0427086eec8d26",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "tests/agent-worktrees-noindex.bats",
+      "blob": "2078c8909f68259847d4793436fcdc63be2dbd16",
+      "line": 15,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/agent-worktrees-noindex.sh\"",
+      "names": [
+        "agent-worktrees-noindex.sh"
+      ]
+    },
+    {
+      "path": "tests/agentbrew-claude-model-layer.bats",
+      "blob": "b1c8c6c18d9fb936f9342489140891ffa0c19d3e",
+      "line": 14,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/claude-model-layer.sh\"",
+      "names": [
+        "claude-model-layer.sh"
+      ]
+    },
+    {
+      "path": "tests/agentbrew-memory-readiness.bats",
+      "blob": "67cc6f7a525377baefe0b9d70bde74e4035a6805",
+      "line": 22,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/agentbrew-memory-readiness.sh\"",
+      "names": [
+        "agentbrew-memory-readiness.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 43,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 49,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 69,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 90,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 111,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 132,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 153,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 182,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 205,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 227,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 250,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 260,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 281,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 291,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 315,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 353,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 372,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 382,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 392,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 402,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 413,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 441,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 461,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 482,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 503,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 518,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 531,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/apply-defaults.bats",
+      "blob": "0c2b592440200656ba1154f84915f069dfaf0c90",
+      "line": 545,
+      "text": "  source \"$TEST_DOTFILES/lib/apply-defaults.sh\"",
+      "names": [
+        "apply-defaults.sh"
+      ]
+    },
+    {
+      "path": "tests/brew-bottle-audit-cache.bats",
+      "blob": "081cd8b6bf983df02bf2296a306efc71180a6957",
+      "line": 60,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/brew-bottle-audit.sh\"",
+      "names": [
+        "brew-bottle-audit.sh"
+      ]
+    },
+    {
+      "path": "tests/checkout-split.bats",
+      "blob": "99e6df407e4d74ffc14ac413da0b2c86324e5306",
+      "line": 71,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "tests/checkout-split.bats",
+      "blob": "99e6df407e4d74ffc14ac413da0b2c86324e5306",
+      "line": 83,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "tests/checkout-split.bats",
+      "blob": "99e6df407e4d74ffc14ac413da0b2c86324e5306",
+      "line": 94,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "tests/checkout-split.bats",
+      "blob": "99e6df407e4d74ffc14ac413da0b2c86324e5306",
+      "line": 102,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/dotfiles-source-dir.sh\"",
+      "names": [
+        "dotfiles-source-dir.sh"
+      ]
+    },
+    {
+      "path": "tests/cleanup.bats",
+      "blob": "9ad277863104464eca5397c498f6031cba91b5a7",
+      "line": 16,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/colors.sh\"",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "tests/coverage.bats",
+      "blob": "d59ce2f8b7376bae3dfb46d072a236873a69afed",
+      "line": 228,
+      "text": "    source '$DOTFILES_DIR/lib/coverage-trap.sh'",
+      "names": [
+        "coverage-trap.sh"
+      ]
+    },
+    {
+      "path": "tests/coverage.bats",
+      "blob": "d59ce2f8b7376bae3dfb46d072a236873a69afed",
+      "line": 230,
+      "text": "    source '$DOTFILES_DIR/lib/coverage-trap.sh'",
+      "names": [
+        "coverage-trap.sh"
+      ]
+    },
+    {
+      "path": "tests/coverage.bats",
+      "blob": "d59ce2f8b7376bae3dfb46d072a236873a69afed",
+      "line": 251,
+      "text": "    source '$DOTFILES_DIR/lib/coverage-trap.sh'",
+      "names": [
+        "coverage-trap.sh"
+      ]
+    },
+    {
+      "path": "tests/doctor-result-verification.bats",
+      "blob": "49fcdfac421c70bb6f5c55b8f08be658ef71ec00",
+      "line": 107,
+      "text": "source \"$DOTFILES_DIR/lib/run-with-timeout.sh\"",
+      "names": [
+        "run-with-timeout.sh"
+      ]
+    },
+    {
+      "path": "tests/dotfiles-apply-if-changed.bats",
+      "blob": "0cbe2c590f072c97740f299d8ee60879fa920e50",
+      "line": 159,
+      "text": "  source \"$REPO_ROOT/lib/apply-state.sh\"",
+      "names": [
+        "apply-state.sh"
+      ]
+    },
+    {
+      "path": "tests/dotfiles-sync.bats",
+      "blob": "31a0e283e9acba75738bbc382ff1b9936664dd34",
+      "line": 442,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/push-error-classify.sh\"",
+      "names": [
+        "push-error-classify.sh"
+      ]
+    },
+    {
+      "path": "tests/focus-steal-audit.bats",
+      "blob": "5949c13812193b4efd5e72a367557c2d876dfaf4",
+      "line": 21,
+      "text": "  source \"$DOTFILES_DIR/lib/focus-steal-audit.sh\"",
+      "names": [
+        "focus-steal-audit.sh"
+      ]
+    },
+    {
+      "path": "tests/focus-steal-audit.bats",
+      "blob": "5949c13812193b4efd5e72a367557c2d876dfaf4",
+      "line": 33,
+      "text": "  source \"$DOTFILES_DIR/lib/focus-steal-audit.sh\"",
+      "names": [
+        "focus-steal-audit.sh"
+      ]
+    },
+    {
+      "path": "tests/focus-steal-audit.bats",
+      "blob": "5949c13812193b4efd5e72a367557c2d876dfaf4",
+      "line": 47,
+      "text": "  source \"$DOTFILES_DIR/lib/focus-steal-audit.sh\"",
+      "names": [
+        "focus-steal-audit.sh"
+      ]
+    },
+    {
+      "path": "tests/focus-steal-audit.bats",
+      "blob": "5949c13812193b4efd5e72a367557c2d876dfaf4",
+      "line": 59,
+      "text": "  source \"$DOTFILES_DIR/lib/focus-steal-audit.sh\"",
+      "names": [
+        "focus-steal-audit.sh"
+      ]
+    },
+    {
+      "path": "tests/focus-steal-audit.bats",
+      "blob": "5949c13812193b4efd5e72a367557c2d876dfaf4",
+      "line": 72,
+      "text": "  source \"$DOTFILES_DIR/lib/focus-steal-audit.sh\"",
+      "names": [
+        "focus-steal-audit.sh"
+      ]
+    },
+    {
+      "path": "tests/git-doctor-xcode-license.bats",
+      "blob": "1c1a91bb84bbc693191b7f13c221be87cac20cea",
+      "line": 10,
+      "text": "  source \"$DOTFILES_DIR/lib/xcode-license.sh\"",
+      "names": [
+        "xcode-license.sh"
+      ]
+    },
+    {
+      "path": "tests/git-maintain.bats",
+      "blob": "7870faa2fcf8f1cf9d816f751cb2f00063ad0bd5",
+      "line": 63,
+      "text": "    source '$BATS_TEST_DIRNAME/../lib/colors.sh'",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "tests/git-maintain.bats",
+      "blob": "7870faa2fcf8f1cf9d816f751cb2f00063ad0bd5",
+      "line": 236,
+      "text": "    source '$BATS_TEST_DIRNAME/../lib/colors.sh'",
+      "names": [
+        "colors.sh"
+      ]
+    },
+    {
+      "path": "tests/launchagent-duplicates.bats",
+      "blob": "bde296a84785db0ba94722f8e4d48e8a016dfda7",
+      "line": 14,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/launchagent-duplicates.sh\"",
+      "names": [
+        "launchagent-duplicates.sh"
+      ]
+    },
+    {
+      "path": "tests/lib-agentbrew-locate.bats",
+      "blob": "31d2fa4d070280d8080d633f574708b499a1edf4",
+      "line": 18,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh\"",
+      "names": [
+        "agentbrew-locate.sh"
+      ]
+    },
+    {
+      "path": "tests/lib-dotfiles-arch.bats",
+      "blob": "a27be55610d825cece7ad20ff3f00556bb88bae7",
+      "line": 10,
+      "text": "  source \"$DOTFILES_DIR/lib/dotfiles-arch.sh\"",
+      "names": [
+        "dotfiles-arch.sh"
+      ]
+    },
+    {
+      "path": "tests/login-apps.bats",
+      "blob": "16b2f350f612a2495d26f117d396111bef779b1c",
+      "line": 7,
+      "text": "  source \"$REPO_ROOT/lib/login-apps.sh\"",
+      "names": [
+        "login-apps.sh"
+      ]
+    },
+    {
+      "path": "tests/module-agent-browser.bats",
+      "blob": "fbeaacaa6136760f9e340b5c3748a21f9689bc14",
+      "line": 57,
+      "text": ". \"${DOTFILES_DIR}/lib/agent-browser-session-env.sh\"",
+      "names": [
+        "agent-browser-session-env.sh"
+      ]
+    },
+    {
+      "path": "tests/module-git-doctor.bats",
+      "blob": "abb12cc030aa34dcc94a4786a3063090b9c32cc7",
+      "line": 84,
+      "text": "  source \"$REPO/lib/gitconfig-user-migrate.sh\"",
+      "names": [
+        "gitconfig-user-migrate.sh"
+      ]
+    },
+    {
+      "path": "tests/module-resilience-amphetamine-stale.bats",
+      "blob": "ad0026a0a41811cd00b85db8cf2029039a2eb03f",
+      "line": 93,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/run-with-timeout.sh\"",
+      "names": [
+        "run-with-timeout.sh"
+      ]
+    },
+    {
+      "path": "tests/morning.bats",
+      "blob": "077b37d60c9898e5bb2e46fdca7f0b677e1216ee",
+      "line": 74,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "tests/no-internal-refs.bats",
+      "blob": "a904bf3bf1c27ef0e01921c4843fdd395cb2d789",
+      "line": 5,
+      "text": "source \"$REPO_ROOT/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "tests/node-endpoint-safe-mode.bats",
+      "blob": "866488aeb45bcf819a32cd223e4c18e0a88b4134",
+      "line": 332,
+      "text": "  source lib/dotfiles-agent-node.sh",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "tests/node-endpoint-safe-mode.bats",
+      "blob": "866488aeb45bcf819a32cd223e4c18e0a88b4134",
+      "line": 339,
+      "text": "  source lib/dotfiles-agent-node.sh",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "tests/node-endpoint-safe-mode.bats",
+      "blob": "866488aeb45bcf819a32cd223e4c18e0a88b4134",
+      "line": 351,
+      "text": "  source lib/dotfiles-agent-node.sh",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "tests/node-endpoint-safe-mode.bats",
+      "blob": "866488aeb45bcf819a32cd223e4c18e0a88b4134",
+      "line": 358,
+      "text": "  source lib/dotfiles-agent-node.sh",
+      "names": [
+        "dotfiles-agent-node.sh"
+      ]
+    },
+    {
+      "path": "tests/oss-readiness-lib.bats",
+      "blob": "41035858171b095dfb200b4b9a5c1b2e312c81fd",
+      "line": 6,
+      "text": "  source \"$REPO_ROOT/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "tests/plugin-contract-gaps.bats",
+      "blob": "da2b1b3183148a5e75d40be3fa41342ed78174d0",
+      "line": 84,
+      "text": "  source \"$REPO_ROOT/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "tests/plugin-contract-gaps.bats",
+      "blob": "da2b1b3183148a5e75d40be3fa41342ed78174d0",
+      "line": 93,
+      "text": "  source \"$REPO_ROOT/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "tests/plugin-contract-gaps.bats",
+      "blob": "da2b1b3183148a5e75d40be3fa41342ed78174d0",
+      "line": 127,
+      "text": "  source \"$REPO_ROOT/lib/oss-readiness.sh\"",
+      "names": [
+        "oss-readiness.sh"
+      ]
+    },
+    {
+      "path": "tests/plugin-contract-gaps.bats",
+      "blob": "da2b1b3183148a5e75d40be3fa41342ed78174d0",
+      "line": 139,
+      "text": "  source \"$REPO_ROOT/lib/plugin.sh\"",
+      "names": [
+        "plugin.sh"
+      ]
+    },
+    {
+      "path": "tests/stats.bats",
+      "blob": "0992c39ed4044c3bc8f2b7dee06f6adc06531734",
+      "line": 17,
+      "text": "  source \"$BATS_TEST_DIRNAME/../lib/stats.sh\"",
+      "names": [
+        "stats.sh"
+      ]
+    },
+    {
+      "path": "tests/tool-shims.bats",
+      "blob": "07b6fe69589d7eb6353202878730828f702862da",
+      "line": 122,
+      "text": "  source \"$TEST_DOTFILES/lib/dotfiles-endpoint-paths.sh\"",
+      "names": [
+        "dotfiles-endpoint-paths.sh"
+      ]
+    },
+    {
+      "path": "tests/zshrc-appends.bats",
+      "blob": "a0085ea39ee8310638e156814e0b5e6d635cf783",
+      "line": 70,
+      "text": "  source \"$REPO/lib/zshrc-appends.sh\"",
+      "names": [
+        "zshrc-appends.sh"
+      ]
+    },
+    {
+      "path": "tests/zshrc-appends.bats",
+      "blob": "a0085ea39ee8310638e156814e0b5e6d635cf783",
+      "line": 80,
+      "text": "  source \"$REPO/lib/zshrc-appends.sh\"",
+      "names": [
+        "zshrc-appends.sh"
+      ]
+    },
+    {
+      "path": "tests/zshrc.bats",
+      "blob": "99273937c599742400816013d66bc3c77c96deab",
+      "line": 62,
+      "text": "    . \"'\"$tmp\"'/path-block.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    },
+    {
+      "path": "tests/zshrc.bats",
+      "blob": "99273937c599742400816013d66bc3c77c96deab",
+      "line": 87,
+      "text": "    . \"'\"$tmp\"'/path-block.sh\"",
+      "names": [
+        "lock.sh"
+      ]
+    }
+  ]
+}

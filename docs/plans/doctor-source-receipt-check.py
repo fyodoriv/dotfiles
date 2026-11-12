@@ -7,6 +7,81 @@ import subprocess
 import sys
 from pathlib import Path
 
+def library_caller_receipt():
+    revision = "57a4b14da82ad42c47bceebfc4e051d8bb9541d3"
+    tree_raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", revision])
+    tree = {}
+    for entry in tree_raw.split(b"\0"):
+        if not entry:
+            continue
+        meta, raw_path = entry.split(b"\t", 1)
+        mode, kind, blob = meta.decode("ascii").split()
+        path = raw_path.decode("utf-8")
+        if kind == "blob":
+            tree[path] = blob
+    names = sorted({Path(path).name for path in tree if path.startswith("lib/")})
+    if len(names) != 63:
+        raise SystemExit("unexpected library names")
+    command = ["git", "grep", "-n", "-z", "-I", "-F"]
+    for name in names:
+        command.extend(["-e", name])
+    command.extend([revision, "--", ":(exclude)docs/plans/rust-source-inventory-evidence.json"])
+    result = subprocess.run(command, stdout=subprocess.PIPE, check=False)
+    if result.returncode not in (0, 1):
+        raise SystemExit("source search failed")
+    remaining = result.stdout
+    rows = []
+    while remaining:
+        raw_path, remaining = remaining.split(b"\0", 1)
+        raw_line, remaining = remaining.split(b"\0", 1)
+        raw_text, remaining = remaining.split(b"\n", 1)
+        prefix = (revision + ":").encode()
+        if not raw_path.startswith(prefix):
+            raise SystemExit("unexpected search revision")
+        path = raw_path[len(prefix):].decode("utf-8")
+        text = raw_text.decode("utf-8")
+        if re.match(r"^\s*(?:source|\.)\s+", text):
+            rows.append({"path": path, "blob": tree[path], "line": int(raw_line),
+                         "text": text, "names": [name for name in names if name in text]})
+    if len(rows) != 277 or len({row["path"] for row in rows}) != 123:
+        raise SystemExit("unexpected source-syntax scope")
+    return {"format": 1, "revision": revision, "rows": rows}
+
+
+if sys.argv[1:] in (["--library-callers"], ["--generate-library-callers"]):
+    expected = library_caller_receipt()
+    if sys.argv[1:] == ["--generate-library-callers"]:
+        print(json.dumps(expected, indent=2))
+        raise SystemExit(0)
+    receipt = json.loads(Path("docs/plans/rust-library-caller-receipt.json").read_text(encoding="utf-8"))
+    expected_bytes = json.dumps(expected, sort_keys=True)
+
+    def matches(candidate):
+        return json.dumps(candidate, sort_keys=True) == expected_bytes
+
+    if not matches(receipt):
+        raise SystemExit("caller receipt does not match pinned sources")
+    count = 0
+    for index in range(len(receipt["rows"])):
+        for field in ("remove", "duplicate", "blob", "line", "text", "names"):
+            case = copy.deepcopy(receipt)
+            if field == "remove":
+                case["rows"].pop(index)
+            elif field == "duplicate":
+                case["rows"].append(copy.deepcopy(case["rows"][index]))
+            elif field == "line":
+                case["rows"][index][field] = -1
+            elif field == "names":
+                case["rows"][index][field] = ["invalid"]
+            else:
+                case["rows"][index][field] = "invalid"
+            if matches(case):
+                raise SystemExit("a planted caller error was accepted")
+            count += 1
+    print(f"checked {len(receipt['rows'])} source-syntax rows; rejected {count} planted errors")
+    raise SystemExit(0)
+
+
 if sys.argv[1:] == []:
     REVISION = "a846166aa1a14158cb6a5fef9a1c06ed3c0711f1"
     RECEIPT = Path("docs/plans/doctor-source-receipt.json")
@@ -16,7 +91,7 @@ elif sys.argv[1:] in (["--libraries"], ["--generate-libraries"]):
     RECEIPT = Path("docs/plans/rust-library-source-receipt.json")
     FAMILY, EXPECTED = "lib/", 63
 else:
-    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries]")
+    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers]")
 raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY])
 tree = {}
 for record in raw.split(b"\0"):

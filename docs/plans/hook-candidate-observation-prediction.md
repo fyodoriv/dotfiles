@@ -245,3 +245,11 @@ guarantee. Do not run it until both conditions are resolved. An isolated
 cache would need a separately registered and validated comparison because
 changing paths can affect timing. Earlier A/A results do not prove the
 current run is safe or that the candidate meets the speed gate.
+
+## Qualification correction (2026-11-12)
+
+The numeric RSS limit above was calculated from a baseline later found
+inconclusive. It is provisional and cannot be used as a qualified decision
+bound. Do not reuse that baseline. Establish a fresh qualified baseline before
+calculating a candidate bound; see [the corrected experiment record](rust-hook-status-experiment.md).
+The original prediction remains above for the historical record.

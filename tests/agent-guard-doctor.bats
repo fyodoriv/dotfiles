@@ -4,7 +4,7 @@ load test_helper
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-  export HOME="$TEST_DIR/home" REPO="$TEST_DIR/repo" DOTFILES_DOCTOR_NOTIFY=0
+  export HOME="$TEST_DIR/home" REPO="$TEST_DIR/repo" DOTFILES_DOCTOR_NOTIFY=0 DOTFILES_CI=0
   mkdir -p "$HOME/.claude" "$REPO/bin" "$REPO/modules" "$REPO/.chezmoiscripts" "$TEST_DIR/bin"
   cp -R "$BATS_TEST_DIRNAME/../lib" "$REPO/lib"
   cp -R "$BATS_TEST_DIRNAME/../modules/security" "$REPO/modules/security"

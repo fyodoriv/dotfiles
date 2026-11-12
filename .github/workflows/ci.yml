@@ -62,7 +62,7 @@ jobs:
       - name: Install dependencies
         # bash: the git hooks and the coverage harness need Homebrew bash;
         # the runner has only /bin/bash 3.2. coreutils: tests call gtimeout.
-        run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd
+        run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd shfmt ripgrep
       - name: Restore the per-file gate cache
         # bin/cached-run skips a file whose inputs passed before, like nx.
         # A cache entry cannot be changed, so each run saves a new one and

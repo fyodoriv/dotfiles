@@ -135,3 +135,9 @@ workflow_code() {
   grep -qE '^[[:space:]]*run: make check$' "$file"
   awk '/^  test:/ { in_job = 1; next } in_job && /^  [a-z]+:/ { exit } in_job' "$file" | grep -q 'runs-on: macos-latest'
 }
+
+@test "workflow installs tools required by guard tests" {
+  local file="$REPO_ROOT/.github/workflows/ci.yml"
+  awk '/^  test:/ { in_job = 1; next } in_job && /^  [a-z]+:/ { exit } in_job' "$file" \
+    | grep -qE 'brew install .*shfmt.*ripgrep'
+}

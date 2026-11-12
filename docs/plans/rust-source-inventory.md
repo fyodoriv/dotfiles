@@ -87,6 +87,13 @@ declarations in the pinned text and leaves 17 unresolved. Run
 `python3 docs/plans/test-reference-roles.py --check` to verify those anchors.
 A declaration does not prove its condition was met or the command ran.
 
+The [hook source-edge receipt](hook-source-edge.json) follows one of the
+previously unresolved candidates: the pinned launcher assigns the memory
+harness path, imports it dynamically and passes it to a later launch call.
+Run `python3 docs/plans/hook-source-edge.py --check` to verify the source
+identities and anchors. The relationship was first noticed in an exploratory
+read. It does not prove that the import or launch occurred.
+
 The [compiler fixture receipt](compiler-fixture-targets.json) verifies that
 three of the remaining candidates are explicit test targets in their pinned
 Cargo manifest. Run `python3 docs/plans/compiler-fixture-targets.py --check`

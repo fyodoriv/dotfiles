@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "pin": "d6c7b6dd8636a11a140bf3937cdce547377f2e5e",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "caller": {
+    "path": "tests/helpers/hook_trusted_launch.py",
+    "mode": "100644",
+    "blob": "cb05bd3a2ea5a18247fad321b7bc3c5f8c9245f1"
+  },
+  "target": {
+    "path": "tests/helpers/hook_rss_provenance.py",
+    "mode": "100644",
+    "blob": "f4471e40dc1866aa84dfbcdfb1ec6e1636ac27e9"
+  },
+  "anchors": [
+    156,
+    164,
+    165,
+    166,
+    185
+  ],
+  "relationship": "dynamic_import_and_launch"
+}

@@ -81,6 +81,12 @@ source and compare the receipt. The search skips binary files and requires
 UTF-8 paths; unsupported paths stop the check. Matches can be comments,
 fixtures or data. They do not prove execution, ownership, dynamic references or complete callers.
 
+The [reference role receipt](test-reference-roles.json) examines the 24
+referenced candidates. It anchors seven explicit command or source
+declarations in the pinned text and leaves 17 unresolved. Run
+`python3 docs/plans/test-reference-roles.py --check` to verify those anchors.
+A declaration does not prove its condition was met or the command ran.
+
 The [Cargo fixture receipt](test-cargo-targets.json) checks four of the
 unmatched files against their pinned manifests. It identifies a default binary,
 a default integration test, an explicitly declared integration test and the

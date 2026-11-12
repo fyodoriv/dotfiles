@@ -21,6 +21,7 @@ CHECKERS = {
     "stale-lifecycle-ranges": "OUTPUT",
     "non-test-source-classification": "OUTPUT",
     "stale-hook-bin-ranges": "OUTPUT",
+    "bats-discovery-receipt": "OUTPUT",
 }
 
 

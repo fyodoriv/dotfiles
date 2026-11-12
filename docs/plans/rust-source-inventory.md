@@ -53,6 +53,15 @@ The categories do not establish ownership, execution, or generated output
 behavior. The 383 absent test-tree candidates and six stale-only candidates
 remain separate; this review does not complete the inventory.
 
+The [Bats discovery receipt](bats-discovery-receipt.json) accounts for those
+383 test-tree candidates at the same pinned revision. Of these, 341 match
+the Makefile's root or plugin Bats globs, two match its e2e glob, and 40 have
+unresolved discovery. The e2e target invokes the test directory; a glob match
+alone does not prove runtime selection. Run
+`python3 docs/plans/bats-discovery-receipt.py --check` to verify the pinned
+identities and declarations. These are lexical discovery candidates, not
+proof of test roles, execution, ownership, or migration scope.
+
 The [stale hook and bin receipt](stale-hook-bin-ranges.json) compares the
 other three stale-only paths with their earlier family receipts. It records
 13 changed alignment ranges and the current match positions of 20 old

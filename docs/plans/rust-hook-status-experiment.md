@@ -19,7 +19,10 @@ Perl parser can change a parser failure into an allow.
 
 First collect two baseline peak-RSS medians: 15 invocations each under
 `/usr/bin/time -l`, with the gate row's JSON input and an exclusive
-`heavy-run` slot. The A/A ratio must be 0.95 to 1.05. Record every result and
+`heavy-run` slot. Set `DOTFILES_DIR` to this checkout, and use the same
+`bash -c`/`exec` wrapper for baseline and candidate so hook stderr can be
+checked separately. The wrapper can affect peak RSS. The A/A ratio must be
+0.95 to 1.05. Record every result and
 failure in a private scratch file. A missing value makes the result
 inconclusive. Compare a candidate's 15-run median to the lower baseline median; R_M
 must be at most 1.10. If any trial is invalid, stop and mark the run

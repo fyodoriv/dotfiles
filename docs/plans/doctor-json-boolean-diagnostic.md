@@ -38,3 +38,7 @@ changes environment. Pivot: any real preferences domain access or failure in
 either environment stops the correction and retains the original behavior.
 Anchor: `check_defaults` in `bin/dotfiles-doctor`, PR #600 hosted logs, Basili,
 Caldiera and Rombach 1994 (GQM), and Munafò et al. 2017 (pre-registration).
+
+Result: PR #600 reproduced the failure with CI mode enabled. The scoped fixture
+correction passed with CI mode enabled and unset locally. Hosted CI then ran
+and passed the boolean case. No production doctor behavior changed.

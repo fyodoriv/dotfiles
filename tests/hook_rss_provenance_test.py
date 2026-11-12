@@ -17,6 +17,44 @@ spec.loader.exec_module(provenance)
 
 
 class ReceiptControls(unittest.TestCase):
+    def test_private_expected_parent_must_match(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent_file = Path(directory) / "parent"
+            parent_file.write_text("123\n")
+            parent_file.chmod(0o600)
+            verify = getattr(provenance, "expected_parent_valid", lambda *_: False)
+            self.assertTrue(verify(parent_file, 123))
+            self.assertFalse(verify(parent_file, 124))
+            parent_file.chmod(0o644)
+            self.assertFalse(verify(parent_file, 123))
+
+    def test_parent_wait_fails_closed_for_missing_wrong_and_symlink(self):
+        wait = getattr(provenance, "wait_expected_parent", lambda *_args, **_kwargs: False)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parent = root / "parent"
+            self.assertFalse(wait(parent, 123, timeout=0))
+            parent.write_text("124\n")
+            parent.chmod(0o600)
+            self.assertFalse(wait(parent, 123, timeout=0))
+            parent.write_text("123\n")
+            self.assertTrue(wait(parent, 123, timeout=0))
+            target = root / "target"
+            parent.rename(target)
+            parent.symlink_to(target)
+            self.assertFalse(wait(parent, 123, timeout=0))
+
+    def test_main_never_collects_when_parent_is_not_bound(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            with patch.dict(os.environ, {"HOOK_RSS_RUN_DIR": str(root), "DOTFILES_DIR": str(root)}), \
+                    patch.object(provenance.Path, "cwd", return_value=root), \
+                    patch.object(provenance, "installed_root", return_value=True), \
+                    patch.object(provenance, "wait_expected_parent", return_value=False), \
+                    patch.object(provenance, "collect", side_effect=AssertionError("collection ran")):
+                with self.assertRaisesRegex(ValueError, "parent"):
+                    provenance.main()
+
     def test_admission_requires_one_matching_exclusive_parent(self):
         line = "waited=1 pid=123 slot=exclusive\n"
         self.assertTrue(provenance.admission_valid(line, 123, "exclusive"))

@@ -53,6 +53,16 @@ validates the input identities and rejects planted receipt errors. Run
 These counts describe correspondence with the listed receipts, not ownership,
 execution, complete source coverage or the current working tree.
 
+## Tooling-checkup skill scripts
+
+The [tooling-checkup reference receipt](tooling-checkup-callers.json) pins the
+11 skill scripts and 164 matching source lines across 26 paths at `3d3b904`.
+The [registered search](tooling-checkup-callers-prediction.md) records literal
+basename matches without copying line contents. Run
+`python3 docs/plans/tooling-checkup-callers.py --check` to verify the receipt.
+Matches can be documentation, tests or code. They do not prove execution,
+dynamic calls, generated scripts or ownership.
+
 ## Tracked bin entrypoints
 
 The [bin source receipt](rust-bin-source-inventory-evidence.json) pins every

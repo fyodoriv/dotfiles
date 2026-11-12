@@ -1,0 +1,21 @@
+{
+  "revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "path": "tests/host-load.bash",
+  "mode": "100644",
+  "blob": "c7863c179266fe72a1a08e6811499a8edf41ffe6",
+  "direct_sources": [
+    {
+      "file": "tests/agent-keepawake.bats",
+      "line": 9
+    },
+    {
+      "file": "tests/brew-audit.bats",
+      "line": 9
+    }
+  ],
+  "conditional_path_source": {
+    "file": "tests/test_helper.bash",
+    "line": 75
+  },
+  "limits": "runtime test directory and shell fallback affect resolution; no execution or complete caller coverage inferred"
+}

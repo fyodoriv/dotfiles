@@ -118,6 +118,12 @@ and Python imports depend on their runtime context. The adjacent Python import
 is a candidate relationship: import hooks or interpreter settings can select
 another module. These declarations do not prove which code ran or establish ownership or complete caller coverage.
 
+The [host-load helper receipt](host-load-relationships.json) records two
+source statements using the Bats test directory and one test-helper source
+statement with conditional path resolution. The directory and fallback are runtime inputs. A
+Makefile cache dependency and a shellcheck comment are not calls. These
+statements do not establish execution or complete caller coverage.
+
 Two referenced doctor fixtures have conditional source routes in the
 [fixture relationship receipt](doctor-fixture-relationships.json). Their tests
 set a fixture root and request module names. The loader admits that root only

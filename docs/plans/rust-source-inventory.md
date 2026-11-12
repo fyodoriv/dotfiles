@@ -107,6 +107,14 @@ regenerates the receipt and rejects planted errors. Run
 prove execution or cover dynamically constructed calls and embedded workflow
 bodies.
 
+The [workflow source receipt](workflow-source-inventory.json) records pinned
+workflow identities and lexical `run:` candidates, including indented block
+text. The [registered check](workflow-source-inventory-prediction.md) rejects
+planted receipt errors. Run `python3 docs/plans/workflow-source-inventory.py --check`.
+This is a lexical inventory aid, not a YAML parser or proof that a
+candidate runs. Dynamic code and executable content outside the predicate
+remain open.
+
 ## Library source identities
 
 The [library source receipt](rust-library-source-receipt.json) pins all 63

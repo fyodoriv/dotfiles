@@ -17,7 +17,8 @@ from hook_trusted_launch import (audited_inputs_valid, create_private_log, launc
 
 PAIR_TRACKED = ("tests/helpers/hook_pair_launcher.py", "tests/helpers/hook_pair_binding.py",
                 "tests/helpers/hook_pair_receipts.py", "tests/helpers/hook_status_pairs.py",
-                "tests/helpers/hook_pair_worker.py", "tests/helpers/hook_rss_provenance.py",
+                "tests/helpers/hook_pair_worker.py", "tests/helpers/hook_source_snapshot.py",
+                "tests/helpers/hook_rss_provenance.py",
                 "tests/helpers/hook_trusted_launch.py", "bin/heavy-run")
 OLD_TRACKED = ("agent-hooks/block-dangerous-git.sh", "agent-hooks/bootstrap-endpoint-path.sh",
                "agent-hooks/plain-document-write.jq", "lib/dotfiles-endpoint-paths.sh")

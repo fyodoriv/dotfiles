@@ -3,7 +3,14 @@ from pathlib import Path
 import re
 
 from hook_pair_receipts import private_dir
+from hook_rss_provenance import identity
 from hook_trusted_launch import read_private, strict_json
+
+HOOK = "agent-hooks/block-dangerous-git.sh"
+BOOTSTRAP = "agent-hooks/bootstrap-endpoint-path.sh"
+PARSER = "agent-hooks/plain-document-write.jq"
+ENDPOINT = "lib/dotfiles-endpoint-paths.sh"
+STATUS = "agent-hooks/literal-status-only.sh"
 
 
 def identity_ok(root, run_dir, environ, parent_pid):
@@ -33,4 +40,49 @@ def identity_ok(root, run_dir, environ, parent_pid):
         rows = re.findall(rb"\bpid=(\d+)\s+slot=(\S+)", wait)
         return len(wait.splitlines()) == 1 and rows == [(str(parent_pid).encode("ascii"), b"exclusive")]
     except (KeyError, OSError, TypeError, UnicodeError, ValueError):
+        return False
+
+
+def materialize(scratch, old_revision, candidate_revision, fetch):
+    """Create equal-layout scratch hooks from already pinned source blobs."""
+    scratch = Path(scratch)
+    if not private_dir(scratch) or any(scratch.iterdir()):
+        raise ValueError("empty private scratch required")
+    entries = {}
+    for side, revision in (("old", old_revision), ("new", candidate_revision)):
+        paths = (HOOK, BOOTSTRAP, PARSER, ENDPOINT) + ((STATUS,) if side == "new" else ())
+        for path in paths:
+            mode, content = fetch(revision, path)
+            expected_mode = "100644" if path in (PARSER, ENDPOINT) else "100755"
+            if mode != expected_mode or type(content) is not bytes or len(content) > 2_000_000:
+                raise ValueError("invalid source blob")
+            entries[(side, path)] = (mode, content)
+    if any(entries[("old", path)] != entries[("new", path)] for path in (BOOTSTRAP, PARSER, ENDPOINT)):
+        raise ValueError("shared source differs")
+    paths = []
+    hooks = {}
+    for side in ("old", "new"):
+        side_dir = scratch / side
+        side_dir.mkdir(mode=0o700)
+        source = side_dir / "source"
+        links = side_dir / "hooks"
+        source.mkdir()
+        links.mkdir()
+        for path in (HOOK, BOOTSTRAP, PARSER) + ((STATUS,) if side == "new" else ()):
+            name = Path(path).name
+            target = source / name
+            target.write_bytes(entries[(side, path)][1])
+            target.chmod(0o755 if entries[(side, path)][0] == "100755" else 0o644)
+            link = links / name
+            link.symlink_to("../source/" + name)
+            paths.extend((target, link))
+        hooks[side] = links / Path(HOOK).name
+    return {"paths": paths, "snapshot": tuple(identity(path) for path in paths), "hooks": hooks}
+
+
+def fixture_unchanged(fixture):
+    try:
+        return (type(fixture) is dict and bool(fixture["paths"]) and
+                fixture["snapshot"] == tuple(identity(path) for path in fixture["paths"]))
+    except (KeyError, OSError, TypeError, ValueError):
         return False

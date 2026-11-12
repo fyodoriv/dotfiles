@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -79,6 +80,45 @@ class WorkerControls(unittest.TestCase):
                         path.rename(target)
                         path.symlink_to(target)
                     self.assertFalse(worker.identity_ok(root, run_dir, env, 123))
+
+    def test_materialization_binds_old_and_candidate_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def fetch(revision, path):
+                content = (revision if path.endswith("block-dangerous-git.sh") else "shared").encode()
+                mode = "100755" if path.endswith(".sh") and not path.startswith("lib/") else "100644"
+                return mode, content
+            fixture = worker.materialize(root, "old", "new", fetch)
+            self.assertTrue(worker.fixture_unchanged(fixture))
+            (root / "new/hooks/literal-status-only.sh").unlink()
+            os.symlink("../source/block-dangerous-git.sh", root / "new/hooks/literal-status-only.sh")
+            self.assertFalse(worker.fixture_unchanged(fixture))
+
+    def test_changed_shared_helper_stops_before_materialization(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def fetch(revision, path):
+                value = revision if path.endswith("bootstrap-endpoint-path.sh") else "same"
+                mode = "100755" if path.endswith(".sh") and not path.startswith("lib/") else "100644"
+                return mode, value.encode()
+            with self.assertRaises(ValueError):
+                worker.materialize(root, "old", "new", fetch)
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_preexisting_scratch_symlink_cannot_redirect_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            outer = Path(directory)
+            scratch, external = outer / "scratch", outer / "external"
+            scratch.mkdir(mode=0o700)
+            external.mkdir()
+            (scratch / "old").symlink_to(external)
+            def fetch(revision, path):
+                mode = "100755" if path.endswith(".sh") and not path.startswith("lib/") else "100644"
+                return mode, b"fixture"
+            with self.assertRaises(ValueError):
+                worker.materialize(scratch, "old", "new", fetch)
+            self.assertEqual(list(external.iterdir()), [])
+
 
 
 if __name__ == "__main__":

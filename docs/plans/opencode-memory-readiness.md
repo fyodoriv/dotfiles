@@ -13,6 +13,12 @@ The same isolated check can run on hosted macOS CI with a checksum-verified
 OpenCode release. Its network-denial control uses a synthetic local listener.
 This does not replace a later check on the installed Mac.
 
+The first hosted trial verified the release checksum and passed the synthetic
+network-denial control. Service configuration and start returned zero, but the
+subsequent authenticated API command returned nonzero. The test suppressed
+service output, so the failure cause is not yet known. Reproduce it locally and
+investigate the isolation boundary before changing the installed launcher.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

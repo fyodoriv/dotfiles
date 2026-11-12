@@ -35,3 +35,33 @@ signal a process without proven ownership and cleanup.
 Anchors: [libgit2 repository open flags](https://libgit2.org/docs/reference/main/repository/git_repository_open_flag_t.html),
 [object database API](https://libgit2.org/docs/reference/main/odb/index.html),
 and [candidate observation prediction](hook-candidate-observation-prediction.md).
+
+## Candidate snapshot alternative
+
+Registered before building the snapshot adapter, 2026-11-12. A read-only
+inspection found checked-out copies whose hook bytes match the previously
+observed old blob. That observation is not a timing result.
+
+Hypothesis: an independently reviewed, private source snapshot can bind the
+old and candidate paths to their pinned commits before admission. The timing
+worker can then verify bounded regular-file reads against that snapshot without
+running Git or decoding packed objects during measurement.
+
+Measurement: independently verify commit, path, mode and Git blob identity
+for every old and candidate input. Record the mapping in a private audit bound
+to a fresh run ID and both revisions. Copy only bounded regular files into an
+owner-only snapshot; reject links, mismatched hashes, changed source, missing
+files and altered audit records. Recheck snapshot identities before and after
+capture. Test the exact adapter and its launcher in isolated fixtures, then
+have an independent reviewer audit the actual source, tool and startup inputs.
+
+Success: every required input has one verified revision/path/mode/blob mapping;
+zero live Git, library object reads or source changes during measurement;
+every planted missing, linked, oversized, altered or mismatched input is
+refused. Preserve all timing, memory, output, admission and postflight gates.
+
+Pivot: if the commit-to-blob mapping, snapshot source, ownership or retained
+binding cannot be established, do not time and mark the result inconclusive.
+This is trusted local correlation, not protection from same-user tampering or
+transient swaps. An audit command that hangs does not authorize a measurement;
+never send a signal without independently proven ownership and cleanup.

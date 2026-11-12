@@ -189,3 +189,24 @@ the hook itself. Pivot: any unresolved selection, unsafe path or mismatch
 blocks timing. This binds only the helper; wrapper interpreters and system
 dependencies still need independent review. Anchor: the effective tool
 closure review above.
+
+## Owned-child capture prediction
+
+Hypothesis: one direct owned child per sample, bounded stream draining and
+deferred ordinary interruption can preserve the queue slot and partial
+evidence without signaling an unowned process. Measurement: pure injected
+process, stream, clock and receipt tests for start, output, wait, interruption
+and persistence failures. Success: zero next samples after an invalid event,
+zero unbounded retained output, zero signals sent by the worker, and every
+completed attempt persisted before continuation. Pivot: any unverified child
+or failed cleanup makes the run inconclusive; do not start a live benchmark.
+
+Install handlers for ordinary INT, TERM and HUP before starting the owned
+child. They only mark interruption. Drain both output pipes with a fixed cap,
+reap that direct child, retain its invalid attempt and run postflight before
+releasing the queue slot. An indefinitely hung child cannot be safely killed
+by this protocol; keep the slot and treat cleanup as unresolved. Hard kill,
+parent death, descendants and host failure remain outside this guarantee.
+Physical interruption or descendant tests require separate preregistration
+and an independent safety review. Anchor: the retained publication and
+observation controls above.

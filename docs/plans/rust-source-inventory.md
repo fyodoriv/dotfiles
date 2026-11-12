@@ -57,6 +57,16 @@ The endpoint-path scripts also source shared helpers or invoke managed shim
 helpers. Independent review checked the source family; the receipt does not
 claim every dynamic caller or semantic boundary is covered.
 
+## Root source candidates
+
+The [root source receipt](rust-root-source-receipt.json) records root-level
+tracked blobs with executable mode, a shebang, or selected source suffixes at
+revision `861c94f`. The [registered check](rust-root-source-receipt.md) pins
+selected entry, helper and command anchors. Run
+`python3 docs/plans/doctor-source-receipt-check.py --root-sources`. The bounded
+predicate does not cover generated files or extensionless, non-executable
+source without a shebang; it does not establish actual execution.
+
 ## Script sources
 
 The [scripts receipt](rust-scripts-source-receipt.json) pins the tracked

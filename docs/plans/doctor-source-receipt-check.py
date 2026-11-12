@@ -98,9 +98,14 @@ elif sys.argv[1:] in (["--scripts"], ["--generate-scripts"]):
     REVISION = "8a2cb8ce664277d54c5b4a93cde20d360fb940fa"
     RECEIPT = Path("docs/plans/rust-scripts-source-receipt.json")
     FAMILY, EXPECTED = "scripts/", 8
+elif sys.argv[1:] in (["--root-sources"], ["--generate-root-sources"]):
+    REVISION = "861c94fbe37176c95fed04e258abc942f31e45db"
+    RECEIPT = Path("docs/plans/rust-root-source-receipt.json")
+    FAMILY, EXPECTED = "root", 6
 else:
-    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks|--scripts|--generate-scripts]")
-raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY])
+    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks|--scripts|--generate-scripts|--root-sources|--generate-root-sources]")
+tree_command = ["git", "ls-tree", "-z", REVISION] if FAMILY == "root" else ["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY]
+raw = subprocess.check_output(tree_command)
 tree = {}
 for record in raw.split(b"\0"):
     if not record:
@@ -110,6 +115,12 @@ for record in raw.split(b"\0"):
     if FAMILY == "modules/" and not re.fullmatch(r"modules/[^/]+/doctor\.sh", path):
         continue
     mode, kind, blob = meta.decode("ascii").split()
+    if FAMILY == "root":
+        if kind != "blob":
+            continue
+        content = subprocess.check_output(["git", "cat-file", "blob", blob])
+        if mode != "100755" and not content.startswith(b"#!") and not path.endswith((".sh", ".py", ".pl", ".mjs")):
+            continue
     if kind != "blob" or path in tree:
         raise SystemExit("invalid source tree")
     tree[path] = {"mode": mode, "blob": blob}
@@ -136,9 +147,18 @@ script_anchors = {
     "scripts/perf-gate.sh": [1, 172],
     "scripts/proof.sh": [1, 36, 185],
 }
-if sys.argv[1:] in (["--generate-libraries"], ["--generate-git-hooks"], ["--generate-scripts"]):
+root_anchors = {
+    "macos-apps.sh": [1, 13, 15, 17, 19],
+    "macos-trackpad.sh": [1, 31, 35],
+    "macos-visual.sh": [1, 13, 15, 20],
+    "macos.sh": [1, 20, 22, 36],
+    "modify_private_dot_npmrc": [1, 19, 48],
+    "snapshot.sh": [1, 15, 60],
+}
+if sys.argv[1:] in (["--generate-libraries"], ["--generate-git-hooks"], ["--generate-scripts"], ["--generate-root-sources"]):
     selected = ({path: [1] for path in tree} if FAMILY == "lib/" else
-                git_hook_anchors if FAMILY == "git-hooks/" else script_anchors)
+                git_hook_anchors if FAMILY == "git-hooks/" else
+                script_anchors if FAMILY == "scripts/" else root_anchors)
     generated = {
         "format": 1,
         "revision": REVISION,
@@ -185,8 +205,8 @@ def valid(data):
             seen.add((path, number))
         if FAMILY == "lib/":
             return len(anchors) == len(tree) and seen == {(path, 1) for path in tree}
-        if FAMILY in ("git-hooks/", "scripts/"):
-            selected = git_hook_anchors if FAMILY == "git-hooks/" else script_anchors
+        if FAMILY in ("git-hooks/", "scripts/", "root"):
+            selected = git_hook_anchors if FAMILY == "git-hooks/" else script_anchors if FAMILY == "scripts/" else root_anchors
             return seen == {(path, number) for path, numbers in selected.items() for number in numbers}
         return {path for path, _ in seen} == set(tree)
     except (KeyError, TypeError, ValueError):
@@ -210,7 +230,7 @@ for index, row in enumerate(data["files"]):
             case["files"][index][field] = "invalid"
         mutants.append(case)
 for index in range(len(data["anchors"])):
-    fields = ("line", "text", "duplicate", "remove") if FAMILY in ("git-hooks/", "scripts/") else ("line", "text", "duplicate")
+    fields = ("line", "text", "duplicate", "remove") if FAMILY in ("git-hooks/", "scripts/", "root") else ("line", "text", "duplicate")
     for field in fields:
         case = copy.deepcopy(data)
         if field == "remove":

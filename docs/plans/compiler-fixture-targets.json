@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "pin": "025f0a0473f9f60d27d07d8a1ef47fcc1ec1787b",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "manifest": {
+    "path": "tests/fixtures/compiler-queue-observer/Cargo.toml",
+    "mode": "100644",
+    "blob": "59e4f421fc91cc83ccea7d8da52c026a2bf4e606"
+  },
+  "records": [
+    {
+      "path": "tests/fixtures/compiler-queue-observer/epoch.rs",
+      "mode": "100644",
+      "blob": "e8da096291bf74ff8ae22eb86a14760a8fb15873",
+      "target": "compiler_queue_epoch"
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/harness.rs",
+      "mode": "100644",
+      "blob": "97fac1d52e1e1660f9cea5cdbbbf9e153068f3a2",
+      "target": "compiler_queue_harness"
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/receipts.rs",
+      "mode": "100644",
+      "blob": "70fc6d10cb4b4480ff445863a679e147c8234769",
+      "target": "compiler_queue_receipts"
+    }
+  ]
+}

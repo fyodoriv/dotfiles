@@ -46,24 +46,27 @@ These four variants are supplementary checks of the same hook slice. They do
 not establish independent gate-qualified results for the non-row workloads.
 The unchanged `git status` budget row remains the benefit decision.
 
-## Qualified peak-RSS baseline (2026-11-12)
+## Provisional peak-RSS baseline (2026-11-12)
 
 The second retained baseline used source revision
 `2b531529bb9bc6b787363aa96afc689b8940ff4e`. The two 15-sample
 windows each had a median peak RSS of 4,784,128 bytes. Their ratio was
-1.000, within the registered 0.95–1.05 A/A range. The candidate's median
-must be at most 5,262,540 bytes to meet the 1.10 bound.
+1.000, within the registered 0.95–1.05 A/A range. Applying the 1.10
+calculation gives 5,262,540 bytes, but this is not a qualified candidate bound.
 
 A separately retained request and startup audit were checked against the
 private launch, wait and sample receipts. Independent review confirmed the
 15 + 15 counts, medians, ratio and retained validation flags. This is trusted
 local correlation, not kernel lock attestation. It does not rule out
 same-user tampering or transient changes; source, tool and load flags remain
-controller observations. Raw samples and launch evidence stay private.
+controller observations. A later independent review found that the retained
+audit does not establish the effective helper and executable/interpreter chains.
+The baseline is therefore inconclusive for qualification. A later probe cannot
+repair the evidence for this run. Raw samples and launch evidence stay private.
 
 The candidate retry mechanically passed the two-window sample and arithmetic
 checks. Each 15-sample window had a median of 4,767,744 bytes, below the
-registered 5,262,540-byte bound; their A/A ratio was 1.000. A later independent
+provisional 5,262,540-byte calculation; their A/A ratio was 1.000. A later independent
 review found that the retained audit does not establish the actual resolved
 helper and all selected executable/interpreter chains. The result is
 **provisional and inconclusive for qualification**. Do not retrofit a later

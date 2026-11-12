@@ -19,11 +19,12 @@ class ReferenceControls(unittest.TestCase):
         expected = module.generate()
         referenced = next(i for i, row in enumerate(expected["records"]) if row["references"])
         changes = []
-        for mutation in ("missing", "blob", "line", "extra"):
+        for mutation in ("missing", "blob", "line", "extra", "locations"):
             value = copy.deepcopy(expected)
             if mutation == "missing": value["records"].pop()
             elif mutation == "blob": value["records"][0]["blob"] = "0" * 40
             elif mutation == "line": value["records"][referenced]["references"][0]["line"] += 1
+            elif mutation == "locations": value["location_count"] += 1
             else: value["records"].append(copy.deepcopy(value["records"][0]))
             changes.append(value)
         with tempfile.TemporaryDirectory() as directory:

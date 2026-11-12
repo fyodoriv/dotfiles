@@ -57,6 +57,20 @@ The endpoint-path scripts also source shared helpers or invoke managed shim
 helpers. Independent review checked the source family; the receipt does not
 claim every dynamic caller or semantic boundary is covered.
 
+## Library source identities
+
+The [library source receipt](rust-library-source-receipt.json) pins all 63
+tracked `lib/` blobs at revision `57a4b14`. Each path has a mode, blob and
+first-line anchor. Regenerate it with
+`python3 docs/plans/doctor-source-receipt-check.py --generate-libraries`.
+The [registered check](rust-library-receipt.md) compares
+them to that tree and plants identity and anchor errors. Run it with
+`python3 docs/plans/doctor-source-receipt-check.py --libraries`.
+
+This is an identity receipt, not a full caller or execution inventory. It does
+not classify the libraries, establish dynamic calls, or account for generated
+files. The manifest and pinned agentbrew validator remain open.
+
 ## Doctor module sources
 
 The [doctor source receipt](doctor-source-receipt.json) pins the tracked

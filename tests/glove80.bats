@@ -352,7 +352,7 @@ MOCK
 @test "pairing diagnostic reads a synthetic connection failure" {
   local pair_status pair_output
   printf '#!/bin/bash\nprintf "opened\\n" >> "$OPEN_LOG"\n' > "$TEST_DIR/bin/open"
-  export GLOVE80_WAIT_SECONDS=1
+  export GLOVE80_WAIT_SECONDS=4
   run confirm_pair y
   pair_status="$status"; pair_output="$output"
   [ "$pair_status" -ne 0 ]

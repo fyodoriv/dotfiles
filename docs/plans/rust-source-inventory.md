@@ -46,6 +46,13 @@ shebang alone cannot classify the code it launches. The native wrapper paths
 can overlap the earlier ledger. Reconcile overlapping paths before counting
 repository-wide coverage.
 
+The [current bin identity receipt](rust-current-bin-source-receipt.json)
+pins `bin/` at revision `c5ed285`; its [registered check](rust-current-bin-receipt.md)
+records every tracked path, mode, blob and first line. Run
+`python3 docs/plans/doctor-source-receipt-check.py --bin-sources`. The older
+embedded-code anchors above remain historical; changes since that revision
+need separate semantic review before they can support current caller coverage.
+
 ## Agent hook sources
 
 The [agent-hook source receipt](agent-hook-source-receipt.json) pins the

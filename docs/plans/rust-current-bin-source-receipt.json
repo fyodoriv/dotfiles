@@ -1,0 +1,1358 @@
+{
+  "format": 1,
+  "revision": "c5ed285bbd51278501536bc40602761f779d24d2",
+  "files": [
+    {
+      "path": "bin/add-task",
+      "mode": "100755",
+      "blob": "6f7738f6d96b451efac35078f5fd90c7fd7953fe"
+    },
+    {
+      "path": "bin/agent-browser-reap-strays",
+      "mode": "100755",
+      "blob": "ecf81ee49d0be51bcc78983d818e65f78ab54a97"
+    },
+    {
+      "path": "bin/agent-browser-singleton-preflight",
+      "mode": "100755",
+      "blob": "e20b739e9c383a7305b80c320cd03c6931d6d7b8"
+    },
+    {
+      "path": "bin/agent-browser-temp-route",
+      "mode": "100755",
+      "blob": "5d017b1a2ef52234bb3b7cca02fbaed52d893cef"
+    },
+    {
+      "path": "bin/agent-scratch-prune",
+      "mode": "100755",
+      "blob": "0233909b4b9608feb94ad9d92d175f7f42cf0e3e"
+    },
+    {
+      "path": "bin/agent-tab",
+      "mode": "100755",
+      "blob": "eb9ca287bc3ec9c3766d643d799975d20c20e20e"
+    },
+    {
+      "path": "bin/agent-tmux",
+      "mode": "100755",
+      "blob": "9b7007fcd4fe8b9a474c99a22257a2eb4fc6ba78"
+    },
+    {
+      "path": "bin/agentbrew",
+      "mode": "100755",
+      "blob": "e8c0e76a616e157140906f94d8acaf97bfadc24b"
+    },
+    {
+      "path": "bin/app-priority",
+      "mode": "100755",
+      "blob": "5c29fc3f69568b9689b02218fd7f6bfc3dd1bc05"
+    },
+    {
+      "path": "bin/bats-affected",
+      "mode": "100755",
+      "blob": "c48833025e7878ce2ec927315589786ff01e5092"
+    },
+    {
+      "path": "bin/cached-run",
+      "mode": "100755",
+      "blob": "75c24f963e9d8bf7bf24592210e85355ff1ee131"
+    },
+    {
+      "path": "bin/cascade-caffeinate",
+      "mode": "100755",
+      "blob": "6b0daa3a0ed16f3198788895a44fc0d7c7db0c5b"
+    },
+    {
+      "path": "bin/cheat",
+      "mode": "100755",
+      "blob": "8bb1ec07501fdfb8b155907dbaaab1b937b5e183"
+    },
+    {
+      "path": "bin/check-all",
+      "mode": "100755",
+      "blob": "a54e5433e2709be51dd9a32b1a9cbc86970dde7d"
+    },
+    {
+      "path": "bin/chrome-enforce-profile",
+      "mode": "100755",
+      "blob": "52b5a1139948fb2d55996b9a7ff3dbadce7ef392"
+    },
+    {
+      "path": "bin/chrome-heal",
+      "mode": "100755",
+      "blob": "2ae77a8486f96638b4a041e3da81a8505fe9e3eb"
+    },
+    {
+      "path": "bin/chromework-activate",
+      "mode": "100755",
+      "blob": "71497c5aa74f1984fe8b898441e6428cc758fd99"
+    },
+    {
+      "path": "bin/chromework-fix-http-routing",
+      "mode": "100755",
+      "blob": "bbb7adc526db749de715b051869bcca2cc580a78"
+    },
+    {
+      "path": "bin/chromework-install",
+      "mode": "100755",
+      "blob": "d81e398b5147988d483d8a27ef92ca84fcb98c2d"
+    },
+    {
+      "path": "bin/chromework-open-url",
+      "mode": "100755",
+      "blob": "9e99e957f9034a0615373e4d46d902f843abe9e6"
+    },
+    {
+      "path": "bin/cleanup",
+      "mode": "100755",
+      "blob": "80e984bcd86f55170d5e0f410a18bc9b28e21e32"
+    },
+    {
+      "path": "bin/dotfiles",
+      "mode": "100755",
+      "blob": "52658472934d2a3181f37bd87358078f2d3893d1"
+    },
+    {
+      "path": "bin/dotfiles-actions",
+      "mode": "100755",
+      "blob": "2753a23ab4d3b91789ddcb10b8af271c32c1d103"
+    },
+    {
+      "path": "bin/dotfiles-add",
+      "mode": "100755",
+      "blob": "cba5f318dc55df16c123d24417ef846e7a009502"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-bottles",
+      "mode": "100755",
+      "blob": "2fff5dcb039c140ef3ac8877589e817dc23aa1e2"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-curl",
+      "mode": "100755",
+      "blob": "8f69d95f4d22801063717780bc36a702295d45fc"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-endpoint-shims",
+      "mode": "100755",
+      "blob": "1c1aa98481ff95c6d9e1616ee3d62842a38eb1f3"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-ggrep",
+      "mode": "100755",
+      "blob": "69a177d30d86040dc584fe78538fb86b50446b4a"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-jq",
+      "mode": "100755",
+      "blob": "2b5d2279c5ebd3f5965f1a6d97f2f96f6b1446b9"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-uv-pythons",
+      "mode": "100755",
+      "blob": "2a8116aad151fe84f30ca1cb7be04a2f29d16d2e"
+    },
+    {
+      "path": "bin/dotfiles-agent-keepawake",
+      "mode": "100755",
+      "blob": "8ca720a467c8f78e2c33dc7b57b8604d9af44a99"
+    },
+    {
+      "path": "bin/dotfiles-agent-wake-recover",
+      "mode": "100755",
+      "blob": "59c8c6817e2f42b55a873d43d7927226cc2e4b6b"
+    },
+    {
+      "path": "bin/dotfiles-agentfile-resync",
+      "mode": "100755",
+      "blob": "606e15b7fe68eaa504fa3c76577338cc6dbd2356"
+    },
+    {
+      "path": "bin/dotfiles-amphetamine-sync",
+      "mode": "100755",
+      "blob": "6303ced88d85ca7d96a9cd572fc6fc1b60ff02b6"
+    },
+    {
+      "path": "bin/dotfiles-audit",
+      "mode": "100755",
+      "blob": "de8d6b11458d11cf0f8228cdbc23b777b13ff701"
+    },
+    {
+      "path": "bin/dotfiles-brew-add",
+      "mode": "100755",
+      "blob": "70cf31f2c4cb425e3fef109dc00286ab739dda68"
+    },
+    {
+      "path": "bin/dotfiles-chrome-dock-guard",
+      "mode": "100755",
+      "blob": "42f2352e8b2ff6add3f02d90a87f61336816ad62"
+    },
+    {
+      "path": "bin/dotfiles-config",
+      "mode": "100755",
+      "blob": "2e84f65b8f3c2ce4f3dee2fb5fe801e9d2585cc4"
+    },
+    {
+      "path": "bin/dotfiles-contribute",
+      "mode": "100755",
+      "blob": "4540f80f742de2fe68ad1122eaaf60aa9dcd464b"
+    },
+    {
+      "path": "bin/dotfiles-coverage",
+      "mode": "100755",
+      "blob": "8114e57182bf76bfcf676f15815d718329b311b0"
+    },
+    {
+      "path": "bin/dotfiles-defaults-add",
+      "mode": "100755",
+      "blob": "e45adc12095e6e800088ee9215730b4fc18cf044"
+    },
+    {
+      "path": "bin/dotfiles-defaults-preview",
+      "mode": "100755",
+      "blob": "291b47f8254cf2a1d7c2e538d2b94bc959a4c002"
+    },
+    {
+      "path": "bin/dotfiles-disable-blocked-node-automation",
+      "mode": "100755",
+      "blob": "0d74e8fbef8f99afc187286cf855cfc2c51bd763"
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "mode": "100755",
+      "blob": "67f8e4f82a061fcf951031457efdae7c42c54861"
+    },
+    {
+      "path": "bin/dotfiles-ensure-gui-path",
+      "mode": "100755",
+      "blob": "215b12e611cebc7fd57da176b8362387894a5a6b"
+    },
+    {
+      "path": "bin/dotfiles-enterprise",
+      "mode": "100755",
+      "blob": "d38b88278089a1d5259f43b0010e27ea858e36e4"
+    },
+    {
+      "path": "bin/dotfiles-fix-launchagent-endpoint-path",
+      "mode": "100755",
+      "blob": "3e63d0006aeaef91c7e1bb7fdb8fd64f9a85fb53"
+    },
+    {
+      "path": "bin/dotfiles-glove80",
+      "mode": "100755",
+      "blob": "f9cf714306cef9ed6e13071b60e03cf8119afe64"
+    },
+    {
+      "path": "bin/dotfiles-heal-stuck-agents",
+      "mode": "100755",
+      "blob": "ee68ee5d76eb69e8b7bb509201d3b3368c6f855c"
+    },
+    {
+      "path": "bin/dotfiles-install",
+      "mode": "100755",
+      "blob": "b69633d516c4fee8e25f51712145732d39385282"
+    },
+    {
+      "path": "bin/dotfiles-install-aws-gcloud",
+      "mode": "100755",
+      "blob": "72d4efc571ea230eac119b93b85d6365e1eaddc4"
+    },
+    {
+      "path": "bin/dotfiles-install-codex",
+      "mode": "100755",
+      "blob": "84affda764870277a50f704e0c9599fd77ba23ed"
+    },
+    {
+      "path": "bin/dotfiles-launchagent-drift",
+      "mode": "100755",
+      "blob": "106b877f23c16871c7da2ebbe6af6f1c7e0291d9"
+    },
+    {
+      "path": "bin/dotfiles-launchd-maxfiles",
+      "mode": "100755",
+      "blob": "6c664de4c68209290de5f621b292461ac302c8f0"
+    },
+    {
+      "path": "bin/dotfiles-leak",
+      "mode": "100755",
+      "blob": "ab6bf760983b66439f4b3e56e2e2d61bb8ab81cd"
+    },
+    {
+      "path": "bin/dotfiles-link-awk-shim",
+      "mode": "100755",
+      "blob": "48466680bd50c6975181a55b353773020e87477a"
+    },
+    {
+      "path": "bin/dotfiles-link-curl-shim",
+      "mode": "100755",
+      "blob": "6bfbc208bec01e2862476eae68ae19a43ee99078"
+    },
+    {
+      "path": "bin/dotfiles-link-find-shim",
+      "mode": "100755",
+      "blob": "c46428d02fa221740a3670640becdf37243b2d92"
+    },
+    {
+      "path": "bin/dotfiles-link-git-shim",
+      "mode": "100755",
+      "blob": "0c3b4f9460a21aa231a89c7acf2cf620ee9124c1"
+    },
+    {
+      "path": "bin/dotfiles-link-grep-shim",
+      "mode": "100755",
+      "blob": "9ede160a9b10add68aea552a2de10fbd23089026"
+    },
+    {
+      "path": "bin/dotfiles-link-jq-shim",
+      "mode": "100755",
+      "blob": "9aa29528bde6373343faa216b18adabaf71abe90"
+    },
+    {
+      "path": "bin/dotfiles-link-otool-shim",
+      "mode": "100755",
+      "blob": "a223a0305770b261c52859c837740edbded11f53"
+    },
+    {
+      "path": "bin/dotfiles-link-perl-shim",
+      "mode": "100755",
+      "blob": "aa36bf762ed139b2a3e21386802ebe678816256e"
+    },
+    {
+      "path": "bin/dotfiles-link-python-shim",
+      "mode": "100755",
+      "blob": "b789a277540d163f2ffd99f2492253106febec08"
+    },
+    {
+      "path": "bin/dotfiles-link-sed-shim",
+      "mode": "100755",
+      "blob": "d39f01dace803780ef629f75fb9a90c903029b85"
+    },
+    {
+      "path": "bin/dotfiles-load-sampler",
+      "mode": "100755",
+      "blob": "0bd7dd5d7c27e772a16dcfa7de45f86bf79c646b"
+    },
+    {
+      "path": "bin/dotfiles-lock-checked",
+      "mode": "100755",
+      "blob": "ef320c491e12ac5c26e6f71846348b05e3438269"
+    },
+    {
+      "path": "bin/dotfiles-mas-upgrade",
+      "mode": "100755",
+      "blob": "6438fe3c8631df9d054dc5966aaa5e8c931bc04c"
+    },
+    {
+      "path": "bin/dotfiles-mcp-launch",
+      "mode": "100755",
+      "blob": "26d8bd56cf9237bc470d0f181ad2059dbc6d089f"
+    },
+    {
+      "path": "bin/dotfiles-memory",
+      "mode": "100755",
+      "blob": "915a95cf787a29a8e73fad431c9ce9fbde060151"
+    },
+    {
+      "path": "bin/dotfiles-memory-sync-projects",
+      "mode": "100755",
+      "blob": "4179617c8cbfe2d04543ac921a5da00f68ff5a07"
+    },
+    {
+      "path": "bin/dotfiles-metrics",
+      "mode": "100755",
+      "blob": "ce41d48b1064139672d20f4ddc03f76a1e95d872"
+    },
+    {
+      "path": "bin/dotfiles-new-module",
+      "mode": "100755",
+      "blob": "ac80f5a9f837fe8d1eebc875141f9eb18e9d856f"
+    },
+    {
+      "path": "bin/dotfiles-node-upgrade",
+      "mode": "100755",
+      "blob": "55d5b94ec104ac1d1abf7b2c2e800d7bc995bf34"
+    },
+    {
+      "path": "bin/dotfiles-npm-global-scripts",
+      "mode": "100755",
+      "blob": "3a04d6155791fc7b2ca406dcbb27e8d9b0ba7a71"
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "mode": "100755",
+      "blob": "48c17a27f840fa4780dbd31c92c21a15270aa2a8"
+    },
+    {
+      "path": "bin/dotfiles-pmset-drift-watch",
+      "mode": "100755",
+      "blob": "975785a2eb2c43d8c38d1cbc21e9a36fe1cccbb3"
+    },
+    {
+      "path": "bin/dotfiles-pnpm-global-update",
+      "mode": "100755",
+      "blob": "036308a6da8f0acb391f092ed8fbaf526b9b079c"
+    },
+    {
+      "path": "bin/dotfiles-profile",
+      "mode": "100755",
+      "blob": "759d3c22b2222aa59972b1fa11315756dc24593d"
+    },
+    {
+      "path": "bin/dotfiles-python-tls-relax",
+      "mode": "100755",
+      "blob": "0139fd25bcc3c1beb826ef56ec28e4833b0929ae"
+    },
+    {
+      "path": "bin/dotfiles-quickstart",
+      "mode": "100755",
+      "blob": "c6e270b4020259e4b4ee50482801bacdd371d75c"
+    },
+    {
+      "path": "bin/dotfiles-quit-relay",
+      "mode": "100755",
+      "blob": "e87d17a7763c3c4a5177aecc29271e7bbf78e3f8"
+    },
+    {
+      "path": "bin/dotfiles-reload-launchagents",
+      "mode": "100755",
+      "blob": "0184024d314608961073be0d5f04aba1859a7929"
+    },
+    {
+      "path": "bin/dotfiles-remove-framework-python",
+      "mode": "100755",
+      "blob": "b8d48258642fba1d06c15b62832cb55477d6072f"
+    },
+    {
+      "path": "bin/dotfiles-resilience-setup",
+      "mode": "100755",
+      "blob": "931cd3bba8d5f5cd2524c5d204b31f3e77c4b933"
+    },
+    {
+      "path": "bin/dotfiles-restore-focus-after-chrome",
+      "mode": "100755",
+      "blob": "b20b9e2f6d8d72c82f6e7d193936cca770508712"
+    },
+    {
+      "path": "bin/dotfiles-set-persistent-chrome-themes",
+      "mode": "100755",
+      "blob": "a73d3eac5b3c2657c86ae06d05487ceb26bb51d8"
+    },
+    {
+      "path": "bin/dotfiles-start",
+      "mode": "100755",
+      "blob": "ee0524c63405773e8b587e98a783090c5eabbf2b"
+    },
+    {
+      "path": "bin/dotfiles-stats",
+      "mode": "100755",
+      "blob": "3ba0070542e3cc5c2d009a0992c61865f470b73b"
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "mode": "100755",
+      "blob": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe"
+    },
+    {
+      "path": "bin/dotfiles-telemetry",
+      "mode": "100755",
+      "blob": "26082e9775eaa95fc4d7e4450e3e87bcd1ea2273"
+    },
+    {
+      "path": "bin/dotfiles-uninstall",
+      "mode": "100755",
+      "blob": "de2d50a177b854e7ad3a8c6e86f08808db361a18"
+    },
+    {
+      "path": "bin/dotfiles-unmanage",
+      "mode": "100755",
+      "blob": "3c1bb3a58c31d69039737a83ad7b36d3715269d2"
+    },
+    {
+      "path": "bin/dotfiles-update",
+      "mode": "100755",
+      "blob": "bb59408f9220b1223853f3faefdbfc827701c1fb"
+    },
+    {
+      "path": "bin/dotfiles-updates-landed",
+      "mode": "100755",
+      "blob": "2c113cc97bd47d2c8b0e3499f4e0cb37372f2ab6"
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "mode": "100755",
+      "blob": "837728f14d1081eb4a448d21513498780c8cf05b"
+    },
+    {
+      "path": "bin/dotfiles-validate",
+      "mode": "100755",
+      "blob": "19eac1cdd93f24cb28ecb6d99e40da7391d207ee"
+    },
+    {
+      "path": "bin/dotfiles-workspace",
+      "mode": "100755",
+      "blob": "da306ddebff0cd69e7af1203d55d469d3869f1d0"
+    },
+    {
+      "path": "bin/gh",
+      "mode": "100755",
+      "blob": "bc7397d9e0ccc19aa49bbad1f5fb84e6dfcda7ce"
+    },
+    {
+      "path": "bin/git",
+      "mode": "100755",
+      "blob": "ae129f82bc587fc9690c2484e8280d3f9b5bed1c"
+    },
+    {
+      "path": "bin/git-maintain",
+      "mode": "100755",
+      "blob": "09df9f32f91b0ae339a770d08a6ad9a9e9a3aa89"
+    },
+    {
+      "path": "bin/git-safe",
+      "mode": "100755",
+      "blob": "95da872ddb3735f65d95a8cf2965422b06538e6a"
+    },
+    {
+      "path": "bin/graceful-restart",
+      "mode": "100755",
+      "blob": "7cd31b951eb5f6f6ffd1e637cdc8056605256751"
+    },
+    {
+      "path": "bin/headless-chrome-unlocked",
+      "mode": "100755",
+      "blob": "af051e10d1091eb59179da02910e7b9f4abaac3b"
+    },
+    {
+      "path": "bin/heavy-run",
+      "mode": "100755",
+      "blob": "927c5e979195b86de9f1595bff04f143e5186325"
+    },
+    {
+      "path": "bin/hotfix",
+      "mode": "100755",
+      "blob": "90695163f820b20acbab72b2b62a2f7fe51f69a5"
+    },
+    {
+      "path": "bin/jetbrains-install-plugins",
+      "mode": "100755",
+      "blob": "ba37d0b1862391862edf158afcbd6016b03e4f7b"
+    },
+    {
+      "path": "bin/kimi-goal",
+      "mode": "100755",
+      "blob": "f10daca4d19b652efb0ff39639b3459697d83e2c"
+    },
+    {
+      "path": "bin/kimi-usage",
+      "mode": "100755",
+      "blob": "293dcadb0843af29ab3c587f54a21b9f233d401e"
+    },
+    {
+      "path": "bin/land",
+      "mode": "100755",
+      "blob": "cde564d91db3351a16f543a7dd0c905efe2aaf3d"
+    },
+    {
+      "path": "bin/learn-repos-inventory",
+      "mode": "100755",
+      "blob": "90b8cad1c49f429193e8ff57e4067f11b441eb00"
+    },
+    {
+      "path": "bin/learn-repos-source-fingerprint",
+      "mode": "100755",
+      "blob": "1db6787e482dbe0bd1f32e3266dfa5161eede1ae"
+    },
+    {
+      "path": "bin/local-ai-agent",
+      "mode": "100755",
+      "blob": "c48412629935417172e91f43e9ff1a17e8eaa21e"
+    },
+    {
+      "path": "bin/local-ai-bench",
+      "mode": "100755",
+      "blob": "bfdee822a043d6ed86050e750139b60f88115c57"
+    },
+    {
+      "path": "bin/local-ai-loop",
+      "mode": "100755",
+      "blob": "e669bca5bed90e797852a9040155e4256abefdb1"
+    },
+    {
+      "path": "bin/local-ai-readiness-check",
+      "mode": "100755",
+      "blob": "e927df2ef1a200f505f4842f6234b1c1ec2a3013"
+    },
+    {
+      "path": "bin/local-ai-record-lesson",
+      "mode": "100755",
+      "blob": "76f353cb8f60f6b49847528eae636d44696df3be"
+    },
+    {
+      "path": "bin/local-ai-warmup",
+      "mode": "100755",
+      "blob": "4d19b4c784d8541af69945010cd959d3ff5ab9c9"
+    },
+    {
+      "path": "bin/local-models",
+      "mode": "100755",
+      "blob": "f291da0980153e7ec4bf05fd14151f9773b1006a"
+    },
+    {
+      "path": "bin/mcp-memory-launchagent",
+      "mode": "100755",
+      "blob": "88850f846b2a084261abea7a40ec3e4eac68fc03"
+    },
+    {
+      "path": "bin/morning",
+      "mode": "100755",
+      "blob": "55011ac3762306570b0af702911923d234943f64"
+    },
+    {
+      "path": "bin/network-watchdog",
+      "mode": "100755",
+      "blob": "c39bbee73a28ce21d48482abf10de27b48a87a86"
+    },
+    {
+      "path": "bin/new-project",
+      "mode": "100755",
+      "blob": "7e62d7e18fb1fd442ce6de77e38ac6954acdd4f7"
+    },
+    {
+      "path": "bin/note",
+      "mode": "100755",
+      "blob": "dd6019338ba66c7fb9bd499462c1c12609ae64d3"
+    },
+    {
+      "path": "bin/ollama-launchagent",
+      "mode": "100755",
+      "blob": "4e89ccb3882415bc6910082a5d979e8bc59d4a61"
+    },
+    {
+      "path": "bin/pr",
+      "mode": "100755",
+      "blob": "e7e37fac1d59d0b412065d6cace1a49966038340"
+    },
+    {
+      "path": "bin/rancher-desktop",
+      "mode": "100755",
+      "blob": "d50ee0efabea3742de433390189207746d271b88"
+    },
+    {
+      "path": "bin/review",
+      "mode": "100755",
+      "blob": "7f0b1e3078c90f8b89abdcfadbcb385ed368984e"
+    },
+    {
+      "path": "bin/setup-chrome",
+      "mode": "100755",
+      "blob": "e77b8e940c1124f3b253d13f7af03da2f264c2c4"
+    },
+    {
+      "path": "bin/setup-dock",
+      "mode": "100755",
+      "blob": "71772e3b4dac98c41f7bd81cdea4133a0d090d95"
+    },
+    {
+      "path": "bin/slack-draft",
+      "mode": "100755",
+      "blob": "3af2264cee760c86d8be2ad41b18c26a20e1f51e"
+    },
+    {
+      "path": "bin/status",
+      "mode": "100755",
+      "blob": "0e07475d9e25cc479c1a0b26f7fd886372019ea6"
+    },
+    {
+      "path": "bin/temp-browser",
+      "mode": "100755",
+      "blob": "e9646df28bf1a2770489cdf5160f003d01aefead"
+    },
+    {
+      "path": "bin/timer",
+      "mode": "100755",
+      "blob": "846d680070af697a37c87eebc7a41e807e3d8ea3"
+    },
+    {
+      "path": "bin/tooling-sync",
+      "mode": "100755",
+      "blob": "4a2ba82725addff1c69af0778d4e92ab3aadc625"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "bin/add-task",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agent-browser-reap-strays",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agent-browser-singleton-preflight",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agent-browser-temp-route",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agent-scratch-prune",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agent-tab",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agent-tmux",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/agentbrew",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/app-priority",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/bats-affected",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/cached-run",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/cascade-caffeinate",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/cheat",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/check-all",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/chrome-enforce-profile",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/chrome-heal",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/chromework-activate",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/chromework-fix-http-routing",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/chromework-install",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/chromework-open-url",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/cleanup",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-actions",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-add",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-bottles",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-curl",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-endpoint-shims",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-ggrep",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-jq",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-adhoc-sign-uv-pythons",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-agent-keepawake",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-agent-wake-recover",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-agentfile-resync",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-amphetamine-sync",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-audit",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-brew-add",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-chrome-dock-guard",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-config",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-contribute",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-coverage",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-defaults-add",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-defaults-preview",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-disable-blocked-node-automation",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-doctor",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-ensure-gui-path",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-enterprise",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-fix-launchagent-endpoint-path",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-glove80",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-heal-stuck-agents",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-install",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-install-aws-gcloud",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-install-codex",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-launchagent-drift",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-launchd-maxfiles",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-leak",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-awk-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-curl-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-find-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-git-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-grep-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-jq-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-otool-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-perl-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-python-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-link-sed-shim",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-load-sampler",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-lock-checked",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-mas-upgrade",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-mcp-launch",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-memory",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-memory-sync-projects",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-metrics",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-new-module",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-node-upgrade",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-npm-global-scripts",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-plugin",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-pmset-drift-watch",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-pnpm-global-update",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-profile",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-python-tls-relax",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-quickstart",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-quit-relay",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-reload-launchagents",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-remove-framework-python",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-resilience-setup",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-restore-focus-after-chrome",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-set-persistent-chrome-themes",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-start",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-stats",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-sync",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-telemetry",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-uninstall",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-unmanage",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-update",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-updates-landed",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-upgrade",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-validate",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/dotfiles-workspace",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/gh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/git",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/git-maintain",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/git-safe",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/graceful-restart",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/headless-chrome-unlocked",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/heavy-run",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/hotfix",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/jetbrains-install-plugins",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/kimi-goal",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/kimi-usage",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/land",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/learn-repos-inventory",
+      "line": 1,
+      "text": "#!/bin/sh"
+    },
+    {
+      "path": "bin/learn-repos-source-fingerprint",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-ai-agent",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-ai-bench",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-ai-loop",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-ai-readiness-check",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-ai-record-lesson",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-ai-warmup",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/local-models",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/mcp-memory-launchagent",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/morning",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/network-watchdog",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/new-project",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/note",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/ollama-launchagent",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/pr",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/rancher-desktop",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/review",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/setup-chrome",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/setup-dock",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/slack-draft",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/status",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/temp-browser",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/timer",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "bin/tooling-sync",
+      "line": 1,
+      "text": "#!/bin/bash"
+    }
+  ]
+}

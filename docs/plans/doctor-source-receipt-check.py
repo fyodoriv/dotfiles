@@ -102,8 +102,12 @@ elif sys.argv[1:] in (["--root-sources"], ["--generate-root-sources"]):
     REVISION = "861c94fbe37176c95fed04e258abc942f31e45db"
     RECEIPT = Path("docs/plans/rust-root-source-receipt.json")
     FAMILY, EXPECTED = "root", 6
+elif sys.argv[1:] in (["--bin-sources"], ["--generate-bin-sources"]):
+    REVISION = "c5ed285bbd51278501536bc40602761f779d24d2"
+    RECEIPT = Path("docs/plans/rust-current-bin-source-receipt.json")
+    FAMILY, EXPECTED = "bin/", 135
 else:
-    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks|--scripts|--generate-scripts|--root-sources|--generate-root-sources]")
+    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks|--scripts|--generate-scripts|--root-sources|--generate-root-sources|--bin-sources|--generate-bin-sources]")
 tree_command = ["git", "ls-tree", "-z", REVISION] if FAMILY == "root" else ["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY]
 raw = subprocess.check_output(tree_command)
 tree = {}
@@ -155,8 +159,8 @@ root_anchors = {
     "modify_private_dot_npmrc": [1, 19, 48],
     "snapshot.sh": [1, 15, 60],
 }
-if sys.argv[1:] in (["--generate-libraries"], ["--generate-git-hooks"], ["--generate-scripts"], ["--generate-root-sources"]):
-    selected = ({path: [1] for path in tree} if FAMILY == "lib/" else
+if sys.argv[1:] in (["--generate-libraries"], ["--generate-git-hooks"], ["--generate-scripts"], ["--generate-root-sources"], ["--generate-bin-sources"]):
+    selected = ({path: [1] for path in tree} if FAMILY in ("lib/", "bin/") else
                 git_hook_anchors if FAMILY == "git-hooks/" else
                 script_anchors if FAMILY == "scripts/" else root_anchors)
     generated = {
@@ -203,7 +207,7 @@ def valid(data):
             if lines[path][number - 1] != text or (path, number) in seen:
                 return False
             seen.add((path, number))
-        if FAMILY == "lib/":
+        if FAMILY in ("lib/", "bin/"):
             return len(anchors) == len(tree) and seen == {(path, 1) for path in tree}
         if FAMILY in ("git-hooks/", "scripts/", "root"):
             selected = git_hook_anchors if FAMILY == "git-hooks/" else script_anchors if FAMILY == "scripts/" else root_anchors
@@ -230,7 +234,7 @@ for index, row in enumerate(data["files"]):
             case["files"][index][field] = "invalid"
         mutants.append(case)
 for index in range(len(data["anchors"])):
-    fields = ("line", "text", "duplicate", "remove") if FAMILY in ("git-hooks/", "scripts/", "root") else ("line", "text", "duplicate")
+    fields = ("line", "text", "duplicate", "remove") if FAMILY in ("git-hooks/", "scripts/", "root", "bin/") else ("line", "text", "duplicate")
     for field in fields:
         case = copy.deepcopy(data)
         if field == "remove":

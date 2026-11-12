@@ -26,6 +26,16 @@ class PairControls(unittest.TestCase):
         self.data = {name: sample(case_index=i) for i, name in enumerate(pairs.CASES)}
         self.flags = dict.fromkeys(("admission", "source", "tools", "output", "load"), True)
 
+    def test_registered_cases_use_fixed_gate_payloads(self):
+        expected = {"plain": "git status", "short": "git status --short",
+                    "short_branch": "git status -s -b", "porcelain_v1": "git status --porcelain=v1"}
+        for name, command in expected.items():
+            self.assertEqual(pairs.payload(name), json.dumps({"tool_input": {"command": command}, "cwd": "/tmp"},
+                                                             separators=(",", ":")).encode())
+        self.assertEqual(pairs.payload("plain"), b'{"tool_input":{"command":"git status"},"cwd":"/tmp"}')
+        for invalid in ("unknown", None, True):
+            with self.assertRaises(ValueError): pairs.payload(invalid)
+
     def test_four_complete_balanced_cases_pass(self):
         result = pairs.summarize(self.data, self.flags)
         self.assertTrue(result["valid"])

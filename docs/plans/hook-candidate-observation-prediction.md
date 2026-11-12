@@ -10,8 +10,9 @@ unverified inputs before making a performance claim.
 Measurement: under exclusive `heavy-run` admissions, measure two windows of
 15 candidate peak-RSS samples using the registered payload, direct source path
 and wrapper, and four separate
-sets of 15 order-balanced old/candidate timing pairs. Check status, stdout and
-stderr parity for each pair. Record all samples privately. Separately run the
+sets of 15 order-balanced old/candidate timing pairs. The preparation helper
+constructs the four fixed JSON payloads; the plain case matches the RSS gate
+payload byte for byte. Check status, stdout and stderr parity for each pair. Record all samples privately. Separately run the
 unchanged registered performance gate.
 
 Alternate the first version within each case. Start cases one and three with

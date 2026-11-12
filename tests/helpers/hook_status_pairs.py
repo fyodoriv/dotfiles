@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 """Validate bounded, order-balanced status timing observations."""
+import json
 import statistics
 
 CASES = ("plain", "short", "short_branch", "porcelain_v1")
 FLAGS = ("admission", "source", "tools", "output", "load")
+COMMANDS = {"plain": "git status", "short": "git status --short", "short_branch": "git status -s -b",
+            "porcelain_v1": "git status --porcelain=v1"}
+
+
+def payload(case):
+    if type(case) is not str or case not in COMMANDS:
+        raise ValueError("unknown status case")
+    return json.dumps({"tool_input": {"command": COMMANDS[case]}, "cwd": "/tmp"},
+                      separators=(",", ":")).encode("ascii")
 
 
 def summarize(cases, flags):

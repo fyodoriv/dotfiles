@@ -57,6 +57,15 @@ The endpoint-path scripts also source shared helpers or invoke managed shim
 helpers. Independent review checked the source family; the receipt does not
 claim every dynamic caller or semantic boundary is covered.
 
+## Git hook sources
+
+The [Git hook receipt](rust-git-hook-source-receipt.json) pins the tracked
+`git-hooks/` files at revision `81bcb68`. Its selected entry, helper, AWK and
+delegation anchors are checked by the [registered receipt](rust-git-hook-receipt.md).
+Run `python3 docs/plans/doctor-source-receipt-check.py --git-hooks`. These
+anchors do not establish installed hook settings, downstream ownership or
+complete executable behavior.
+
 ## Library source identities
 
 The [library source receipt](rust-library-source-receipt.json) pins all 63

@@ -90,8 +90,12 @@ elif sys.argv[1:] in (["--libraries"], ["--generate-libraries"]):
     REVISION = "57a4b14da82ad42c47bceebfc4e051d8bb9541d3"
     RECEIPT = Path("docs/plans/rust-library-source-receipt.json")
     FAMILY, EXPECTED = "lib/", 63
+elif sys.argv[1:] in (["--git-hooks"], ["--generate-git-hooks"]):
+    REVISION = "81bcb6879d481d2ba3dedde256db278255b6e1ee"
+    RECEIPT = Path("docs/plans/rust-git-hook-source-receipt.json")
+    FAMILY, EXPECTED = "git-hooks/", 3
 else:
-    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers]")
+    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries|--library-callers|--generate-library-callers|--git-hooks|--generate-git-hooks]")
 raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY])
 tree = {}
 for record in raw.split(b"\0"):
@@ -113,14 +117,20 @@ lines = {
 }
 
 
-if sys.argv[1:] == ["--generate-libraries"]:
+git_hook_anchors = {
+    "git-hooks/commit-msg": [1, 95, 100],
+    "git-hooks/pre-commit": [1, 38, 49, 55, 93, 304],
+    "git-hooks/pre-push": [1, 38, 53, 124, 159, 286, 299, 333, 336, 353],
+}
+if sys.argv[1:] in (["--generate-libraries"], ["--generate-git-hooks"]):
+    selected = {path: [1] for path in tree} if FAMILY == "lib/" else git_hook_anchors
     generated = {
         "format": 1,
         "revision": REVISION,
         "files": [{"path": path, **identity} for path, identity in tree.items()],
         "anchors": [
-            {"path": path, "line": 1, "text": source[0]}
-            for path, source in lines.items()
+            {"path": path, "line": number, "text": lines[path][number - 1]}
+            for path in tree for number in selected[path]
         ],
     }
     print(json.dumps(generated, indent=2))
@@ -160,6 +170,8 @@ def valid(data):
             seen.add((path, number))
         if FAMILY == "lib/":
             return len(anchors) == len(tree) and seen == {(path, 1) for path in tree}
+        if FAMILY == "git-hooks/":
+            return seen == {(path, number) for path, numbers in git_hook_anchors.items() for number in numbers}
         return {path for path, _ in seen} == set(tree)
     except (KeyError, TypeError, ValueError):
         return False
@@ -182,9 +194,12 @@ for index, row in enumerate(data["files"]):
             case["files"][index][field] = "invalid"
         mutants.append(case)
 for index in range(len(data["anchors"])):
-    for field in ("line", "text", "duplicate"):
+    fields = ("line", "text", "duplicate", "remove") if FAMILY == "git-hooks/" else ("line", "text", "duplicate")
+    for field in fields:
         case = copy.deepcopy(data)
-        if field == "duplicate":
+        if field == "remove":
+            case["anchors"].pop(index)
+        elif field == "duplicate":
             case["anchors"].append(copy.deepcopy(case["anchors"][index]))
         else:
             case["anchors"][index][field] = -1 if field == "line" else "invalid planted text"

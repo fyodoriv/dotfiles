@@ -87,6 +87,13 @@ declarations in the pinned text and leaves 17 unresolved. Run
 `python3 docs/plans/test-reference-roles.py --check` to verify those anchors.
 A declaration does not prove its condition was met or the command ran.
 
+The [compiler fixture receipt](compiler-fixture-targets.json) verifies that
+three of the remaining candidates are explicit test targets in their pinned
+Cargo manifest. Run `python3 docs/plans/compiler-fixture-targets.py --check`
+to check the source identities and manifest declarations. The manifest was
+first noticed in an exploratory read; the checker and its mutation test were
+registered before implementation. This does not prove any target ran.
+
 The [Cargo fixture receipt](test-cargo-targets.json) checks four of the
 unmatched files against their pinned manifests. It identifies a default binary,
 a default integration test, an explicitly declared integration test and the

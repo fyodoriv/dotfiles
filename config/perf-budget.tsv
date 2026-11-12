@@ -28,6 +28,7 @@ PERF_GATE_PATH=git-hooks/
 PERF_GATE_PATH=config/
 PERF_GATE_PATH=scripts/perf-gate.sh
 PERF_GATE_PATH=scripts/perf-gate.pl
+PERF_GATE_ALLOW=perf-gate:compare local executable links in an isolated base checkout
 
 # Allow section: one line per intended slowdown above 10% in this PR.
 #   PERF_GATE_ALLOW=<name>:<reason>

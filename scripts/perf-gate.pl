@@ -41,6 +41,7 @@ use File::Temp qw(tempdir);
 use File::Path qw(make_path remove_tree);
 use File::Glob qw(bsd_glob);
 use Cwd qw(realpath);
+use Digest::SHA ();
 use Fcntl qw(:flock);
 use POSIX ();
 
@@ -234,14 +235,86 @@ if (@stale) {
 
 my $scratch = tempdir("perf-gate.XXXXXX", TMPDIR => 1, CLEANUP => 1);
 mkdir "$scratch/home";
+my @local_links;
+sub link_signature {
+  my ($path) = @_;
+  my $raw = readlink($path);
+  my $resolved = realpath($path);
+  return unless defined($raw) && defined($resolved) && -f $resolved && -x $resolved;
+  open(my $fh, '<', $resolved) or return;
+  binmode $fh;
+  my $sha = Digest::SHA->new(256)->addfile($fh)->hexdigest;
+  close($fh) or return;
+  return join("\0", $raw, $resolved, $sha);
+}
+
+# The live checkout can contain ignored executable links that the clean base
+# lacks. Mirror them only in a disposable clone, never in the shared cache.
+if ($base ne "") {
+  open(my $ignored, "-|", "git", "-C", $head, "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "bin/")
+    or die "perf gate: cannot inspect local executable links\n";
+  local $/ = "\0";
+  my @paths = <$ignored>;
+  close($ignored) or die "perf gate: cannot inspect local executable links\n";
+  chomp @paths;
+  if (@paths) {
+    my @links;
+    for my $path (@paths) {
+      $path =~ m{\Abin/[A-Za-z0-9_.+-]+\z} && -l "$head/$path"
+        or die "perf gate: unsupported ignored file in bin; cannot compare safely\n";
+      my $raw = readlink("$head/$path");
+      my $target = realpath("$head/$path");
+      defined($raw) && defined($target) && -f $target && -x $target
+        or die "perf gate: invalid local executable link; cannot compare safely\n";
+      my $head_real = realpath($head);
+      $raw =~ m{\A/} && defined($head_real) && index("$target/", "$head_real/") != 0
+        or die "perf gate: unsafe local executable link; cannot compare safely\n";
+      my $signature = link_signature("$head/$path");
+      defined($signature) or die "perf gate: cannot inspect local executable link\n";
+      push @links, [$path, $raw, $target, $signature];
+    }
+    my $copy = "$scratch/base";
+    git_quiet($head, "clone", "--shared", "--no-checkout", "--", $base, $copy)
+      && git_quiet($copy, "-c", "core.hooksPath=/dev/null", "checkout", "--detach", $sha)
+      or die "perf gate: cannot make isolated comparison checkout\n";
+    make_path("$copy/bin") unless -d "$copy/bin";
+    !-l "$copy/bin" or die "perf gate: unsafe comparison bin directory\n";
+    for my $link (@links) {
+      my ($path, $raw, $target, $signature) = @$link;
+      !-e "$copy/$path" && !-l "$copy/$path"
+        or die "perf gate: local executable link conflicts with the base\n";
+      symlink($raw, "$copy/$path") or die "perf gate: cannot mirror local executable link\n";
+      push @local_links, ["$head/$path", "$copy/$path", $raw, $target, $signature];
+    }
+    $base = $copy;
+  }
+}
 %ENV = (
   PATH => $ENV{PATH} // "/usr/bin:/bin", HOME => "$scratch/home", TMPDIR => $ENV{TMPDIR} // "/tmp",
   HEAVY_RUN_DIR => "$scratch/heavy-run", DO_NOT_TRACK => 1, DOTFILES_STATS_LOG => 0, DOTFILES_ERRORS_LOG => 0,
 );
 
+sub check_local_links {
+  my ($contents) = @_;
+  for my $link (@local_links) {
+    for my $path (@$link[0, 1]) {
+      my $raw = readlink($path);
+      my $resolved = realpath($path);
+      defined($raw) && defined($resolved) && $raw eq $link->[2] && $resolved eq $link->[3]
+        or die "perf gate: local executable link changed during measurement\n";
+      if ($contents) {
+        my $now = link_signature($path);
+        defined($now) && $now eq $link->[4]
+          or die "perf gate: local executable link changed during measurement\n";
+      }
+    }
+  }
+}
+
 # Run the command once in $dir. Returns (milliseconds, wait status).
 sub run_once {
   my ($dir, $c) = @_;
+  check_local_links(0);
   my $t0 = time;
   my $pid = fork;
   die "perf gate: fork failed: $!\n" unless defined $pid;
@@ -252,7 +325,9 @@ sub run_once {
     exec { $c->{argv}[0] } @{ $c->{argv} } or POSIX::_exit(127);
   }
   waitpid($pid, 0);
-  return ((time - $t0) * 1000, $?);
+  my ($elapsed, $status) = ((time - $t0) * 1000, $?);
+  check_local_links(0);
+  return ($elapsed, $status);
 }
 
 sub slower { my ($b, $h) = @_; return $h > $b * $RATIO && $h - $b > $FLOOR_MS; }
@@ -361,6 +436,7 @@ for my $c (@$cmds) {
   push @rows, \%r;
 }
 # A tracked command may not leave the budget file silently.
+check_local_links(1);
 my %in_head = map { $_->{name} => 1 } @$cmds;
 for my $b (@$base_cmds) {
   next if $in_head{ $b->{name} } || fresh($b->{name});

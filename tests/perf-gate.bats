@@ -86,6 +86,130 @@ gate() {
 
 # ── Verdicts ─────────────────────────────────────────────────────────
 
+@test "perf gate gives both trees the same ignored executable links" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  printf '#!/bin/bash\n[ -L bin/tool-link ] || exit 23\nsleep 0.1\n' > "$FIX/tool.sh"
+  chmod +x "$FIX/tool.sh"
+  merge 'link fixture'
+  ln -s /bin/echo "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 0 ]
+  [ -L "$FIX/bin/tool-link" ]
+  local base_sha
+  base_sha=$(git -C "$FIX" rev-parse main)
+  [ -z "$(git -C "$CACHE/$base_sha" status --porcelain --ignored --untracked-files=all)" ]
+}
+
+@test "perf gate rejects a broken ignored executable link" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  merge 'link fixture'
+  ln -s "$TEST_DIR/missing" "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'invalid local executable link'* ]]
+  [ -L "$FIX/bin/tool-link" ]
+}
+
+@test "perf gate rejects links into the candidate source tree" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  merge 'link fixture'
+  ln -s ../tool.sh "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'unsafe local executable link'* ]]
+}
+
+@test "perf gate rejects relative external executable links" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  merge 'relative link fixture'
+  printf '#!/bin/bash\n' > "$TEST_DIR/external-tool"
+  chmod +x "$TEST_DIR/external-tool"
+  ln -s ../../external-tool "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'unsafe local executable link'* ]]
+}
+
+@test "perf gate rejects non-executable link targets" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  merge 'non-executable link fixture'
+  printf 'not executable\n' > "$TEST_DIR/plain-file"
+  chmod 600 "$TEST_DIR/plain-file"
+  ln -s "$TEST_DIR/plain-file" "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'invalid local executable link'* ]]
+}
+
+@test "perf gate rejects ignored executable files that are not links" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/local-tool\n' > "$FIX/.gitignore"
+  merge 'ignored file fixture'
+  printf '#!/bin/bash\n' > "$FIX/bin/local-tool"
+  chmod +x "$FIX/bin/local-tool"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'unsupported ignored file in bin'* ]]
+  [ -f "$FIX/bin/local-tool" ]
+}
+
+@test "perf gate rejects a link that conflicts with a tracked base file" {
+  mkdir -p "$FIX/bin"
+  printf 'base\n' > "$FIX/bin/tool-link"
+  merge 'tracked base fixture'
+  git -C "$FIX" rm -q bin/tool-link
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  ln -s /bin/echo "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'local executable link conflicts with the base'* ]]
+  [ -L "$FIX/bin/tool-link" ]
+}
+
+@test "perf gate rejects an external executable changed during measurement" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  printf '#!/bin/bash\nexit 0\n' > "$TEST_DIR/external-tool"
+  chmod +x "$TEST_DIR/external-tool"
+  printf '#!/bin/bash\nprintf "#\\n" >> "%s"\nsleep 0.1\n' "$TEST_DIR/external-tool" > "$FIX/tool.sh"
+  chmod +x "$FIX/tool.sh"
+  merge 'mutable link fixture'
+  ln -s "$TEST_DIR/external-tool" "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'local executable link changed during measurement'* ]]
+}
+
+@test "perf gate rejects mutation of the comparison copy's link" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  printf '#!/bin/bash\nrm bin/tool-link\nln -s /bin/true bin/tool-link\n' > "$FIX/tool.sh"
+  chmod +x "$FIX/tool.sh"
+  merge 'link mutation fixture'
+  ln -s /bin/echo "$FIX/bin/tool-link"
+  gate --force
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'local executable link changed during measurement'* ]]
+  [ "$(readlink "$FIX/bin/tool-link")" = /bin/echo ]
+}
+
+@test "perf gate still detects a slowdown when an ignored link exists" {
+  mkdir -p "$FIX/bin"
+  printf 'bin/tool-link\n' > "$FIX/.gitignore"
+  merge 'link fixture'
+  ln -s /bin/echo "$FIX/bin/tool-link"
+  tool 0.30
+  gate --force
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'tool got slower'* ]]
+}
+
 @test "perf gate fails on a seeded slowdown and names the command" {
   tool 0.20
   gate

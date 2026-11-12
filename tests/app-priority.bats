@@ -414,6 +414,46 @@ MOCK
 
 # ── Stats logging ────────────────────────────────────────────────
 
+@test "app-priority records elapsed milliseconds from the clock" {
+  cat > "$TEST_BIN/perl" <<'MOCK'
+#!/bin/bash
+if [ ! -e "$CLOCK_MARKER" ]; then
+  touch "$CLOCK_MARKER"
+  echo 100000
+else
+  echo 100125
+fi
+MOCK
+  chmod +x "$TEST_BIN/perl"
+  export CLOCK_MARKER="$TEST_DIR/clock-started"
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  jq -e '.duration_ms == 125 and .timing_source == "monotonic-ms"' "$HOME/.dotfiles-stats.jsonl"
+}
+
+@test "app-priority records a run without claiming a valid clock sample" {
+  printf '#!/bin/bash\nexit 1\n' > "$TEST_BIN/perl"
+  chmod +x "$TEST_BIN/perl"
+  run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
+  [ "$status" -eq 0 ]
+  jq -e '.task == "app-priority" and (has("timing_source") | not)' "$HOME/.dotfiles-stats.jsonl"
+}
+
+@test "migration window excludes legacy and failed clock samples" {
+  local now query
+  now=$(jq -nr 'now - 60 | todate')
+  printf '%s\n' \
+    "{\"task\":\"app-priority\",\"timestamp\":\"$now\",\"duration_ms\":1000}" \
+    "{\"task\":\"app-priority\",\"timestamp\":\"$now\",\"duration_ms\":125,\"timing_source\":\"monotonic-ms\"}" \
+    "{\"task\":\"other\",\"timestamp\":\"$now\",\"duration_ms\":1,\"timing_source\":\"monotonic-ms\"}" > "$HOME/.dotfiles-stats.jsonl"
+  query=$(grep '^jq -c -s --argjson to 0 ' "$REAL_DOTFILES/docs/plans/rust-migration.md")
+  [ -n "$query" ]
+  run bash -c "$query"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.mean')" = 125 ]
+  [ "$(printf '%s' "$output" | jq -r '.runs')" = 1 ]
+}
+
 @test "app-priority logs run to stats file" {
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]

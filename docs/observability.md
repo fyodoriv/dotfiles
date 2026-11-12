@@ -1,5 +1,12 @@
 # Observability
 
+`app-priority` marks valid monotonic millisecond samples with
+`timing_source: monotonic-ms`. If the clock fails, it still records the run
+without that marker. Filter on the marker for performance comparisons: older
+samples were rounded to whole seconds. The interval excludes the first clock
+process startup and the final stats write; assess both clock processes when
+measuring total job cost.
+
 How to see what dotfiles did on this Mac, what failed, and how healthy it is.
 Everything stays on the Mac, with one exit that needs your yes:
 `dotfiles telemetry` (see [Telemetry](#telemetry)). `dotfiles metrics --share` writes an aggregate-only
@@ -541,6 +548,13 @@ command slower. `scripts/perf-gate.sh` times each command in
 `config/perf-budget.tsv` in two trees in the same run: your working tree and a
 checkout of the merge-base with the default branch. It needs no stored
 baseline, so it works the same on every machine.
+
+When the working tree has ignored executable links in `bin/`, the gate puts
+the same absolute external links in a disposable base clone. It keeps its
+shared base cache clean. It rejects unsupported files, relative links, links
+into the working tree, conflicting base paths and links that change during a
+run. It checks executable content before and after timing; this detects a
+persistent change, not every possible change to an external dependency.
 
 - **Fails when** two rules agree that a command is slower, or when it is
   above its ceiling in the budget file. Rule 1: the fastest run in your tree

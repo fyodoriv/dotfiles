@@ -202,8 +202,9 @@ completed attempt persisted before continuation. Pivot: any unverified child
 or failed cleanup makes the run inconclusive; do not start a live benchmark.
 
 Install handlers for ordinary INT, TERM and HUP before starting the owned
-child. They only mark interruption. Drain both output pipes with a fixed cap,
-reap that direct child, retain its invalid attempt and run postflight before
+child. They only mark interruption. Retain at most 4,096 bytes per output
+stream and drain any excess without keeping it; any excess invalidates the
+sample. Reap that direct child, retain its invalid attempt and run postflight before
 releasing the queue slot. An indefinitely hung child cannot be safely killed
 by this protocol; keep the slot and treat cleanup as unresolved. Hard kill,
 parent death, descendants and host failure remain outside this guarantee.

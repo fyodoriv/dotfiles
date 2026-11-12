@@ -12,7 +12,12 @@ content before and after the run.
 
 The linked set's `base_min` values below are milliseconds, in run order.
 Each value is the fastest of 15 samples for that tree in the gate run. These
-are baseline observations, not a new acceptance rule.
+are baseline observations, not a new acceptance rule. The retained gate
+records contain verdicts and summaries, not all 15 individual samples or a
+complete independently reviewed executable and interpreter chain. They do
+not establish the full retained-sample and input-provenance contract. The
+historical gate used a scratch child environment; it was not the later RSS
+startup path.
 
 - `hook-require-heavy-run`: 50.090, 51.242, 56.729, 56.237, 60.386,
   56.382, 51.691, 53.756, 49.436, 52.071, 53.998, 50.028, 49.742,

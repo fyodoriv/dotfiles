@@ -101,7 +101,10 @@ redirects, bounded response sizes and socket inactivity timeouts. A final
 over-limit detection read can consume one extra byte, then stops the fetcher. Send no
 local paths or credentials.
 Retain the reviewed mapping and response provenance privately and bind it to
-the run and source audit. The archive writer requires an independently
+the run and source audit. A standalone verifier checks the independent audit
+and archive digests, then compares all manifest modes and blob IDs. It is not
+yet wired into the launcher, and it does not verify source bytes or origin.
+The archive writer requires an independently
 supplied directory identity, uses exclusive creation and checks readback.
 A failed write leaves an unusable partial file; never derive an accepted digest
 from it or overwrite it. The archive origin field is not proof of acquisition. Compare each mapped blob with the bounded local

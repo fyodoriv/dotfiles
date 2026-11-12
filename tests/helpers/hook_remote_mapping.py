@@ -13,6 +13,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 from hook_source_snapshot import EXPECTED, parse_manifest
+from hook_source_audit import parse_source_audit
 from hook_pair_private import read_private
 from hook_pair_receipts import private_dir
 from hook_trusted_launch import strict_json
@@ -278,3 +279,17 @@ def store_archive(root, expected_identity, run_id, old, candidate, records):
         return digest if read_archive(root, expected_identity, digest, run_id, old, candidate) == records else None
     except (OSError, TypeError, ValueError):
         return None
+
+
+def verify_source_binding(run_id, old, candidate, manifest, audit, archive, expected_audit_sha256, expected_archive_sha256):
+    """Correlate independent retained inputs; this does not attest their origin."""
+    try:
+        if (type(audit) is not bytes or len(audit) > 65536 or type(expected_audit_sha256) is not str or
+                re.fullmatch(r"[0-9a-f]{64}", expected_audit_sha256) is None or
+                hashlib.sha256(audit).hexdigest() != expected_audit_sha256 or
+                parse_source_audit(audit, manifest, run_id, old, candidate) is None):
+            return False
+        records = decode_archive(archive, expected_archive_sha256, run_id, old, candidate)
+        return records is not None and verify_retained(old, candidate, run_id, manifest, records)
+    except (TypeError, ValueError):
+        return False

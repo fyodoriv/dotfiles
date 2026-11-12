@@ -214,6 +214,42 @@ class MappingControls(unittest.TestCase):
                 if mutation == "replace": self.assertEqual(list(root.iterdir()), [])
                 else: self.assertTrue((root / "mapping.json").exists())
 
+    def test_source_binding_requires_independent_archive_and_audit_digests(self):
+        old, new, commits, trees = self.fixture()
+        run_id = "9" * 32
+        records = {(kind, key): json.dumps(value).encode() for kind, group in
+                   (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        resolved = mapping.resolve(old, new, commits, trees)
+        files = [{"side": side, "path": path, "mode": mode, "file": f"{i:03}.src",
+                  "blob": resolved[(side, path)][1], "sha256": "8" * 64}
+                 for i, (side, path, mode) in enumerate(snapshots.EXPECTED)]
+        manifest = json.dumps({"format": 1, "run_id": run_id, "old_revision": old,
+                               "candidate_revision": new, "files": files}).encode()
+        source_audit = json.dumps({"format": 1, "run_id": run_id, "old_revision": old,
+                                   "candidate_revision": new, "manifest_sha256": hashlib.sha256(manifest).hexdigest(),
+                                   "local_filesystems": True, "roots": {
+                                       "old": {"path": "/old", "dev": 1, "ino": 2},
+                                       "new": {"path": "/new", "dev": 1, "ino": 3}}}).encode()
+        archive = mapping.encode_archive(run_id, old, new, records)
+        args = (run_id, old, new, manifest, source_audit, archive,
+                hashlib.sha256(source_audit).hexdigest(), hashlib.sha256(archive).hexdigest())
+        self.assertTrue(mapping.verify_source_binding(*args))
+        for index in (0, 1, 2, 3, 4, 5, 6, 7):
+            changed = list(args)
+            changed[index] = b"bad" if isinstance(changed[index], bytes) else "0" * len(changed[index])
+            self.assertFalse(mapping.verify_source_binding(*changed))
+        different_audit = json.loads(source_audit)
+        different_audit["roots"]["old"]["ino"] = 7
+        changed_audit = json.dumps(different_audit).encode()
+        self.assertFalse(mapping.verify_source_binding(run_id, old, new, manifest, changed_audit, archive, args[6], args[7]))
+        changed_manifest = json.loads(manifest)
+        changed_manifest["files"][0]["blob"] = "0" * 40
+        changed_manifest = json.dumps(changed_manifest).encode()
+        different_audit["manifest_sha256"] = hashlib.sha256(changed_manifest).hexdigest()
+        resealed = json.dumps(different_audit).encode()
+        self.assertFalse(mapping.verify_source_binding(run_id, old, new, changed_manifest, resealed, archive,
+                                                       hashlib.sha256(resealed).hexdigest(), args[7]))
+
     def test_bounded_strict_record_decoder(self):
         raw = b'{"sha":"' + b'a' * 40 + b'","tree":{"sha":"' + b'b' * 40 + b'"}}'
         self.assertEqual(mapping.decode_record(raw, len(raw))["sha"], "a" * 40)

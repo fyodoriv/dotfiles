@@ -7,6 +7,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+from git_blob_batch import read_blobs
+
 def library_caller_receipt():
     revision = "57a4b14da82ad42c47bceebfc4e051d8bb9541d3"
     tree_raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", revision])
@@ -130,10 +133,8 @@ for record in raw.split(b"\0"):
     tree[path] = {"mode": mode, "blob": blob}
 if len(tree) != EXPECTED:
     raise SystemExit("unexpected source family size")
-lines = {
-    path: subprocess.check_output(["git", "show", f"{REVISION}:{path}"]).decode("utf-8").splitlines()
-    for path in tree
-}
+contents = read_blobs([source["blob"] for source in tree.values()])
+lines = {path: content.decode("utf-8").splitlines() for path, content in zip(tree, contents)}
 
 
 git_hook_anchors = {

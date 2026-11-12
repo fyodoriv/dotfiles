@@ -13,7 +13,7 @@ blobs and record each selected definition and call line with its exact text.
 Regenerate the receipt byte for byte and plant missing, duplicate, identity,
 line and text errors in each row. Run the focused receipt tests and hosted CI.
 
-Success: all seven named boundaries and their nine selected calls are accounted
+Success: all seven named boundaries and their eight selected calls are accounted
 for; regeneration matches byte for byte; every planted error is rejected.
 Pivot: if an anchor cannot be mapped unambiguously or a planted error passes,
 retain the historical receipt and label the current boundary unresolved. Do

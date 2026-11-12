@@ -49,9 +49,15 @@ repository-wide coverage.
 The [current bin identity receipt](rust-current-bin-source-receipt.json)
 pins `bin/` at revision `c5ed285`; its [registered check](rust-current-bin-receipt.md)
 records every tracked path, mode, blob and first line. Run
-`python3 docs/plans/doctor-source-receipt-check.py --bin-sources`. The older
-embedded-code anchors above remain historical; changes since that revision
-need separate semantic review before they can support current caller coverage.
+`python3 docs/plans/doctor-source-receipt-check.py --bin-sources`.
+
+The [current boundary receipt](current-bin-boundaries.json) maps the seven
+historical selected interpreter boundaries to pinned source at `0490b7b`.
+The [registered check](current-bin-boundary-prediction.md) compares exact
+definition and call lines, rejects planted errors and detects ambiguous
+matches. Run `python3 docs/plans/current-bin-boundaries.py --check`. It does
+not classify the full interpreter bodies, find other boundaries, or prove a
+caller executes.
 
 ## Agent hook sources
 

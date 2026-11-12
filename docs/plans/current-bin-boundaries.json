@@ -1,0 +1,159 @@
+{
+  "format": 1,
+  "historical_revision": "a1928495a953055ff7db3d8f525d504faef2dc3a",
+  "current_revision": "0490b7b981c976c03cde98e064fffb6e38623622",
+  "boundaries": [
+    {
+      "name": "status snapshot",
+      "path": "bin/heavy-run",
+      "interpreter": "perl",
+      "old_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "current_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "definitions": [
+        {
+          "old_line": 148,
+          "current_line": 148,
+          "text": "common_code='"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 258,
+          "current_line": 258,
+          "text": "    exec perl -e \"$common_code\"'"
+        }
+      ]
+    },
+    {
+      "name": "admission controller",
+      "path": "bin/heavy-run",
+      "interpreter": "perl",
+      "old_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "current_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "definitions": [
+        {
+          "old_line": 148,
+          "current_line": 148,
+          "text": "common_code='"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 352,
+          "current_line": 352,
+          "text": "exec perl -e \"$common_code\"'"
+        }
+      ]
+    },
+    {
+      "name": "payload priority",
+      "path": "bin/heavy-run",
+      "interpreter": "perl",
+      "old_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "current_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "definitions": [
+        {
+          "old_line": 314,
+          "current_line": 314,
+          "text": "priority_code='"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 334,
+          "current_line": 334,
+          "text": "  exec perl -e \"$priority_code\" \"$level\" \"$@\""
+        },
+        {
+          "old_line": 670,
+          "current_line": 670,
+          "text": "    exec(\"perl\", \"-e\", $priority_code, $level, @cmd) or die \"heavy-run: cannot run $cmd[0]: $!\\n\";"
+        }
+      ]
+    },
+    {
+      "name": "nested admission lock probe",
+      "path": "bin/heavy-run",
+      "interpreter": "perl",
+      "old_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "current_blob": "927c5e979195b86de9f1595bff04f143e5186325",
+      "definitions": [
+        {
+          "old_line": 333,
+          "current_line": 333,
+          "text": "  ! perl -e 'use Fcntl qw(:flock); open(my $f, \"<\", $ARGV[0]) or exit 0; exit(flock($f, LOCK_SH | LOCK_NB) ? 0 : 1)' \"$HEAVY_RUN_HELD\"; then"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 333,
+          "current_line": 333,
+          "text": "  ! perl -e 'use Fcntl qw(:flock); open(my $f, \"<\", $ARGV[0]) or exit 0; exit(flock($f, LOCK_SH | LOCK_NB) ? 0 : 1)' \"$HEAVY_RUN_HELD\"; then"
+        }
+      ]
+    },
+    {
+      "name": "test source edges",
+      "path": "bin/cached-run",
+      "interpreter": "awk",
+      "old_blob": "75c24f963e9d8bf7bf24592210e85355ff1ee131",
+      "current_blob": "75c24f963e9d8bf7bf24592210e85355ff1ee131",
+      "definitions": [
+        {
+          "old_line": 172,
+          "current_line": 172,
+          "text": "SOURCES_AWK='"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 331,
+          "current_line": 331,
+          "text": "      xargs -0 awk \"$SOURCES_AWK\" 2>/dev/null > \"$tmp/new-edges\" || true"
+        }
+      ]
+    },
+    {
+      "name": "test cache keys",
+      "path": "bin/cached-run",
+      "interpreter": "awk",
+      "old_blob": "75c24f963e9d8bf7bf24592210e85355ff1ee131",
+      "current_blob": "75c24f963e9d8bf7bf24592210e85355ff1ee131",
+      "definitions": [
+        {
+          "old_line": 223,
+          "current_line": 223,
+          "text": "KEYS_AWK='"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 345,
+          "current_line": 345,
+          "text": "  awk -v tmp=\"$tmp\" \"$KEYS_AWK\" \"$ledger_in\" \"$tmp/hashes\" \"$tmp/edges\" \"$tmp/files\" > \"$tmp/todo\""
+        }
+      ]
+    },
+    {
+      "name": "test source roots",
+      "path": "bin/bats-affected",
+      "interpreter": "awk",
+      "old_blob": "589dd1200e1294e28bee5d1d9a0c4e2bd293e7de",
+      "current_blob": "c48833025e7878ce2ec927315589786ff01e5092",
+      "definitions": [
+        {
+          "old_line": 405,
+          "current_line": 411,
+          "text": "roots_awk='"
+        }
+      ],
+      "calls": [
+        {
+          "old_line": 448,
+          "current_line": 454,
+          "text": "done < <(awk \"$roots_awk\" \"${all_bats[@]}\" </dev/null 2>/dev/null || true)"
+        }
+      ]
+    }
+  ]
+}

@@ -401,10 +401,9 @@ them. -->
   - **ID**: rust-final-audit
   - **Tags**: migration, rust
   - **Mode**: AFK
-  - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) are a default adopted on 2026-11-10; the owner has not ruled on them. A slice that ended at its Pivot counts as `exception`. The audit reports each measured hot path as ported or as a supported exception. It never claims "all code is Rust".
+  - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) were confirmed by the owner on 2026-11-12. A slice that ended at its Pivot counts as `exception`. The audit reports each measured hot path as ported or as a supported exception. It never claims "all code is Rust".
   - **Output**: measurement
   - **Blocked by**: rust-agent-hooks, rust-app-priority, rust-source-inventory
-  - **Blocked**: needs-owner — the owner rules on the defaults in the plan's "Decisions (2026-11-10)" and on the five audit states. The agentbrew task `rust-owner-rules-on-replan-defaults` (HITL) tracks that ruling for both plans.
   - **Acceptance**: Every owned component in the manifest has one of the five states; `ported` has receipts and `exception` has a plan row. Every ported slice still meets its number on the current tree. No temporary bridge remains without a deletion condition.
   - **Hypothesis**: Reconciling the manifest with the tree exposes every gap: 0 unrecorded owned components, and 100% of ported slices still at or under their registered number.
   - **Measurement**: `heavy-run rust/target/release/migration-check inventory --check` (runnable after the inventory step merges), `scripts/perf-gate.sh --force --json` and `heavy-run make check`.

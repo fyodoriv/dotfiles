@@ -10,6 +10,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).parent / "helpers"))
 import hook_remote_mapping as mapping
+import hook_source_snapshot as snapshots
 
 
 class MappingControls(unittest.TestCase):
@@ -95,6 +96,38 @@ class MappingControls(unittest.TestCase):
         records[("trees", "c" * 40)] = json.dumps(duplicate).encode()
         self.assertIsNone(mapping.collect(old, new, fetch))
         self.assertIsNone(mapping.collect(old, new, lambda *args: (_ for _ in ()).throw(RuntimeError("private"))))
+
+    def test_independent_replay_matches_every_manifest_blob(self):
+        old, new, commits, trees = self.fixture()
+        run_id = "9" * 32
+        raw_records = {(kind, key): json.dumps(value).encode() for kind, group in
+                       (("commits", commits), ("trees", trees)) for key, value in group.items()}
+        resolved = mapping.resolve(old, new, commits, trees)
+        files = [{"side": side, "path": path, "mode": mode, "file": f"{index:03}.src",
+                  "blob": resolved[(side, path)][1], "sha256": "8" * 64}
+                 for index, (side, path, mode) in enumerate(snapshots.EXPECTED)]
+        manifest = json.dumps({"format": 1, "run_id": run_id, "old_revision": old,
+                               "candidate_revision": new, "files": files}).encode()
+        self.assertTrue(mapping.verify_retained(old, new, run_id, manifest, raw_records))
+        for mutation in ("blob", "mode", "missing", "extra", "wrong_record", "wrong_run", "wrong_revision", "duplicate_json", "oversize", "too_many", "total_limit"):
+            with self.subTest(mutation=mutation):
+                retained = dict(raw_records)
+                changed = copy.deepcopy(files)
+                if mutation == "blob": changed[0]["blob"] = "9" * 40
+                elif mutation == "mode": changed[0]["mode"] = "100644"
+                elif mutation == "duplicate_json": retained[("commits", old)] = b'{"sha":1,"sha":2}'
+                elif mutation == "oversize": retained[("commits", old)] = b"x" * 1_000_001
+                elif mutation == "too_many":
+                    for i in range(5): retained[("trees", str(i) * 40)] = b"{}"
+                elif mutation == "total_limit":
+                    retained = {("trees", str(i) * 40): b"x" * 1_000_000 for i in range(9)}
+                elif mutation == "missing": retained.pop(("trees", "e" * 40))
+                elif mutation == "extra": retained[("trees", "9" * 40)] = b"{}"
+                elif mutation == "wrong_record": retained[("trees", "e" * 40)] = retained[("trees", "f" * 40)]
+                data = json.dumps({"format": 1, "run_id": run_id, "old_revision": old,
+                                   "candidate_revision": new, "files": changed}).encode()
+                self.assertFalse(mapping.verify_retained(old, "0" * 40 if mutation == "wrong_revision" else new,
+                                                         "0" * 32 if mutation == "wrong_run" else run_id, data, retained))
 
     def test_bounded_strict_record_decoder(self):
         raw = b'{"sha":"' + b'a' * 40 + b'","tree":{"sha":"' + b'b' * 40 + b'"}}'

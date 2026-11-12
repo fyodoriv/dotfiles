@@ -5,7 +5,7 @@ from http.client import HTTPException
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
-from hook_source_snapshot import EXPECTED
+from hook_source_snapshot import EXPECTED, parse_manifest
 from hook_trusted_launch import strict_json
 
 
@@ -151,3 +151,20 @@ def collect(old, candidate, fetch):
         return None if result is None else {"mapping": result, "records": raw_records}
     except Exception:
         return None
+
+
+def verify_retained(old, candidate, run_id, manifest, records):
+    """Replay retained records and compare all manifest modes and blob IDs."""
+    try:
+        if (type(records) is not dict or len(records) > 12 or
+                any(type(raw) is not bytes or len(raw) > 1_000_000 for raw in records.values()) or
+                sum(len(raw) for raw in records.values()) > 8_000_000):
+            return False
+        rows = parse_manifest(manifest, run_id, old, candidate)
+        replay = collect(old, candidate, lambda kind, oid: records.get((kind, oid)))
+        if rows is None or replay is None or set(replay["records"]) != set(records):
+            return False
+        return all(replay["mapping"][(row["side"], row["path"])] == (row["mode"], row["blob"])
+                   for row in rows)
+    except (KeyError, TypeError, ValueError):
+        return False

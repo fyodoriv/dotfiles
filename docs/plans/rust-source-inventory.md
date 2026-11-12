@@ -107,7 +107,16 @@ a default integration test, an explicitly declared integration test and the
 source module imported by that test. Run
 `python3 docs/plans/test-cargo-targets.py --check` to verify the pinned
 identities and declarations. These are target and module relationships, not
-proof that Cargo or a fixture ran. The other unmatched files remain unresolved.
+proof that Cargo or a fixture ran.
+
+The [relative relationship receipt](test-unmatched-relationships.json)
+examines the other 12 unmatched files. It anchors 11 command, source, target,
+or import declarations and leaves one unresolved. Run
+`python3 docs/plans/test-unmatched-relationships.py --check` to verify their
+pinned identities and source anchors. Indirect calls, Bats extension lookup,
+and Python imports depend on their runtime context. The adjacent Python import
+is a candidate relationship: import hooks or interpreter settings can select
+another module. These declarations do not prove which code ran or establish ownership or complete caller coverage.
 
 The [stale hook and bin receipt](stale-hook-bin-ranges.json) compares the
 other three stale-only paths with their earlier family receipts. It records

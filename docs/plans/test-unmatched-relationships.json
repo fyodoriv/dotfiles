@@ -1,0 +1,155 @@
+{
+  "format": 1,
+  "pin": "b93b8a6a7b50613cc971ae1a5069e7e17dbb084d",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "records": [
+    {
+      "path": "tests/fixtures/fake-cdp-dom-ws.mjs",
+      "mode": "100644",
+      "blob": "200c1afe69e04fe386e290e8f557122c9bc7242e",
+      "role": "invocation",
+      "anchors": [
+        {
+          "file": "tests/agent-tab.bats",
+          "line": 405
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/fake-cdp-eval-ws.mjs",
+      "mode": "100644",
+      "blob": "4842f530e5475ac16b234c6bb6a2641819120f6c",
+      "role": "invocation",
+      "anchors": [
+        {
+          "file": "tests/agent-tab.bats",
+          "line": 326
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/fake-cdp-ws.mjs",
+      "mode": "100644",
+      "blob": "60d7655f09963887c251c348608ee8229c0a4f78",
+      "role": "invocation",
+      "anchors": [
+        {
+          "file": "tests/agent-tab.bats",
+          "line": 297
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/fake-slack-page.mjs",
+      "mode": "100644",
+      "blob": "04ddcb47ecbe7e38efca63aa43f99e9370d62985",
+      "role": "indirect_invocation",
+      "anchors": [
+        {
+          "file": "tests/slack-draft.bats",
+          "line": 7
+        },
+        {
+          "file": "tests/slack-draft.bats",
+          "line": 25
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/gate-attribution/controls.py",
+      "mode": "100644",
+      "blob": "5607c80f7fbdfb1bc5e04473567cb6737f0ae0f1",
+      "role": "invocation",
+      "anchors": [
+        {
+          "file": "tests/gate-attribution.bats",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/gate-attribution/join.py",
+      "mode": "100644",
+      "blob": "d75f9acf9bdef19dac4a143a36eb0328215116c9",
+      "role": "adjacent_import",
+      "anchors": [
+        {
+          "file": "tests/fixtures/gate-attribution/controls.py",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/heavy-run-discovery-json-model.py",
+      "mode": "100644",
+      "blob": "cbb00c14c95277ac2fac32a38d5c8f9756b39d3c",
+      "role": "indirect_invocation",
+      "anchors": [
+        {
+          "file": "tests/heavy-run-discovery-json.bats",
+          "line": 4
+        },
+        {
+          "file": "tests/heavy-run-discovery-json.bats",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/plugin-fixtures/simple-plugin/plugins/dotfiles/doctor/test-plugin/doctor.sh",
+      "mode": "100644",
+      "blob": "de01a7bfe70829a332861838278e62826ffd7b2a",
+      "role": "unresolved",
+      "anchors": []
+    },
+    {
+      "path": "tests/fixtures/queue-privacy-cutover/activation.rs",
+      "mode": "100644",
+      "blob": "540cab2ec2d2ec149336f932fb45446028830be6",
+      "role": "cargo_test",
+      "anchors": [
+        {
+          "file": "tests/fixtures/queue-privacy-cutover/Cargo.toml",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/doctor-status-diagnostic.bash",
+      "mode": "100644",
+      "blob": "504745341f11502fa470d926a406f286155c8ea9",
+      "role": "source",
+      "anchors": [
+        {
+          "file": "tests/doctor-json-status.bats",
+          "line": 19
+        }
+      ]
+    },
+    {
+      "path": "tests/helpers/realtime-probe.bash",
+      "mode": "100644",
+      "blob": "47d609d6968a62fc66a0ae5bec1f75ddc88e66d6",
+      "role": "bats_load",
+      "anchors": [
+        {
+          "file": "tests/heavy-run.bats",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "path": "tests/verify-counts-exemptions.sh",
+      "mode": "100644",
+      "blob": "1c81265b991a98389f00f087815228d0b71871e4",
+      "role": "source",
+      "anchors": [
+        {
+          "file": "tests/verify-counts.bats",
+          "line": 8
+        }
+      ]
+    }
+  ],
+  "declared_count": 11
+}

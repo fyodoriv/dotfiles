@@ -12,11 +12,13 @@ independently audited shell startup files without disclosing their identities.
 
 Measurement: use synthetic launcher and receipt fixtures, never the live queue,
 to plant a wrong launcher, pre-existing log, altered executable, wrong parent,
-changed startup digest, nested queue marker, nonexclusive admission, and private
-canaries. Verify no timed child starts in each rejected case. Check one valid
-fixture end to end, then request independent review before any live timing.
+changed startup digest, nested queue marker, and nonexclusive admission. Verify
+no timed child starts in each rejected case. Include a private canary in a
+failure case. A synthetic pre-timing handshake must reject a wrong parent
+before it can start the synthetic timed child. Check one valid fixture end to
+end, then request independent review before any live timing.
 
-Success: the valid fixture passes, all eight planted invalid cases fail closed,
+Success: the valid fixture passes, all seven planted invalid cases fail closed,
 no rejected case starts a timed child, and zero private canaries or digests
 appear in public output. The resulting evidence is a trusted-launch correlation,
 not independent kernel attestation or proof that inputs never changed and

@@ -21,3 +21,20 @@ any private content appears or a legitimate result is misclassified.
 
 Anchor: `tests/doctor-json-status.bats`, PR #600 hosted test log, Basili,
 Caldiera and Rombach 1994 (GQM), and Munafò et al. 2017 (pre-registration).
+
+## Fixture correction prediction
+
+Registered before the fixture correction. The second hosted run reported an
+unexpected status. Source inspection showed that hosted `DOTFILES_CI=1` makes
+`check_defaults` return `skip` before the fixture can exercise a fix. Running
+the isolated test with that environment reproduced the failure locally.
+
+Hypothesis: disabling CI mode only for this scratch-domain doctor invocation
+will exercise the intended fix path under both inherited CI settings.
+Measurement: run the focused boolean tests with `DOTFILES_CI=1` and with it
+unset, then use the hosted required gate. Success: both focused runs pass all
+boolean tests, and the hosted case returns `fixed`; no other doctor invocation
+changes environment. Pivot: any real preferences domain access or failure in
+either environment stops the correction and retains the original behavior.
+Anchor: `check_defaults` in `bin/dotfiles-doctor`, PR #600 hosted logs, Basili,
+Caldiera and Rombach 1994 (GQM), and Munafò et al. 2017 (pre-registration).

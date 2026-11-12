@@ -62,6 +62,16 @@ alone does not prove runtime selection. Run
 identities and declarations. These are lexical discovery candidates, not
 proof of test roles, execution, ownership, or migration scope.
 
+Independent source review grouped the 40 unresolved files as five Python
+test-style candidates, four Rust test-body candidates, four other Rust source
+candidates, nine fake or mock module candidates, three queue fixture or model
+candidates, two gate-attribution source candidates, four shell entry or
+helper candidates, seven other shell helpers, and two hook measurement or
+launcher candidates. This is source triage, not a complete caller map. Some
+fixtures, mocks, tests and helpers contain process or server code. Keep their
+actual discovery, callers, ownership and execution conditions unresolved
+until those relationships are verified.
+
 The [stale hook and bin receipt](stale-hook-bin-ranges.json) compares the
 other three stale-only paths with their earlier family receipts. It records
 13 changed alignment ranges and the current match positions of 20 old

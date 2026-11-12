@@ -221,3 +221,12 @@ The lifecycle review found that direct-child wait, pipe EOF and a new process
 group cannot by themselves prove that descendants have exited. A descendant
 can close its pipes or leave a group. Do not weaken the original no-outliving
 requirement or treat the bounded-output preparation as a completed lifecycle.
+
+Apple's [background-process guidance](https://developer.apple.com/documentation/appkit/managing-ongoing-background-processes-in-your-mac)
+suggests XPC services for system-managed service lifetime. The reviewed
+[XPC service documentation](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingXPCServices.html)
+does not state that arbitrary descendants are contained or finished when a
+service ends. The [waitpid manual](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/waitpid.2.html)
+describes waiting for child processes. From these sources, we cannot infer a
+recursive descendant-completion guarantee. This is a bounded documentation
+search, not proof that no other API exists.

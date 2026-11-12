@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 
-PIN = "bcd4157c003c7cc019d5a0884f8fe8057aed41b4"
+PIN = "e80b74812d2c697ad82886ff891d2a0884fc117b"
 OUTPUT = Path("docs/plans/source-evidence-join.json")
 INDEX = "docs/plans/tracked-source-candidates.json"
 CHECKER = "docs/plans/tracked-source-candidates.py"
@@ -20,6 +20,8 @@ RECEIPTS = (
     "docs/plans/agent-hook-source-receipt.json",
     "docs/plans/ci-source-inventory.json",
     "docs/plans/rust-source-inventory-evidence.json",
+    "docs/plans/tooling-checkup-callers.json",
+    "docs/plans/current-doctor-anchors.json",
 )
 
 
@@ -79,8 +81,9 @@ def join(candidates, evidence):
 def extract_records(name, data, source_tree):
     ledger = name.endswith("rust-source-inventory-evidence.json")
     ci = name.endswith("ci-source-inventory.json")
+    references = ci or name.endswith("tooling-checkup-callers.json")
     expected_keys = ({"format", "revision", "files", "generated_outputs", "outside_scope_references", "relationships"} if ledger else
-                     {"format", "revision", "files", "references"} if ci else {"format", "revision", "files", "anchors"})
+                     {"format", "revision", "files", "references"} if references else {"format", "revision", "files", "anchors"})
     expected_format = "dotfiles-source-collection-v1" if ledger else 1
     if (type(data) is not dict or set(data) != expected_keys or type(data["format"]) is not type(expected_format) or
             data["format"] != expected_format):
@@ -118,6 +121,17 @@ def extract_records(name, data, source_tree):
     return evidence
 
 
+def prior_links_preserved(old, new):
+    if type(old) is not list or type(new) is not list or len(old) != len(new):
+        return False
+    for before, after in zip(old, new):
+        if any(before.get(key) != after.get(key) for key in ("path", "mode", "blob", "reasons")):
+            return False
+        if any(link not in after.get("evidence", []) for link in before.get("evidence", [])):
+            return False
+    return True
+
+
 def generate():
     pin_tree = tree(PIN)
     pinned_index = git("show", f"{PIN}:{INDEX}")
@@ -147,8 +161,12 @@ def generate():
     candidates = index["files"]
     if type(candidates) is not list:
         raise ValueError("invalid candidates")
+    rows = join(candidates, evidence)
+    old = strict_json(git("show", "3d3b904ea144b3b49fac3130d3f28c9ddcd205c1:docs/plans/source-evidence-join.json"))
+    if not prior_links_preserved(old["candidates"], rows):
+        raise ValueError("prior source evidence was lost")
     return {"format": 1, "pin": PIN, "index_blob": pin_tree[INDEX]["blob"],
-            "candidate_revision": index["revision"], "inputs": inputs, "candidates": join(candidates, evidence)}
+            "candidate_revision": index["revision"], "inputs": inputs, "candidates": rows}
 
 
 def main():

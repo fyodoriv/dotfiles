@@ -177,6 +177,8 @@ Host `BASH_ENV` puts live `bin/` shims first on `PATH`;
 `tests/setup_suite.bash` unsets it without removing the coverage trap.
 Scripts sourcing `lib/dotfiles-endpoint-paths.sh` re-add those shims. Use a
 temporary `DOTFILES_DIR` in tests.
+Doctor fixtures must put their `chezmoi` stub first on PATH before doctor
+starts. Doctor resolves the source path before it adjusts PATH.
 
 Interpreter test wrappers must resolve and export the original interpreter
 before prefixing `PATH`. Check staged fixtures for rewritten machine paths.

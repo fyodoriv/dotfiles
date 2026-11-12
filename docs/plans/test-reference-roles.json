@@ -1,0 +1,149 @@
+{
+  "format": 1,
+  "pin": "b93b8a6a7b50613cc971ae1a5069e7e17dbb084d",
+  "candidate_revision": "94eef660b9d531b401f1f78c7c788101eb3e7bfb",
+  "records": [
+    {
+      "path": "tests/bash32/bash",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/e2e/hermetic-exec.sh",
+      "role": "invocation",
+      "anchor": {
+        "file": "tests/e2e/stories-e2e.bats",
+        "line": 26
+      }
+    },
+    {
+      "path": "tests/e2e/hermetic-install.sh",
+      "role": "invocation",
+      "anchor": {
+        "file": "tests/e2e/stories-e2e.bats",
+        "line": 20
+      }
+    },
+    {
+      "path": "tests/e2e/needs-e2e.sh",
+      "role": "invocation",
+      "anchor": {
+        "file": "Makefile",
+        "line": 201
+      }
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/epoch.rs",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/harness.rs",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/compiler-queue-observer/receipts.rs",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/heavy-run-429",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/heavy-run-430",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/json-fail-fix-module/doctor.sh",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/mock-npm-registry.py",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/mock-ollama.py",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/fixtures/notification-fail-module/doctor.sh",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/git_blob_batch_test.py",
+      "role": "invocation",
+      "anchor": {
+        "file": "tests/git-blob-batch.bats",
+        "line": 4
+      }
+    },
+    {
+      "path": "tests/helpers/duplicate_identity.py",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/helpers/heavy-run-project-interop.py",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/helpers/hook_rss_provenance.py",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/helpers/hook_trusted_launch.py",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/hook_rss_provenance_test.py",
+      "role": "invocation",
+      "anchor": {
+        "file": "tests/hook-rss-provenance.bats",
+        "line": 4
+      }
+    },
+    {
+      "path": "tests/hook_trusted_launch_test.py",
+      "role": "invocation",
+      "anchor": {
+        "file": "tests/hook-trusted-launch.bats",
+        "line": 4
+      }
+    },
+    {
+      "path": "tests/host-load.bash",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/setup_suite.bash",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/test_helper.bash",
+      "role": "unresolved",
+      "anchor": null
+    },
+    {
+      "path": "tests/verify-counts-doc-paths.sh",
+      "role": "source",
+      "anchor": {
+        "file": "bin/bats-affected",
+        "line": 25
+      }
+    }
+  ],
+  "declared_count": 7
+}

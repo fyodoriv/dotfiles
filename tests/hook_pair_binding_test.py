@@ -68,6 +68,15 @@ class BindingControls(unittest.TestCase):
             target.write_text(json.dumps(data))
             self.assertIsNone(binding.verify_pair_link(root, *args, 123))
 
+    def test_pending_final_can_be_verified_before_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.build(root)
+            (root / "launch.json").rename(root / "launch.pending")
+            self.assertIsNone(binding.verify_pair_link(root, *args, 123))
+            self.assertIsNotNone(binding.verify_pair_link(root, *args, 123, final_name="launch.pending"))
+            self.assertIsNone(binding.verify_pair_link(root, *args, 123, final_name="../launch.pending"))
+
     def test_missing_or_false_flags_never_qualify(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

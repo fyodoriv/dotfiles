@@ -12,10 +12,11 @@ from hook_status_pairs import CASES, FLAGS, summarize
 from hook_trusted_launch import parse_audit, read_private, strict_json
 
 
-def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, parent_pid):
+def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, parent_pid, final_name="launch.json"):
     try:
         root = Path(root)
-        if (not private_dir(root) or type(parent_pid) is not int or parent_pid <= 0 or
+        if (final_name not in ("launch.json", "launch.pending") or
+                not private_dir(root) or type(parent_pid) is not int or parent_pid <= 0 or
                 type(run_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", run_id) or
                 any(type(revision) is not str or not re.fullmatch(r"[0-9a-f]{40}", revision)
                     for revision in (candidate, old, harness))):
@@ -27,7 +28,7 @@ def verify_pair_link(root, run_id, candidate, old, harness, audit_bytes, parent_
         receipt_bytes = read_private(root / "receipt.json", 65536)
         intent = strict_json(intent_bytes)
         receipt = strict_json(receipt_bytes)
-        final = strict_json(read_private(root / "launch.json", 4096))
+        final = strict_json(read_private(root / final_name, 4096))
         expected_intent = {"format": 1, "run_id": run_id, "candidate_revision": candidate,
                            "old_revision": old, "harness_revision": harness,
                            "audit_sha256": hashlib.sha256(audit_bytes).hexdigest()}

@@ -80,6 +80,10 @@ differ, so the installed-machine trial remains necessary.
 The local command hook treats a multi-file Bats invocation as a full suite.
 The two commands above run the same named files separately.
 
+In a network-denied scratch home, the installed OpenCode binary accepted the
+wrapper's translated `-c --dir <path> --help` invocation. This checks argument
+parsing only; it does not start a session or prove shared-memory recall.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

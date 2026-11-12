@@ -5,6 +5,9 @@ from pathlib import Path
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True
+from strict_receipt_json import same_json, strict_json
+
 REVISION = "3d3b904ea144b3b49fac3130d3f28c9ddcd205c1"
 OUTPUT = Path("docs/plans/tooling-checkup-callers.json")
 
@@ -63,8 +66,8 @@ def main():
             print("  ]," if key == "files" else "  ]")
         print("}")
         return
-    actual = json.loads(OUTPUT.read_text())
-    if actual != expected:
+    actual = strict_json(OUTPUT.read_text())
+    if not same_json(actual, expected):
         raise SystemExit("skill reference receipt differs from pinned sources")
     count = 0
     for key, fields in (("files", ("remove", "duplicate", "blob", "mode")),

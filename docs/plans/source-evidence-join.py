@@ -5,6 +5,10 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
+
+sys.dont_write_bytecode = True
+from strict_receipt_json import same_json, strict_json
 
 PIN = "e80b74812d2c697ad82886ff891d2a0884fc117b"
 OUTPUT = Path("docs/plans/source-evidence-join.json")
@@ -27,17 +31,6 @@ RECEIPTS = (
 
 def git(*args):
     return subprocess.check_output(["git", *args])
-
-
-def strict_json(data):
-    def unique(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate JSON field")
-            result[key] = value
-        return result
-    return json.loads(data, object_pairs_hook=unique)
 
 
 def tree(revision):
@@ -127,7 +120,7 @@ def prior_links_preserved(old, new):
     for before, after in zip(old, new):
         if any(before.get(key) != after.get(key) for key in ("path", "mode", "blob", "reasons")):
             return False
-        if any(link not in after.get("evidence", []) for link in before.get("evidence", [])):
+        if any(not any(same_json(link, candidate) for candidate in after.get("evidence", [])) for link in before.get("evidence", [])):
             return False
     return True
 
@@ -136,10 +129,13 @@ def generate():
     pin_tree = tree(PIN)
     pinned_index = git("show", f"{PIN}:{INDEX}")
     pinned_checker = git("show", f"{PIN}:{CHECKER}")
-    if Path(INDEX).read_bytes() != pinned_index or Path(CHECKER).read_bytes() != pinned_checker:
-        raise ValueError("candidate checker differs from pinned input")
-    subprocess.run([sys.executable, CHECKER, "--check"], stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL, check=True)
+    if Path(INDEX).read_bytes() != pinned_index:
+        raise ValueError("candidate index differs from pinned input")
+    with tempfile.TemporaryDirectory(prefix="source-check-") as scratch:
+        checker = Path(scratch) / "pinned-checker.py"
+        checker.write_bytes(pinned_checker)
+        subprocess.run([sys.executable, str(checker), "--check"], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=True)
     index = strict_json(pinned_index)
     if type(index) is not dict or set(index) != {"format", "revision", "files"} or type(index["format"]) is not int or index["format"] != 1:
         raise ValueError("invalid candidate index")
@@ -184,7 +180,7 @@ def main():
         print('  ]\n}')
         return
     actual = strict_json(OUTPUT.read_text())
-    if actual != expected:
+    if not same_json(actual, expected):
         raise SystemExit("source evidence join differs from pinned inputs")
     rows, count = actual["candidates"], 0
     for index, row in enumerate(rows):

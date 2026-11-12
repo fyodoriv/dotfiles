@@ -6,7 +6,9 @@ import sys
 import unittest
 
 sys.dont_write_bytecode = True
-spec = importlib.util.spec_from_file_location("join", Path(__file__).parents[1] / "docs/plans/source-evidence-join.py")
+plan_dir = Path(__file__).parents[1] / "docs/plans"
+sys.path.insert(0, str(plan_dir))
+spec = importlib.util.spec_from_file_location("join", plan_dir / "source-evidence-join.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 

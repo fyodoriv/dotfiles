@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 sys.dont_write_bytecode = True
+from strict_receipt_json import same_json, strict_json
 from git_blob_batch import read_blobs
 
 REVISION = "d70f8f0143857bff55eb3460b7a20a05bc1fd1cc"
@@ -52,8 +53,8 @@ def main():
     if sys.argv[1:] == ["--generate"]:
         print(json.dumps(expected, indent=2))
         return
-    receipt = json.loads(RECEIPT.read_text())
-    if receipt != expected:
+    receipt = strict_json(RECEIPT.read_text())
+    if not same_json(receipt, expected):
         raise SystemExit("CI source receipt does not match pinned sources")
     count = 0
     for key, fields in (("files", ("remove", "duplicate", "blob", "mode", "first_line")),

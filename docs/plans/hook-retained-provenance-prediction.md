@@ -24,6 +24,14 @@ file or disclosure leaves the old and new observations provisional. The record
 is a trusted local correlation, not kernel lock attestation or proof against
 transient changes and same-user tampering.
 
+Before launch, an exclusive private intent records the run ID, revision and
+digest of the exact reviewed audit bytes. After postflight, a separate private
+final record binds that intent, parent record, wait log and receipt bytes. A
+verifier receives the expected revision and audit bytes independently, rejects
+duplicate keys and unsafe files, and recomputes the numeric sample checks. It
+does not claim crash durability or that an unkeyed record proves the controller
+ran. Incomplete records remain inconclusive.
+
 Anchor: `hook-rss-provenance.md`, the independent 2026-11-12 run review,
 Basili, Caldiera and Rombach 1994 (GQM), and Munafò et al. 2017
 (pre-registration).

@@ -1,0 +1,138 @@
+{
+  "format": 1,
+  "revision": "8a2cb8ce664277d54c5b4a93cde20d360fb940fa",
+  "files": [
+    {
+      "path": "scripts/benchmark-run.sh",
+      "mode": "100755",
+      "blob": "986bb77803c3ff7bb6129ccb826dce464b546145"
+    },
+    {
+      "path": "scripts/changelog.sh",
+      "mode": "100755",
+      "blob": "4dd2f639320abca17a0d156d38d21c89420d2452"
+    },
+    {
+      "path": "scripts/check-pr-vision-trace.mjs",
+      "mode": "100755",
+      "blob": "ac6982d160646c7173f7201991fb1dff6748b497"
+    },
+    {
+      "path": "scripts/gate-timed.sh",
+      "mode": "100755",
+      "blob": "e8caec9037ef8a72439aa5ba8059ff6ad9899447"
+    },
+    {
+      "path": "scripts/heavy-run-bench.sh",
+      "mode": "100755",
+      "blob": "bc8296f43215113775e8fe008747b9bb9f74e995"
+    },
+    {
+      "path": "scripts/perf-gate.pl",
+      "mode": "100755",
+      "blob": "8f15ee6db9a6242f5aa131b4394f59678908d190"
+    },
+    {
+      "path": "scripts/perf-gate.sh",
+      "mode": "100755",
+      "blob": "2b3ace735cb9247bb1ef0edebd5298aa4e20fb4c"
+    },
+    {
+      "path": "scripts/proof.sh",
+      "mode": "100755",
+      "blob": "4a32cf84718fe85d133ba7e39e34642e7a437dfa"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "scripts/benchmark-run.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "line": 61,
+      "text": "  awk '/^```/{if (f) exit; f = 1; next} f && $0 !~ /^[[:space:]]*(#|$)/' \"$DOTFILES_DIR/README.md\" | wc -l | tr -d ' '"
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "line": 82,
+      "text": "now_ms() { perl -MTime::HiRes=time -e 'printf \"%d\\n\", time() * 1000'; }"
+    },
+    {
+      "path": "scripts/changelog.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "scripts/changelog.sh",
+      "line": 31,
+      "text": "git-cliff --config cliff.toml \"$root..$full\" 2>/dev/null"
+    },
+    {
+      "path": "scripts/check-pr-vision-trace.mjs",
+      "line": 1,
+      "text": "#!/usr/bin/env node"
+    },
+    {
+      "path": "scripts/gate-timed.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "scripts/gate-timed.sh",
+      "line": 20,
+      "text": "\"$@\""
+    },
+    {
+      "path": "scripts/heavy-run-bench.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "scripts/heavy-run-bench.sh",
+      "line": 27,
+      "text": "median() { sort -n | awk '{ a[NR] = $1 } END { if (NR % 2) print a[(NR + 1) / 2]; else print (a[NR / 2] + a[NR / 2 + 1]) / 2 }'; }"
+    },
+    {
+      "path": "scripts/perf-gate.pl",
+      "line": 1,
+      "text": "#!/usr/bin/perl"
+    },
+    {
+      "path": "scripts/perf-gate.pl",
+      "line": 73,
+      "text": "    exec(\"git\", \"-C\", $dir, @args) or POSIX::_exit(127);"
+    },
+    {
+      "path": "scripts/perf-gate.pl",
+      "line": 325,
+      "text": "    exec { $c->{argv}[0] } @{ $c->{argv} } or POSIX::_exit(127);"
+    },
+    {
+      "path": "scripts/perf-gate.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "scripts/perf-gate.sh",
+      "line": 172,
+      "text": "set -- \"$perl_bin\" \"$script_dir/perf-gate.pl\" \"$root\" \"$base_sha\" \"$cache\" \"$runs\" \"$warmups\" \"$json\" \"$base_ref\" \"$base_date\""
+    },
+    {
+      "path": "scripts/proof.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "scripts/proof.sh",
+      "line": 36,
+      "text": "    /usr/bin/time -p zsh -i -c exit 2>&1 >/dev/null | awk '/^real/{print int($2*1000)}'"
+    },
+    {
+      "path": "scripts/proof.sh",
+      "line": 185,
+      "text": "  SECTION=\"$section\" awk '"
+    }
+  ]
+}

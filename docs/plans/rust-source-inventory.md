@@ -57,6 +57,14 @@ The endpoint-path scripts also source shared helpers or invoke managed shim
 helpers. Independent review checked the source family; the receipt does not
 claim every dynamic caller or semantic boundary is covered.
 
+## Script sources
+
+The [scripts receipt](rust-scripts-source-receipt.json) pins the tracked
+`scripts/` files at revision `8a2cb8c`. Its selected entry, command-preparation and child-command
+anchors are checked by the [registered receipt](rust-scripts-receipt.md).
+Run `python3 docs/plans/doctor-source-receipt-check.py --scripts`. These
+anchors do not establish complete embedded code, dynamic targets or execution.
+
 ## Git hook sources
 
 The [Git hook receipt](rust-git-hook-source-receipt.json) pins the tracked

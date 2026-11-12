@@ -45,6 +45,8 @@ noninteractive shells when the dotfiles `bin` directory is on `PATH`. It takes
 precedence over another program named `oc` when that directory comes first.
 The launcher and doctor prefer the managed `~/.opencode/bin/opencode` install,
 then fall back to the executable on `PATH`.
+If the version is unknown or macOS cannot unload the old job, apply preserves
+its existing configuration and reports the failure.
 
 1. Buy the Kimi Code plan and create a key in the Kimi Code Console. A platform API key bills per token instead.
 2. Store the key: `opencode auth login` (pick Kimi Code Plan). For headless or LaunchAgent runs, also save it to the Keychain: `security add-generic-password -a "$USER" -s kimi-code-api-key -w`.

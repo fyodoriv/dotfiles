@@ -147,6 +147,10 @@ remove_skipped_agent() {
     return 0
   fi
   launchctl unload "$dst" 2>/dev/null || true
+  if [ "$short" = opencode-serve ] && launchctl print "gui/$(id -u)/${dst_name%.plist}" >/dev/null 2>&1; then
+    echo "⚠ OpenCode's legacy job is still loaded; preserving its plist" >&2
+    return 2
+  fi
   rm -f "$dst"
   echo "⊘ Removed $short (not applicable for current profile/config)"
 }
@@ -187,7 +191,22 @@ install_plist() {
   local src="$1" dst_name="$2" name="$3" short="$4"
 
   if should_skip_agent "$short"; then
-    remove_skipped_agent "$short" "$dst_name" && return 0
+    if [ "$short" = opencode-serve ] && [ "${LOCAL_AI_AGENTS:-false}" = true ] && [ -x "$HOME/.opencode/bin/opencode" ]; then
+      local oc_major
+      oc_major="$(opencode_major_version "$HOME/.opencode/bin/opencode" 2>/dev/null || true)"
+      if [ "$oc_major" != 2 ]; then
+        echo "⚠ Cannot select an OpenCode service; preserving the existing job" >&2
+        failed=$((failed + 1))
+        return 0
+      fi
+    fi
+    local remove_status=0
+    remove_skipped_agent "$short" "$dst_name" || remove_status=$?
+    [ "$remove_status" -eq 0 ] && return 0
+    if [ "$remove_status" -ne 1 ]; then
+      failed=$((failed + 1))
+      return 0
+    fi
     echo "⊘ Skipping $short (not applicable for current profile/config)"
     return 0
   fi

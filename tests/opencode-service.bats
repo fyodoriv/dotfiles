@@ -74,6 +74,14 @@ SH
   [ "$output" = "$HOME/.opencode/bin/opencode" ]
 }
 
+@test "oc falls back to the PATH binary when the managed install is absent" {
+  rm -f "$HOME/.opencode/bin/opencode"
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash "$repo/bin/dotfiles-opencode" -c
+  [ "$status" -eq 0 ]
+  [ "$output" = '<-c>' ]
+}
+
 @test "an unrecognized OpenCode version fails without starting a client" {
   export FAKE_OPENCODE_VERSION='unknown'
   run /bin/bash "$repo/bin/dotfiles-opencode" -c
@@ -125,6 +133,8 @@ SH
   cat > "$scratch/launchctl" <<'SH'
 #!/bin/bash
 printf '%s\n' "$*" >> "$FAKE_LAUNCHCTL_TRACE"
+[ "$1" = print ] && exit 1
+exit 0
 SH
   chmod +x "$scratch/launchctl"
   mkdir -p "$BATS_TEST_TMPDIR/home/Library/LaunchAgents"
@@ -139,7 +149,59 @@ SH
   ' _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   [ "$status" -eq 0 ]
   [ ! -e "$BATS_TEST_TMPDIR/home/Library/LaunchAgents/com.dotfiles.opencode-serve.plist" ]
-  [[ "$(cat "$FAKE_LAUNCHCTL_TRACE")" == unload*com.dotfiles.opencode-serve.plist ]]
+  [[ "$(cat "$FAKE_LAUNCHCTL_TRACE")" == unload*com.dotfiles.opencode-serve.plist* ]]
+}
+
+@test "an unknown version preserves the existing launch agent and reports failure" {
+  export FAKE_OPENCODE_VERSION='unknown'
+  export FAKE_LAUNCHCTL_TRACE="$BATS_TEST_TMPDIR/launchctl-trace"
+  cat > "$scratch/launchctl" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >> "$FAKE_LAUNCHCTL_TRACE"
+SH
+  chmod +x "$scratch/launchctl"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  touch "$HOME/Library/LaunchAgents/com.dotfiles.opencode-serve.plist"
+  run env HOME="$HOME" /bin/bash -c '
+    source "$1"
+    for name in should_skip_agent remove_skipped_agent install_plist; do
+      eval "$(awk -v name="$name" '\''$0 ~ "^" name "\\(\\) \\{" {p=1} p{print} p && /^\}/{exit}'\'' "$2")"
+    done
+    self_reload_should_defer() { return 1; }
+    LOCAL_AI_AGENTS=true
+    failed=0
+    install_plist unused com.dotfiles.opencode-serve.plist com.dotfiles.opencode-serve opencode-serve
+    printf "failed=%s\n" "$failed"
+  ' _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'failed=1'* ]]
+  [ -e "$HOME/Library/LaunchAgents/com.dotfiles.opencode-serve.plist" ]
+  [ ! -e "$FAKE_LAUNCHCTL_TRACE" ]
+}
+
+@test "a failed unload preserves the active legacy job and reports failure" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  cat > "$scratch/launchctl" <<'SH'
+#!/bin/bash
+case "$1" in unload) exit 1 ;; print) exit 0 ;; esac
+SH
+  chmod +x "$scratch/launchctl"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  touch "$HOME/Library/LaunchAgents/com.dotfiles.opencode-serve.plist"
+  run env HOME="$HOME" /bin/bash -c '
+    source "$1"
+    for name in should_skip_agent remove_skipped_agent install_plist; do
+      eval "$(awk -v name="$name" '\''$0 ~ "^" name "\\(\\) \\{" {p=1} p{print} p && /^\}/{exit}'\'' "$2")"
+    done
+    self_reload_should_defer() { return 1; }
+    LOCAL_AI_AGENTS=true
+    failed=0
+    install_plist unused com.dotfiles.opencode-serve.plist com.dotfiles.opencode-serve opencode-serve
+    printf "failed=%s\n" "$failed"
+  ' _ "$repo/lib/opencode-version.sh" "$repo/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'failed=1'* ]]
+  [ -e "$HOME/Library/LaunchAgents/com.dotfiles.opencode-serve.plist" ]
 }
 
 @test "managed service health uses upstream status without starting a client" {

@@ -16,8 +16,10 @@ SIGINT retire before starting and cannot run after the holder releases.
 Measurement: extend `tests/heavy-run.bats` using its private queue and existing
 fixture holder. For each of 20 trials use a distinct private log and output
 marker, wait until the owned waiter is queued, signal only its direct child
-identity, wait for exit 130, and verify the queue is empty. Release the owned
-holder, wait for it, and check that no cancelled marker was created. Hosted CI
+identity, wait for exit 130, and verify its exact ticket and sidecars are gone.
+Check that the holder remains active. Release it, run a test-owned sentinel,
+and observe for one second that no cancelled marker appears. This bounded
+observation cannot prove what happens forever. Hosted CI
 runs the affected suite. Never inspect, pause, or signal the live queue or an
 unowned process.
 

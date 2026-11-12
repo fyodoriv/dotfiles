@@ -172,3 +172,16 @@ to the independently audited source, including fallback and absence cases.
 Audit actual selected wrappers and their interpreter chains. Recheck the
 effective inputs after capture. Boundary checks do not prove that inputs were
 unchanged between them. An unresolved selection or dependency blocks timing.
+
+## Effective endpoint helper prediction
+
+Hypothesis: requiring the configured installed root and its exact audited
+endpoint helper rejects bootstrap fallback or substitution before capture.
+Measurement: focused synthetic controls for the configured root, missing or
+changed bin directory, helper bytes, modes, links and directory identities.
+Success: the exact audited helper is accepted; every planted missing, changed,
+linked or fallback case is rejected, with zero fallback behavior changed in
+the hook itself. Pivot: any unresolved selection, unsafe path or mismatch
+blocks timing. This binds only the helper; wrapper interpreters and system
+dependencies still need independent review. Anchor: the effective tool
+closure review above.

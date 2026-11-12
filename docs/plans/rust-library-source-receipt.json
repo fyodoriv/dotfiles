@@ -1,0 +1,638 @@
+{
+  "format": 1,
+  "revision": "57a4b14da82ad42c47bceebfc4e051d8bb9541d3",
+  "files": [
+    {
+      "path": "lib/agent-browser-session-env.sh",
+      "mode": "100644",
+      "blob": "e61387a57dca26eaaa249123561969af75d6bd27"
+    },
+    {
+      "path": "lib/agent-keepawake.sh",
+      "mode": "100644",
+      "blob": "5cfc45454724495242c6b8d27b5e2d36d09a0c82"
+    },
+    {
+      "path": "lib/agent-worktrees-noindex.sh",
+      "mode": "100644",
+      "blob": "6abb690b4fc31edc09a23b007a56085ad3535bc9"
+    },
+    {
+      "path": "lib/agentbrew-locate.sh",
+      "mode": "100644",
+      "blob": "37a6a8cac94db9f3f058f252a0eaf4103c6622d0"
+    },
+    {
+      "path": "lib/agentbrew-memory-readiness.sh",
+      "mode": "100644",
+      "blob": "e4012079d3cf413a5965050b66f704795c24e61f"
+    },
+    {
+      "path": "lib/agentfile-layers.sh",
+      "mode": "100644",
+      "blob": "dedce6bfde55c8ed0fb5961190517549640b54d2"
+    },
+    {
+      "path": "lib/apply-defaults.sh",
+      "mode": "100644",
+      "blob": "89ce0a7c6a4518d7ac0e484ae6f4263354c3d09f"
+    },
+    {
+      "path": "lib/apply-state.sh",
+      "mode": "100644",
+      "blob": "eaec46637100cd10ad468be18dbd41065765a6af"
+    },
+    {
+      "path": "lib/blocked-software.sh",
+      "mode": "100644",
+      "blob": "2bfbfdacc1de259c41e4a4235b21b3436e1ec070"
+    },
+    {
+      "path": "lib/brew-bottle-audit.sh",
+      "mode": "100644",
+      "blob": "469c821f51f2d3cd670a37bd6d81c49b5b4aead6"
+    },
+    {
+      "path": "lib/brew-cask-adoption.sh",
+      "mode": "100644",
+      "blob": "d117213f6c9367dfa88abb55c82e848336d478c6"
+    },
+    {
+      "path": "lib/chrome-dock-guard.swift",
+      "mode": "100644",
+      "blob": "c510c704ac5964bca1c265f54d812f08f90a0693"
+    },
+    {
+      "path": "lib/chrome-purpose-options.sh",
+      "mode": "100644",
+      "blob": "fb9c83eaadbfa2eb2545956138202944d8429ff9"
+    },
+    {
+      "path": "lib/claude-model-layer.sh",
+      "mode": "100644",
+      "blob": "a2c5963122d24f2f59cae460aac2ad55f6d0cc7b"
+    },
+    {
+      "path": "lib/colors.sh",
+      "mode": "100644",
+      "blob": "b67698833a4ab67e02d479a5a66e1a1404fece3b"
+    },
+    {
+      "path": "lib/confirm.sh",
+      "mode": "100644",
+      "blob": "fc82f3404151c92c1715667837fb3490a9f77a85"
+    },
+    {
+      "path": "lib/coverage-report.py",
+      "mode": "100644",
+      "blob": "50cd2d0ddc79fc206e539837a4e25753d36ee4b3"
+    },
+    {
+      "path": "lib/coverage-trap.sh",
+      "mode": "100644",
+      "blob": "62955471959ddcc0780f56bf98fd9a5e18473119"
+    },
+    {
+      "path": "lib/dotfiles-agent-node.sh",
+      "mode": "100644",
+      "blob": "8cda79d39e42641cf638eaa8638f82d573efec20"
+    },
+    {
+      "path": "lib/dotfiles-agent-session-env.py",
+      "mode": "100644",
+      "blob": "ac5d9cdf974b0e1814e75c3f5a7ca63ee7065d93"
+    },
+    {
+      "path": "lib/dotfiles-arch.sh",
+      "mode": "100644",
+      "blob": "8f28fc52970dcf7b2c9fa963cc6570b7d2fd06f3"
+    },
+    {
+      "path": "lib/dotfiles-endpoint-paths.sh",
+      "mode": "100644",
+      "blob": "115e579cf48f28e7f3f7b10f0d079f213dcf1a6b"
+    },
+    {
+      "path": "lib/dotfiles-source-dir.sh",
+      "mode": "100644",
+      "blob": "2b2d1c428ee43c2a9cffe974a01f55f2c5d12b3c"
+    },
+    {
+      "path": "lib/errors-log.sh",
+      "mode": "100644",
+      "blob": "57e0dbc96fab9b7d2160292c1d40871683291230"
+    },
+    {
+      "path": "lib/focus-steal-audit.sh",
+      "mode": "100644",
+      "blob": "9f633f2554c336cfc067d0868cef04bae1fb97d8"
+    },
+    {
+      "path": "lib/gh-public-leak.sh",
+      "mode": "100644",
+      "blob": "1835ffdb076c35a2c01f3e18a035a43843acfc81"
+    },
+    {
+      "path": "lib/gitconfig-user-migrate.sh",
+      "mode": "100755",
+      "blob": "624690d1d5905d42136c87a6006c9a78e1ddfb47"
+    },
+    {
+      "path": "lib/glove80-private-log.rb",
+      "mode": "100644",
+      "blob": "352633f8a16919d2d2b7de09f14761e518365675"
+    },
+    {
+      "path": "lib/heal-stuck-agents.sh",
+      "mode": "100644",
+      "blob": "154e7290cd050865452d4487f4d8b50f46b9ac37"
+    },
+    {
+      "path": "lib/launchagent-args.sh",
+      "mode": "100644",
+      "blob": "e374b14017385d89e5a10c118e18dd426129210d"
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "mode": "100644",
+      "blob": "3509d2d9332c3c44b9c9b92f3c446f2075e25152"
+    },
+    {
+      "path": "lib/launchctl-timeout.sh",
+      "mode": "100644",
+      "blob": "dbe1bf5cad1233e86be3ebea0b4983a194693e13"
+    },
+    {
+      "path": "lib/leak-allow.sh",
+      "mode": "100644",
+      "blob": "b44bee6d58c7b527ad9857b144fe06a74759a320"
+    },
+    {
+      "path": "lib/local-ai-agent.py",
+      "mode": "100755",
+      "blob": "54e48d6a933037c6917b2c91ec81f1a930ff7e08"
+    },
+    {
+      "path": "lib/local-ai-loop.py",
+      "mode": "100644",
+      "blob": "75397268edcc16611e899a450d0bda26f2df01d8"
+    },
+    {
+      "path": "lib/lock.sh",
+      "mode": "100644",
+      "blob": "6573b5ebb79e28c2f4aeccb69324e1dd56885f08"
+    },
+    {
+      "path": "lib/login-apps.sh",
+      "mode": "100644",
+      "blob": "6c5764b6bf4c7bb1d983bdc0ba113c72f6312f0a"
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "mode": "100644",
+      "blob": "da99f94ca600f167393e33ac993c57c0b4cc5956"
+    },
+    {
+      "path": "lib/node-pin.sh",
+      "mode": "100644",
+      "blob": "b2320825bc66261205c18328c2eae5661774a433"
+    },
+    {
+      "path": "lib/oss-readiness.sh",
+      "mode": "100644",
+      "blob": "8287b7b06d7b786bf4b2a03be6944ef2d9652668"
+    },
+    {
+      "path": "lib/output.sh",
+      "mode": "100644",
+      "blob": "73dfdb65fbb64d4a044653a0ec977b09a8206917"
+    },
+    {
+      "path": "lib/plugin-capabilities.sh",
+      "mode": "100644",
+      "blob": "d12edc802f4e50439d79f0b4d7adfc4ec5f5908f"
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "mode": "100644",
+      "blob": "19ea424fededa49cad6c759f1a3df52b3c4b682a"
+    },
+    {
+      "path": "lib/plugin-sandbox-runner.sh",
+      "mode": "100644",
+      "blob": "b08be16e92ac2c1b9b4fe12203099495946c016c"
+    },
+    {
+      "path": "lib/plugin-signers.sh",
+      "mode": "100644",
+      "blob": "e26de4e77af0b469068a4cd8cfae32264ef21e19"
+    },
+    {
+      "path": "lib/plugin.sh",
+      "mode": "100644",
+      "blob": "c0004f17fc48f7000948dda8d6fc95b968bf2ae8"
+    },
+    {
+      "path": "lib/poetry-repair.sh",
+      "mode": "100755",
+      "blob": "47659630823ab9175896e662f3b12f1d62603acf"
+    },
+    {
+      "path": "lib/private-ref-markers.awk",
+      "mode": "100644",
+      "blob": "8f0f8fcfe4cbbbdb4b28b7ffe59c3298d5114f24"
+    },
+    {
+      "path": "lib/push-error-classify.sh",
+      "mode": "100644",
+      "blob": "33db5dc78aebaf19dd7245eaa36d85e17de527f3"
+    },
+    {
+      "path": "lib/python/dotfiles_tls_relax.py",
+      "mode": "100644",
+      "blob": "e98a92cb54e2168e88024a8a842aae732b95fd4f"
+    },
+    {
+      "path": "lib/quit-watcher.swift",
+      "mode": "100644",
+      "blob": "5b5cb7842a01f4f238a355b4bf946a1d2b1919a1"
+    },
+    {
+      "path": "lib/run-with-timeout.sh",
+      "mode": "100644",
+      "blob": "13f4ab9cd12f17c825a868126860dc4867b07c83"
+    },
+    {
+      "path": "lib/secret-scan.sh",
+      "mode": "100644",
+      "blob": "c0f99534c7b95a327168dbbdb05b7bc0d821efda"
+    },
+    {
+      "path": "lib/self-reload.sh",
+      "mode": "100644",
+      "blob": "922b105180ee398eb31eb366282396dfe6e39c4c"
+    },
+    {
+      "path": "lib/spotlight-probe.sh",
+      "mode": "100755",
+      "blob": "d5082b0736c998c623ecfe6861b20c7002c20a12"
+    },
+    {
+      "path": "lib/stats.sh",
+      "mode": "100644",
+      "blob": "f0f470ee6534e72759c8663470422974c5b42194"
+    },
+    {
+      "path": "lib/strip-agent-attribution.sh",
+      "mode": "100644",
+      "blob": "896105c6dc3a33fa94d45c409ba8e5dd0db29037"
+    },
+    {
+      "path": "lib/updates-landed.sh",
+      "mode": "100644",
+      "blob": "19c89038a7569958817ca73ce71f2159566407a2"
+    },
+    {
+      "path": "lib/weekly-metrics.sh",
+      "mode": "100644",
+      "blob": "fee76a4ea6e0bd7cfcb1ec2d3e3ea3033e2e7e14"
+    },
+    {
+      "path": "lib/workspace-discovery.sh",
+      "mode": "100755",
+      "blob": "55e582ab32a5ce21a7ebf68bb25c60842b7fe72d"
+    },
+    {
+      "path": "lib/xcode-license.sh",
+      "mode": "100644",
+      "blob": "d9809a808c34d5cb07a317a53232df22b1b87a35"
+    },
+    {
+      "path": "lib/zsh-completion-audit.zsh",
+      "mode": "100644",
+      "blob": "88631e0291a1c8e98222cb0f74471e92f5f2eb17"
+    },
+    {
+      "path": "lib/zshrc-appends.sh",
+      "mode": "100644",
+      "blob": "5f2f3be964863e2e8027868c466fadbd3bddd5c3"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "lib/agent-browser-session-env.sh",
+      "line": 1,
+      "text": "# Shared AGENT_BROWSER_SESSION assignment for agent contexts."
+    },
+    {
+      "path": "lib/agent-keepawake.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/agent-worktrees-noindex.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/agentbrew-locate.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/agentbrew-memory-readiness.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/agentfile-layers.sh",
+      "line": 1,
+      "text": "#!/usr/bin/env bash"
+    },
+    {
+      "path": "lib/apply-defaults.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/apply-state.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/blocked-software.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/brew-bottle-audit.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/brew-cask-adoption.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/chrome-dock-guard.swift",
+      "line": 1,
+      "text": "// chrome-dock-guard: hand the user's Chrome click to the user's Chrome."
+    },
+    {
+      "path": "lib/chrome-purpose-options.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/claude-model-layer.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/colors.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/confirm.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/coverage-report.py",
+      "line": 1,
+      "text": "\"\"\"Aggregate bash xtrace logs into a kcov-compatible coverage.json."
+    },
+    {
+      "path": "lib/coverage-trap.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/dotfiles-agent-node.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/dotfiles-agent-session-env.py",
+      "line": 1,
+      "text": "#!/usr/bin/env python3"
+    },
+    {
+      "path": "lib/dotfiles-arch.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/dotfiles-endpoint-paths.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/dotfiles-source-dir.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/errors-log.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/focus-steal-audit.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/gh-public-leak.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/gitconfig-user-migrate.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/glove80-private-log.rb",
+      "line": 1,
+      "text": "#!/usr/bin/env ruby"
+    },
+    {
+      "path": "lib/heal-stuck-agents.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/launchagent-args.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/launchctl-timeout.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/leak-allow.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/local-ai-agent.py",
+      "line": 1,
+      "text": "\"\"\"Minimal agentic loop over Ollama's native /api/chat."
+    },
+    {
+      "path": "lib/local-ai-loop.py",
+      "line": 1,
+      "text": "\"\"\"Pick the highest-priority unblocked task from TASKS.md and run it"
+    },
+    {
+      "path": "lib/lock.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/login-apps.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/node-pin.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/oss-readiness.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/output.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/plugin-capabilities.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/plugin-sandbox-runner.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/plugin-signers.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/plugin.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/poetry-repair.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/private-ref-markers.awk",
+      "line": 1,
+      "text": "# Generic private-reference markers that need no private pattern file."
+    },
+    {
+      "path": "lib/push-error-classify.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/python/dotfiles_tls_relax.py",
+      "line": 1,
+      "text": "\"\"\"Clear only OpenSSL's VERIFY_X509_STRICT flag (dotfiles #349)."
+    },
+    {
+      "path": "lib/quit-watcher.swift",
+      "line": 1,
+      "text": "// A tiny accessory app that lets macOS quit a LaunchAgent Chrome (issue #298)."
+    },
+    {
+      "path": "lib/run-with-timeout.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/secret-scan.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/self-reload.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/spotlight-probe.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/stats.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/strip-agent-attribution.sh",
+      "line": 1,
+      "text": "#!/bin/sh"
+    },
+    {
+      "path": "lib/updates-landed.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/weekly-metrics.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/workspace-discovery.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/xcode-license.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "lib/zsh-completion-audit.zsh",
+      "line": 1,
+      "text": "#!/bin/zsh -df"
+    },
+    {
+      "path": "lib/zshrc-appends.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    }
+  ]
+}

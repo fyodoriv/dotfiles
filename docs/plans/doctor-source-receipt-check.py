@@ -4,29 +4,52 @@ import copy
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
-REVISION = "a846166aa1a14158cb6a5fef9a1c06ed3c0711f1"
-RECEIPT = Path("docs/plans/doctor-source-receipt.json")
-raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", REVISION, "--", "modules/"])
+if sys.argv[1:] == []:
+    REVISION = "a846166aa1a14158cb6a5fef9a1c06ed3c0711f1"
+    RECEIPT = Path("docs/plans/doctor-source-receipt.json")
+    FAMILY, EXPECTED = "modules/", 33
+elif sys.argv[1:] in (["--libraries"], ["--generate-libraries"]):
+    REVISION = "57a4b14da82ad42c47bceebfc4e051d8bb9541d3"
+    RECEIPT = Path("docs/plans/rust-library-source-receipt.json")
+    FAMILY, EXPECTED = "lib/", 63
+else:
+    raise SystemExit("usage: doctor-source-receipt-check.py [--libraries|--generate-libraries]")
+raw = subprocess.check_output(["git", "ls-tree", "-r", "-z", REVISION, "--", FAMILY])
 tree = {}
 for record in raw.split(b"\0"):
     if not record:
         continue
     meta, path = record.split(b"\t", 1)
     path = path.decode("utf-8")
-    if not re.fullmatch(r"modules/[^/]+/doctor\.sh", path):
+    if FAMILY == "modules/" and not re.fullmatch(r"modules/[^/]+/doctor\.sh", path):
         continue
     mode, kind, blob = meta.decode("ascii").split()
     if kind != "blob" or path in tree:
         raise SystemExit("invalid source tree")
     tree[path] = {"mode": mode, "blob": blob}
-if len(tree) != 33:
+if len(tree) != EXPECTED:
     raise SystemExit("unexpected source family size")
 lines = {
     path: subprocess.check_output(["git", "show", f"{REVISION}:{path}"]).decode("utf-8").splitlines()
     for path in tree
 }
+
+
+if sys.argv[1:] == ["--generate-libraries"]:
+    generated = {
+        "format": 1,
+        "revision": REVISION,
+        "files": [{"path": path, **identity} for path, identity in tree.items()],
+        "anchors": [
+            {"path": path, "line": 1, "text": source[0]}
+            for path, source in lines.items()
+        ],
+    }
+    print(json.dumps(generated, indent=2))
+    raise SystemExit(0)
 
 
 def valid(data):
@@ -60,6 +83,8 @@ def valid(data):
             if lines[path][number - 1] != text or (path, number) in seen:
                 return False
             seen.add((path, number))
+        if FAMILY == "lib/":
+            return len(anchors) == len(tree) and seen == {(path, 1) for path in tree}
         return {path for path, _ in seen} == set(tree)
     except (KeyError, TypeError, ValueError):
         return False
@@ -89,6 +114,11 @@ for index in range(len(data["anchors"])):
         else:
             case["anchors"][index][field] = -1 if field == "line" else "invalid planted text"
         mutants.append(case)
+if FAMILY == "lib/":
+    path = next(path for path, source in lines.items() if len(source) > 1)
+    case = copy.deepcopy(data)
+    case["anchors"].append({"path": path, "line": 2, "text": lines[path][1]})
+    mutants.append(case)
 if not mutants or any(valid(case) for case in mutants):
     raise SystemExit("a planted error was accepted")
-print(f"checked {len(tree)}/33 files and {len(data['anchors'])} anchors; rejected {len(mutants)} planted errors")
+print(f"checked {len(tree)}/{EXPECTED} files and {len(data['anchors'])} anchors; rejected {len(mutants)} planted errors")

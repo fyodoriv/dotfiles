@@ -380,6 +380,12 @@ JSONL
   jq -e '.ok == false and .duration_ms == 1234' "$DOTFILES_STATS_FILE"
 }
 
+@test "log_run does not mark an invalid duration as monotonic" {
+  log_run sync 1 ok invalid '' monotonic-ms
+  log_run sync 1 ok '' '' monotonic-ms
+  jq -s -e 'length == 2 and all(.[]; has("timing_source") | not)' "$DOTFILES_STATS_FILE"
+}
+
 @test "log_run allow-lists ok and duration_ms" {
   log_run sync 1 'x"y' 'nope'
   jq -e '.ok == true and (.duration_ms | type) == "number"' "$DOTFILES_STATS_FILE"

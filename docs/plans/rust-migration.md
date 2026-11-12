@@ -1,6 +1,6 @@
 # Measured Rust migration plan
 
-**Status (2026-11-10): porting stays paused until the owner starts it.**
+**Status (2026-11-11): the owner started execution; measurement is in progress.**
 This plan was rewritten on 2026-11-10 after the
 [validation review](#validation-review-2026-11-09). No code is ported yet.
 The re-plan Pivot did not apply: gate G stays. A first independent review of
@@ -64,9 +64,9 @@ Reviewed at revision `788d43d` on 2026-11-10.
 | The Makefile has no cargo step | Makefile | fact |
 | Rust exists only as test fixture crates | `tests/fixtures/` (`checkup-read-consumer`, `compiler-queue-observer`, `connector-credentials`, `queue-privacy-cutover`) | fact |
 | Two agent hooks run on each agent Bash call and start Perl, `shfmt` or `jq` | agent-hooks/require-heavy-run.sh, agent-hooks/block-dangerous-git.sh | fact |
-| The performance gate tracks both hooks and three commands; it compares minimums only | config/perf-budget.tsv, scripts/perf-gate.sh | fact |
+| The performance gate tracks both hooks and three commands; it checks minimums and paired median differences | config/perf-budget.tsv, scripts/perf-gate.pl; #573 | fact |
 | `app-priority` runs every 60 seconds and logs each run in whole seconds | launchagents/com.dotfiles.app-priority.plist.tmpl; `log_run app-priority` | fact |
-| `app-priority` mean run time: 1,560 ms over 9,674 runs in the last 7 days; 990 ms over 8,654 runs in the 7 days before; 926 ms over all logged runs | The window command below, run on 2026-11-10 | measured |
+| `app-priority` mean run time: 1,560 ms over 9,674 runs in the last 7 days; 990 ms over 8,654 runs in the 7 days before; 926 ms over all logged runs | The earlier whole-second window command, run on 2026-11-10 | measured, not a millisecond baseline |
 | Commands and runs log `duration_ms`; telemetry adds `runtime` | lib/stats.sh; bin/dotfiles-telemetry | fact |
 | Shell embeds Perl/Python/Node; some programs lack an extension | bin/heavy-run, bin/agent-tab, bin/learn-repos-inventory, lib/ | fact |
 | Source collection covers several families | [source inventory](rust-source-inventory.md) | fact |
@@ -162,15 +162,16 @@ printed no JSON when this revision was committed. The
 finished run. The task `rust-agent-hooks` runs the gate before any change.
 
 ```sh
-jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl
+jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timing_source == "monotonic-ms" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl
 ```
 
-This is the **window command**. It printed
+This is the **window command**. The filter selects only valid millisecond samples. Before that filter existed, the old whole-second version printed
 `{"runs":9674,"mean":1560.47,"zeros":2562}` (mean shortened here) for the
 last 7 days. With `--argjson to 7` it printed
 `{"runs":8654,"mean":990.41,"zeros":3531}` for the 7 days before. `to` is
-the number of days back where the 7-day window ends. `zeros` counts runs
-that `log_run` rounded down to 0. `mean` is `null` for an empty window.
+the number of days back where the 7-day window ends. In the old result,
+`zeros` counted runs rounded down to 0. In the new command it counts valid
+sub-millisecond samples rounded to 0. `mean` is `null` for an empty window.
 
 ```sh
 jq -s '[.[] | select(.task == "app-priority") | .duration_ms] | add / length' ~/.dotfiles-stats.jsonl
@@ -253,16 +254,18 @@ about three tail samples, and measured noise on this Mac was 19-50%.
 - **Time, for a row in the budget file (R_T):** the performance gate
   decides. It compares the fastest of 15 runs per tree and times a
   slower-looking row again, up to two more rounds. R_T is the `ratio` it
-  prints. The gate compares minimums only; task
-  `perf-gate-paired-median-parity` adds the paired-median rule.
+  prints. Since #573 the gate also requires the paired median difference to
+  exceed the same slowdown limit before it fails a row. R_T remains the
+  registered minimum ratio for the slice's benefit decision.
 - **The row must keep its command path.** A row whose file the base commit
   does not have gets the ceiling check only. A port PR must not change the
   row's command path. The row keeps calling the same entry file, and that
   file calls the new code.
 - **Time, for a logged run (R_T):** the mean `duration_ms` of a 7-day
   window from the window command above, with at least 1,000 runs in each
-  window. R_T is the after window divided by the lower of the two before
-  windows.
+  window. Both before windows must start after the final timing change is
+  deployed, and the after window must start after the candidate is deployed.
+  R_T is the after window divided by the lower of the two before windows.
 - **Time, for a workload with no row and no log (R_T):** the median of the
   paired ratios candidate time / baseline time, from at least 30
   order-balanced pairs. Take a percentile bootstrap of the median with
@@ -337,6 +340,8 @@ is no separate "move tests to Rust" step.
 
 Each hot-path task commits its absolute baseline number before any
 replacement code. The ratio or mean above is the decision rule.
+The first instrumentation prediction is in
+[app-priority timing](app-priority-timing.md).
 
 The owner ruling is the agentbrew task `rust-owner-rules-on-replan-defaults`
 (HITL). It blocks step 5 only.

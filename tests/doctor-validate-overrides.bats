@@ -73,6 +73,22 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
+assert_doctor_succeeded() {
+  local safe_status=unknown json=no failures=unknown chezmoi_failures=unknown permission=no missing=no
+  [[ "$1" =~ ^[0-9]{1,3}$ ]] && safe_status="$1"
+  [ "$safe_status" = 0 ] && return 0
+  if printf '%s' "$2" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    json=yes
+    failures=$(printf '%s' "$2" | jq '[.[] | objects | select(.status == "fail")] | length' 2>/dev/null) || failures=unknown
+    chezmoi_failures=$(printf '%s' "$2" | jq '[.[] | objects | select(.status == "fail" and (.id | type == "string" and startswith("chezmoi.")))] | length' 2>/dev/null) || chezmoi_failures=unknown
+  fi
+  [[ "$2" == *'Permission denied'* ]] && permission=yes
+  [[ "$2" == *'No such file or directory'* || "$2" == *'command not found'* ]] && missing=yes
+  printf 'doctor status: %s; json: %s; failures: %s; chezmoi failures: %s; permission: %s; missing: %s\n' \
+    "$safe_status" "$json" "$failures" "$chezmoi_failures" "$permission" "$missing" >&2
+  return 1
+}
+
 install_discovery_mode_module() {
   export DOTFILES_USE_LOCAL_AI=false
   mkdir -p "$TEST_DOTFILES/modules/conditional"
@@ -203,12 +219,55 @@ EOF
   [[ "$output" == *"typo.local"* ]]
 }
 
+@test "doctor failure diagnostic hides a real fixture's private output" {
+  export DOTFILES_LOCAL_OVERRIDES="$TEST_DIR/absent-overrides"
+  printf 'check "fake.alpha" "PRIVATE_CANARY_123" "false" ""\n' > "$TEST_DOTFILES/modules/fake/doctor.sh"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --module fake --json
+  local doctor_status="$status" doctor_output="$output"
+  [ "$doctor_status" -ne 0 ]
+  [[ "$doctor_output" == *PRIVATE_CANARY_123* ]]
+  run assert_doctor_succeeded "$doctor_status" "$doctor_output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'doctor status: '* ]]
+  [[ "$output" == *'json: yes'* ]]
+  [[ "$output" != *PRIVATE_CANARY_123* ]]
+}
+
+@test "doctor failure diagnostic reports only allowlisted error classes" {
+  run assert_doctor_succeeded 7 'PRIVATE_CANARY_123 Permission denied No such file or directory'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'json: no'*'permission: yes'*'missing: yes'* ]]
+  [[ "$output" != *PRIVATE_CANARY_123* ]]
+}
+
+@test "doctor failure diagnostic counts a synthetic chezmoi failure" {
+  export MOCK_CHEZMOI_LOG="$TEST_DIR/chezmoi-calls"
+  export PATH="$TEST_DOTFILES/bin:$PATH"
+  cat > "$TEST_DOTFILES/bin/chezmoi" <<'MOCK'
+#!/bin/bash
+case "$1" in
+  doctor) printf 'doctor\n' >> "$MOCK_CHEZMOI_LOG"; printf 'error synthetic synthetic\n' ;;
+  *) exit 1 ;;
+esac
+MOCK
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  mkdir -p "$TEST_HOME/.config/dotfiles"
+  printf 'fake.alpha\n' > "$TEST_HOME/.config/dotfiles/overrides"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --module fake --json
+  local doctor_status="$status" doctor_output="$output"
+  [ "$doctor_status" -ne 0 ]
+  grep -qx doctor "$MOCK_CHEZMOI_LOG"
+  run assert_doctor_succeeded "$doctor_status" "$doctor_output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'chezmoi failures: 1'* ]]
+}
+
 @test "a per-machine override skips its check in a doctor run" {
   touch "$TEST_DOTFILES/.overrides"
   mkdir -p "$TEST_HOME/.config/dotfiles"
   echo "fake.alpha" > "$TEST_HOME/.config/dotfiles/overrides"
   run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --module fake --json
-  [ "$status" -eq 0 ]
+  assert_doctor_succeeded "$status" "$output"
   [ "$(printf '%s' "$output" | jq -r '.[] | select(.id == "fake.alpha") | .status')" = skip ]
 }
 

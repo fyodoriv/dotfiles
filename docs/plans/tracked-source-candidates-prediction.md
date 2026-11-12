@@ -13,6 +13,12 @@ and matching reasons. Regenerate byte for byte. Plant an omission, duplicate
 and wrong blob for each candidate and require each to be rejected. Run the
 focused test and hosted required gate.
 
+The suffix set is `.sh`, `.bash`, `.zsh`, `.py`, `.pl`, `.awk`, `.rs`,
+`.swift`, `.mjs`, `.cjs`, `.js`, `.ts`, `.tsx`, `.bats` and `.tmpl`.
+The mode predicate is `100755`. The shebang predicate covers first-line
+matches in Git's text search; binary content and symlink targets are not
+followed. Modes and suffixes may still select such paths as candidates.
+
 Success: all paths matching the three documented predicates appear once;
 100% of planted omissions, duplicates and wrong blobs are rejected; and
 regeneration matches byte for byte. Pivot: any missed predicate match,

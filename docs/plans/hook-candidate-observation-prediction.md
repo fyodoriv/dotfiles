@@ -82,3 +82,25 @@ both sides match the verified snapshot. Pivot: any uncontained write or
 unverifiable partial fixture blocks worker integration. The scratch snapshot
 must be rechecked before and after capture. Anchor: the fixture input boundary
 and trusted-local-correlation limits above.
+
+## Remote source mapping prediction
+
+Hypothesis: the public GitHub Git data API can supply an independently
+reviewable commit-to-blob mapping without a local Git object reader. Trust the
+GitHub HTTPS API as the remote source; its JSON is not cryptographic proof of
+the commit object. Measurement: focused mapping-parser tests with exact commit
+and tree responses, missing or duplicate paths, wrong hashes, types, modes,
+truncation and malformed records. Success: all nine expected entries resolve
+to exact blob IDs and modes for the two full revisions, and every planted
+invalid response is rejected. Pivot: unavailable, oversized, ambiguous or
+unverifiable responses leave the mapping inconclusive and block timing.
+
+Fetch only the fixed public repository and exact commit and tree IDs. Use
+non-recursive trees, TLS, restricted hosts and redirects, bounded response
+sizes and connection/read deadlines. Send no local paths or credentials.
+Retain the reviewed mapping and response provenance privately and bind it to
+the run and source audit. Compare each mapped blob with the bounded local
+source snapshot. The network and filesystem may still defeat a strict
+wall-time bound. This does not establish checkout HEAD, installed behavior,
+tool closure or protection against transient same-user changes. Anchor:
+[object-reader pivot](hook-object-reader-pivot.md).

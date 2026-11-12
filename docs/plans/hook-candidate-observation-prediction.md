@@ -157,3 +157,18 @@ adapter built against macOS headers over a handwritten filesystem structure.
 Audit its source, binary, ABI and load path, and test local, nonlocal and error
 outcomes. Check again after capture before qualifying a run. This check does not prove durability or prevent transient same-user changes. Anchor: the source-audit
 local-filesystem assertion above.
+
+## Effective tool closure review
+
+The four literal status cases use the selected `dirname` and `cat`, absolute
+`plutil`, and the bootstrap's conditional path and helper resolution. The old
+hook also probes for `rg`. The existing tool snapshot captures many selected
+paths, candidates, startup files and boundary states, but does not prove which
+live endpoint helper the hook actually sources. It also does not bind every
+shebang interpreter or intermediate symlink of selected wrappers.
+
+Before capture, bind the hook-resolved dotfiles root and live endpoint helper
+to the independently audited source, including fallback and absence cases.
+Audit actual selected wrappers and their interpreter chains. Recheck the
+effective inputs after capture. Boundary checks do not prove that inputs were
+unchanged between them. An unresolved selection or dependency blocks timing.

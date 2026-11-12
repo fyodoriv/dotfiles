@@ -1,0 +1,148 @@
+{
+  "format": 1,
+  "revision": "861c94fbe37176c95fed04e258abc942f31e45db",
+  "files": [
+    {
+      "path": "macos-apps.sh",
+      "mode": "100644",
+      "blob": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574"
+    },
+    {
+      "path": "macos-trackpad.sh",
+      "mode": "100755",
+      "blob": "0313dab587cabb849252fb0b6c88c2896b1b9aef"
+    },
+    {
+      "path": "macos-visual.sh",
+      "mode": "100644",
+      "blob": "9d018e9cea89074ec221f55004b4a0b7edb092d8"
+    },
+    {
+      "path": "macos.sh",
+      "mode": "100755",
+      "blob": "510e75f257e139447d965073654068ddc529497d"
+    },
+    {
+      "path": "modify_private_dot_npmrc",
+      "mode": "100755",
+      "blob": "97ae537f26f29e9358e02eaefef0264f15ee2f4f"
+    },
+    {
+      "path": "snapshot.sh",
+      "mode": "100755",
+      "blob": "5bde1a90bf1b76ac5d231113ce0427086eec8d26"
+    }
+  ],
+  "anchors": [
+    {
+      "path": "macos-apps.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "macos-apps.sh",
+      "line": 13,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\""
+    },
+    {
+      "path": "macos-apps.sh",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/apply-defaults.sh\""
+    },
+    {
+      "path": "macos-apps.sh",
+      "line": 17,
+      "text": "source \"$DOTFILES_DIR/lib/dotfiles-arch.sh\""
+    },
+    {
+      "path": "macos-apps.sh",
+      "line": 19,
+      "text": "source \"$DOTFILES_DIR/lib/login-apps.sh\""
+    },
+    {
+      "path": "macos-trackpad.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "macos-trackpad.sh",
+      "line": 31,
+      "text": "  sed 's/#.*//' \"$skip_file\" | awk -v d=\"$1\" -v k=\"$2\" '$1 == d { $1 = \"\"; sub(/^ +/, \"\"); sub(/ +$/, \"\"); if ($0 == k) found = 1 } END { exit !found }'"
+    },
+    {
+      "path": "macos-trackpad.sh",
+      "line": 35,
+      "text": "  skipped \"$1\" \"$2\" || defaults write \"$@\""
+    },
+    {
+      "path": "macos-visual.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "macos-visual.sh",
+      "line": 13,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\""
+    },
+    {
+      "path": "macos-visual.sh",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/apply-defaults.sh\""
+    },
+    {
+      "path": "macos-visual.sh",
+      "line": 20,
+      "text": "apply_defaults \"visual\""
+    },
+    {
+      "path": "macos.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "macos.sh",
+      "line": 20,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\""
+    },
+    {
+      "path": "macos.sh",
+      "line": 22,
+      "text": "source \"$DOTFILES_DIR/lib/apply-defaults.sh\""
+    },
+    {
+      "path": "macos.sh",
+      "line": 36,
+      "text": "apply_defaults \"core\""
+    },
+    {
+      "path": "modify_private_dot_npmrc",
+      "line": 1,
+      "text": "#!/bin/sh"
+    },
+    {
+      "path": "modify_private_dot_npmrc",
+      "line": 19,
+      "text": "cat <<'MANAGED'"
+    },
+    {
+      "path": "modify_private_dot_npmrc",
+      "line": 48,
+      "text": "[ -n \"$preserved\" ] && printf '\\n%s\\n' \"$preserved\""
+    },
+    {
+      "path": "snapshot.sh",
+      "line": 1,
+      "text": "#!/bin/bash"
+    },
+    {
+      "path": "snapshot.sh",
+      "line": 15,
+      "text": "source \"$DOTFILES_DIR/lib/colors.sh\""
+    },
+    {
+      "path": "snapshot.sh",
+      "line": 60,
+      "text": "    defaults read \"$domain\" 2>/dev/null >> \"$outfile\" || echo \"(not set)\" >> \"$outfile\""
+    }
+  ]
+}

@@ -141,3 +141,15 @@ result. A separate reviewer then verifies the retained links and replays the
 records. Any missing, changed or ambiguous link is inconclusive. This remains
 trusted local correlation, not protection from same-user interference or a
 cryptographic proof of remote origin.
+
+## Run-directory locality prediction
+
+Hypothesis: checking the opened run directory's filesystem after reservation
+will reject a nonlocal or unverified destination before source acquisition.
+Measurement: focused synthetic local/nonlocal/error cases, followed by an
+independent audit of the macOS filesystem API. Success: every local fixture
+is admitted and every nonlocal, unsupported or failed check is rejected.
+Pivot: an unknown ABI, unavailable flag or mismatch blocks the measurement;
+do not infer locality from the parent alone. This check does not prove
+durability or prevent transient same-user changes. Anchor: the source-audit
+local-filesystem assertion above.

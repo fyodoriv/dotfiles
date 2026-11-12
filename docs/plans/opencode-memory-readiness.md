@@ -9,6 +9,10 @@
 - **Pivot:** If any check fails or the isolation boundary permits access to the live memory service, do not alter the installed launcher or alias; inspect upstream behavior first.
 - **Anchor:** [OpenCode shared service documentation](https://opencode.ai/docs/cli/web/) and `launchagents/com.dotfiles.opencode-serve.plist.tmpl`.
 
+The same isolated check can run on hosted macOS CI with a checksum-verified
+OpenCode release. Its network-denial control uses a synthetic local listener.
+This does not replace a later check on the installed Mac.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

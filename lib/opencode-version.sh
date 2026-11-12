@@ -1,4 +1,13 @@
 #!/bin/bash
+# Match the launch agent's managed install, then fall back to PATH.
+opencode_resolve_binary() {
+  if [ -x "$HOME/.opencode/bin/opencode" ]; then
+    printf '%s\n' "$HOME/.opencode/bin/opencode"
+  else
+    command -v opencode
+  fi
+}
+
 # Parse the major version of the executable passed by the caller.
 opencode_major_version() {
   local version major

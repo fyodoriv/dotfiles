@@ -40,9 +40,15 @@ check "local-ai.opencode_installed" "opencode binary present" \
 # macOS kills a binary whose signature no longer matches its contents
 # (launchd: OS_REASON_CODESIGNING), so opencode-serve never answers.
 # The fix re-signs it ad hoc, like the other user-dir binaries here.
-_opencode_bin() { command -v opencode 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"; }
 # shellcheck source=/dev/null
 [ -f "${DOTFILES_DIR:-}/lib/opencode-version.sh" ] && source "$DOTFILES_DIR/lib/opencode-version.sh"
+_opencode_bin() {
+  if declare -F opencode_resolve_binary >/dev/null; then
+    opencode_resolve_binary 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"
+  else
+    command -v opencode 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"
+  fi
+}
 _local_ai_doctor_opencode_major="$(opencode_major_version "$(_opencode_bin)" 2>/dev/null || true)"
 check "local-ai.opencode_signature_valid" "opencode binary code signature is valid" \
   "[ ! -x \"\$(_opencode_bin)\" ] || ! command -v codesign >/dev/null || codesign --verify \"\$(_opencode_bin)\"" \

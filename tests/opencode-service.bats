@@ -22,6 +22,7 @@ SH
   chmod +x "$scratch/opencode"
   mkdir -p "$BATS_TEST_TMPDIR/home/.opencode/bin"
   cp "$scratch/opencode" "$BATS_TEST_TMPDIR/home/.opencode/bin/opencode"
+  export HOME="$BATS_TEST_TMPDIR/home"
   export PATH="$scratch:/usr/bin:/bin"
 }
 
@@ -51,6 +52,26 @@ SH
   run /bin/bash "$repo/bin/dotfiles-opencode" -c
   [ "$status" -eq 0 ]
   [ "$output" = $'<attach>\n<http://127.0.0.1:4096>\n<-c>' ]
+}
+
+@test "oc uses the same installed binary as the launch agent" {
+  export FAKE_OPENCODE_VERSION='1.14.2'
+  cat > "$HOME/.opencode/bin/opencode" <<'SH'
+#!/bin/bash
+if [ "${1:-}" = '--version' ]; then printf 'opencode v2.2.6\n'; else printf '<home:%s>\n' "$@"; fi
+SH
+  chmod +x "$HOME/.opencode/bin/opencode"
+  run /bin/bash "$repo/bin/dotfiles-opencode" -c
+  [ "$status" -eq 0 ]
+  [ "$output" = '<home:-c>' ]
+  run env DOTFILES_DIR="$repo" LIST_MODE=true /bin/bash -c '
+    check() { :; }
+    check_advisory() { :; }
+    source "$DOTFILES_DIR/modules/local-ai/doctor.sh"
+    _opencode_bin
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "$HOME/.opencode/bin/opencode" ]
 }
 
 @test "an unrecognized OpenCode version fails without starting a client" {

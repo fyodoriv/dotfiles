@@ -17,6 +17,7 @@ setup() {
   mkdir -p "$TEST_HOME" "$TEST_DOTFILES" "$TEST_BIN"
 
   export HOME="$TEST_HOME"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config"
   export DOTFILES_DIR="$TEST_DOTFILES"
 
   # Mock pgrep: logs calls, returns no processes by default

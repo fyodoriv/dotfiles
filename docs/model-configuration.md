@@ -39,8 +39,8 @@ Use `oc` to open OpenCode. Version 2 uses its own authenticated shared
 service; version 1 keeps the existing local attach path. On the next
 `dotfiles apply`, the obsolete version 1 launch agent is removed for version 2.
 The local-AI doctor checks the matching service and its API. An unrecognized
-major version fails instead of guessing an interface. `oc --dir <path>` remains
-available for opening a project. The `oc` executable also works in
+major version fails instead of guessing an interface. `oc --dir <path>` opens
+a project, and `oc run --dir <path> <prompt>` runs in that project. The `oc` executable also works in
 noninteractive shells when the dotfiles `bin` directory is on `PATH`. It takes
 precedence over another program named `oc` when that directory comes first.
 The launcher and doctor prefer the managed `~/.opencode/bin/opencode` install,

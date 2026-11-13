@@ -17,6 +17,7 @@ if [ "${1:-}" = service ] && [ "${2:-}" = status ]; then
   exit 0
 fi
 if [ "${1:-}" = api ] && [ "${FAKE_API_FAIL:-0}" = 1 ]; then exit 1; fi
+if [ "${FAKE_REPORT_PWD:-0}" = 1 ]; then printf 'cwd=<%s> env=<%s>\n' "$(pwd -P)" "$PWD"; fi
 if [ "$#" -eq 0 ]; then printf '<no-args>\n'; exit 0; fi
 printf '<%s>\n' "$@"
 SH
@@ -53,6 +54,17 @@ SH
   run /bin/bash "$repo/bin/dotfiles-opencode" -c --dir '/tmp/synthetic project'
   [ "$status" -eq 0 ]
   [ "$output" = $'<-c>\n</tmp/synthetic project>' ]
+}
+
+@test "OpenCode 2 run selects the requested directory without changing the prompt" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6' FAKE_REPORT_PWD=1
+  local target="$BATS_TEST_TMPDIR/synthetic project"
+  mkdir -p "$target"
+  target="$(cd "$target" && pwd -P)"
+  run /bin/bash "$repo/bin/dotfiles-opencode" run --dir "$target" 'hello'
+  [ "$status" -eq 0 ]
+  expected="$(printf 'cwd=<%s> env=<%s>\n<run>\n<hello>' "$target" "$target")"
+  if [ "$output" != "$expected" ]; then printf 'got: %s\nexpected: %s\n' "$output" "$expected" >&3; return 1; fi
 }
 
 @test "OpenCode 1 oc keeps the existing attach interface" {

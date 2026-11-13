@@ -23,6 +23,10 @@ case "$major" in
       esac
     done
     if "$has_directory"; then
+      if [ "${args[0]:-}" = run ]; then
+        cd -- "$directory"
+        exec "$binary" "${args[@]}"
+      fi
       exec "$binary" ${args[@]+"${args[@]}"} "$directory"
     fi
     exec "$binary" ${args[@]+"${args[@]}"} ;;

@@ -102,6 +102,25 @@ record. Its tool evidence included `memory_search` and the test phrase, and
 its answer returned that phrase. The exact test record was deleted and an
 exact search confirmed it was absent. This proves one shared read; it does
 not prove the bootstrap or session-save lifecycle, or a persistent service.
+The test harness set the subprocess working directory but inherited `PWD`
+from Agentbrew. OpenCode 2.2.6 prefers `PWD`, so this run does not establish
+the intended scratch-project scope. The Agentbrew worktree was clean afterward.
+
+## Run directory prediction
+
+- **Root cause:** The draft wrapper translates `--dir` to a positional
+  directory. OpenCode's `run` command treats positional arguments as the
+  prompt, and its directory comes from `PWD`.
+- **Hypothesis:** Changing directory before invoking `oc run` will select the
+  requested project without adding the path to the model prompt.
+- **Measurement:** Use a fake OpenCode executable to record its working
+  directory, `PWD`, and arguments for `run --dir`; keep the existing
+  interactive directory and version compatibility tests.
+- **Success:** Both directory values equal the requested path, the prompt
+  arguments contain no extra path, and every existing wrapper test passes.
+- **Pivot:** If the directory or prompt is wrong, or any existing version path
+  fails, leave the wrapper undeployed and investigate.
+- **Anchor:** [OpenCode 2.2.6 run source](https://github.com/anomalyco/opencode/blob/v2.2.6/packages/cli/src/run/run.ts).
 
 ## Prediction before the fix
 

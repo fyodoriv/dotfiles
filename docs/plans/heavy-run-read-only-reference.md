@@ -27,8 +27,7 @@ The allowance applies only to a whole top-level command: an optional exact
 `command -v bats &&` prefix, literal `rg`, an optional `-n` or `-l`, one
 single-quoted simple search term, and the exact double-quoted
 `$(command -v bats)` file argument. Anchor both ends and permit only spaces
-and tabs, never newlines. Check the original complete command before splitting. No shell operator,
-extra argument, variable, backtick, backslash, quote breakout, comment,
+and tabs, never newlines. Check the original complete command before splitting. Except for that exact optional prefix, no shell operator, extra argument, variable, backtick, backslash, quote breakout, comment,
 assignment, flag with code execution, or output redirection is accepted.
 Plant each as a refusal control, including a nested substitution, trailing
 operator, alias/function declaration, newline and `rg --pre`. The lexical

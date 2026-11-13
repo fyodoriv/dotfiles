@@ -137,3 +137,18 @@ It checks one required path before a broader memory comparison.
 - **Pivot:** If either condition fails, retain the red test and investigate status propagation before delivery.
 - **Stability guard:** Successful goal and dry-run cases keep their current output and exit status.
 - **Anchor:** `bin/kimi-goal` at commit `9c9c292`, where the pipeline is followed by `|| true`.
+
+## Validator failure diagnostics
+
+- **Root cause:** `tests/validate.bats` redirects validator output in
+  `setup_file`. Bats stops on the failed command before saving its exit status,
+  and teardown removes the only copy of the diagnostic.
+- **Hypothesis:** Printing the captured validator output when setup fails will
+  reveal the failing check while retaining a failing test result.
+- **Measurement:** Run a Bats fixture with a fake validator that exits nonzero
+  and prints a known diagnostic; also run `bats tests/validate.bats`.
+- **Success:** The fixture fails and exposes the diagnostic; the real validator
+  tests continue to pass locally. The hosted run identifies its failure.
+- **Pivot:** If the fixture hides the diagnostic, accepts a failure, or the
+  real validator tests regress, leave the change unmerged and investigate.
+- **Anchor:** Hosted dotfiles run 43333887839 and `tests/validate.bats`.

@@ -39,3 +39,35 @@ tests.
 The exact historical input was not retained in this task record. The paired
 lookup-and-search fixture reproduces the recorded shape, not the original
 bytes. Do not claim the original incident is reproduced without that receipt.
+
+## Rejected first candidate and new prediction
+
+The first candidate passed the three read-only fixtures and 84 caller tests,
+but independent review found that inherited ripgrep configuration can enable
+a preprocessor. It is rejected and removed. [Ripgrep's guide](https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md#configuration-file)
+documents `RIPGREP_CONFIG_PATH` and `--no-config`; its [changelog](https://github.com/BurntSushi/ripgrep/blob/master/CHANGELOG.md)
+documents `--pre`. The old search without `--no-config` stays blocked.
+
+- **Hypothesis:** Requiring literal `rg --no-config` in the same closed
+  command grammar admits a safe explicit alternative while retaining the
+  existing block for the original form and all planted bypasses.
+- **Measurement:** First use a disposable file and a fake preprocessor that
+  writes only a scratch canary. Verify configured ripgrep invokes it and
+  `--no-config` does not. Add focused hook cases for three `--no-config`
+  variants, the old form, a synthetic configured preprocessor, and the
+  original adversarial matrix. Run the affected Bats file with `heavy-run`
+  and hosted CI.
+- **Success:** The synthetic preprocessor canary appears only for the
+  configured run without `--no-config`; all three exact safe alternatives
+  pass the hook, the old form and all planted unsafe inputs refuse, and no
+  hook fixture dispatches a runner.
+- **Pivot:** A missing or unexpected canary, a bypass, ambiguous effective
+  tool identity, or altered legacy guard result rejects this method. Preserve
+  the old guard and record the limitation.
+- **Scope:** This is a safe alternative, not a fix for every original
+  read-only command. Shell command substitution strips trailing newlines
+  before the hook matches; do not claim it rejects those normalized bytes.
+  Other shell/PATH trust assumptions remain as stated above.
+
+Anchor: ripgrep's guide and changelog above, the task, and the independent
+review on 2026-11-13.

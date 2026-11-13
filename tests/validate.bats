@@ -11,8 +11,13 @@ setup_file() {
   export VALIDATE_CACHE_DIR="$(mktemp -d)"
   export VALIDATE_OUT="$VALIDATE_CACHE_DIR/out"
   export VALIDATE_STATUS="$VALIDATE_CACHE_DIR/status"
-  bash "$DOTFILES_DIR/bin/dotfiles-validate" --quick > "$VALIDATE_OUT" 2>&1
-  echo "$?" > "$VALIDATE_STATUS"
+  local validate_status=0
+  bash "$DOTFILES_DIR/bin/dotfiles-validate" --quick > "$VALIDATE_OUT" 2>&1 || validate_status=$?
+  echo "$validate_status" > "$VALIDATE_STATUS"
+  if [ "$validate_status" -ne 0 ]; then
+    cat "$VALIDATE_OUT" >&2
+    return "$validate_status"
+  fi
 }
 
 teardown_file() {

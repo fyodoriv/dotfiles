@@ -114,13 +114,14 @@ check reported stopped during startup; a later check and the post-recall
 doctor check passed. This does not prove bootstrap, session save, or that the
 installed configuration has been updated.
 
-Three synthetic Kimi session-save attempts did not yield their test markers in
-an exact shared-memory search. At least two tool-event traces included a
-request for `commit_session_legacy`; the captured summaries did not establish
-whether the service accepted a save or why no marker was returned. An exact
-search for the test marker prefix found no records to clean up. Treat the
-OpenCode session-save lifecycle as unverified and investigate before adding a
-fail-closed OpenCode instruction.
+Three initial synthetic Kimi session-save attempts produced no exact-search
+match. Their scratch project explicitly denied `memory_commit_session_legacy`,
+and one tool result reported a configuration-policy block. In a separate
+scratch project with only that test denial removed, Kimi called the save tool;
+exact search returned the synthetic session and decision. Both were deleted by
+exact hash and a later exact search returned no match. This proves one save and
+recall with the remaining scratch restrictions; bootstrap and broader lifecycle
+behavior still need verification.
 
 The obsolete launchd job was then unloaded after the managed service was
 healthy. Its plist was retained. A launchd check confirmed the old job was

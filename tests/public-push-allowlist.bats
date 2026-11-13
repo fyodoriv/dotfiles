@@ -67,7 +67,7 @@ setup() {
 }
 
 @test "the own public tool repos are allowed" {
-  for repo in fyodoriv/taskgrind fyodoriv/code-smells fyodoriv/homebrew-tap tasksmd/tasks.md; do
+  for repo in fyodoriv/taskgrind fyodoriv/code-smells fyodoriv/homebrew-tap tasksmd/tasks.md fyodoriv/careerbrew; do
     run _git_public_repository_allowed "git@github.com:$repo.git"
     [ "$status" -eq 0 ] || { echo "blocked: $repo"; return 1; }
   done

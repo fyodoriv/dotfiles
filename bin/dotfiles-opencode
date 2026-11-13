@@ -1,0 +1,46 @@
+#!/bin/bash
+# Keep `oc` on the supported shared-service interface for each major version.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd -P)"
+# shellcheck source=/dev/null
+source "$root/lib/opencode-version.sh"
+binary="$(opencode_resolve_binary)" || { echo 'OpenCode is not installed' >&2; exit 1; }
+major="$(opencode_major_version "$binary")" || { echo 'Unsupported OpenCode version' >&2; exit 1; }
+case "$major" in
+  1) exec "$binary" attach http://127.0.0.1:4096 "$@" ;;
+  2)
+    args=()
+    has_directory=false
+    directory=''
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --dir)
+          [ "$#" -ge 2 ] || { echo 'The --dir option needs a directory' >&2; exit 1; }
+          directory="$2"; has_directory=true; shift 2 ;;
+        --dir=*) directory="${1#--dir=}"; has_directory=true; shift ;;
+        --) args+=("$@"); break ;;
+        *) args+=("$1"); shift ;;
+      esac
+    done
+    if "$has_directory"; then
+      is_run=false
+      skip_value=false
+      for argument in ${args[@]+"${args[@]}"}; do
+        if "$skip_value"; then skip_value=false; continue; fi
+        case "$argument" in
+          --log-level|--completions|--server|--session|-s|--prompt) skip_value=true ;;
+          --) break ;;
+          -*) ;;
+          run) is_run=true; break ;;
+          *) break ;;
+        esac
+      done
+      if "$is_run"; then
+        cd -- "$directory"
+        exec "$binary" "${args[@]}"
+      fi
+      exec "$binary" ${args[@]+"${args[@]}"} "$directory"
+    fi
+    exec "$binary" ${args[@]+"${args[@]}"} ;;
+  *) echo 'Unsupported OpenCode version' >&2; exit 1 ;;
+esac

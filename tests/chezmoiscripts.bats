@@ -948,7 +948,8 @@ CONFIG
   local script="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   grep -q 'source "$SOURCE_DIR/lib/launchagent-duplicates.sh"' "$script"
   grep -q 'launchagent_remove_duplicates "$HOME/Library/LaunchAgents" "$SOURCE_DIR"' "$script"
-  grep -q 'remove_skipped_agent "$short" "$dst_name" && return 0' "$script"
+  grep -q 'remove_skipped_agent "$short" "$dst_name" || remove_status=$?' "$script"
+  grep -q '\[ "$remove_status" -eq 0 \] && return 0' "$script"
   # chezmoi re-runs the script only when its rendered text changes; the
   # duplicate rules' hash in the header makes a rules fix re-run it.
   grep -q 'include "lib/launchagent-duplicates.sh" | sha256sum' "$script"

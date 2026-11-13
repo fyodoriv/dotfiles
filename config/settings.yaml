@@ -114,7 +114,7 @@ settings:
   local_ai_agents:
     type: bool
     default: "@use_local_ai|owner_machine"
-    description: Load the local-AI LaunchAgents (opencode serve, Ollama, model warmup).
+    description: Load the local-AI LaunchAgents (Ollama, model warmup, and the OpenCode 1 server).
   gh_admin_scopes:
     type: bool
     default: false

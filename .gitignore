@@ -26,6 +26,8 @@ home/gitconfig|git
 .dotfiles-snapshots/
 .worktrees/
 coverage/
+__pycache__/
+*.py[cod]
 
 # Minsky per-machine bootstrap sidecar. `minsky-bootstrap` writes
 # `.minsky/repo.yaml` with the canonical host-fork's GHE org name and

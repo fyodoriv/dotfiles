@@ -11,8 +11,13 @@ setup_file() {
   export VALIDATE_CACHE_DIR="$(mktemp -d)"
   export VALIDATE_OUT="$VALIDATE_CACHE_DIR/out"
   export VALIDATE_STATUS="$VALIDATE_CACHE_DIR/status"
-  bash "$DOTFILES_DIR/bin/dotfiles-validate" --quick > "$VALIDATE_OUT" 2>&1
-  echo "$?" > "$VALIDATE_STATUS"
+  local validate_status=0
+  bash "$DOTFILES_DIR/bin/dotfiles-validate" --quick > "$VALIDATE_OUT" 2>&1 || validate_status=$?
+  echo "$validate_status" > "$VALIDATE_STATUS"
+  if [ "$validate_status" -ne 0 ]; then
+    cat "$VALIDATE_OUT" >&2
+    return "$validate_status"
+  fi
 }
 
 teardown_file() {
@@ -141,6 +146,25 @@ EOF
   rm -rf "$repo"
   [ "$status" -eq 0 ]
   [[ "$output" == *"No hardcoded user paths in shared config"* ]]
+}
+
+@test "validate --quick ignores generated Python caches" {
+  local repo
+  repo="$(mktemp -d)"
+  create_validate_fixture_repo "$repo"
+  cp "$DOTFILES_DIR/.gitignore" "$repo/.gitignore"
+  mkdir -p "$repo/lib/__pycache__"
+  printf '/Users/example/generated.py\n' > "$repo/lib/__pycache__/generated.cpython.pyc"
+
+  run env GIT_CONFIG_GLOBAL=/dev/null bash "$repo/bin/dotfiles-validate" --quick
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No hardcoded user paths in shared config"* ]]
+
+  git -C "$repo" add -f lib/__pycache__/generated.cpython.pyc
+  run env GIT_CONFIG_GLOBAL=/dev/null bash "$repo/bin/dotfiles-validate" --quick
+  rm -rf "$repo"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Hardcoded user path in lib/__pycache__/generated.cpython.pyc"* ]]
 }
 
 @test "validate --quick reports an enterprise hostname fixture with relative path" {

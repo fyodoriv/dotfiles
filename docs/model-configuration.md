@@ -35,6 +35,20 @@ Each agent keeps its own default model. Do not infer a cross-agent model change 
 
 OpenCode Desktop (cask `opencode-desktop`) and the `opencode` CLI run Kimi through the built-in `kimi-code-plan-global` provider (endpoint `https://api.kimi.ai/coding/v1`, billed to the Kimi Code membership). The desktop cask is opt-in: run `dotfiles config set opencode_desktop true` and then `dotfiles apply`. A failed optional cask install does not stop apply. agentbrew syncs the same rules, skills, commands, and MCP servers (memory included) to OpenCode as to Claude Code.
 
+Use `oc` to open OpenCode. Version 2 uses its own authenticated shared
+service; version 1 keeps the existing local attach path. On the next
+`dotfiles apply`, the obsolete version 1 launch agent is removed for version 2.
+The local-AI doctor checks the matching service and its API. An unrecognized
+major version fails instead of guessing an interface. `oc --dir <path>` opens
+a project, and `oc run --dir <path> <prompt>` runs in that project. Global
+options may precede `run`. The `oc` executable also works in
+noninteractive shells when the dotfiles `bin` directory is on `PATH`. It takes
+precedence over another program named `oc` when that directory comes first.
+The launcher and doctor prefer the managed `~/.opencode/bin/opencode` install,
+then fall back to the executable on `PATH`.
+If the version is unknown or macOS cannot unload the old job, apply preserves
+its existing configuration and reports the failure.
+
 1. Buy the Kimi Code plan and create a key in the Kimi Code Console. A platform API key bills per token instead.
 2. Store the key: `opencode auth login` (pick Kimi Code Plan). For headless or LaunchAgent runs, also save it to the Keychain: `security add-generic-password -a "$USER" -s kimi-code-api-key -w`.
 3. Check: `kimi-goal --check` (doctor line `local-ai.kimi_key`).

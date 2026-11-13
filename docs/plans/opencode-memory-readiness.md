@@ -90,6 +90,13 @@ In a network-denied scratch home, the installed OpenCode binary accepted the
 wrapper's translated `-c --dir <path> --help` invocation. This checks argument
 parsing only; it does not start a session or prove shared-memory recall.
 
+On November 12, the draft `oc` wrapper returned an exact synthetic `READY`
+text event from the configured Kimi model. The process exited successfully.
+The separate `oc service status` check still returned `stopped` during and
+after the trial, and no OpenCode process remained afterward. This verifies a
+model reply, not a healthy persistent service or memory recall. The difference
+between the reply and service status needs investigation before deployment.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

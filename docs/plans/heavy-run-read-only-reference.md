@@ -23,7 +23,7 @@ uses its output only as a file path. The task is
 - **Anchor:** The task and existing `_lookup_only` and `_strip_text` behavior;
   Basili et al. 1994 (GQM) and Munafò et al. 2017 (preregistration).
 
-The allowance applies only to a whole top-level command: an optional exact
+The rejected first allowance applied only to a whole top-level command: an optional exact
 `command -v bats &&` prefix, literal `rg`, an optional `-n` or `-l`, one
 single-quoted simple search term, and the exact double-quoted
 `$(command -v bats)` file argument. Anchor both ends and permit only spaces
@@ -51,11 +51,13 @@ documents `--pre`. The old search without `--no-config` stays blocked.
 - **Hypothesis:** Requiring literal `rg --no-config` in the same closed
   command grammar admits a safe explicit alternative while retaining the
   existing block for the original form and all planted bypasses.
-- **Measurement:** First use a disposable file and a fake preprocessor that
+- **Measurement:** First use a trusted resolved `rg`, private scratch HOME and TMPDIR, an
+  owned regular file and an absolute executable scratch preprocessor that
   writes only a scratch canary. Verify configured ripgrep invokes it and
-  `--no-config` does not. Add focused hook cases for three `--no-config`
-  variants, the old form, a synthetic configured preprocessor, and the
-  original adversarial matrix. Run the affected Bats file with `heavy-run`
+  `--no-config` does not, with matching output and successful exits in both
+  runs. Add focused hook cases for three `--no-config`
+  variants, the old form, an explicit `--pre` option, a synthetic configured
+  preprocessor, and the original adversarial matrix. Run the affected Bats file with `heavy-run`
   and hosted CI.
 - **Success:** The synthetic preprocessor canary appears only for the
   configured run without `--no-config`; all three exact safe alternatives

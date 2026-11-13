@@ -103,3 +103,13 @@ explicit `--` before the quoted term. The earlier `--no-config` form without
 This remains a narrow explicit workaround. It does not admit the original
 command, prove arbitrary shell safety, or establish the identity of a
 replaced executable, function or alias.
+
+## Final focused result (2026-11-13)
+
+The exact new search form was blocked before the change (expected 0, received
+2). The scratch preprocessor and option-like pattern controls passed. After
+the change, the focused caller file passed all 86 tests, including the four
+explicit alternatives, the earlier blocked forms and the unsafe-input matrix.
+Independent review found no remaining matcher bypass within the documented
+trusted shell and PATH boundary. The original command form still refuses; the
+related task remains open. Hosted CI is required for the final branch.

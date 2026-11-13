@@ -16,6 +16,13 @@ command="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"
 [ -n "$command" ] || exit 0
 
+# This exact search disables rg configuration and ends option parsing before
+# reading the resolved runner file. All other substitutions keep the guard.
+_read_only_runner_search=$'^[ \t]*(command[ \t]+-v[ \t]+bats[ \t]*&&[ \t]*)?rg[ \t]+--no-config[ \t]+(-(n|l)[ \t]+)?--[ \t]+\047[A-Za-z0-9_.-]+\047[ \t]+"\\$\\(command[ \t]+-v[ \t]+bats\\)"[ \t]*$'
+if [[ "$command" != *$'\n'* && "$command" =~ $_read_only_runner_search ]]; then
+  exit 0
+fi
+
 # True when the arguments pick one test: a filter (-g, --grep, -t,
 # --testNamePattern) with a real value, or an explicit spec path. "." , ".*",
 # a folder ("tests/"), and the value of any other flag (--config, --output

@@ -93,9 +93,15 @@ parsing only; it does not start a session or prove shared-memory recall.
 On November 12, the draft `oc` wrapper returned an exact synthetic `READY`
 text event from the configured Kimi model. The process exited successfully.
 The separate `oc service status` check still returned `stopped` during and
-after the trial, and no OpenCode process remained afterward. This verifies a
-model reply, not a healthy persistent service or memory recall. The difference
+after the trial, and no OpenCode process remained afterward. The first trial
+verified a model reply, not a healthy persistent service. The difference
 between the reply and service status needs investigation before deployment.
+
+A second real `oc` session with Kimi searched for a newly stored synthetic
+record. Its tool evidence included `memory_search` and the test phrase, and
+its answer returned that phrase. The exact test record was deleted and an
+exact search confirmed it was absent. This proves one shared read; it does
+not prove the bootstrap or session-save lifecycle, or a persistent service.
 
 ## Prediction before the fix
 

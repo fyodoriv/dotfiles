@@ -1,5 +1,17 @@
 # OpenCode memory readiness
 
+## Run directory with global options
+
+- **Root cause:** The wrapper detects `run` only as the first argument, so a
+  preceding global option makes it append the directory to the message.
+- **Hypothesis:** Recognizing `run` after supported global options preserves the
+  requested working directory without treating an option value as a command.
+- **Measurement:** `bats tests/opencode-service.bats` with cases for a global
+  option before `run` and for an option whose value is `run`.
+- **Success:** The new regression fails before the fix; all cases pass after it.
+- **Pivot:** If either case fails or existing launcher cases regress, do not ship.
+- **Anchor:** OpenCode 2.2.6 `--help` and `bin/dotfiles-opencode`.
+
 ## Managed service trial prediction
 
 - **Root cause:** The legacy launch agent uses a log-level value rejected by OpenCode 2. Its former `attach` client interface was removed. The obvious log-level correction exposes a generated password in the existing stdout log.

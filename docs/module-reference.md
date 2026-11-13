@@ -531,7 +531,7 @@ Local inference stack: Ollama (`:11434`) is the one engine, plus `opencode serve
 | `local-ai.opencode_serve_api` | `opencode serve` responds on `:4096` | `launchctl kickstart -k` |
 | `local-ai.reserved_models_present` | Every model an app reserves is on disk | `local-models ensure` |
 | `local-ai.no_unreserved_models` | No unreserved Ollama model on disk (advisory) | `local-models prune --yes` |
-| `local-ai.oc_alias` | `oc` alias defined for fast attach to `opencode serve` | None (hint: `dotfiles apply`) |
+| `local-ai.oc_alias` | Managed `oc` executable or its deployed alias is available | None (hint: `dotfiles apply`) |
 | `local-ai.opencode_tools_enabled` | `opencode.json` has an Ollama model with `tools: true` | None (hint: edit `~/.config/opencode/opencode.json`) |
 | `local-ai.opencode_mcp_format` | `opencode.json` MCP entries use the type + command-array schema | None (agentbrew owns `~/.config/opencode/`) |
 

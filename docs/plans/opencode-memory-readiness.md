@@ -114,6 +114,20 @@ check reported stopped during startup; a later check and the post-recall
 doctor check passed. This does not prove bootstrap, session save, or that the
 installed configuration has been updated.
 
+Three synthetic Kimi session-save attempts did not yield their test markers in
+an exact shared-memory search. At least two tool-event traces included a
+request for `commit_session_legacy`; the captured summaries did not establish
+whether the service accepted a save or why no marker was returned. An exact
+search for the test marker prefix found no records to clean up. Treat the
+OpenCode session-save lifecycle as unverified and investigate before adding a
+fail-closed OpenCode instruction.
+
+The obsolete launchd job was then unloaded after the managed service was
+healthy. Its plist was retained. A launchd check confirmed the old job was
+not loaded and the managed service remained healthy. This is temporary: the
+installed configuration could load the old plist again until the source change
+is delivered and applied.
+
 ## Run directory prediction
 
 - **Root cause:** The draft wrapper translates `--dir` to a positional

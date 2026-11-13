@@ -14,6 +14,14 @@
   ship the doctor change.
 - **Anchor:** `modules/local-ai/doctor.sh` and `home/zshrc.ai-tools`.
 
+The first review found two additional cases: a stale local alias can override
+the executable, and the doctor can run from a checkout other than the deployed
+one. The follow-up must reject a known legacy alias even with the managed
+executable on `PATH`, and accept the launcher from the deployed checkout.
+Success is zero failures across those new cases and the existing service
+fixtures. If either classification is wrong, do not ship the doctor change.
+The measurement remains `bats tests/opencode-service.bats`.
+
 ## Run directory with global options
 
 - **Root cause:** The wrapper detects `run` only as the first argument, so a

@@ -35,3 +35,12 @@ scratch data. It does not prove continuous immutability, which bytes Bash
 actually read, live startup or interpreter closure, resistance to same-user
 substitution, or recursive descendant completion. It does not qualify the
 retained timing or RSS records.
+
+## Focused result
+
+All 16 scratch selection and join cases passed, along with the three existing
+snapshot tests. Independent review corrected the replacement fixture and closed
+error handling before the run. The replacement-root case changes both root
+and helper identity, so it establishes combined rejection, not a root-only
+proof; the existing direct snapshot control separately checks wrong identity.
+These are scratch boundary results, not evidence of the bytes a live hook read.

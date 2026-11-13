@@ -115,3 +115,96 @@ compare_fixture() {
   [[ "$output" != *loaded* ]]
   [ "$(/bin/cat "$BATS_TEST_TMPDIR/canary")" = untouched ]
 }
+
+join_call() {
+  env -i PATH=/usr/bin:/bin HOME="$BATS_TEST_TMPDIR/home" /usr/bin/python3 -I \
+    "$ROOT/tests/helpers/hook_scratch_join.py" "$1" "$CONFIG" "$HELPER" \
+    "$BATS_TEST_TMPDIR/join.json" "$BATS_TEST_TMPDIR/observed.receipt"
+}
+
+join_before() {
+  cp "$HELPER" "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  join_call before
+}
+
+@test "scratch identity joins the configured selection" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  [ "$(join_call after)" = accepted ]
+}
+
+@test "scratch join refuses changed helper bytes" {
+  join_before
+  printf '\n# changed\n' >> "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  compare_fixture "$CONFIG" configured
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses a missing helper after observation" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  rm "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses a helper symlink" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  rm "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  ln -s "$HELPER" "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses a replaced root" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  mv "$CONFIG" "$BATS_TEST_TMPDIR/old-root"
+  mkdir -p "$CONFIG/bin" "$CONFIG/lib"
+  cp "$HELPER" "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses a replaced bin directory" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  mv "$CONFIG/bin" "$CONFIG/old-bin"
+  mkdir "$CONFIG/bin"
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses a wrong independent identity" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  env -i PATH=/usr/bin:/bin HOME="$BATS_TEST_TMPDIR/home" /usr/bin/python3 -I - "$BATS_TEST_TMPDIR/join.json" <<'PYCODE'
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+state = json.loads(path.read_text())
+state['identity'][1] += 1
+path.write_text(json.dumps(state))
+PYCODE
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses fallback, unknown, and extra receipts" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  for receipt in fallback inconclusive configured-extra; do
+    printf '%s\n' "$receipt" > "$BATS_TEST_TMPDIR/observed.receipt"
+    [ "$(join_call after)" = inconclusive ]
+  done
+  printf 'configured\nconfigured\n' > "$BATS_TEST_TMPDIR/observed.receipt"
+  [ "$(join_call after)" = inconclusive ]
+  rm "$BATS_TEST_TMPDIR/observed.receipt"
+  [ "$(join_call after)" = inconclusive ]
+  printf 'not-json' > "$BATS_TEST_TMPDIR/join.json"
+  [ "$(join_call after)" = inconclusive ]
+}
+
+@test "scratch join refuses changed helper after observation" {
+  join_before
+  compare_fixture "$CONFIG" configured
+  printf '\n# changed\n' >> "$CONFIG/lib/dotfiles-endpoint-paths.sh"
+  [ "$(join_call after)" = inconclusive ]
+}

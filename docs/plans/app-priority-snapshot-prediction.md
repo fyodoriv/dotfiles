@@ -43,7 +43,11 @@ Rechecking a PID before a separate action still leaves a race. Apple
 [warns](https://developer.apple.com/documentation/xpc/xpc_connection_get_pid%28_%3A%29)
 that macOS can reuse PIDs. Together these facts do not establish an
 identity-bound action or prove that no such primitive exists. Identify an
-actual platform primitive that closes the action boundary or pivot. If an
+actual platform primitive that closes the action boundary or pivot. In a
+[pinned Apple source revision](https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c),
+`taskpolicy` uses PID-based priority calls for background changes and a
+separate PID lookup for QoS. This source does not identify the installed
+binary or prove an identity-bound replacement. If an
 ancestry lookup fails, the current script treats the process as noninteractive
 and backgrounds it. A candidate that skips that action is a behavior change,
 not parity: stop and resolve that difference separately before deployment.

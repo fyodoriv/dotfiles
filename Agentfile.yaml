@@ -209,5 +209,12 @@ rules: |
   for timing runs. A waiting run whose caller dies leaves the queue; send its
   output to a file to keep its place. `heavy-run --status` shows the queue and
   why each run waits.
+  While queued checks wait, continue independent work and, when authorized,
+  push a reviewable branch so hosted CI can run. Count hosted CI as evidence
+  only when it ran the required equivalent checks for the current change and
+  target base, and is green. Pending, failed, skipped, or missing CI is not a
+  pass. Keep required local-only checks queued and finish them before claiming
+  their results; do
+  not bypass the queue, required gates, privacy rules, or delivery approvals.
   Never drive AppleScript, keystrokes, or window activation to stage a terminal
   image; that steals focus and can type into whatever is frontmost.

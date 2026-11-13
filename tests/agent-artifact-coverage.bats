@@ -163,6 +163,16 @@ EOF
   grep -q "heavy-run --exclusive <command>" "$agentfile"
 }
 
+@test "queued checks preserve hosted and local evidence" {
+  local agentfile="$BATS_TEST_DIRNAME/../Agentfile.yaml"
+  grep -q 'While queued checks wait, continue independent work' "$agentfile"
+  grep -q 'required equivalent checks for the current change and' "$agentfile"
+  grep -q 'target base, and is green' "$agentfile"
+  grep -q 'Pending, failed, skipped, or missing CI is not a' "$agentfile"
+  grep -q 'local-only checks queued and finish them' "$agentfile"
+  grep -q 'not bypass the queue, required gates' "$agentfile"
+}
+
 @test "pending footer C1 canonical owner contract puts Pending before Needed" {
   local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml"
   grep -Fq 'Right before the Needed-from-you line' "$owner_rules"

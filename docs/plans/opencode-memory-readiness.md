@@ -22,6 +22,14 @@ Success is zero failures across those new cases and the existing service
 fixtures. If either classification is wrong, do not ship the doctor change.
 The measurement remains `bats tests/opencode-service.bats`.
 
+The second review found that static shell text cannot prove which alias is
+effective: a later definition or a condition can change it. The follow-up
+hypothesis is that checking the managed executable separately and reporting
+legacy alias text only as a possible conflict avoids a false hard failure.
+Run the same Bats file. Success is a passing executable check with an advisory
+for legacy text, and zero failures in the deployed-checkout fixtures. Pivot if
+the doctor calls a possible conflict certain or accepts an unrelated executable.
+
 ## Run directory with global options
 
 - **Root cause:** The wrapper detects `run` only as the first argument, so a

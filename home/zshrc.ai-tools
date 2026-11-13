@@ -245,16 +245,8 @@ if [[ -o interactive ]] \
   ) &!
 fi
 
-# ── opencode fast-attach alias ───────────────────────────────────────
-# `oc` attaches to the persistent opencode-serve daemon at 127.0.0.1:4096
-# (managed by ~/Library/LaunchAgents/com.dotfiles.opencode-serve.plist).
-# Skips ~5–10 s of JS bootstrap that bare `opencode` pays per invocation.
-#
-# Use:
-#   oc                     # new TUI session, daemon-attached
-#   oc -c                  # continue last session
-#   oc --dir ~/foo         # attach with project context
-alias oc='opencode attach http://127.0.0.1:4096'
+# `oc` selects the shared service interface supported by the installed version.
+alias oc='dotfiles-opencode'
 
 # ── Anthropic API key slot (paid stable cloud fallback for opencode) ──
 # Uncomment + fill in to enable the paid Anthropic provider in opencode

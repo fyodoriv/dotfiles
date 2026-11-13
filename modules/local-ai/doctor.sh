@@ -40,7 +40,16 @@ check "local-ai.opencode_installed" "opencode binary present" \
 # macOS kills a binary whose signature no longer matches its contents
 # (launchd: OS_REASON_CODESIGNING), so opencode-serve never answers.
 # The fix re-signs it ad hoc, like the other user-dir binaries here.
-_opencode_bin() { command -v opencode 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"; }
+# shellcheck source=/dev/null
+[ -f "${DOTFILES_DIR:-}/lib/opencode-version.sh" ] && source "$DOTFILES_DIR/lib/opencode-version.sh"
+_opencode_bin() {
+  if declare -F opencode_resolve_binary >/dev/null; then
+    opencode_resolve_binary 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"
+  else
+    command -v opencode 2>/dev/null || printf '%s' "$HOME/.opencode/bin/opencode"
+  fi
+}
+_local_ai_doctor_opencode_major="$(opencode_major_version "$(_opencode_bin)" 2>/dev/null || true)"
 check "local-ai.opencode_signature_valid" "opencode binary code signature is valid" \
   "[ ! -x \"\$(_opencode_bin)\" ] || ! command -v codesign >/dev/null || codesign --verify \"\$(_opencode_bin)\"" \
   "codesign --force --sign - \"\$(_opencode_bin)\""
@@ -52,9 +61,17 @@ check "local-ai.warmup_agent_loaded" "com.dotfiles.local-ai-warmup LaunchAgent r
   "_launchagent_loaded com.dotfiles.local-ai-warmup" \
   "launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.dotfiles.local-ai-warmup.plist"
 
-check "local-ai.opencode_serve_agent_loaded" "com.dotfiles.opencode-serve LaunchAgent registered" \
-  "_launchagent_loaded com.dotfiles.opencode-serve" \
-  "launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.dotfiles.opencode-serve.plist"
+if [ "$_local_ai_doctor_opencode_major" = 2 ]; then
+  check "local-ai.opencode_serve_agent_loaded" "OpenCode shared service running" \
+    "opencode_managed_service_healthy \"\$(_opencode_bin)\"" \
+    "\"\$(_opencode_bin)\" service start >/dev/null 2>&1"
+elif [ "$_local_ai_doctor_opencode_major" = 1 ]; then
+  check "local-ai.opencode_serve_agent_loaded" "com.dotfiles.opencode-serve LaunchAgent registered" \
+    "_launchagent_loaded com.dotfiles.opencode-serve" \
+    "launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.dotfiles.opencode-serve.plist"
+else
+  check "local-ai.opencode_serve_agent_loaded" "OpenCode version is supported" "false" ""
+fi
 
 # Ollama supervised LaunchAgent — only relevant when Ollama is installed.
 # When LM Studio is the chosen engine, this check is skipped (Ollama agent
@@ -71,9 +88,18 @@ check "local-ai.inference_api_responding" "Ollama API responding on :11434" \
   "\$HOME/bin/local-ai-warmup (or check ~/.local/share/dotfiles/logs/local-ai-warmup.log)"
 
 # ── opencode-serve daemon ───────────────────────────────────────────
-check "local-ai.opencode_serve_api" "opencode-serve responding on :4096" \
-  "curl -sf -m 2 http://127.0.0.1:4096/ >/dev/null" \
-  "launchctl kickstart -k gui/\$(id -u)/com.dotfiles.opencode-serve"
+if [ "$_local_ai_doctor_opencode_major" = 2 ]; then
+  check "local-ai.opencode_serve_api" "OpenCode shared service API responds" \
+    "opencode_managed_service_healthy \"\$(_opencode_bin)\"" \
+    "\"\$(_opencode_bin)\" service start >/dev/null 2>&1"
+elif [ "$_local_ai_doctor_opencode_major" = 1 ]; then
+  check "local-ai.opencode_serve_api" "opencode-serve responding on :4096" \
+    "curl -sf -m 2 http://127.0.0.1:4096/ >/dev/null" \
+    "launchctl kickstart -k gui/\$(id -u)/com.dotfiles.opencode-serve"
+else
+  check "local-ai.opencode_serve_api" "OpenCode version is supported" "false" ""
+fi
+unset _local_ai_doctor_opencode_major
 
 # ── Models on disk: exactly what apps reserve ──────────────────────
 _local_models() {
@@ -90,7 +116,7 @@ if [ "${LIST_MODE:-false}" = true ] || _ollama_up; then
 fi
 
 # ── Shell wiring ────────────────────────────────────────────────────
-check "local-ai.oc_alias" "'oc' alias defined for fast attach to opencode-serve" \
+check "local-ai.oc_alias" "'oc' alias defined for the OpenCode shared service" \
   "grep -q \"alias oc=\" \$HOME/.zshrc.ai-tools 2>/dev/null || grep -q \"alias oc=\" \$HOME/.zshrc.local 2>/dev/null || grep -q \"alias oc=\" \$HOME/.zshrc 2>/dev/null" \
   "Re-apply dotfiles to deploy home/zshrc.ai-tools (and use \`oc\` instead of \`opencode\`)"
 

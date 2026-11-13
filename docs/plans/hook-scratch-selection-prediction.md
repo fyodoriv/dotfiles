@@ -40,3 +40,12 @@ execution. The insertion changes code and can affect state or timing; fixture
 parity does not prove deployed behavior, startup or interpreter closure,
 continuous identity, or descendant completion. No live hook timing, process
 signal, external service or production path is part of this experiment.
+
+## Focused result
+
+All seven scratch cases passed after independent safety review. Both admitted
+copies returned zero and matched the recorded output, error output, exports and
+helper marker. The missing case had no receipt or marker; a closed receipt
+descriptor surfaced failure. The review corrected source-copy verification and
+isolated Python startup before the first run. This does not cover arbitrary
+nonzero parity, deployed selection, timing or descendant completion.

@@ -376,3 +376,69 @@ NOTE
 @test "queue caller N20: a probe feeding process substitution refuses" {
   assert_hook_decision N20 2 'xargs -I{} {} build < <(command -v cargo)'
 }
+
+@test "runner lookup used as a search file stays read-only" {
+  assert_hook_decision R01 0 "rg --no-config -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision R02 0 "rg --no-config -n -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision R03 0 "command -v bats && rg --no-config -l -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision R04 0 "rg --no-config -- '--passthru' \"\$(command -v bats)\""
+}
+
+@test "runner search without explicit no-config remains blocked" {
+  assert_hook_decision O01 2 "rg 'version' \"\$(command -v bats)\""
+  assert_hook_decision O02 2 "command -v bats && rg -n 'version' \"\$(command -v bats)\""
+  assert_hook_decision O03 2 "rg --no-config 'version' \"\$(command -v bats)\""
+  assert_hook_decision O04 2 "rg --no-config '--passthru' \"\$(command -v bats)\""
+}
+
+@test "runner search allowance refuses executable or ambiguous input" {
+  assert_hook_decision X01 2 'bats tests/'
+  assert_hook_decision X02 2 'cargo build'
+  assert_hook_decision X03 2 'npm run verify'
+  assert_hook_decision X04 2 '$(command -v bats) tests/'
+  assert_hook_decision X05 2 'command -v bats | xargs -I{} {} tests/'
+  assert_hook_decision X06 2 "rg --no-config --pre=bats -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision X07 2 "rg --no-config -- 'version' \"\$(command -v bats)\"; bats tests/"
+  assert_hook_decision X08 2 "rg --no-config -- 'version' \"\$(command -v \$(bats tests/))\""
+  assert_hook_decision X09 2 "rg --no-config -- 'version' \"\$(command -v bats)\" > /tmp/output"
+  assert_hook_decision X10 2 $'rg --no-config -- \'version\' "$(command -v bats)"\nbats tests/'
+  assert_hook_decision X11 2 "rg --no-config -- 'version' \"\$(command -v bats)\" && bats tests/"
+  assert_hook_decision X12 2 "alias rg=bats; rg --no-config -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision X13 2 "rg() { bats tests/; }; rg --no-config -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision X14 2 "rg --no-config -- 'version'; bats tests/; echo 'x' \"\$(command -v bats)\""
+  assert_hook_decision X15 2 "rg --no-config -- \"\$PATTERN\" \"\$(command -v bats)\""
+  assert_hook_decision X16 2 "rg --no-config -- 'version' \"\$(command -v bats)\" \`bats tests/\`"
+  assert_hook_decision X17 2 "rg --no-config -- 'ver\\sion' \"\$(command -v bats)\""
+  assert_hook_decision X18 2 "rg --no-config -- 'version' \"\$(command -v bats)\" # comment"
+  assert_hook_decision X19 2 "MODE=1 rg --no-config -- 'version' \"\$(command -v bats)\""
+  assert_hook_decision X20 2 "rg --no-config -- 'version' \"\$(command -v bats)\" &&"
+}
+
+@test "no-config suppresses configured scratch preprocessor" {
+  local rg_path config source pre marker
+  rg_path="$(type -P rg)"
+  [ -x "$rg_path" ]
+  config="$BATS_TEST_TMPDIR/rgrc"
+  source="$BATS_TEST_TMPDIR/search.txt"
+  pre="$BATS_TEST_TMPDIR/preprocessor"
+  marker="$BATS_TEST_TMPDIR/pre-ran"
+  mkdir -p "$BATS_TEST_TMPDIR/tmp"
+  printf '%s\n' needle > "$source"
+  printf '%s\n' '#!/bin/sh' 'printf ran > "$PRE_MARKER"' 'exec /bin/cat "$1"' > "$pre"
+  chmod 700 "$pre"
+  printf '%s\n' --pre "$pre" > "$config"
+  run env RIPGREP_CONFIG_PATH="$config" PRE_MARKER="$marker" TMPDIR="$BATS_TEST_TMPDIR/tmp" "$rg_path" needle "$source"
+  [ "$status" -eq 0 ]
+  [ "$output" = needle ]
+  [ -f "$marker" ]
+  rm "$marker"
+  run env RIPGREP_CONFIG_PATH="$config" PRE_MARKER="$marker" TMPDIR="$BATS_TEST_TMPDIR/tmp" "$rg_path" --no-config needle "$source"
+  [ "$status" -eq 0 ]
+  [ "$output" = needle ]
+  [ ! -e "$marker" ]
+  printf "%s\n" --passthru > "$source"
+  run env RIPGREP_CONFIG_PATH="$config" PRE_MARKER="$marker" TMPDIR="$BATS_TEST_TMPDIR/tmp" "$rg_path" --no-config -- --passthru "$source"
+  [ "$status" -eq 0 ]
+  [ "$output" = --passthru ]
+  [ ! -e "$marker" ]
+}

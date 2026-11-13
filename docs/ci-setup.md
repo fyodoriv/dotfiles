@@ -180,6 +180,7 @@ verified without the network — see `tests/tasks-lint.bats`.
 ## Required secrets and environment variables
 
 **None required.** The CI workflow uses no secrets or environment variables beyond what's on the runner. All dependencies are installed via `brew install` during the workflow.
+The macOS test job installs ripgrep for the isolated configuration canary.
 
 If you add team-specific secrets (e.g., for enterprise tool testing), add them in Settings > Secrets and variables > Actions.
 

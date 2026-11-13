@@ -130,10 +130,19 @@ workflow_code() {
   [ "$(grep -c 'persist-credentials: false' "$file")" -eq "$(workflow_code "$file" | grep -c 'uses: actions/checkout@')" ]
 }
 
+test_job_has_ripgrep() {
+  awk '/^  test:/ { in_job = 1; next } in_job && /^  [a-z]+:/ { exit } in_job' "$1" |
+    grep -qE '^[[:space:]]*run:[[:space:]]*brew[[:space:]]+install([[:space:]]+[^[:space:]#]+)*[[:space:]]+ripgrep([[:space:]]|$)'
+}
+
 @test "workflow files: ci.yml test job runs the local gate on macOS" {
   local file="$REPO_ROOT/.github/workflows/ci.yml"
   grep -qE '^[[:space:]]*run: make check$' "$file"
   awk '/^  test:/ { in_job = 1; next } in_job && /^  [a-z]+:/ { exit } in_job' "$file" | grep -q 'runs-on: macos-latest'
+  test_job_has_ripgrep "$file"
+  local fixture="$BATS_TEST_TMPDIR/workflow.yml"
+  printf '%s\n' '  test:' '    # run: brew install ripgrep' '    run: brew install not-ripgrep' > "$fixture"
+  ! test_job_has_ripgrep "$fixture"
 }
 
 @test "workflow installs tools required by guard tests" {

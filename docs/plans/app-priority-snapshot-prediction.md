@@ -58,3 +58,24 @@ changes or signals to live processes. Independently review the fixture and
 identity design before a live candidate is deployed. The current process can
 already race; this experiment must not hide or increase that risk. No before
 window can be repaired with a later snapshot.
+
+## Existing fixture isolation correction
+
+Root cause: the existing app-priority test setup changes HOME but inherits
+XDG_CONFIG_HOME. Several tests remove a configuration file through the latter.
+
+- **Hypothesis:** Setting XDG_CONFIG_HOME inside the test's disposable HOME
+  keeps the inherited configuration canary untouched and preserves the test
+  suite's behavior.
+- **Measurement:** Run one existing default-config test as a child Bats run
+  with HOME and XDG_CONFIG_HOME set to separate disposable directories. A
+  parent regression test checks the inherited configuration canary after the
+  child exits. Run the touched test suite in hosted CI.
+- **Success:** The canary is removed before the fix, remains byte-identical
+  after it, and the selected child test succeeds in both observations. The
+  regression passes and hosted CI is green.
+- **Pivot:** Stop if the child can reach a real configuration, an action
+  command is not mocked, the canary changes after the fix, or the selected
+  test's result changes. Never use a real configuration to reproduce this.
+- **Anchor:** `tests/app-priority.bats` setup and default-config tests; the
+  independent fixture review on 2026-11-13.

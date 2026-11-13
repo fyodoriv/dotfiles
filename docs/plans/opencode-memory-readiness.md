@@ -1,5 +1,19 @@
 # OpenCode memory readiness
 
+## Doctor launcher discovery prediction
+
+- **Root cause:** The doctor only looks for text resembling an `oc` alias. A
+  stale alias can pass, and the supported executable alone can fail.
+- **Hypothesis:** Checking for the managed executable or its deployed alias
+  will report the usable launcher without accepting a stale attach alias.
+- **Measurement:** `bats tests/opencode-service.bats` with synthetic homes and
+  launcher paths covering the executable, deployed alias, and stale alias.
+- **Success:** Each usable path passes and the stale-only path fails; no
+  existing service test fails.
+- **Pivot:** If a working launcher fails or an unrelated `oc` passes, do not
+  ship the doctor change.
+- **Anchor:** `modules/local-ai/doctor.sh` and `home/zshrc.ai-tools`.
+
 ## Run directory with global options
 
 - **Root cause:** The wrapper detects `run` only as the first argument, so a

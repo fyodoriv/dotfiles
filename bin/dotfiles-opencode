@@ -23,7 +23,19 @@ case "$major" in
       esac
     done
     if "$has_directory"; then
-      if [ "${args[0]:-}" = run ]; then
+      is_run=false
+      skip_value=false
+      for argument in ${args[@]+"${args[@]}"}; do
+        if "$skip_value"; then skip_value=false; continue; fi
+        case "$argument" in
+          --log-level|--completions|--server|--session|-s|--prompt) skip_value=true ;;
+          --) break ;;
+          -*) ;;
+          run) is_run=true; break ;;
+          *) break ;;
+        esac
+      done
+      if "$is_run"; then
         cd -- "$directory"
         exec "$binary" "${args[@]}"
       fi

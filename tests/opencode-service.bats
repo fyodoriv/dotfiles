@@ -67,6 +67,24 @@ SH
   if [ "$output" != "$expected" ]; then printf 'got: %s\nexpected: %s\n' "$output" "$expected" >&3; return 1; fi
 }
 
+@test "OpenCode 2 run after a global option uses the requested directory" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6' FAKE_REPORT_PWD=1
+  local target="$BATS_TEST_TMPDIR/synthetic project"
+  mkdir -p "$target"
+  target="$(cd "$target" && pwd -P)"
+  run /bin/bash "$repo/bin/dotfiles-opencode" --log-level warn run --dir "$target" 'hello'
+  [ "$status" -eq 0 ]
+  expected="$(printf 'cwd=<%s> env=<%s>\n<--log-level>\n<warn>\n<run>\n<hello>' "$target" "$target")"
+  if [ "$output" != "$expected" ]; then printf 'got: %s\nexpected: %s\n' "$output" "$expected" >&3; return 1; fi
+}
+
+@test "OpenCode 2 does not mistake a global option value for run" {
+  export FAKE_OPENCODE_VERSION='opencode v2.2.6'
+  run /bin/bash "$repo/bin/dotfiles-opencode" --log-level run --dir '/tmp/synthetic project'
+  [ "$status" -eq 0 ]
+  [ "$output" = $'<--log-level>\n<run>\n</tmp/synthetic project>' ]
+}
+
 @test "OpenCode 1 oc keeps the existing attach interface" {
   export FAKE_OPENCODE_VERSION='1.14.2'
   run /bin/bash "$repo/bin/dotfiles-opencode" -c

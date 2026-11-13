@@ -284,16 +284,17 @@ SH
   [[ "$output" == *FAIL* ]]
 }
 
-@test "doctor rejects a legacy alias that overrides the managed executable" {
+@test "doctor reports legacy alias text as a possible conflict" {
   export FAKE_OPENCODE_VERSION='opencode v2.2.6'
   printf "alias oc='opencode attach http://127.0.0.1:4096'\n" > "$HOME/.zshrc.local"
   run env HOME="$HOME" DOTFILES_DIR="$repo" LIST_MODE=true PATH="$repo/bin:$PATH" /bin/bash -c '
-    check() { if [ "$1" = local-ai.oc_alias ]; then if eval "$3"; then echo PASS; else echo FAIL; fi; fi; return 0; }
-    check_advisory() { :; }
+    check() { if [ "$1" = local-ai.oc_alias ]; then if eval "$3"; then echo CHECK_PASS; else echo CHECK_FAIL; fi; fi; return 0; }
+    check_advisory() { if [ "$1" = local-ai.oc_legacy_alias ]; then if eval "$3"; then echo ADVISORY_PASS; else echo ADVISORY_WARN; fi; fi; return 0; }
     source "$DOTFILES_DIR/modules/local-ai/doctor.sh"
   '
   [ "$status" -eq 0 ]
-  [[ "$output" == *FAIL* ]]
+  [[ "$output" == *CHECK_PASS* ]]
+  [[ "$output" == *ADVISORY_WARN* ]]
 }
 
 @test "doctor accepts the launcher from the deployed checkout" {
@@ -310,7 +311,7 @@ SH
   [[ "$output" == *PASS* ]]
 }
 
-@test "doctor accepts the deployed managed alias" {
+@test "doctor requires the managed executable for noninteractive use" {
   export FAKE_OPENCODE_VERSION='opencode v2.2.6'
   printf "alias oc='dotfiles-opencode'\n" > "$HOME/.zshrc.ai-tools"
   run env HOME="$HOME" DOTFILES_DIR="$repo" LIST_MODE=true PATH="$repo/bin:$scratch:/usr/bin:/bin" /bin/bash -c '
@@ -320,7 +321,7 @@ SH
     source "$DOTFILES_DIR/modules/local-ai/doctor.sh"
   '
   [ "$status" -eq 0 ]
-  [[ "$output" == *PASS* ]]
+  [[ "$output" == *FAIL* ]]
 }
 
 @test "doctor rejects the managed alias when its launcher is unavailable" {

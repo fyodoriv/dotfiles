@@ -117,22 +117,23 @@ fi
 
 # ── Shell wiring ────────────────────────────────────────────────────
 _opencode_oc_available() {
-  local resolved file root="${DOTFILES_LINK_DIR:-$DOTFILES_DIR}"
-  for file in "$HOME/.zshrc.ai-tools" "$HOME/.zshrc.local" "$HOME/.zshrc"; do
-    grep -Eq '^[[:space:]]*alias[[:space:]]+oc=.*opencode[[:space:]]+attach[[:space:]]+http://(127[.]0[.]0[.]1|localhost):4096' "$file" 2>/dev/null && return 1
-  done
+  local resolved root="${DOTFILES_LINK_DIR:-$DOTFILES_DIR}"
   resolved="$(command -v oc 2>/dev/null || true)"
-  [ "$resolved" = "$root/bin/oc" ] && [ -x "$resolved" ] && return 0
-  resolved="$(command -v dotfiles-opencode 2>/dev/null || true)"
-  [ "$resolved" = "$root/bin/dotfiles-opencode" ] && [ -x "$resolved" ] || return 1
+  [ "$resolved" = "$root/bin/oc" ] && [ -x "$resolved" ]
+}
+_opencode_legacy_alias_present() {
+  local file
   for file in "$HOME/.zshrc.ai-tools" "$HOME/.zshrc.local" "$HOME/.zshrc"; do
-    grep -Fxq "alias oc='dotfiles-opencode'" "$file" 2>/dev/null && return 0
+    grep -Eq '^[[:space:]]*alias[[:space:]]+oc=.*opencode[[:space:]]+attach[[:space:]]+http://(127[.]0[.]0[.]1|localhost):4096' "$file" 2>/dev/null && return 0
   done
   return 1
 }
-check "local-ai.oc_alias" "Managed 'oc' launcher available" \
+check "local-ai.oc_alias" "Managed 'oc' executable available on PATH" \
   "_opencode_oc_available" \
-  "Remove a stale oc attach alias from shell overrides, or re-apply dotfiles to deploy the managed launcher"
+  "Re-apply dotfiles to put the managed launcher on PATH"
+check_advisory "local-ai.oc_legacy_alias" "Shell files have no possible legacy oc attach alias" \
+  "! _opencode_legacy_alias_present" \
+  "Check whether the legacy alias overrides the managed launcher"
 
 # ── opencode.json tool-call wiring ──────────────────────────────────
 # `~/.config/opencode/` is owned by agentbrew per the dotfiles/agentbrew

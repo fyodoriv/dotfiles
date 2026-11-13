@@ -108,8 +108,16 @@ replaced executable, function or alias.
 
 The exact new search form was blocked before the change (expected 0, received
 2). The scratch preprocessor and option-like pattern controls passed. After
-the change, the focused caller file passed all 86 tests, including the four
+the change, the focused caller file passed, including the four
 explicit alternatives, the earlier blocked forms and the unsafe-input matrix.
 Independent review found no remaining matcher bypass within the documented
 trusted shell and PATH boundary. The original command form still refuses; the
 related task remains open. Hosted CI is required for the final branch.
+
+## Hosted follow-up
+
+The first hosted run lacked ripgrep, so the scratch canary could not select
+its executable. The docs-count guard also rejected the focused-test count in
+this plan. Both failures were reproduced with focused controls. The workflow
+now installs ripgrep, a workflow test guards that dependency, and this plan
+uses no volatile test count. Hosted verification must pass before merge.

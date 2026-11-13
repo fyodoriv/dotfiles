@@ -70,6 +70,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [competition/](competition/) | The competitive scorecard and how it is measured | both |
 | [decisions/](decisions/) | Why the hard-to-reverse choices were made (ADRs) | both |
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
+| [App-priority snapshot prediction](plans/app-priority-snapshot-prediction.md) | Safety and measurement plan for a cheaper process lookup | agent |
 | [templates/](templates/) | Templates, such as the plan template | agent |
 | [audits/](audits/) | Past audits and run logs | both |
 | [human-blocked-actions/](human-blocked-actions/) | Steps that need a human, with the exact command | both |

@@ -152,3 +152,18 @@ It checks one required path before a broader memory comparison.
 - **Pivot:** If the fixture hides the diagnostic, accepts a failure, or the
   real validator tests regress, leave the change unmerged and investigate.
 - **Anchor:** Hosted dotfiles run 43333887839 and `tests/validate.bats`.
+
+## Generated Python cache in validation
+
+- **Root cause:** Parallel tests create untracked Python bytecode in `lib/`.
+  The sharing validator scans those generated files as untracked source and
+  finds the runner's path embedded by Python.
+- **Hypothesis:** Ignoring generated Python caches keeps them out of the
+  untracked-file scan while tracked files and untracked source remain checked.
+- **Measurement:** Run a fixture with an untracked cache containing a fake
+  user path, plus existing untracked and tracked source-path checks.
+- **Success:** The generated cache does not fail validation; both tracked and
+  untracked source with a hardcoded user path still fail.
+- **Pivot:** If a source path stops being reported or the cache still fails,
+  do not merge; inspect Git's tracked and ignored file selection.
+- **Anchor:** Hosted dotfiles run 43335347865 and `bin/dotfiles-validate`.

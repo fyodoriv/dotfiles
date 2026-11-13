@@ -94,8 +94,8 @@ On November 12, the draft `oc` wrapper returned an exact synthetic `READY`
 text event from the configured Kimi model. The process exited successfully.
 The separate `oc service status` check still returned `stopped` during and
 after the trial, and no OpenCode process remained afterward. The first trial
-verified a model reply, not a healthy persistent service. The difference
-between the reply and service status needs investigation before deployment.
+verified a model reply, not a healthy persistent service. Automatic service
+startup was not established by that run.
 
 A second real `oc` session with Kimi searched for a newly stored synthetic
 record. Its tool evidence included `memory_search` and the test phrase, and
@@ -105,6 +105,14 @@ not prove the bootstrap or session-save lifecycle, or a persistent service.
 The test harness set a scratch working directory but inherited `PWD` from
 Agentbrew. A follow-up check confirmed that the wrapper's Bash process resets
 `PWD` to the actual scratch working directory before it starts OpenCode.
+
+The managed service was then started explicitly with the draft `oc` wrapper.
+Its status returned a loopback address, and the draft doctor recognized it
+as healthy. A real Kimi session called `memory_search` through that service
+and returned the public advisory's fixed version. One intermediate status
+check reported stopped during startup; a later check and the post-recall
+doctor check passed. This does not prove bootstrap, session save, or that the
+installed configuration has been updated.
 
 ## Run directory prediction
 

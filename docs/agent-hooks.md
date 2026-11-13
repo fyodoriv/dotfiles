@@ -178,6 +178,10 @@ The lookup allowance holds only for a top-level probe whose output feeds
 nothing. A probe inside `$(...)`, backticks, `sh -c`, or `eval` text refuses,
 and so does any probe when the command has a pipe (`|`, `|&`) or a process
 substitution (`<(...)`, `>(...)`), as in `command -v cargo | xargs -I{} {} build`.
+One narrow alternative passes: `rg --no-config -- 'term' "$(command -v bats)"`,
+optionally with `-n` or `-l` before `--` and an initial `command -v bats &&`.
+The term uses only letters, numbers, underscores, dots, or hyphens. Searches
+without either safety flag and forms with extra shell syntax still refuse.
 Literal quoted Rust executable paths are recognized at a bare command boundary;
 inert documentation strings remain ignored. Each hook invocation owns only
 its input text and decision. This does not prove queue ownership or cover

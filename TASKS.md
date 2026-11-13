@@ -166,7 +166,7 @@ them. -->
   - **ID**: heavy-run-read-only-reference
   - **Tags**: agent-hooks, heavy-run, false-positive
   - **Mode**: AFK
-  - **Details**: On 2026-11-13 the heavy-run hook blocked a read-only command that combined a runner lookup with a search of the runner's script. The command mentioned `bats` but did not run a test. Reproduce the exact matcher behavior with synthetic hook input; keep actual heavy test and build commands guarded.
+  - **Details**: On 2026-11-13 the heavy-run hook blocked a read-only command that combined a runner lookup with a search of the runner's script. The command mentioned `bats` but did not run a test. The explicit `rg --no-config --` alternative passes after the guarded change; the original unqualified form still refuses. Reproduce the exact matcher behavior with synthetic hook input; keep actual heavy test and build commands guarded.
   - **Output**: code
   - **Acceptance**: Read-only runner lookup and file-search inputs pass. Real unqueued heavy test and build commands remain blocked. No user files or live tests are used in the planted controls.
   - **Hypothesis**: Recognizing command position removes this observed false block while keeping all planted heavy-run blocks.

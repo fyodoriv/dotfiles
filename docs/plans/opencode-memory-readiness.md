@@ -97,6 +97,12 @@ after the trial, and no OpenCode process remained afterward. The first trial
 verified a model reply, not a healthy persistent service. Automatic service
 startup was not established by that run.
 
+On November 12, a separate scratch-home trial began with the service stopped.
+An `api get /api/info` call automatically started the installed OpenCode
+binary's service and returned successfully. The sandbox denied access to the
+live service, and cleanup removed the scratch listener and service state.
+This tests API-triggered startup, not a deployed `oc` command or every client.
+
 A second real `oc` session with Kimi searched for a newly stored synthetic
 record. Its tool evidence included `memory_search` and the test phrase, and
 its answer returned that phrase. The exact test record was deleted and an

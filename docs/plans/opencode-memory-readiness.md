@@ -122,6 +122,11 @@ Agentbrew. A follow-up check confirmed that the wrapper's Bash process resets
   fails, leave the wrapper undeployed and investigate.
 - **Anchor:** [OpenCode 2.2.6 run source](https://github.com/anomalyco/opencode/blob/v2.2.6/packages/cli/src/run/run.ts).
 
+The fake-client regression passes. In a real Kimi run with `oc run --dir`, one
+tool event contained the scratch directory and the process exited zero. The
+final text did not contain the expected absolute path, so this run does not
+independently prove that the tool output was `pwd` in the requested directory.
+
 ## Prediction before the fix
 
 **Pivot:** OpenCode 2.2.6 prints a generated server password at startup.

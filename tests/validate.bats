@@ -148,6 +148,25 @@ EOF
   [[ "$output" == *"No hardcoded user paths in shared config"* ]]
 }
 
+@test "validate --quick ignores generated Python caches" {
+  local repo
+  repo="$(mktemp -d)"
+  create_validate_fixture_repo "$repo"
+  cp "$DOTFILES_DIR/.gitignore" "$repo/.gitignore"
+  mkdir -p "$repo/lib/__pycache__"
+  printf '/Users/example/generated.py\n' > "$repo/lib/__pycache__/generated.cpython.pyc"
+
+  run env GIT_CONFIG_GLOBAL=/dev/null bash "$repo/bin/dotfiles-validate" --quick
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No hardcoded user paths in shared config"* ]]
+
+  git -C "$repo" add -f lib/__pycache__/generated.cpython.pyc
+  run env GIT_CONFIG_GLOBAL=/dev/null bash "$repo/bin/dotfiles-validate" --quick
+  rm -rf "$repo"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Hardcoded user path in lib/__pycache__/generated.cpython.pyc"* ]]
+}
+
 @test "validate --quick reports an enterprise hostname fixture with relative path" {
   local repo
   repo="$(mktemp -d)"

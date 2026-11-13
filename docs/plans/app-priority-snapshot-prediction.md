@@ -37,7 +37,12 @@ lines, accept ambiguous rows, or equate an unreadable process with a safe one.
 The design must explain how it preserves process identity across the action
 boundary, or refuse the candidate. Record the platform-specific `pgrep` and
 `ps` semantics and their differences; an assumed equivalent regex is not proof.
-Rechecking a PID before a separate action still leaves a race. Identify an
+Rechecking a PID before a separate action still leaves a race. Apple
+[documents](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/setpriority.2.html)
+`setpriority(PRIO_PROCESS, ...)` as selecting a process by PID, and separately
+[warns](https://developer.apple.com/documentation/xpc/xpc_connection_get_pid%28_%3A%29)
+that macOS can reuse PIDs. Together these facts do not establish an
+identity-bound action or prove that no such primitive exists. Identify an
 actual platform primitive that closes the action boundary or pivot. If an
 ancestry lookup fails, the current script treats the process as noninteractive
 and backgrounds it. A candidate that skips that action is a behavior change,

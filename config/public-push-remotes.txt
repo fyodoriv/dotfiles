@@ -7,3 +7,4 @@ github.com/fyodoriv/taskgrind
 github.com/fyodoriv/code-smells
 github.com/fyodoriv/homebrew-tap
 github.com/tasksmd/tasks.md
+github.com/fyodoriv/careerbrew

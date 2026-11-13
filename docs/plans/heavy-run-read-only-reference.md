@@ -73,3 +73,32 @@ documents `--pre`. The old search without `--no-config` stays blocked.
 
 Anchor: ripgrep's guide and changelog above, the task, and the independent
 review on 2026-11-13.
+
+## Rejected option parsing and final prediction
+
+The `--no-config` candidate passed the focused controls, but independent
+review found that a quoted search term beginning with `-` can still be an
+option. That candidate is removed. The proposed alternative now requires an
+explicit `--` before the quoted term. The earlier `--no-config` form without
+`--` stays blocked.
+
+- **Hypothesis:** The explicit end-of-options marker makes the literal term
+  an operand while retaining the no-configuration boundary and all prior
+  refusal controls.
+- **Measurement:** Repeat the scratch preprocessor canary and use a scratch
+  file containing `--passthru` to check `rg --no-config --` treats it as the
+  pattern. Add hook controls for the exact new form, the prior form without
+  `--`, `--passthru` without `--`, explicit `--pre`, and the existing unsafe
+  matrix. Run `heavy-run bats tests/agent-hooks-heavy-build-callers.bats` and
+  hosted CI; no user files or programs are involved.
+- **Success:** The three exact new search forms pass, including an option-like
+  term after `--`; the scratch match succeeds, both earlier forms and every
+  unsafe mutation refuse, and no hook fixture dispatches a runner.
+- **Pivot:** Any option parsing surprise, bypass, canary failure, or guard
+  regression rejects the method and preserves the original guard.
+- **Anchor:** The preceding pivot and independent review on 2026-11-13;
+  Basili et al. 1994 (GQM) and Munafò et al. 2017 (preregistration).
+
+This remains a narrow explicit workaround. It does not admit the original
+command, prove arbitrary shell safety, or establish the identity of a
+replaced executable, function or alias.

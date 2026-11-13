@@ -40,8 +40,9 @@ The exact historical input was not retained in this task record. The paired
 lookup-and-search fixture reproduces the recorded shape, not the original
 bytes. Do not claim the original incident is reproduced without that receipt.
 
-## Rejected first candidate and new prediction
+## Rejected first candidate and superseded prediction
 
+The prediction in this section was superseded by the final prediction below.
 The first candidate passed the three read-only fixtures and 84 caller tests,
 but independent review found that inherited ripgrep configuration can enable
 a preprocessor. It is rejected and removed. [Ripgrep's guide](https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md#configuration-file)

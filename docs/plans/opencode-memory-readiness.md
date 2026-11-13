@@ -1,5 +1,35 @@
 # OpenCode memory readiness
 
+## Doctor launcher discovery prediction
+
+- **Root cause:** The doctor only looks for text resembling an `oc` alias. A
+  stale alias can pass, and the supported executable alone can fail.
+- **Hypothesis:** Checking for the managed executable or its deployed alias
+  will report the usable launcher without accepting a stale attach alias.
+- **Measurement:** `bats tests/opencode-service.bats` with synthetic homes and
+  launcher paths covering the executable, deployed alias, and stale alias.
+- **Success:** Each usable path passes and the stale-only path fails; no
+  existing service test fails.
+- **Pivot:** If a working launcher fails or an unrelated `oc` passes, do not
+  ship the doctor change.
+- **Anchor:** `modules/local-ai/doctor.sh` and `home/zshrc.ai-tools`.
+
+The first review found two additional cases: a stale local alias can override
+the executable, and the doctor can run from a checkout other than the deployed
+one. The follow-up must reject a known legacy alias even with the managed
+executable on `PATH`, and accept the launcher from the deployed checkout.
+Success is zero failures across those new cases and the existing service
+fixtures. If either classification is wrong, do not ship the doctor change.
+The measurement remains `bats tests/opencode-service.bats`.
+
+The second review found that static shell text cannot prove which alias is
+effective: a later definition or a condition can change it. The follow-up
+hypothesis is that checking the managed executable separately and reporting
+legacy alias text only as a possible conflict avoids a false hard failure.
+Run the same Bats file. Success is a passing executable check with an advisory
+for legacy text, and zero failures in the deployed-checkout fixtures. Pivot if
+the doctor calls a possible conflict certain or accepts an unrelated executable.
+
 ## Run directory with global options
 
 - **Root cause:** The wrapper detects `run` only as the first argument, so a

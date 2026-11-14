@@ -28,3 +28,12 @@ the actual count, load, process data or path. No timing run is part of this
 change. Confirm no active hook-memory retry before changing the receipt code.
 The task block currently exists on the migration draft, not the default branch;
 remove it from that draft after this fix is merged into its base.
+
+## Focused result
+
+The three new reason assertions failed before the fix, as expected. After the
+change all 17 focused tests passed. The planted CPU and load values did not
+appear in the serialized receipts; the earlier sample failure retained its
+original class and position. Independent review found no changed gate decision.
+The migration draft needs its scratch fixtures adapted and its source/audit
+provenance renewed after it incorporates this change.

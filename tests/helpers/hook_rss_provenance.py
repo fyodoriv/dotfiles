@@ -199,7 +199,8 @@ def collect(root, revision, expected_digest, run_id, wait_log, executing=None):
                 sample_index = 0
                 loads.append(os.getloadavg()[0])
                 if not cpus or loads[-1] > cpus:
-                    failure = {"class": "load", "window": window_index, "index": 0}
+                    failure = {"class": "load", "reason": "cpu-unavailable" if not cpus else "load-over-limit",
+                               "window": window_index, "index": 0}
                     break
                 window = []
                 windows.append(window)
@@ -219,7 +220,8 @@ def collect(root, revision, expected_digest, run_id, wait_log, executing=None):
                     window.append(int(match.group(1)))
                 loads.append(os.getloadavg()[0])
                 if cpus and loads[-1] > cpus:
-                    failure = failure or {"class": "load", "window": window_index, "index": len(window)}
+                    failure = failure or {"class": "load", "reason": "load-over-limit",
+                                          "window": window_index, "index": len(window)}
                     break
                 if not output_ok:
                     break

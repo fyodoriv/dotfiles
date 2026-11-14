@@ -164,12 +164,62 @@ class ReceiptControls(unittest.TestCase):
                     patch.object(provenance, "source_clean", return_value=True), \
                     patch.object(provenance, "installed_root", return_value=True), \
                     patch.object(provenance, "tool_snapshot", return_value=("fixture",)), \
-                    patch.object(provenance.os, "getloadavg", return_value=(5.0, 5.0, 5.0)), \
-                    patch.object(provenance.os, "cpu_count", return_value=4), \
+                    patch.object(provenance.os, "getloadavg", return_value=(938.0, 938.0, 938.0)), \
+                    patch.object(provenance.os, "cpu_count", return_value=937), \
                     patch.object(provenance.subprocess, "run", side_effect=AssertionError("timed command ran")):
                 receipt = provenance.collect(root, "a" * 40, digest, "b" * 32, wait, executing=harness)
             self.assertFalse(receipt["valid"])
-            self.assertEqual(receipt["failure"], {"class": "load", "window": 0, "index": 0})
+            self.assertEqual(receipt["failure"], {"class": "load", "reason": "load-over-limit", "window": 0, "index": 0})
+            self.assertNotIn("938.0", json.dumps(receipt))
+            self.assertNotIn("937", json.dumps(receipt))
+
+    def test_unavailable_cpu_count_stops_before_timed_commands(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            harness = root / provenance.TRACKED[-1]
+            harness.parent.mkdir(parents=True)
+            harness.write_text("fixture")
+            digest = hashlib.sha256(harness.read_bytes()).hexdigest()
+            wait = root / "wait.log"
+            wait.write_text(f"waited=1 pid={os.getppid()} slot=exclusive\n")
+            with patch.dict(os.environ, {"HEAVY_RUN_SLOT": "exclusive"}), \
+                    patch.object(provenance, "source_clean", return_value=True), \
+                    patch.object(provenance, "installed_root", return_value=True), \
+                    patch.object(provenance, "tool_snapshot", return_value=("fixture",)), \
+                    patch.object(provenance.os, "getloadavg", return_value=(938.0, 938.0, 938.0)), \
+                    patch.object(provenance.os, "cpu_count", return_value=None), \
+                    patch.object(provenance.subprocess, "run", side_effect=AssertionError("timed command ran")):
+                receipt = provenance.collect(root, "a" * 40, digest, "b" * 32, wait, executing=harness)
+            self.assertFalse(receipt["valid"])
+            self.assertEqual(receipt["failure"], {"class": "load", "reason": "cpu-unavailable", "window": 0, "index": 0})
+            self.assertNotIn("938.0", json.dumps(receipt))
+            self.assertNotIn("937", json.dumps(receipt))
+
+    def test_post_window_load_preserves_earlier_failure(self):
+        for sample_fails in (False, True):
+            with self.subTest(sample_fails=sample_fails), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                harness = root / provenance.TRACKED[-1]
+                harness.parent.mkdir(parents=True)
+                harness.write_text("fixture")
+                digest = hashlib.sha256(harness.read_bytes()).hexdigest()
+                wait = root / "wait.log"
+                wait.write_text(f"waited=1 pid={os.getppid()} slot=exclusive\n")
+                def fake_run(argv, **_kwargs):
+                    Path(argv[-1]).write_text("")
+                    return SimpleNamespace(returncode=1 if sample_fails else 0, stdout=b"", stderr=b" 100 maximum resident set size\n")
+                with patch.dict(os.environ, {"HEAVY_RUN_SLOT": "exclusive"}), \
+                        patch.object(provenance, "source_clean", return_value=True), \
+                        patch.object(provenance, "installed_root", return_value=True), \
+                        patch.object(provenance, "tool_snapshot", return_value=("fixture",)), \
+                        patch.object(provenance.os, "getloadavg", side_effect=[(1.0, 1.0, 1.0), (938.0, 938.0, 938.0)]), \
+                        patch.object(provenance.os, "cpu_count", return_value=937), \
+                        patch.object(provenance.subprocess, "run", side_effect=fake_run):
+                    receipt = provenance.collect(root, "a" * 40, digest, "b" * 32, wait, executing=harness)
+                expected = {"class": "exit", "window": 0, "index": 0} if sample_fails else {"class": "load", "reason": "load-over-limit", "window": 0, "index": 15}
+                self.assertEqual(receipt["failure"], expected)
+                self.assertNotIn("938.0", json.dumps(receipt))
+                self.assertNotIn("937", json.dumps(receipt))
 
     def test_midrun_failure_retains_only_bounded_samples(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -652,3 +652,21 @@ missed the timing limit: baseline median 182.59 ms, candidate median 81.73 ms,
 ratio 0.448. The registered pivot rejects this lookup-and-action combination.
 The simulated actions do not establish live syscall cost or behavior. See
 [run 43617256945](https://github.com/fyodoriv/dotfiles/actions/runs/43617256945).
+
+#### Smaller offline process adapter: rejected
+
+The [registered trial](https://github.com/fyodoriv/dotfiles/commit/d9686c8)
+replaced the process library with an adapter to Apple process APIs and a
+vendored libc. Its release build succeeded offline on hosted macOS. The
+controlled fixture preserved all ten ordered actions in 30 pairs, but the
+candidate median was 255.87 ms versus 334.54 ms for the shell, a ratio of
+0.765. The registered limit was 0.40. The candidate failed its speed gate and
+is not eligible for activation. See [the hosted result](https://github.com/fyodoriv/dotfiles/actions/runs/43621132344).
+
+The Rust unit check also failed because the adapter could not read an ancestor's
+process details; the selector consequently used its shell fallback. The exact
+reason the operating system denied that lookup remains unproven. See
+[the diagnostic run](https://github.com/fyodoriv/dotfiles/actions/runs/43621212683).
+Keep the existing shell entry point active. The earlier native selector and
+offline delivery remain separate work; the fixture result is not an in-use
+performance claim.

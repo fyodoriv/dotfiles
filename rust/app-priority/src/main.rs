@@ -207,6 +207,7 @@ mod tests {
             let result = unsafe { task_policy_get(mach_task_self_, 9, qos.as_mut_ptr(), &mut count, &mut get_default) };
             // SAFETY: who=0 queries only this child.
             let background = unsafe { getpriority(4, 0) };
+            println!("OBS {result},{count},{background}");
             assert_eq!(result, 0);
             assert_eq!(count, 2);
             println!("STATE {background},{},{},{get_default}", qos[0], qos[1]);
@@ -219,12 +220,19 @@ mod tests {
                 .env(CHILD, "reference").stdin(Stdio::null()).output().unwrap();
             let native = Command::new(&exe).args(test_args).env(CHILD, format!("native-{mode}"))
                 .stdin(Stdio::null()).output().unwrap();
-            assert!(reference.status.success(), "reference child failed");
-            assert!(native.status.success(), "native child failed");
             let extract = |out: &[u8]| -> String {
                 let text = String::from_utf8(out.to_vec()).unwrap();
                 text.lines().find_map(|line| line.split_once("STATE ").map(|(_, s)| s.to_owned())).unwrap()
             };
+            let observation = |out: &[u8]| -> String {
+                let text = String::from_utf8_lossy(out);
+                text.lines().find_map(|line| line.split_once("OBS ").map(|(_, s)| s.to_owned()))
+                    .unwrap_or_else(|| "missing".into())
+            };
+            assert!(reference.status.success(), "reference {mode} failed: exit={:?} observation={}",
+                reference.status.code(), observation(&reference.stdout));
+            assert!(native.status.success(), "native {mode} failed: exit={:?} observation={}",
+                native.status.code(), observation(&native.stdout));
             assert_eq!(extract(&reference.stdout), extract(&native.stdout), "{mode} policy differs");
         }
     }

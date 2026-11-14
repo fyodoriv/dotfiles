@@ -1,5 +1,9 @@
 # App-priority snapshot prediction
 
+The owner removed the seven-day wait on 2026-11-14. The
+[same-day experiment](app-priority-same-day.md) replaces the window durations
+below; the safety and parity boundaries remain.
+
 The current command repeatedly looks up processes and walks parent chains.
 The migration plan asks to try one process snapshot before a Rust port. This
 prediction covers a synthetic candidate only. It does not alter the installed

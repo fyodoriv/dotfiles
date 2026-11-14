@@ -73,3 +73,29 @@ native delivery remain separate work.
 
 Anchor: the migration plan's gate G and hook task; Basili, Caldiera and
 Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+
+## Installed dispatch result (2026-11-14)
+
+The [delivery draft](https://github.com/fyodoriv/dotfiles/pull/680) supervises
+the Rust helper and verifies its checksum. Its first corrected installed-path
+[gate run](https://github.com/fyodoriv/dotfiles/actions/runs/43638960781)
+measured 0.698, above the required 0.50. A pre-registered replacement of the
+external symlink lookup with a Bash file-identity check passed the focused
+safety tests, but its [gate run](https://github.com/fyodoriv/dotfiles/actions/runs/43639666649)
+measured 0.631. The candidate remains uninstalled. Both ratios fall between
+the task's success and exception-pivot thresholds, so this is inconclusive,
+not a port or an exception. The second hook still needs its own result.
+
+Lesson: benchmark the real supervised, integrity-checked delivery path before
+claiming a speedup. An earlier scratch wrapper measured 0.166 but did not
+provide the same failure handling. Keep the shell guard while the production
+path misses its target.
+
+## Heavy-run guard shortcut (2026-11-14)
+
+The [shortcut draft](https://github.com/fyodoriv/dotfiles/pull/682) kept the
+existing parser and skipped the later scan only for the exact parsed status
+command. Its [hosted performance run](https://github.com/fyodoriv/dotfiles/actions/runs/43640123377)
+measured a 0.840 ratio, above the required 0.50. The registered pivot retains
+the existing hook. This is a failed cheaper fix, not a Rust port attempt or a
+completed exception decision.

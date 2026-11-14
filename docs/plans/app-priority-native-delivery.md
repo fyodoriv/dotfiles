@@ -56,3 +56,29 @@ the system `sha256` executable; keep the existing checksum fallback elsewhere.
 - **Pivot:** A failed check or missed memory bound keeps the shell active.
 - **Anchor:** [the first memory result](https://github.com/fyodoriv/dotfiles/actions/runs/43624038601)
   and gate G's memory requirement.
+
+## Hosted build budget
+
+The hosted build-budget check uses an empty Cargo home and a fresh target
+directory. It measures a locked offline release build and repeats it warm
+inside one exclusive queue slot. Gate G limits the cold build to 120 seconds
+and the warm build to 15 seconds. Queue wait is excluded.
+
+## Hosted result and installation
+
+[Pull request 672](https://github.com/fyodoriv/dotfiles/pull/672) merged the
+integrity-checked delivery path. The native binary is installed on the owner's
+Mac; `dotfiles priority-native rollback` restores the shell path.
+
+The [30-pair hosted fixture](https://github.com/fyodoriv/dotfiles/actions/runs/43626223966)
+preserved ten ordered simulated actions in every pair, with the former shell
+rules removed from the scratch candidate. The shell median was 526.10 ms and
+the candidate median was 194.41 ms: ratio 0.370, within the 0.40 target. The
+[hosted memory run](https://github.com/fyodoriv/dotfiles/actions/runs/43624227263)
+had baseline and candidate ratios of 1.00. The [build-budget run](https://github.com/fyodoriv/dotfiles/actions/runs/43641648585)
+measured 4.200 seconds cold and 0.039 seconds warm.
+
+These controlled measurements do not prove an in-use speedup. The shortened
+baseline was unstable, and live durations vary under load. The final migration
+audit remains open and must verify all gate G requirements before closing the
+task.

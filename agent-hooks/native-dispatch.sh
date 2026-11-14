@@ -3,10 +3,16 @@
 [ "${DOTFILES_NATIVE_GUARD_BYPASS:-}" != 1 ] || return 0
 _native_dir="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/hook-status"
 [ -L "$_native_dir/current" ] && [ -x /sbin/sha256 ] || return 0
-_native_name="$(readlink "$_native_dir/current" 2>/dev/null)" || return 0
-[[ "$_native_name" =~ ^hook-status-[0-9a-f]{64}$ ]] || return 0
-_native_path="$_native_dir/$_native_name"
-[ -f "$_native_path" ] && [ ! -L "$_native_path" ] && [ -x "$_native_path" ] || return 0
+_native_path=
+for _native_candidate in "$_native_dir"/hook-status-*; do
+  [ -f "$_native_candidate" ] && [ ! -L "$_native_candidate" ] && [ -x "$_native_candidate" ] || continue
+  [[ "$_native_candidate" -ef "$_native_dir/current" ]] || continue
+  _native_name="${_native_candidate##*/}"
+  [[ "$_native_name" =~ ^hook-status-[0-9a-f]{64}$ ]] || continue
+  _native_path="$_native_candidate"
+  break
+done
+[ -n "$_native_path" ] || return 0
 _native_hash="$(/sbin/sha256 -q "$_native_path" 2>/dev/null)" || return 0
 [ "$_native_hash" = "${_native_name#hook-status-}" ] || return 0
 

@@ -235,6 +235,16 @@ describes waiting for child processes. From these sources, we cannot infer a
 recursive descendant-completion guarantee. This is a bounded documentation
 search, not proof that no other API exists.
 
+Apple's [launchd guidance](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html)
+requires managed programs not to daemonize. That is a requirement on the
+program, not a guarantee that arbitrary descendants have finished. In the
+reviewed [XNU source](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_fork.c),
+the `RLIMIT_NPROC` check uses a count for the real user, not a count scoped to
+one hook tree. That source does not identify the installed kernel. A no-fork
+replacement would also change this workload, which starts subprocesses, and
+would need separately proven enforcement and parity. No new containment
+guarantee follows from these observations.
+
 ## Unchanged gate pre-run review
 
 A read-only review found that the current base cache is absent and the gate's

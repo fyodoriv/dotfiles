@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Generate the dependency lock, check parity, or measure selection
+        description: Check parity or measure selection
         type: choice
-        options: [lock, check, measure]
+        options: [check, measure]
         default: check
 
 permissions:
@@ -25,21 +25,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Generate dependency lock
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'lock' }}
-        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run cargo generate-lockfile --manifest-path scripts/app-priority-native-probe/Cargo.toml
-      - name: Save dependency lock
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'lock' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: native-probe-lock
-          path: scripts/app-priority-native-probe/Cargo.lock
-          if-no-files-found: error
       - name: Build reviewed native probe
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode != 'lock' }}
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run cargo build --locked --release --manifest-path scripts/app-priority-native-probe/Cargo.toml
       - name: Compare controlled process selection
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode != 'lock' }}
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run scripts/app-priority-native-probe/target/release/app-priority-native-probe
       - name: Measure controlled process selection
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'measure' }}

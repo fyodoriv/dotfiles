@@ -179,6 +179,7 @@ fn run(measure: bool) -> Result<(), &'static str> {
 fn main() {
     if std::env::args_os().nth(1).as_deref() == Some(OsStr::new("--child")) {
         let _ = std::io::stdout().write_all(b"R");
+        let _ = std::io::stdout().flush();
         let _ = std::io::stdin().read_to_end(&mut Vec::new());
         return;
     }

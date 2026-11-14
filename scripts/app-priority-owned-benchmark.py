@@ -1,11 +1,13 @@
 """Compare priority decisions on owned hosted children without changing priority."""
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import statistics
 import subprocess
+import shutil
 import tempfile
 import time
 
@@ -42,6 +44,18 @@ def main():
                "XDG_STATE_HOME": str(home / "state"), "LC_ALL": "C",
                "PATH": str(mockbin) + ":/usr/bin:/bin:/usr/sbin:/sbin",
                "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log)}
+        candidate_env = env.copy()
+        delivery_binary = os.environ.get("APP_PRIORITY_DELIVERY_BINARY")
+        if delivery_binary:
+            native_dir = home / "data" / "dotfiles" / "native" / "app-priority"
+            native_dir.mkdir(parents=True)
+            binary = Path(delivery_binary)
+            name = "app-priority-" + hashlib.sha256(binary.read_bytes()).hexdigest()
+            shutil.copy2(binary, native_dir / name)
+            (native_dir / "current").symlink_to(name)
+            env["DOTFILES_STATS_LOG"] = "1"
+            candidate_env = env.copy()
+            candidate_env["XDG_DATA_HOME"] = str(home / "data")
         cases = [("Slack", "slack"), ("claude", "claude"), ("codex", "codex"),
                  ("bats", "bats"), ("node", "minsky"), ("node", "node_modules/vitest")]
         try:
@@ -68,7 +82,7 @@ def main():
                     tree = args.base if label == "base" else args.candidate
                     start = time.perf_counter_ns()
                     result = subprocess.run(["/bin/bash", str(tree / "bin/app-priority")],
-                                            env=env, stdout=subprocess.PIPE,
+                                            env=candidate_env if label == "candidate" else env, stdout=subprocess.PIPE,
                                             stderr=subprocess.PIPE, check=False)
                     times[label].append((time.perf_counter_ns() - start) / 1_000_000)
                     if result.returncode != 0 or result.stdout or result.stderr:

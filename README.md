@@ -1448,6 +1448,12 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `local-models` | Keep only the Ollama models your apps reserve in `.agents/local-models`: `status`, `check`, `ensure` (installs Ollama and pulls missing reserved models only when needed), `prune --yes` (removes unreserved ones; dry run without `--yes`). See [local AI models](#local-ai-models) | On demand; prune every 6 hours |
 | `agent-scratch-prune` | Reclaim disk that AI agents leave behind: idle `node_modules`/`.venv`/Cargo `target`, clean pushed worktrees in `~/.codex/worktrees`, old scratch folders in `~/.local/state`, and agent temp entries in the macOS per-user temp folder idle 3 days. Never touches dirty, unpushed, locked, or recent work. `--dry-run` lists what would go | Every 6 hours (LaunchAgent) |
 | `app-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
+
+Run `app-priority-native install` to build the native candidate offline and
+switch the next run to it. Run `app-priority-native rollback` to return to the
+shell implementation. The command checks the installed binary's digest before
+each use and keeps the normal timing record. A failed native run is not retried
+through the shell.
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
@@ -1459,6 +1465,12 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `dotfiles-launchagent-drift` | Check that each loaded `com.dotfiles.*` LaunchAgent runs its plist's arguments and that KeepAlive jobs run; `--fix` reloads, kickstarts, or bootstraps (#297) | After `dotfiles apply` (update-tooling) |
 | `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then the apply-time sync script in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
+
+Run `app-priority-native install` to build the native candidate offline and
+switch the next run to it. Run `app-priority-native rollback` to return to the
+shell implementation. The command checks the installed binary's digest before
+each use and keeps the normal timing record. A failed native run is not retried
+through the shell.
 
 **Git workflow**
 

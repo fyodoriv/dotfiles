@@ -89,8 +89,12 @@ jobs:
           git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
           (cd "$candidate/rust" && "$GITHUB_WORKSPACE/bin/heavy-run" cargo build --locked --offline --release --features fixture-actions --target-dir "$target" --manifest-path app-priority/Cargo.toml)
           ./bin/heavy-run cargo build --locked --release --target-dir "$target" --manifest-path "$candidate/scripts/app-priority-native-probe/Cargo.toml"
-          printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
-          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
+          if [ -f "$candidate/bin/app-priority-native" ]; then
+            APP_PRIORITY_DELIVERY_BINARY="$target/release/dotfiles-app-priority" PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 "$candidate/scripts/app-priority-owned-benchmark.py" --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
+          else
+            printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
+            PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
+          fi
   rust-command:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_command_check }}
     runs-on: macos-latest

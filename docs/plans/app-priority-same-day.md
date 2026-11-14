@@ -301,8 +301,8 @@ the following before implementing or measuring a Rust candidate.
 - **Anchor:** the controlled fallback above and the macOS comparison in
   [run 43609622748](https://github.com/fyodoriv/dotfiles/actions/runs/43609622748).
 
-The fixture candidate checks the fixed mock scripts before invoking them and
-refuses custom configuration. It is not installed. Its mock-script check and
+The fixture candidate checks the fixed mock scripts before invoking them. It
+is not installed. Its mock-script check and
 environment are not an operating-system sandbox: review both source trees
 before dispatching the hosted comparison. The default-fixture, altered-mock
 and custom-config controls run with the compiled candidate on hosted Linux

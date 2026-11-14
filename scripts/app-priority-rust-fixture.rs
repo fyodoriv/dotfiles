@@ -86,7 +86,20 @@ fn run() -> Result<(), &'static str> {
     let dir = mock_dir()?;
     let config = PathBuf::from(env::var_os("XDG_CONFIG_HOME").ok_or("missing config")?)
         .join("dotfiles/priority-apps.txt");
-    if config.exists() { return Err("custom config unsupported"); }
+    if config.is_file() {
+        let input = fs::read_to_string(config).map_err(|_| "invalid custom config")?;
+        for raw in input.split_inclusive('\n').filter(|line| line.ends_with('\n')) {
+            let line = raw.trim_end_matches('\n').split('#').next().unwrap_or("").trim_matches(' ');
+            if line.is_empty() { continue; }
+            let option = if line.contains('*') || line.contains('.') { "-f" } else { "-x" };
+            let found = output(&dir, "pgrep", &[option, line])?;
+            for pid in found.lines().filter(|pid| !pid.is_empty()) {
+                if !pid.bytes().all(|b| b.is_ascii_digit()) { return Err("invalid pid"); }
+                apply(&dir, pid, "foreground")?;
+            }
+        }
+        return Ok(());
+    }
     let exact = rows(&output(&dir, "pgrep", &["-l", "-x", "Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel"])?)?;
     let patterns = rows(&output(&dir, "pgrep", &["-l", "-f", "mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome "])?)?;
     for (name, kind) in [("Slack", "foreground"), ("Google Chrome", "foreground"), ("Microsoft Outlook", "foreground"), ("ghostty", "foreground"), ("WebStorm", "foreground"), ("claude", "agent"), ("codex", "agent"), ("ollama", "background")] {

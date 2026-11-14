@@ -81,6 +81,13 @@ jobs:
         env:
           BASE: ${{ github.event.before }}
         run: git cat-file -e "${BASE}^{commit}"
+      - name: Add the checkout timing tool to PATH
+        run: |
+          mkdir -p "$RUNNER_TEMP/timing-tools"
+          ln -s "$GITHUB_WORKSPACE/bin/heavy-run" "$RUNNER_TEMP/timing-tools/heavy-run"
+          echo "$RUNNER_TEMP/timing-tools" >> "$GITHUB_PATH"
+      - name: Verify timing queue is available
+        run: test "$(command -v heavy-run)" = "$RUNNER_TEMP/timing-tools/heavy-run"
       - name: Gate (make check)
         env:
           # A push run compares with the commit before the push. Compared

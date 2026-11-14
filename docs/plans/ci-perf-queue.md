@@ -14,3 +14,6 @@ performance measurements did not use the required exclusive queue.
   keeps the result unqualified until the cause is fixed.
 - **Anchor:** [hosted run 43623313574](https://github.com/fyodoriv/dotfiles/actions/runs/43623313574)
   and the repository's exclusive timing rule.
+
+The implementation exposes only a link to the checkout's `heavy-run`, so
+other checkout commands do not change the hosted job's PATH resolution.

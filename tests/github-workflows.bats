@@ -138,7 +138,7 @@ test_job_has_ripgrep() {
 test_job_adds_repo_bin() {
   awk '/^  test:/ { in_job = 1; next }
     in_job && /^  [a-z]+:/ { exit }
-    in_job && /echo "\$GITHUB_WORKSPACE\/bin" >> "\$GITHUB_PATH"/ { found = 1 }
+    in_job && /echo "\$RUNNER_TEMP\/timing-tools" >> "\$GITHUB_PATH"/ { found = 1 }
     in_job && /name: Gate \(make check\)/ { exit !found }
     END { if (!found) exit 1 }' "$1"
 }

@@ -35,19 +35,15 @@ find_exact_processes() {
 }
 
 prepare_default_batch() {
-  local row pid name status=0 seen=" "
+  local row pid name status=0
   APP_PRIORITY_BATCH_ROWS="$(pgrep -l -x 'Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel' 2>/dev/null)" || status=$?
   [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || return 0
-  if [ "$status" -eq 0 ] && [ -z "$APP_PRIORITY_BATCH_ROWS" ]; then return 0; fi
-  if [ "$status" -eq 1 ] && [ -n "$APP_PRIORITY_BATCH_ROWS" ]; then return 0; fi
   while IFS= read -r row; do
     [ -n "$row" ] || continue
     case "$row" in *' '*) ;; *) return 0 ;; esac
     pid="${row%% *}"
     name="${row#* }"
     case "$pid" in ''|*[!0-9]*) return 0 ;; esac
-    case "$seen" in *" $pid "*) return 0 ;; esac
-    seen="$seen$pid "
     case "$name" in
       Slack|'Google Chrome'|'Microsoft Outlook'|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel) ;;
       *) return 0 ;;

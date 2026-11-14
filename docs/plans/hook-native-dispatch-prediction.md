@@ -37,3 +37,16 @@ Any safety difference or missed threshold retains the existing shell guard.
 
 **Anchor:** the 0.631 hosted gate result, `rust-agent-hooks`, and Munafò et al.
 2017.
+
+### Hosted result
+
+The [installed-path run](https://github.com/fyodoriv/dotfiles/actions/runs/43643440449)
+passed the safety and fixed-input parity checks. The registered gate ratio was
+0.378. The three additional status-variant ratios were 0.382, 0.417 and 0.421,
+within their 0.80 limits. Baseline and candidate peak-RSS ratios were both
+1.00. These are controlled hosted results, not live usage measurements.
+
+The shortcut handles only conservative status input. Other commands still run
+the original shell guard, so this result does not complete the full hook port.
+Lesson: qualify the actual supervised entry point, including its setup and
+fallback, rather than extrapolating from a direct binary fixture.

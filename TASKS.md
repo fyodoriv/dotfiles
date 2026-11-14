@@ -400,7 +400,7 @@ them. -->
   - **ID**: rust-app-priority
   - **Tags**: migration, rust, performance
   - **Mode**: AFK
-  - **Details**: Step 2 of the [Rust migration](docs/plans/rust-migration.md). The owner requested completion today and removed the seven-day waits on 2026-11-14. Follow the preregistered [same-day experiment](docs/plans/app-priority-same-day.md): compare two six-hour baseline windows, then assess a candidate with a 15-minute in-use window. Keep the same nice and QoS decisions for the same processes. The earlier whole-second windows are not a millisecond baseline.
+  - **Details**: Step 2 of the [Rust migration](docs/plans/rust-migration.md). The owner requested completion today and removed the seven-day waits on 2026-11-14. The preregistered [same-day experiment](docs/plans/app-priority-same-day.md) found the two six-hour baseline windows unstable; use its controlled fixture fallback and keep in-use benefit unverified. Keep the same nice and QoS decisions for the same processes.
   - **Output**: code
   - **Acceptance**: Gate G in the plan. `bats tests/app-priority.bats` passes with the same priority decisions on the same fixture process table. No process outside the owned rules changes priority.
   - **Hypothesis**: One process-table pass cuts the post-change mean to at most 400 ms and at most 40% of the lower qualifying six-hour before window, with identical priority decisions in the fixture.

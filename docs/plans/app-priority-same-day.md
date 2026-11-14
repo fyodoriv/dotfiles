@@ -490,6 +490,13 @@ requires a cold build within 120 seconds and a warm build within 15 seconds.
 Any missing or altered dependency, network requirement or exceeded bound
 keeps native delivery inactive. Anchor: gate G and Cargo's source replacement.
 
+The complete vendor archive expands to about 242 MB, mostly Windows crates.
+Before committing it, test whether removing whole Windows-only crates permits
+the supported macOS build. Success requires the same locked offline cold and
+warm limits using an empty Cargo cache. If Cargo needs any removed crate,
+retain it or change the dependency; do not edit individual vendored crates or
+claim an offline build passed. Anchor: the offline build contract above.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

@@ -497,6 +497,12 @@ warm limits using an empty Cargo cache. If Cargo needs any removed crate,
 retain it or change the dependency; do not edit individual vendored crates or
 claim an offline build passed. Anchor: the offline build contract above.
 
+The filtered hosted build failed because Cargo still resolves `ntapi` from
+the locked dependency graph even on macOS. Retain the complete, unmodified
+vendored set and verify the offline build with an empty Cargo cache. The
+compressed set is about 19 MB and expands to about 242 MB; most of it is for
+other platforms. See [run 43619952178](https://github.com/fyodoriv/dotfiles/actions/runs/43619952178).
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

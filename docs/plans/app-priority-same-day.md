@@ -362,6 +362,30 @@ pairs, but missed the ratio: baseline median 276.73 ms, candidate median
 188.20 ms, ratio 0.680. The registered pivot rejects this candidate. See
 [run 43612749087](https://github.com/fyodoriv/dotfiles/actions/runs/43612749087).
 
+### Native lookup in the Rust command
+
+Register before implementation. The Rust command with per-rule `pgrep`
+and simulated native actions missed its full-fixture timing target. The
+separate native selection probe met its narrower selection target. Integrate
+that process source per rule, retain POSIX matching and ancestor exclusions,
+and recheck process identity and the match before acting.
+
+- **Hypothesis:** Per-rule native selection and native actions preserve the
+  shell's decisions and action order while reaching the registered 0.40 ratio.
+- **Measurement:** Compare controlled process selection with `pgrep`, run
+  action-parity tests with injected actions, and compare 30 hosted macOS
+  pairs on the existing fixed fixture. Build and test through hosted CI.
+- **Success:** All controlled selections and ordered actions match; no
+  unintended priority action occurs; candidate/base median is at most 0.40
+  and candidate median at most 400 ms. Build, resource, identity and rollback
+  gates pass before any live switch.
+- **Pivot:** A mismatch, incomplete scan, unsafe identity, failed resource
+  bound or missed timing target keeps the installed shell command active.
+  A pre-action identity check cannot make a PID-based syscall atomic; do not
+  describe it as eliminating PID reuse or as proof of in-use benefit.
+- **Anchor:** the native selector and full-command fixture results above,
+  and the existing action-parity contract in `tests/app-priority.bats`.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

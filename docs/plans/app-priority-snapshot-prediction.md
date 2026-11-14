@@ -88,3 +88,20 @@ XDG_CONFIG_HOME. Several tests remove a configuration file through the latter.
   test's result changes. Never use a real configuration to reproduce this.
 - **Anchor:** `tests/app-priority.bats` setup and default-config tests; the
   independent fixture review on 2026-11-13.
+
+## Task-port identity lead (2026-11-14)
+
+Apple's [task-port event documentation](https://developer.apple.com/documentation/endpointsecurity/es_event_get_task_t)
+describes an event for access to a task-control right; it does not grant that
+right or change priority. Its [Mach IPC guidance](https://developer.apple.com/documentation/xcode/conforming-to-mach-ipc-security-restrictions)
+describes permission-checked identity-token conversion in protected exception
+messages. Those sources do not establish how this tool would obtain a token for
+arbitrary target apps, or an owner-accessible equivalent to both background
+priority and QoS actions. Apple's archived [SIP guide](https://developer.apple.com/library/archive/documentation/Security/Conceptual/System_Integrity_Protection_Guide/RuntimeProtections/RuntimeProtections.html)
+describes task-port restrictions for protected processes; it does not establish
+access for every other target.
+
+Independent review found no qualified replacement in these sources. The pinned
+`taskpolicy` source above does not identify this Mac's installed binary. This
+research does not prove that no other API exists. No target process was accessed
+or changed. Keep the identity pivot and both baseline windows unchanged.

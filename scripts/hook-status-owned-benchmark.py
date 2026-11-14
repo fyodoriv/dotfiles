@@ -29,11 +29,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix="hook-status-fixture-") as home:
         env = os.environ.copy()
         env["HOME"] = home
-        for payload in inputs:
+        for index, payload in enumerate(inputs):
             expected = subprocess.run(baseline, input=payload, env=env, capture_output=True, check=False)
             actual = subprocess.run(candidate, input=payload, env=env, capture_output=True, check=False)
             if (expected.returncode, expected.stdout, expected.stderr) != (actual.returncode, actual.stdout, actual.stderr):
-                raise SystemExit("guard parity mismatch")
+                raise SystemExit(f"guard parity mismatch case {index}: status_equal={expected.returncode == actual.returncode} stdout_equal={expected.stdout == actual.stdout} stderr_equal={expected.stderr == actual.stderr}")
         times = {"base": [], "candidate": []}
         for pair in range(15):
             for label in (("base", "candidate") if pair % 2 == 0 else ("candidate", "base")):

@@ -386,3 +386,11 @@ reader. The experiment is read-only and does not change any priorities.
   identity, platform versions, priority actions, installation or stats.
 - **Anchor:** the per-rule result above, the [sysinfo process API](https://docs.rs/sysinfo/0.40.1/sysinfo/struct.Process.html),
   and [Apple's pgrep implementation](https://github.com/apple-oss-distributions/adv_cmds/blob/6bed8737a34dbb54782a18f47dccf933a9967a12/pkill/pkill.c#L491-L580).
+
+The hosted macOS probe at commit `128699a` passed the controlled exact-name,
+full-argument, nonmatch and caller/ancestor checks. It closed and waited for
+both children. Across 30 alternating three-query pairs, the `pgrep` median
+was 33.727 ms and the native median was 6.324 ms (ratio 0.188). The release
+build reported 5.10 s on that runner, with network access for dependencies.
+These are selection-only observations, not full-command or in-use results.
+See [run 43614347851](https://github.com/fyodoriv/dotfiles/actions/runs/43614347851).

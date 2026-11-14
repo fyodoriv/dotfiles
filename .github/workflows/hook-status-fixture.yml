@@ -19,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Test the offline native guard candidate
         run: |
@@ -29,3 +30,10 @@ jobs:
           ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml
       - name: Compare guard decisions, timing, and memory
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
+      - name: Check the installed entry point and performance row
+        run: |
+          cp agent-hooks/block-dangerous-git.sh agent-hooks/block-dangerous-git-legacy.sh
+          printf '#!/bin/bash\nexec "%s" "%s"\n' "$GITHUB_WORKSPACE/rust/hook-status/target/release/dotfiles-hook-status" "$GITHUB_WORKSPACE/agent-hooks/block-dangerous-git-legacy.sh" > agent-hooks/block-dangerous-git.sh
+          HOOK_STATUS_INSTALLED=1 PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/perf-gate.sh --force --json > "$RUNNER_TEMP/hook-gate.json"
+          jq -e '.commands[] | select(.name == "hook-block-dangerous-git") | .ratio <= 0.50' "$RUNNER_TEMP/hook-gate.json"

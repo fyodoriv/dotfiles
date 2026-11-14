@@ -1374,6 +1374,7 @@ default app list; include `ghostty` and `WebStorm` to keep this policy.
 dotfiles [--yes] [--health]                       Start screen: set up, applied, jobs, health, updates, Next
 dotfiles glove80 [<command>] [--yes]              Check or pair a Glove80 keyboard
 dotfiles priority-native <install|rollback>       Enable or roll back native app priority
+dotfiles hook-native <install|rollback>           Enable or roll back the native status guard
 dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
 dotfiles config get <key>                         Print one value
 dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it
@@ -1449,12 +1450,8 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `local-models` | Keep only the Ollama models your apps reserve in `.agents/local-models`: `status`, `check`, `ensure` (installs Ollama and pulls missing reserved models only when needed), `prune --yes` (removes unreserved ones; dry run without `--yes`). See [local AI models](#local-ai-models) | On demand; prune every 6 hours |
 | `agent-scratch-prune` | Reclaim disk that AI agents leave behind: idle `node_modules`/`.venv`/Cargo `target`, clean pushed worktrees in `~/.codex/worktrees`, old scratch folders in `~/.local/state`, and agent temp entries in the macOS per-user temp folder idle 3 days. Never touches dirty, unpushed, locked, or recent work. `--dry-run` lists what would go | Every 6 hours (LaunchAgent) |
 | `app-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
+| `hook-status-native` | Build or roll back the [native status guard](docs/agent-hooks.md) | On demand |
 
-Run `dotfiles priority-native install` to build the native candidate offline and
-switch the next run to it. Run `dotfiles priority-native rollback` to return to the
-shell implementation. The command checks the installed binary's digest before
-each use and keeps the normal timing record. A failed native run is not retried
-through the shell.
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |
 | `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
@@ -1467,8 +1464,8 @@ through the shell.
 | `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then the apply-time sync script in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 
-Run `app-priority-native install` to build the native candidate offline and
-switch the next run to it. Run `app-priority-native rollback` to return to the
+Run `dotfiles priority-native install` to build the native candidate offline and
+switch the next run to it. Run `dotfiles priority-native rollback` to return to the
 shell implementation. The command checks the installed binary's digest before
 each use and keeps the normal timing record. A failed native run is not retried
 through the shell.

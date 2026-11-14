@@ -32,10 +32,16 @@ jobs:
           ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml
       - name: Check the installed entry point and performance row
         run: |
-          cp agent-hooks/block-dangerous-git.sh agent-hooks/block-dangerous-git-legacy.sh
-          python3 -c 'import os,shlex; from pathlib import Path; p=Path("agent-hooks/block-dangerous-git.sh"); s=p.read_text(); marker="set -euo pipefail\n"; assert s.count(marker)==1; helper=shlex.quote(os.environ["GITHUB_WORKSPACE"]+"/rust/hook-status/target/release/dotfiles-hook-status"); p.write_text(s.replace(marker,"set -euo pipefail; if [ \"${DOTFILES_NATIVE_GUARD_BYPASS:-}\" != 1 ] && [ -x "+helper+" ]; then exec "+helper+" --exec \"$0\"; fi\n"))'
+          export XDG_DATA_HOME="$RUNNER_TEMP/native-hook-data"
+          ./bin/hook-status-native install
+          git show origin/feat/chezmoi:agent-hooks/block-dangerous-git.sh > agent-hooks/block-dangerous-git-legacy.sh
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/app-priority-native.bats tests/hook-status-native.bats
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/agent-hooks-block-dangerous-git.bats
+          # The gate uses a scratch HOME. Keep this fixture's artifact path in both copies.
+          python3 -c 'import os,shlex; from pathlib import Path; marker="set -euo pipefail\n"; extra="set -euo pipefail; export XDG_DATA_HOME="+shlex.quote(os.environ["XDG_DATA_HOME"])+"\n"; paths=[Path("agent-hooks/block-dangerous-git.sh"),Path("agent-hooks/block-dangerous-git-legacy.sh")]; [(lambda s,p: (s.count(marker)==1 or (_ for _ in ()).throw(ValueError("guard marker")),p.write_text(s.replace(marker,extra))))(p.read_text(),p) for p in paths]'
           HOOK_STATUS_INSTALLED=1 PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/perf-gate.sh --force --json > "$RUNNER_TEMP/hook-gate.json"
           jq '.commands[] | select(.name == "hook-block-dangerous-git")' "$RUNNER_TEMP/hook-gate.json"
           jq -e '.commands[] | select(.name == "hook-block-dangerous-git") | .ratio <= 0.50' "$RUNNER_TEMP/hook-gate.json"
+          ./bin/hook-status-native rollback
+          test ! -L "$XDG_DATA_HOME/dotfiles/native/hook-status/current"

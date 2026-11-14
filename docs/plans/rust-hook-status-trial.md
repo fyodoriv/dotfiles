@@ -24,3 +24,7 @@ escapes, malformed JSON and unknown syntax always use the old guard.
 This trial does not port the heavy-run hook or qualify a live switch. The
 fallback bridge remains temporary until the whole selected boundary can pass
 gate G without the former implementation.
+
+The first hosted comparison invokes the candidate directly against the
+existing guard in a disposable environment. It can reject a candidate, but it
+does not substitute for the registered gate row or installed-wrapper proof.

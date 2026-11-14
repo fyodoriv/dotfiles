@@ -6,6 +6,7 @@ on:
     paths:
       - rust/hook-status/**
       - rust/vendor/**
+      - scripts/hook-status-owned-benchmark.py
       - .github/workflows/hook-status-fixture.yml
 
 permissions:
@@ -26,3 +27,5 @@ jobs:
           cd rust
           ../bin/heavy-run cargo test --locked --offline --manifest-path hook-status/Cargo.toml
           ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml
+      - name: Compare guard decisions, timing, and memory
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py

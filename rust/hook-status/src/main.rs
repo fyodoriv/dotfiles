@@ -62,4 +62,12 @@ mod tests {
         assert!(!literal_status(br#"{"tool_input":{"command":"git status"}"#));
         assert!(!literal_status(b""));
     }
+
+    #[test]
+    fn shell_control_characters_never_take_the_shortcut() {
+        for ch in [';', '&', '|', '$', '(', ')', '`', '\n', '\t', '>', '<', '*', '?', '/'] {
+            let event = serde_json::json!({"tool_input": {"command": format!("git status{ch}")}});
+            assert!(!literal_status(event.to_string().as_bytes()));
+        }
+    }
 }

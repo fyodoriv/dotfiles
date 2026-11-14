@@ -6,9 +6,7 @@ set -euo pipefail
 set -f # Keep branch words literal when split below.
 # SECONDS counts the hook's whole run; it caps the total time spent in gh.
 SECONDS=0
-_hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# The native status path uses absolute helpers; fallback performs endpoint setup.
-unset BASH_ENV ENV
+_hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"; unset BASH_ENV ENV
 # shellcheck source=native-dispatch.sh
 if [ -r "$_hook_dir/native-dispatch.sh" ]; then source "$_hook_dir/native-dispatch.sh"; fi
 # shellcheck source=bootstrap-endpoint-path.sh

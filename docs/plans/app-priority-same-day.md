@@ -413,3 +413,10 @@ simple argument pattern; it cannot establish the documented `pgrep` behavior.
   cases do not prove parity for every process table or identity-safe actions.
 - **Anchor:** the native comparison above and Apple's published `pgrep`
   fallback and regex logic linked above.
+
+The first broader run failed with a generic selection mismatch. To identify
+the case without exposing process data, the next run reports only a fixed
+case label and three booleans: whether the reference and candidate each
+selected the controlled child and whether their selected sets agree. Missing
+or ambiguous diagnostics leave the cause unknown; no process details are
+printed. This does not change the selection or cleanup decisions.

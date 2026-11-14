@@ -416,6 +416,13 @@ priority actions; no actual priority change is permitted.
   effects, offline installation, stats or in-use benefit.
 - **Anchor:** the native lookup and full-command fixture results above.
 
+The hosted macOS comparison at candidate `5c5bcb8` completed 30 pairs with
+the same 10 ordered actions per pair, only owned child targets, and clean
+child exits. The shell median was 744.34 ms; the Rust median was 250.78 ms,
+ratio 0.337. The actions were simulated, so this is not evidence of real
+priority effects or in-use benefit. See
+[run 43618342224](https://github.com/fyodoriv/dotfiles/actions/runs/43618342224).
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

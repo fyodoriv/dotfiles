@@ -335,3 +335,28 @@ priority-apps file; the Rust fixture currently refuses it.
   installation or in-use performance.
 - **Anchor:** `bin/app-priority` custom-config branch and the fixture result
   above; Basili et al. (1994) and Munafò et al. (2017).
+### Per-rule Rust selection
+
+Register before implementation. The successful fixed fixture batches process
+observations before actions, which can increase the age of a selected PID.
+The shell queries each rule just before applying that rule. Test that order
+in the Rust fixture rather than treating the batch result as deployment proof.
+
+- **Hypothesis:** Per-rule Rust selection preserves the shell's fixed ordered
+  actions and still meets the fixture ratio of at most 0.40 on hosted macOS.
+- **Measurement:** Compare the pinned baseline and reviewed per-rule Rust
+  candidate in 30 alternating hosted macOS pairs, with the same fixed mock
+  table and action checks. Run the existing default and custom-list controls.
+- **Success:** All pairs and controls pass, candidate median is at most
+  400 ms, and candidate/base median is at most 0.40.
+- **Pivot:** A failed ratio, action mismatch or missing pair rejects this
+  candidate. Keep the live command unchanged. Matching query order does not
+  eliminate the existing PID reuse window, qualify arbitrary process tables,
+  or prove live equivalence and in-use benefit.
+- **Anchor:** `bin/app-priority` query/action order and the batched Rust
+  fixture result above.
+
+On hosted macOS, commit `49800a5` preserved the fixed actions in all 30
+pairs, but missed the ratio: baseline median 276.73 ms, candidate median
+188.20 ms, ratio 0.680. The registered pivot rejects this candidate. See
+[run 43612749087](https://github.com/fyodoriv/dotfiles/actions/runs/43612749087).

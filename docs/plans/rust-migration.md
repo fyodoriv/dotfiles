@@ -356,6 +356,16 @@ Raw JSON matching also needs a complete treatment of escapes and duplicate
 fields. Keep the existing path until a separately reviewed failure contract,
 parity controls and the registered measurement gates are satisfied. This review
 ran no hook or timing and claims no speedup.
+
+The bounded dangerous-Git shortcut in [draft 673](https://github.com/fyodoriv/dotfiles/pull/673)
+did not qualify. Its hosted parity test expected identical output for
+malformed input and observed a difference; the exact cause was not identified.
+Three existing guard cases also expected status 0 and failed. The hosted gate
+reported a 0.713 status-row ratio against the 0.50 target, but its log says
+`heavy-run` was unavailable, so that timing is not a qualified measurement.
+The [registered pivot](https://github.com/fyodoriv/dotfiles/commit/2303e42)
+retains the existing guard. The second hook remains open.
+
 The [cold-path fixture audit](rust-cold-profile-fixture-audit.md) records
 safety boundaries, unknowns and the registered pivot criteria. No profile ran.
 

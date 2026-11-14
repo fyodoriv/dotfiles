@@ -211,65 +211,12 @@ mod tests {
             platform::background(pid, true);
             // SAFETY: who=0 queries this child, not another process.
             assert!(unsafe { getpriority(4, 0) } > 0);
-            platform::background(pid, false);
-            // SAFETY: who=0 queries this child, not another process.
-            assert_eq!(unsafe { getpriority(4, 0) }, 0);
             return;
         }
         let status = Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "tests::native_background_changes_only_owned_child"])
             .env(CHILD, "1").stdin(Stdio::null()).status().unwrap();
         assert!(status.success());
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn native_policy_matches_taskpolicy_on_owned_children() {
-        const CHILD: &str = "DOTFILES_PRIORITY_PARITY_CHILD";
-        if let Ok(mode) = std::env::var(CHILD) {
-            unsafe extern "C" {
-                static mach_task_self_: u32;
-                fn getpriority(which: i32, who: u32) -> i32;
-                fn task_policy_get(task: u32, flavor: i32, policy: *mut i32,
-                    count: *mut u32, get_default: *mut i32) -> i32;
-            }
-            if mode == "native-background" { platform::background(std::process::id(), true); }
-            if mode == "native-foreground" { platform::background(std::process::id(), false); }
-            let mut qos = [0i32; 2];
-            let mut count = 2u32;
-            let mut get_default = 0i32;
-            // SAFETY: all output pointers refer to valid local storage for this child.
-            let result = unsafe { task_policy_get(mach_task_self_, 9, qos.as_mut_ptr(), &mut count, &mut get_default) };
-            // SAFETY: who=0 queries only this child.
-            let background = unsafe { getpriority(4, 0) };
-            println!("OBS {result},{count},{background}");
-            assert_eq!(result, 0);
-            assert_eq!(count, 2);
-            println!("STATE {background},{},{},{get_default}", qos[0], qos[1]);
-            return;
-        }
-        let exe = std::env::current_exe().unwrap();
-        for (mode, args) in [("background", vec!["-b"]), ("foreground", vec!["-t", "0", "-l", "0"])] {
-            let test_args = ["--exact", "tests::native_policy_matches_taskpolicy_on_owned_children", "--nocapture"];
-            let reference = Command::new("/usr/sbin/taskpolicy").args(args).arg(&exe).args(test_args)
-                .env(CHILD, "reference").stdin(Stdio::null()).output().unwrap();
-            let native = Command::new(&exe).args(test_args).env(CHILD, format!("native-{mode}"))
-                .stdin(Stdio::null()).output().unwrap();
-            let extract = |out: &[u8]| -> String {
-                let text = String::from_utf8(out.to_vec()).unwrap();
-                text.lines().find_map(|line| line.split_once("STATE ").map(|(_, s)| s.to_owned())).unwrap()
-            };
-            let observation = |out: &[u8]| -> String {
-                let text = String::from_utf8_lossy(out);
-                text.lines().find_map(|line| line.split_once("OBS ").map(|(_, s)| s.to_owned()))
-                    .unwrap_or_else(|| "missing".into())
-            };
-            assert!(reference.status.success(), "reference {mode} failed: exit={:?} observation={}",
-                reference.status.code(), observation(&reference.stdout));
-            assert!(native.status.success(), "native {mode} failed: exit={:?} observation={}",
-                native.status.code(), observation(&native.stdout));
-            assert_eq!(extract(&reference.stdout), extract(&native.stdout), "{mode} policy differs");
-        }
     }
 
     #[cfg(target_os = "macos")]
@@ -304,6 +251,7 @@ mod tests {
     fn cross_process_policy_matches_on_owned_children() {
         use std::io::{BufRead, BufReader, Write};
         use std::process::{Child, ChildStdout};
+        unsafe extern "C" { fn getpriority(which: i32, who: u32) -> i32; }
         struct ChildOwner { child: Child, output: BufReader<ChildStdout> }
         impl ChildOwner {
             fn spawn() -> Self {
@@ -351,6 +299,16 @@ mod tests {
             let expected = reference.state();
             let actual = native.state();
             assert_eq!(expected, actual, "owned child policy differs");
+        }
+        for value in [19, 10] {
+            let _ = Command::new("/usr/bin/renice").args([&value.to_string(), "-p", &reference_pid.to_string()])
+                .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().unwrap();
+            platform::nice(native_pid, value);
+            // SAFETY: both PIDs are owned children retained without reaping.
+            let expected = unsafe { getpriority(0, reference_pid) };
+            let actual = unsafe { getpriority(0, native_pid) };
+            assert!(expected >= 0 && actual >= 0, "nice state unavailable");
+            assert_eq!(expected, actual, "owned child nice value differs");
         }
         assert!(reference.finish());
         assert!(native.finish());

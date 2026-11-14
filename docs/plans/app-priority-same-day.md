@@ -465,6 +465,14 @@ and nice operations. The owned-child parity check must pass before deployment.
 The full-command fixture must include the retained mock `taskpolicy` process
 and still meet the unchanged 0.40 ratio; otherwise reject the candidate.
 
+With that wrapper, the hosted cross-process test matched the reference for
+background and foreground QoS on retained owned children. Two earlier
+self-process assertions are not equivalent: they mixed self and external
+policy scopes. The retained cross-process check covers the command's actual
+target scope. It also compares nice values after both a lowering and a
+potentially denied priority increase. The expected result is zero differing
+nice values; any mismatch rejects the candidate. Other PIDs remain unqualified.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

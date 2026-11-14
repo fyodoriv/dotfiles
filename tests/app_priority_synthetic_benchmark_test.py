@@ -68,7 +68,13 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(actions, b"taskpolicy -b -p 101\n")
 
 
-@unittest.skipUnless(benchmark.hosted(), "physical fixture runs only on hosted macOS")
+def hosted_fixture():
+    return (os.environ.get("GITHUB_ACTIONS") == "true"
+            and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+            and os.environ.get("RUNNER_OS") in {"Linux", "macOS"})
+
+
+@unittest.skipUnless(hosted_fixture(), "physical fixture runs only on hosted runners")
 class CandidateFixtureTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-candidate-")

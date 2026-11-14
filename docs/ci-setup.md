@@ -41,6 +41,8 @@ Organization-specific branch-protection / approval workflows belong in your priv
 The app-priority fixture workflow runs its isolated mock-action checks and one
 same-source timing pair on hosted macOS when the benchmark or command changes.
 One pair checks the harness; it is not the 30-pair performance decision.
+The same mock-action tests also run on hosted Linux as an early preflight;
+only hosted macOS supplies the timing result.
 A manual dispatch with two reviewed full commit IDs runs the 30-pair decision
 and enforces the registered ratio and time limits. Review both source trees
 before dispatch: the fixture PATH is not an operating-system sandbox.

@@ -456,6 +456,15 @@ owned-child run reports only the numeric task-port and policy-call results to
 distinguish a call failure from an observer issue. The candidate remains
 inactive; an error code alone does not establish its cause.
 
+The diagnostic returned 0 for the task-name lookup and 4 for the native QoS
+policy call; the reference child still received the requested tiers. The
+installed macOS `taskpolicy` binary carries an Apple-private task-policy
+entitlement, but the error code alone does not prove why the native call
+failed. Retain `taskpolicy` for foreground QoS, and keep native background
+and nice operations. The owned-child parity check must pass before deployment.
+The full-command fixture must include the retained mock `taskpolicy` process
+and still meet the unchanged 0.40 ratio; otherwise reject the candidate.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

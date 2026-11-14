@@ -128,6 +128,14 @@ class CandidateFixtureTests(unittest.TestCase):
         pgrep.write_text(source.replace(expected, replacement))
         benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
 
+    def test_malformed_grouped_pattern_output_falls_back(self):
+        pgrep = self.mockbin / "pgrep"
+        source = pgrep.read_text()
+        expected = 'printf "501 node minsky\\n601 node_modules/vitest\\n"'
+        self.assertIn(expected, source)
+        pgrep.write_text(source.replace(expected, 'printf "invalid\\n"'))
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
     def test_explicit_config_uses_original_selection(self):
         folder = self.config / "dotfiles"
         folder.mkdir()

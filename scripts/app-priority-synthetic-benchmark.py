@@ -15,6 +15,8 @@ MOCKS = {
 case "$*" in
   "-l -x Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel")
     printf "101 claude\\n201 codex\\n301 Slack\\n401 bats\\n" ;;
+  "-l -f mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ")
+    printf "501 node minsky\n601 node_modules/vitest\n" ;;
   "-x Slack") printf "301\n" ;;
   "-x claude") printf "101\n" ;;
   "-x codex") printf "201\n" ;;

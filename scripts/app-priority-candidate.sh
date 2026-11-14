@@ -18,6 +18,8 @@ source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
 # The grouped observation can age before an action; do not deploy it.
 APP_PRIORITY_BATCH_READY=0
 APP_PRIORITY_BATCH_ROWS=""
+APP_PRIORITY_PATTERN_READY=0
+APP_PRIORITY_PATTERN_ROWS=""
 
 find_exact_processes() {
   local requested="$1" row pid name
@@ -58,6 +60,43 @@ prepare_default_batch() {
   APP_PRIORITY_BATCH_READY=1
 }
 
+
+find_pattern_processes() {
+  local requested="$1" row pid command_line
+  # Bash dynamic scope writes the caller's local process_ids.
+  process_ids=""
+  if [ "$APP_PRIORITY_PATTERN_READY" != 1 ]; then
+    process_ids=$(pgrep -f "$requested" 2>/dev/null || true)
+    return 0
+  fi
+  while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    pid="${row%% *}"
+    command_line="${row#* }"
+    [[ "$command_line" =~ $requested ]] && process_ids="${process_ids}${pid}"$'\n'
+  done <<< "$APP_PRIORITY_PATTERN_ROWS"
+  return 0
+}
+
+prepare_default_patterns() {
+  local row pid command_line status=0 seen=" "
+  APP_PRIORITY_PATTERN_ROWS="$(pgrep -l -f 'mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ' 2>/dev/null)" || status=$?
+  [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || return 0
+  if [ "$status" -eq 0 ] && [ -z "$APP_PRIORITY_PATTERN_ROWS" ]; then return 0; fi
+  if [ "$status" -eq 1 ] && [ -n "$APP_PRIORITY_PATTERN_ROWS" ]; then return 0; fi
+  while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    case "$row" in *' '*) ;; *) return 0 ;; esac
+    pid="${row%% *}"
+    command_line="${row#* }"
+    case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+    [ -n "$command_line" ] || return 0
+    case "$seen" in *" $pid "*) return 0 ;; esac
+    seen="$seen$pid "
+  done <<< "$APP_PRIORITY_PATTERN_ROWS"
+  APP_PRIORITY_PATTERN_READY=1
+}
+
 set_process_priority() {
   local process_name="$1"
   local process_ids
@@ -73,7 +112,7 @@ set_process_priority() {
 set_process_priority_pattern() {
   local pattern="$1"
   local process_ids
-  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
+  find_pattern_processes "$pattern"
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -98,7 +137,7 @@ set_process_background() {
 set_process_background_pattern() {
   local pattern="$1"
   local process_ids
-  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
+  find_pattern_processes "$pattern"
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -111,7 +150,7 @@ set_process_background_pattern() {
 set_process_nice_pattern() {
   local pattern="$1"
   local process_ids
-  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
+  find_pattern_processes "$pattern"
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -180,6 +219,7 @@ if [ -f "$CONFIG_FILE" ]; then
 else
   # Default process list when no config file exists
   prepare_default_batch
+  prepare_default_patterns
   # Interactive apps
   set_process_priority "Slack"
   set_process_priority "Google Chrome"

@@ -1,0 +1,31 @@
+name: Affected-test selector benchmark
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - bin/bats-affected
+      - tests/bats-affected.bats
+      - scripts/benchmark-bats-affected.py
+      - .github/workflows/bats-selector-benchmark.yml
+
+permissions:
+  contents: read
+
+jobs:
+  selector:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install test tools
+        run: brew install bats-core
+      - name: Check selector contracts
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/bats-affected.bats
+      - name: Compare outputs and timing
+        env:
+          SELECTOR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/benchmark-bats-affected.py

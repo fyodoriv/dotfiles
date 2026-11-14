@@ -21,15 +21,17 @@ APP_PRIORITY_BATCH_ROWS=""
 
 find_exact_processes() {
   local requested="$1" row pid name
+  # Bash dynamic scope writes the caller's local process_ids.
+  process_ids=""
   if [ "$APP_PRIORITY_BATCH_READY" != 1 ]; then
-    pgrep -x "$requested" 2>/dev/null || true
+    process_ids=$(pgrep -x "$requested" 2>/dev/null || true)
     return 0
   fi
   while IFS= read -r row; do
     [ -n "$row" ] || continue
     pid="${row%% *}"
     name="${row#* }"
-    [ "$name" = "$requested" ] && printf '%s\n' "$pid"
+    [ "$name" = "$requested" ] && process_ids="${process_ids}${pid}"$'\n'
   done <<< "$APP_PRIORITY_BATCH_ROWS"
   return 0
 }
@@ -59,7 +61,7 @@ prepare_default_batch() {
 set_process_priority() {
   local process_name="$1"
   local process_ids
-  process_ids=$(find_exact_processes "$process_name")
+  find_exact_processes "$process_name"
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -83,7 +85,7 @@ set_process_priority_pattern() {
 set_process_background() {
   local process_name="$1"
   local process_ids
-  process_ids=$(find_exact_processes "$process_name")
+  find_exact_processes "$process_name"
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -144,7 +146,7 @@ is_descendant_of_interactive_app() {
 set_agent_priority() {
   local process_name="$1"
   local process_ids
-  process_ids=$(find_exact_processes "$process_name")
+  find_exact_processes "$process_name"
   [ -z "$process_ids" ] && return
 
   local process_id

@@ -131,6 +131,10 @@ This changes the order of source preparation only. It does not waive the
 snapshot prediction's identity or parity requirements for deployment, and a
 fixture result is not evidence of behavior on a changing process table.
 
+The fixture candidate rejects malformed rows, duplicate IDs and inconsistent
+status/output pairs by falling back to individual queries. This is not an
+identity check.
+
 The fixture candidate is `scripts/app-priority-candidate.sh`; the live command
 is unchanged. The hosted job copies this file into its disposable candidate
 tree only when the `fixture_candidate` input is true. Use the reviewed

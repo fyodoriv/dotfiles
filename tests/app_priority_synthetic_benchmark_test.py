@@ -87,6 +87,15 @@ class CandidateFixtureTests(unittest.TestCase):
         pgrep.write_text(source)
         benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
 
+    def test_duplicate_grouped_pid_falls_back_to_individual_queries(self):
+        pgrep = self.mockbin / "pgrep"
+        source = pgrep.read_text()
+        expected = 'printf "101 claude\\\\n201 codex\\\\n301 Slack\\\\n401 bats\\\\n"'
+        replacement = 'printf "101 claude\\n101 claude\\n"'
+        self.assertIn(expected, source)
+        pgrep.write_text(source.replace(expected, replacement))
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
     def test_explicit_config_uses_original_selection(self):
         folder = self.config / "dotfiles"
         folder.mkdir()

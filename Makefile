@@ -231,6 +231,7 @@ check-steps:
 	@scripts/gate-timed.sh lint-tasks $(MAKE) --no-print-directory lint-tasks
 	@scripts/gate-timed.sh perf-gate $(MAKE) --no-print-directory perf-gate
 	@scripts/gate-timed.sh test $(MAKE) --no-print-directory test
+	@scripts/rust-affected.sh
 	@scripts/gate-timed.sh plugins-bash32 $(MAKE) --no-print-directory test-plugins-bash32
 	@scripts/gate-timed.sh e2e $(MAKE) --no-print-directory e2e-if-needed
 

@@ -361,3 +361,28 @@ On hosted macOS, commit `49800a5` preserved the fixed actions in all 30
 pairs, but missed the ratio: baseline median 276.73 ms, candidate median
 188.20 ms, ratio 0.680. The registered pivot rejects this candidate. See
 [run 43612749087](https://github.com/fyodoriv/dotfiles/actions/runs/43612749087).
+
+### Native process-selection comparison
+
+Register before implementation. The per-rule candidate preserves query order
+but pays for a separate `pgrep` process for every rule. Evaluate the existing
+`sysinfo` Rust library as a process-table source rather than writing a new OS
+reader. The experiment is read-only and does not change any priorities.
+
+- **Hypothesis:** A per-rule native refresh can match macOS `pgrep` selection
+  for controlled child processes and reduce the median selection time to at
+  most 40% of the corresponding `pgrep` calls.
+- **Measurement:** On hosted macOS, use owned, short-lived child fixtures to
+  compare exact-name and full-argument regex decisions with `pgrep`, including
+  nonmatches and the caller/ancestor exclusion. Compare 30 alternating pairs
+  over the same stable fixture and record medians. Retain only fixed labels,
+  aggregate counts and times; never log process arguments or environment.
+- **Success:** Every controlled decision matches, no child is left running,
+  the native/base selection median is at most 0.40, and the candidate median
+  is at most 400 ms. Compilation and tests pass on hosted macOS.
+- **Pivot:** Missing data, disagreement, an orphan, a failed timing threshold
+  or unsafe observation rejects the approach. Keep the live command as-is.
+  A match for controlled children is not parity for all process tables, PID
+  identity, platform versions, priority actions, installation or stats.
+- **Anchor:** the per-rule result above, the [sysinfo process API](https://docs.rs/sysinfo/0.40.1/sysinfo/struct.Process.html),
+  and [Apple's pgrep implementation](https://github.com/apple-oss-distributions/adv_cmds/blob/6bed8737a34dbb54782a18f47dccf933a9967a12/pkill/pkill.c#L491-L580).

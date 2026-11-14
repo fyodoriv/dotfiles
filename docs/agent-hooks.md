@@ -4,6 +4,10 @@ This text moved here from `AGENTS.md` so the always-loaded file stays short. `AG
 
 ## Hook-based enforcement (post-2026-05-27)
 
+The dangerous-Git guard recognizes a narrow literal `git status` command and
+selected status flags early. Other syntax follows the full guard. If its
+literal helper is unavailable, the full guard remains active.
+
 `bin/gh` and `git-hooks/commit-msg` are **backstop** enforcement now. The
 primary enforcement happens via agentbrew Claude Code hooks deployed to
 `~/.claude/codeassist/hooks-scripts/` and wired into `~/.claude/settings.json`.

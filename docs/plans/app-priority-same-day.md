@@ -423,6 +423,28 @@ ratio 0.337. The actions were simulated, so this is not evidence of real
 priority effects or in-use benefit. See
 [run 43618342224](https://github.com/fyodoriv/dotfiles/actions/runs/43618342224).
 
+#### Priority parity on owned target children
+
+Register before implementation. Self-child checks cannot establish the
+cross-process `-p` behavior used by the command.
+
+- **Hypothesis:** Native operations match `taskpolicy -b` and
+  `taskpolicy -B -t 0 -l 0` on separately owned child targets.
+- **Measurement:** On hosted macOS, retain each direct child handle without
+  waiting or reaping until all operations and observations finish. Apply the
+  reference and native operations to separate children, then compare the
+  background and QoS fields. Close their input pipes and wait for both. The
+  retained child PID cannot be reused before it is reaped. No process group
+  is signaled and no unowned PID is targeted; log only fixed labels and
+  numeric outcomes.
+- **Success:** Both actions and observations succeed, states match, and both
+  children exit. Hosted CI passes.
+- **Pivot:** Missing permissions, a changed state, failed observation or
+  cleanup error is inconclusive or rejects the candidate. Keep the live
+  command unchanged. This does not prove arbitrary-PID permissions or atomic
+  identity at runtime; `renice`, stats and offline delivery remain open.
+- **Anchor:** the self-child result and Apple's taskpolicy source above.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

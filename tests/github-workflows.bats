@@ -135,6 +135,22 @@ test_job_has_ripgrep() {
     grep -qE '^[[:space:]]*run:[[:space:]]*brew[[:space:]]+install([[:space:]]+[^[:space:]#]+)*[[:space:]]+ripgrep([[:space:]]|$)'
 }
 
+test_job_adds_repo_bin() {
+  awk '/^  test:/ { in_job = 1; next }
+    in_job && /^  [a-z]+:/ { exit }
+    in_job && /echo "\$GITHUB_WORKSPACE\/bin" >> "\$GITHUB_PATH"/ { found = 1 }
+    in_job && /name: Gate \(make check\)/ { exit !found }
+    END { if (!found) exit 1 }' "$1"
+}
+
+@test "hosted performance gate can find the exclusive queue" {
+  local file="$REPO_ROOT/.github/workflows/ci.yml"
+  test_job_adds_repo_bin "$file"
+  local fixture="$BATS_TEST_TMPDIR/workflow.yml"
+  printf '%s\n' '  test:' '    # no checkout bin' > "$fixture"
+  ! test_job_adds_repo_bin "$fixture"
+}
+
 @test "workflow files: ci.yml test job runs the local gate on macOS" {
   local file="$REPO_ROOT/.github/workflows/ci.yml"
   grep -qE '^[[:space:]]*run: make check$' "$file"

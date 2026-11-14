@@ -115,3 +115,47 @@ write or replacement fails closed.
   candidate RSS ratio at most 1.10.
 - **Pivot:** Any failure or missed threshold leaves the old guard active.
 - **Anchor:** The two preceding hosted trials and gate G.
+
+The unlinked-file version passed six Rust checks, all 33 existing guard safety
+cases, same-path parity, and the queued scratch-entry gate. The gate ratio was
+0.166 and the candidate memory ratio was 1.00. The reader kept the same PID
+for fallback and the input file was unlinked before writing. See
+[run 43628534967](https://github.com/fyodoriv/dotfiles/actions/runs/43628534967).
+This does not qualify an installed path.
+
+## Native hook delivery
+
+Register before implementation. Share the native install and rollback
+mechanism with app-priority. The real guard checks a content-addressed binary
+before dispatch, and falls back to the old guard when it is absent or corrupt.
+
+- **Hypothesis:** The installed dispatch preserves guard safety and retains
+  the 0.50 timing and 1.10 memory bounds with integrity checks included.
+- **Measurement:** Hosted macOS tests offline build, repeat install, rollback,
+  corrupt and missing artifacts, failure before selection, all guard safety
+  cases, same-path parity, RSS and the unchanged queued performance row.
+- **Success:** Zero unsafe permits or changed guard output; zero named input
+  files; all install and rollback cases pass; stable baseline RSS ratio
+  0.95–1.05, candidate RSS ratio at most 1.10, and row ratio at most 0.50.
+- **Pivot:** Any failed safety, integrity, lifecycle or performance check keeps
+  the existing shell guard active. A failed install must not replace it.
+- **Anchor:** Native delivery, gate G, and the hosted candidate result above.
+
+### Fail-closed dispatch receipt
+
+Register before implementation. The shell guard remains the parent and
+accepts an allow or fallback result only when the native reader sends a
+one-byte receipt. The receipt carries no input. Missing or malformed receipts
+block. A fallback receipt preserves the old guard's exit status and output.
+
+- **Hypothesis:** The receipt distinguishes a completed decision from a
+  failed native start without changing normal guard decisions or exceeding
+  the registered timing and memory limits.
+- **Measurement:** Hosted tests cover missing, corrupt, failing and
+  receiptless helpers, normal fallback, all guard safety cases, same-path
+  parity, RSS and the queued performance row.
+- **Success:** Zero false permits or changed normal results; every failed
+  native start blocks; no input appears in the receipt; the status-row ratio
+  is at most 0.50 and the candidate/base RSS ratio is at most 1.10.
+- **Pivot:** Any failure retains the existing shell guard.
+- **Anchor:** Gate G, the unlinked-file trial, and Claude hook exit behavior.

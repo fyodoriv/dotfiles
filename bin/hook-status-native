@@ -1,0 +1,24 @@
+#!/bin/bash
+# Install or roll back the native dangerous-Git status shortcut.
+# Usage:
+#   dotfiles hook-native install   Build offline and enable the status shortcut
+#   dotfiles hook-native rollback  Restore the shell guard
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+directory="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/hook-status"
+# shellcheck source=../lib/native-delivery.sh
+source "$root/lib/native-delivery.sh"
+
+case "${1:-}" in
+  --help|-h) echo 'Usage: dotfiles hook-native install|rollback'; exit 0 ;;
+  install)
+    native_delivery_install "$root" hook-status dotfiles-hook-status "$directory" hook-status hook-status-native
+    echo 'Native hook status shortcut installed.'
+    ;;
+  rollback)
+    native_delivery_rollback "$directory" hook-status hook-status-native
+    echo 'Shell guard restored.'
+    ;;
+  *) echo 'Usage: hook-status-native install|rollback' >&2; exit 2 ;;
+esac

@@ -3,14 +3,14 @@
 # Receives tool input as JSON on stdin.
 
 set -euo pipefail
-# No globbing: a branch word like feat/* must stay literal when split below.
-set -f
+set -f # Keep branch words literal when split below.
 # SECONDS counts the hook's whole run; it caps the total time spent in gh.
 SECONDS=0
-_hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+_hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"; unset BASH_ENV ENV
+# shellcheck source=native-dispatch.sh
+if [ -r "$_hook_dir/native-dispatch.sh" ]; then source "$_hook_dir/native-dispatch.sh"; fi
 # shellcheck source=bootstrap-endpoint-path.sh
 source "$_hook_dir/bootstrap-endpoint-path.sh"
-
 input=$(cat)
 command="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"

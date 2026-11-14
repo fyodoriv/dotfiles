@@ -4,6 +4,13 @@ This text moved here from `AGENTS.md` so the always-loaded file stays short. `AG
 
 ## Hook-based enforcement (post-2026-05-27)
 
+`dotfiles hook-native install` builds the status shortcut offline and enables
+it for the dangerous-Git guard. `dotfiles hook-native rollback` restores the
+shell guard. The guard checks the binary digest before use and blocks if a
+selected native execution cannot provide a valid completion receipt. Other
+commands fall back to the existing guard. Fallback input is stored locally in
+an owner-only temporary file, unlinked before it is written and closed on exit.
+
 `bin/gh` and `git-hooks/commit-msg` are **backstop** enforcement now. The
 primary enforcement happens via agentbrew Claude Code hooks deployed to
 `~/.claude/codeassist/hooks-scripts/` and wired into `~/.claude/settings.json`.

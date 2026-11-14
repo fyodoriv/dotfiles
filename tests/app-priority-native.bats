@@ -7,8 +7,9 @@ setup() {
   export HOME="$TEST_DIR/home" XDG_DATA_HOME="$TEST_DIR/data" XDG_CONFIG_HOME="$TEST_DIR/config"
   export DOTFILES_STATS_LOG=1 DOTFILES_STATS_FILE="$TEST_DIR/stats.jsonl" NATIVE_LOG="$TEST_DIR/native.log" PGREP_LOG="$TEST_DIR/pgrep.log"
   export TEST_ROOT="$TEST_DIR/repo"
-  mkdir -p "$HOME" "$TEST_ROOT/bin" "$TEST_ROOT/rust/app-priority/target/release" "$TEST_DIR/mockbin"
+  mkdir -p "$HOME" "$TEST_ROOT/bin" "$TEST_ROOT/lib" "$TEST_ROOT/rust/app-priority/target/release" "$TEST_DIR/mockbin"
   cp "$BATS_TEST_DIRNAME/../bin/app-priority-native" "$TEST_ROOT/bin/"
+  cp "$BATS_TEST_DIRNAME/../lib/native-delivery.sh" "$TEST_ROOT/lib/"
   cat > "$TEST_ROOT/bin/heavy-run" <<'MOCK'
 #!/bin/bash
 [ "${FAIL_BUILD:-0}" = 0 ]

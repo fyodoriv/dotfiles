@@ -31,7 +31,9 @@ def main():
               b'{"tool_input":{"command":"git status --short"}}',
               b'{"tool_input":{"command":"git status; echo safe"}}',
               b'{"tool_input":{"command":"git status","command":"echo safe"}}',
-              b'{"tool_input":{"comm\\u0061nd":"git status"}}', b'{}', b'not-json']
+              b'{"tool_input":{"comm\\u0061nd":"git status"}}', b'{}', b'not-json',
+              b'{"tool_input":{"command":"git status -s -b"}}',
+              b'{"tool_input":{"command":"git status --porcelain=v1"}}']
     with tempfile.TemporaryDirectory(prefix="hook-status-fixture-") as home:
         env = os.environ.copy()
         env["HOME"] = home
@@ -39,16 +41,22 @@ def main():
             expected = invoke("base", payload, env)
             actual = invoke("candidate", payload, env)
             if (expected.returncode, expected.stdout, expected.stderr) != (actual.returncode, actual.stdout, actual.stderr):
+                if index in (0, 5):
+                    def safe_error(result):
+                        return result.stderr.decode("utf-8", "replace").replace(str(ROOT), "<checkout>").replace(home, "<home>")[:300]
+                    print(f"fixed-input result: expected={expected.returncode} actual={actual.returncode} expected_stderr={safe_error(expected)!r} actual_stderr={safe_error(actual)!r}")
                 raise SystemExit(f"guard parity mismatch case {index}: status_equal={expected.returncode == actual.returncode} stdout_equal={expected.stdout == actual.stdout} stderr_equal={expected.stderr == actual.stderr}")
-        times = {"base": [], "candidate": []}
-        for pair in range(15):
-            for label in (("base", "candidate") if pair % 2 == 0 else ("candidate", "base")):
-                guard.write_bytes(original if label == "base" else modified)
-                start = time.monotonic_ns()
-                result = subprocess.run(command, input=inputs[0], env=env, capture_output=True, check=False)
-                times[label].append((time.monotonic_ns() - start) / 1_000_000)
-                if result.returncode != 0 or result.stdout or result.stderr:
-                    raise SystemExit("timing sample failed")
+        times = {}
+        for index in (0, 1, 7, 8):
+            times[index] = {"base": [], "candidate": []}
+            for pair in range(15):
+                for label in (("base", "candidate") if pair % 2 == 0 else ("candidate", "base")):
+                    guard.write_bytes(original if label == "base" else modified)
+                    start = time.monotonic_ns()
+                    result = subprocess.run(command, input=inputs[index], env=env, capture_output=True, check=False)
+                    times[index][label].append((time.monotonic_ns() - start) / 1_000_000)
+                    if result.returncode != 0 or result.stdout or result.stderr:
+                        raise SystemExit("timing sample failed")
         memory = {"base_first": [], "base_second": [], "candidate": []}
         for label in memory:
             for _ in range(15):
@@ -57,14 +65,16 @@ def main():
                 if result.returncode != 0 or result.stdout or sample is None:
                     raise SystemExit("memory sample failed")
                 memory[label].append(int(sample.group(1)))
-        time_ratio = statistics.median(times["candidate"]) / statistics.median(times["base"])
+        time_ratios = {index: statistics.median(samples["candidate"]) / statistics.median(samples["base"])
+                       for index, samples in times.items()}
         first, second = (statistics.median(memory[k]) for k in ("base_first", "base_second"))
         baseline_ratio = second / first
         memory_ratio = statistics.median(memory["candidate"]) / min(first, second)
         guard.write_bytes(modified)
-        print(json.dumps({"time_ms": times, "time_ratio": time_ratio, "memory": memory,
+        print(json.dumps({"time_ms": times, "time_ratios": time_ratios, "memory": memory,
                           "baseline_memory_ratio": baseline_ratio, "candidate_memory_ratio": memory_ratio}))
-        if time_ratio > 0.50 or not 0.95 <= baseline_ratio <= 1.05 or memory_ratio > 1.10:
+        if (time_ratios[0] > 0.50 or any(time_ratios[i] > 0.80 for i in (1, 7, 8))
+                or not 0.95 <= baseline_ratio <= 1.05 or memory_ratio > 1.10):
             raise SystemExit("fixture threshold missed")
 
 

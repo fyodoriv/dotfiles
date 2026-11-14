@@ -2,6 +2,17 @@
 use std::io::{self, Read};
 
 #[cfg(target_os = "macos")]
+fn send_receipt(value: u8) -> io::Result<()> {
+    // SAFETY: descriptor 3 is the caller's receipt pipe; value is valid for one byte.
+    if unsafe { libc::write(3, (&value as *const u8).cast(), 1) } != 1 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: descriptor 3 belongs to this process and is no longer needed.
+    if unsafe { libc::close(3) } != 0 { return Err(io::Error::last_os_error()); }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
 fn private_input(input: &[u8]) -> io::Result<(std::fs::File, std::ffi::CString)> {
     use std::io::{Seek, SeekFrom, Write};
     use std::os::fd::FromRawFd;
@@ -53,15 +64,22 @@ fn run() -> Result<i32, &'static str> {
     if args.next().is_some() { return Err("unexpected argument"); }
     if mode != "--check" && mode != "--exec" { return Err("unknown mode"); }
     if (mode == "--check") != guard.is_none() { return Err("invalid arguments"); }
+    #[cfg(not(target_os = "macos"))]
+    if mode == "--exec" { return Err("unsupported platform"); }
     let mut input = Vec::new();
     io::stdin().read_to_end(&mut input).map_err(|_| "input read failed")?;
-    if literal_status(&input) { return Ok(0); }
+    if literal_status(&input) {
+        #[cfg(target_os = "macos")]
+        if mode == "--exec" { send_receipt(b'A').map_err(|_| "receipt failed")?; }
+        return Ok(0);
+    }
     if mode == "--check" { return Ok(1); }
     #[cfg(target_os = "macos")]
     {
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
         let (file, _) = private_input(&input).map_err(|_| "fallback input failed")?;
+        send_receipt(b'F').map_err(|_| "receipt failed")?;
         let error = Command::new("/bin/bash").arg(guard.unwrap())
             .env("DOTFILES_NATIVE_GUARD_BYPASS", "1")
             .stdin(Stdio::from(file)).exec();
@@ -73,8 +91,10 @@ fn run() -> Result<i32, &'static str> {
 }
 
 fn main() {
+    let exec_mode = std::env::args_os().nth(1).is_some_and(|mode| mode == "--exec");
     match run() {
         Ok(status) => std::process::exit(status),
+        Err(_) if exec_mode => { eprintln!("BLOCKED: native guard could not complete safely."); std::process::exit(2); },
         Err(_) => std::process::exit(1),
     }
 }

@@ -81,6 +81,7 @@ Start:
                               a fresh doctor check. Same as \`dotfiles start\`.
   glove80 [<command>] [--yes]  Check or pair a Glove80 keyboard
   priority-native <command>  Install or roll back native app priority
+  hook-native <command>      Install or roll back the native status guard
   config [<key>]              Show every setting (value, source, allowed) or one
   config set <key> <value>    Check a value against config/settings.yaml and save it
   actions [<name>] [--json]   Every command for agents: usage, arguments, notes
@@ -210,6 +211,12 @@ case "$cmd" in
     # agent: install the offline native candidate or roll back to the shell on request.
     shift
     exec bash "$DOTFILES_DIR/bin/app-priority-native" "$@"
+    ;;
+
+  hook-native)
+    # agent: install the offline native status shortcut or restore the shell guard on request.
+    shift
+    exec bash "$DOTFILES_DIR/bin/hook-status-native" "$@"
     ;;
 
   config)

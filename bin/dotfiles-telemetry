@@ -137,7 +137,7 @@ TASK_NAMES="app-priority audit cleanup doctor git-maintain hotfix install mornin
 # Every command name a commands log line may carry: the dispatch arms of the
 # upstream bin/dotfiles. A fork's own arm is not here, so its name is never
 # sent. tests/telemetry.bats fails when an upstream arm is missing here.
-COMMAND_NAMES="actions add apply audit brew-add cd cheat config contribute defaults-add defaults-preview diff doctor edit enterprise glove80 h help init install leak managed memory metrics new-module plugin priority-native profile quickstart start stats status sync telemetry uninstall unmanage update upgrade v validate version"
+COMMAND_NAMES="actions add apply audit brew-add cd cheat config contribute defaults-add defaults-preview diff doctor edit enterprise glove80 h help hook-native init install leak managed memory metrics new-module plugin priority-native profile quickstart start stats status sync telemetry uninstall unmanage update upgrade v validate version"
 # app_version is the short SHA of the last commit this checkout shares with
 # this ref, so a local commit never makes a per-machine version.
 UPSTREAM_REF="origin/feat/chezmoi"

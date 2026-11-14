@@ -620,12 +620,10 @@ shell stats and rollback path until native delivery is qualified.
 - **Anchor:** `bin/app-priority`, the per-rule timing result, and Apple's
   taskpolicy source cited above.
 
-The candidate lives in `rust/app-priority`; it keeps the existing shell
-entry point and stats path untouched while its action and deployment parity
-remain open. `make check` builds and tests the Rust crate when `rust/`
-changes. A clean build or unit test alone does not qualify live activation.
-The candidate requires `--apply` and is not installed, so invoking the binary
-without that argument does not change process priority.
+At this trial stage, the candidate lived in `rust/app-priority` and was not
+installed. The later delivery result is recorded in
+[the native delivery plan](app-priority-native-delivery.md#hosted-result-and-installation).
+`make check` builds and tests the Rust crate when `rust/` changes.
 
 #### Full-command fixture with native-action simulation
 

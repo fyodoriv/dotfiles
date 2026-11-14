@@ -315,3 +315,23 @@ The fixed fixture omits custom configuration, live process selection, the
 normal stats path and process-identity guarantees. It is evidence to continue
 the port, not evidence that the production command is ready or faster in use.
 The full samples are in [run 43611732789](https://github.com/fyodoriv/dotfiles/actions/runs/43611732789).
+
+### Custom-list fixture parity
+
+Register before implementation. The live shell command accepts a custom
+priority-apps file; the Rust fixture currently refuses it.
+
+- **Hypothesis:** A fixture-only Rust implementation of that file's line,
+  comment, space and pattern routing preserves the shell's ordered mock
+  actions for the registered cases.
+- **Measurement:** On hosted Linux and macOS, compare both candidates with
+  fixed mock tools and custom lists covering an exact name, a pattern, blank
+  and comment lines, inline comments and spaces. Check an empty file too.
+- **Success:** Every case has identical ordered actions, stdout, stderr and
+  success status; the default fixture and modified-mock refusal still pass.
+  No real priority action runs.
+- **Pivot:** Any discrepancy rejects the change until fixed. These cases do
+  not qualify arbitrary bytes, system pgrep semantics, live identity, stats,
+  installation or in-use performance.
+- **Anchor:** `bin/app-priority` custom-config branch and the fixture result
+  above; Basili et al. (1994) and Munafò et al. (2017).

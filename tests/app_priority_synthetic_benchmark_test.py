@@ -1,8 +1,10 @@
 """Safety checks for the fixture benchmark without starting a process."""
 
 import importlib.util
+import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,6 +17,18 @@ SPEC.loader.exec_module(benchmark)
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_workflow_cancels_only_superseded_pull_request_runs(self):
+        workflow = SCRIPT.parents[1] / ".github/workflows/app-priority-fixture.yml"
+        data = subprocess.check_output([
+            "ruby", "-rjson", "-ryaml", "-e",
+            "puts JSON.dump(YAML.load_file(ARGV.fetch(0)))", str(workflow)
+        ], text=True)
+        concurrency = json.loads(data).get("concurrency")
+        self.assertEqual(concurrency, {
+            "group": "app-priority-fixture-${{ github.event.pull_request.number || github.run_id }}",
+            "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+        })
+
     def test_only_hosted_macos_is_admitted(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(benchmark.hosted())

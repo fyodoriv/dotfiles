@@ -173,7 +173,7 @@ by this session and were canceled while still queued.
 - **Measurement:** Run the focused workflow configuration test before and
   after adding the group, then verify the changed workflow in hosted CI.
 - **Success:** The configuration test fails on the missing group and passes
-  after the change; the group uses the pull-request number or ref, and
+  after the change; the group uses the pull-request number or unique run ID, and
   `cancel-in-progress` is true only for pull-request events.
 - **Pivot:** If a manual control can share a cancellation group with another
   manual run, or the configuration cannot be parsed, do not enable automatic

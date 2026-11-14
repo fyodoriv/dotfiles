@@ -362,6 +362,125 @@ pairs, but missed the ratio: baseline median 276.73 ms, candidate median
 188.20 ms, ratio 0.680. The registered pivot rejects this candidate. See
 [run 43612749087](https://github.com/fyodoriv/dotfiles/actions/runs/43612749087).
 
+### Native lookup in the Rust command
+
+Register before implementation. The Rust command with per-rule `pgrep`
+and simulated native actions missed its full-fixture timing target. The
+separate native selection probe met its narrower selection target. Integrate
+that process source per rule, retain POSIX matching and ancestor exclusions,
+and recheck process identity and the match before acting.
+
+- **Hypothesis:** Per-rule native selection and native actions preserve the
+  shell's decisions and action order while reaching the registered 0.40 ratio.
+- **Measurement:** Compare controlled process selection with `pgrep`, run
+  action-parity tests with injected actions, and compare 30 hosted macOS
+  pairs on the existing fixed fixture. Build and test through hosted CI.
+- **Success:** All controlled selections and ordered actions match; no
+  unintended priority action occurs; candidate/base median is at most 0.40
+  and candidate median at most 400 ms. Build, resource, identity and rollback
+  gates pass before any live switch.
+- **Pivot:** A mismatch, incomplete scan, unsafe identity, failed resource
+  bound or missed timing target keeps the installed shell command active.
+  A pre-action identity check cannot make a PID-based syscall atomic; do not
+  describe it as eliminating PID reuse or as proof of in-use benefit.
+- **Anchor:** the native selector and full-command fixture results above,
+  and the existing action-parity contract in `tests/app-priority.bats`.
+
+The uninstalled Rust candidate now uses the native process source per rule,
+falls back to `pgrep` when lookup fails, and rechecks a start-time identity
+and the current match before each priority operation. Its controlled-child
+test compares the selected PID order with `pgrep`. A start-time check is not
+an atomic process handle. General process-table parity, executable identity,
+permission behavior, timing and offline delivery remain open.
+
+#### Full command with owned processes
+
+Register before implementation. The fixed mock process table cannot exercise
+the native process source. Compare the whole default rule path against real,
+short-lived owned children on a hosted macOS runner. Mock both commands'
+priority actions; no actual priority change is permitted.
+
+- **Hypothesis:** Native per-rule lookup and simulated actions preserve the
+  shell's ordered decisions and meet the 0.40 full-command ratio.
+- **Measurement:** Start owned children with the default target names and
+  argument shapes. Run 30 alternating baseline and candidate pairs. Record
+  only fixed labels, action counts and elapsed times, never raw process IDs or
+  arguments. Close and wait for all children. No non-child may appear in an
+  action log; unknown targets fail the check.
+- **Success:** All 30 ordered action logs match, every target is an owned
+  child, all children exit, the candidate/base median is at most 0.40 and
+  the candidate median is at most 400 ms. No real priority action occurs.
+- **Pivot:** A mismatch, unknown target, missing pair, cleanup failure or
+  failed timing rejects this candidate. Matching these owned children does
+  not establish parity for all processes, atomic PID identity, real priority
+  effects, offline installation, stats or in-use benefit.
+- **Anchor:** the native lookup and full-command fixture results above.
+
+The hosted macOS comparison at candidate `5c5bcb8` completed 30 pairs with
+the same 10 ordered actions per pair, only owned child targets, and clean
+child exits. The shell median was 744.34 ms; the Rust median was 250.78 ms,
+ratio 0.337. The actions were simulated, so this is not evidence of real
+priority effects or in-use benefit. See
+[run 43618342224](https://github.com/fyodoriv/dotfiles/actions/runs/43618342224).
+
+#### Priority parity on owned target children
+
+Register before implementation. Self-child checks cannot establish the
+cross-process `-p` behavior used by the command.
+
+- **Hypothesis:** Native operations match `taskpolicy -b` and
+  `taskpolicy -B -t 0 -l 0` on separately owned child targets.
+- **Measurement:** On hosted macOS, retain each direct child handle without
+  waiting or reaping until all operations and observations finish. Apply the
+  reference and native operations to separate children, then compare the
+  background and QoS fields. Close their input pipes and wait for both. The
+  retained child PID cannot be reused before it is reaped. No process group
+  is signaled and no unowned PID is targeted; log only fixed labels and
+  numeric outcomes.
+- **Success:** Both actions and observations succeed, states match, and both
+  children exit. Hosted CI passes.
+- **Pivot:** Missing permissions, a changed state, failed observation or
+  cleanup error is inconclusive or rejects the candidate. Keep the live
+  command unchanged. This does not prove arbitrary-PID permissions or atomic
+  identity at runtime; `renice`, stats and offline delivery remain open.
+- **Anchor:** the self-child result and Apple's taskpolicy source above.
+
+The first hosted attempt could not read the reference child's policy through
+an externally acquired task port. The next control has each retained child
+report its own policy after the parent applies the action. It still targets
+only unreaped owned children and reports no process identifiers.
+
+That control found a foreground QoS difference: the reference child reported
+tiers 16711681 and 16646145, while the native child reported 0 and 0. The next
+owned-child run reports only the numeric task-port and policy-call results to
+distinguish a call failure from an observer issue. The candidate remains
+inactive; an error code alone does not establish its cause.
+
+The diagnostic returned 0 for the task-name lookup and 4 for the native QoS
+policy call; the reference child still received the requested tiers. The
+installed macOS `taskpolicy` binary carries an Apple-private task-policy
+entitlement, but the error code alone does not prove why the native call
+failed. Retain `taskpolicy` for foreground QoS, and keep native background
+and nice operations. The owned-child parity check must pass before deployment.
+The full-command fixture must include the retained mock `taskpolicy` process
+and still meet the unchanged 0.40 ratio; otherwise reject the candidate.
+
+With that wrapper, the hosted cross-process test matched the reference for
+background and foreground QoS on retained owned children. Two earlier
+self-process assertions are not equivalent: they mixed self and external
+policy scopes. The retained cross-process check covers the command's actual
+target scope. It also compares nice values after both a lowering and a
+potentially denied priority increase. The expected result is zero differing
+nice values; any mismatch rejects the candidate. Other PIDs remain unqualified.
+
+The hosted owned-child check passed both cross-process QoS states and both
+nice-value comparisons in [run 43619395440](https://github.com/fyodoriv/dotfiles/actions/runs/43619395440).
+With foreground `taskpolicy` retained, the hosted full-command fixture also
+preserved all ten actions over 30 pairs. Baseline median was 448.30 ms;
+candidate median was 144.54 ms, ratio 0.322. Actions were simulated in that
+timing run; it does not establish real in-use speed. See
+[run 43619190003](https://github.com/fyodoriv/dotfiles/actions/runs/43619190003).
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

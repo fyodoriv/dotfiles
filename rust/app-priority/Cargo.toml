@@ -3,3 +3,10 @@ name = "dotfiles-app-priority"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+[features]
+fixture-actions = []
+
+[dependencies]
+libc = "=0.2.191"
+sysinfo = { version = "=0.40.1", default-features = false, features = ["system"] }

@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 mod platform;
+#[cfg(target_os = "macos")]
+mod selector;
 
 trait Backend {
     fn find(&mut self, query: &OsStr, full: bool) -> Vec<u32>;
@@ -13,9 +15,22 @@ trait Backend {
     fn nice(&mut self, pid: u32, value: i32);
 }
 
-struct System;
+#[derive(Default)]
+struct System {
+    #[cfg(target_os = "macos")]
+    identities: Option<(std::collections::BTreeMap<u32, selector::Identity>, std::ffi::OsString, bool)>,
+}
 impl Backend for System {
     fn find(&mut self, query: &OsStr, full: bool) -> Vec<u32> {
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(found) = selector::find(query, full) {
+                let pids = found.keys().copied().collect();
+                self.identities = Some((found, query.to_owned(), full));
+                return pids;
+            }
+            self.identities = None;
+        }
         Command::new("pgrep").arg(if full { "-f" } else { "-x" }).arg(query)
             .stdin(Stdio::null()).stderr(Stdio::null()).output().ok()
             .map(|out| out.stdout.split(|b| *b == b'\n')
@@ -27,8 +42,22 @@ impl Backend for System {
             .stdin(Stdio::null()).stderr(Stdio::null()).output()
             .map(|out| out.stdout).unwrap_or_default()
     }
-    fn background(&mut self, pid: u32, enabled: bool) { platform::background(pid, enabled); }
-    fn nice(&mut self, pid: u32, value: i32) { platform::nice(pid, value); }
+    fn background(&mut self, pid: u32, enabled: bool) {
+        if self.current(pid) { platform::background(pid, enabled); }
+    }
+    fn nice(&mut self, pid: u32, value: i32) {
+        if self.current(pid) { platform::nice(pid, value); }
+    }
+}
+impl System {
+    fn current(&self, pid: u32) -> bool {
+        #[cfg(target_os = "macos")]
+        if let Some((identities, query, full)) = &self.identities {
+            return identities.get(&pid).is_some_and(|identity| selector::same(pid, *identity, query, *full));
+        }
+        let _ = pid;
+        true
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -99,7 +128,7 @@ fn run() -> std::io::Result<()> {
     let config = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty())
         .map(PathBuf::from).unwrap_or_else(|| PathBuf::from(home).join(".config"))
         .join("dotfiles/priority-apps.txt");
-    let mut backend = System;
+    let mut backend = System::default();
     if config.is_file() { custom(&mut backend, &std::fs::read(config)?); }
     else { defaults(&mut backend); }
     Ok(())
@@ -109,6 +138,9 @@ fn main() {
     if !cfg!(target_os = "macos") || std::env::args_os().nth(1).as_deref() != Some(OsStr::new("--apply")) {
         std::process::exit(2);
     }
+    #[cfg(target_os = "macos")]
+    // SAFETY: set the process locale before the single-threaded command starts.
+    unsafe { libc::setlocale(libc::LC_ALL, b"\0".as_ptr().cast()); }
     if run().is_err() { std::process::exit(1); }
 }
 
@@ -179,9 +211,6 @@ mod tests {
             platform::background(pid, true);
             // SAFETY: who=0 queries this child, not another process.
             assert!(unsafe { getpriority(4, 0) } > 0);
-            platform::background(pid, false);
-            // SAFETY: who=0 queries this child, not another process.
-            assert_eq!(unsafe { getpriority(4, 0) }, 0);
             return;
         }
         let status = Command::new(std::env::current_exe().unwrap())
@@ -192,51 +221,96 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn native_policy_matches_taskpolicy_on_owned_children() {
-        const CHILD: &str = "DOTFILES_PRIORITY_PARITY_CHILD";
-        if let Ok(mode) = std::env::var(CHILD) {
-            unsafe extern "C" {
-                static mach_task_self_: u32;
-                fn getpriority(which: i32, who: u32) -> i32;
-                fn task_policy_get(task: u32, flavor: i32, policy: *mut i32,
-                    count: *mut u32, get_default: *mut i32) -> i32;
-            }
-            if mode == "native-background" { platform::background(std::process::id(), true); }
-            if mode == "native-foreground" { platform::background(std::process::id(), false); }
-            let mut qos = [0i32; 2];
-            let mut count = 2u32;
-            let mut get_default = 0i32;
-            // SAFETY: all output pointers refer to valid local storage for this child.
-            let result = unsafe { task_policy_get(mach_task_self_, 9, qos.as_mut_ptr(), &mut count, &mut get_default) };
-            // SAFETY: who=0 queries only this child.
+    fn priority_action_child() {
+        use std::io::{BufRead, Write};
+        if std::env::var_os("DOTFILES_ACTION_CHILD").is_none() { return; }
+        unsafe extern "C" {
+            static mach_task_self_: u32;
+            fn getpriority(which: i32, who: u32) -> i32;
+            fn task_policy_get(task: u32, flavor: i32, policy: *mut i32,
+                count: *mut u32, get_default: *mut i32) -> i32;
+        }
+        println!("POLICY_READY");
+        std::io::stdout().flush().unwrap();
+        for line in std::io::stdin().lock().lines() {
+            assert_eq!(line.unwrap(), "state");
+            let mut qos = [0; 2];
+            let mut count = 2;
+            let mut default = 0;
+            // SAFETY: the output pointers are valid and both queries target this child.
+            let status = unsafe { task_policy_get(mach_task_self_, 9, qos.as_mut_ptr(), &mut count, &mut default) };
             let background = unsafe { getpriority(4, 0) };
-            println!("OBS {result},{count},{background}");
-            assert_eq!(result, 0);
-            assert_eq!(count, 2);
-            println!("STATE {background},{},{},{get_default}", qos[0], qos[1]);
-            return;
+            assert!(status == 0 && count == 2 && background >= 0);
+            println!("POLICY_STATE {background},{},{},{default}", qos[0], qos[1]);
+            std::io::stdout().flush().unwrap();
         }
-        let exe = std::env::current_exe().unwrap();
-        for (mode, args) in [("background", vec!["-b"]), ("foreground", vec!["-t", "0", "-l", "0"])] {
-            let test_args = ["--exact", "tests::native_policy_matches_taskpolicy_on_owned_children", "--nocapture"];
-            let reference = Command::new("/usr/sbin/taskpolicy").args(args).arg(&exe).args(test_args)
-                .env(CHILD, "reference").stdin(Stdio::null()).output().unwrap();
-            let native = Command::new(&exe).args(test_args).env(CHILD, format!("native-{mode}"))
-                .stdin(Stdio::null()).output().unwrap();
-            let extract = |out: &[u8]| -> String {
-                let text = String::from_utf8(out.to_vec()).unwrap();
-                text.lines().find_map(|line| line.split_once("STATE ").map(|(_, s)| s.to_owned())).unwrap()
-            };
-            let observation = |out: &[u8]| -> String {
-                let text = String::from_utf8_lossy(out);
-                text.lines().find_map(|line| line.split_once("OBS ").map(|(_, s)| s.to_owned()))
-                    .unwrap_or_else(|| "missing".into())
-            };
-            assert!(reference.status.success(), "reference {mode} failed: exit={:?} observation={}",
-                reference.status.code(), observation(&reference.stdout));
-            assert!(native.status.success(), "native {mode} failed: exit={:?} observation={}",
-                native.status.code(), observation(&native.stdout));
-            assert_eq!(extract(&reference.stdout), extract(&native.stdout), "{mode} policy differs");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn cross_process_policy_matches_on_owned_children() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::process::{Child, ChildStdout};
+        unsafe extern "C" { fn getpriority(which: i32, who: u32) -> i32; }
+        struct ChildOwner { child: Child, output: BufReader<ChildStdout> }
+        impl ChildOwner {
+            fn spawn() -> Self {
+                let mut child = Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "tests::priority_action_child", "--nocapture"])
+                    .env("DOTFILES_ACTION_CHILD", "1").stdin(Stdio::piped())
+                    .stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+                let mut output = BufReader::new(child.stdout.take().unwrap());
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    assert!(output.read_line(&mut line).unwrap() > 0, "owned child did not start");
+                    if line.contains("POLICY_READY") { break; }
+                }
+                Self { child, output }
+            }
+            fn state(&mut self) -> String {
+                let input = self.child.stdin.as_mut().unwrap();
+                input.write_all(b"state\n").unwrap();
+                input.flush().unwrap();
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    assert!(self.output.read_line(&mut line).unwrap() > 0, "owned child state unavailable");
+                    if let Some((_, state)) = line.split_once("POLICY_STATE ") { return state.trim().to_owned(); }
+                }
+            }
+            fn finish(mut self) -> bool {
+                self.child.stdin.take();
+                self.child.wait().is_ok_and(|status| status.success())
+            }
         }
+        impl Drop for ChildOwner {
+            fn drop(&mut self) { self.child.stdin.take(); let _ = self.child.wait(); }
+        }
+        let mut reference = ChildOwner::spawn();
+        let mut native = ChildOwner::spawn();
+        let reference_pid = reference.child.id();
+        let native_pid = native.child.id();
+        for (args, enabled) in [(vec!["-b"], true), (vec!["-B", "-t", "0", "-l", "0"], false)] {
+            let status = Command::new("/usr/sbin/taskpolicy").args(args).args(["-p", &reference_pid.to_string()])
+                .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().unwrap();
+            assert!(status.success(), "reference action failed");
+            platform::background(native_pid, enabled);
+            let expected = reference.state();
+            let actual = native.state();
+            assert_eq!(expected, actual, "owned child policy differs");
+        }
+        for value in [19, 10] {
+            let _ = Command::new("/usr/bin/renice").args([&value.to_string(), "-p", &reference_pid.to_string()])
+                .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().unwrap();
+            platform::nice(native_pid, value);
+            // SAFETY: both PIDs are owned children retained without reaping.
+            let expected = unsafe { getpriority(0, reference_pid) };
+            let actual = unsafe { getpriority(0, native_pid) };
+            assert!(expected >= 0 && actual >= 0, "nice state unavailable");
+            assert_eq!(expected, actual, "owned child nice value differs");
+        }
+        assert!(reference.finish());
+        assert!(native.finish());
     }
 }

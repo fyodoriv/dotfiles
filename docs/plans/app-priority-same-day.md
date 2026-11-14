@@ -180,3 +180,19 @@ by this session and were canceled while still queued.
   cancellation. The test verifies configuration, not GitHub scheduling.
 - **Anchor:** `.github/workflows/ci.yml` concurrency policy and the three
   observed superseded fixture jobs.
+
+### Hosted Linux preflight
+
+The macOS jobs are queued. Before running any additional fixture, register a
+Linux preflight on a GitHub-hosted runner. It uses the same fake processes and
+mock priority commands; it does not replace the macOS tests or timing.
+
+- **Hypothesis:** The duplicate-action regression reproduces on hosted Linux
+  and the corrected selector preserves the fixed action log there.
+- **Measurement:** Run the exact hosted fixture unit tests on the first and
+  corrected candidates in separate GitHub-hosted Linux jobs.
+- **Success:** The first candidate fails the duplicate-action case; the
+  corrected candidate passes all fixture cases with no real priority action.
+- **Pivot:** A setup or unrelated failure is inconclusive; inspect its log.
+  Linux results do not qualify macOS semantics, timing or process identity.
+- **Anchor:** the duplicate grouped ID control above and the hosted fixture.

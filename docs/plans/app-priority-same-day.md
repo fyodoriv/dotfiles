@@ -213,3 +213,24 @@ preflight before running it; it checks the comparison path, not Mac speed.
   passing result leave the control inconclusive. Linux evidence does not
   replace the registered macOS control, candidate timing, or identity gate.
 - **Anchor:** the same-source negative control and hosted Linux preflight above.
+
+### Linux candidate preflight
+
+The Linux same-source preflight completed 30 pairs with identical fixture
+actions. Its median ratio was 1.0003, so it correctly rejected a 0.40
+threshold. The macOS control remains required and queued.
+
+Register the candidate preflight before measuring it:
+
+- **Hypothesis:** The fixture-only batched candidate preserves all ordered
+  actions and has median candidate/base ratio at most 0.40 on hosted Linux.
+- **Measurement:** Run 30 alternating mocked pairs for the reviewed baseline
+  and fixture-candidate commits on a GitHub-hosted Linux runner. Record all
+  elapsed times and the ratio. No real priority action is allowed.
+- **Success:** All 30 pairs preserve the fixed action log, the ratio is at
+  most 0.40, and the candidate median is at most 400 ms.
+- **Pivot:** A failed action, missing pair, setup error, ratio above 0.40 or
+  median above 400 ms is a failure of this preflight. Linux does not decide
+  macOS performance, production identity safety, or in-use benefit.
+- **Anchor:** the registered fixture-only candidate and Linux comparison
+  preflight above.

@@ -256,3 +256,27 @@ Register the next candidate before implementation:
   unchanged. Linux timing and fixture regexes do not prove Darwin parity,
   process identity or in-use benefit.
 - **Anchor:** the Linux candidate preflight and snapshot prediction above.
+
+### Fixture-only Rust selector
+
+The pattern-batching shell candidate preserved the mock actions in 30 hosted
+macOS pairs but failed the registered speed limit: baseline median 181.30 ms,
+candidate 112.30 ms, ratio 0.619. It is not eligible for live use. Register
+the following before implementing or measuring a Rust candidate.
+
+- **Hypothesis:** A Rust selector for the fixed default fixture, using the
+  existing mock process and priority interfaces, preserves every ordered
+  action and reaches a median candidate/base ratio at most 0.40.
+- **Measurement:** Compile the reviewed candidate on a hosted runner and
+  compare it with the pinned shell baseline in 30 alternating mock-action
+  pairs. Record both medians, all samples and the ordered-action result.
+  Run hosted fixture controls and normal CI. No real priority action runs.
+- **Success:** All 30 pairs and fixture controls pass, the macOS ratio is at
+  most 0.40, and the candidate median is at most 400 ms.
+- **Pivot:** Any changed action, unsafe execution, missing sample or failed
+  threshold rejects the candidate. Keep the live command unchanged. A
+  fixture pass does not qualify custom configuration, Darwin process
+  selection, process identity, installed binaries or in-use benefit; those
+  need separate evidence before deployment.
+- **Anchor:** the controlled fallback above and the macOS comparison in
+  [run 43609622748](https://github.com/fyodoriv/dotfiles/actions/runs/43609622748).

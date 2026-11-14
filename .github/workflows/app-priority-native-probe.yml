@@ -1,0 +1,34 @@
+name: App priority native selection probe
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - scripts/app-priority-native-probe/**
+      - .github/workflows/app-priority-native-probe.yml
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Check parity or measure selection
+        type: choice
+        options: [check, measure]
+        default: check
+
+permissions:
+  contents: read
+
+jobs:
+  native-probe:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build reviewed native probe
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run cargo build --locked --release --manifest-path scripts/app-priority-native-probe/Cargo.toml
+      - name: Compare controlled process selection
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run scripts/app-priority-native-probe/target/release/app-priority-native-probe
+      - name: Measure controlled process selection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'measure' }}
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure

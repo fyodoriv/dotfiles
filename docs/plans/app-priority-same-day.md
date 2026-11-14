@@ -100,3 +100,33 @@ The hosted job archives the specified commits into its private runner
 temporary directory, runs the registered 30 pairs through `heavy-run
 --exclusive`, and fails if the action parity or numeric thresholds fail.
 It does not establish process selection outside the fixed fixture.
+
+## Fixture-only batched-selector candidate
+
+Register before implementation. The live `bin/app-priority` is not modified
+by this experiment. A candidate will live under `scripts/` and will be copied
+into a disposable hosted candidate tree only for the fixed fixture.
+
+- **Hypothesis:** One `pgrep -l -x` query for the fixed default exact names
+  can preserve the registered fixture's ordered actions while cutting its
+  median runtime to at most 40% of the old command and at most 400 ms.
+- **Measurement:** After the same-source negative control validates the
+  decision, compare the reviewed baseline and candidate in 30 alternating
+  hosted pairs. Extend the existing mock to return the same frozen fake
+  processes for the grouped query; do not change the expected actions. Run
+  existing hosted checks and fixture tests.
+- **Success:** All 30 pairs finish, all expected actions and output match,
+  no real process receives a priority change, and both registered timing
+  limits pass. The live command and its installer remain unchanged.
+- **Pivot:** A mismatch, missing sample, invalid batch output, unsafe mock
+  boundary or failed numeric threshold rejects this candidate. Even if the
+  fixture passes, earlier process discovery can age a PID before an action.
+  Do not deploy until a separately reviewed design preserves identity and
+  live selection semantics; unresolved identity keeps the old command.
+- **Anchor:** [snapshot prediction](app-priority-snapshot-prediction.md),
+  [same-day fallback](app-priority-same-day.md#baseline-result-and-same-day-pivot),
+  Basili et al. (1994), GQM, and Munafò et al. (2017), preregistration.
+
+This changes the order of source preparation only. It does not waive the
+snapshot prediction's identity or parity requirements for deployment, and a
+fixture result is not evidence of behavior on a changing process table.

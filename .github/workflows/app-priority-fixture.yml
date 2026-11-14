@@ -53,6 +53,21 @@ on:
         required: false
         type: boolean
         default: false
+      delivery_check:
+        description: Test native installation and rollback
+        required: false
+        type: boolean
+        default: false
+      memory_comparison:
+        description: Compare peak memory on owned processes
+        required: false
+        type: boolean
+        default: false
+      without_legacy:
+        description: Remove the old priority rules from the scratch candidate
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -62,8 +77,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  delivery-check:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.delivery_check }}
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install test tools
+        run: brew install bats-core jq
+      - name: Test installation and rollback
+        run: |
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/app-priority-native.bats
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats -f 'README CLI reference|every task name' tests/dotfiles-actions.bats tests/telemetry.bats
+      - name: Build, install and roll back in a scratch home
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+          export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+          export HOME="$RUNNER_TEMP/priority-install-home"
+          export XDG_DATA_HOME="$HOME/data"
+          mkdir -p "$HOME"
+          ./bin/app-priority-native install
+          test -L "$XDG_DATA_HOME/dotfiles/native/app-priority/current"
+          ./bin/app-priority-native rollback
+          test ! -L "$XDG_DATA_HOME/dotfiles/native/app-priority/current"
   owned-comparison:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.owned_comparison }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.owned_comparison || inputs.memory_comparison) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -75,6 +115,8 @@ jobs:
         env:
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          MEMORY_COMPARISON: ${{ inputs.memory_comparison }}
+          WITHOUT_LEGACY: ${{ inputs.without_legacy }}
         run: |
           for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
             case "$sha" in ''|*[!0-9a-f]*) exit 2 ;; esac
@@ -89,8 +131,14 @@ jobs:
           git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
           (cd "$candidate/rust" && "$GITHUB_WORKSPACE/bin/heavy-run" cargo build --locked --offline --release --features fixture-actions --target-dir "$target" --manifest-path app-priority/Cargo.toml)
           ./bin/heavy-run cargo build --locked --release --target-dir "$target" --manifest-path "$candidate/scripts/app-priority-native-probe/Cargo.toml"
-          printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
-          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
+          if [ -f "$candidate/bin/app-priority-native" ]; then
+            extra=()
+            if [ "$MEMORY_COMPARISON" = true ]; then extra+=(--memory); fi
+            APP_PRIORITY_WITHOUT_LEGACY="$([ "$WITHOUT_LEGACY" = true ] && printf 1 || printf 0)" APP_PRIORITY_DELIVERY_BINARY="$target/release/dotfiles-app-priority" PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 "$candidate/scripts/app-priority-owned-benchmark.py" --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe" "${extra[@]}"
+          else
+            printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
+            PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
+          fi
   rust-command:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_command_check }}
     runs-on: macos-latest
@@ -122,7 +170,7 @@ jobs:
       - name: Compare and measure controlled process selection
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure
   linux-fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check && !inputs.memory_comparison) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -178,7 +226,7 @@ jobs:
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
 
   fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check && !inputs.memory_comparison) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

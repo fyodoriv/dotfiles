@@ -1,0 +1,66 @@
+#!/bin/bash
+# Install or roll back the native app-priority candidate.
+# Usage:
+#   dotfiles priority-native install   Build offline and enable native dispatch
+#   dotfiles priority-native rollback  Restore the shell dispatch
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+directory="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/app-priority"
+
+case "${1:-}" in
+  --help|-h) echo 'Usage: dotfiles priority-native install|rollback'; exit 0 ;;
+  install)
+    [ "$(uname -s)" = Darwin ] || { echo 'app-priority-native: macOS required' >&2; exit 1; }
+    (cd "$root/rust" && "$root/bin/heavy-run" cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml)
+    source_file="$root/rust/app-priority/target/release/dotfiles-app-priority"
+    [ -f "$source_file" ] && [ -x "$source_file" ] || { echo 'app-priority-native: build did not produce an executable' >&2; exit 1; }
+    mkdir -p "$directory"
+    if [ -e "$directory/current" ] && [ ! -L "$directory/current" ]; then
+      echo 'app-priority-native: refusing to replace an unowned file' >&2
+      exit 1
+    fi
+    if [ -L "$directory/current" ]; then
+      current_target="$(readlink "$directory/current")"
+      if [[ ! "$current_target" =~ ^app-priority-[0-9a-f]{64}$ ]] || [ -d "$directory/current" ]; then
+        echo 'app-priority-native: refusing to replace an unowned link' >&2
+        exit 1
+      fi
+    fi
+    temporary="$(mktemp "$directory/.binary.XXXXXXXX")"
+    link_temp=""
+    trap 'rm -f "$temporary" ${link_temp:+"$link_temp"}' EXIT
+    cp "$source_file" "$temporary"
+    chmod 700 "$temporary"
+    source_hash="$(shasum -a 256 "$source_file" | cut -d' ' -f1)"
+    copy_hash="$(shasum -a 256 "$temporary" | cut -d' ' -f1)"
+    [ "$source_hash" = "$copy_hash" ] || { echo 'app-priority-native: copy integrity check failed' >&2; exit 1; }
+    destination="app-priority-$copy_hash"
+    if [ -L "$directory/$destination" ] || { [ -e "$directory/$destination" ] && [ ! -f "$directory/$destination" ]; }; then
+      echo 'app-priority-native: refusing to replace an unowned artifact' >&2
+      exit 1
+    fi
+    mv -f "$temporary" "$directory/$destination"
+    link_temp="$(mktemp "$directory/.current.XXXXXXXX")"
+    rm -f "$link_temp"
+    ln -s "$destination" "$link_temp"
+    mv -f "$link_temp" "$directory/current"
+    echo 'Native app-priority installed.'
+    ;;
+  rollback)
+    if [ -L "$directory/current" ]; then
+      target="$(readlink "$directory/current")"
+      if [[ "$target" =~ ^app-priority-[0-9a-f]{64}$ ]]; then
+        rm "$directory/current"
+      else
+        echo 'app-priority-native: refusing to remove an unowned link' >&2
+        exit 1
+      fi
+    elif [ -e "$directory/current" ]; then
+      echo 'app-priority-native: refusing to remove an unowned file' >&2
+      exit 1
+    fi
+    echo 'Shell app-priority restored.'
+    ;;
+  *) echo 'Usage: app-priority-native install|rollback' >&2; exit 2 ;;
+esac

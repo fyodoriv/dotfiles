@@ -473,6 +473,10 @@ foreground child can compare `-t 0 -l 0` without `-B`; the native
 background-to-foreground transition has a separate self-child check. Neither
 establishes `-B` parity for an arbitrary other process.
 
+The corrected hosted self-child checks passed for background state and the
+fresh-foreground QoS fields in [run 43616587099](https://github.com/fyodoriv/dotfiles/actions/runs/43616587099).
+They do not establish permissions, effects or identity safety for other PIDs.
+
 ### Rust priority command with existing lookup
 
 Register before implementation. Keep per-rule `pgrep` and ancestry `ps`
@@ -501,3 +505,5 @@ The candidate lives in `rust/app-priority`; it keeps the existing shell
 entry point and stats path untouched while its action and deployment parity
 remain open. `make check` builds and tests the Rust crate when `rust/`
 changes. A clean build or unit test alone does not qualify live activation.
+The candidate requires `--apply` and is not installed, so invoking the binary
+without that argument does not change process priority.

@@ -69,6 +69,9 @@ jobs:
         run: |
           ./bin/heavy-run cargo test --locked --manifest-path rust/app-priority/Cargo.toml
           ./bin/heavy-run cargo build --locked --release --manifest-path rust/app-priority/Cargo.toml
+          status=0
+          rust/app-priority/target/release/dotfiles-app-priority || status=$?
+          [ "$status" -eq 2 ]
   native-probe:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_probe }}
     runs-on: macos-latest

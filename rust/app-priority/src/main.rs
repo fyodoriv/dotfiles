@@ -106,7 +106,10 @@ fn run() -> std::io::Result<()> {
 }
 
 fn main() {
-    if !cfg!(target_os = "macos") || run().is_err() { std::process::exit(1); }
+    if !cfg!(target_os = "macos") || std::env::args_os().nth(1).as_deref() != Some(OsStr::new("--apply")) {
+        std::process::exit(2);
+    }
+    if run().is_err() { std::process::exit(1); }
 }
 
 #[cfg(test)]

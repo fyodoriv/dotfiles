@@ -15,12 +15,12 @@ start_ms=$(clock_ms) || start_ms=""
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
 
 finish_priority_run() {
-  local outcome="${1:-ok}" end_ms
+  local outcome="${1:-ok}" runtime="${2:-shell}" end_ms
   end_ms=$(clock_ms) || end_ms=""
   if [[ "$start_ms" =~ ^[0-9]{1,12}$ && "$end_ms" =~ ^[0-9]{1,12}$ ]] && (( end_ms >= start_ms && end_ms - start_ms <= 9999999999 )); then
-    log_run app-priority 1 "$outcome" "$((end_ms - start_ms))" "" monotonic-ms
+    log_run app-priority 1 "$outcome" "$((end_ms - start_ms))" "" monotonic-ms "$runtime"
   else
-    log_run app-priority 1 "$outcome"
+    log_run app-priority 1 "$outcome" "" "" "" "$runtime"
   fi
 }
 
@@ -37,7 +37,7 @@ if [ -L "$native_dir/current" ]; then
     if [ "$native_hash" = "${native_name#app-priority-}" ]; then
       native_status=0
       "$native_dir/$native_name" --apply || native_status=$?
-      if [ "$native_status" -eq 0 ]; then finish_priority_run ok; else finish_priority_run error; fi
+      if [ "$native_status" -eq 0 ]; then finish_priority_run ok rust; else finish_priority_run error rust; fi
       exit "$native_status"
     fi
   fi

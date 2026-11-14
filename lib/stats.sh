@@ -41,6 +41,7 @@ _task_estimate() {
 #       times 1000, which is the script run time when log_run runs at the end.
 #   $5  failing-check count (optional). Written as "fail":N when it is a number.
 #   $6  timing source (optional). Only the known monotonic clock is recorded.
+#   $7  runtime (optional). Only `rust` or `shell` is recorded.
 #
 # Side effects: appends one JSONL line to $DOTFILES_STATS_FILE (off when
 # DOTFILES_STATS_LOG=0; the Makefile and tests/test_helper.bash set it)
@@ -79,6 +80,8 @@ log_run() {
   [[ "$fail" =~ ^[0-9]{1,6}$ ]] && fail_field=",\"fail\":$fail"
   local timing_field=""
   [ "$duration_valid" = 1 ] && [ -n "${4:-}" ] && [ "${6:-}" = monotonic-ms ] && timing_field=',"timing_source":"monotonic-ms"'
+  local runtime_field=""
+  case "${7:-}" in rust|shell) runtime_field=",\"runtime\":\"$7\"" ;; esac
   local estimate
   estimate="$(_task_estimate "$task")"
   local seconds_saved=$((estimate * units))
@@ -90,7 +93,7 @@ log_run() {
   fi
   # Suppress write errors AND swallow the non-zero exit so a read-only
   # or full stats file never aborts the calling automation script.
-  if ! echo "{\"task\":\"$task\",\"timestamp\":\"$timestamp\",\"seconds_saved\":$seconds_saved,\"units\":$units,\"ok\":$ok,\"duration_ms\":$duration_ms$fail_field$timing_field}" \
+  if ! echo "{\"task\":\"$task\",\"timestamp\":\"$timestamp\",\"seconds_saved\":$seconds_saved,\"units\":$units,\"ok\":$ok,\"duration_ms\":$duration_ms$fail_field$timing_field$runtime_field}" \
         >> "$DOTFILES_STATS_FILE" 2>/dev/null; then
     echo "⚠ stats: cannot write to $DOTFILES_STATS_FILE" >&2
     return 0

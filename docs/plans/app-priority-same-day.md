@@ -527,3 +527,9 @@ lines instead of touching priorities; the release backend is unchanged.
   actions do not establish real syscall cost, cross-process parity, identity,
   installation, stats or in-use benefit.
 - **Anchor:** the Rust command prediction and controlled fallback above.
+
+The hosted macOS run at candidate `4984d5a` preserved all fixed actions but
+missed the timing limit: baseline median 182.59 ms, candidate median 81.73 ms,
+ratio 0.448. The registered pivot rejects this lookup-and-action combination.
+The simulated actions do not establish live syscall cost or behavior. See
+[run 43617256945](https://github.com/fyodoriv/dotfiles/actions/runs/43617256945).

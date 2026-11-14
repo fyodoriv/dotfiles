@@ -118,6 +118,15 @@ fn compare(patterns: &[(&str, bool)]) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn require_child(pattern: &str, exact: bool, pid: u32) -> Result<(), &'static str> {
+    let reference = pgrep(pattern, exact)?;
+    let candidate = native(pattern, exact)?;
+    if reference != candidate || !reference.contains(&pid) {
+        return Err("controlled selection mismatch");
+    }
+    Ok(())
+}
+
 fn run(measure: bool) -> Result<(), &'static str> {
     if std::env::var("GITHUB_ACTIONS").as_deref() != Ok("true")
         || std::env::var("RUNNER_ENVIRONMENT").as_deref() != Ok("github-hosted")
@@ -143,6 +152,22 @@ fn run(measure: bool) -> Result<(), &'static str> {
             return Err("ancestor exclusion mismatch");
         }
     }
+    let long_name = format!("priorityselection{seed}long");
+    let spaced_marker = format!("priorityprobe{seed} node minsky");
+    let long_child = spawn_child(&long_name, &spaced_marker)?;
+    let long_pattern = format!("^{long_name}$");
+    let spaced_pattern = format!("priorityprobe{seed} node.*minsky");
+    require_child(&long_pattern, true, long_child.0.id())?;
+    require_child(&spaced_pattern, false, long_child.0.id())?;
+    let finished_pid = long_child.0.id();
+    long_child.finish()?;
+    if pgrep(&long_pattern, true)?.contains(&finished_pid)
+        || native(&long_pattern, true)?.contains(&finished_pid) {
+        return Err("exited child remained selected");
+    }
+    let empty_child = spawn_child("", "empty-argument-zero")?;
+    require_child("^app-priority.*$", true, empty_child.0.id())?;
+    empty_child.finish()?;
     if !measure {
         child_a.finish()?;
         child_b.finish()?;

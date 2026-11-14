@@ -160,3 +160,23 @@ an action, so the candidate now falls back to individual queries.
   the candidate in draft.
 - **Anchor:** the fixture-only candidate prediction above and the existing
   action-parity gate.
+
+### Fixture workflow queue correction
+
+Three obsolete checks from earlier revisions of this pull request remained
+queued after later pushes. The fixture workflow lacked the pull-request
+concurrency rule used by the main CI workflow. The obsolete jobs were owned
+by this session and were canceled while still queued.
+
+- **Hypothesis:** A pull-request-scoped concurrency group cancels an older
+  check for the same pull request, while manual controls are not canceled.
+- **Measurement:** Run the focused workflow configuration test before and
+  after adding the group, then verify the changed workflow in hosted CI.
+- **Success:** The configuration test fails on the missing group and passes
+  after the change; the group uses the pull-request number or ref, and
+  `cancel-in-progress` is true only for pull-request events.
+- **Pivot:** If a manual control can share a cancellation group with another
+  manual run, or the configuration cannot be parsed, do not enable automatic
+  cancellation. The test verifies configuration, not GitHub scheduling.
+- **Anchor:** `.github/workflows/ci.yml` concurrency policy and the three
+  observed superseded fixture jobs.

@@ -1,6 +1,36 @@
 //! Read-only status shortcut. Other inputs are passed to the existing guard.
 use std::io::{self, Read};
 
+#[cfg(target_os = "macos")]
+fn private_input(input: &[u8]) -> io::Result<(std::fs::File, std::ffi::CString)> {
+    use std::io::{Seek, SeekFrom, Write};
+    use std::os::fd::FromRawFd;
+
+    for _ in 0..8 {
+        let mut random = [0u8; 12];
+        // SAFETY: random points to a writable buffer of the requested size.
+        unsafe { libc::arc4random_buf(random.as_mut_ptr().cast(), random.len()) };
+        let suffix: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
+        let name = std::ffi::CString::new(format!("/dfh-{suffix}")).unwrap();
+        // SAFETY: name is NUL-terminated and the mode is supplied for O_CREAT.
+        let fd = unsafe { libc::shm_open(name.as_ptr(), libc::O_CREAT | libc::O_EXCL | libc::O_RDWR, 0o600) };
+        if fd < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::AlreadyExists { continue; }
+            return Err(error);
+        }
+        // SAFETY: shm_open returned a new owned descriptor.
+        let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+        // Unlink before writing: only this descriptor retains the input object.
+        // SAFETY: name remains a valid NUL-terminated shared-memory name.
+        if unsafe { libc::shm_unlink(name.as_ptr()) } != 0 { return Err(io::Error::last_os_error()); }
+        file.write_all(input)?;
+        file.seek(SeekFrom::Start(0))?;
+        return Ok((file, name));
+    }
+    Err(io::Error::new(io::ErrorKind::AlreadyExists, "shared-memory name collision"))
+}
+
 fn literal_status(input: &[u8]) -> bool {
     // Escaped keys and duplicate target keys always go to the original guard.
     if input.contains(&b'\\')
@@ -21,11 +51,27 @@ fn run() -> Result<i32, &'static str> {
     let mut args = std::env::args_os();
     let _ = args.next();
     let mode = args.next().ok_or("missing check mode")?;
+    let guard = args.next();
     if args.next().is_some() { return Err("unexpected argument"); }
-    if mode != "--check" { return Err("unknown mode"); }
+    if mode != "--check" && mode != "--exec" { return Err("unknown mode"); }
+    if (mode == "--check") != guard.is_none() { return Err("invalid arguments"); }
     let mut input = Vec::new();
     io::stdin().read_to_end(&mut input).map_err(|_| "input read failed")?;
-    Ok(if literal_status(&input) { 0 } else { 1 })
+    if literal_status(&input) { return Ok(0); }
+    if mode == "--check" { return Ok(1); }
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::unix::process::CommandExt;
+        use std::process::{Command, Stdio};
+        let (file, _) = private_input(&input).map_err(|_| "fallback input failed")?;
+        let error = Command::new("/bin/bash").arg(guard.unwrap())
+            .env("DOTFILES_NATIVE_GUARD_BYPASS", "1")
+            .stdin(Stdio::from(file)).exec();
+        let _ = error;
+        Err("fallback start failed")
+    }
+    #[cfg(not(target_os = "macos"))]
+    { Err("unsupported platform") }
 }
 
 fn main() {
@@ -62,5 +108,18 @@ mod tests {
             let event = serde_json::json!({"tool_input": {"command": format!("git status{ch}")}});
             assert!(!literal_status(event.to_string().as_bytes()));
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn fallback_input_is_unlinked_before_use() {
+        use std::io::Read;
+        let (mut file, name) = super::private_input(b"fixture input").unwrap();
+        // SAFETY: name is NUL-terminated and O_RDONLY needs no mode argument.
+        let fd = unsafe { libc::shm_open(name.as_ptr(), libc::O_RDONLY) };
+        assert_eq!(fd, -1);
+        let mut content = Vec::new();
+        file.read_to_end(&mut content).unwrap();
+        assert_eq!(content, b"fixture input");
     }
 }

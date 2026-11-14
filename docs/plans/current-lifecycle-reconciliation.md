@@ -42,3 +42,4 @@ The added OpenCode relationship makes the older LaunchAgent review incomplete
 for this revision. Its caller and helper behavior need their own review before
 classification. These three records do not establish a complete component or
 edge inventory, a rendered template, or execution.
+The follow-up review is registered in [OpenCode helper boundary](opencode-helper-boundary.md).

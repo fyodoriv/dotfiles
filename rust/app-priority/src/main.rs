@@ -214,7 +214,7 @@ mod tests {
             return;
         }
         let exe = std::env::current_exe().unwrap();
-        for (mode, args) in [("background", vec!["-b"]), ("foreground", vec!["-B", "-t", "0", "-l", "0"])] {
+        for (mode, args) in [("background", vec!["-b"]), ("foreground", vec!["-t", "0", "-l", "0"])] {
             let test_args = ["--exact", "tests::native_policy_matches_taskpolicy_on_owned_children", "--nocapture"];
             let reference = Command::new("/usr/sbin/taskpolicy").args(args).arg(&exe).args(test_args)
                 .env(CHILD, "reference").stdin(Stdio::null()).output().unwrap();

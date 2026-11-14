@@ -467,6 +467,11 @@ need their own controlled behavior checks.
 The first hosted control stopped before comparison because the proposed test
 used `/usr/bin/taskpolicy`, which does not exist on the runner. The actual
 macOS path is `/usr/sbin/taskpolicy`; the control uses that corrected path.
+The background comparison then passed, but foreground `-B` exited with usage
+status 64 because `taskpolicy` requires `-p` for that option. A fresh
+foreground child can compare `-t 0 -l 0` without `-B`; the native
+background-to-foreground transition has a separate self-child check. Neither
+establishes `-B` parity for an arbitrary other process.
 
 ### Rust priority command with existing lookup
 

@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      linux_preflight_only:
+        description: Run only the hosted Linux negative-control preflight
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -43,10 +48,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Check mock-action fixture on Linux
         run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Run same-source comparison preflight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_sha != '' && inputs.baseline_sha == inputs.candidate_sha && !inputs.fixture_candidate }}
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          APP_PRIORITY_LINUX_PREFLIGHT: '1'
+        run: |
+          case "$BASELINE_SHA" in ''|*[!0-9a-f]*) echo 'Expected a full lowercase commit ID' >&2; exit 2 ;; esac
+          [ "${#BASELINE_SHA}" -eq 40 ] || exit 2
+          git cat-file -e "$BASELINE_SHA^{commit}"
+          baseline="$RUNNER_TEMP/app-priority-linux-baseline"
+          mkdir -p "$baseline"
+          git archive "$BASELINE_SHA" | tar -x -C "$baseline"
+          result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$baseline" --pairs 30)"
+          printf '%s\n' "$result"
+          printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and (r["ratio"] > 0.40 or r["candidate_median_ms"] > 400) else 1)'
 
   fixture:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.linux_preflight_only }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

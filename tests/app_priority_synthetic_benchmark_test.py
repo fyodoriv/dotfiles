@@ -36,6 +36,18 @@ class BenchmarkTests(unittest.TestCase):
                                     "RUNNER_ENVIRONMENT": "github-hosted"}, clear=True):
             self.assertTrue(benchmark.hosted())
 
+    def test_linux_comparison_requires_explicit_hosted_preflight(self):
+        environment = {"GITHUB_ACTIONS": "true", "RUNNER_OS": "Linux",
+                       "RUNNER_ENVIRONMENT": "github-hosted"}
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertFalse(benchmark.hosted())
+        environment["APP_PRIORITY_LINUX_PREFLIGHT"] = "1"
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertTrue(benchmark.hosted())
+        environment["RUNNER_ENVIRONMENT"] = "self-hosted"
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertFalse(benchmark.hosted())
+
     def test_action_and_output_changes_refuse(self):
         base = (benchmark.EXPECTED_ACTIONS, b"", b"")
         benchmark.compare(base, base)

@@ -56,9 +56,13 @@ EXPECTED_ACTIONS = (
 
 
 def hosted():
+    runner = os.environ.get("RUNNER_OS")
+    allowed_os = runner == "macOS" or (
+        runner == "Linux" and os.environ.get("APP_PRIORITY_LINUX_PREFLIGHT") == "1"
+    )
     return (os.environ.get("GITHUB_ACTIONS") == "true"
-            and os.environ.get("RUNNER_OS") == "macOS"
-            and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
+            and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+            and allowed_os)
 
 
 def prepare(root):
@@ -104,7 +108,7 @@ def main():
     parser.add_argument("--pairs", type=int, required=True)
     args = parser.parse_args()
     if not hosted():
-        parser.error("run only on a GitHub-hosted macOS runner")
+        parser.error("run only on hosted macOS or an explicit hosted Linux preflight")
     if not 1 <= args.pairs <= 30:
         parser.error("pairs must be between 1 and 30")
     trees = {"base": args.base.resolve(strict=True),

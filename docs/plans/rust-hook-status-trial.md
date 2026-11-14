@@ -92,3 +92,26 @@ back to the original guard.
   0.50; the baseline and candidate memory ratios meet 0.95–1.05 and 1.10.
 - **Pivot:** Any mismatch, failed sample or missed bound retains the old guard.
 - **Anchor:** The rejected shell-owned and shared-memory trials above.
+
+The here-string version passed safety, parity and memory checks but had a
+0.623 median timing ratio in the hosted fixture, above the 0.50 limit. It was
+not installed. See [run 43628134375](https://github.com/fyodoriv/dotfiles/actions/runs/43628134375).
+
+## Unlinked private-file fallback
+
+Register before implementation. Retry process replacement using an owner-only
+temporary file that is unlinked before any input is written. The file carries
+fallback input on the local machine and is closed when the guard exits. No
+payload, file name or temporary path is logged. A failed create, unlink,
+write or replacement fails closed.
+
+- **Hypothesis:** The unlinked-file boundary preserves input and process
+  identity while meeting the registered speed and memory limits.
+- **Measurement:** Repeat hosted guard safety, same-path parity, 15 + 15
+  baseline and 15 candidate memory samples, and the queued performance gate.
+  Test that the file is unlinked before writing and the replacement keeps its PID.
+- **Success:** Zero parity or safety failures, no named payload file, same
+  process ID, gate ratio at most 0.50, baseline RSS ratio 0.95–1.05, and
+  candidate RSS ratio at most 1.10.
+- **Pivot:** Any failure or missed threshold leaves the old guard active.
+- **Anchor:** The two preceding hosted trials and gate G.

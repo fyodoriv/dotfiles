@@ -335,6 +335,7 @@ priority-apps file; the Rust fixture currently refuses it.
   installation or in-use performance.
 - **Anchor:** `bin/app-priority` custom-config branch and the fixture result
   above; Basili et al. (1994) and Munafò et al. (2017).
+
 ### Per-rule Rust selection
 
 Register before implementation. The successful fixed fixture batches process

@@ -42,6 +42,10 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 
 Organization-specific branch-protection / approval workflows belong in your private overlay (see your overlay's `.github/workflows/`).
 
+The app-priority fixture workflow runs its isolated mock-action checks and one
+same-source timing pair on hosted macOS when the benchmark or command changes.
+One pair checks the harness; it is not the 30-pair performance decision.
+
 The bats suite includes `tests/docs-links.bats`, which validates local Markdown
 links in `README.md` and `docs/*.md` so onboarding links fail fast in CI.
 

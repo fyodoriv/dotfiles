@@ -81,3 +81,9 @@ Before implementing the fallback benchmark or a candidate, register it here:
 - **Anchor:** [snapshot safety prediction](app-priority-snapshot-prediction.md),
   [migration plan](rust-migration.md), Basili et al. (1994), GQM, and
   Munafò et al. (2017), preregistration.
+
+The fixture benchmark accepts only reviewed source trees. Its mock PATH is not
+an operating-system sandbox: source that invokes an absolute priority tool
+could bypass it. Review both command trees and their selected helpers before
+running a pair. The hosted workflow's one same-source pair checks the fixture;
+it does not qualify the registered 30-pair decision.

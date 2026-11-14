@@ -7,6 +7,11 @@ samples were rounded to whole seconds. The interval excludes the first clock
 process startup and the final stats write; assess both clock processes when
 measuring total job cost.
 
+The [same-day experiment](plans/app-priority-same-day.md) uses a controlled
+process-table fixture when the in-use baseline is unstable. Its benchmark
+runs only on a GitHub-hosted macOS runner and compares reviewed source trees
+with mock priority commands. It does not prove an in-use speedup.
+
 How to see what dotfiles did on this Mac, what failed, and how healthy it is.
 Everything stays on the Mac, with one exit that needs your yes:
 `dotfiles telemetry` (see [Telemetry](#telemetry)). `dotfiles metrics --share` writes an aggregate-only

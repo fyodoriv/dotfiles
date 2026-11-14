@@ -6,5 +6,6 @@ if [ -n "$base" ]; then
   changed="$(git diff --name-only "$base" -- rust/; git ls-files --others --exclude-standard -- rust/)"
   if [ -z "$changed" ]; then exit 0; fi
 fi
-./bin/heavy-run cargo test --locked --manifest-path rust/app-priority/Cargo.toml
-./bin/heavy-run cargo build --locked --release --manifest-path rust/app-priority/Cargo.toml
+cd rust
+../bin/heavy-run cargo test --locked --offline --manifest-path app-priority/Cargo.toml
+../bin/heavy-run cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml

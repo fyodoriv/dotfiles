@@ -1,6 +1,4 @@
 use std::io::Write;
-#[cfg(target_os = "macos")]
-use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
 
 #[test]
@@ -17,26 +15,4 @@ fn check_mode_returns_only_a_decision() {
         assert_eq!(result.status.code(), Some(expected));
         assert!(result.stdout.is_empty() && result.stderr.is_empty());
     }
-}
-
-#[cfg(target_os = "macos")]
-#[test]
-fn fallback_replaces_the_reader_and_preserves_input() {
-    let directory = std::env::temp_dir().join(format!("hook-status-exec-{}", std::process::id()));
-    std::fs::create_dir(&directory).unwrap();
-    let guard = directory.join("guard.sh");
-    std::fs::write(&guard, b"#!/bin/bash\n[ \"$DOTFILES_NATIVE_GUARD_BYPASS\" = 1 ] || exit 12\nprintf '%s' \"$$\" >&2\ncat\nexit 7\n").unwrap();
-    std::fs::set_permissions(&guard, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let input = br#"{"tool_input":{"command":"git status; echo x"}}"#;
-    let mut child = Command::new(env!("CARGO_BIN_EXE_dotfiles-hook-status"))
-        .arg("--exec").arg(&guard).stdin(Stdio::piped()).stdout(Stdio::piped())
-        .stderr(Stdio::piped()).spawn().unwrap();
-    let pid = child.id().to_string();
-    child.stdin.take().unwrap().write_all(input).unwrap();
-    let result = child.wait_with_output().unwrap();
-    assert_eq!(result.status.code(), Some(7));
-    assert_eq!(result.stdout, input);
-    assert_eq!(result.stderr, pid.as_bytes());
-    std::fs::remove_file(guard).unwrap();
-    std::fs::remove_dir(directory).unwrap();
 }

@@ -393,6 +393,29 @@ test compares the selected PID order with `pgrep`. A start-time check is not
 an atomic process handle. General process-table parity, executable identity,
 permission behavior, timing and offline delivery remain open.
 
+#### Full command with owned processes
+
+Register before implementation. The fixed mock process table cannot exercise
+the native process source. Compare the whole default rule path against real,
+short-lived owned children on a hosted macOS runner. Mock both commands'
+priority actions; no actual priority change is permitted.
+
+- **Hypothesis:** Native per-rule lookup and simulated actions preserve the
+  shell's ordered decisions and meet the 0.40 full-command ratio.
+- **Measurement:** Start owned children with the default target names and
+  argument shapes. Run 30 alternating baseline and candidate pairs. Record
+  only fixed labels, action counts and elapsed times, never raw process IDs or
+  arguments. Close and wait for all children. No non-child may appear in an
+  action log; unknown targets fail the check.
+- **Success:** All 30 ordered action logs match, every target is an owned
+  child, all children exit, the candidate/base median is at most 0.40 and
+  the candidate median is at most 400 ms. No real priority action occurs.
+- **Pivot:** A mismatch, unknown target, missing pair, cleanup failure or
+  failed timing rejects this candidate. Matching these owned children does
+  not establish parity for all processes, atomic PID identity, real priority
+  effects, offline installation, stats or in-use benefit.
+- **Anchor:** the native lookup and full-command fixture results above.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

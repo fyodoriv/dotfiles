@@ -285,3 +285,6 @@ kernel locks. Never rewrite another controller's live records.
 To trace a freeze, read `~/.local/state/dotfiles/load-samples.tsv` first: it survives a forced
 power-off. `dotfiles-load-sampler report` counts kernel-stall rows (high load with a low CPU-busy
 column).
+
+The heavy-run guard still runs its parser for an exact `git status` command.
+After that succeeds, it skips the later heavy-command scan for that exact input.

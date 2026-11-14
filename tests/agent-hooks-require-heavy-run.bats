@@ -203,3 +203,27 @@ run_hook() {
   done
   [ "$failures" -eq 0 ]
 }
+
+@test "exact status shortcut keeps appended builds guarded" {
+  run_hook "git status"
+  [ "$status" -eq 0 ]
+  run_hook "git status; make test-all"
+  [ "$status" -eq 2 ]
+}
+
+@test "status still fails when the existing parser fails" {
+  local scratch
+  scratch="$(mktemp -d)"
+  cp agent-hooks/bootstrap-endpoint-path.sh "$scratch/"
+  python3 - "$HOOK" "$scratch/guard.sh" <<'PYTEST'
+from pathlib import Path
+import sys
+s = Path(sys.argv[1]).read_text()
+needle = '/' + 'usr/bin/perl -0777 -pe'
+assert s.count(needle) == 1
+Path(sys.argv[2]).write_text(s.replace(needle, '/bin/false'))
+PYTEST
+  run bash -c 'printf "%s" "{\"tool_input\":{\"command\":\"git status\"}}" | bash "$1"' _ "$scratch/guard.sh"
+  rm -rf "$scratch"
+  [ "$status" -ne 0 ]
+}

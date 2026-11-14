@@ -251,6 +251,10 @@ _strip_text() {
 }
 
 stripped="$(printf '%s\n' "$command" | _strip_text)"
+# The parser has succeeded; this exact command has no heavy-run segment.
+if [ "$command" = 'git status' ] && [ "$stripped" = 'git status' ]; then
+  exit 0
+fi
 # The command -v lookup allowance holds only for a top-level probe whose output
 # feeds nothing: no pipe (| or |&) or process substitution anywhere in the
 # command, and not a line lifted out of $(...), backticks, sh -c, or eval text.

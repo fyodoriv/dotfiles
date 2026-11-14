@@ -1,0 +1,29 @@
+name: Heavy hook status experiment
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - agent-hooks/require-heavy-run.sh
+      - tests/agent-hooks-require-heavy-run.bats
+      - .github/workflows/heavy-hook-status.yml
+
+permissions:
+  contents: read
+
+jobs:
+  performance:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Measure the registered hook row
+        run: |
+          mkdir -p "$RUNNER_TEMP/timing-tools"
+          ln -s "$GITHUB_WORKSPACE/bin/heavy-run" "$RUNNER_TEMP/timing-tools/heavy-run"
+          PATH="$RUNNER_TEMP/timing-tools:$PATH" heavy-run --exclusive scripts/perf-gate.sh --force --json > "$RUNNER_TEMP/hook-gate.json"
+          jq '.commands[] | select(.name == "hook-require-heavy-run")' "$RUNNER_TEMP/hook-gate.json"
+          jq -e '.commands[] | select(.name == "hook-require-heavy-run") | .ratio <= 0.50' "$RUNNER_TEMP/hook-gate.json"

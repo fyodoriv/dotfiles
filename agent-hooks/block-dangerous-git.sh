@@ -7,10 +7,12 @@ set -f # Keep branch words literal when split below.
 # SECONDS counts the hook's whole run; it caps the total time spent in gh.
 SECONDS=0
 _hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=bootstrap-endpoint-path.sh
-source "$_hook_dir/bootstrap-endpoint-path.sh"
+# The native status path uses absolute helpers; fallback performs endpoint setup.
+unset BASH_ENV ENV
 # shellcheck source=native-dispatch.sh
 if [ -r "$_hook_dir/native-dispatch.sh" ]; then source "$_hook_dir/native-dispatch.sh"; fi
+# shellcheck source=bootstrap-endpoint-path.sh
+source "$_hook_dir/bootstrap-endpoint-path.sh"
 input=$(cat)
 command="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"

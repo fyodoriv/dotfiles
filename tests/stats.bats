@@ -28,6 +28,14 @@ setup() {
   grep -q '"seconds_saved":3' "$DOTFILES_STATS_FILE"
 }
 
+@test "log_run records only allowlisted runtime values" {
+  log_run app-priority 1 ok 10 '' monotonic-ms rust
+  log_run app-priority 1 ok 10 '' monotonic-ms shell
+  log_run app-priority 1 ok 10 '' monotonic-ms 'unapproved-fixture'
+  jq -s -e 'length == 3 and .[0].runtime == "rust" and .[1].runtime == "shell" and (.[2] | has("runtime") | not)' "$DOTFILES_STATS_FILE"
+  ! grep -q 'unapproved-fixture' "$DOTFILES_STATS_FILE"
+}
+
 @test "log_run appends multiple entries" {
   log_run sync
   log_run cleanup

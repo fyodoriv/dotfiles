@@ -46,7 +46,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$(wc -l < "$NATIVE_LOG" | tr -d ' ')" -eq 1 ]
   [ "$(cat "$NATIVE_LOG")" = --apply ]
   [ ! -e "$PGREP_LOG" ]
-  run jq -e 'select(.task == "app-priority" and .ok == true)' "$DOTFILES_STATS_FILE"
+  run jq -e 'select(.task == "app-priority" and .ok == true and .runtime == "rust")' "$DOTFILES_STATS_FILE"
   [ "$status" -eq 0 ]
 }
 
@@ -57,6 +57,8 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
   [ ! -e "$NATIVE_LOG" ]
   [ -s "$PGREP_LOG" ]
+  run jq -e 'select(.task == "app-priority" and .runtime == "shell")' "$DOTFILES_STATS_FILE"
+  [ "$status" -eq 0 ]
 }
 
 @test "failed native execution never repeats actions through the shell" {
@@ -65,8 +67,16 @@ teardown() { rm -rf "$TEST_DIR"; }
   run "$COMMAND"
   [ "$status" -eq 9 ]
   [ ! -e "$PGREP_LOG" ]
-  run jq -e 'select(.task == "app-priority" and .ok == false)' "$DOTFILES_STATS_FILE"
+  run jq -e 'select(.task == "app-priority" and .ok == false and .runtime == "rust")' "$DOTFILES_STATS_FILE"
   [ "$status" -eq 0 ]
+}
+
+@test "disabled stats do not record the native runtime" {
+  "$INSTALLER" install
+  export DOTFILES_STATS_LOG=0
+  run "$COMMAND"
+  [ "$status" -eq 0 ]
+  [ ! -e "$DOTFILES_STATS_FILE" ]
 }
 
 @test "a failed build keeps the prior install and rollback restores shell" {
@@ -89,6 +99,13 @@ teardown() { rm -rf "$TEST_DIR"; }
   run "$INSTALLER" rollback
   [ "$status" -ne 0 ]
   [ -L "$DIRECTORY/current" ]
+}
+
+@test "Cargo outputs are ignored but source stays visible" {
+  run git -C "$BATS_TEST_DIRNAME/.." check-ignore --no-index rust/app-priority/target/example
+  [ "$status" -eq 0 ]
+  run git -C "$BATS_TEST_DIRNAME/.." check-ignore --no-index rust/app-priority/src/main.rs
+  [ "$status" -ne 0 ]
 }
 
 @test "an interrupted copy leaves the previous install selected" {

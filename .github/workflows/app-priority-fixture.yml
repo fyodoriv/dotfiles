@@ -48,6 +48,11 @@ on:
         required: false
         type: boolean
         default: false
+      rust_full_comparison:
+        description: Compare the Rust command with simulated actions
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -57,6 +62,36 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  rust-full-comparison:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_full_comparison }}
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Compare Rust command with simulated actions
+        env:
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
+            case "$sha" in ''|*[!0-9a-f]*) exit 2 ;; esac
+            [ "${#sha}" -eq 40 ] || exit 2
+            git cat-file -e "$sha^{commit}"
+          done
+          baseline="$RUNNER_TEMP/app-priority-full-baseline"
+          candidate="$RUNNER_TEMP/app-priority-full-candidate"
+          target="$RUNNER_TEMP/app-priority-full-target"
+          mkdir -p "$baseline" "$candidate"
+          git archive "$BASELINE_SHA" | tar -x -C "$baseline"
+          git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
+          ./bin/heavy-run cargo build --locked --release --features fixture-actions --target-dir "$target" --manifest-path "$candidate/rust/app-priority/Cargo.toml"
+          printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
+          result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$candidate" --pairs 30)"
+          printf '%s\n' "$result"
+          printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
   rust-command:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_command_check }}
     runs-on: macos-latest
@@ -85,7 +120,7 @@ jobs:
       - name: Compare and measure controlled process selection
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure
   linux-fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.rust_full_comparison) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -141,7 +176,7 @@ jobs:
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
 
   fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.rust_full_comparison) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

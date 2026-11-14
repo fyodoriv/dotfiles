@@ -344,6 +344,17 @@ The first instrumentation prediction is in
 [app-priority timing](app-priority-timing.md).
 The [hook baseline](rust-hook-baseline-2026-11-11.md) records both sets of
 20 A/A runs and the absolute linked-checkout observations.
+
+A source-only review of `require-heavy-run.sh` found a possible literal
+`git status` shortcut after JSON decoding, but no unconditional shortcut is
+qualified. The existing path for this status shape runs Perl under `set -e` and
+`pipefail`; an early success could change a nonzero hook result to success
+when that invocation fails. A file check or
+separate probe does not establish the outcome of the skipped invocation.
+Raw JSON matching also needs a complete treatment of escapes and duplicate
+fields. Keep the existing path until a separately reviewed failure contract,
+parity controls and the registered measurement gates are satisfied. This review
+ran no hook or timing and claims no speedup.
 The [cold-path fixture audit](rust-cold-profile-fixture-audit.md) records
 safety boundaries, unknowns and the registered pivot criteria. No profile ran.
 

@@ -386,3 +386,55 @@ reader. The experiment is read-only and does not change any priorities.
   identity, platform versions, priority actions, installation or stats.
 - **Anchor:** the per-rule result above, the [sysinfo process API](https://docs.rs/sysinfo/0.40.1/sysinfo/struct.Process.html),
   and [Apple's pgrep implementation](https://github.com/apple-oss-distributions/adv_cmds/blob/6bed8737a34dbb54782a18f47dccf933a9967a12/pkill/pkill.c#L491-L580).
+
+The hosted macOS probe at commit `128699a` passed the controlled exact-name,
+full-argument, nonmatch and caller/ancestor checks. It closed and waited for
+both children. Across 30 alternating three-query pairs, the `pgrep` median
+was 33.727 ms and the native median was 6.324 ms (ratio 0.188). The release
+build reported 5.10 s on that runner, with network access for dependencies.
+These are selection-only observations, not full-command or in-use results.
+See [run 43614347851](https://github.com/fyodoriv/dotfiles/actions/runs/43614347851).
+
+#### Broader controlled selection cases
+
+Register before adding cases. The first passing probe used short names and one
+simple argument pattern; it cannot establish the documented `pgrep` behavior.
+
+- **Hypothesis:** The native selector also agrees with hosted macOS `pgrep`
+  for a long `argv[0]`, an empty `argv[0]`, spaced arguments with a POSIX
+  pattern, and a child that exits before a new query.
+- **Measurement:** Add owned child cases and compare complete selected sets
+  without printing process names, IDs, arguments or environment. Close their
+  input pipes and wait for them; query again after the exit case.
+- **Success:** Each positive case selects its intended child on both paths,
+  selected sets agree, the exited child is absent, and no child remains.
+- **Pivot:** Missing data, a disagreement or cleanup failure rejects the
+  native selector for deployment until its cause and fix are reviewed. These
+  cases do not prove parity for every process table or identity-safe actions.
+- **Anchor:** the native comparison above and Apple's published `pgrep`
+  fallback and regex logic linked above.
+
+The first broader run failed with a generic selection mismatch. To identify
+the case without exposing process data, the next run reports only a fixed
+case label and three booleans: whether the reference and candidate each
+selected the controlled child and whether their selected sets agree. Missing
+or ambiguous diagnostics leave the cause unknown; no process details are
+printed. This does not change the selection or cleanup decisions.
+
+The diagnostic identified the empty-argument-zero case, but both selectors
+missed the name assumed by the test. That is an invalid expected result, not
+evidence of disagreement. A follow-up checks four fixed pattern categories
+and reports only whether each path selected the controlled child. The case
+remains unqualified until its expected behavior is established.
+
+On the hosted runner both paths selected that child for the fixed `--child`
+pattern and neither selected it for the assumed executable-name pattern.
+The control now compares the observed reference behavior. This does not
+establish how all macOS versions or all empty arguments are represented.
+
+The corrected hosted macOS controls at commit `676a0fd` passed for the long
+name, empty first argument, spaced pattern and exited child. The same run
+closed and waited for its children and measured 30 three-query pairs: the
+`pgrep` median was 46.850 ms, the native median was 11.966 ms, and the ratio
+was 0.255. The earlier incorrect expectation and diagnostic are retained in
+the preceding paragraphs. See [run 43614912955](https://github.com/fyodoriv/dotfiles/actions/runs/43614912955).

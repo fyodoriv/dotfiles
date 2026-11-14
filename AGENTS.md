@@ -62,7 +62,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 1. **Prefer the modern CLI cohort** (`fd`, `rg`, `sd`, `xh`, …); POSIX only as a fallback.
 2. **Quote pip specs** (`pip install 'pkg>=1.2.3'`); keep command output out of the repo root.
 3. **Never hardcode `$HOME` paths**; use `~`, env vars, resolvers, or chezmoi templates.
-4. **[CI](docs/ci-setup.md) runs `make check` per PR.** Locally: lint, touched tests.
+4. **[Hosted CI](docs/ci-setup.md) runs `make check` per PR.**
 5. **Update docs with every behavior change, in the same PR** (see Docs upkeep).
 6. **New modules need `modules/<name>/doctor.sh`.**
 7. **The Brewfile is inlined** in `.chezmoiscripts/run_onchange_brew.sh.tmpl`.

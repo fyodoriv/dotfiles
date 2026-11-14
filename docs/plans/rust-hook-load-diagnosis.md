@@ -35,8 +35,10 @@ The three new reason assertions failed before the fix, as expected. After the
 change all 17 focused tests passed. The planted CPU and load values did not
 appear in the serialized receipts; the earlier sample failure retained its
 original class and position. Independent review found no changed gate decision.
-The migration draft needs its scratch fixtures adapted and its source/audit
-provenance renewed after it incorporates this change.
+The migration draft adapts its scratch fixtures to the link checks. This merge
+changes the helper, so future candidate measurements require a fresh
+source-bound audit. Earlier receipts remain independently inconclusive and
+cannot be qualified by a later audit.
 
 The first hosted run exposed a stale wrapper assertion: it expected exactly
 a fixed test count after the focused suite grew. The wrapper failure was

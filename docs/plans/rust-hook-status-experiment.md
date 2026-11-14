@@ -35,11 +35,16 @@ heredocs, quotes, malformed and missing JSON fields, and missing or spoofed
 helper tools. Retain the existing dangerous-Git tests. Require zero changed
 verdicts and zero new false permits.
 
-Measure the three status variants above with 15 order-balanced old/candidate
-pairs each under an exclusive `heavy-run` slot. The median candidate/old ratio
+Measure all four status variants listed above with 15 order-balanced
+old/candidate pairs each under an exclusive `heavy-run` slot. The earlier
+wording said three although it listed four; all four must pass. The median candidate/old ratio
 must be at most 0.80 for each variant. Run the unchanged performance gate for
 its registered row; its ratio must be at most 0.50. Queue wait is not execution
 time. Preserve the raw samples and validity outcomes privately.
+
+These four variants are supplementary checks of the same hook slice. They do
+not establish independent gate-qualified results for the non-row workloads.
+The unchanged `git status` budget row remains the benefit decision.
 
 ## Provisional peak-RSS baseline (2026-11-12)
 
@@ -59,6 +64,16 @@ audit does not establish the effective helper and executable/interpreter chains.
 The baseline is therefore inconclusive for qualification. A later probe cannot
 repair the evidence for this run. Raw samples and launch evidence stay private.
 
+The candidate retry mechanically passed the two-window sample and arithmetic
+checks. Each 15-sample window had a median of 4,767,744 bytes, below the
+provisional 5,262,540-byte calculation; their A/A ratio was 1.000. A later independent
+review found that the retained audit does not establish the actual resolved
+helper and all selected executable/interpreter chains. The result is
+**provisional and inconclusive for qualification**. Do not retrofit a later
+probe as evidence of the earlier run. The first candidate attempt had no
+samples because its initial load gate failed and also remains inconclusive.
+Neither result establishes parity or speed.
+
 An earlier 15 + 15 run lacked this retained binding and remains provisional.
 Do not use it as the baseline. This record does not establish a performance
 improvement or relax the parity and gate requirements above.
@@ -66,7 +81,7 @@ improvement or relax the parity and gate requirements above.
 ## Success and pivot
 
 Success requires all parity and safety checks, the RSS floor and bound, the
-three representative ratios, and the registered gate ratio. If any check
+four representative ratios, and the registered gate ratio. If any check
 fails, or the measurements are contaminated or unavailable, retain the old
 hook. A narrow win on the benchmark alone is not enough. The second hook and
 native delivery remain separate work.

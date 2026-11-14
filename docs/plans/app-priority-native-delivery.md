@@ -37,3 +37,20 @@ action, unstable baseline or higher ratio leaves memory unqualified and the
 shell active. This is a fixture measurement, not a claim about in-use memory.
 
 Anchor: gate G and the peak-RSS definition in [the migration plan](rust-migration.md).
+
+### Native checksum helper trial
+
+Register before implementation. The first hosted memory run had stable shell
+baselines but a candidate ratio of 1.368, above the 1.10 limit. One possible
+cost is the Perl-based checksum command on the dispatch path. On macOS, try
+the system `sha256` executable; keep the existing checksum fallback elsewhere.
+
+- **Hypothesis:** The system checksum helper reduces the candidate's peak RSS
+  without changing integrity checks, actions or the timing record.
+- **Measurement:** Repeat the same hosted 15 + 15 baseline and 15 candidate
+  owned-child samples, plus the install and corrupt-artifact checks.
+- **Success:** Both baseline medians have a ratio from 0.95 to 1.05; the
+  candidate ratio is at most 1.10; every action and focused check passes.
+- **Pivot:** A failed check or missed memory bound keeps the shell active.
+- **Anchor:** [the first memory result](https://github.com/fyodoriv/dotfiles/actions/runs/43624038601)
+  and gate G's memory requirement.

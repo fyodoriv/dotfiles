@@ -140,3 +140,22 @@ before dispatch, and falls back to the old guard when it is absent or corrupt.
 - **Pivot:** Any failed safety, integrity, lifecycle or performance check keeps
   the existing shell guard active. A failed install must not replace it.
 - **Anchor:** Native delivery, gate G, and the hosted candidate result above.
+
+### Fail-closed dispatch receipt
+
+Register before implementation. The shell guard remains the parent and
+accepts an allow or fallback result only when the native reader sends a
+one-byte receipt. The receipt carries no input. Missing or malformed receipts
+block. A fallback receipt preserves the old guard's exit status and output.
+
+- **Hypothesis:** The receipt distinguishes a completed decision from a
+  failed native start without changing normal guard decisions or exceeding
+  the registered timing and memory limits.
+- **Measurement:** Hosted tests cover missing, corrupt, failing and
+  receiptless helpers, normal fallback, all guard safety cases, same-path
+  parity, RSS and the queued performance row.
+- **Success:** Zero false permits or changed normal results; every failed
+  native start blocks; no input appears in the receipt; the status-row ratio
+  is at most 0.50 and the candidate/base RSS ratio is at most 1.10.
+- **Pivot:** Any failure retains the existing shell guard.
+- **Anchor:** Gate G, the unlinked-file trial, and Claude hook exit behavior.

@@ -1,5 +1,8 @@
 #!/bin/bash
 # Install or roll back the native app-priority candidate.
+# Usage:
+#   dotfiles priority-native install   Build offline and enable native dispatch
+#   dotfiles priority-native rollback  Restore the shell dispatch
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

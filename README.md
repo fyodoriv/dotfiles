@@ -1449,8 +1449,8 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `agent-scratch-prune` | Reclaim disk that AI agents leave behind: idle `node_modules`/`.venv`/Cargo `target`, clean pushed worktrees in `~/.codex/worktrees`, old scratch folders in `~/.local/state`, and agent temp entries in the macOS per-user temp folder idle 3 days. Never touches dirty, unpushed, locked, or recent work. `--dry-run` lists what would go | Every 6 hours (LaunchAgent) |
 | `app-priority` | Prioritize interactive apps and background agent/model workers | Every 60 seconds |
 
-Run `app-priority-native install` to build the native candidate offline and
-switch the next run to it. Run `app-priority-native rollback` to return to the
+Run `dotfiles priority-native install` to build the native candidate offline and
+switch the next run to it. Run `dotfiles priority-native rollback` to return to the
 shell implementation. The command checks the installed binary's digest before
 each use and keeps the normal timing record. A failed native run is not retried
 through the shell.

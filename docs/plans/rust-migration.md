@@ -261,7 +261,8 @@ about three tail samples, and measured noise on this Mac was 19-50%.
   does not have gets the ceiling check only. A port PR must not change the
   row's command path. The row keeps calling the same entry file, and that
   file calls the new code.
-- **Time, for a logged run (R_T):** the mean `duration_ms` of a 7-day
+- **Same-day owner override, app-priority only:** use the preregistered [same-day experiment](app-priority-same-day.md). The owner removed the seven-day wait on 2026-11-14. The shorter result measures today, not week-to-week stability.
+- **Time, for other logged runs (R_T):** the mean `duration_ms` of a 7-day
   window from the window command above, with at least 1,000 runs in each
   window. Both before windows must start after the final timing change is
   deployed, and the after window must start after the candidate is deployed.
@@ -333,7 +334,7 @@ is no separate "move tests to Rust" step.
 | Step / task ID | Why and change | User-benefit metric, number and command | Depends on |
 |---|---|---|---|
 | 1. `rust-agent-hooks` | Two hooks run on each agent Bash call and start Perl, `shfmt` or `jq`. Remove those starts. Weigh a shell fast path first. | `hook-require-heavy-run` and `hook-block-dangerous-git` `ratio` at most 0.50 each, from `scripts/perf-gate.sh --force --json`, after 20 clean A/A runs. The rows keep their command paths. | none |
-| 2. `rust-app-priority` | `app-priority` runs every 60 seconds at about 1 to 1.6 s mean. First make the number usable: log real milliseconds. Then weigh one `ps` pass. | 7-day mean `duration_ms` at most 400 ms and at most 40% of the lower before window, from the window command, after the before windows agree within 20%. | none; parallel with 1 |
+| 2. `rust-app-priority` | `app-priority` runs every 60 seconds. The owner requested completion today; first use the [same-day experiment](app-priority-same-day.md), then weigh one `ps` pass. | Post-change mean at most 400 ms and at most 40% of the lower qualifying six-hour before window. | none; parallel with 1 |
 | 3. `rust-cold-path-profile` | Doctor, apply, sync, upgrade and the queue lack qualified child-span coverage. The registered pivot retains them as exceptions. | Not separable with the currently evidenced method; local p50 and owned share are unknown. Reopen only with a qualified measurement. | none; pivot recorded |
 | 4. `rust-source-inventory` | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
 | 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the confirmed owner ruling |
@@ -448,7 +449,8 @@ authorized throwaway-app proof. Physical lid/power, signed endpoint and real
 credential paths need their own evidence; unavailable proof remains a blocker.
 Never use owner tabs, real drafts, elevated changes or public posts as fixtures.
 
-**14-day field check.** Within 14 days after a switch, the slice must show
+**Field check.** The owner removed the long wait for `app-priority`; use its
+[same-day experiment](app-priority-same-day.md). For other slices, within 14 days after a switch, the slice must show
 its gain outside the PR. For a logged run, use the window command: the
 after window against the before windows, by the logged-run statistic. For a
 hook row, the hooks write no log line; run the gate again with

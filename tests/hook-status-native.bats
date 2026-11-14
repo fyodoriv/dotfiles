@@ -51,6 +51,14 @@ probe() { printf '%s' '{"tool_input":{"command":"git status"},"cwd":"/tmp"}' | "
   [ -z "$output" ]
 }
 
+@test "an input-reading helper can return an allow receipt" {
+  printf '#!/bin/bash\ncat >/dev/null\nprintf A >&3\nexit 0\n' > "$TEST_ROOT/rust/hook-status/target/release/dotfiles-hook-status"
+  "$INSTALLER" install
+  run probe
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "an allow receipt with a failed native process blocks" {
   printf '#!/bin/bash\nprintf A >&3\nexit 1\n' > "$TEST_ROOT/rust/hook-status/target/release/dotfiles-hook-status"
   "$INSTALLER" install

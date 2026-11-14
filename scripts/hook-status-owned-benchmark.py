@@ -39,6 +39,9 @@ def main():
             expected = invoke("base", payload, env)
             actual = invoke("candidate", payload, env)
             if (expected.returncode, expected.stdout, expected.stderr) != (actual.returncode, actual.stdout, actual.stderr):
+                if index == 0:
+                    safe_error = actual.stderr.decode("utf-8", "replace").replace(str(ROOT), "<checkout>").replace(home, "<home>")
+                    print(f"safe-status result: expected={expected.returncode} actual={actual.returncode} stderr={safe_error[:300]!r}")
                 raise SystemExit(f"guard parity mismatch case {index}: status_equal={expected.returncode == actual.returncode} stdout_equal={expected.stdout == actual.stdout} stderr_equal={expected.stderr == actual.stderr}")
         times = {"base": [], "candidate": []}
         for pair in range(15):

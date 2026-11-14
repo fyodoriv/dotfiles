@@ -307,3 +307,11 @@ environment are not an operating-system sandbox: review both source trees
 before dispatching the hosted comparison. The default-fixture, altered-mock
 and custom-config controls run with the compiled candidate on hosted Linux
 and macOS. They do not qualify dynamic process tables or deployment.
+
+The registered hosted macOS comparison completed 30 pairs at tested commit
+`0d564f0`. Every fixed action matched. The baseline median was 273.07 ms,
+the Rust fixture median was 88.73 ms, and the ratio was 0.325, below 0.40.
+The fixed fixture omits custom configuration, live process selection, the
+normal stats path and process-identity guarantees. It is evidence to continue
+the port, not evidence that the production command is ready or faster in use.
+The full samples are in [run 43611732789](https://github.com/fyodoriv/dotfiles/actions/runs/43611732789).

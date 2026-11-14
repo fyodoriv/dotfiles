@@ -31,7 +31,7 @@ fn run() -> Result<i32, &'static str> {
 fn main() {
     match run() {
         Ok(status) => std::process::exit(status),
-        Err(message) => { eprintln!("hook-status: {message}"); std::process::exit(1); }
+        Err(_) => std::process::exit(1),
     }
 }
 

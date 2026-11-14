@@ -386,3 +386,28 @@ reader. The experiment is read-only and does not change any priorities.
   identity, platform versions, priority actions, installation or stats.
 - **Anchor:** the per-rule result above, the [sysinfo process API](https://docs.rs/sysinfo/0.40.1/sysinfo/struct.Process.html),
   and [Apple's pgrep implementation](https://github.com/apple-oss-distributions/adv_cmds/blob/6bed8737a34dbb54782a18f47dccf933a9967a12/pkill/pkill.c#L491-L580).
+
+### Native priority action on owned children
+
+Register before implementation. The selector probe does not change any
+priority. The live command also uses `taskpolicy` and `renice`; native calls
+need their own controlled behavior checks.
+
+- **Hypothesis:** On hosted macOS, direct calls in an owned child preserve
+  the observable background and foreground QoS state set by `taskpolicy`.
+- **Measurement:** Start fresh short-lived children in the hosted runner.
+  Each candidate changes only its own process (`who=0` and its own Mach task).
+  Reference children start through `/usr/bin/taskpolicy` with equivalent
+  options before executing the same observer. Compare return status and
+  reported background and QoS fields. Close and wait for every owned child.
+  No arbitrary PID, process-group signal, or priority action on another
+  process is allowed. Record only fixed labels, status and numeric fields.
+- **Success:** Background and foreground reference and native states match,
+  all children exit, and hosted checks pass. Unknown fields are failures.
+- **Pivot:** A changed field, failure, missing result, cleanup error or
+  post-exec policy difference rejects the candidate or makes the comparison
+  inconclusive. Keep the installed command unchanged. Self-action evidence
+  cannot prove permission or identity safety for other processes; `renice`,
+  errors, stats and installation need separate controls.
+- **Anchor:** [Apple taskpolicy source](https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L202-L244)
+  and the native selector result above.

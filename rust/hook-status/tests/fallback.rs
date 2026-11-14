@@ -19,3 +19,15 @@ fn ambiguous_input_reaches_the_guard_unchanged() {
     std::fs::remove_file(guard).unwrap();
     std::fs::remove_dir(directory).unwrap();
 }
+
+#[test]
+fn literal_status_does_not_start_the_guard() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_dotfiles-hook-status"))
+        .arg("/missing/fixture/guard.sh")
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
+        .spawn().unwrap();
+    child.stdin.take().unwrap().write_all(br#"{"tool_input":{"command":"git status"}}"#).unwrap();
+    let result = child.wait_with_output().unwrap();
+    assert!(result.status.success());
+    assert!(result.stdout.is_empty() && result.stderr.is_empty());
+}

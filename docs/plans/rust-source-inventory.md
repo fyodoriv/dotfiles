@@ -40,6 +40,9 @@ These are source-level relationships. They do not prove a template rendered,
 a condition passed, a script ran, or an external change occurred. The earlier
 ledger does not yet record the new relationships.
 
+A current-source reconciliation is registered in
+[current lifecycle reconciliation](current-lifecycle-reconciliation.md).
+
 The [non-test classification receipt](non-test-source-classification.json)
 reviews the 34 candidates outside `tests/` that were absent from the joined
 receipts at candidate revision `94eef66`. It records 17 executable-source

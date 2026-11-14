@@ -56,3 +56,10 @@ the system `sha256` executable; keep the existing checksum fallback elsewhere.
 - **Pivot:** A failed check or missed memory bound keeps the shell active.
 - **Anchor:** [the first memory result](https://github.com/fyodoriv/dotfiles/actions/runs/43624038601)
   and gate G's memory requirement.
+
+## Hosted build budget
+
+The hosted build-budget check uses an empty Cargo home and a fresh target
+directory. It measures a locked offline release build and repeats it warm
+inside one exclusive queue slot. Gate G limits the cold build to 120 seconds
+and the warm build to 15 seconds. Queue wait is excluded.

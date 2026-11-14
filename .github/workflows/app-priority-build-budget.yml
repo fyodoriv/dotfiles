@@ -1,0 +1,38 @@
+name: App priority build budget
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - rust/app-priority/**
+      - rust/vendor/**
+      - .github/workflows/app-priority-build-budget.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-budget:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Measure cold and warm offline builds
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/priority-target"
+          mkdir -p "$CARGO_HOME"
+          cd rust
+          ../bin/heavy-run --exclusive python3 -c '
+          import subprocess, time
+          command = ["cargo", "build", "--locked", "--offline", "--release", "--manifest-path", "app-priority/Cargo.toml"]
+          for label, limit in (("cold", 120), ("warm", 15)):
+              start = time.monotonic()
+              subprocess.run(command, check=True)
+              elapsed = time.monotonic() - start
+              print(f"{label}: {elapsed:.3f}s (limit {limit}s)", flush=True)
+              if elapsed > limit:
+                  raise SystemExit(f"{label} build exceeded budget")
+          '

@@ -130,3 +130,11 @@ into a disposable hosted candidate tree only for the fixed fixture.
 This changes the order of source preparation only. It does not waive the
 snapshot prediction's identity or parity requirements for deployment, and a
 fixture result is not evidence of behavior on a changing process table.
+
+The fixture candidate is `scripts/app-priority-candidate.sh`; the live command
+is unchanged. The hosted job copies this file into its disposable candidate
+tree only when the `fixture_candidate` input is true. Use the reviewed
+candidate commit and include `-f fixture_candidate=true` in the manual
+dispatch. Remove the fixture candidate when a safe implementation is deployed
+or this approach is abandoned. A passing fixture does not clear the identity
+boundary or establish an in-use benefit.

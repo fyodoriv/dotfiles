@@ -9,6 +9,7 @@ on:
       - lib/stats.sh
       - lib/colors.sh
       - scripts/app-priority-synthetic-benchmark.py
+      - scripts/app-priority-candidate.sh
       - tests/app_priority_synthetic_benchmark_test.py
       - .github/workflows/app-priority-fixture.yml
   workflow_dispatch:
@@ -21,6 +22,11 @@ on:
         description: Full reviewed candidate commit ID (leave both empty for harness check)
         required: false
         type: string
+      fixture_candidate:
+        description: Use the reviewed fixture-only candidate from the candidate commit
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,6 +51,7 @@ jobs:
         env:
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          FIXTURE_CANDIDATE: ${{ inputs.fixture_candidate }}
         run: |
           for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
             case "$sha" in ''|*[!0-9a-f]*) echo 'Expected full lowercase commit IDs' >&2; exit 2 ;; esac
@@ -56,6 +63,10 @@ jobs:
           mkdir -p "$baseline" "$candidate"
           git archive "$BASELINE_SHA" | tar -x -C "$baseline"
           git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
+          if [ "$FIXTURE_CANDIDATE" = true ]; then
+            [ -f "$candidate/scripts/app-priority-candidate.sh" ] || exit 2
+            cp "$candidate/scripts/app-priority-candidate.sh" "$candidate/bin/app-priority"
+          fi
           result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$candidate" --pairs 30)"
           printf '%s\n' "$result"
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'

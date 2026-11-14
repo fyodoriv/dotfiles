@@ -13,6 +13,8 @@ import time
 MOCKS = {
     "pgrep": r'''#!/bin/bash
 case "$*" in
+  "-l -x Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel")
+    printf "101 claude\\n201 codex\\n301 Slack\\n401 bats\\n" ;;
   "-x Slack") printf "301\n" ;;
   "-x claude") printf "101\n" ;;
   "-x codex") printf "201\n" ;;

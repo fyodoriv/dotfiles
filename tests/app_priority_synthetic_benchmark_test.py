@@ -2,6 +2,7 @@
 
 import importlib.util
 import os
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -51,6 +52,47 @@ class BenchmarkTests(unittest.TestCase):
             with patch.object(benchmark.subprocess, "run", side_effect=fake_run):
                 _, actions, _, _ = benchmark.sample(root, root, home, config, mockbin)
             self.assertEqual(actions, b"taskpolicy -b -p 101\n")
+
+
+@unittest.skipUnless(benchmark.hosted(), "physical fixture runs only on hosted macOS")
+class CandidateFixtureTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-candidate-")
+        self.root = Path(self.temporary.name)
+        self.home, self.config, self.mockbin = benchmark.prepare(self.root)
+        self.repo = SCRIPT.parents[1]
+        self.candidate = self.root / "candidate"
+        (self.candidate / "bin").mkdir(parents=True)
+        (self.candidate / "lib").mkdir()
+        shutil.copyfile(self.repo / "scripts/app-priority-candidate.sh",
+                        self.candidate / "bin/app-priority")
+        for name in ("stats.sh", "colors.sh"):
+            shutil.copyfile(self.repo / "lib" / name, self.candidate / "lib" / name)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def observe(self, tree):
+        return benchmark.sample(tree, self.root, self.home, self.config, self.mockbin)[1:]
+
+    def test_default_fixture_keeps_all_actions_and_output(self):
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
+    def test_malformed_grouped_output_falls_back_to_individual_queries(self):
+        pgrep = self.mockbin / "pgrep"
+        source = pgrep.read_text()
+        source = source.replace('printf "101 claude\\\\n201 codex\\\\n301 Slack\\\\n401 bats\\\\n"',
+                                'printf "invalid\\n"')
+        self.assertNotEqual(source, pgrep.read_text())
+        pgrep.write_text(source)
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
+    def test_explicit_config_uses_original_selection(self):
+        folder = self.config / "dotfiles"
+        folder.mkdir()
+        (folder / "priority-apps.txt").write_text("Slack\n")
+        self.assertEqual(self.observe(self.repo), self.observe(self.candidate))
+        self.assertEqual(self.observe(self.candidate)[0], b"taskpolicy -B -t 0 -l 0 -p 301\n")
 
 
 if __name__ == "__main__":

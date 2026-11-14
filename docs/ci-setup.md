@@ -44,6 +44,8 @@ One pair checks the harness; it is not the 30-pair performance decision.
 A manual dispatch with two reviewed full commit IDs runs the 30-pair decision
 and enforces the registered ratio and time limits. Review both source trees
 before dispatch: the fixture PATH is not an operating-system sandbox.
+For the fixture-only batched selector, set `fixture_candidate=true`; the
+workflow copies it into a disposable candidate tree, not the installed path.
 
 The bats suite includes `tests/docs-links.bats`, which validates local Markdown
 links in `README.md` and `docs/*.md` so onboarding links fail fast in CI.

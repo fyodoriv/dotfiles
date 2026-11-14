@@ -670,3 +670,17 @@ and the existing libc dependency. Keep the shell entry point active.
   implementation and rules out activation of this candidate.
 - **Anchor:** The native selector and owned-child results above, Apple's
   libproc and sysctl interfaces, and the existing offline delivery requirement.
+
+The first trial failed its timing and lookup checks. One bounded correction is
+worth testing: macOS launchd is the root ancestor, so include PID 1 in the
+excluded ancestor set without querying its parent. Keep errors for other
+unreadable ancestors as a fallback to the existing shell lookup.
+
+- **Hypothesis:** The failed lookup was the root ancestor query; stopping at
+  that known root allows native selection without changing owned-child actions.
+- **Measurement:** Repeat the hosted empty-cache Rust checks and the 30-pair
+  owned-child comparison against the same shell baseline.
+- **Success:** Every Rust check passes, every ordered action matches, the
+  candidate median is at most 400 ms, and its median ratio is at most 0.40.
+- **Pivot:** Any failure rejects the correction and retains the shell path.
+- **Anchor:** The failed hosted diagnostic and Apple's launchd process model.

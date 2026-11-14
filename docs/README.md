@@ -72,6 +72,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
 | [Heavy-run read-only reference](plans/heavy-run-read-only-reference.md) | Narrow search allowance and safety controls | agent |
 | [App-priority snapshot prediction](plans/app-priority-snapshot-prediction.md) | Safety and measurement plan for a cheaper process lookup | agent |
+| [App-priority native delivery](plans/app-priority-native-delivery.md) | Install, rollback, and full-command measurement prediction | agent |
 | [templates/](templates/) | Templates, such as the plan template | agent |
 | [audits/](audits/) | Past audits and run logs | both |
 | [human-blocked-actions/](human-blocked-actions/) | Steps that need a human, with the exact command | both |

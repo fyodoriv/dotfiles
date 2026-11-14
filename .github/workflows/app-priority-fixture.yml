@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      memory_comparison:
+        description: Compare peak memory on owned processes
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -82,7 +87,7 @@ jobs:
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/app-priority-native.bats
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats -f 'README CLI reference|every task name' tests/dotfiles-actions.bats tests/telemetry.bats
   owned-comparison:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.owned_comparison }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.owned_comparison || inputs.memory_comparison) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -94,6 +99,7 @@ jobs:
         env:
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          MEMORY_COMPARISON: ${{ inputs.memory_comparison }}
         run: |
           for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
             case "$sha" in ''|*[!0-9a-f]*) exit 2 ;; esac
@@ -109,7 +115,9 @@ jobs:
           (cd "$candidate/rust" && "$GITHUB_WORKSPACE/bin/heavy-run" cargo build --locked --offline --release --features fixture-actions --target-dir "$target" --manifest-path app-priority/Cargo.toml)
           ./bin/heavy-run cargo build --locked --release --target-dir "$target" --manifest-path "$candidate/scripts/app-priority-native-probe/Cargo.toml"
           if [ -f "$candidate/bin/app-priority-native" ]; then
-            APP_PRIORITY_DELIVERY_BINARY="$target/release/dotfiles-app-priority" PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 "$candidate/scripts/app-priority-owned-benchmark.py" --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
+            extra=()
+            if [ "$MEMORY_COMPARISON" = true ]; then extra+=(--memory); fi
+            APP_PRIORITY_DELIVERY_BINARY="$target/release/dotfiles-app-priority" PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 "$candidate/scripts/app-priority-owned-benchmark.py" --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe" "${extra[@]}"
           else
             printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
             PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
@@ -145,7 +153,7 @@ jobs:
       - name: Compare and measure controlled process selection
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure
   linux-fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check && !inputs.memory_comparison) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -201,7 +209,7 @@ jobs:
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
 
   fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check && !inputs.memory_comparison) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

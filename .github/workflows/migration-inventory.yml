@@ -1,0 +1,32 @@
+name: Migration inventory
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - rust/migration-inventory/**
+      - .github/workflows/migration-inventory.yml
+
+permissions:
+  contents: read
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare pinned offline source
+        run: |
+          cd rust/migration-inventory
+          ../../bin/heavy-run cargo vendor --versioned-dirs vendor > vendor-config.toml
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: migration-inventory-vendor
+          include-hidden-files: true
+          path: |
+            rust/migration-inventory/Cargo.lock
+            rust/migration-inventory/vendor-config.toml
+            rust/migration-inventory/vendor/

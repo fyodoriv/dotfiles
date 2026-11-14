@@ -420,3 +420,9 @@ case label and three booleans: whether the reference and candidate each
 selected the controlled child and whether their selected sets agree. Missing
 or ambiguous diagnostics leave the cause unknown; no process details are
 printed. This does not change the selection or cleanup decisions.
+
+The diagnostic identified the empty-argument-zero case, but both selectors
+missed the name assumed by the test. That is an invalid expected result, not
+evidence of disagreement. A follow-up checks four fixed pattern categories
+and reports only whether each path selected the controlled child. The case
+remains unqualified until its expected behavior is established.

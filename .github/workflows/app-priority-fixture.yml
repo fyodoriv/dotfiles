@@ -5,10 +5,22 @@ on:
     branches: [feat/chezmoi]
     paths:
       - bin/app-priority
+      - bin/heavy-run
+      - lib/stats.sh
+      - lib/colors.sh
       - scripts/app-priority-synthetic-benchmark.py
       - tests/app_priority_synthetic_benchmark_test.py
       - .github/workflows/app-priority-fixture.yml
   workflow_dispatch:
+    inputs:
+      baseline_sha:
+        description: Full reviewed baseline commit ID (leave both empty for harness check)
+        required: false
+        type: string
+      candidate_sha:
+        description: Full reviewed candidate commit ID (leave both empty for harness check)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -21,8 +33,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Check fixture isolation and refusal logic
         run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
       - name: Check one same-source fixture pair
         run: |
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$GITHUB_WORKSPACE" --candidate "$GITHUB_WORKSPACE" --pairs 1
+      - name: Compare reviewed source trees
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.baseline_sha != '' || inputs.candidate_sha != '') }}
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
+            case "$sha" in ''|*[!0-9a-f]*) echo 'Expected full lowercase commit IDs' >&2; exit 2 ;; esac
+            [ "${#sha}" -eq 40 ] || { echo 'Expected full lowercase commit IDs' >&2; exit 2; }
+            git cat-file -e "$sha^{commit}"
+          done
+          baseline="$RUNNER_TEMP/app-priority-baseline"
+          candidate="$RUNNER_TEMP/app-priority-candidate"
+          mkdir -p "$baseline" "$candidate"
+          git archive "$BASELINE_SHA" | tar -x -C "$baseline"
+          git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
+          result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$candidate" --pairs 30)"
+          printf '%s\n' "$result"
+          printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'

@@ -87,3 +87,16 @@ an operating-system sandbox: source that invokes an absolute priority tool
 could bypass it. Review both command trees and their selected helpers before
 running a pair. The hosted workflow's one same-source pair checks the fixture;
 it does not qualify the registered 30-pair decision.
+
+Once both source trees have been reviewed, dispatch the hosted workflow on a
+branch that contains it, supplying the full baseline and candidate commit IDs:
+
+```sh
+gh workflow run app-priority-fixture.yml --ref <branch> \
+  -f baseline_sha=<baseline-commit> -f candidate_sha=<candidate-commit>
+```
+
+The hosted job archives the specified commits into its private runner
+temporary directory, runs the registered 30 pairs through `heavy-run
+--exclusive`, and fails if the action parity or numeric thresholds fail.
+It does not establish process selection outside the fixed fixture.

@@ -69,7 +69,7 @@ concurrency:
 jobs:
   prepare-vendor:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_vendor }}
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,6 +78,17 @@ jobs:
       - name: Vendor locked dependencies
         run: |
           ./bin/heavy-run cargo vendor --locked --manifest-path rust/app-priority/Cargo.toml rust/vendor > "$RUNNER_TEMP/vendor-config.toml"
+          python3 -c 'import pathlib,shutil; root=pathlib.Path("rust/vendor"); [shutil.rmtree(p) for p in root.iterdir() if p.is_dir() and (p.name.startswith("windows") or p.name.startswith("winapi") or p.name == "ntapi")]'
+          mkdir -p rust/.cargo "$RUNNER_TEMP/empty-cargo"
+          printf '[source.crates-io]\nreplace-with = "vendored-sources"\n[source.vendored-sources]\ndirectory = "vendor"\n' > rust/.cargo/config.toml
+          SECONDS=0
+          (cd rust && CARGO_HOME="$RUNNER_TEMP/empty-cargo" ../bin/heavy-run cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml)
+          cold="$SECONDS"
+          SECONDS=0
+          (cd rust && CARGO_HOME="$RUNNER_TEMP/empty-cargo" ../bin/heavy-run cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml)
+          warm="$SECONDS"
+          printf 'offline build seconds: cold=%s warm=%s\n' "$cold" "$warm"
+          [ "$cold" -le 120 ] && [ "$warm" -le 15 ]
           tar -czf "$RUNNER_TEMP/priority-vendor.tar.gz" -C rust vendor
           sha256sum "$RUNNER_TEMP/priority-vendor.tar.gz"
       - name: Save vendored dependencies

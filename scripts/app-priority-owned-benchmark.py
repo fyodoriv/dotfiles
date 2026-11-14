@@ -49,6 +49,14 @@ def main():
         candidate_env = env.copy()
         delivery_binary = os.environ.get("APP_PRIORITY_DELIVERY_BINARY")
         if delivery_binary:
+            if os.environ.get("APP_PRIORITY_WITHOUT_LEGACY") == "1":
+                entry = args.candidate / "bin/app-priority"
+                text = entry.read_text()
+                start = "# BEGIN TEMPORARY SHELL PRIORITY RULES"
+                end = "# END TEMPORARY SHELL PRIORITY RULES"
+                if text.count(start) != 1 or text.count(end) != 1 or text.index(start) >= text.index(end):
+                    raise RuntimeError("legacy rule boundaries are invalid")
+                entry.write_text(text[:text.index(start)] + "exit 90\n" + text[text.index(end) + len(end):])
             native_dir = home / "data" / "dotfiles" / "native" / "app-priority"
             native_dir.mkdir(parents=True)
             binary = Path(delivery_binary)

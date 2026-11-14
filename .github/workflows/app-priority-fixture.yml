@@ -63,6 +63,11 @@ on:
         required: false
         type: boolean
         default: false
+      without_legacy:
+        description: Remove the old priority rules from the scratch candidate
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -111,6 +116,7 @@ jobs:
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           MEMORY_COMPARISON: ${{ inputs.memory_comparison }}
+          WITHOUT_LEGACY: ${{ inputs.without_legacy }}
         run: |
           for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
             case "$sha" in ''|*[!0-9a-f]*) exit 2 ;; esac
@@ -128,7 +134,7 @@ jobs:
           if [ -f "$candidate/bin/app-priority-native" ]; then
             extra=()
             if [ "$MEMORY_COMPARISON" = true ]; then extra+=(--memory); fi
-            APP_PRIORITY_DELIVERY_BINARY="$target/release/dotfiles-app-priority" PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 "$candidate/scripts/app-priority-owned-benchmark.py" --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe" "${extra[@]}"
+            APP_PRIORITY_WITHOUT_LEGACY="$([ "$WITHOUT_LEGACY" = true ] && printf 1 || printf 0)" APP_PRIORITY_DELIVERY_BINARY="$target/release/dotfiles-app-priority" PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 "$candidate/scripts/app-priority-owned-benchmark.py" --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe" "${extra[@]}"
           else
             printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
             PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"

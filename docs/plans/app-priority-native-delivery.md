@@ -24,6 +24,8 @@ native command has started: a partial native failure could duplicate actions.
 
 The legacy code remains a temporary rollback bridge. It is not a completed
 port until the native command passes gate G without the former implementation.
+The owned-child test also removes the shell rules from a scratch copy and
+fails if the native dispatch falls through to them.
 
 ## Memory qualification
 

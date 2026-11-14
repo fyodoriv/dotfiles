@@ -43,6 +43,7 @@ if [ -L "$native_dir/current" ]; then
   fi
 fi
 
+# BEGIN TEMPORARY SHELL PRIORITY RULES
 set_process_priority() {
   local process_name="$1"
   local process_ids
@@ -195,4 +196,5 @@ else
   set_process_nice_pattern "/biome "
 fi
 
+# END TEMPORARY SHELL PRIORITY RULES
 finish_priority_run

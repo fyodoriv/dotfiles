@@ -1,11 +1,14 @@
 """Compare priority decisions on owned hosted children without changing priority."""
 
 import argparse
+import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import statistics
 import subprocess
+import shutil
 import tempfile
 import time
 
@@ -21,6 +24,7 @@ def main():
     parser.add_argument("--base", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--child", type=Path, required=True)
+    parser.add_argument("--memory", action="store_true")
     args = parser.parse_args()
     if not allowed():
         raise SystemExit("hosted macOS required")
@@ -42,6 +46,26 @@ def main():
                "XDG_STATE_HOME": str(home / "state"), "LC_ALL": "C",
                "PATH": str(mockbin) + ":/usr/bin:/bin:/usr/sbin:/sbin",
                "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log)}
+        candidate_env = env.copy()
+        delivery_binary = os.environ.get("APP_PRIORITY_DELIVERY_BINARY")
+        if delivery_binary:
+            if os.environ.get("APP_PRIORITY_WITHOUT_LEGACY") == "1":
+                entry = args.candidate / "bin/app-priority"
+                text = entry.read_text()
+                start = "# BEGIN TEMPORARY SHELL PRIORITY RULES"
+                end = "# END TEMPORARY SHELL PRIORITY RULES"
+                if text.count(start) != 1 or text.count(end) != 1 or text.index(start) >= text.index(end):
+                    raise RuntimeError("legacy rule boundaries are invalid")
+                entry.write_text(text[:text.index(start)] + "exit 90\n" + text[text.index(end) + len(end):])
+            native_dir = home / "data" / "dotfiles" / "native" / "app-priority"
+            native_dir.mkdir(parents=True)
+            binary = Path(delivery_binary)
+            name = "app-priority-" + hashlib.sha256(binary.read_bytes()).hexdigest()
+            shutil.copy2(binary, native_dir / name)
+            (native_dir / "current").symlink_to(name)
+            env["DOTFILES_STATS_LOG"] = "1"
+            candidate_env = env.copy()
+            candidate_env["XDG_DATA_HOME"] = str(home / "data")
         cases = [("Slack", "slack"), ("claude", "claude"), ("codex", "codex"),
                  ("bats", "bats"), ("node", "minsky"), ("node", "node_modules/vitest")]
         try:
@@ -60,24 +84,42 @@ def main():
                 f"taskpolicy -b -p {ids[4]}\nrenice 10 -p {ids[4]}\n"
                 f"taskpolicy -b -p {ids[3]}\nrenice 10 -p {ids[3]}\n"
                 f"renice 10 -p {ids[5]}\n").encode()
-            times = {"base": [], "candidate": []}
-            for pair in range(30):
-                order = ("base", "candidate") if pair % 2 == 0 else ("candidate", "base")
-                for label in order:
-                    action_log.write_bytes(b"")
-                    tree = args.base if label == "base" else args.candidate
-                    start = time.perf_counter_ns()
-                    result = subprocess.run(["/bin/bash", str(tree / "bin/app-priority")],
-                                            env=env, stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE, check=False)
-                    times[label].append((time.perf_counter_ns() - start) / 1_000_000)
-                    if result.returncode != 0 or result.stdout or result.stderr:
-                        raise RuntimeError("command or output mismatch")
-                    if action_log.read_bytes() != expected:
-                        raise RuntimeError("ordered actions or target ownership differ")
-            base = statistics.median(times["base"])
-            candidate = statistics.median(times["candidate"])
-            ratio = candidate / base
+            if args.memory:
+                memory = {"base_first": [], "base_second": [], "candidate": []}
+                for label in memory:
+                    tree = args.candidate if label == "candidate" else args.base
+                    for _ in range(15):
+                        action_log.write_bytes(b"")
+                        result = subprocess.run(["/usr/bin/time", "-l", "/bin/bash", str(tree / "bin/app-priority")],
+                                                env=candidate_env if label == "candidate" else env,
+                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                        sample = re.search(rb"^\s*(\d+)\s+maximum resident set size\s*$", result.stderr, re.MULTILINE)
+                        if result.returncode != 0 or result.stdout or sample is None or action_log.read_bytes() != expected:
+                            raise RuntimeError("memory sample or ordered actions invalid")
+                        memory[label].append(int(sample.group(1)))
+                first = statistics.median(memory["base_first"])
+                second = statistics.median(memory["base_second"])
+                base_ratio = second / first
+                ratio = statistics.median(memory["candidate"]) / min(first, second)
+            else:
+                times = {"base": [], "candidate": []}
+                for pair in range(30):
+                    order = ("base", "candidate") if pair % 2 == 0 else ("candidate", "base")
+                    for label in order:
+                        action_log.write_bytes(b"")
+                        tree = args.base if label == "base" else args.candidate
+                        start = time.perf_counter_ns()
+                        result = subprocess.run(["/bin/bash", str(tree / "bin/app-priority")],
+                                                env=candidate_env if label == "candidate" else env, stdout=subprocess.PIPE,
+                                                stderr=subprocess.PIPE, check=False)
+                        times[label].append((time.perf_counter_ns() - start) / 1_000_000)
+                        if result.returncode != 0 or result.stdout or result.stderr:
+                            raise RuntimeError("command or output mismatch")
+                        if action_log.read_bytes() != expected:
+                            raise RuntimeError("ordered actions or target ownership differ")
+                base = statistics.median(times["base"])
+                candidate = statistics.median(times["candidate"])
+                ratio = candidate / base
         finally:
             for child in children:
                 if child.stdin:
@@ -85,6 +127,11 @@ def main():
             for child in children:
                 if child.wait(timeout=10) != 0:
                     raise RuntimeError("owned child cleanup failed")
+        if args.memory:
+            print(json.dumps({"samples": memory, "baseline_ratio": base_ratio, "candidate_ratio": ratio}))
+            if not 0.95 <= base_ratio <= 1.05 or ratio > 1.10:
+                raise SystemExit("memory threshold missed or baseline unstable")
+            return
         print(json.dumps({"pairs": 30, "actions_per_pair": 10,
                           "base_ms": times["base"], "candidate_ms": times["candidate"],
                           "base_median_ms": base, "candidate_median_ms": candidate,

@@ -53,6 +53,11 @@ on:
         required: false
         type: boolean
         default: false
+      delivery_check:
+        description: Test native installation and rollback
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -62,6 +67,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  delivery-check:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.delivery_check }}
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install test tools
+        run: brew install bats-core jq
+      - name: Test installation and rollback
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/app-priority-native.bats
   owned-comparison:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.owned_comparison }}
     runs-on: macos-latest
@@ -126,7 +143,7 @@ jobs:
       - name: Compare and measure controlled process selection
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure
   linux-fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -182,7 +199,7 @@ jobs:
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
 
   fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.delivery_check) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

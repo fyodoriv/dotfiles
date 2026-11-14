@@ -142,3 +142,21 @@ candidate commit and include `-f fixture_candidate=true` in the manual
 dispatch. Remove the fixture candidate when a safe implementation is deployed
 or this approach is abandoned. A passing fixture does not clear the identity
 boundary or establish an in-use benefit.
+
+### Duplicate grouped ID control
+
+The first candidate accepts repeated IDs in grouped output. That can repeat
+an action, so the candidate now falls back to individual queries.
+
+- **Hypothesis:** The duplicate fixture fails against candidate `b09aeb0`
+  and passes with the duplicate guard, with exactly the original action log.
+- **Measurement:** Run the hosted fixture tests once with the first candidate
+  and the duplicate test, then run them with the corrected candidate. No
+  live priority command is used.
+- **Success:** The first run reports an action-log mismatch in the duplicate
+  case; the corrected run passes all fixture cases with zero extra actions.
+- **Pivot:** Any earlier setup or unrelated failure is inconclusive; inspect
+  that failure before changing the fixture. A mismatch after the guard keeps
+  the candidate in draft.
+- **Anchor:** the fixture-only candidate prediction above and the existing
+  action-parity gate.

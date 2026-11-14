@@ -271,4 +271,46 @@ mod tests {
             assert_eq!(extract(&reference.stdout), extract(&native.stdout), "{mode} policy differs");
         }
     }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn cross_process_policy_matches_on_owned_children() {
+        unsafe extern "C" {
+            static mach_task_self_: u32;
+            fn getpriority(which: i32, who: u32) -> i32;
+            fn task_name_for_pid(target: u32, pid: i32, task: *mut u32) -> i32;
+            fn task_policy_get(task: u32, flavor: i32, policy: *mut i32,
+                count: *mut u32, get_default: *mut i32) -> i32;
+            fn mach_port_deallocate(task: u32, name: u32) -> i32;
+        }
+        fn state(pid: u32) -> Option<(i32, [i32; 2], i32)> {
+            let mut port = 0;
+            // SAFETY: the PID is an owned child held unreaped and port is writable.
+            let task = unsafe { mach_task_self_ };
+            if unsafe { task_name_for_pid(task, pid as i32, &mut port) } != 0 { return None; }
+            let mut qos = [0; 2];
+            let mut count = 2;
+            let mut default = 0;
+            // SAFETY: the policy buffer has two integers and both output pointers are valid.
+            let status = unsafe { task_policy_get(port, 9, qos.as_mut_ptr(), &mut count, &mut default) };
+            // SAFETY: the acquired port is released once; getpriority only reads the held child.
+            let background = unsafe { mach_port_deallocate(task, port); getpriority(4, pid) };
+            (status == 0 && count == 2 && background >= 0).then_some((background, qos, default))
+        }
+        let reference = crate::selector::tests::spawn("owned-reference");
+        let native = crate::selector::tests::spawn("owned-native");
+        let reference_pid = reference.child.id();
+        let native_pid = native.child.id();
+        for (args, enabled) in [(vec!["-b"], true), (vec!["-B", "-t", "0", "-l", "0"], false)] {
+            let status = Command::new("/usr/sbin/taskpolicy").args(args).args(["-p", &reference_pid.to_string()])
+                .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().unwrap();
+            assert!(status.success(), "reference action failed");
+            platform::background(native_pid, enabled);
+            let expected = state(reference_pid).expect("reference state unavailable");
+            let actual = state(native_pid).expect("native state unavailable");
+            assert_eq!(expected, actual, "owned child policy differs");
+        }
+        assert!(reference.finish());
+        assert!(native.finish());
+    }
 }

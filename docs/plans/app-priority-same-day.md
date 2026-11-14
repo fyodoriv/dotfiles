@@ -431,3 +431,10 @@ On the hosted runner both paths selected that child for the fixed `--child`
 pattern and neither selected it for the assumed executable-name pattern.
 The control now compares the observed reference behavior. This does not
 establish how all macOS versions or all empty arguments are represented.
+
+The corrected hosted macOS controls at commit `676a0fd` passed for the long
+name, empty first argument, spaced pattern and exited child. The same run
+closed and waited for its children and measured 30 three-query pairs: the
+`pgrep` median was 46.850 ms, the native median was 11.966 ms, and the ratio
+was 0.255. The earlier incorrect expectation and diagnostic are retained in
+the preceding paragraphs. See [run 43614912955](https://github.com/fyodoriv/dotfiles/actions/runs/43614912955).

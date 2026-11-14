@@ -479,20 +479,17 @@ lower line count is coverage, not a user benefit.
 
 The choices below were adopted on the reviewer's recommendation on
 2026-11-10. On 2026-11-12 the owner confirmed all seven as a group. The
-owner can reverse any of them. The agentbrew task
-`rust-owner-rules-on-replan-defaults` tracks recording the same ruling in
-the other plan.
+owner can reverse any of them.
 
-| Choice | Adopted default |
-|---|---|
-| Order | The per-call hook slice comes first, with a pre-registered cut per agent Bash call. It needs no native delivery task and no full harness. |
-| Cold paths | Doctor probes, sync orchestration and the other slices in the table above are recorded exceptions. |
-| Test tasks | The separate "move tests to Rust" task is gone. Tests move with their slice. |
-| Inventory | The inventory step is a manifest and a thin adapter to a small validator. |
-| Cheaper options | Each slice weighs a cheaper fix first: one `ps` pass for `app-priority`, parallel or cached doctor probes, `bats --jobs` for the gate. |
-| Existing Rust code | Fixture crates are `grandfathered`. Rust passes G only when it replaces a production path. The review asked for a statement; this is the default. |
-| Final audit states | The audit accepts `ported`, `exception`, `frozen`, `grandfathered` and `out-of-scope`. The review said the audit needs an owner decision; the owner confirmed these states on 2026-11-12. |
-
+| Choice | Adopted default | Owner ruling |
+|---|---|---|
+| Order | The per-call hook slice comes first, with a pre-registered cut per agent Bash call. It needs no native delivery task and no full harness.  Kept, 2026-11-12 |
+| Cold paths | Doctor probes, sync orchestration and the other slices in the table above are recorded exceptions.  Kept, 2026-11-12 |
+| Test tasks | The separate "move tests to Rust" task is gone. Tests move with their slice.  Kept, 2026-11-12 |
+| Inventory | The inventory step is a manifest and a thin adapter to a small validator.  Kept, 2026-11-12 |
+| Cheaper options | Each slice weighs a cheaper fix first: one `ps` pass for `app-priority`, parallel or cached doctor probes, `bats --jobs` for the gate.  Kept, 2026-11-12 |
+| Existing Rust code | Fixture crates are `grandfathered`. Rust passes G only when it replaces a production path. The review asked for a statement; this is the default.  Kept, 2026-11-12 |
+| Final audit states | The audit accepts `ported`, `exception`, `frozen`, `grandfathered` and `out-of-scope`. The review said the audit needs an owner decision; the owner confirmed these states on 2026-11-12.  Kept, 2026-11-12 |
 ## Validation review (2026-11-09)
 
 An independent reviewer checked this plan against measured timings on

@@ -10,6 +10,7 @@ on:
       - lib/colors.sh
       - scripts/app-priority-synthetic-benchmark.py
       - scripts/app-priority-candidate.sh
+      - scripts/app-priority-rust-fixture.rs
       - tests/app_priority_synthetic_benchmark_test.py
       - .github/workflows/app-priority-fixture.yml
   workflow_dispatch:
@@ -24,6 +25,11 @@ on:
         type: string
       fixture_candidate:
         description: Use the reviewed fixture-only candidate from the candidate commit
+        required: false
+        type: boolean
+        default: false
+      rust_candidate:
+        description: Use the reviewed fixture-only Rust candidate from the candidate commit
         required: false
         type: boolean
         default: false
@@ -51,6 +57,10 @@ jobs:
           fetch-depth: 0
       - name: Check mock-action fixture on Linux
         run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Compile and check Rust fixture on Linux
+        run: |
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run rustc --edition=2021 -O scripts/app-priority-rust-fixture.rs -o "$RUNNER_TEMP/app-priority-rust-fixture"
+          APP_PRIORITY_RUST_FIXTURE_BINARY="$RUNNER_TEMP/app-priority-rust-fixture" python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
       - name: Run same-source comparison preflight
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_sha != '' && inputs.baseline_sha == inputs.candidate_sha && !inputs.fixture_candidate }}
         shell: bash
@@ -103,6 +113,10 @@ jobs:
           fetch-depth: 0
       - name: Check fixture isolation and refusal logic
         run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Compile and check Rust fixture on macOS
+        run: |
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run rustc --edition=2021 -O scripts/app-priority-rust-fixture.rs -o "$RUNNER_TEMP/app-priority-rust-fixture"
+          APP_PRIORITY_RUST_FIXTURE_BINARY="$RUNNER_TEMP/app-priority-rust-fixture" python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
       - name: Check one same-source fixture pair
         run: |
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$GITHUB_WORKSPACE" --candidate "$GITHUB_WORKSPACE" --pairs 1
@@ -113,6 +127,7 @@ jobs:
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           FIXTURE_CANDIDATE: ${{ inputs.fixture_candidate }}
+          RUST_CANDIDATE: ${{ inputs.rust_candidate }}
         run: |
           for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
             case "$sha" in ''|*[!0-9a-f]*) echo 'Expected full lowercase commit IDs' >&2; exit 2 ;; esac
@@ -124,7 +139,11 @@ jobs:
           mkdir -p "$baseline" "$candidate"
           git archive "$BASELINE_SHA" | tar -x -C "$baseline"
           git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
-          if [ "$FIXTURE_CANDIDATE" = true ]; then
+          if [ "$RUST_CANDIDATE" = true ]; then
+            [ "$FIXTURE_CANDIDATE" != true ] || exit 2
+            PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run rustc --edition=2021 -O "$candidate/scripts/app-priority-rust-fixture.rs" -o "$candidate/bin/app-priority-rust-fixture"
+            printf '%s\n' '#!/bin/bash' 'exec "${0%/*}/app-priority-rust-fixture"' > "$candidate/bin/app-priority"
+          elif [ "$FIXTURE_CANDIDATE" = true ]; then
             [ -f "$candidate/scripts/app-priority-candidate.sh" ] || exit 2
             cp "$candidate/scripts/app-priority-candidate.sh" "$candidate/bin/app-priority"
           fi

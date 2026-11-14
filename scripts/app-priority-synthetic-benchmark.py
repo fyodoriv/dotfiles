@@ -86,7 +86,8 @@ def sample(tree, root, home, config, mockbin):
     env = {"HOME": str(home), "XDG_CONFIG_HOME": str(config),
            "XDG_STATE_HOME": str(home / "state"),
            "PATH": str(mockbin) + ":/usr/bin:/bin", "LC_ALL": "C",
-           "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log)}
+           "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log),
+           "APP_PRIORITY_FIXTURE_ONLY": "1"}
     command = tree / "bin" / "app-priority"
     started = time.perf_counter_ns()
     result = subprocess.run(["/bin/bash", str(command)], env=env,

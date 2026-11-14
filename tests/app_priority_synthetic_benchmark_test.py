@@ -86,6 +86,46 @@ def hosted_fixture():
             and os.environ.get("RUNNER_OS") in {"Linux", "macOS"})
 
 
+@unittest.skipUnless(hosted_fixture() and os.environ.get("APP_PRIORITY_RUST_FIXTURE_BINARY"),
+                     "compiled Rust fixture runs only on hosted runners")
+class RustFixtureTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-rust-")
+        self.root = Path(self.temporary.name)
+        self.home, self.config, self.mockbin = benchmark.prepare(self.root)
+        self.candidate = self.root / "candidate"
+        (self.candidate / "bin").mkdir(parents=True)
+        shutil.copyfile(os.environ["APP_PRIORITY_RUST_FIXTURE_BINARY"],
+                        self.candidate / "bin/app-priority-rust-fixture")
+        (self.candidate / "bin/app-priority-rust-fixture").chmod(0o755)
+        (self.candidate / "bin/app-priority").write_text(
+            '#!/bin/bash\nexec "${0%/*}/app-priority-rust-fixture"\n')
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def test_default_fixture_keeps_ordered_actions(self):
+        repo = SCRIPT.parents[1]
+        base = benchmark.sample(repo, self.root, self.home, self.config, self.mockbin)[1:]
+        candidate = benchmark.sample(self.candidate, self.root, self.home,
+                                     self.config, self.mockbin)[1:]
+        benchmark.compare(base, candidate)
+
+    def test_modified_priority_mock_is_refused_before_actions(self):
+        (self.mockbin / "renice").write_text("#!/bin/bash\nexit 0\n")
+        with self.assertRaisesRegex(RuntimeError, "fixture command failed"):
+            benchmark.sample(self.candidate, self.root, self.home, self.config, self.mockbin)
+        self.assertEqual((self.root / "actions").read_bytes(), b"")
+
+    def test_custom_configuration_is_refused_before_actions(self):
+        config = self.config / "dotfiles/priority-apps.txt"
+        config.parent.mkdir()
+        config.write_text("Slack\n")
+        with self.assertRaisesRegex(RuntimeError, "fixture command failed"):
+            benchmark.sample(self.candidate, self.root, self.home, self.config, self.mockbin)
+        self.assertEqual((self.root / "actions").read_bytes(), b"")
+
+
 @unittest.skipUnless(hosted_fixture(), "physical fixture runs only on hosted runners")
 class CandidateFixtureTests(unittest.TestCase):
     def setUp(self):

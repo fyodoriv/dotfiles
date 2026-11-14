@@ -497,7 +497,12 @@ ${dir#tests/}"
   # ("./agent-hooks/x.sh", "launchagents/x.plist.tmpl"). A root-level file
   # needs the "./" (a bare TASKS.md is usually a fixture name).
   if [[ "$file" == */* ]]; then rel="(\./)?$escaped"; else rel="\./$escaped"; fi
+  # Every existing path match contains the file's literal basename. Search
+  # all tests once first, then run the precise root and derived-root checks
+  # only on files that can match.
+  candidate_files=$'\n'"$(grep -lF -- "${file##*/}" "${all_bats[@]}" 2>/dev/null || true)"$'\n'
   for i in "${!all_bats[@]}"; do
+    [[ "$candidate_files" == *$'\n'"${all_bats[$i]}"$'\n'* ]] || continue
     if grep -qE -- "\\\$\{?(${bats_roots[$i]})\}?\"?/$escaped([^A-Za-z0-9_.-]|$)|(^|[[:space:]\"'(=])$rel([^A-Za-z0-9_.-]|$)" "${all_bats[$i]}" 2>/dev/null; then
       affected+=("${all_bats[$i]}")
       continue

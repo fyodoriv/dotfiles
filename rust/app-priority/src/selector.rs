@@ -104,26 +104,20 @@ pub fn same(pid: u32, expected: Identity, query: &OsStr, full: bool) -> bool {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
     use std::io::{BufRead, BufReader, Read, Write};
     use std::os::unix::process::CommandExt;
     use std::process::{Child, Command, Stdio};
 
-    pub(crate) struct Fixture { pub(crate) child: Child, _stdout: BufReader<std::process::ChildStdout> }
-    impl Fixture {
-        pub(crate) fn finish(mut self) -> bool {
-            self.child.stdin.take();
-            self.child.wait().is_ok_and(|status| status.success())
-        }
-    }
+    struct Fixture { child: Child, _stdout: BufReader<std::process::ChildStdout> }
     impl Drop for Fixture {
         fn drop(&mut self) {
             self.child.stdin.take();
             let _ = self.child.wait();
         }
     }
-    pub(crate) fn spawn(name: &str) -> Fixture {
+    fn spawn(name: &str) -> Fixture {
         let child = Command::new(std::env::current_exe().unwrap()).arg0(name)
             .args(["--exact", "selector::tests::controlled_child", "--nocapture"])
             .env("DOTFILES_SELECTOR_CHILD", "1").stdin(Stdio::piped())

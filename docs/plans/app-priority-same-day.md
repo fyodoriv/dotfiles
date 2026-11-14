@@ -445,6 +445,11 @@ cross-process `-p` behavior used by the command.
   identity at runtime; `renice`, stats and offline delivery remain open.
 - **Anchor:** the self-child result and Apple's taskpolicy source above.
 
+The first hosted attempt could not read the reference child's policy through
+an externally acquired task port. The next control has each retained child
+report its own policy after the parent applies the action. It still targets
+only unreaped owned children and reports no process identifiers.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

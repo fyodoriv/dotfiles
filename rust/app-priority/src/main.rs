@@ -274,31 +274,73 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn cross_process_policy_matches_on_owned_children() {
+    fn priority_action_child() {
+        use std::io::{BufRead, Write};
+        if std::env::var_os("DOTFILES_ACTION_CHILD").is_none() { return; }
         unsafe extern "C" {
             static mach_task_self_: u32;
             fn getpriority(which: i32, who: u32) -> i32;
-            fn task_name_for_pid(target: u32, pid: i32, task: *mut u32) -> i32;
             fn task_policy_get(task: u32, flavor: i32, policy: *mut i32,
                 count: *mut u32, get_default: *mut i32) -> i32;
-            fn mach_port_deallocate(task: u32, name: u32) -> i32;
         }
-        fn state(pid: u32) -> Option<(i32, [i32; 2], i32)> {
-            let mut port = 0;
-            // SAFETY: the PID is an owned child held unreaped and port is writable.
-            let task = unsafe { mach_task_self_ };
-            if unsafe { task_name_for_pid(task, pid as i32, &mut port) } != 0 { return None; }
+        println!("POLICY_READY");
+        std::io::stdout().flush().unwrap();
+        for line in std::io::stdin().lock().lines() {
+            assert_eq!(line.unwrap(), "state");
             let mut qos = [0; 2];
             let mut count = 2;
             let mut default = 0;
-            // SAFETY: the policy buffer has two integers and both output pointers are valid.
-            let status = unsafe { task_policy_get(port, 9, qos.as_mut_ptr(), &mut count, &mut default) };
-            // SAFETY: the acquired port is released once; getpriority only reads the held child.
-            let background = unsafe { mach_port_deallocate(task, port); getpriority(4, pid) };
-            (status == 0 && count == 2 && background >= 0).then_some((background, qos, default))
+            // SAFETY: the output pointers are valid and both queries target this child.
+            let status = unsafe { task_policy_get(mach_task_self_, 9, qos.as_mut_ptr(), &mut count, &mut default) };
+            let background = unsafe { getpriority(4, 0) };
+            assert!(status == 0 && count == 2 && background >= 0);
+            println!("POLICY_STATE {background},{},{},{default}", qos[0], qos[1]);
+            std::io::stdout().flush().unwrap();
         }
-        let reference = crate::selector::tests::spawn("owned-reference");
-        let native = crate::selector::tests::spawn("owned-native");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn cross_process_policy_matches_on_owned_children() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::process::{Child, ChildStdout};
+        struct ChildOwner { child: Child, output: BufReader<ChildStdout> }
+        impl ChildOwner {
+            fn spawn() -> Self {
+                let mut child = Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "tests::priority_action_child", "--nocapture"])
+                    .env("DOTFILES_ACTION_CHILD", "1").stdin(Stdio::piped())
+                    .stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+                let mut output = BufReader::new(child.stdout.take().unwrap());
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    assert!(output.read_line(&mut line).unwrap() > 0, "owned child did not start");
+                    if line.contains("POLICY_READY") { break; }
+                }
+                Self { child, output }
+            }
+            fn state(&mut self) -> String {
+                let input = self.child.stdin.as_mut().unwrap();
+                input.write_all(b"state\n").unwrap();
+                input.flush().unwrap();
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    assert!(self.output.read_line(&mut line).unwrap() > 0, "owned child state unavailable");
+                    if let Some((_, state)) = line.split_once("POLICY_STATE ") { return state.trim().to_owned(); }
+                }
+            }
+            fn finish(mut self) -> bool {
+                self.child.stdin.take();
+                self.child.wait().is_ok_and(|status| status.success())
+            }
+        }
+        impl Drop for ChildOwner {
+            fn drop(&mut self) { self.child.stdin.take(); let _ = self.child.wait(); }
+        }
+        let mut reference = ChildOwner::spawn();
+        let mut native = ChildOwner::spawn();
         let reference_pid = reference.child.id();
         let native_pid = native.child.id();
         for (args, enabled) in [(vec!["-b"], true), (vec!["-B", "-t", "0", "-l", "0"], false)] {
@@ -306,8 +348,8 @@ mod tests {
                 .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().unwrap();
             assert!(status.success(), "reference action failed");
             platform::background(native_pid, enabled);
-            let expected = state(reference_pid).expect("reference state unavailable");
-            let actual = state(native_pid).expect("native state unavailable");
+            let expected = reference.state();
+            let actual = native.state();
             assert_eq!(expected, actual, "owned child policy differs");
         }
         assert!(reference.finish());

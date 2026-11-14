@@ -162,20 +162,6 @@ them. -->
 
 ## P2
 
-- [ ] Explain why a hook memory run fails its load check
-  - **ID**: rust-hook-load-diagnosis
-  - **Tags**: migration, rust, performance
-  - **Mode**: AFK
-  - **Details**: The first candidate memory attempt stopped before its first sample. Its receipt combines an unavailable CPU count and a one-minute load above the CPU count in one flag, so the cause is unknown. After the active retry ends, add a closed reason to the private receipt. Preserve the existing admission, load threshold and sample rules. Never record raw host details.
-  - **Output**: code
-  - **Acceptance**: Focused tests distinguish an unavailable CPU count from excessive load, preserve rejection for both, and reveal no raw host values.
-  - **Hypothesis**: A closed reason makes both load-gate failures distinguishable without changing any accept or reject decision.
-  - **Measurement**: `python3 tests/hook_rss_provenance_test.py` with planted unavailable-count and excessive-load cases.
-  - **Success**: 2 of 2 planted causes receive distinct correct reasons; 0 changed gate decisions; 0 raw host values in receipts.
-  - **Pivot**: Any ambiguous reason, changed decision or host-value leak retains the current gate and receipt.
-  - **Anchor**: Candidate RSS receipt, 2026-11-12; Basili, Caldiera and Rombach 1994 (GQM).
-  - **Competitive-goal**: none — private measurement diagnosis.
-
 - [ ] Distinguish read-only test-runner references from test runs
   - **ID**: heavy-run-read-only-reference
   - **Tags**: agent-hooks, heavy-run, false-positive

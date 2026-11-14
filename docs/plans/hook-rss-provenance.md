@@ -33,6 +33,11 @@ the normal Mac-wide `heavy-run --exclusive` queue, never a private replacement
 queue. A later candidate uses the same method and compares its median with
 the lower qualifying baseline median.
 
+A private load failure receipt includes a closed reason: `cpu-unavailable`
+for the existing falsy CPU-count condition, or `load-over-limit` for the
+existing high-load condition. Earlier sample failures keep precedence. The
+receipt does not include raw CPU-count or load values.
+
 Success: 30 valid samples, exact admission binding, stable enumerated inputs,
 valid load checks, ratio in range and independent review. Pivot: any unknown
 identity, failed validity condition, unsafe output or mismatched admission is

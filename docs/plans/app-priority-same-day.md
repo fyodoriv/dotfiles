@@ -653,6 +653,37 @@ ratio 0.448. The registered pivot rejects this lookup-and-action combination.
 The simulated actions do not establish live syscall cost or behavior. See
 [run 43617256945](https://github.com/fyodoriv/dotfiles/actions/runs/43617256945).
 
+#### Smaller offline process adapter
+
+Register before implementation. The complete locked dependency vendor set
+builds offline, but expands to 242 MB and contains private-reference matches.
+Replace the process library with a small adapter around Apple's process APIs
+and the existing libc dependency. Keep the shell entry point active.
+
+- **Hypothesis:** The smaller adapter preserves controlled selection and
+  action behavior while allowing a clean-cache offline build.
+- **Measurement:** Hosted macOS runs the Rust checks, an empty-cache offline
+  release build, and 30 alternating owned-child fixture pairs.
+- **Success:** Every ordered action matches, the offline build succeeds, the
+  candidate median is at most 400 ms, and its median ratio is at most 0.40.
+- **Pivot:** Any mismatch, build failure, or missed timing retains the shell
+  implementation and rules out activation of this candidate.
+- **Anchor:** The native selector and owned-child results above, Apple's
+  libproc and sysctl interfaces, and the existing offline delivery requirement.
+
+The first trial failed its timing and lookup checks. One bounded correction is
+worth testing: macOS launchd is the root ancestor, so include PID 1 in the
+excluded ancestor set without querying its parent. Keep errors for other
+unreadable ancestors as a fallback to the existing shell lookup.
+
+- **Hypothesis:** The failed lookup was the root ancestor query; stopping at
+  that known root allows native selection without changing owned-child actions.
+- **Measurement:** Repeat the hosted empty-cache Rust checks and the 30-pair
+  owned-child comparison against the same shell baseline.
+- **Success:** Every Rust check passes, every ordered action matches, the
+  candidate median is at most 400 ms, and its median ratio is at most 0.40.
+- **Pivot:** Any failure rejects the correction and retains the shell path.
+- **Anchor:** The failed hosted diagnostic and Apple's launchd process model.
 #### Smaller offline process adapter: rejected
 
 The [registered trial](https://github.com/fyodoriv/dotfiles/commit/d9686c8)
@@ -670,3 +701,10 @@ reason the operating system denied that lookup remains unproven. See
 Keep the existing shell entry point active. The earlier native selector and
 offline delivery remain separate work; the fixture result is not an in-use
 performance claim.
+
+The bounded root-ancestor correction passed all seven hosted Rust tests. In
+30 owned-child pairs it preserved all ten ordered actions, with a 118.10 ms
+candidate median and 442.00 ms shell median, ratio 0.267. See the
+[hosted comparison](https://github.com/fyodoriv/dotfiles/actions/runs/43621417697)
+and [offline checks](https://github.com/fyodoriv/dotfiles/actions/runs/43621417760).
+Installation, live side effects and in-use benefit remain unverified.

@@ -2,7 +2,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{CString, OsStr};
 use std::os::unix::ffi::OsStrExt;
-use sysinfo::{Pid, Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Identity { seconds: u64, micros: u64 }
@@ -32,75 +31,97 @@ impl Drop for Expression {
     }
 }
 
-fn matches(process: &Process, expression: &Expression, full: bool) -> bool {
-    let args = process.cmd();
-    let value = if !full {
-        let first = args.first().map(OsStr::new).unwrap_or_else(|| process.name());
-        first.as_bytes().rsplit(|b| *b == b'/').next().unwrap_or_default().to_vec()
-    } else if args.is_empty() {
-        process.name().as_bytes().to_vec()
-    } else {
-        let mut value = Vec::new();
-        for (index, arg) in args.iter().enumerate() {
-            if index != 0 { value.push(b' '); }
-            value.extend_from_slice(arg.as_bytes());
-        }
-        value
-    };
-    expression.matches(&value, !full)
-}
+struct Details { identity: Identity, parent: u32, system: bool, name: Vec<u8> }
 
-fn details(pid: u32) -> Result<(Identity, bool), ()> {
+fn details(pid: u32) -> Result<Details, ()> {
     let mut info = std::mem::MaybeUninit::<libc::proc_bsdinfo>::uninit();
     let size = std::mem::size_of::<libc::proc_bsdinfo>();
-    // SAFETY: info has space for the requested structure; the PID is bounded below.
+    // SAFETY: info has space for the requested structure and the PID is bounded.
     if pid > i32::MAX as u32 || unsafe {
         libc::proc_pidinfo(pid as i32, libc::PROC_PIDTBSDINFO, 0, info.as_mut_ptr().cast(), size as i32)
     } != size as i32 { return Err(()); }
     // SAFETY: proc_pidinfo returned the complete structure.
     let info = unsafe { info.assume_init() };
-    Ok((Identity { seconds: info.pbi_start_tvsec, micros: info.pbi_start_tvusec }, info.pbi_flags & 1 != 0))
+    let name = info.pbi_comm.iter().take_while(|c| **c != 0).map(|c| *c as u8).collect();
+    Ok(Details { identity: Identity { seconds: info.pbi_start_tvsec, micros: info.pbi_start_tvusec },
+        parent: info.pbi_ppid, system: info.pbi_flags & 1 != 0, name })
 }
 
-fn refresh(system: &mut System, scope: ProcessesToUpdate<'_>) -> bool {
-    system.refresh_processes_specifics(scope, true,
-        ProcessRefreshKind::nothing().with_cmd(UpdateKind::Always)) > 0
+fn arguments(pid: u32) -> Option<Vec<Vec<u8>>> {
+    let mut mib = [libc::CTL_KERN, libc::KERN_PROCARGS2, pid as i32];
+    let mut size = 0usize;
+    // SAFETY: the MIB and output length are valid; no output buffer is provided.
+    if unsafe { libc::sysctl(mib.as_mut_ptr(), 3, std::ptr::null_mut(), &mut size,
+        std::ptr::null_mut(), 0) } != 0 || size > 8 * 1024 * 1024 || size < 4 { return None; }
+    let mut data = vec![0u8; size];
+    // SAFETY: data has size bytes and the MIB and length pointers remain valid.
+    if unsafe { libc::sysctl(mib.as_mut_ptr(), 3, data.as_mut_ptr().cast(), &mut size,
+        std::ptr::null_mut(), 0) } != 0 || size > data.len() { return None; }
+    data.truncate(size);
+    let argc = i32::from_ne_bytes(data.get(..4)?.try_into().ok()?);
+    if !(0..=65536).contains(&argc) { return None; }
+    let mut pos = 4 + data.get(4..)?.iter().position(|b| *b == 0)?;
+    while data.get(pos) == Some(&0) { pos += 1; }
+    let mut args = Vec::new();
+    for _ in 0..argc {
+        let rest = data.get(pos..)?;
+        let end = rest.iter().position(|b| *b == 0)?;
+        args.push(rest[..end].to_vec());
+        pos += end + 1;
+    }
+    Some(args)
+}
+
+fn matches(pid: u32, info: &Details, expression: &Expression, full: bool) -> bool {
+    let args = arguments(pid).unwrap_or_default();
+    let value = if !full {
+        let first = args.first().filter(|a| !a.is_empty()).unwrap_or(&info.name);
+        first.rsplit(|b| *b == b'/').next().unwrap_or_default().to_vec()
+    } else if args.is_empty() {
+        info.name.clone()
+    } else {
+        args.join(&b' ')
+    };
+    expression.matches(&value, !full)
 }
 
 pub fn find(query: &OsStr, full: bool) -> Result<BTreeMap<u32, Identity>, ()> {
     let expression = Expression::compile(query)?;
-    let mut system = System::new().map_err(|_| ())?;
-    if !refresh(&mut system, ProcessesToUpdate::All) { return Err(()); }
+    // SAFETY: querying the count uses no output buffer.
+    let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
+    if count <= 0 { #[cfg(test)] eprintln!("process list count failed"); return Err(()); }
+    let mut pids = vec![0i32; count as usize + 128];
+    let bytes = pids.len().checked_mul(std::mem::size_of::<i32>()).ok_or(())?;
+    if bytes > i32::MAX as usize { return Err(()); }
+    // SAFETY: pids contains bytes writable bytes for the returned PID list.
+    let count = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), bytes as i32) };
+    if count <= 0 || count as usize >= pids.len() { #[cfg(test)] eprintln!("process list read failed"); return Err(()); }
+    pids.truncate(count as usize);
     let mut ancestors = BTreeSet::new();
-    let mut current = Some(Pid::from_u32(std::process::id()));
-    while let Some(pid) = current {
-        if !ancestors.insert(pid.as_u32()) { return Err(()); }
-        current = system.process(pid).and_then(Process::parent);
+    let mut current = std::process::id();
+    while current != 0 {
+        if !ancestors.insert(current) { #[cfg(test)] eprintln!("ancestor cycle"); return Err(()); }
+        if current == 1 { break; }
+        current = details(current).map_err(|_| { #[cfg(test)] eprintln!("ancestor details failed"); })?.parent;
     }
-    let candidates: Vec<Pid> = system.processes().iter()
-        .filter(|(pid, process)| !ancestors.contains(&pid.as_u32()) && matches(process, &expression, full))
-        .map(|(pid, _)| *pid).collect();
     let mut result = BTreeMap::new();
-    for pid in candidates {
-        let (before, is_system) = details(pid.as_u32())?;
-        if is_system { continue; }
-        if !refresh(&mut system, ProcessesToUpdate::Some(&[pid])) { return Err(()); }
-        let process = system.process(pid).ok_or(())?;
-        if !matches(process, &expression, full) { continue; }
-        let (after, is_system) = details(pid.as_u32())?;
-        if before == after && !is_system { result.insert(pid.as_u32(), after); }
+    for pid in pids.into_iter().filter(|pid| *pid > 0).map(|pid| pid as u32) {
+        if ancestors.contains(&pid) { continue; }
+        let Ok(before) = details(pid) else { continue };
+        if before.system || !matches(pid, &before, &expression, full) { continue; }
+        let after = details(pid).map_err(|_| { #[cfg(test)] eprintln!("candidate details failed"); })?;
+        if before.identity == after.identity && !after.system && matches(pid, &after, &expression, full) {
+            result.insert(pid, after.identity);
+        }
     }
     Ok(result)
 }
 
 pub fn same(pid: u32, expected: Identity, query: &OsStr, full: bool) -> bool {
     let Ok(expression) = Expression::compile(query) else { return false };
-    if !details(pid).is_ok_and(|(current, is_system)| current == expected && !is_system) { return false; }
-    let Ok(mut system) = System::new() else { return false };
-    let pid_value = Pid::from_u32(pid);
-    if !refresh(&mut system, ProcessesToUpdate::Some(&[pid_value])) { return false; }
-    if !system.process(pid_value).is_some_and(|process| matches(process, &expression, full)) { return false; }
-    details(pid).is_ok_and(|(current, is_system)| current == expected && !is_system)
+    let Ok(before) = details(pid) else { return false };
+    if before.identity != expected || before.system || !matches(pid, &before, &expression, full) { return false; }
+    details(pid).is_ok_and(|after| after.identity == expected && !after.system)
 }
 
 #[cfg(test)]

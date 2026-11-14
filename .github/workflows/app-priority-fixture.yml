@@ -87,7 +87,7 @@ jobs:
           mkdir -p "$baseline" "$candidate"
           git archive "$BASELINE_SHA" | tar -x -C "$baseline"
           git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
-          ./bin/heavy-run cargo build --locked --release --features fixture-actions --target-dir "$target" --manifest-path "$candidate/rust/app-priority/Cargo.toml"
+          (cd "$candidate/rust" && "$GITHUB_WORKSPACE/bin/heavy-run" cargo build --locked --offline --release --features fixture-actions --target-dir "$target" --manifest-path app-priority/Cargo.toml)
           ./bin/heavy-run cargo build --locked --release --target-dir "$target" --manifest-path "$candidate/scripts/app-priority-native-probe/Cargo.toml"
           printf '#!/bin/bash\nexec "%s" --apply\n' "$target/release/dotfiles-app-priority" > "$candidate/bin/app-priority"
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-owned-benchmark.py --base "$baseline" --candidate "$candidate" --child "$target/release/app-priority-native-probe"
@@ -101,10 +101,13 @@ jobs:
           persist-credentials: false
       - name: Test and build Rust command
         run: |
-          ./bin/heavy-run cargo test --locked --manifest-path rust/app-priority/Cargo.toml
-          ./bin/heavy-run cargo build --locked --release --manifest-path rust/app-priority/Cargo.toml
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          mkdir -p "$CARGO_HOME"
+          cd rust
+          ../bin/heavy-run cargo test --locked --offline --manifest-path app-priority/Cargo.toml
+          ../bin/heavy-run cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml
           status=0
-          rust/app-priority/target/release/dotfiles-app-priority || status=$?
+          app-priority/target/release/dotfiles-app-priority || status=$?
           [ "$status" -eq 2 ]
   native-probe:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_probe }}

@@ -9,6 +9,8 @@ on:
       - lib/stats.sh
       - lib/colors.sh
       - scripts/app-priority-synthetic-benchmark.py
+      - scripts/app-priority-candidate.sh
+      - scripts/app-priority-rust-fixture.rs
       - tests/app_priority_synthetic_benchmark_test.py
       - .github/workflows/app-priority-fixture.yml
   workflow_dispatch:
@@ -21,12 +23,87 @@ on:
         description: Full reviewed candidate commit ID (leave both empty for harness check)
         required: false
         type: string
+      fixture_candidate:
+        description: Use the reviewed fixture-only candidate from the candidate commit
+        required: false
+        type: boolean
+        default: false
+      rust_candidate:
+        description: Use the reviewed fixture-only Rust candidate from the candidate commit
+        required: false
+        type: boolean
+        default: false
+      linux_preflight_only:
+        description: Run only the hosted Linux negative-control preflight
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: app-priority-fixture-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  linux-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check mock-action fixture on Linux
+        run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Compile and check Rust fixture on Linux
+        run: |
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run rustc --edition=2021 -O scripts/app-priority-rust-fixture.rs -o "$RUNNER_TEMP/app-priority-rust-fixture"
+          APP_PRIORITY_RUST_FIXTURE_BINARY="$RUNNER_TEMP/app-priority-rust-fixture" python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Run same-source comparison preflight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_sha != '' && inputs.baseline_sha == inputs.candidate_sha && !inputs.fixture_candidate }}
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          APP_PRIORITY_LINUX_PREFLIGHT: '1'
+        run: |
+          case "$BASELINE_SHA" in ''|*[!0-9a-f]*) echo 'Expected a full lowercase commit ID' >&2; exit 2 ;; esac
+          [ "${#BASELINE_SHA}" -eq 40 ] || exit 2
+          git cat-file -e "$BASELINE_SHA^{commit}"
+          baseline="$RUNNER_TEMP/app-priority-linux-baseline"
+          mkdir -p "$baseline"
+          git archive "$BASELINE_SHA" | tar -x -C "$baseline"
+          result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$baseline" --pairs 30)"
+          printf '%s\n' "$result"
+          printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and (r["ratio"] > 0.40 or r["candidate_median_ms"] > 400) else 1)'
+
+      - name: Run candidate comparison preflight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_sha != '' && inputs.candidate_sha != '' && inputs.fixture_candidate }}
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          APP_PRIORITY_LINUX_PREFLIGHT: '1'
+        run: |
+          for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
+            case "$sha" in ''|*[!0-9a-f]*) echo 'Expected full lowercase commit IDs' >&2; exit 2 ;; esac
+            [ "${#sha}" -eq 40 ] || exit 2
+            git cat-file -e "$sha^{commit}"
+          done
+          baseline="$RUNNER_TEMP/app-priority-linux-baseline"
+          candidate="$RUNNER_TEMP/app-priority-linux-candidate"
+          mkdir -p "$baseline" "$candidate"
+          git archive "$BASELINE_SHA" | tar -x -C "$baseline"
+          git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
+          [ -f "$candidate/scripts/app-priority-candidate.sh" ] || exit 2
+          cp "$candidate/scripts/app-priority-candidate.sh" "$candidate/bin/app-priority"
+          result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$candidate" --pairs 30)"
+          printf '%s\n' "$result"
+          printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
+
   fixture:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.linux_preflight_only }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -36,6 +113,10 @@ jobs:
           fetch-depth: 0
       - name: Check fixture isolation and refusal logic
         run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Compile and check Rust fixture on macOS
+        run: |
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run rustc --edition=2021 -O scripts/app-priority-rust-fixture.rs -o "$RUNNER_TEMP/app-priority-rust-fixture"
+          APP_PRIORITY_RUST_FIXTURE_BINARY="$RUNNER_TEMP/app-priority-rust-fixture" python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
       - name: Check one same-source fixture pair
         run: |
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$GITHUB_WORKSPACE" --candidate "$GITHUB_WORKSPACE" --pairs 1
@@ -45,6 +126,8 @@ jobs:
         env:
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          FIXTURE_CANDIDATE: ${{ inputs.fixture_candidate }}
+          RUST_CANDIDATE: ${{ inputs.rust_candidate }}
         run: |
           for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
             case "$sha" in ''|*[!0-9a-f]*) echo 'Expected full lowercase commit IDs' >&2; exit 2 ;; esac
@@ -56,6 +139,14 @@ jobs:
           mkdir -p "$baseline" "$candidate"
           git archive "$BASELINE_SHA" | tar -x -C "$baseline"
           git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
+          if [ "$RUST_CANDIDATE" = true ]; then
+            [ "$FIXTURE_CANDIDATE" != true ] || exit 2
+            PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run rustc --edition=2021 -O "$candidate/scripts/app-priority-rust-fixture.rs" -o "$candidate/bin/app-priority-rust-fixture"
+            printf '%s\n' '#!/bin/bash' 'exec "${0%/*}/app-priority-rust-fixture"' > "$candidate/bin/app-priority"
+          elif [ "$FIXTURE_CANDIDATE" = true ]; then
+            [ -f "$candidate/scripts/app-priority-candidate.sh" ] || exit 2
+            cp "$candidate/scripts/app-priority-candidate.sh" "$candidate/bin/app-priority"
+          fi
           result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$candidate" --pairs 30)"
           printf '%s\n' "$result"
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'

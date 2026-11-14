@@ -41,9 +41,14 @@ Organization-specific branch-protection / approval workflows belong in your priv
 The app-priority fixture workflow runs its isolated mock-action checks and one
 same-source timing pair on hosted macOS when the benchmark or command changes.
 One pair checks the harness; it is not the 30-pair performance decision.
+The same mock-action tests also run on hosted Linux as an early preflight;
+an explicit same-source Linux preflight checks the comparison path. Only
+hosted macOS supplies the decision timing result.
 A manual dispatch with two reviewed full commit IDs runs the 30-pair decision
 and enforces the registered ratio and time limits. Review both source trees
 before dispatch: the fixture PATH is not an operating-system sandbox.
+For the fixture-only batched selector, set `fixture_candidate=true`; the
+workflow copies it into a disposable candidate tree, not the installed path.
 
 The bats suite includes `tests/docs-links.bats`, which validates local Markdown
 links in `README.md` and `docs/*.md` so onboarding links fail fast in CI.

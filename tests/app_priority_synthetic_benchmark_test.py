@@ -1,7 +1,10 @@
 """Safety checks for the fixture benchmark without starting a process."""
 
 import importlib.util
+import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,12 +17,36 @@ SPEC.loader.exec_module(benchmark)
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_workflow_cancels_only_superseded_pull_request_runs(self):
+        workflow = SCRIPT.parents[1] / ".github/workflows/app-priority-fixture.yml"
+        data = subprocess.check_output([
+            "ruby", "-rjson", "-ryaml", "-e",
+            "puts JSON.dump(YAML.load_file(ARGV.fetch(0)))", str(workflow)
+        ], text=True)
+        concurrency = json.loads(data).get("concurrency")
+        self.assertEqual(concurrency, {
+            "group": "app-priority-fixture-${{ github.event.pull_request.number || github.run_id }}",
+            "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+        })
+
     def test_only_hosted_macos_is_admitted(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(benchmark.hosted())
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "RUNNER_OS": "macOS",
                                     "RUNNER_ENVIRONMENT": "github-hosted"}, clear=True):
             self.assertTrue(benchmark.hosted())
+
+    def test_linux_comparison_requires_explicit_hosted_preflight(self):
+        environment = {"GITHUB_ACTIONS": "true", "RUNNER_OS": "Linux",
+                       "RUNNER_ENVIRONMENT": "github-hosted"}
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertFalse(benchmark.hosted())
+        environment["APP_PRIORITY_LINUX_PREFLIGHT"] = "1"
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertTrue(benchmark.hosted())
+        environment["RUNNER_ENVIRONMENT"] = "self-hosted"
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertFalse(benchmark.hosted())
 
     def test_action_and_output_changes_refuse(self):
         base = (benchmark.EXPECTED_ACTIONS, b"", b"")
@@ -51,6 +78,125 @@ class BenchmarkTests(unittest.TestCase):
             with patch.object(benchmark.subprocess, "run", side_effect=fake_run):
                 _, actions, _, _ = benchmark.sample(root, root, home, config, mockbin)
             self.assertEqual(actions, b"taskpolicy -b -p 101\n")
+
+
+def hosted_fixture():
+    return (os.environ.get("GITHUB_ACTIONS") == "true"
+            and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+            and os.environ.get("RUNNER_OS") in {"Linux", "macOS"})
+
+
+@unittest.skipUnless(hosted_fixture() and os.environ.get("APP_PRIORITY_RUST_FIXTURE_BINARY"),
+                     "compiled Rust fixture runs only on hosted runners")
+class RustFixtureTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-rust-")
+        self.root = Path(self.temporary.name)
+        self.home, self.config, self.mockbin = benchmark.prepare(self.root)
+        self.candidate = self.root / "candidate"
+        (self.candidate / "bin").mkdir(parents=True)
+        shutil.copyfile(os.environ["APP_PRIORITY_RUST_FIXTURE_BINARY"],
+                        self.candidate / "bin/app-priority-rust-fixture")
+        (self.candidate / "bin/app-priority-rust-fixture").chmod(0o755)
+        (self.candidate / "bin/app-priority").write_text(
+            '#!/bin/bash\nexec "${0%/*}/app-priority-rust-fixture"\n')
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def test_default_fixture_keeps_ordered_actions(self):
+        repo = SCRIPT.parents[1]
+        base = benchmark.sample(repo, self.root, self.home, self.config, self.mockbin)[1:]
+        candidate = benchmark.sample(self.candidate, self.root, self.home,
+                                     self.config, self.mockbin)[1:]
+        benchmark.compare(base, candidate)
+
+    def test_modified_priority_mock_is_refused_before_actions(self):
+        (self.mockbin / "renice").write_text("#!/bin/bash\nexit 0\n")
+        with self.assertRaisesRegex(RuntimeError, "fixture command failed"):
+            benchmark.sample(self.candidate, self.root, self.home, self.config, self.mockbin)
+        self.assertEqual((self.root / "actions").read_bytes(), b"")
+
+    def test_custom_configuration_matches_shell_actions(self):
+        config = self.config / "dotfiles/priority-apps.txt"
+        config.parent.mkdir()
+        config.write_text("  Slack # foreground\nnode.*minsky\n  # ignored\n\n")
+        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+                                self.config, self.mockbin)[1:]
+        candidate = benchmark.sample(self.candidate, self.root, self.home,
+                                     self.config, self.mockbin)[1:]
+        self.assertEqual(base, candidate)
+        self.assertEqual(base[0], b"taskpolicy -B -t 0 -l 0 -p 301\n"
+                                  b"taskpolicy -B -t 0 -l 0 -p 501\n")
+
+    def test_empty_custom_configuration_matches_shell(self):
+        config = self.config / "dotfiles/priority-apps.txt"
+        config.parent.mkdir()
+        config.write_text("")
+        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+                                self.config, self.mockbin)[1:]
+        candidate = benchmark.sample(self.candidate, self.root, self.home,
+                                     self.config, self.mockbin)[1:]
+        self.assertEqual(base, candidate)
+        self.assertEqual(base[0], b"")
+
+
+@unittest.skipUnless(hosted_fixture(), "physical fixture runs only on hosted runners")
+class CandidateFixtureTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-candidate-")
+        self.root = Path(self.temporary.name)
+        self.home, self.config, self.mockbin = benchmark.prepare(self.root)
+        self.repo = SCRIPT.parents[1]
+        self.candidate = self.root / "candidate"
+        (self.candidate / "bin").mkdir(parents=True)
+        (self.candidate / "lib").mkdir()
+        shutil.copyfile(self.repo / "scripts/app-priority-candidate.sh",
+                        self.candidate / "bin/app-priority")
+        for name in ("stats.sh", "colors.sh"):
+            shutil.copyfile(self.repo / "lib" / name, self.candidate / "lib" / name)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def observe(self, tree):
+        return benchmark.sample(tree, self.root, self.home, self.config, self.mockbin)[1:]
+
+    def test_default_fixture_keeps_all_actions_and_output(self):
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
+    def test_malformed_grouped_output_falls_back_to_individual_queries(self):
+        pgrep = self.mockbin / "pgrep"
+        source = pgrep.read_text()
+        source = source.replace('printf "101 claude\\\\n201 codex\\\\n301 Slack\\\\n401 bats\\\\n"',
+                                'printf "invalid\\n"')
+        self.assertNotEqual(source, pgrep.read_text())
+        pgrep.write_text(source)
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
+    def test_duplicate_grouped_pid_falls_back_to_individual_queries(self):
+        pgrep = self.mockbin / "pgrep"
+        source = pgrep.read_text()
+        expected = 'printf "101 claude\\\\n201 codex\\\\n301 Slack\\\\n401 bats\\\\n"'
+        replacement = 'printf "101 claude\\n101 claude\\n"'
+        self.assertIn(expected, source)
+        pgrep.write_text(source.replace(expected, replacement))
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
+    def test_malformed_grouped_pattern_output_falls_back(self):
+        pgrep = self.mockbin / "pgrep"
+        source = pgrep.read_text()
+        expected = 'printf "501 node minsky\\n601 node_modules/vitest\\n"'
+        self.assertIn(expected, source)
+        pgrep.write_text(source.replace(expected, 'printf "invalid\\n"'))
+        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+
+    def test_explicit_config_uses_original_selection(self):
+        folder = self.config / "dotfiles"
+        folder.mkdir()
+        (folder / "priority-apps.txt").write_text("Slack\n")
+        self.assertEqual(self.observe(self.repo), self.observe(self.candidate))
+        self.assertEqual(self.observe(self.candidate)[0], b"taskpolicy -B -t 0 -l 0 -p 301\n")
 
 
 if __name__ == "__main__":

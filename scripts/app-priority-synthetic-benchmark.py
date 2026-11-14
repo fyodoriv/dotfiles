@@ -13,6 +13,10 @@ import time
 MOCKS = {
     "pgrep": r'''#!/bin/bash
 case "$*" in
+  "-l -x Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel")
+    printf "101 claude\\n201 codex\\n301 Slack\\n401 bats\\n" ;;
+  "-l -f mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ")
+    printf "501 node minsky\n601 node_modules/vitest\n" ;;
   "-x Slack") printf "301\n" ;;
   "-x claude") printf "101\n" ;;
   "-x codex") printf "201\n" ;;
@@ -54,9 +58,13 @@ EXPECTED_ACTIONS = (
 
 
 def hosted():
+    runner = os.environ.get("RUNNER_OS")
+    allowed_os = runner == "macOS" or (
+        runner == "Linux" and os.environ.get("APP_PRIORITY_LINUX_PREFLIGHT") == "1"
+    )
     return (os.environ.get("GITHUB_ACTIONS") == "true"
-            and os.environ.get("RUNNER_OS") == "macOS"
-            and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
+            and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+            and allowed_os)
 
 
 def prepare(root):
@@ -78,7 +86,8 @@ def sample(tree, root, home, config, mockbin):
     env = {"HOME": str(home), "XDG_CONFIG_HOME": str(config),
            "XDG_STATE_HOME": str(home / "state"),
            "PATH": str(mockbin) + ":/usr/bin:/bin", "LC_ALL": "C",
-           "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log)}
+           "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log),
+           "APP_PRIORITY_FIXTURE_ONLY": "1"}
     command = tree / "bin" / "app-priority"
     started = time.perf_counter_ns()
     result = subprocess.run(["/bin/bash", str(command)], env=env,
@@ -102,7 +111,7 @@ def main():
     parser.add_argument("--pairs", type=int, required=True)
     args = parser.parse_args()
     if not hosted():
-        parser.error("run only on a GitHub-hosted macOS runner")
+        parser.error("run only on hosted macOS or an explicit hosted Linux preflight")
     if not 1 <= args.pairs <= 30:
         parser.error("pairs must be between 1 and 30")
     trees = {"base": args.base.resolve(strict=True),

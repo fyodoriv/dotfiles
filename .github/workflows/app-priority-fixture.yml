@@ -53,6 +53,11 @@ on:
         required: false
         type: boolean
         default: false
+      prepare_vendor:
+        description: Prepare locked Rust dependencies for offline builds
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -62,6 +67,25 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  prepare-vendor:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_vendor }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Vendor locked dependencies
+        run: |
+          ./bin/heavy-run cargo vendor --locked --manifest-path rust/app-priority/Cargo.toml rust/vendor > "$RUNNER_TEMP/vendor-config.toml"
+          tar -czf "$RUNNER_TEMP/priority-vendor.tar.gz" -C rust vendor
+          sha256sum "$RUNNER_TEMP/priority-vendor.tar.gz"
+      - name: Save vendored dependencies
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-priority-vendor
+          path: ${{ runner.temp }}/priority-vendor.tar.gz
+          if-no-files-found: error
   owned-comparison:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.owned_comparison }}
     runs-on: macos-latest
@@ -119,7 +143,7 @@ jobs:
       - name: Compare and measure controlled process selection
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure
   linux-fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.prepare_vendor) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -175,7 +199,7 @@ jobs:
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
 
   fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check && !inputs.owned_comparison && !inputs.prepare_vendor) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

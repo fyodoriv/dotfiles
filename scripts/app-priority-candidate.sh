@@ -21,35 +21,29 @@ APP_PRIORITY_BATCH_ROWS=""
 
 find_exact_processes() {
   local requested="$1" row pid name
-  # Bash dynamic scope writes the caller's local process_ids.
-  process_ids=""
   if [ "$APP_PRIORITY_BATCH_READY" != 1 ]; then
-    process_ids=$(pgrep -x "$requested" 2>/dev/null || true)
+    pgrep -x "$requested" 2>/dev/null || true
     return 0
   fi
   while IFS= read -r row; do
     [ -n "$row" ] || continue
     pid="${row%% *}"
     name="${row#* }"
-    [ "$name" = "$requested" ] && process_ids="${process_ids}${pid}"$'\n'
+    [ "$name" = "$requested" ] && printf '%s\n' "$pid"
   done <<< "$APP_PRIORITY_BATCH_ROWS"
   return 0
 }
 
 prepare_default_batch() {
-  local row pid name status=0 seen=" "
+  local row pid name status=0
   APP_PRIORITY_BATCH_ROWS="$(pgrep -l -x 'Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel' 2>/dev/null)" || status=$?
   [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || return 0
-  if [ "$status" -eq 0 ] && [ -z "$APP_PRIORITY_BATCH_ROWS" ]; then return 0; fi
-  if [ "$status" -eq 1 ] && [ -n "$APP_PRIORITY_BATCH_ROWS" ]; then return 0; fi
   while IFS= read -r row; do
     [ -n "$row" ] || continue
     case "$row" in *' '*) ;; *) return 0 ;; esac
     pid="${row%% *}"
     name="${row#* }"
     case "$pid" in ''|*[!0-9]*) return 0 ;; esac
-    case "$seen" in *" $pid "*) return 0 ;; esac
-    seen="$seen$pid "
     case "$name" in
       Slack|'Google Chrome'|'Microsoft Outlook'|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel) ;;
       *) return 0 ;;
@@ -61,7 +55,7 @@ prepare_default_batch() {
 set_process_priority() {
   local process_name="$1"
   local process_ids
-  find_exact_processes "$process_name"
+  process_ids=$(find_exact_processes "$process_name")
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -85,7 +79,7 @@ set_process_priority_pattern() {
 set_process_background() {
   local process_name="$1"
   local process_ids
-  find_exact_processes "$process_name"
+  process_ids=$(find_exact_processes "$process_name")
   [ -z "$process_ids" ] && return
 
   while IFS= read -r process_id; do
@@ -146,7 +140,7 @@ is_descendant_of_interactive_app() {
 set_agent_priority() {
   local process_name="$1"
   local process_ids
-  find_exact_processes "$process_name"
+  process_ids=$(find_exact_processes "$process_name")
   [ -z "$process_ids" ] && return
 
   local process_id

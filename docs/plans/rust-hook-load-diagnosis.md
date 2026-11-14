@@ -39,7 +39,7 @@ The migration draft needs its scratch fixtures adapted and its source/audit
 provenance renewed after it incorporates this change.
 
 The first hosted run exposed a stale wrapper assertion: it expected exactly
-15 tests while the focused suite now has 17. The wrapper failure was
+a fixed test count after the focused suite grew. The wrapper failure was
 reproduced locally. It now checks the named load controls and a clean `OK`
 instead of pinning the total; its focused Bats test passes. Fresh hosted
 verification remains required.

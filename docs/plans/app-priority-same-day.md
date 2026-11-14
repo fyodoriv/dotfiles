@@ -48,3 +48,36 @@ select tagged records with `.timestamp >= ($deployed | todate)` and
 `.timestamp < (($deployed + 900) | todate)`. The interval starts after the
 new executable is active. Record the deployed source identity and actual
 start and end; do not combine old and new code.
+
+## Baseline result and same-day pivot
+
+The baseline was captured after prediction commit `89560f6`, ending at
+2026-11-14 14:31:38 UTC. The earlier six-hour window had 343 samples and a
+mean of 2,805.31 ms; the later window had 350 samples and a mean of
+1,510.40 ms. Both counts passed, but the means differ by 46.16% of the larger.
+The preregistered 20% stability floor failed. This is not a usable in-use
+baseline and cannot establish an in-use improvement.
+
+Before implementing the fallback benchmark or a candidate, register it here:
+
+- **Hypothesis:** On a fixed synthetic process table, the safe candidate
+  preserves every ordered action while its median elapsed time is at most
+  40% of the existing command and at most 400 ms.
+- **Measurement:** On a fresh hosted macOS runner, run
+  `heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py
+  --base <base> --candidate <candidate> --pairs 30`. The benchmark uses
+  isolated HOME, XDG configuration and PATH, fixed process and ancestry
+  responses, and mock priority actions. Alternate order in successive pairs.
+  Record all 60 elapsed times and both ordered action logs. No real process
+  receives a priority change.
+- **Success:** All 30 pairs finish, every ordered action log matches, no real
+  priority command executes, median candidate/base is at most 0.40, and the
+  candidate median is at most 400 ms. The existing targeted parity checks and
+  hosted CI also pass.
+- **Pivot:** A mismatched action, missing or failed sample, real process
+  action, unsupported matching semantics, identity risk, or ratio above 0.40
+  rejects the candidate. Keep the old command and do not claim an in-use
+  gain. Fixture results describe only the fixed workload.
+- **Anchor:** [snapshot safety prediction](app-priority-snapshot-prediction.md),
+  [migration plan](rust-migration.md), Basili et al. (1994), GQM, and
+  Munafò et al. (2017), preregistration.

@@ -411,3 +411,27 @@ need their own controlled behavior checks.
   errors, stats and installation need separate controls.
 - **Anchor:** [Apple taskpolicy source](https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L202-L244)
   and the native selector result above.
+
+### Rust priority command with existing lookup
+
+Register before implementation. Keep per-rule `pgrep` and ancestry `ps`
+queries initially so the Rust command follows the current lookup and action
+order. Replace priority-tool starts with native macOS calls, and keep the
+shell stats and rollback path until native delivery is qualified.
+
+- **Hypothesis:** A Rust command using the existing lookups and native
+  priority operations preserves the ordered decisions and reaches the
+  registered 0.40 controlled-fixture ratio.
+- **Measurement:** Run the existing app-priority behavior cases against an
+  injected test backend, compare owned-child native priority behavior with
+  the existing tools, and run the registered 30-pair hosted comparison. Run
+  hosted CI and the build and resource gates before switching the live path.
+- **Success:** Zero changed decisions or unintended priority actions; all
+  parity, ownership, build and hosted checks pass; median candidate/base is
+  at most 0.40 and candidate median at most 400 ms.
+- **Pivot:** Any mismatch, unsafe target, failed resource gate or missed
+  timing target rejects the candidate. Keep the shell command active and
+  apply the migration plan's exception rule when its evidence is sufficient.
+  Fixture speed does not prove in-use benefit.
+- **Anchor:** `bin/app-priority`, the per-rule timing result, and Apple's
+  taskpolicy source cited above.

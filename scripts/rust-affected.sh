@@ -9,3 +9,5 @@ fi
 cd rust
 ../bin/heavy-run cargo test --locked --offline --manifest-path app-priority/Cargo.toml
 ../bin/heavy-run cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml
+../bin/heavy-run cargo test --locked --offline --manifest-path hook-status/Cargo.toml
+../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml

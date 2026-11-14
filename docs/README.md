@@ -76,6 +76,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [Priority runtime evidence](plans/app-priority-runtime-evidence.md) | Runtime tagging and build-output prediction | agent |
 | [Affected-test selection for large changes](plans/bats-affected-vendor-speed.md) | Search parity and timing prediction for large diffs | agent |
 | [Hosted performance queue](plans/ci-perf-queue.md) | Prediction for queueing hosted timing runs | agent |
+| [Native status guard trial](plans/rust-hook-status-trial.md) | JSON guard parity, timing, and memory prediction | agent |
 | [templates/](templates/) | Templates, such as the plan template | agent |
 | [audits/](audits/) | Past audits and run logs | both |
 | [human-blocked-actions/](human-blocked-actions/) | Steps that need a human, with the exact command | both |

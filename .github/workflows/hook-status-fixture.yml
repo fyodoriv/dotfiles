@@ -1,0 +1,41 @@
+name: Native hook fixture
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - rust/hook-status/**
+      - rust/vendor/**
+      - scripts/hook-status-owned-benchmark.py
+      - .github/workflows/hook-status-fixture.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install guard test tools
+        run: brew install bats-core jq shfmt
+      - name: Test the offline native guard candidate
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          mkdir -p "$CARGO_HOME"
+          cd rust
+          ../bin/heavy-run cargo test --locked --offline --manifest-path hook-status/Cargo.toml
+          ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml
+      - name: Check the installed entry point and performance row
+        run: |
+          cp agent-hooks/block-dangerous-git.sh agent-hooks/block-dangerous-git-legacy.sh
+          python3 -c 'import os,shlex; from pathlib import Path; p=Path("agent-hooks/block-dangerous-git.sh"); s=p.read_text(); marker="set -euo pipefail\n"; assert s.count(marker)==1; helper=shlex.quote(os.environ["GITHUB_WORKSPACE"]+"/rust/hook-status/target/release/dotfiles-hook-status"); p.write_text(s.replace(marker,"set -euo pipefail; if [ \"${DOTFILES_NATIVE_GUARD_BYPASS:-}\" != 1 ] && [ -x "+helper+" ]; then exec "+helper+" --exec \"$0\"; fi\n"))'
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/agent-hooks-block-dangerous-git.bats
+          HOOK_STATUS_INSTALLED=1 PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/perf-gate.sh --force --json > "$RUNNER_TEMP/hook-gate.json"
+          jq '.commands[] | select(.name == "hook-block-dangerous-git")' "$RUNNER_TEMP/hook-gate.json"
+          jq -e '.commands[] | select(.name == "hook-block-dangerous-git") | .ratio <= 0.50' "$RUNNER_TEMP/hook-gate.json"

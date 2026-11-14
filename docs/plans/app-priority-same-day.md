@@ -481,6 +481,15 @@ candidate median was 144.54 ms, ratio 0.322. Actions were simulated in that
 timing run; it does not establish real in-use speed. See
 [run 43619190003](https://github.com/fyodoriv/dotfiles/actions/runs/43619190003).
 
+#### Offline Rust build
+
+Register before preparing dependencies. Vendoring the locked crates should
+let the candidate build with no network. On hosted macOS, build with
+`cargo build --locked --offline --release` from the Rust directory. Success
+requires a cold build within 120 seconds and a warm build within 15 seconds.
+Any missing or altered dependency, network requirement or exceeded bound
+keeps native delivery inactive. Anchor: gate G and Cargo's source replacement.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

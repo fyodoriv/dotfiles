@@ -73,6 +73,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [Heavy-run read-only reference](plans/heavy-run-read-only-reference.md) | Narrow search allowance and safety controls | agent |
 | [App-priority snapshot prediction](plans/app-priority-snapshot-prediction.md) | Safety and measurement plan for a cheaper process lookup | agent |
 | [App-priority native delivery](plans/app-priority-native-delivery.md) | Install, rollback, and full-command measurement prediction | agent |
+| [Priority runtime evidence](plans/app-priority-runtime-evidence.md) | Runtime tagging and build-output prediction | agent |
 | [Affected-test selection for large changes](plans/bats-affected-vendor-speed.md) | Search parity and timing prediction for large diffs | agent |
 | [Hosted performance queue](plans/ci-perf-queue.md) | Prediction for queueing hosted timing runs | agent |
 | [templates/](templates/) | Templates, such as the plan template | agent |

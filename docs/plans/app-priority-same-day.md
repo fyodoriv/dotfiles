@@ -449,7 +449,7 @@ need their own controlled behavior checks.
   the observable background and foreground QoS state set by `taskpolicy`.
 - **Measurement:** Start fresh short-lived children in the hosted runner.
   Each candidate changes only its own process (`who=0` and its own Mach task).
-  Reference children start through `/usr/bin/taskpolicy` with equivalent
+  Reference children start through `/usr/sbin/taskpolicy` with equivalent
   options before executing the same observer. Compare return status and
   reported background and QoS fields. Close and wait for every owned child.
   No arbitrary PID, process-group signal, or priority action on another
@@ -463,6 +463,10 @@ need their own controlled behavior checks.
   errors, stats and installation need separate controls.
 - **Anchor:** [Apple taskpolicy source](https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L202-L244)
   and the native selector result above.
+
+The first hosted control stopped before comparison because the proposed test
+used `/usr/bin/taskpolicy`, which does not exist on the runner. The actual
+macOS path is `/usr/sbin/taskpolicy`; the control uses that corrected path.
 
 ### Rust priority command with existing lookup
 

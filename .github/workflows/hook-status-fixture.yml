@@ -1,0 +1,28 @@
+name: Native hook fixture
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - rust/hook-status/**
+      - rust/vendor/**
+      - .github/workflows/hook-status-fixture.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test the offline native guard candidate
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          mkdir -p "$CARGO_HOME"
+          cd rust
+          ../bin/heavy-run cargo test --locked --offline --manifest-path hook-status/Cargo.toml
+          ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml

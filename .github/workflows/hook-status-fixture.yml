@@ -30,15 +30,11 @@ jobs:
           cd rust
           ../bin/heavy-run cargo test --locked --offline --manifest-path hook-status/Cargo.toml
           ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml
-      - name: Compare guard decisions, timing, and memory
-        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
       - name: Check the installed entry point and performance row
         run: |
           cp agent-hooks/block-dangerous-git.sh agent-hooks/block-dangerous-git-legacy.sh
-          printf '#!/bin/bash\nexec "%s" "%s"\n' "$GITHUB_WORKSPACE/rust/hook-status/target/release/dotfiles-hook-status" "$GITHUB_WORKSPACE/agent-hooks/block-dangerous-git-legacy.sh" > agent-hooks/block-dangerous-git.sh
-          # The source-specific plutil assertion belongs to the fallback now.
-          python3 -c 'from pathlib import Path; p=Path("tests/agent-hooks-block-dangerous-git.bats"); s=p.read_text(); a="grep -q '\''/usr/bin/plutil'\'' agent-hooks/block-dangerous-git.sh"; assert s.count(a)==1; Path("tests/native-guard-fixture.bats").write_text(s.replace(a,a.replace("block-dangerous-git.sh","block-dangerous-git-legacy.sh")))'
-          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/native-guard-fixture.bats
+          python3 -c 'import os,shlex; from pathlib import Path; p=Path("agent-hooks/block-dangerous-git.sh"); s=p.read_text(); marker="input=$(cat)\n"; assert s.count(marker)==1; helper=shlex.quote(os.environ["GITHUB_WORKSPACE"]+"/rust/hook-status/target/release/dotfiles-hook-status"); p.write_text(s.replace(marker,marker+"if printf '\''%s'\'' \"$input\" | "+helper+" --check; then exit 0; fi\n"))'
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/agent-hooks-block-dangerous-git.bats
           HOOK_STATUS_INSTALLED=1 PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/perf-gate.sh --force --json > "$RUNNER_TEMP/hook-gate.json"
           jq '.commands[] | select(.name == "hook-block-dangerous-git")' "$RUNNER_TEMP/hook-gate.json"

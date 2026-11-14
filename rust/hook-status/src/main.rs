@@ -1,7 +1,5 @@
 //! Read-only status shortcut. Other inputs are passed to the existing guard.
-use std::io::{self, Read, Write};
-use std::os::unix::process::ExitStatusExt;
-use std::process::{Command, Stdio};
+use std::io::{self, Read};
 
 fn literal_status(input: &[u8]) -> bool {
     // Escaped keys and duplicate target keys always go to the original guard.
@@ -22,17 +20,12 @@ fn literal_status(input: &[u8]) -> bool {
 fn run() -> Result<i32, &'static str> {
     let mut args = std::env::args_os();
     let _ = args.next();
-    let legacy = args.next().ok_or("missing guard path")?;
+    let mode = args.next().ok_or("missing check mode")?;
     if args.next().is_some() { return Err("unexpected argument"); }
+    if mode != "--check" { return Err("unknown mode"); }
     let mut input = Vec::new();
     io::stdin().read_to_end(&mut input).map_err(|_| "input read failed")?;
-    if literal_status(&input) { return Ok(0); }
-    let mut child = Command::new("/bin/bash").arg(legacy)
-        .stdin(Stdio::piped()).stdout(Stdio::inherit()).stderr(Stdio::inherit())
-        .spawn().map_err(|_| "guard start failed")?;
-    if let Some(mut stdin) = child.stdin.take() { let _ = stdin.write_all(&input); }
-    let status = child.wait().map_err(|_| "guard wait failed")?;
-    Ok(status.code().unwrap_or_else(|| 128 + status.signal().unwrap_or(1)))
+    Ok(if literal_status(&input) { 0 } else { 1 })
 }
 
 fn main() {

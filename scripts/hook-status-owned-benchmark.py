@@ -17,12 +17,10 @@ def main():
             and os.environ.get("RUNNER_OS") == "macOS"):
         raise SystemExit("hosted macOS required")
     guard = ROOT / "agent-hooks/block-dangerous-git.sh"
-    native = ROOT / "rust/hook-status/target/release/dotfiles-hook-status"
-    baseline = ["/bin/bash", str(guard)]
-    candidate = [str(native), str(guard)]
-    if os.environ.get("HOOK_STATUS_INSTALLED") == "1":
-        baseline = ["/bin/bash", str(guard.with_name("block-dangerous-git-legacy.sh"))]
-        candidate = ["/bin/bash", str(guard)]
+    if os.environ.get("HOOK_STATUS_INSTALLED") != "1":
+        raise SystemExit("scratch entry point required")
+    baseline = ["/bin/bash", str(guard.with_name("block-dangerous-git-legacy.sh"))]
+    candidate = ["/bin/bash", str(guard)]
     inputs = [b'{"tool_input":{"command":"git status"},"cwd":"/tmp"}',
               b'{"tool_input":{"command":"git status --short"}}',
               b'{"tool_input":{"command":"git status; echo safe"}}',

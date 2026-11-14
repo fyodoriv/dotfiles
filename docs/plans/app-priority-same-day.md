@@ -196,3 +196,20 @@ mock priority commands; it does not replace the macOS tests or timing.
 - **Pivot:** A setup or unrelated failure is inconclusive; inspect its log.
   Linux results do not qualify macOS semantics, timing or process identity.
 - **Anchor:** the duplicate grouped ID control above and the hosted fixture.
+
+### Linux comparison preflight
+
+The macOS negative control remains queued. Register a separate Linux
+preflight before running it; it checks the comparison path, not Mac speed.
+
+- **Hypothesis:** Thirty same-source mocked pairs on hosted Linux preserve
+  the action log and fail the 0.40 speed threshold.
+- **Measurement:** Run the fixed benchmark on a GitHub-hosted Linux runner
+  with an explicit preflight flag and identical reviewed source commits.
+- **Success:** All 30 pairs complete with identical actions, and the ratio
+  exceeds 0.40 or the candidate median exceeds 400 ms. No real priority
+  action runs.
+- **Pivot:** Missing samples, setup errors, action mismatch or an unexpected
+  passing result leave the control inconclusive. Linux evidence does not
+  replace the registered macOS control, candidate timing, or identity gate.
+- **Anchor:** the same-source negative control and hosted Linux preflight above.

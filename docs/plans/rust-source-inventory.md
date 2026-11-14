@@ -363,3 +363,11 @@ file, component, generated-target and edge records. Use its observed call
 receipts for executable boundaries. This ledger defines a source evidence
 format only. It does not set the validator schema or satisfy the acceptance
 gate in [the migration plan](rust-migration.md).
+
+## Shared comparison pin
+
+`rust/migration-inventory` pins the shared agentbrew comparison core by Git
+revision and includes an offline vendor copy. Its hosted check verifies the
+locked build and a missing embedded-identity control. This is a dependency
+step only. It does not discover source, create the component manifest, or
+complete `rust-source-inventory`.

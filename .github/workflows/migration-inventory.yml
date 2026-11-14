@@ -11,22 +11,28 @@ permissions:
   contents: read
 
 jobs:
-  vendor:
-    runs-on: ubuntu-latest
+  offline-core:
+    runs-on: macos-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Prepare pinned offline source
+      - name: Check the pinned source offline
         run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/inventory-target"
+          mkdir -p "$CARGO_HOME"
           cd rust/migration-inventory
-          ../../bin/heavy-run cargo vendor --versioned-dirs vendor > vendor-config.toml
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: migration-inventory-vendor
-          include-hidden-files: true
-          path: |
-            rust/migration-inventory/Cargo.lock
-            rust/migration-inventory/vendor-config.toml
-            rust/migration-inventory/vendor/
+          ../../bin/heavy-run --exclusive python3 -c '
+          import subprocess, time
+          command = ["cargo", "build", "--locked", "--offline", "--release"]
+          for label, limit in (("cold", 120), ("warm", 15)):
+              start = time.monotonic()
+              subprocess.run(command, check=True)
+              elapsed = time.monotonic() - start
+              print(f"{label}: {elapsed:.3f}s (limit {limit}s)", flush=True)
+              if elapsed > limit:
+                  raise SystemExit(f"{label} build exceeded budget")
+          '
+          ../../bin/heavy-run cargo test --locked --offline

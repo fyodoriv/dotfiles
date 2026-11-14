@@ -568,3 +568,29 @@ remain open. `make check` builds and tests the Rust crate when `rust/`
 changes. A clean build or unit test alone does not qualify live activation.
 The candidate requires `--apply` and is not installed, so invoking the binary
 without that argument does not change process priority.
+
+#### Full-command fixture with native-action simulation
+
+Register before implementation. The production candidate keeps per-rule
+`pgrep` calls but uses in-process priority operations. For a safe fixture,
+compile a test-only action backend that appends the same ordered mock action
+lines instead of touching priorities; the release backend is unchanged.
+
+- **Hypothesis:** The full Rust rule path and in-process simulated actions
+  preserve every fixed action and meet the existing 0.40 timing ratio.
+- **Measurement:** Compare 30 alternating hosted macOS pairs with the pinned
+  shell baseline, the same mock process tools, and the fixture-only Rust build.
+  Record all samples and run the existing Rust and shell controls.
+- **Success:** All ordered action logs match, no real priority changes occur,
+  candidate/base median is at most 0.40, and candidate median is at most 400 ms.
+- **Pivot:** A mismatch, missing sample, real priority action or failed timing
+  rejects this fixture candidate. A pass is a synthetic result only: simulated
+  actions do not establish real syscall cost, cross-process parity, identity,
+  installation, stats or in-use benefit.
+- **Anchor:** the Rust command prediction and controlled fallback above.
+
+The hosted macOS run at candidate `4984d5a` preserved all fixed actions but
+missed the timing limit: baseline median 182.59 ms, candidate median 81.73 ms,
+ratio 0.448. The registered pivot rejects this lookup-and-action combination.
+The simulated actions do not establish live syscall cost or behavior. See
+[run 43617256945](https://github.com/fyodoriv/dotfiles/actions/runs/43617256945).

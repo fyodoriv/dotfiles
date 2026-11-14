@@ -1,0 +1,28 @@
+name: App priority fixture
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - bin/app-priority
+      - scripts/app-priority-synthetic-benchmark.py
+      - tests/app_priority_synthetic_benchmark_test.py
+      - .github/workflows/app-priority-fixture.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check fixture isolation and refusal logic
+        run: python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
+      - name: Check one same-source fixture pair
+        run: |
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$GITHUB_WORKSPACE" --candidate "$GITHUB_WORKSPACE" --pairs 1

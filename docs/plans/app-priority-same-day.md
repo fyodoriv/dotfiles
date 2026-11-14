@@ -394,3 +394,22 @@ was 33.727 ms and the native median was 6.324 ms (ratio 0.188). The release
 build reported 5.10 s on that runner, with network access for dependencies.
 These are selection-only observations, not full-command or in-use results.
 See [run 43614347851](https://github.com/fyodoriv/dotfiles/actions/runs/43614347851).
+
+#### Broader controlled selection cases
+
+Register before adding cases. The first passing probe used short names and one
+simple argument pattern; it cannot establish the documented `pgrep` behavior.
+
+- **Hypothesis:** The native selector also agrees with hosted macOS `pgrep`
+  for a long `argv[0]`, an empty `argv[0]`, spaced arguments with a POSIX
+  pattern, and a child that exits before a new query.
+- **Measurement:** Add owned child cases and compare complete selected sets
+  without printing process names, IDs, arguments or environment. Close their
+  input pipes and wait for them; query again after the exit case.
+- **Success:** Each positive case selects its intended child on both paths,
+  selected sets agree, the exited child is absent, and no child remains.
+- **Pivot:** Missing data, a disagreement or cleanup failure rejects the
+  native selector for deployment until its cause and fix are reviewed. These
+  cases do not prove parity for every process table or identity-safe actions.
+- **Anchor:** the native comparison above and Apple's published `pgrep`
+  fallback and regex logic linked above.

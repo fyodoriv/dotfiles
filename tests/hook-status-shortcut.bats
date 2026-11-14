@@ -18,6 +18,8 @@ probe() {
   jq -nc --arg command "$2" '{tool_input:{command:$command},cwd:"/tmp"}' | "$1/block-dangerous-git.sh"
 }
 
+probe_raw() { printf '%s' "$2" | "$1/block-dangerous-git.sh"; }
+
 @test "literal status and complex syntax retain guard verdict and output" {
   local command expected_status expected_output
   for command in 'git status' 'git status --short' 'git status -s -b' \
@@ -26,6 +28,17 @@ probe() {
     run probe "$TEST_DIR/base" "$command"
     expected_status="$status" expected_output="$output"
     run probe "$TEST_DIR/candidate" "$command"
+    [ "$status" -eq "$expected_status" ]
+    [ "$output" = "$expected_output" ]
+  done
+}
+
+@test "malformed and missing input retain guard verdict and output" {
+  local input expected_status expected_output
+  for input in '' 'not-json' '{}' '{"tool_input":{}}'; do
+    run probe_raw "$TEST_DIR/base" "$input"
+    expected_status="$status" expected_output="$output"
+    run probe_raw "$TEST_DIR/candidate" "$input"
     [ "$status" -eq "$expected_status" ]
     [ "$output" = "$expected_output" ]
   done

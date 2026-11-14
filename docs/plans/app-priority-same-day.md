@@ -684,3 +684,27 @@ unreadable ancestors as a fallback to the existing shell lookup.
   candidate median is at most 400 ms, and its median ratio is at most 0.40.
 - **Pivot:** Any failure rejects the correction and retains the shell path.
 - **Anchor:** The failed hosted diagnostic and Apple's launchd process model.
+#### Smaller offline process adapter: rejected
+
+The [registered trial](https://github.com/fyodoriv/dotfiles/commit/d9686c8)
+replaced the process library with an adapter to Apple process APIs and a
+vendored libc. Its release build succeeded offline on hosted macOS. The
+controlled fixture preserved all ten ordered actions in 30 pairs, but the
+candidate median was 255.87 ms versus 334.54 ms for the shell, a ratio of
+0.765. The registered limit was 0.40. The candidate failed its speed gate and
+is not eligible for activation. See [the hosted result](https://github.com/fyodoriv/dotfiles/actions/runs/43621132344).
+
+The Rust unit check also failed because the adapter could not read an ancestor's
+process details; the selector consequently used its shell fallback. The exact
+reason the operating system denied that lookup remains unproven. See
+[the diagnostic run](https://github.com/fyodoriv/dotfiles/actions/runs/43621212683).
+Keep the existing shell entry point active. The earlier native selector and
+offline delivery remain separate work; the fixture result is not an in-use
+performance claim.
+
+The bounded root-ancestor correction passed all seven hosted Rust tests. In
+30 owned-child pairs it preserved all ten ordered actions, with a 118.10 ms
+candidate median and 442.00 ms shell median, ratio 0.267. See the
+[hosted comparison](https://github.com/fyodoriv/dotfiles/actions/runs/43621417697)
+and [offline checks](https://github.com/fyodoriv/dotfiles/actions/runs/43621417760).
+Installation, live side effects and in-use benefit remain unverified.

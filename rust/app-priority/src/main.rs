@@ -186,4 +186,46 @@ mod tests {
             .env(CHILD, "1").stdin(Stdio::null()).status().unwrap();
         assert!(status.success());
     }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn native_policy_matches_taskpolicy_on_owned_children() {
+        const CHILD: &str = "DOTFILES_PRIORITY_PARITY_CHILD";
+        if let Ok(mode) = std::env::var(CHILD) {
+            unsafe extern "C" {
+                static mach_task_self_: u32;
+                fn getpriority(which: i32, who: u32) -> i32;
+                fn task_policy_get(task: u32, flavor: i32, policy: *mut i32,
+                    count: *mut u32, get_default: *mut i32) -> i32;
+            }
+            if mode == "native-background" { platform::background(std::process::id(), true); }
+            if mode == "native-foreground" { platform::background(std::process::id(), false); }
+            let mut qos = [0i32; 2];
+            let mut count = 2u32;
+            let mut get_default = 0i32;
+            // SAFETY: all output pointers refer to valid local storage for this child.
+            let result = unsafe { task_policy_get(mach_task_self_, 9, qos.as_mut_ptr(), &mut count, &mut get_default) };
+            // SAFETY: who=0 queries only this child.
+            let background = unsafe { getpriority(4, 0) };
+            assert_eq!(result, 0);
+            assert_eq!(count, 2);
+            println!("STATE {background},{},{},{get_default}", qos[0], qos[1]);
+            return;
+        }
+        let exe = std::env::current_exe().unwrap();
+        for (mode, args) in [("background", vec!["-b"]), ("foreground", vec!["-B", "-t", "0", "-l", "0"])] {
+            let test_args = ["--exact", "tests::native_policy_matches_taskpolicy_on_owned_children", "--nocapture"];
+            let reference = Command::new("/usr/bin/taskpolicy").args(args).arg(&exe).args(test_args)
+                .env(CHILD, "reference").stdin(Stdio::null()).output().unwrap();
+            let native = Command::new(&exe).args(test_args).env(CHILD, format!("native-{mode}"))
+                .stdin(Stdio::null()).output().unwrap();
+            assert!(reference.status.success(), "reference child failed");
+            assert!(native.status.success(), "native child failed");
+            let extract = |out: &[u8]| -> String {
+                let text = String::from_utf8(out.to_vec()).unwrap();
+                text.lines().find_map(|line| line.split_once("STATE ").map(|(_, s)| s.to_owned())).unwrap()
+            };
+            assert_eq!(extract(&reference.stdout), extract(&native.stdout), "{mode} policy differs");
+        }
+    }
 }

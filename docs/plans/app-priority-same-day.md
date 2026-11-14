@@ -652,3 +652,21 @@ missed the timing limit: baseline median 182.59 ms, candidate median 81.73 ms,
 ratio 0.448. The registered pivot rejects this lookup-and-action combination.
 The simulated actions do not establish live syscall cost or behavior. See
 [run 43617256945](https://github.com/fyodoriv/dotfiles/actions/runs/43617256945).
+
+#### Smaller offline process adapter
+
+Register before implementation. The complete locked dependency vendor set
+builds offline, but expands to 242 MB and contains private-reference matches.
+Replace the process library with a small adapter around Apple's process APIs
+and the existing libc dependency. Keep the shell entry point active.
+
+- **Hypothesis:** The smaller adapter preserves controlled selection and
+  action behavior while allowing a clean-cache offline build.
+- **Measurement:** Hosted macOS runs the Rust checks, an empty-cache offline
+  release build, and 30 alternating owned-child fixture pairs.
+- **Success:** Every ordered action matches, the offline build succeeds, the
+  candidate median is at most 400 ms, and its median ratio is at most 0.40.
+- **Pivot:** Any mismatch, build failure, or missed timing retains the shell
+  implementation and rules out activation of this candidate.
+- **Anchor:** The native selector and owned-child results above, Apple's
+  libproc and sysctl interfaces, and the existing offline delivery requirement.

@@ -304,6 +304,27 @@ mod tests {
     fn cross_process_policy_matches_on_owned_children() {
         use std::io::{BufRead, BufReader, Write};
         use std::process::{Child, ChildStdout};
+        unsafe extern "C" {
+            static mach_task_self_: u32;
+            fn task_name_for_pid(target: u32, pid: i32, task: *mut u32) -> i32;
+            fn task_policy_set(task: u32, flavor: i32, policy: *mut i32, count: u32) -> i32;
+            fn mach_port_deallocate(task: u32, name: u32) -> i32;
+        }
+        fn diagnose(pid: u32) -> (i32, Option<i32>) {
+            let mut port = 0;
+            // SAFETY: pid is a retained owned child; port points to writable storage.
+            let task = unsafe { mach_task_self_ };
+            let name_status = unsafe { task_name_for_pid(task, pid as i32, &mut port) };
+            if name_status != 0 { return (name_status, None); }
+            let mut qos = [(0xff << 16) | 1, (0xfe << 16) | 1];
+            // SAFETY: this policy takes two integer fields and the acquired port is released.
+            let policy_status = unsafe {
+                let status = task_policy_set(port, 9, qos.as_mut_ptr(), 2);
+                mach_port_deallocate(task, port);
+                status
+            };
+            (name_status, Some(policy_status))
+        }
         struct ChildOwner { child: Child, output: BufReader<ChildStdout> }
         impl ChildOwner {
             fn spawn() -> Self {
@@ -350,6 +371,9 @@ mod tests {
             platform::background(native_pid, enabled);
             let expected = reference.state();
             let actual = native.state();
+            if expected != actual && !enabled {
+                eprintln!("owned native QoS status: {:?}", diagnose(native_pid));
+            }
             assert_eq!(expected, actual, "owned child policy differs");
         }
         assert!(reference.finish());

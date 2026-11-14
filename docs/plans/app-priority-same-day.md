@@ -450,6 +450,12 @@ an externally acquired task port. The next control has each retained child
 report its own policy after the parent applies the action. It still targets
 only unreaped owned children and reports no process identifiers.
 
+That control found a foreground QoS difference: the reference child reported
+tiers 16711681 and 16646145, while the native child reported 0 and 0. The next
+owned-child run reports only the numeric task-port and policy-call results to
+distinguish a call failure from an observer issue. The candidate remains
+inactive; an error code alone does not establish its cause.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

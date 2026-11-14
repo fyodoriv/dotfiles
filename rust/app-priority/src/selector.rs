@@ -155,5 +155,13 @@ mod tests {
             assert!(candidate.contains_key(&first.child.id()) && candidate.contains_key(&second.child.id()));
             assert!(same(first.child.id(), candidate[&first.child.id()], OsStr::new(&pattern), full));
         }
+        let pattern = format!("^{name}$");
+        let selected = find(OsStr::new(&pattern), false).unwrap();
+        let pid = first.child.id();
+        let identity = selected[&pid];
+        let altered = Identity { seconds: identity.seconds, micros: identity.micros ^ 1 };
+        assert!(!same(pid, altered, OsStr::new(&pattern), false));
+        drop(first);
+        assert!(!same(pid, identity, OsStr::new(&pattern), false));
     }
 }

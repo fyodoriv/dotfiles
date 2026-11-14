@@ -438,3 +438,72 @@ closed and waited for its children and measured 30 three-query pairs: the
 `pgrep` median was 46.850 ms, the native median was 11.966 ms, and the ratio
 was 0.255. The earlier incorrect expectation and diagnostic are retained in
 the preceding paragraphs. See [run 43614912955](https://github.com/fyodoriv/dotfiles/actions/runs/43614912955).
+
+### Native priority action on owned children
+
+Register before implementation. The selector probe does not change any
+priority. The live command also uses `taskpolicy` and `renice`; native calls
+need their own controlled behavior checks.
+
+- **Hypothesis:** On hosted macOS, direct calls in an owned child preserve
+  the observable background and foreground QoS state set by `taskpolicy`.
+- **Measurement:** Start fresh short-lived children in the hosted runner.
+  Each candidate changes only its own process (`who=0` and its own Mach task).
+  Reference children start through `/usr/sbin/taskpolicy` with equivalent
+  options before executing the same observer. Compare return status and
+  reported background and QoS fields. Close and wait for every owned child.
+  No arbitrary PID, process-group signal, or priority action on another
+  process is allowed. Record only fixed labels, status and numeric fields.
+- **Success:** Background and foreground reference and native states match,
+  all children exit, and hosted checks pass. Unknown fields are failures.
+- **Pivot:** A changed field, failure, missing result, cleanup error or
+  post-exec policy difference rejects the candidate or makes the comparison
+  inconclusive. Keep the installed command unchanged. Self-action evidence
+  cannot prove permission or identity safety for other processes; `renice`,
+  errors, stats and installation need separate controls.
+- **Anchor:** [Apple taskpolicy source](https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L202-L244)
+  and the native selector result above.
+
+The first hosted control stopped before comparison because the proposed test
+used `/usr/bin/taskpolicy`, which does not exist on the runner. The actual
+macOS path is `/usr/sbin/taskpolicy`; the control uses that corrected path.
+The background comparison then passed, but foreground `-B` exited with usage
+status 64 because `taskpolicy` requires `-p` for that option. A fresh
+foreground child can compare `-t 0 -l 0` without `-B`; the native
+background-to-foreground transition has a separate self-child check. Neither
+establishes `-B` parity for an arbitrary other process.
+
+The corrected hosted self-child checks passed for background state and the
+fresh-foreground QoS fields in [run 43616587099](https://github.com/fyodoriv/dotfiles/actions/runs/43616587099).
+They do not establish permissions, effects or identity safety for other PIDs.
+
+### Rust priority command with existing lookup
+
+Register before implementation. Keep per-rule `pgrep` and ancestry `ps`
+queries initially so the Rust command follows the current lookup and action
+order. Replace priority-tool starts with native macOS calls, and keep the
+shell stats and rollback path until native delivery is qualified.
+
+- **Hypothesis:** A Rust command using the existing lookups and native
+  priority operations preserves the ordered decisions and reaches the
+  registered 0.40 controlled-fixture ratio.
+- **Measurement:** Run the existing app-priority behavior cases against an
+  injected test backend, compare owned-child native priority behavior with
+  the existing tools, and run the registered 30-pair hosted comparison. Run
+  hosted CI and the build and resource gates before switching the live path.
+- **Success:** Zero changed decisions or unintended priority actions; all
+  parity, ownership, build and hosted checks pass; median candidate/base is
+  at most 0.40 and candidate median at most 400 ms.
+- **Pivot:** Any mismatch, unsafe target, failed resource gate or missed
+  timing target rejects the candidate. Keep the shell command active and
+  apply the migration plan's exception rule when its evidence is sufficient.
+  Fixture speed does not prove in-use benefit.
+- **Anchor:** `bin/app-priority`, the per-rule timing result, and Apple's
+  taskpolicy source cited above.
+
+The candidate lives in `rust/app-priority`; it keeps the existing shell
+entry point and stats path untouched while its action and deployment parity
+remain open. `make check` builds and tests the Rust crate when `rust/`
+changes. A clean build or unit test alone does not qualify live activation.
+The candidate requires `--apply` and is not installed, so invoking the binary
+without that argument does not change process priority.

@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: false
+      rust_command_check:
+        description: Test and build the Rust priority command only
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -52,6 +57,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  rust-command:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_command_check }}
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test and build Rust command
+        run: |
+          ./bin/heavy-run cargo test --locked --manifest-path rust/app-priority/Cargo.toml
+          ./bin/heavy-run cargo build --locked --release --manifest-path rust/app-priority/Cargo.toml
+          status=0
+          rust/app-priority/target/release/dotfiles-app-priority || status=$?
+          [ "$status" -eq 2 ]
   native-probe:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_probe }}
     runs-on: macos-latest
@@ -65,7 +85,7 @@ jobs:
       - name: Compare and measure controlled process selection
         run: PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/app-priority-native-probe/target/release/app-priority-native-probe --measure
   linux-fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.native_probe }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.native_probe && !inputs.rust_command_check) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -121,7 +141,7 @@ jobs:
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
 
   fixture:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.linux_preflight_only && !inputs.native_probe && !inputs.rust_command_check) }}
     runs-on: macos-latest
     timeout-minutes: 15
     steps:

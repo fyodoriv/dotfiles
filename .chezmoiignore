@@ -44,6 +44,7 @@ macos-trackpad.sh
 macos-visual.sh
 macos.sh
 modules
+rust
 scripts
 skills
 snapshot.sh

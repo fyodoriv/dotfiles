@@ -1,5 +1,9 @@
 # Observability
 
+`app-priority` timing records include an allowlisted `runtime` value (`rust`
+or `shell`). It identifies the path selected for that run. It does not record
+process names or command contents.
+
 `app-priority` marks valid monotonic millisecond samples with
 `timing_source: monotonic-ms`. If the clock fails, it still records the run
 without that marker. Filter on the marker for performance comparisons: older

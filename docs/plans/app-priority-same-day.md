@@ -356,3 +356,8 @@ in the Rust fixture rather than treating the batch result as deployment proof.
   or prove live equivalence and in-use benefit.
 - **Anchor:** `bin/app-priority` query/action order and the batched Rust
   fixture result above.
+
+On hosted macOS, commit `49800a5` preserved the fixed actions in all 30
+pairs, but missed the ratio: baseline median 276.73 ms, candidate median
+188.20 ms, ratio 0.680. The registered pivot rejects this candidate. See
+[run 43612749087](https://github.com/fyodoriv/dotfiles/actions/runs/43612749087).

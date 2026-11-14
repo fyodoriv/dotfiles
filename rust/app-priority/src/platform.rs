@@ -1,4 +1,4 @@
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "fixture-actions")))]
 mod macos {
     use std::ffi::c_int;
 
@@ -40,10 +40,28 @@ mod macos {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "fixture-actions")))]
 pub use macos::{background, nice};
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), not(feature = "fixture-actions")))]
 pub fn background(_: u32, _: bool) {}
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), not(feature = "fixture-actions")))]
 pub fn nice(_: u32, _: i32) {}
+
+#[cfg(feature = "fixture-actions")]
+mod fixture {
+    use std::io::Write;
+    fn record(line: &str) {
+        let path = std::env::var_os("ACTION_LOG").expect("fixture log required");
+        let mut file = std::fs::OpenOptions::new().append(true).open(path)
+            .expect("fixture log unavailable");
+        writeln!(file, "{line}").expect("fixture log unavailable");
+    }
+    pub fn background(pid: u32, enabled: bool) {
+        if enabled { record(&format!("taskpolicy -b -p {pid}")); }
+        else { record(&format!("taskpolicy -B -t 0 -l 0 -p {pid}")); }
+    }
+    pub fn nice(pid: u32, value: i32) { record(&format!("renice {value} -p {pid}")); }
+}
+#[cfg(feature = "fixture-actions")]
+pub use fixture::{background, nice};

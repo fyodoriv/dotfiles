@@ -11,7 +11,7 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 | Job | Runner | What it does |
 |-----|--------|-------------|
 | **lint** | ubuntu-latest | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-latest | Adds the checkout's `heavy-run` to PATH so timing uses the queue, then runs `make check`; runs `make test-all` (full bats suite) on a manual run only, until task `full-suite-bats-argument-compatibility` lands |
+| **test** | macos-latest | Installs `shfmt` for guard parity, adds the checkout's `heavy-run` to PATH, then runs `make check`; runs `make test-all` (full bats suite) on a manual run only, until task `full-suite-bats-argument-compatibility` lands |
 | **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (manual start only: a clean runner has no chezmoi config) |
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
 | **coverage** | ubuntu-latest | Manual runs only (`gh workflow run ci.yml`): `bin/dotfiles-coverage` + bats -- shell coverage report artifact. It did not finish in 45 minutes on a hosted runner (task `hosted-coverage-job-time`) |

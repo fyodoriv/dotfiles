@@ -68,6 +68,30 @@ jobs:
           printf '%s\n' "$result"
           printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and (r["ratio"] > 0.40 or r["candidate_median_ms"] > 400) else 1)'
 
+      - name: Run candidate comparison preflight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_sha != '' && inputs.candidate_sha != '' && inputs.fixture_candidate }}
+        shell: bash
+        env:
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          APP_PRIORITY_LINUX_PREFLIGHT: '1'
+        run: |
+          for sha in "$BASELINE_SHA" "$CANDIDATE_SHA"; do
+            case "$sha" in ''|*[!0-9a-f]*) echo 'Expected full lowercase commit IDs' >&2; exit 2 ;; esac
+            [ "${#sha}" -eq 40 ] || exit 2
+            git cat-file -e "$sha^{commit}"
+          done
+          baseline="$RUNNER_TEMP/app-priority-linux-baseline"
+          candidate="$RUNNER_TEMP/app-priority-linux-candidate"
+          mkdir -p "$baseline" "$candidate"
+          git archive "$BASELINE_SHA" | tar -x -C "$baseline"
+          git archive "$CANDIDATE_SHA" | tar -x -C "$candidate"
+          [ -f "$candidate/scripts/app-priority-candidate.sh" ] || exit 2
+          cp "$candidate/scripts/app-priority-candidate.sh" "$candidate/bin/app-priority"
+          result="$(PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$candidate" --pairs 30)"
+          printf '%s\n' "$result"
+          printf '%s\n' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); sys.exit(0 if r["pairs"] == 30 and 0 < r["ratio"] <= 0.40 and 0 < r["candidate_median_ms"] <= 400 else 1)'
+
   fixture:
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.linux_preflight_only }}
     runs-on: macos-latest

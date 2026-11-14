@@ -117,13 +117,28 @@ class RustFixtureTests(unittest.TestCase):
             benchmark.sample(self.candidate, self.root, self.home, self.config, self.mockbin)
         self.assertEqual((self.root / "actions").read_bytes(), b"")
 
-    def test_custom_configuration_is_refused_before_actions(self):
+    def test_custom_configuration_matches_shell_actions(self):
         config = self.config / "dotfiles/priority-apps.txt"
         config.parent.mkdir()
-        config.write_text("Slack\n")
-        with self.assertRaisesRegex(RuntimeError, "fixture command failed"):
-            benchmark.sample(self.candidate, self.root, self.home, self.config, self.mockbin)
-        self.assertEqual((self.root / "actions").read_bytes(), b"")
+        config.write_text("  Slack # foreground\nnode.*minsky\n  # ignored\n\n")
+        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+                                self.config, self.mockbin)[1:]
+        candidate = benchmark.sample(self.candidate, self.root, self.home,
+                                     self.config, self.mockbin)[1:]
+        self.assertEqual(base, candidate)
+        self.assertEqual(base[0], b"taskpolicy -B -t 0 -l 0 -p 301\n"
+                                  b"taskpolicy -B -t 0 -l 0 -p 501\n")
+
+    def test_empty_custom_configuration_matches_shell(self):
+        config = self.config / "dotfiles/priority-apps.txt"
+        config.parent.mkdir()
+        config.write_text("")
+        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+                                self.config, self.mockbin)[1:]
+        candidate = benchmark.sample(self.candidate, self.root, self.home,
+                                     self.config, self.mockbin)[1:]
+        self.assertEqual(base, candidate)
+        self.assertEqual(base[0], b"")
 
 
 @unittest.skipUnless(hosted_fixture(), "physical fixture runs only on hosted runners")

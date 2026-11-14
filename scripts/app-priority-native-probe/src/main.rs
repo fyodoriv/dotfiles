@@ -168,15 +168,7 @@ fn run(measure: bool) -> Result<(), &'static str> {
         return Err("exited child remained selected");
     }
     let empty_child = spawn_child("", "empty-argument-zero")?;
-    for (label, pattern) in [("empty-first-argument", "^--child$"),
-        ("empty-second-argument", "^empty-argument-zero$"),
-        ("empty-program-name", "^app-priority.*$"), ("empty-any-name", ".*")] {
-        let reference = pgrep(pattern, true)?;
-        let candidate = native(pattern, true)?;
-        eprintln!("case {label}: reference_child={} native_child={}",
-            reference.contains(&empty_child.0.id()), candidate.contains(&empty_child.0.id()));
-    }
-    require_child("empty-argument-zero", "^app-priority.*$", true, empty_child.0.id())?;
+    require_child("empty-argument-zero", "^--child$", true, empty_child.0.id())?;
     empty_child.finish()?;
     if !measure {
         child_a.finish()?;

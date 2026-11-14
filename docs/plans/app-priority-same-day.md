@@ -426,3 +426,8 @@ missed the name assumed by the test. That is an invalid expected result, not
 evidence of disagreement. A follow-up checks four fixed pattern categories
 and reports only whether each path selected the controlled child. The case
 remains unqualified until its expected behavior is established.
+
+On the hosted runner both paths selected that child for the fixed `--child`
+pattern and neither selected it for the assumed executable-name pattern.
+The control now compares the observed reference behavior. This does not
+establish how all macOS versions or all empty arguments are represented.

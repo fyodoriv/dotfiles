@@ -89,26 +89,26 @@ pub fn find(query: &OsStr, full: bool) -> Result<BTreeMap<u32, Identity>, ()> {
     let expression = Expression::compile(query)?;
     // SAFETY: querying the count uses no output buffer.
     let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
-    if count <= 0 { return Err(()); }
+    if count <= 0 { #[cfg(test)] eprintln!("process list count failed"); return Err(()); }
     let mut pids = vec![0i32; count as usize + 128];
     let bytes = pids.len().checked_mul(std::mem::size_of::<i32>()).ok_or(())?;
     if bytes > i32::MAX as usize { return Err(()); }
     // SAFETY: pids contains bytes writable bytes for the returned PID list.
     let count = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), bytes as i32) };
-    if count <= 0 || count as usize >= pids.len() { return Err(()); }
+    if count <= 0 || count as usize >= pids.len() { #[cfg(test)] eprintln!("process list read failed"); return Err(()); }
     pids.truncate(count as usize);
     let mut ancestors = BTreeSet::new();
     let mut current = std::process::id();
     while current != 0 {
-        if !ancestors.insert(current) { return Err(()); }
-        current = details(current)?.parent;
+        if !ancestors.insert(current) { #[cfg(test)] eprintln!("ancestor cycle"); return Err(()); }
+        current = details(current).map_err(|_| { #[cfg(test)] eprintln!("ancestor details failed"); })?.parent;
     }
     let mut result = BTreeMap::new();
     for pid in pids.into_iter().filter(|pid| *pid > 0).map(|pid| pid as u32) {
         if ancestors.contains(&pid) { continue; }
         let Ok(before) = details(pid) else { continue };
         if before.system || !matches(pid, &before, &expression, full) { continue; }
-        let after = details(pid)?;
+        let after = details(pid).map_err(|_| { #[cfg(test)] eprintln!("candidate details failed"); })?;
         if before.identity == after.identity && !after.system && matches(pid, &after, &expression, full) {
             result.insert(pid, after.identity);
         }

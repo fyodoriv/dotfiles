@@ -473,6 +473,14 @@ target scope. It also compares nice values after both a lowering and a
 potentially denied priority increase. The expected result is zero differing
 nice values; any mismatch rejects the candidate. Other PIDs remain unqualified.
 
+The hosted owned-child check passed both cross-process QoS states and both
+nice-value comparisons in [run 43619395440](https://github.com/fyodoriv/dotfiles/actions/runs/43619395440).
+With foreground `taskpolicy` retained, the hosted full-command fixture also
+preserved all ten actions over 30 pairs. Baseline median was 448.30 ms;
+candidate median was 144.54 ms, ratio 0.322. Actions were simulated in that
+timing run; it does not establish real in-use speed. See
+[run 43619190003](https://github.com/fyodoriv/dotfiles/actions/runs/43619190003).
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

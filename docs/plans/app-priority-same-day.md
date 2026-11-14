@@ -234,3 +234,25 @@ Register the candidate preflight before measuring it:
   macOS performance, production identity safety, or in-use benefit.
 - **Anchor:** the registered fixture-only candidate and Linux comparison
   preflight above.
+
+### Fixture-only pattern batching follow-up
+
+The first Linux candidate completed 30 pairs with identical fixed actions,
+but its median ratio was 0.782 (58.48 ms baseline, 45.75 ms candidate),
+above 0.40. That rejects its Linux preflight; it is not a macOS result.
+
+Register the next candidate before implementation:
+
+- **Hypothesis:** Batching the fixed default full-command pattern queries as
+  well as exact-name queries keeps the fixture's ordered actions and cuts
+  the hosted Linux median candidate/base ratio to at most 0.40.
+- **Measurement:** Run 30 alternating hosted Linux pairs with the same fixed
+  process table and expected actions. Extend only the mock's grouped-query
+  response for those same processes. Run malformed-output fallback controls.
+- **Success:** All pairs and action checks pass, the median ratio is at most
+  0.40 and candidate median at most 400 ms. No real priority action occurs.
+- **Pivot:** Any action mismatch, malformed-output acceptance, missing sample
+  or failed threshold rejects this Linux preflight. Keep the live command
+  unchanged. Linux timing and fixture regexes do not prove Darwin parity,
+  process identity or in-use benefit.
+- **Anchor:** the Linux candidate preflight and snapshot prediction above.

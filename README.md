@@ -1373,6 +1373,7 @@ default app list; include `ghostty` and `WebStorm` to keep this policy.
 ```
 dotfiles [--yes] [--health]                       Start screen: set up, applied, jobs, health, updates, Next
 dotfiles glove80 [<command>] [--yes]              Check or pair a Glove80 keyboard
+dotfiles priority-native <install|rollback>       Enable or roll back native app priority
 dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
 dotfiles config get <key>                         Print one value
 dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it

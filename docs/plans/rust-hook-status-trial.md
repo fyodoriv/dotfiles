@@ -48,3 +48,25 @@ a separate fallback guard process behind if the native reader is interrupted.
   threshold retains the old installed guard.
 - **Anchor:** Gate G in [the migration plan](rust-migration.md) and the
   native direct-reader fixture results.
+
+## Process-replacement fallback
+
+Register before implementation. The shell-owned reader boundary preserved
+the 33 guard safety cases and same-path output in the hosted fixture, but its
+median timing ratio was 0.651, above 0.50. Trial a native entry point that
+replaces itself with the existing shell guard when it cannot prove a literal
+status command. An unlinked, owner-only shared-memory object carries the input
+to that replacement; it is closed when the guard exits. No payload is logged.
+
+- **Hypothesis:** Process replacement preserves fallback output and lifecycle
+  while removing enough startup work to meet the status-row target.
+- **Measurement:** Repeat the existing guard safety suite, same-path parity,
+  15 + 15 baseline and 15 candidate RSS samples, and queued performance gate
+  on hosted macOS. Check that the replacement retains the original PID.
+- **Success:** Zero parity or safety failures, no persistent shared-memory
+  object, the replacement keeps the PID, gate ratio is at most 0.50, and the
+  baseline and candidate RSS ratios meet 0.95–1.05 and 1.10 respectively.
+- **Pivot:** Any missed bound, cleanup failure or changed decision retains the
+  old guard. Invalid evidence remains inconclusive.
+- **Anchor:** [the hosted shell-boundary result](https://github.com/fyodoriv/dotfiles/actions/runs/43627487962)
+  and the migration plan's gate G.

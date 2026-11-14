@@ -386,6 +386,13 @@ and recheck process identity and the match before acting.
 - **Anchor:** the native selector and full-command fixture results above,
   and the existing action-parity contract in `tests/app-priority.bats`.
 
+The uninstalled Rust candidate now uses the native process source per rule,
+falls back to `pgrep` when lookup fails, and rechecks a start-time identity
+and the current match before each priority operation. Its controlled-child
+test compares the selected PID order with `pgrep`. A start-time check is not
+an atomic process handle. General process-table parity, executable identity,
+permission behavior, timing and offline delivery remain open.
+
 ### Native process-selection comparison
 
 Register before implementation. The per-rule candidate preserves query order

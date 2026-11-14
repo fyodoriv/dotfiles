@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 mod platform;
+#[cfg(target_os = "macos")]
+mod selector;
 
 trait Backend {
     fn find(&mut self, query: &OsStr, full: bool) -> Vec<u32>;
@@ -13,9 +15,22 @@ trait Backend {
     fn nice(&mut self, pid: u32, value: i32);
 }
 
-struct System;
+#[derive(Default)]
+struct System {
+    #[cfg(target_os = "macos")]
+    identities: Option<(std::collections::BTreeMap<u32, selector::Identity>, std::ffi::OsString, bool)>,
+}
 impl Backend for System {
     fn find(&mut self, query: &OsStr, full: bool) -> Vec<u32> {
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(found) = selector::find(query, full) {
+                let pids = found.keys().copied().collect();
+                self.identities = Some((found, query.to_owned(), full));
+                return pids;
+            }
+            self.identities = None;
+        }
         Command::new("pgrep").arg(if full { "-f" } else { "-x" }).arg(query)
             .stdin(Stdio::null()).stderr(Stdio::null()).output().ok()
             .map(|out| out.stdout.split(|b| *b == b'\n')
@@ -27,8 +42,22 @@ impl Backend for System {
             .stdin(Stdio::null()).stderr(Stdio::null()).output()
             .map(|out| out.stdout).unwrap_or_default()
     }
-    fn background(&mut self, pid: u32, enabled: bool) { platform::background(pid, enabled); }
-    fn nice(&mut self, pid: u32, value: i32) { platform::nice(pid, value); }
+    fn background(&mut self, pid: u32, enabled: bool) {
+        if self.current(pid) { platform::background(pid, enabled); }
+    }
+    fn nice(&mut self, pid: u32, value: i32) {
+        if self.current(pid) { platform::nice(pid, value); }
+    }
+}
+impl System {
+    fn current(&self, pid: u32) -> bool {
+        #[cfg(target_os = "macos")]
+        if let Some((identities, query, full)) = &self.identities {
+            return identities.get(&pid).is_some_and(|identity| selector::same(pid, *identity, query, *full));
+        }
+        let _ = pid;
+        true
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -99,7 +128,7 @@ fn run() -> std::io::Result<()> {
     let config = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty())
         .map(PathBuf::from).unwrap_or_else(|| PathBuf::from(home).join(".config"))
         .join("dotfiles/priority-apps.txt");
-    let mut backend = System;
+    let mut backend = System::default();
     if config.is_file() { custom(&mut backend, &std::fs::read(config)?); }
     else { defaults(&mut backend); }
     Ok(())
@@ -109,6 +138,9 @@ fn main() {
     if !cfg!(target_os = "macos") || std::env::args_os().nth(1).as_deref() != Some(OsStr::new("--apply")) {
         std::process::exit(2);
     }
+    #[cfg(target_os = "macos")]
+    // SAFETY: set the process locale before the single-threaded command starts.
+    unsafe { libc::setlocale(libc::LC_ALL, b"\0".as_ptr().cast()); }
     if run().is_err() { std::process::exit(1); }
 }
 

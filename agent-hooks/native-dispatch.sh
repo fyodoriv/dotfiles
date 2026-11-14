@@ -4,6 +4,7 @@
 _native_dir="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/hook-status"
 [ -L "$_native_dir/current" ] && [ -x /sbin/sha256 ] || return 0
 _native_path=
+set +f # The guard disables globbing; enable it only for this lookup.
 for _native_candidate in "$_native_dir"/hook-status-*; do
   [ -f "$_native_candidate" ] && [ ! -L "$_native_candidate" ] && [ -x "$_native_candidate" ] || continue
   [[ "$_native_candidate" -ef "$_native_dir/current" ]] || continue
@@ -12,6 +13,7 @@ for _native_candidate in "$_native_dir"/hook-status-*; do
   _native_path="$_native_candidate"
   break
 done
+set -f
 [ -n "$_native_path" ] || return 0
 _native_hash="$(/sbin/sha256 -q "$_native_path" 2>/dev/null)" || return 0
 [ "$_native_hash" = "${_native_name#hook-status-}" ] || return 0

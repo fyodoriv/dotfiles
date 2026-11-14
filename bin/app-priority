@@ -29,7 +29,11 @@ native_dir="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/app-priority"
 if [ -L "$native_dir/current" ]; then
   native_name="$(readlink "$native_dir/current")" || native_name=""
   if [[ "$native_name" =~ ^app-priority-[0-9a-f]{64}$ ]] && [ -f "$native_dir/$native_name" ] && [ ! -L "$native_dir/$native_name" ] && [ -x "$native_dir/$native_name" ]; then
-    native_hash="$(shasum -a 256 "$native_dir/$native_name" | cut -d' ' -f1)" || native_hash=""
+    if [ -x /sbin/sha256 ]; then
+      native_hash="$(/sbin/sha256 -q "$native_dir/$native_name")" || native_hash=""
+    else
+      native_hash="$(shasum -a 256 "$native_dir/$native_name" | cut -d' ' -f1)" || native_hash=""
+    fi
     if [ "$native_hash" = "${native_name#app-priority-}" ]; then
       native_status=0
       "$native_dir/$native_name" --apply || native_status=$?

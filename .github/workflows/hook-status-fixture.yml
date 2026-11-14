@@ -33,7 +33,7 @@ jobs:
       - name: Check the installed entry point and performance row
         run: |
           cp agent-hooks/block-dangerous-git.sh agent-hooks/block-dangerous-git-legacy.sh
-          python3 -c 'import os,shlex; from pathlib import Path; p=Path("agent-hooks/block-dangerous-git.sh"); s=p.read_text(); marker="input=$(cat)\n"; assert s.count(marker)==1; helper=shlex.quote(os.environ["GITHUB_WORKSPACE"]+"/rust/hook-status/target/release/dotfiles-hook-status"); p.write_text(s.replace(marker,marker+"if [ -x "+helper+" ] && printf '\''%s'\'' \"$input\" | "+helper+" --check 2>/dev/null; then exit 0; fi\n"))'
+          python3 -c 'import os,shlex; from pathlib import Path; p=Path("agent-hooks/block-dangerous-git.sh"); s=p.read_text(); marker="input=$(cat)\n"; assert s.count(marker)==1; helper=shlex.quote(os.environ["GITHUB_WORKSPACE"]+"/rust/hook-status/target/release/dotfiles-hook-status"); p.write_text(s.replace(marker,"input=$(cat); if [ -x "+helper+" ] && printf '\''%s'\'' \"$input\" | "+helper+" --check 2>/dev/null; then exit 0; fi\n"))'
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/agent-hooks-block-dangerous-git.bats
           HOOK_STATUS_INSTALLED=1 PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/hook-status-owned-benchmark.py
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive scripts/perf-gate.sh --force --json > "$RUNNER_TEMP/hook-gate.json"

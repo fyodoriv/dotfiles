@@ -9,6 +9,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 directory="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/app-priority"
 
 case "${1:-}" in
+  --help|-h) echo 'Usage: dotfiles priority-native install|rollback'; exit 0 ;;
   install)
     [ "$(uname -s)" = Darwin ] || { echo 'app-priority-native: macOS required' >&2; exit 1; }
     (cd "$root/rust" && "$root/bin/heavy-run" cargo build --locked --offline --release --manifest-path app-priority/Cargo.toml)

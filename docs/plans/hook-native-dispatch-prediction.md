@@ -17,3 +17,23 @@ guard and record the result; do not claim a port or weaken the safety checks.
 
 **Anchor:** `rust-hook-status-experiment.md`; Basili, Caldiera, Rombach 1994;
 Munafò et al. 2017.
+
+## Dispatch before endpoint setup
+
+Registered before changing the order on 2026-11-14. The installed dispatch
+measured 0.631 and retained the old hook. Its fast path still runs endpoint
+setup before inspecting the input, although the native status decision uses
+absolute helper paths and does not need that environment.
+
+**Hypothesis:** Trying the integrity-checked native dispatch before endpoint
+setup cuts the gate ratio to at most 0.50. Unknown inputs still execute the
+original guard, including endpoint setup, and native failures still block.
+
+**Measurement:** Hosted macOS runs the existing guard and dispatch safety
+controls, installed-entry parity, the exclusive performance gate, and the
+registered memory comparison. **Success:** No changed decisions, no false
+permits, ratio at most 0.50, and memory within the existing bounds. **Pivot:**
+Any safety difference or missed threshold retains the existing shell guard.
+
+**Anchor:** the 0.631 hosted gate result, `rust-agent-hooks`, and Munafò et al.
+2017.

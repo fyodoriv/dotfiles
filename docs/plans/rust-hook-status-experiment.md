@@ -90,3 +90,12 @@ Lesson: benchmark the real supervised, integrity-checked delivery path before
 claiming a speedup. An earlier scratch wrapper measured 0.166 but did not
 provide the same failure handling. Keep the shell guard while the production
 path misses its target.
+
+## Heavy-run guard shortcut (2026-11-14)
+
+The [shortcut draft](https://github.com/fyodoriv/dotfiles/pull/682) kept the
+existing parser and skipped the later scan only for the exact parsed status
+command. Its [hosted performance run](https://github.com/fyodoriv/dotfiles/actions/runs/43640123377)
+measured a 0.840 ratio, above the required 0.50. The registered pivot retains
+the existing hook. This is a failed cheaper fix, not a Rust port attempt or a
+completed exception decision.

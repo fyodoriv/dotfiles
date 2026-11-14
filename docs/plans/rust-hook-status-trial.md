@@ -28,3 +28,23 @@ gate G without the former implementation.
 The first hosted comparison invokes the candidate directly against the
 existing guard in a disposable environment. It can reject a candidate, but it
 does not substitute for the registered gate row or installed-wrapper proof.
+
+## In-process fallback boundary
+
+Register before the next implementation. Keep the existing shell guard as the
+process that reads input and owns fallback. After that read, invoke the native
+reader only as a yes-or-no check. A rejected input or reader error continues
+through the same shell guard with the same captured bytes. This avoids leaving
+a separate fallback guard process behind if the native reader is interrupted.
+
+- **Hypothesis:** This boundary preserves the existing fallback lifecycle and
+  still meets the 0.50 status-row and 1.10 memory limits.
+- **Measurement:** Run the existing guard safety suite and the hosted
+  scratch-entry comparison, memory samples, and registered performance gate.
+- **Success:** Zero changed guard decisions or output; all safety tests pass;
+  gate ratio is at most 0.50; stable baseline memory ratio is 0.95–1.05 and
+  candidate memory ratio is at most 1.10.
+- **Pivot:** Any mismatch, failed safety check, unstable baseline, or missed
+  threshold retains the old installed guard.
+- **Anchor:** Gate G in [the migration plan](rust-migration.md) and the
+  native direct-reader fixture results.

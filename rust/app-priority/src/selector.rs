@@ -101,6 +101,7 @@ pub fn find(query: &OsStr, full: bool) -> Result<BTreeMap<u32, Identity>, ()> {
     let mut current = std::process::id();
     while current != 0 {
         if !ancestors.insert(current) { #[cfg(test)] eprintln!("ancestor cycle"); return Err(()); }
+        if current == 1 { break; }
         current = details(current).map_err(|_| { #[cfg(test)] eprintln!("ancestor details failed"); })?.parent;
     }
     let mut result = BTreeMap::new();

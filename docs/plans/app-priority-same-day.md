@@ -100,3 +100,23 @@ The hosted job archives the specified commits into its private runner
 temporary directory, runs the registered 30 pairs through `heavy-run
 --exclusive`, and fails if the action parity or numeric thresholds fail.
 It does not establish process selection outside the fixed fixture.
+
+## Same-source negative control
+
+Register this control before dispatch. The earlier single pair only checked
+the harness; it did not exercise the 30-pair decision.
+
+- **Hypothesis:** Comparing the same reviewed tree against itself cannot
+  satisfy the required 60% reduction. The hosted decision must reject it.
+- **Measurement:** Dispatch `app-priority-fixture.yml` with both full commit
+  IDs set to `2dba87e9a17774c199dd8ea6abfdb17a3f872616` and retain the
+  job result and all 30 pairs. This is an intentional negative control.
+- **Success:** Exactly 30 pairs preserve the fixed action log, and the decision
+  fails because the ratio is above 0.40 or the candidate median exceeds
+  400 ms. Zero priority changes reach real processes.
+- **Pivot:** A passed decision, missing pair, action mismatch, execution
+  failure or ambiguous job result does not validate the threshold. Stop and
+  correct the harness or method before judging a candidate. Do not relabel an
+  infrastructure or setup failure as a successful negative control.
+- **Anchor:** the same-day fallback above, GQM (Basili et al., 1994), and
+  preregistration (Munafò et al., 2017).

@@ -70,3 +70,25 @@ to that replacement; it is closed when the guard exits. No payload is logged.
   old guard. Invalid evidence remains inconclusive.
 - **Anchor:** [the hosted shell-boundary result](https://github.com/fyodoriv/dotfiles/actions/runs/43627487962)
   and the migration plan's gate G.
+
+The first process-replacement attempt failed before replay: macOS returned
+`Device not configured` for the shared-memory input path. The object was
+unlinked before any attempted write. See [run 43627918779](https://github.com/fyodoriv/dotfiles/actions/runs/43627918779).
+It is rejected and never installed.
+
+## Shell-owned fallback with a here-string
+
+Register before implementation. Return to the shell-owned fallback boundary.
+Use a here-string to feed the native check instead of starting a `printf`
+pipeline. The existing shell keeps its captured input and handles every
+non-match. The added newline is JSON whitespace; ambiguous input still falls
+back to the original guard.
+
+- **Hypothesis:** Removing the extra pipeline process preserves parity and
+  reaches the existing 0.50 status-row ratio.
+- **Measurement:** Repeat the hosted guard safety suite, same-path parity,
+  memory samples, and exclusive performance gate.
+- **Success:** All guard decisions and output match; the gate ratio is at most
+  0.50; the baseline and candidate memory ratios meet 0.95–1.05 and 1.10.
+- **Pivot:** Any mismatch, failed sample or missed bound retains the old guard.
+- **Anchor:** The rejected shell-owned and shared-memory trials above.

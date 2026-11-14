@@ -24,3 +24,16 @@ native command has started: a partial native failure could duplicate actions.
 
 The legacy code remains a temporary rollback bridge. It is not a completed
 port until the native command passes gate G without the former implementation.
+
+## Memory qualification
+
+Register before measurement. On hosted macOS use the same owned children and
+simulated actions as the complete-command fixture. Measure peak resident memory
+with `/usr/bin/time -l`: two 15-run shell windows, then 15 native-dispatch runs.
+Every run must preserve the expected ordered actions and exit successfully.
+The two shell medians must have a ratio from 0.95 to 1.05. The candidate median
+divided by the lower shell median must be at most 1.10. A missing sample, failed
+action, unstable baseline or higher ratio leaves memory unqualified and the
+shell active. This is a fixture measurement, not a claim about in-use memory.
+
+Anchor: gate G and the peak-RSS definition in [the migration plan](rust-migration.md).

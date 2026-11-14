@@ -11,7 +11,7 @@ _native_hash="$(/sbin/sha256 -q "$_native_path" 2>/dev/null)" || return 0
 [ "$_native_hash" = "${_native_name#hook-status-}" ] || return 0
 
 _native_status=0
-_native_receipt="$("$_native_path" --exec "$0" 3>&1 1>&4)" 4>&1 || _native_status=$?
+{ _native_receipt="$("$_native_path" --exec "$0" 3>&1 1>&4)" || _native_status=$?; } 4>&1
 case "$_native_receipt" in
   A) [ "$_native_status" -eq 0 ] && exit 0 ;;
   F) exit "$_native_status" ;;

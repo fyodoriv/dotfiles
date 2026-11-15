@@ -384,3 +384,11 @@ manifest remain open; the bridge alone is not a completed inventory.
 The two non-executable inventory ledger files are excluded from their own
 object-ID comparison to avoid self-reference. No other tracked path is excluded
 by the bridge.
+
+The `migration-check inventory --check` command reads both review ledgers from
+one committed Git tree. It requires a source review for each tracked path and
+compares independently recorded embedded and generated identities with the
+manifest. The ledgers are not complete yet, so the command fails closed when
+they are missing. A structural pass is not proof that source discovery or the
+manual reviews are complete. Uncommitted and untracked work needs a separate
+audit.

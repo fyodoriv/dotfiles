@@ -517,11 +517,15 @@ if looks_like_branch_delete; then
   for _tool in /opt/homebrew/bin/jq /usr/local/bin/jq; do
     if [ -x "$_tool" ]; then _boundary_jq="$_tool"; break; fi
   done
-  if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
-    [ -r "$_hook_dir/python-document-boundaries.py" ]; then
-    _segments=$(printf '%s' "$command" | "$_boundary_shfmt" --to-json 2>/dev/null |
-      /usr/bin/python3 -I -S "$_hook_dir/python-document-boundaries.py" 2>/dev/null) || _segments=""
-  fi
+  case "$command" in
+    *'<<'*)
+      if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
+        [ -r "$_hook_dir/python-document-boundaries.py" ]; then
+        _segments=$(printf '%s' "$command" | "$_boundary_shfmt" --to-json 2>/dev/null |
+          /usr/bin/python3 -I -S "$_hook_dir/python-document-boundaries.py" 2>/dev/null) || _segments=""
+      fi
+      ;;
+  esac
   _original_command="$command"
   _segment_match=1
   if [ -n "$_segments" ] && [ "$(printf '%s' "$_segments" | "$_boundary_jq" 'length' 2>/dev/null)" = 4 ]; then

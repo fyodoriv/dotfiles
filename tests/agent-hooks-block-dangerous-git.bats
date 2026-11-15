@@ -223,3 +223,11 @@ _check_command_text() {
   _check_command_text 'git branch ${FLAG} topic'
   [ "$status" -eq 2 ]
 }
+
+@test "missing empty and malformed command inputs block explicitly" {
+  for payload in '{}' '{"tool_input":{"command":""}}' 'not-json'; do
+    run bash -c 'printf "%s" "$1" | ./agent-hooks/block-dangerous-git.sh' _ "$payload"
+    [ "$status" -eq 2 ] || { echo "expected block for invalid input; got $status"; return 1; }
+    [[ "$output" == *"BLOCKED: missing or invalid command input."* ]]
+  done
+}

@@ -26,10 +26,12 @@ compare_payload() {
   done
 }
 
-@test "missing and malformed hook input keep old decisions and output" {
+@test "missing and malformed hook input block explicitly" {
   local input
   for input in '' '{' '{}' '{"tool_input":{}}' '{"tool_input":{"command":null}}'; do
     printf '%s' "$input" > "$BATS_TEST_TMPDIR/input"
-    compare_payload "$BATS_TEST_TMPDIR/input"
+    run bash "$ROOT/agent-hooks/block-dangerous-git.sh" < "$BATS_TEST_TMPDIR/input"
+    [ "$status" -eq 2 ]
+    [ "$output" = 'BLOCKED: missing or invalid command input.' ]
   done
 }

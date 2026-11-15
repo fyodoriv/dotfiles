@@ -52,6 +52,9 @@ migration architecture.
 
 ## block-dangerous-git (dotfiles hook)
 
+The guard blocks missing, empty, or malformed command input. It reports a clear
+error instead of allowing an unparsed command to proceed.
+
 The guard uses `shfmt` to recognize one plain `cat` text write or display.
 Only its wholly quoted heredoc bodies are masked before command checks.
 Shell consumers, pipelines, arithmetic, unquoted substitutions, special-file

@@ -70,6 +70,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [competition/](competition/) | The competitive scorecard and how it is measured | both |
 | [decisions/](decisions/) | Why the hard-to-reverse choices were made (ADRs) | both |
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
+| [Vendor inventory ledger](plans/rust-vendor-ledger-prediction.md) | How are reviewed vendor files added to the inventory? | agent |
 | [Partial inventory ledger](plans/rust-partial-ledger-prediction.md) | How are reviewed boundaries added without claiming completeness? | agent |
 | [Shared inventory core ownership](plans/rust-shared-core-ownership-prediction.md) | How is the vendored agentbrew core identified? | agent |
 | [Rust vendor ownership evidence](plans/rust-vendor-ownership-prediction.md) | How are vendored source identities and ownership checked? | agent |

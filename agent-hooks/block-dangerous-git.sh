@@ -510,17 +510,24 @@ esac
 if looks_like_branch_delete; then
   # Keep every segment, including the Python body, in the branch detector.
   _segments=""
-  if command -v shfmt >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 &&
+  _boundary_shfmt="" _boundary_jq=""
+  for _tool in /opt/homebrew/bin/shfmt /usr/local/bin/shfmt; do
+    if [ -x "$_tool" ]; then _boundary_shfmt="$_tool"; break; fi
+  done
+  for _tool in /opt/homebrew/bin/jq /usr/local/bin/jq; do
+    if [ -x "$_tool" ]; then _boundary_jq="$_tool"; break; fi
+  done
+  if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
     [ -r "$_hook_dir/python-document-boundaries.py" ]; then
-    _segments=$(printf '%s' "$command" | shfmt --to-json 2>/dev/null |
+    _segments=$(printf '%s' "$command" | "$_boundary_shfmt" --to-json 2>/dev/null |
       /usr/bin/python3 -I -S "$_hook_dir/python-document-boundaries.py" 2>/dev/null) || _segments=""
   fi
   _original_command="$command"
   _segment_match=1
-  if [ -n "$_segments" ] && [ "$(printf '%s' "$_segments" | jq 'length' 2>/dev/null)" = 4 ]; then
+  if [ -n "$_segments" ] && [ "$(printf '%s' "$_segments" | "$_boundary_jq" 'length' 2>/dev/null)" = 4 ]; then
     _segment_match=0
     for _segment_index in 0 1 2 3; do
-      command=$(printf '%s' "$_segments" | jq -r ".[${_segment_index}]")
+      command=$(printf '%s' "$_segments" | "$_boundary_jq" -r ".[${_segment_index}]")
       if looks_like_branch_delete; then _segment_match=1; break; fi
     done
   fi

@@ -381,3 +381,6 @@ The snapshot bridge compares every tracked path and independently supplied
 embedded and generated observations with reviewed entries. It rejects missing
 entries and stale source identities. Observation completeness and the reviewed
 manifest remain open; the bridge alone is not a completed inventory.
+The two non-executable inventory ledger files are excluded from their own
+object-ID comparison to avoid self-reference. No other tracked path is excluded
+by the bridge.

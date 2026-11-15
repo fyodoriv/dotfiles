@@ -8,6 +8,7 @@ use crate::{snapshot::Snapshot, validate, Entry, Error, Identity, Kind};
 #[derive(Debug, Eq, PartialEq)]
 pub enum BridgeError {
     DuplicatePath,
+    InvalidInventoryMetadata,
     FileObservation,
     UnknownSource,
     StaleSource,
@@ -25,6 +26,11 @@ pub fn validate_snapshot(
     let mut sources = BTreeMap::new();
     let mut identities = Vec::new();
     for path in &snapshot.paths {
+        // These two declarative ledgers cannot include their own Git object IDs.
+        if matches!(path.path.as_str(), "rust/migration-inventory/inventory.tsv" | "rust/migration-inventory/observations.tsv") {
+            if path.mode != "100644" { errors.push(BridgeError::InvalidInventoryMetadata); }
+            continue;
+        }
         if sources.insert(path.path.as_str(), path.object.as_str()).is_some() {
             errors.push(BridgeError::DuplicatePath);
         }
@@ -79,6 +85,15 @@ mod tests {
             incomplete.remove(index);
             assert!(validate_snapshot(&snapshot, &observations, &incomplete).iter().any(|error| matches!(error, BridgeError::Comparison(Error::MissingEntry(_)))));
         }
+    }
+
+    #[test]
+    fn excludes_only_non_executable_inventory_ledgers() {
+        let (mut snapshot, observations, entries) = fixture();
+        snapshot.paths.push(TrackedPath { path: "rust/migration-inventory/inventory.tsv".into(), mode: "100644".into(), object: "e".repeat(40) });
+        assert!(validate_snapshot(&snapshot, &observations, &entries).is_empty());
+        snapshot.paths.last_mut().unwrap().mode = "100755".into();
+        assert!(validate_snapshot(&snapshot, &observations, &entries).contains(&BridgeError::InvalidInventoryMetadata));
     }
 
     #[test]

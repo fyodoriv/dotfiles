@@ -8,6 +8,10 @@
 
 load test_helper
 
+# These jobs skip while a real-time app runs (lib/realtime-hold.sh); keep
+# them running here even when a game is open on this Mac.
+export DOTFILES_REALTIME_HOLD=0
+
 REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)"
 SYNC_LABEL="com.dotfiles.dotfiles-sync"
 LAUNCHAGENT_TMPL="$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
@@ -156,7 +160,7 @@ STUB
   git init --quiet "$fx/dotfiles"
   mkdir -p "$fx/dotfiles/bin" "$fx/dotfiles/lib"
   for f in bin/dotfiles-sync; do cp "$REPO_ROOT/$f" "$fx/dotfiles/$f"; done
-  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload zshrc-appends apply-state; do
+  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload zshrc-appends apply-state realtime-hold; do
     cp "$REPO_ROOT/lib/$f.sh" "$fx/dotfiles/lib/$f.sh"
   done
   # Stub follow-up helper: records each call.
@@ -202,7 +206,7 @@ STUB
   git init --quiet "$fx/dotfiles"
   mkdir -p "$fx/dotfiles/bin" "$fx/dotfiles/lib"
   cp "$REPO_ROOT/bin/dotfiles-sync" "$fx/dotfiles/bin/"
-  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload zshrc-appends apply-state; do
+  for f in colors stats errors-log lock push-error-classify agentbrew-locate self-reload zshrc-appends apply-state realtime-hold; do
     cp "$REPO_ROOT/lib/$f.sh" "$fx/dotfiles/lib/$f.sh"
   done
   printf '#!/bin/bash\necho followup >> "%s/followup.log"\n' "$TEST_DIR" > "$fx/dotfiles/bin/dotfiles-reload-launchagents"

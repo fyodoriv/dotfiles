@@ -64,6 +64,14 @@ if [[ "$FORCE" -eq 0 && -f "$STAMP_FILE" ]]; then
     fi
 fi
 
+# A game stream lags beside parallel Git fetches; skip until it quits.
+# shellcheck source=../lib/realtime-hold.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/realtime-hold.sh"
+if [[ "$FORCE" -eq 0 ]] && rt_app="$(realtime_app_running)"; then
+    echo "tooling-sync: skipped: $rt_app is running (a real-time app)"
+    exit 0
+fi
+
 # Claim the slot immediately to prevent concurrent runs (skip on dry-run).
 if [[ "$DRY_RUN" -eq 0 ]]; then
     date +%s > "$STAMP_FILE"

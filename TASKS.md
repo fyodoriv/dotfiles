@@ -162,6 +162,19 @@ them. -->
 
 ## P2
 
+- [ ] Make the full Bats suite pass on hosted macOS CI
+  - **ID**: hosted-full-suite-green
+  - **Tags**: ci, tests
+  - **Details**: Found 2026-11-15 in PR #714. An edit to `tests/test_helper.bash` makes every Bats file "affected", so `make check` ran the whole suite on hosted `macos-latest` (run 43764639249). 164 failures appeared there, in `gh-wrapper.bats`, `gh-wrapper-stacked-skill.bats`, `doctor-quiet-summary.bats`, `doctor-notification.bats`, `changelog.bats` and others. The same suites pass locally (59 of 59 for three of them). So the hosted full suite is red for environment reasons that per-PR affected runs never show. Read the first failure of each file and fix the missing tool, env var or path. Until then, any PR that touches a shared test helper cannot go green.
+  - **Output**: code
+  - **Acceptance**: a manual hosted full-suite run (`workflow_dispatch`, "Full suite") on `feat/chezmoi` has 0 failures.
+  - **Hypothesis**: a few shared causes (missing tools on the runner, HOME or PATH differences) explain most of the 164 failures; fixing them takes the hosted full suite from 164 failures to 0.
+  - **Measurement**: `gh run view <run> --log-failed | rg -c '^.*not ok'` on a fresh `workflow_dispatch` run of `ci.yml`.
+  - **Success**: 0 failures in one hosted full run, then 0 again in a second run.
+  - **Pivot**: more than 20 failures left after fixing the top 3 causes -> mark the remaining suites `skip` on hosted CI with a reason each and a follow-up per suite.
+  - **Anchor**: Forsgren, Humble, Kim 2018 (change failure rate); Kohavi, Tang, Xu 2020 (A/A checks).
+  - **Competitive-goal**: none — gate reliability (docs/metrics.md gate row), not a scorecard metric.
+
 - [ ] Distinguish read-only test-runner references from test runs
   - **ID**: heavy-run-read-only-reference
   - **Tags**: agent-hooks, heavy-run, false-positive

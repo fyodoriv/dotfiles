@@ -3,6 +3,10 @@
 # Runs via LaunchAgent; exercises git operations in isolated repos.
 
 load test_helper
+
+# These jobs skip while a real-time app runs (lib/realtime-hold.sh); keep
+# them running here even when a game is open on this Mac.
+export DOTFILES_REALTIME_HOLD=0
 # These tests check stats writes, so they turn the stats log back on.
 export DOTFILES_STATS_LOG=1
 
@@ -37,6 +41,7 @@ setup_file() {
   cp "$BATS_TEST_DIRNAME/../lib/push-error-classify.sh" "$tmpl/dotfiles/lib/push-error-classify.sh"
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$tmpl/dotfiles/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/apply-state.sh" "$tmpl/dotfiles/lib/apply-state.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/realtime-hold.sh" "$tmpl/dotfiles/lib/realtime-hold.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$tmpl/dotfiles/lib/agentbrew-locate.sh"
   mkdir -p "$tmpl/dotfiles/config"
   printf '# none\n' > "$tmpl/dotfiles/config/public-push-remotes.txt"
@@ -189,6 +194,7 @@ teardown() {
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$NOT_GIT/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$NOT_GIT/lib/agentbrew-locate.sh"
   cp "$BATS_TEST_DIRNAME/../lib/apply-state.sh" "$NOT_GIT/lib/apply-state.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/realtime-hold.sh" "$NOT_GIT/lib/realtime-hold.sh"
 
   run "$NOT_GIT/bin/dotfiles-sync"
   [ "$status" -eq 0 ]
@@ -209,6 +215,7 @@ teardown() {
   cp "$BATS_TEST_DIRNAME/../lib/zshrc-appends.sh" "$NO_REMOTE/lib/zshrc-appends.sh"
   cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$NO_REMOTE/lib/agentbrew-locate.sh"
   cp "$BATS_TEST_DIRNAME/../lib/apply-state.sh" "$NO_REMOTE/lib/apply-state.sh"
+  cp "$BATS_TEST_DIRNAME/../lib/realtime-hold.sh" "$NO_REMOTE/lib/realtime-hold.sh"
   git -C "$NO_REMOTE" init --quiet
   git -C "$NO_REMOTE" add -A
   git -C "$NO_REMOTE" commit --no-verify --allow-empty -m "chore: init" --quiet

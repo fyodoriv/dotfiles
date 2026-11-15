@@ -72,15 +72,19 @@ fn push(findings: &mut Vec<Finding>, kind: FindingKind, node: &Value, len: usize
 
 fn inspect_statement(statement: &Value, len: usize, findings: &mut Vec<Finding>) -> Result<(), &'static str> {
     let Some(command) = statement.get("Cmd").filter(|c| c.get("Type").and_then(Value::as_str) == Some("CallExpr")) else { return Ok(()); };
-    let args = command.get("Args").and_then(Value::as_array).ok_or("invalid call arguments")?;
-    if args.is_empty() { return Ok(()); }
-    let words: Vec<_> = args.iter().map(literal).collect();
+    let args = match command.get("Args") {
+        None | Some(Value::Null) => &[][..],
+        Some(Value::Array(args)) => args.as_slice(),
+        Some(_) => return Err("invalid call arguments"),
+    };
     let redirects = statement.get("Redirs").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
     for redirect in redirects {
         if matches!(redirect.get("Op").and_then(Value::as_str), Some(">" | ">>" | ">|" | "&>" | "&>>")) {
             push(findings, FindingKind::GeneratedCandidate, redirect, len, "output-redirection")?;
         }
     }
+    if args.is_empty() { return Ok(()); }
+    let words: Vec<_> = args.iter().map(literal).collect();
     let Some(name) = words[0].as_deref() else {
         return push(findings, FindingKind::Unresolved, statement, len, "dynamic-command");
     };
@@ -215,11 +219,12 @@ mod tests {
         let tree = json!({"Type":"File","Pos":{"Offset":0},"End":{"Offset":100},"Stmts":[
             {"Pos":{"Offset":0},"End":{"Offset":30},"Cmd":{"Type":"CallExpr","Args":[word("python3",0,7),word("-c",8,10),word("print(1)",11,19)]}},
             {"Pos":{"Offset":30},"End":{"Offset":60},"Cmd":{"Type":"CallExpr","Args":[word("cat",30,33)]},"Redirs":[{"Op":">","Pos":{"Offset":34},"End":{"Offset":40}}]},
-            {"Pos":{"Offset":60},"End":{"Offset":90},"Cmd":{"Type":"CallExpr","Args":[{"Parts":[{"Type":"ParamExp"}],"Pos":{"Offset":60},"End":{"Offset":64}}]}}
+            {"Pos":{"Offset":60},"End":{"Offset":90},"Cmd":{"Type":"CallExpr","Args":[{"Parts":[{"Type":"ParamExp"}],"Pos":{"Offset":60},"End":{"Offset":64}}]}},
+            {"Pos":{"Offset":90},"End":{"Offset":100},"Cmd":{"Type":"CallExpr","Assigns":[]},"Redirs":[{"Op":">","Pos":{"Offset":94},"End":{"Offset":99}}]}
         ]});
         let report = inspect(100, &serde_json::to_vec(&tree).unwrap()).unwrap();
         assert!(report.findings.iter().any(|f| f.kind == FindingKind::Embedded && f.category == "python"));
-        assert!(report.findings.iter().any(|f| f.kind == FindingKind::GeneratedCandidate));
+        assert!(report.findings.iter().any(|f| f.kind == FindingKind::GeneratedCandidate && f.start == 94));
         assert!(report.findings.iter().any(|f| f.kind == FindingKind::Unresolved));
         assert!(!report.complete);
         assert!(inspect(3, &serde_json::to_vec(&tree).unwrap()).is_err());

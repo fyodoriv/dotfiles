@@ -439,3 +439,9 @@ The [safety-boundary review](rust-safety-boundary-review.json) records three
 expressions in the public-write guard and the security doctor's redaction
 helper. The public-write path has its own recorded exception in the migration
 plan; its leak checks remain fail-closed. Source discovery is still incomplete.
+
+The [vendor ownership review](rust-vendor-ownership-review.json) binds the
+registry packages to their lockfile and vendor checksums. The hosted check
+rejects changed or unlisted files and planted package, file and path errors.
+These sources are upstream-owned and out of dotfiles' migration scope. The
+separate vendored agentbrew core is not included in that third-party group.

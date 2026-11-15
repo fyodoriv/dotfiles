@@ -108,6 +108,9 @@ Never in scope (manifest state `out-of-scope`):
 - Declarative YAML/JSON/plists, prompts, docs, data fixtures and lockfiles.
 - Upstream chezmoi, Homebrew, Git, browser engines, Ollama and the memory
   service.
+- Third-party registry crates in `rust/vendor/`: their upstream owners maintain
+  the code. Dotfiles pins and verifies the vendored snapshot. The separately
+  vendored inventory core is agentbrew-owned, not a third-party registry crate.
 
 Frozen agent support stays as it is. The manifest marks it `frozen`. It
 needs no port and no task.

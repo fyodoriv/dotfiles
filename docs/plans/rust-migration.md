@@ -473,7 +473,7 @@ The final step audits the finished state. It never claims that all code is Rust.
 |---|---|
 | Every tracked path has an owner and one of the five states | 2,232 of 2,232 ([classification](rust-source-classification.md)) |
 | Every `exception` names a row in [Recorded exceptions](#recorded-exceptions) | yes; the generator writes only row names from that table |
-| `ported` slices still meet their number on the current tree | `app-priority`: live median 213 ms over 573 runs on 2026-11-15 (number: at most 400 ms); Rust code unchanged since the measured commit `fa9c743` |
+| `ported` slices still meet their number on the current tree | `app-priority`: live median 213 ms over 573 runs from 2026-11-15 12:00 UTC (the earlier 302 ms is the 2026-11-14 to 2026-11-15 window; number: at most 400 ms); Rust code unchanged since the measured commit `fa9c743` |
 | Performance gate, every tracked command | `scripts/perf-gate.sh --force --json`: `ok`, ratios 0.986 to 1.007, no problems |
 | Temporary bridges have a deletion condition | the shell `app-priority` fallback goes when `app-priority-rust-tail` closes; the unshipped `rust/hook-status` candidate goes when `rust-agent-hooks-full-port` hits its Pivot |
 | `migration-check inventory --check` | fails closed at discovery only, the recorded `embedded-discovery` exception |

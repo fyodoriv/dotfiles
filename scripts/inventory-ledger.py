@@ -59,7 +59,7 @@ EXECUTABLE_RULES = [
     (r"^rust/migration-inventory/", "test tooling", exception("test-build-tooling")),
     (r"^git-hooks/", "git hook", exception("git-security-guards")),
     (r"^data/plugin-template/|^(bin/dotfiles-plugin|lib/plugin[^/]*)$", "plugin command", exception("plugin-trust")),
-    (r"^\.chezmoiscripts/|^modify_|^macos[^/]*\.sh$|^snapshot\.sh$|^skills/update-tooling/", "chezmoi lifecycle",
+    (r"^\.chezmoiscripts/|(^|/)modify_|^macos[^/]*\.sh$|^snapshot\.sh$|^skills/update-tooling/", "chezmoi lifecycle",
      exception("apply-install")),
     (r"^modules/[^/]+/doctor\.sh$|^bin/dotfiles-doctor$", "doctor", exception("doctor-core and the doctor module groups")),
     (r"^modules/", "doctor", exception("doctor-core and the doctor module groups")),
@@ -94,6 +94,8 @@ EXECUTABLE_RULES = [
      r"blocked-software|jetbrains-install|setup-dock|agentfile-|claude-model|agentbrew|zshrc-appends|"
      r"glove80|spotlight-probe|zsh-completion|dotfiles-agent-)", "cli", exception("apply-install")),
     (r"^(bin|lib)/", "cli", exception("developer-utilities")),
+    (r"^home/(sleep|wakeup)$", "sleepwatcher hook", exception("services-power")),
+    (r"^home/git-editor$", "git editor", exception("developer-utilities")),
     (r"^(home|private_dot_|symlink_|dot_config|jetbrains|vscode)", "shell session", OUT_SHELL),
     (r"", "cli", exception("developer-utilities")),
 ]
@@ -142,7 +144,7 @@ def classify(path, mode, oid):
                 "Test tooling follows its component; embedded and generated programs remain unreviewed.")
     if path.startswith("launchagents/"):
         return (REVIEWER, ANCHOR, "dotfiles", "launchd job", *OUT_LAUNCHD)
-    if SHELL_CONFIG.search(path):
+    if SHELL_CONFIG.search(path) and mode != "100755" and not head_bytes(oid).startswith(b"#!"):
         return (REVIEWER, ANCHOR, "dotfiles", "shell session", *OUT_SHELL)
     if not is_executable(path, mode, oid):
         return (REVIEWER, ANCHOR, "dotfiles", "declarative input", *OUT_DATA)

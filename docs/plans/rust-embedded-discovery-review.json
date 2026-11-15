@@ -1507,9 +1507,9 @@
       "start": 408,
       "end": 423,
       "owner": "dotfiles",
-      "caller": "shell session",
-      "state": "out-of-scope",
-      "reason": "Interactive shell or editor configuration; shell must stay shell."
+      "caller": "chezmoi lifecycle",
+      "state": "exception",
+      "reason": "Recorded apply-install exception in rust-migration.md."
     },
     {
       "path": "tests/fixtures/heavy-run-429",

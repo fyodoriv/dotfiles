@@ -13,9 +13,9 @@ static scanning cannot prove that discovery is complete.
 | Tracked paths with a review and a state | 2,232 of 2,232 |
 | Unclassified paths | 0 |
 | `ported` | 5 (Rust `app-priority` and its wrapper) |
-| `exception` | 768, each naming a [Recorded exceptions](rust-migration.md#recorded-exceptions) row |
+| `exception` | 773, each naming a [Recorded exceptions](rust-migration.md#recorded-exceptions) row |
 | `grandfathered` | 8 (the four pre-gate fixture crates) |
-| `out-of-scope` | 1,451 (data, docs, vendored packages, shell and editor configuration) |
+| `out-of-scope` | 1,446 (data, docs, vendored packages, shell and editor configuration) |
 | Embedded programs recorded | 233 (93 from the five earlier boundary reviews, 140 new) |
 | Shell files the scanner cannot parse | 369 (mostly `.bats` files and chezmoi templates) |
 | Unresolved scanner findings | 14,784 (mostly dynamic arguments) |
@@ -51,6 +51,14 @@ committed tree:
 
 Run it after committing source changes, commit the result, and run it again
 until `--check` reports `current` (the review JSON is itself a tracked file).
+
+## Pivot crossed, and why the task still closed
+
+The task's registered Pivot said that any blanket exception changes the
+method to execution and caller analysis. Assigning exceptions by path rule
+is close to a blanket exception, so that Pivot was crossed. The owner's
+ruling on 2026-11-15 ("count some downsides as tasks and continue") is what
+closes the task anyway. Caller analysis is the follow-up task below.
 
 ## What stays open
 

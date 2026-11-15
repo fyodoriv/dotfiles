@@ -69,5 +69,10 @@ That gap is the recorded `embedded-discovery` exception in
 findings and 369 unparsed shell files cannot be settled by static analysis.
 Task `rust-inventory-dynamic-discovery` tracks it.
 
+The ledgers pin blob ids, so each merge makes them stale. The daily
+`.github/workflows/inventory-ledger-refresh.yml` job reruns the generator on
+`feat/chezmoi` and pushes only the three generated files. Run it now with
+`gh workflow run inventory-ledger-refresh.yml`.
+
 The rules classify by path, not by reading callers. A new file lands in the
 first matching rule. A wrong match is a one-line rule change plus a rerun.

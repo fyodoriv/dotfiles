@@ -479,7 +479,8 @@ The final step audits the finished state. It never claims that all code is Rust.
 | `migration-check inventory --check` | fails closed at discovery only, the recorded `embedded-discovery` exception |
 
 Open follow-ups: `app-priority-rust-tail`, `rust-agent-hooks-full-port`,
-`rust-inventory-dynamic-discovery`, `inventory-ledger-freshness`.
+`rust-inventory-dynamic-discovery`. The daily `inventory-ledger-refresh.yml`
+workflow keeps the ledgers current ([ci-setup.md](../ci-setup.md)).
 
 ## Rollout, security and regression coverage
 

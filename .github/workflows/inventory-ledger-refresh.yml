@@ -1,0 +1,53 @@
+name: Inventory ledger refresh
+
+# The Rust inventory ledgers pin Git blob ids, so every source edit makes
+# them stale. Once a day this job regenerates them on feat/chezmoi and
+# pushes commits that change only the three generated files
+# (scripts/inventory-ledger-refresh.sh). Branch protection is off and
+# Actions cannot open pull requests in this repo, so this is the one bot
+# commit straight to feat/chezmoi (docs/ci-setup.md).
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-ledger-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/chezmoi
+          persist-credentials: false
+      - name: Install shell parser
+        run: brew install shfmt
+      - name: Build the scanner offline
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          mkdir -p "$CARGO_HOME"
+          cd rust/migration-inventory
+          cargo build --locked --offline --release
+      - name: Regenerate and commit the ledgers
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash scripts/inventory-ledger-refresh.sh
+      - name: Push the ledger commits
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(git rev-list --count origin/feat/chezmoi..HEAD)" -eq 0 ]; then
+            echo "nothing to push"
+            exit 0
+          fi
+          git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:feat/chezmoi

@@ -455,19 +455,6 @@ them. -->
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
   - **Competitive-goal**: none — migration scope honesty, not a scorecard metric.
 
-- [ ] Keep the inventory ledgers current without a manual rerun
-  - **ID**: inventory-ledger-freshness
-  - **Tags**: rust, ci
-  - **Details**: Follow-up from `rust-source-inventory`. The ledgers pin Git blob ids, so any source edit makes them stale, and the `migration-inventory` workflow runs only when `rust/migration-inventory/**` changes. Today `python3 scripts/inventory-ledger.py --write` (about 100 s, mostly the scanner) must be rerun by hand. Options: a scheduled workflow that opens a refresh PR, or a fast `--check` mode that skips the scanner for unchanged shell blobs.
-  - **Output**: code
-  - **Acceptance**: on `feat/chezmoi`, the ledgers are never stale for more than 24 h, with no extra step for PR authors.
-  - **Hypothesis**: a daily refresh job keeps stale days at 0 of 7 and adds 0 s to `make check`.
-  - **Measurement**: `python3 scripts/inventory-ledger.py --check` on `feat/chezmoi` once a day for 7 days (exit 0 count).
-  - **Success**: 7 of 7 days current; `make check` time unchanged (gate row in docs/metrics.md).
-  - **Pivot**: the refresh PRs need manual fixes on more than 2 of 7 days -> move the check into `make check` for changed shell files only.
-  - **Anchor**: Forsgren, Humble, Kim 2018 (change lead time); Kohavi, Tang, Xu 2020 (guard metrics).
-  - **Competitive-goal**: none — maintenance cost, not a scorecard metric.
-
 - [ ] Bring the Rust app-priority mean run time under 400 ms in daily use
   - **ID**: app-priority-rust-tail
   - **Tags**: rust, performance, launchagents

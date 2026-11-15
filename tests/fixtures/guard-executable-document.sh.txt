@@ -1,0 +1,7 @@
+git switch -c codex/example && python3 - <<'PY'
+from pathlib import Path
+import os
+os.system('git branch -D main')
+Path('docs/plans/example.md').write_text('example')
+PY
+git add docs/plans/example.md && git commit -m 'docs'

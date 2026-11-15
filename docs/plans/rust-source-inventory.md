@@ -395,3 +395,8 @@ audit.
 
 Hosted Linux controls provide an early offline compiler and test signal while
 the macOS gate remains required.
+
+The shell syntax-tree scanner identifies static interpreter bodies and output
+redirection candidates. It marks dynamic and unsupported cases unresolved and
+does not claim complete discovery. It inspects parser output, never executes
+the source, and is not yet wired into the inventory command.

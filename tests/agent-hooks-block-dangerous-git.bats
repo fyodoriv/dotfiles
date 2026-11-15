@@ -268,5 +268,5 @@ git add docs/plans/inventory-tracked-snapshot-prediction.md && git commit -m 'do
 COMMAND
   )
   _check_command_text "$command"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { echo "guard returned $status: $output"; return 1; }
 }

@@ -231,3 +231,17 @@ _check_command_text() {
     [[ "$output" == *"BLOCKED: missing or invalid command input."* ]]
   done
 }
+
+@test "allows safe branch and quoted document creation" {
+  local command
+  command=$(cat <<'COMMAND'
+git switch -c codex/inventory-tracked-snapshot && python3 - <<'PY'
+from pathlib import Path
+Path('docs/plans/inventory-tracked-snapshot-prediction.md').write_text("""Git's committed tree records every tracked path.""")
+PY
+git add docs/plans/inventory-tracked-snapshot-prediction.md && git commit -m 'docs: register tracked inventory snapshot adapter'
+COMMAND
+  )
+  _check_command_text "$command"
+  [ "$status" -eq 0 ]
+}

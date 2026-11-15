@@ -458,3 +458,8 @@ The partial ledgers also include the tracked files covered by these two vendor
 ownership reviews. The [vendor-ledger prediction](rust-vendor-ledger-prediction.md)
 requires each path and source identity to match those reviews. Other source
 reviews and independent discovery remain incomplete.
+
+The [documentation-ledger prediction](rust-document-ledger-prediction.md)
+defines a bounded review for regular Markdown documentation. It excludes
+executable-mode and shebang paths from that group; other source discovery
+continues separately.

@@ -70,6 +70,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [competition/](competition/) | The competitive scorecard and how it is measured | both |
 | [decisions/](decisions/) | Why the hard-to-reverse choices were made (ADRs) | both |
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
+| [Bats test-file inventory](plans/rust-bats-file-ledger-prediction.md) | How are test files recorded without claiming embedded-code coverage? | agent |
 | [Documentation inventory ledger](plans/rust-document-ledger-prediction.md) | How are documentation paths classified without hiding executables? | agent |
 | [Vendor inventory ledger](plans/rust-vendor-ledger-prediction.md) | How are reviewed vendor files added to the inventory? | agent |
 | [Partial inventory ledger](plans/rust-partial-ledger-prediction.md) | How are reviewed boundaries added without claiming completeness? | agent |

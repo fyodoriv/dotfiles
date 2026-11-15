@@ -1,0 +1,182 @@
+{
+  "baseline_revision": "c781ed657bf1b2edc8f591dfdababfd7eb31808f",
+  "scope": "Scanner candidates in selected CI and measurement scripts; not complete discovery or proof of execution.",
+  "entries": [
+    {
+      "path": ".github/scripts/brew-audit-manifest.sh",
+      "source_object": "1bbb603b3b0b4e5dbf8aaa4a1bb7440fc0b21921",
+      "language": "jq",
+      "start": 4142,
+      "end": 4164,
+      "owner": "dotfiles",
+      "caller": "hosted workflow",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": ".github/scripts/brew-audit-manifest.sh",
+      "source_object": "1bbb603b3b0b4e5dbf8aaa4a1bb7440fc0b21921",
+      "language": "jq",
+      "start": 4213,
+      "end": 4244,
+      "owner": "dotfiles",
+      "caller": "hosted workflow",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": ".github/scripts/brew-audit-manifest.sh",
+      "source_object": "1bbb603b3b0b4e5dbf8aaa4a1bb7440fc0b21921",
+      "language": "jq",
+      "start": 4292,
+      "end": 4322,
+      "owner": "dotfiles",
+      "caller": "hosted workflow",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": ".github/scripts/check-shell-coverage.sh",
+      "source_object": "9afb896f1d4d11498c68b70913ac42f38ea6a538",
+      "language": "jq",
+      "start": 495,
+      "end": 522,
+      "owner": "dotfiles",
+      "caller": "hosted workflow",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": ".github/scripts/check-tasks-lint-freshness.sh",
+      "source_object": "b437a590d236404d315ba8288fc00e8ad69b080c",
+      "language": "jq",
+      "start": 2294,
+      "end": 2313,
+      "owner": "dotfiles",
+      "caller": "hosted workflow",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/app-priority-candidate.sh",
+      "source_object": "9bb32793d91435af584444b1fbcdc7847f46ee2d",
+      "language": "perl",
+      "start": 371,
+      "end": 427,
+      "owner": "dotfiles",
+      "caller": "app-priority fixture",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "perl",
+      "start": 3266,
+      "end": 3296,
+      "owner": "dotfiles",
+      "caller": "benchmark runner",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "jq",
+      "start": 11317,
+      "end": 11569,
+      "owner": "dotfiles",
+      "caller": "benchmark runner",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "jq",
+      "start": 13011,
+      "end": 13341,
+      "owner": "dotfiles",
+      "caller": "benchmark runner",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "jq",
+      "start": 14060,
+      "end": 15402,
+      "owner": "dotfiles",
+      "caller": "benchmark runner",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "jq",
+      "start": 15826,
+      "end": 16189,
+      "owner": "dotfiles",
+      "caller": "benchmark runner",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "jq",
+      "start": 16257,
+      "end": 16495,
+      "owner": "dotfiles",
+      "caller": "benchmark runner",
+      "state": "exception",
+      "reason": "Unmeasured cold path; test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/proof.sh",
+      "source_object": "4a32cf84718fe85d133ba7e39e34642e7a437dfa",
+      "language": "jq",
+      "start": 1678,
+      "end": 1930,
+      "owner": "dotfiles",
+      "caller": "proof command",
+      "state": "exception",
+      "reason": "Unmeasured cold path; developer-utilities exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/proof.sh",
+      "source_object": "4a32cf84718fe85d133ba7e39e34642e7a437dfa",
+      "language": "jq",
+      "start": 1962,
+      "end": 2124,
+      "owner": "dotfiles",
+      "caller": "proof command",
+      "state": "exception",
+      "reason": "Unmeasured cold path; developer-utilities exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/proof.sh",
+      "source_object": "4a32cf84718fe85d133ba7e39e34642e7a437dfa",
+      "language": "jq",
+      "start": 2681,
+      "end": 7055,
+      "owner": "dotfiles",
+      "caller": "proof command",
+      "state": "exception",
+      "reason": "Unmeasured cold path; developer-utilities exception in rust-migration.md."
+    },
+    {
+      "path": "scripts/proof.sh",
+      "source_object": "4a32cf84718fe85d133ba7e39e34642e7a437dfa",
+      "language": "jq",
+      "start": 7140,
+      "end": 11425,
+      "owner": "dotfiles",
+      "caller": "proof command",
+      "state": "exception",
+      "reason": "Unmeasured cold path; developer-utilities exception in rust-migration.md."
+    }
+  ]
+}

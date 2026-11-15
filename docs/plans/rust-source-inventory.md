@@ -423,3 +423,8 @@ reported expressions and interpreter bodies in 11 lifecycle and doctor files.
 Each is bound to a source blob and classified as the existing apply-install or
 doctor exception. These are source candidates with conditional callers, not
 proof they ran or that the rest of each file has been discovered.
+
+The [tooling-boundary review](rust-shell-tooling-boundary-review.json) records
+16 candidates in six CI, fixture, benchmark and proof scripts under the
+existing test-build-tooling or developer-utilities exception. The same source
+identity and range check guards both reviews. Other tooling remains unreviewed.

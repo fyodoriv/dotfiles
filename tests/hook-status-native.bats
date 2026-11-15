@@ -100,3 +100,11 @@ probe() { printf '%s' '{"tool_input":{"command":"git status"},"cwd":"/tmp"}' | "
   [ "$status" -ne 0 ]
   [ -L "$DIRECTORY/current" ]
 }
+
+@test "invalid input stays blocked through native fallback" {
+  printf '#!/bin/bash\nprintf F >&3\nDOTFILES_NATIVE_GUARD_BYPASS=1 exec /bin/bash "$2"\n' > "$TEST_ROOT/rust/hook-status/target/release/dotfiles-hook-status"
+  "$INSTALLER" install
+  run bash -c 'printf "%s" "{}" | "$1"' _ "$GUARD"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"BLOCKED: missing or invalid command input."* ]]
+}

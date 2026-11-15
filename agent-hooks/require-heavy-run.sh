@@ -62,13 +62,19 @@ _pytest_heavy() {
         case "${1:-}" in 0) shift ;; *) return 0 ;; esac ;;
       -n0|--numprocesses=0) ;;
       -n*|--numprocesses=*) return 0 ;;
-      -k) [ -n "${1:-}" ] && kfilter=1; shift || true ;;
+      # An empty -k value vanishes with its quotes: the next flag is not a filter.
+      -k) case "${1:-}" in ""|-*|*/*) ;; *) kfilter=1; shift ;; esac ;;
       -k*) kfilter=1 ;;
       -m|-p|-c|-o|-W|-r|--rootdir|--basetemp|--deselect|--ignore|--ignore-glob|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout|--cov|--cov-report|--tb|--import-mode)
         shift || true ;;
+      # A redirection and its target are not test paths.
+      '>'|'>>'|'<'|[0-9]'>'|[0-9]'>>'|'&>') shift || true ;;
+      *'>'*|*'<'*) ;;
       -*) ;;
-      *.py|*.py::*) files=$((files + 1)) ;;
-      *) folders=$((folders + 1)) ;;
+      # Q is a quoted word (see _strip_text): treat a quoted id as one file.
+      *.py|*.py::*|Q) files=$((files + 1)) ;;
+      # Only a path-like word is a folder; other words are flag values.
+      */*|.|..|test|tests|testing) folders=$((folders + 1)) ;;
     esac
   done
   [ "$kfilter" -eq 1 ] && return 1
@@ -159,7 +165,7 @@ _is_heavy() {
       w=("${w[@]:1}")
       while [ "${#w[@]}" -gt 0 ]; do
         case "${w[0]}" in
-          -m) w=("${w[@]:1}"); break ;;
+          -m|-[A-Za-z]*m) w=("${w[@]:1}"); break ;;
           -m*) w[0]="${w[0]#-m}"; break ;;
           -X|-W) w=("${w[@]:2}") ;;
           -c) return 1 ;;
@@ -171,7 +177,10 @@ _is_heavy() {
     bash|sh|zsh|source|.)
       w=("${w[@]:1}")
       # -n reads the script for syntax and runs nothing.
-      [[ "${w[0]:-}" =~ ^-[a-zA-Z]*n[a-zA-Z]*$ ]] && return 1
+      for a in ${w[@]+"${w[@]}"}; do
+        [[ "$a" == -* ]] || break
+        [[ "$a" =~ ^-[a-zA-Z]*n[a-zA-Z]*$ ]] && return 1
+      done
       _skip_flags -o -O --rcfile --init-file
       [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == *.sh ]] || return 1
       w[0]="${w[0]##*/}" ;;

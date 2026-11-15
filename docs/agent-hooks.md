@@ -63,6 +63,11 @@ deployment script links the syntax filter beside the hook. A missing parser
 or failed proof also keeps the original command. Homebrew installs `shfmt`
 on both profiles.
 
+For one fixed branch, literal Python document, add, and commit sequence, the
+guard checks each proven command boundary separately. It still checks the
+Python body and commit message. Unknown syntax or a missing checker keeps the
+original conservative check.
+
 `agent-hooks/block-dangerous-git.sh` blocks `git reset --hard`,
 `git clean -f`, `git checkout .`, `git restore .`, and the force-delete of a
 local branch. A force-delete passes only when every named branch is proven

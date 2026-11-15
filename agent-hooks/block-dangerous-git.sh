@@ -508,7 +508,37 @@ esac
 # The subcommand is parsed, so "git -C <dir> branch", "-d -f", "--delete --force",
 # "-fd", and a flag after the branch name are checked like the plain form.
 if looks_like_branch_delete; then
-  branch_delete_allowed || block "git branch -D"
+  # Keep every segment, including the Python body, in the branch detector.
+  _segments=""
+  _boundary_shfmt="" _boundary_jq=""
+  for _tool in /opt/homebrew/bin/shfmt /usr/local/bin/shfmt; do
+    if [ -x "$_tool" ]; then _boundary_shfmt="$_tool"; break; fi
+  done
+  for _tool in /opt/homebrew/bin/jq /usr/local/bin/jq; do
+    if [ -x "$_tool" ]; then _boundary_jq="$_tool"; break; fi
+  done
+  case "$command" in
+    *'<<'*)
+      if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
+        [ -r "$_hook_dir/python-document-boundaries.py" ]; then
+        _segments=$(printf '%s' "$command" | "$_boundary_shfmt" --to-json 2>/dev/null |
+          /usr/bin/python3 -I -S "$_hook_dir/python-document-boundaries.py" 2>/dev/null) || _segments=""
+      fi
+      ;;
+  esac
+  _original_command="$command"
+  _segment_match=1
+  if [ -n "$_segments" ] && [ "$(printf '%s' "$_segments" | "$_boundary_jq" 'length' 2>/dev/null)" = 4 ]; then
+    _segment_match=0
+    for _segment_index in 0 1 2 3; do
+      command=$(printf '%s' "$_segments" | "$_boundary_jq" -r ".[${_segment_index}]")
+      if looks_like_branch_delete; then _segment_match=1; break; fi
+    done
+  fi
+  command="$_original_command"
+  if [ "$_segment_match" -eq 1 ]; then
+    branch_delete_allowed || block "git branch -D"
+  fi
 fi
 
 exit 0

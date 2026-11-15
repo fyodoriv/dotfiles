@@ -55,7 +55,8 @@ fn parse_tree(raw: &[u8]) -> Result<Vec<TrackedPath>, &'static str> {
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, &'static str> {
-    let output = Command::new("git")
+    // Use the system Git so a repository-local PATH entry cannot supply a program.
+    let output = Command::new("/usr/bin/git")
         .arg("-C").arg(root)
         .args(args)
         .env("GIT_NO_REPLACE_OBJECTS", "1")

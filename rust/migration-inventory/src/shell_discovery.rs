@@ -73,6 +73,9 @@ fn inspect_statement(statement: &Value, len: usize, findings: &mut Vec<Finding>)
     let Some(name) = words[0].as_deref() else {
         return push(findings, FindingKind::Unresolved, statement, len, "dynamic-command");
     };
+    for (index, word) in words.iter().enumerate().skip(1) {
+        if word.is_none() { push(findings, FindingKind::Unresolved, &args[index], len, "dynamic-argument")?; }
+    }
     let base = name.rsplit('/').next().unwrap_or(name);
     if matches!(base, "eval" | "source" | "." | "env" | "command" | "sudo" | "xargs") {
         push(findings, FindingKind::Unresolved, statement, len, "indirect-command")?;
@@ -82,14 +85,14 @@ fn inspect_statement(statement: &Value, len: usize, findings: &mut Vec<Finding>)
         for redirect in redirects {
             if let Some(body) = redirect.get("Hdoc").filter(|body| !body.is_null()) {
                 push(findings, FindingKind::Embedded, body, len, language)?;
+                if !body.get("Parts").and_then(Value::as_array).is_some_and(|parts| parts.iter().all(|part| part.get("Type").and_then(Value::as_str) == Some("Lit"))) {
+                    push(findings, FindingKind::Unresolved, body, len, "dynamic-heredoc")?;
+                }
                 found = true;
             }
         }
         for (index, word) in words.iter().enumerate().skip(1) {
-            let Some(flag) = word.as_deref() else {
-                push(findings, FindingKind::Unresolved, &args[index], len, "dynamic-interpreter-argument")?;
-                continue;
-            };
+            let Some(flag) = word.as_deref() else { continue; };
             let inline = matches!(flag, "-c" | "-e") || (language == "perl" && flag.starts_with('-') && !flag.starts_with("--") && flag.contains('e'));
             if inline {
                 if let Some(argument) = args.get(index + 1) {

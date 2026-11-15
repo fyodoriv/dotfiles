@@ -398,5 +398,8 @@ the macOS gate remains required.
 
 The shell syntax-tree scanner identifies static interpreter bodies and output
 redirection candidates. It marks dynamic and unsupported cases unresolved and
-does not claim complete discovery. It inspects parser output, never executes
-the source, and is not yet wired into the inventory command.
+does not claim complete discovery. It reads one committed blob and uses a
+trusted external parser without executing the source. Its per-invocation
+children have bounded time and output. Parsing failures remain unresolved. Full
+scans use the shared heavy-run queue. The scanner is not yet wired into the
+inventory command.

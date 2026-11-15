@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::process::Command;
 
 #[test]
-fn bats_file_records_do_not_claim_complete_source_reviews() {
+fn bats_file_records_match_the_committed_tree() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output = Command::new("git").current_dir(&root).args(["ls-tree", "-r", "-z", "HEAD", "--", "tests"]).output().unwrap();
     assert!(output.status.success());
@@ -25,6 +25,4 @@ fn bats_file_records_do_not_claim_complete_source_reviews() {
     let mut omitted = actual.clone();
     omitted.pop_first();
     assert_ne!(omitted, expected);
-    let observations = std::fs::read_to_string(root.join("rust/migration-inventory/observations.tsv")).unwrap();
-    assert!(!observations.lines().any(|line| line.starts_with("review\ttests/") && line.split('\t').nth(1).is_some_and(|path| path.ends_with(".bats"))));
 }

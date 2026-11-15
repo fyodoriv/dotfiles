@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::path::{Component, Path};
 use std::process::Command;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrackedPath {
     pub path: String,
     pub mode: String,

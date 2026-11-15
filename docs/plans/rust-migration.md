@@ -110,7 +110,8 @@ Never in scope (manifest state `out-of-scope`):
   service.
 - Third-party registry crates in `rust/vendor/`: their upstream owners maintain
   the code. Dotfiles pins and verifies the vendored snapshot. The separately
-  vendored inventory core is agentbrew-owned, not a third-party registry crate.
+  vendored inventory core is agentbrew-owned, not a third-party registry crate;
+  its source is outside dotfiles-owned migration scope.
 
 Frozen agent support stays as it is. The manifest marks it `frozen`. It
 needs no port and no task.

@@ -447,3 +447,9 @@ registry packages to their lockfile and vendor checksums. The hosted check
 rejects changed or unlisted files and planted package, file and path errors.
 These sources are upstream-owned and out of dotfiles' migration scope. The
 separate vendored agentbrew core is not included in that third-party group.
+
+The [shared-core ownership review](rust-shared-core-ownership-review.json)
+records the agentbrew-owned source blob and the dotfiles vendor file identities.
+The source blob was compared with the pinned agentbrew revision. Hosted checks
+verify the local file set and pin without fetching upstream. This is ownership
+evidence, not proof that the remaining inventory is complete.

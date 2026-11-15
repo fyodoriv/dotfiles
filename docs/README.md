@@ -71,6 +71,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [decisions/](decisions/) | Why the hard-to-reverse choices were made (ADRs) | both |
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
 | [Partial inventory ledger](plans/rust-partial-ledger-prediction.md) | How are reviewed boundaries added without claiming completeness? | agent |
+| [Shared inventory core ownership](plans/rust-shared-core-ownership-prediction.md) | How is the vendored agentbrew core identified? | agent |
 | [Rust vendor ownership evidence](plans/rust-vendor-ownership-prediction.md) | How are vendored source identities and ownership checked? | agent |
 | [Standalone guard Bats regression](plans/guard-standalone-bats-regression.md) | Why did the standalone guard suite fail to load? | agent |
 | [Shell inventory option prediction](plans/inventory-shell-options-prediction.md) | How are interpreter-option discovery errors corrected? | agent |

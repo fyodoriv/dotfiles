@@ -223,7 +223,8 @@ run_hook() {
            "pytest -k '' -n 8" "pytest -k '' tests/" "python3 -Im pytest" "python3 -Bm pytest" \
            'pytest "tests/"' 'uv run pytest -q "tests/unit"' 'pytest "$TESTS"' 'pytest --log-cli-level "INFO"' \
            "pytest -k '' \"tests/\"" "pytest tests/a.py unit" "pytest tests/a.py src" \
-           "pytest tests/a.py --rootdir . tests" 'bash "scripts/check.sh"' '"scripts/check.sh" fast' 'uv run "pytest"'; do
+           "pytest tests/a.py --rootdir . tests" 'bash "scripts/check.sh"' '"scripts/check.sh" fast' 'uv run "pytest"' \
+           'bash "check.sh"' '"python3" -m pytest' '"uv" run pytest' '"${ROOT}/scripts/check.sh" fast'; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; failures=$((failures + 1)); }
   done
@@ -245,7 +246,8 @@ run_hook() {
            "pytest 'tests/a.py::test_x[case-1]'" "python3 -m pip install x" "pytest 'tests/a.py'" \
            'pytest tests/a.py -m "not slow"' 'pytest tests/a.py -k "foo or bar"' "pytest tests/a.py --log-cli-level INFO" \
            "pytest -v tests/a.py tests/b.py >> log.txt" \
-           'pytest -k "test_foo"' 'pytest "$PWD/tests/a.py"' 'pytest "tests/a.py::test_x[a b]"' 'git commit -m "scripts/check.sh"'; do
+           'pytest -k "test_foo"' 'pytest "$PWD/tests/a.py"' 'pytest "tests/a.py::test_x[a b]"' 'git commit -m "scripts/check.sh"' \
+           'echo "${ROOT}/scripts/check.sh"' 'pytest "${ROOT}/tests/a.py"' 'git commit -m "tests/a.py::test_x (pytest)"' 'git commit -m "bash"'; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
   done

@@ -309,12 +309,14 @@ _strip_text() {
       $s =~ s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
         my $q = $1; my $pre = $`; my $in = substr($q, 1, -1);
         my $dq = substr($q, 0, 1) eq "\"";
-        # A quoted path (one word with a slash), a pytest file or test id, or the
-        # word pytest keeps its text so the command checks can read it.
+        # A quoted path (one word with a slash), a pytest file or test id, or a
+        # program or gate script name keeps its text so the command checks can
+        # read it. ${X} becomes $X: braces and parentheses split commands.
+        my $n = $in =~ s{\$\{(\w+)\}}{\$$1}gr;
         my $r = $in =~ m{^\.\*?$} ? $in
-          : $in =~ m{^[\w.\x2f\$\{\}-]+\.py::[^"\x27`\\]*$} ? $in =~ s{\s}{_}gr
-          : $in =~ m{^[\w.\$\{\}-]*\x2f[\w.\x2f\$\{\}-]*$} ? $in
-          : $in =~ m{^(?:[\w.\x2f\$\{\}-]+\.py|pytest|py\.test)$} ? $in
+          : $n =~ m{^[\w.\x2f\$-]+\.py::[^"\x27`\\]*$} ? $n =~ s{[\s(){};&|<>]}{_}gr
+          : $n =~ m{^[\w.\$-]*\x2f[\w.\x2f\$-]*$} ? $n
+          : $n =~ m{^(?:[\w.\x2f\$-]+\.py|pytest|py\.test|python[\d.]*|uvx?|bash|sh|zsh|(?:check|e2e|public-readiness|batch-gate)\.sh)$} ? $n
           : length($in) ? "Q" : "";
         if ($dq) {
           while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }

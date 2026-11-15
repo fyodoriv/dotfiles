@@ -270,7 +270,10 @@ The periodic jobs `dotfiles-sync`, `tooling-sync` and `agent-scratch-prune` use 
 list through `lib/realtime-hold.sh`: while a listed app runs, each skips its run and prints
 `skipped: <app> is running`; the next interval retries. On 2026-11-15 a `git` process at
 about six cores ran beside GeForce NOW and the stream lagged. `DOTFILES_REALTIME_HOLD=0`
-turns this skip off; `tooling-sync --force` ignores it.
+turns this skip off; `tooling-sync --force` ignores it. Two differences from
+`heavy-run`: if the `pgrep` probe fails, the job runs (heavy-run holds), so a broken probe
+never stops syncing; and names are split on commas without trimming, so write
+`GeForceNOW,Steam`, not `GeForceNOW, Steam`.
 
 Each controller caches the app check for at most two seconds. A successful
 check must return process IDs, or report no matches with no output. A failed,

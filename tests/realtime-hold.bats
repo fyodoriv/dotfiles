@@ -65,15 +65,15 @@ hold() { bash -c 'source "$1/lib/realtime-hold.sh"; realtime_app_running' _ "$RE
 }
 
 @test "dotfiles-sync skips before any Git work while a real-time app runs" {
-  cat > "$TEST_DIR/bin/git" <<'EOF'
+  cat > "$TEST_DIR/bin/git" <<EOF
 #!/bin/bash
-echo "git must not run" >&2; exit 99
+touch "$TEST_DIR/git-ran"; exit 99
 EOF
   chmod +x "$TEST_DIR/bin/git"
   run "$REPO/bin/dotfiles-sync"
   [ "$status" -eq 0 ]
   [[ "$output" == *"skipped: FakeGame is running"* ]]
-  [[ "$output" != *"git must not run"* ]]
+  [ ! -e "$TEST_DIR/git-ran" ]
 }
 
 @test "tooling-sync skips and leaves the hourly slot unclaimed" {

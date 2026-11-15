@@ -27,4 +27,5 @@ jobs:
         run: |
           ./bin/heavy-run bats --tap tests/agent-hooks-block-dangerous-git.bats > "$RUNNER_TEMP/guard-standalone.tap"
           cat "$RUNNER_TEMP/guard-standalone.tap"
-          grep -qx '1\.\.37' "$RUNNER_TEMP/guard-standalone.tap"
+          expected="$(grep -c '^@test ' tests/agent-hooks-block-dangerous-git.bats)"
+          grep -qx "1\\.\\.$expected" "$RUNNER_TEMP/guard-standalone.tap"

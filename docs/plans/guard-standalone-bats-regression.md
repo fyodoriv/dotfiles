@@ -13,7 +13,7 @@ hosted Bats invocations load and execute the complete suite.
 **Measurement:** Hosted CI runs `bats tests/agent-hooks-block-dangerous-git.bats`
 as a standalone invocation and the normal affected repository gate.
 
-**Success:** Both invocations load and execute all 37 tests; the planted safe
+**Success:** Both invocations load and execute 100% of the declared tests; the planted safe
 case passes and destructive controls stay blocked. **Pivot:** Any parse error,
 missing case, changed test decision or new unsafe allow rejects this fix; read
 the new log and reassess the parser trigger.

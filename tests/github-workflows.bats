@@ -160,3 +160,22 @@ test_job_adds_repo_bin() {
   printf '%s\n' '  test:' '    # run: brew install ripgrep' '    run: brew install not-ripgrep' > "$fixture"
   ! test_job_has_ripgrep "$fixture"
 }
+
+# The ledger refresh is the one workflow that pushes to feat/chezmoi
+# (docs/ci-setup.md). Fork code must never reach its write token, and it
+# may commit only the three generated ledger files.
+@test "workflow files: the inventory ledger refresh writes only its ledgers" {
+  local file="$REPO_ROOT/.github/workflows/inventory-ledger-refresh.yml"
+  ! workflow_code "$file" | grep -qE '^[[:space:]]*(pull_request|push):' || {
+    echo "the refresh must run only on schedule or by hand"
+    return 1
+  }
+  workflow_code "$file" | grep -qE "^permissions:"
+  [ "$(workflow_code "$file" | grep -cE 'contents:[[:space:]]*write')" -eq 1 ]
+  grep -q 'refusing to commit files other than the ledgers' "$file"
+  for f in rust/migration-inventory/inventory.tsv rust/migration-inventory/observations.tsv \
+    docs/plans/rust-embedded-discovery-review.json; do
+    grep -qF "$f" "$file"
+  done
+  grep -q 'inventory-ledger.py --check' "$file"
+}

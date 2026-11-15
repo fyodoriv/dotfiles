@@ -417,3 +417,9 @@ nor migration-state classification.
 The scanner handles a bounded set of jq flags before its filter and treats
 unknown options as unresolved. Perl module switches are not inline code.
 Unsupported interpreter forms remain unresolved rather than complete.
+
+The [cold-boundary review](rust-shell-cold-boundary-review.json) records 41
+reported expressions and interpreter bodies in 11 lifecycle and doctor files.
+Each is bound to a source blob and classified as the existing apply-install or
+doctor exception. These are source candidates with conditional callers, not
+proof they ran or that the rest of each file has been discovered.

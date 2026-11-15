@@ -495,6 +495,20 @@ them. -->
   - **Anchor**: Hosted parity run 43643041193; Basili, Caldiera, Rombach 1994 (GQM).
   - **Competitive-goal**: none — agent-hook reliability.
 
+- [ ] Stop the Git guard rejecting a safe branch-and-document command
+  - **ID**: dangerous-git-safe-document-false-block
+  - **Tags**: agent-hooks, reliability, security
+  - **Mode**: AFK
+  - **Details**: On 2026-11-15 a command combined a safe branch creation, a quoted Python heredoc writing a local plan, and a normal commit. The guard reported a prohibited force-delete operation even though the command contained none. Splitting the safe operations worked. Reproduce the original shape in a synthetic fixture and retain the real delete protections.
+  - **Output**: code
+  - **Acceptance**: The safe combined fixture is allowed. Existing destructive Git and hostile heredoc fixtures keep their decisions.
+  - **Hypothesis**: Correcting the inert-text boundary reduces the reproduced false blocks from one to zero without a new false permit.
+  - **Measurement**: Hosted CI runs a reproducing Bats case plus the dangerous-Git guard suite.
+  - **Success**: 0 false blocks in the planted safe case; 0 changed decisions for existing destructive cases; 0 new false permits.
+  - **Pivot**: Any unsafe allow or changed destructive-command decision rejects the fix and keeps the existing guard.
+  - **Anchor**: Inventory snapshot work on 2026-11-15; Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — agent-hook reliability.
+
 ## P3
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)

@@ -122,6 +122,7 @@ _check_command_text() {
     bash .chezmoiscripts/run_after_agent-hooks.sh
   [ "$status" -eq 0 ]
   [ -L "$scratch/.config/dotfiles/hooks/plain-document-write.jq" ]
+  [ -L "$scratch/.config/dotfiles/hooks/python-document-boundaries.py" ]
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
   payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
   run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
@@ -269,4 +270,37 @@ COMMAND
   )
   _check_command_text "$command"
   [ "$status" -eq 0 ] || { echo "guard returned $status: $output"; return 1; }
+}
+
+@test "literal document boundary keeps destructive commands visible" {
+  local command
+  command=$(cat <<'COMMAND'
+git switch -c codex/example && python3 - <<'PY'
+from pathlib import Path
+Path('docs/plans/example.md').write_text('git branch -D main')
+PY
+git add docs/plans/example.md && git commit -m 'docs'
+COMMAND
+  )
+  _check_command_text "$command"
+  [ "$status" -eq 2 ]
+  command="$command && git branch -D main"
+  _check_command_text "$command"
+  [ "$status" -eq 2 ]
+}
+
+@test "executable Python heredoc does not qualify as a literal writer" {
+  local command
+  command=$(cat <<'COMMAND'
+git switch -c codex/example && python3 - <<'PY'
+from pathlib import Path
+import os
+os.system('git branch -D main')
+Path('docs/plans/example.md').write_text('example')
+PY
+git add docs/plans/example.md && git commit -m 'docs'
+COMMAND
+  )
+  _check_command_text "$command"
+  [ "$status" -eq 2 ]
 }

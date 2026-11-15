@@ -32,6 +32,20 @@ _make_dry_run() {
   done
 }
 
+# Bats 1.14 refuses a bare `--` before the files ("Bad command line option").
+# cached-run --per-file strips its own `--`; the full-run targets call bats
+# directly, so they must not pass one.
+@test "full-suite targets call bats without a -- separator" {
+  printf '#!/bin/bash\nexit 0\n' > "$FAKE_BIN/parallel"
+  chmod +x "$FAKE_BIN/parallel"
+  for target in test-all test-force; do
+    run _make_dry_run "$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" "$target"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"bats --jobs"*" -- tests/"* ]]
+    [[ "$output" != *"bats -- tests/"* ]]
+  done
+}
+
 @test "CONTRIBUTING documents the serial fallback without parallel" {
   grep -q 'serial' "$REPO_ROOT/CONTRIBUTING.md"
   grep -q 'parallel' "$REPO_ROOT/CONTRIBUTING.md"

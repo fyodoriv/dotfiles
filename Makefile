@@ -112,9 +112,9 @@ BATS_PEER_FILES = $(filter-out tests/doctor.bats,$(BATS_ALL_FILES))
 define BATS_FULL_RUN
 [ -n "$(BATS_ALL_FILES)" ] || exit 1; \
 result=0; \
-if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) -- $(BATS_PEER_FILES) || result=$$?; fi; \
+if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) $(BATS_PEER_FILES) || result=$$?; fi; \
 if [ -n "$(filter tests/doctor.bats,$(BATS_ALL_FILES))" ]; then \
-  bats -- tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
+  bats tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
 fi; \
 exit "$$result"
 endef

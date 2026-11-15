@@ -1,6 +1,7 @@
 //! Shared inventory comparison; source discovery and the audit remain open.
 pub use migration_inventory_core::{validate, Entry, Error, Identity, Kind, State};
 pub mod snapshot;
+pub mod bridge;
 
 #[cfg(test)]
 mod tests {

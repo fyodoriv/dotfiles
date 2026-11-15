@@ -1,0 +1,21 @@
+#!/bin/bash
+# Install or roll back the experimental native heavy-run status path.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+directory="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/hook-heavy"
+# shellcheck source=../lib/native-delivery.sh
+source "$root/lib/native-delivery.sh"
+
+case "${1:-}" in
+  --help|-h) echo 'Usage: dotfiles hook-heavy-native install|rollback'; exit 0 ;;
+  install)
+    native_delivery_install "$root" hook-status dotfiles-hook-heavy "$directory" hook-heavy hook-heavy-native
+    echo 'Native heavy-run status experiment installed.'
+    ;;
+  rollback)
+    native_delivery_rollback "$directory" hook-heavy hook-heavy-native
+    echo 'Heavy-run shell guard restored.'
+    ;;
+  *) echo 'Usage: hook-heavy-native install|rollback' >&2; exit 2 ;;
+esac

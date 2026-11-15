@@ -11,6 +11,9 @@ source "$_hook_dir/bootstrap-endpoint-path.sh"
 
 [ "${HEAVY_RUN_HOOK:-on}" = off ] && exit 0
 
+# shellcheck source=heavy-native-dispatch.sh
+if [ -r "$_hook_dir/heavy-native-dispatch.sh" ]; then source "$_hook_dir/heavy-native-dispatch.sh"; fi
+
 input=$(cat)
 command="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"

@@ -1375,6 +1375,7 @@ dotfiles [--yes] [--health]                       Start screen: set up, applied,
 dotfiles glove80 [<command>] [--yes]              Check or pair a Glove80 keyboard
 dotfiles priority-native <install|rollback>       Enable or roll back native app priority
 dotfiles hook-native <install|rollback>           Enable or roll back the native status guard
+dotfiles hook-heavy-native <install|rollback>     Enable or roll back the heavy-run experiment
 dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
 dotfiles config get <key>                         Print one value
 dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it

@@ -15,6 +15,10 @@ an owner-only temporary file, unlinked before it is written and closed on exit.
 primary enforcement happens via agentbrew Claude Code hooks deployed to
 `~/.claude/codeassist/hooks-scripts/` and wired into `~/.claude/settings.json`.
 
+The separate `dotfiles hook-heavy-native install` command enables the measured
+heavy-run status path. `dotfiles hook-heavy-native rollback` restores the shell
+path. It runs the same Perl parser and keeps unknown commands on the shell path.
+
 The Claude Code hooks fire ahead of the dotfiles wrappers — they catch
 violations at the `PreToolUse` protocol layer, before the wrapper ever
 runs. The wrappers stay because:

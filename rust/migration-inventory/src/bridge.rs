@@ -5,6 +5,9 @@ use std::collections::BTreeMap;
 
 use crate::{snapshot::Snapshot, validate, Entry, Error, Identity, Kind};
 
+pub const INVENTORY_LEDGER: &str = "rust/migration-inventory/inventory.tsv";
+pub const OBSERVATION_LEDGER: &str = "rust/migration-inventory/observations.tsv";
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum BridgeError {
     DuplicatePath,
@@ -27,7 +30,7 @@ pub fn validate_snapshot(
     let mut identities = Vec::new();
     for path in &snapshot.paths {
         // These two declarative ledgers cannot include their own Git object IDs.
-        if matches!(path.path.as_str(), "rust/migration-inventory/inventory.tsv" | "rust/migration-inventory/observations.tsv") {
+        if matches!(path.path.as_str(), INVENTORY_LEDGER | OBSERVATION_LEDGER) {
             if path.mode != "100644" { errors.push(BridgeError::InvalidInventoryMetadata); }
             continue;
         }

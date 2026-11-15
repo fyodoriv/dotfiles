@@ -6,3 +6,7 @@ publish = false
 
 [dependencies]
 migration-inventory-core = { git = "https://github.com/fyodoriv/agentbrew.git", rev = "f1e3f257210de4c689724f8d1a1ac6445e7b528d" }
+
+[[bin]]
+name = "migration-check"
+path = "src/main.rs"

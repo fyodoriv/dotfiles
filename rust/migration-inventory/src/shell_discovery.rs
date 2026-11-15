@@ -2,6 +2,17 @@
 //! These findings are candidates. This module cannot establish full coverage.
 
 use serde_json::Value;
+use std::io::{Read, Write};
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
+
+use crate::snapshot::Snapshot;
+
+const MAX_SOURCE: usize = 1024 * 1024;
+const MAX_AST: usize = 32 * 1024 * 1024;
+const TOOL_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum FindingKind { Embedded, GeneratedCandidate, Unresolved }
@@ -132,6 +143,62 @@ pub fn inspect(source_len: usize, ast: &[u8]) -> Result<Report, &'static str> {
     let mut findings = Vec::new();
     walk(&tree, source_len, &mut findings)?;
     Ok(Report { findings, complete: false })
+}
+
+/// Run one trusted, owned child with bounded input, output, and elapsed time.
+/// `shfmt` and Git are expected not to leave descendants holding their pipes.
+fn run_tool(program: &Path, args: &[&str], input: Vec<u8>, limit: usize) -> Result<Vec<u8>, &'static str> {
+    let mut child = Command::new(program).args(args)
+        .env("GIT_NO_REPLACE_OBJECTS", "1").env("GIT_NO_LAZY_FETCH", "1")
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
+        .spawn().map_err(|_| "cannot start discovery tool")?;
+    let (Some(mut stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("missing tool pipe");
+    };
+    let writer = thread::spawn(move || stdin.write_all(&input));
+    let reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.take((limit + 1) as u64).read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let deadline = Instant::now() + TOOL_TIMEOUT;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
+            _ => { let _ = child.kill(); let _ = child.wait(); break None; }
+        }
+    };
+    let wrote = writer.join().map_err(|_| "tool input failed")?;
+    let output = reader.join().map_err(|_| "tool output failed")?.map_err(|_| "tool output failed")?;
+    if status.is_none() { return Err("discovery tool timed out or failed"); }
+    if !status.unwrap().success() || wrote.is_err() || output.len() > limit { return Err("discovery tool failed or exceeded output limit"); }
+    Ok(output)
+}
+
+/// Inspect one regular file from a committed snapshot with an external trusted shfmt.
+/// Parse failures, oversized source, and unsupported encodings are errors, not clearance.
+pub fn scan_committed_shell(root: &Path, snapshot: &Snapshot, path: &str, shfmt: &Path) -> Result<Report, &'static str> {
+    let mut matches = snapshot.paths.iter().filter(|entry| entry.path == path);
+    let entry = matches.next().ok_or("source path not in snapshot")?;
+    if matches.next().is_some() || !matches!(entry.mode.as_str(), "100644" | "100755") { return Err("source is not one regular tracked file"); }
+    if !matches!(entry.object.len(), 40 | 64) || !entry.object.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) { return Err("invalid source identity"); }
+    let root = root.canonicalize().map_err(|_| "invalid repository root")?;
+    let tool = shfmt.canonicalize().map_err(|_| "shell parser unavailable")?;
+    if tool.starts_with(&root) || tool.file_name().and_then(|name| name.to_str()) != Some("shfmt") || !tool.is_file() {
+        return Err("external trusted shell parser required");
+    }
+    let root_text = root.to_str().ok_or("unsupported repository path")?;
+    let git = Path::new("/usr/bin/git");
+    let size = run_tool(git, &["-C", root_text, "cat-file", "-s", &entry.object], Vec::new(), 128)?;
+    let size = std::str::from_utf8(&size).map_err(|_| "invalid source size")?.trim().parse::<usize>().map_err(|_| "invalid source size")?;
+    if size > MAX_SOURCE { return Err("source exceeds discovery limit"); }
+    let source = run_tool(git, &["-C", root_text, "cat-file", "blob", &entry.object], Vec::new(), MAX_SOURCE)?;
+    if source.len() != size || std::str::from_utf8(&source).is_err() { return Err("invalid or unsupported source"); }
+    let source_len = source.len();
+    let ast = run_tool(&tool, &["-ln", "bash", "--to-json"], source, MAX_AST)?;
+    inspect(source_len, &ast)
 }
 
 #[cfg(test)]

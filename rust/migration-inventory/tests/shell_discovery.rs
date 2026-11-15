@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use dotfiles_migration_inventory::shell_discovery::{inspect, FindingKind};
+use dotfiles_migration_inventory::{shell_discovery::{inspect, scan_committed_shell, FindingKind}, snapshot::committed_tree};
 
 #[test]
 fn shfmt_tree_reports_bodies_outputs_and_dynamic_calls_without_running_source() {
@@ -21,4 +21,15 @@ fn shfmt_tree_reports_bodies_outputs_and_dynamic_calls_without_running_source() 
     assert!(report.findings.iter().any(|f| f.category == "dynamic-heredoc"));
     assert!(!report.complete);
     assert!(!marker.exists());
+}
+
+#[test]
+fn scans_a_committed_shell_blob_with_a_trusted_parser() {
+    let Some(shfmt) = std::env::var_os("INVENTORY_SHFMT") else { return; };
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let snapshot = committed_tree(&root).unwrap();
+    let report = scan_committed_shell(&root, &snapshot, "agent-hooks/require-heavy-run.sh", std::path::Path::new(&shfmt)).unwrap();
+    assert!(report.findings.iter().any(|f| f.kind == FindingKind::Embedded && f.category == "perl"));
+    assert!(!report.complete);
+    assert!(scan_committed_shell(&root, &snapshot, "agent-hooks/require-heavy-run.sh", &root.join("bin/dotfiles")).is_err());
 }

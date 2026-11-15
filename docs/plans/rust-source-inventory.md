@@ -406,3 +406,10 @@ committed shell source with `migration-check inventory --scan-shell PATH
 --shfmt ABSOLUTE_PATH`. Its JSON includes source identities and candidate
 boundaries, not source text; `complete` remains false. The full inventory
 check does not yet consume these findings.
+
+The [first shell candidate review](rust-shell-embedded-review.json) compares
+33 reported boundaries against their pinned source blobs. It identifies 24
+expressions or interpreter bodies and nine option tokens. A flag may also hide
+the actual expression that follows it. The [option correction prediction](inventory-shell-options-prediction.md)
+registers the next scanner change. This review covers neither other source forms
+nor migration-state classification.

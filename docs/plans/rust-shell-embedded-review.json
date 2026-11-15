@@ -1,0 +1,306 @@
+{
+  "scope": "33 scanner candidates only; does not establish complete discovery or execution",
+  "reviewed_against": "git object bytes",
+  "entries": [
+    {
+      "path": ".chezmoiscripts/run_after_claude-disabled-plugins.sh",
+      "source_object": "3babed088cbdbf0c080bc5b89272da8dc07256d8",
+      "language": "jq",
+      "start": 2078,
+      "end": 2096,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-disabled-plugins.sh",
+      "source_object": "3babed088cbdbf0c080bc5b89272da8dc07256d8",
+      "language": "jq",
+      "start": 2410,
+      "end": 2419,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-disabled-plugins.sh",
+      "source_object": "3babed088cbdbf0c080bc5b89272da8dc07256d8",
+      "language": "jq",
+      "start": 2811,
+      "end": 2829,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "source_object": "fc2d8e5dd63301428461d7c013b9516500d91960",
+      "language": "jq",
+      "start": 2787,
+      "end": 2805,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "source_object": "fc2d8e5dd63301428461d7c013b9516500d91960",
+      "language": "jq",
+      "start": 3013,
+      "end": 3022,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-env.sh",
+      "source_object": "fc2d8e5dd63301428461d7c013b9516500d91960",
+      "language": "jq",
+      "start": 3419,
+      "end": 3420,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-model.sh",
+      "source_object": "9ddd2b11bb11660dc655f55957be839324cd2376",
+      "language": "jq",
+      "start": 4753,
+      "end": 4779,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-model.sh",
+      "source_object": "9ddd2b11bb11660dc655f55957be839324cd2376",
+      "language": "jq",
+      "start": 4812,
+      "end": 4823,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-model.sh",
+      "source_object": "9ddd2b11bb11660dc655f55957be839324cd2376",
+      "language": "jq",
+      "start": 5552,
+      "end": 5553,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": ".chezmoiscripts/run_after_claude-settings-model.sh",
+      "source_object": "9ddd2b11bb11660dc655f55957be839324cd2376",
+      "language": "jq",
+      "start": 7375,
+      "end": 7376,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "agent-hooks/require-heavy-run.sh",
+      "source_object": "3946d61397de855f64c475b3069fa5e57d005d89",
+      "language": "perl",
+      "start": 8406,
+      "end": 9957,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/brew-cask-adoption.sh",
+      "source_object": "d117213f6c9367dfa88abb55c82e848336d478c6",
+      "language": "jq",
+      "start": 859,
+      "end": 885,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "source_object": "3509d2d9332c3c44b9c9b92f3c446f2075e25152",
+      "language": "sed",
+      "start": 1428,
+      "end": 1432,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "source_object": "3509d2d9332c3c44b9c9b92f3c446f2075e25152",
+      "language": "sed",
+      "start": 1436,
+      "end": 1440,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "source_object": "3509d2d9332c3c44b9c9b92f3c446f2075e25152",
+      "language": "sed",
+      "start": 1444,
+      "end": 1455,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/plugin.sh",
+      "source_object": "c0004f17fc48f7000948dda8d6fc95b968bf2ae8",
+      "language": "jq",
+      "start": 4284,
+      "end": 4285,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/secret-scan.sh",
+      "source_object": "c0f99534c7b95a327168dbbdb05b7bc0d821efda",
+      "language": "perl",
+      "start": 1027,
+      "end": 1092,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "lib/weekly-metrics.sh",
+      "source_object": "fee76a4ea6e0bd7cfcb1ec2d3e3ea3033e2e7e14",
+      "language": "jq",
+      "start": 2698,
+      "end": 2703,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "macos-apps.sh",
+      "source_object": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574",
+      "language": "osascript",
+      "start": 2217,
+      "end": 2287,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "source_object": "63a2820a915270bca8b8ac903e6afcfdebcbd131",
+      "language": "jq",
+      "start": 18173,
+      "end": 18178,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/claude/doctor.sh",
+      "source_object": "3d9e76778d7dbe5f666aa949a7f40cb03cda7954",
+      "language": "jq",
+      "start": 4307,
+      "end": 4316,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/claude/doctor.sh",
+      "source_object": "3d9e76778d7dbe5f666aa949a7f40cb03cda7954",
+      "language": "jq",
+      "start": 9225,
+      "end": 9355,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/codex/doctor.sh",
+      "source_object": "b20075717a219c097fca9c5e41b66a8edb4b901c",
+      "language": "python",
+      "start": 942,
+      "end": 1226,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/codex/doctor.sh",
+      "source_object": "b20075717a219c097fca9c5e41b66a8edb4b901c",
+      "language": "python",
+      "start": 1304,
+      "end": 2181,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/local-ai/doctor.sh",
+      "source_object": "c565c5549fc38ee96ef51682c5668285e21d4312",
+      "language": "python",
+      "start": 8520,
+      "end": 8806,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/memory/doctor.sh",
+      "source_object": "4f25e144c15dea2c28a27913c00e07c5c8da2884",
+      "language": "jq",
+      "start": 397,
+      "end": 415,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/security/doctor.sh",
+      "source_object": "5091a08d88b7e56f789ec56b9fb0db16e8b05aa4",
+      "language": "jq",
+      "start": 29176,
+      "end": 29181,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "modules/vscode/doctor.sh",
+      "source_object": "825a5a6f0ee6f5498e9f9f5fc6b33aa1cbf04096",
+      "language": "python",
+      "start": 1901,
+      "end": 2849,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "scripts/app-priority-candidate.sh",
+      "source_object": "9bb32793d91435af584444b1fbcdc7847f46ee2d",
+      "language": "perl",
+      "start": 368,
+      "end": 370,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "scripts/app-priority-candidate.sh",
+      "source_object": "9bb32793d91435af584444b1fbcdc7847f46ee2d",
+      "language": "perl",
+      "start": 371,
+      "end": 427,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "perl",
+      "start": 3263,
+      "end": 3265,
+      "source_review": "option token, not embedded program",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "scripts/benchmark-run.sh",
+      "source_object": "986bb77803c3ff7bb6129ccb826dce464b546145",
+      "language": "perl",
+      "start": 3266,
+      "end": 3296,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    },
+    {
+      "path": "scripts/proof.sh",
+      "source_object": "4a32cf84718fe85d133ba7e39e34642e7a437dfa",
+      "language": "jq",
+      "start": 1678,
+      "end": 1930,
+      "source_review": "embedded expression or interpreter body",
+      "audit_state": "unclassified"
+    }
+  ],
+  "baseline_revision": "d65f9763cae036800ea9ac7846be6687a8e0978e",
+  "limits": "Only scanner-reported .sh candidates are reviewed. Other arguments, dynamic forms, generated inputs, execution, callers and migration states remain open.",
+  "discovery_issue": "Some option tokens were mistaken for code; the actual expression after options may be missing."
+}

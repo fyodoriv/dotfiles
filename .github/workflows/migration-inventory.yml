@@ -5,6 +5,8 @@ on:
     branches: [feat/chezmoi]
     paths:
       - rust/migration-inventory/**
+      - scripts/inventory-ledger.py
+      - docs/plans/rust-*-review.json
       - .github/workflows/migration-inventory.yml
 
 permissions:

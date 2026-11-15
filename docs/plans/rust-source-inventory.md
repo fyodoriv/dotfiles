@@ -1,5 +1,9 @@
 # Dotfiles source inventory collection
 
+**Status (2026-11-15): closed.** Every tracked path is now classified; see
+[Rust source classification](rust-source-classification.md). The rest of this
+file is the evidence history that led there.
+
 The [source ledger](rust-source-inventory-evidence.json) records three reviewed
 families at revision `24d7f41f65eb3c542553f41acacc07bf93619b45`.
 This is the source-collection milestone of `rust-source-inventory`.

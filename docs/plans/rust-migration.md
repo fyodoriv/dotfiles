@@ -7,8 +7,12 @@ daily use runs at a 302 ms median against 920 ms for the shell (ratio 0.33,
 hooks stay in shell as a [recorded exception](#recorded-exceptions) by owner
 ruling: their measured attempts reached 0.63 to 0.84 against a 0.50 target.
 Each downside is a task (`app-priority-rust-tail`, `rust-agent-hooks-full-port`).
-Source classification and the final audit remain open; `inventory --check`
-still fails closed until every tracked file is reviewed.
+Source classification is closed too: all 2,234 tracked paths have an owner and
+one of the five states, and 233 embedded programs have records
+([classification](rust-source-classification.md)). `inventory --check` now
+stops only at static discovery, a recorded `embedded-discovery` exception
+(task `rust-inventory-dynamic-discovery`). The final audit is below in
+[Final audit](#final-audit-2026-11-15).
 
 This plan was rewritten on 2026-11-10 after the
 [validation review](#validation-review-2026-11-09). At that time no code had been ported.
@@ -351,8 +355,8 @@ is no separate "move tests to Rust" step.
 | 1. `rust-agent-hooks` (closed 2026-11-15: recorded exception) | Two hooks run on each agent Bash call and start Perl, `shfmt` or `jq`. Remove those starts. Weigh a shell fast path first. | `hook-require-heavy-run` and `hook-block-dangerous-git` `ratio` at most 0.50 each, from `scripts/perf-gate.sh --force --json`, after 20 clean A/A runs. The rows keep their command paths. | none |
 | 2. `rust-app-priority` (closed 2026-11-15: ported) | `app-priority` runs every 60 seconds. The owner requested completion today. The [same-day baseline](app-priority-same-day.md) failed its stability limit, so use its registered controlled fixture fallback. | On hosted macOS, preserve every ordered action across 30 pairs and reach a candidate/base median of at most 0.40 and candidate median of at most 400 ms. In use: median 302 ms vs 920 ms (ratio 0.33); the 400 ms mean target is missed (task `app-priority-rust-tail`). | none; parallel with 1 |
 | 3. `rust-cold-path-profile` | Doctor, apply, sync, upgrade and the queue lack qualified child-span coverage. The registered pivot retains them as exceptions. | Not separable with the currently evidenced method; local p50 and owned share are unknown. Reopen only with a qualified measurement. | none; pivot recorded |
-| 4. `rust-source-inventory` | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
-| 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the confirmed owner ruling |
+| 4. `rust-source-inventory` (closed 2026-11-15: all paths classified; discovery is a recorded exception) | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
+| 5. `rust-final-audit` (closed 2026-11-15: see [Final audit](#final-audit-2026-11-15)) | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the confirmed owner ruling |
 
 Each hot-path task commits its absolute baseline number before any
 replacement code. The ratio or mean above is the decision rule.
@@ -442,6 +446,7 @@ names as classification labels; this table gives each label its state.
 | Slice (old task suffix) | Reason | Cheaper option to weigh first |
 |---|---|---|
 | agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. The heavy-run status path costs about 27 ms median per agent Bash call ([experiment](rust-hook-status-experiment.md)). | A full Rust parser port after agentbrew's hook dispatcher; task `rust-agent-hooks-full-port`. |
+| embedded-discovery | Static shell scanning cannot settle 14,784 unresolved findings (mostly dynamic arguments) or parse 369 shell files (mostly `.bats` and templates), so `inventory --check` keeps failing closed at discovery. Every tracked path is still classified. | Execution tracing or a parser for the unparsed files; task `rust-inventory-dynamic-discovery`. |
 | process-primitives | No measured cost of its own. | None needed. |
 | shared-queue | The owned share is not separable with the current method. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
 | repository-discovery | Rare, agent-driven tools. | None needed. |
@@ -459,6 +464,22 @@ names as classification labels; this table gives each label its state.
 | developer-utilities | Rare commands. | None needed. |
 | python-host-extension | A Rust in-process TLS adapter is unproven, and it has no speed goal. Never weaken TLS validation to port it. | None. |
 | test-build-tooling | Tests move with their slice. The Bats `test` step is 74% of gate time. | `bats --jobs`; tasks `speed-up-make-check` and `make-check-one-job-bats`. |
+
+## Final audit (2026-11-15)
+
+The final step audits the finished state. It never claims that all code is Rust.
+
+| Check | Result |
+|---|---|
+| Every tracked path has an owner and one of the five states | 2,234 of 2,234 ([classification](rust-source-classification.md)) |
+| Every `exception` names a row in [Recorded exceptions](#recorded-exceptions) | yes; the generator writes only row names from that table |
+| `ported` slices still meet their number on the current tree | `app-priority`: live median 213 ms over 573 runs from 2026-11-15 12:00 UTC (the earlier 302 ms is the 2026-11-14 to 2026-11-15 window; number: at most 400 ms); Rust code unchanged since the measured commit `fa9c743` |
+| Performance gate, every tracked command | `scripts/perf-gate.sh --force --json`: `ok`, ratios 0.986 to 1.007, no problems |
+| Temporary bridges have a deletion condition | the shell `app-priority` fallback goes when `app-priority-rust-tail` closes; the unshipped `rust/hook-status` candidate goes when `rust-agent-hooks-full-port` hits its Pivot |
+| `migration-check inventory --check` | fails closed at discovery only, the recorded `embedded-discovery` exception |
+
+Open follow-ups: `app-priority-rust-tail`, `rust-agent-hooks-full-port`,
+`rust-inventory-dynamic-discovery`, `inventory-ledger-freshness`.
 
 ## Rollout, security and regression coverage
 

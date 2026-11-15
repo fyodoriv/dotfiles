@@ -8,13 +8,13 @@ fn lines(path: &std::path::Path, prefix: &str) -> BTreeSet<String> {
 }
 
 #[test]
-fn reviewed_boundaries_match_the_partial_ledgers_and_remain_incomplete() {
+fn reviewed_ledgers_are_complete_and_discovery_stays_open() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut expected_observed = BTreeSet::new();
     let mut expected_inventory = BTreeSet::new();
     for name in ["rust-shell-cold-boundary-review.json", "rust-shell-tooling-boundary-review.json",
                  "rust-setup-service-boundary-review.json", "rust-plugin-workspace-boundary-review.json",
-                 "rust-safety-boundary-review.json"] {
+                 "rust-safety-boundary-review.json", "rust-embedded-discovery-review.json"] {
         let review: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join("docs/plans").join(name)).unwrap()).unwrap();
         for entry in review["entries"].as_array().unwrap() {
             let text = |key| entry[key].as_str().unwrap();
@@ -34,5 +34,5 @@ fn reviewed_boundaries_match_the_partial_ledgers_and_remain_incomplete() {
     let output = Command::new(env!("CARGO_BIN_EXE_migration-check"))
         .current_dir(&root).args(["inventory", "--check"]).output().unwrap();
     assert_eq!(output.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("source reviews are incomplete"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("independent embedded and generated discovery remains incomplete"));
 }

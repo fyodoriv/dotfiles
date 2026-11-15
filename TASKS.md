@@ -395,35 +395,7 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
-- [ ] Account for every executable with a manifest and a thin validator adapter
-  - **ID**: rust-source-inventory
-  - **Tags**: migration, rust
-  - **Mode**: AFK
-  - **Details**: Step 4 of the [Rust migration](docs/plans/rust-migration.md). Deliver the component manifest and a thin pinned Rust adapter to agentbrew's small inventory validator. No full harness. Each owned executable gets one of five states: `ported`, `exception` (with its row in the plan), `frozen`, `grandfathered` (the fixture crates that shipped before gate G) or `out-of-scope` (UI presentation and shell that must stay shell). Embedded interpreters, extensionless tools and generated code must not escape. Pin the shared crate by git `rev` and vendor it, as the plan's cross-repo rule says. This step ports nothing, so only the parity and safety clauses of gate G apply to it. The [reviewed source collection](docs/plans/rust-source-inventory.md) records the completed families and remaining coverage.
-  - **Output**: code
-  - **Blocked**: none — the shared validator and adapter are merged. Independent discovery and reviewed ledgers remain incomplete; the check fails closed until they are ready.
-  - **Acceptance**: Unclassified owned executable components 0; every component has one owner and one of the five states. The validator rejects every planted embedded, extensionless and generated-code omission. `cargo build --locked --offline` works from the vendored copy.
-  - **Hypothesis**: A source-and-caller inventory makes unclassified owned executable components reach 0, including extensionless and embedded code, without changing runtime behavior.
-  - **Measurement**: From `rust/migration-inventory`, run `heavy-run cargo build --locked --offline --release`. From the repository root, run `rust/migration-inventory/target/release/migration-check inventory --check`. The latter fails closed until independent discovery and reviewed ledgers are complete.
-  - **Success**: Unclassified owned executable components 0; unrecorded exceptions 0; every planted omission rejected; cold build at most 120 s.
-  - **Pivot**: Any missed component or blanket exception changes the inventory method to execution/caller analysis before a replacement starts.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).
-  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
 
-- [ ] Prove every owned executable has one of the five audit states
-  - **ID**: rust-final-audit
-  - **Tags**: migration, rust
-  - **Mode**: AFK
-  - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) were confirmed by the owner on 2026-11-12. A slice that ended at its Pivot counts as `exception`. The audit reports each measured hot path as ported or as a supported exception. It never claims "all code is Rust".
-  - **Output**: measurement
-  - **Blocked by**: rust-source-inventory
-  - **Acceptance**: Every owned component in the manifest has one of the five states; `ported` has receipts and `exception` has a plan row. Every ported slice still meets its number on the current tree. No temporary bridge remains without a deletion condition.
-  - **Hypothesis**: Reconciling the manifest with the tree exposes every gap: 0 unrecorded owned components, and 100% of ported slices still at or under their registered number.
-  - **Measurement**: `heavy-run rust/target/release/migration-check inventory --check` (runnable after the inventory step merges), `scripts/perf-gate.sh --force --json` and `heavy-run make check`.
-  - **Success**: 0 unrecorded components; 100% of ported rows pass the gate; `heavy-run make check` green.
-  - **Pivot**: Any unrecorded component or failed ported row -> the migration stays open; fix that boundary. Do not change the goal to converted lines.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
-  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
 
 - [ ] Stop the pre-push leak check flagging a public github.com URL pattern as a private ssh host
   - **ID**: pre-push-ssh-host-false-alarm-escaped-regex
@@ -470,10 +442,36 @@ them. -->
 
 ## P3
 
+- [ ] Settle the embedded programs that static scanning leaves unresolved
+  - **ID**: rust-inventory-dynamic-discovery
+  - **Tags**: rust, migration
+  - **Details**: Follow-up from `rust-source-inventory` (closed 2026-11-15; owner ruling: count downsides as tasks). Every tracked path is classified, but `migration-check inventory --check` still fails closed at discovery: the static scanner leaves 14,784 unresolved findings (mostly dynamic arguments) and cannot parse 369 shell files (mostly `.bats` and chezmoi templates). See [classification](docs/plans/rust-source-classification.md) and the `embedded-discovery` row in [Recorded exceptions](docs/plans/rust-migration.md#recorded-exceptions). Weigh a cheaper option first: render templates before scanning, and treat `.bats` bodies as test tooling.
+  - **Output**: code
+  - **Acceptance**: `migration-check inventory --check` exits 0 only with a discovery method that accounts for every unresolved finding and unparsed file, and still rejects every planted omission.
+  - **Hypothesis**: rendering templates and an execution trace of `make check` cut unresolved findings from 14,784 to under 500 and unparsed files from 369 to 0.
+  - **Measurement**: `python3 scripts/inventory-ledger.py --check` (prints `unresolved_findings` and `unparsed_shell_files`).
+  - **Success**: unresolved under 500, unparsed 0, every planted omission rejected.
+  - **Pivot**: unresolved still above 5,000 after template rendering -> keep the exception and close this task.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+  - **Competitive-goal**: none — migration scope honesty, not a scorecard metric.
+
+- [ ] Keep the inventory ledgers current without a manual rerun
+  - **ID**: inventory-ledger-freshness
+  - **Tags**: rust, ci
+  - **Details**: Follow-up from `rust-source-inventory`. The ledgers pin Git blob ids, so any source edit makes them stale, and the `migration-inventory` workflow runs only when `rust/migration-inventory/**` changes. Today `python3 scripts/inventory-ledger.py --write` (about 100 s, mostly the scanner) must be rerun by hand. Options: a scheduled workflow that opens a refresh PR, or a fast `--check` mode that skips the scanner for unchanged shell blobs.
+  - **Output**: code
+  - **Acceptance**: on `feat/chezmoi`, the ledgers are never stale for more than 24 h, with no extra step for PR authors.
+  - **Hypothesis**: a daily refresh job keeps stale days at 0 of 7 and adds 0 s to `make check`.
+  - **Measurement**: `python3 scripts/inventory-ledger.py --check` on `feat/chezmoi` once a day for 7 days (exit 0 count).
+  - **Success**: 7 of 7 days current; `make check` time unchanged (gate row in docs/metrics.md).
+  - **Pivot**: the refresh PRs need manual fixes on more than 2 of 7 days -> move the check into `make check` for changed shell files only.
+  - **Anchor**: Forsgren, Humble, Kim 2018 (change lead time); Kohavi, Tang, Xu 2020 (guard metrics).
+  - **Competitive-goal**: none — maintenance cost, not a scorecard metric.
+
 - [ ] Bring the Rust app-priority mean run time under 400 ms in daily use
   - **ID**: app-priority-rust-tail
   - **Tags**: rust, performance, launchagents
-  - **Details**: Follow-up from `rust-app-priority` (closed 2026-11-15, owner ruling: count downsides as tasks). In daily use the Rust path has median 302 ms but mean 698 ms and p95 2,476 ms (n=1,579, 2026-11-14 to 2026-11-15). The registered target was a mean of at most 400 ms. Long runs drive the mean. Find which runs are slow (load, process lookup fallback to `pgrep`, or priority syscalls) before changing code. See [app-priority same-day experiment](docs/plans/app-priority-same-day.md#live-result-2026-11-15).
+  - **Details**: Follow-up from `rust-app-priority` (closed 2026-11-15, owner ruling: count downsides as tasks). The shell fallback in `bin/app-priority` stays until this task closes. In daily use the Rust path has median 302 ms but mean 698 ms and p95 2,476 ms (n=1,579, 2026-11-14 to 2026-11-15). The registered target was a mean of at most 400 ms. Long runs drive the mean. Find which runs are slow (load, process lookup fallback to `pgrep`, or priority syscalls) before changing code. See [app-priority same-day experiment](docs/plans/app-priority-same-day.md#live-result-2026-11-15).
   - **Output**: code
   - **Acceptance**: mean `duration_ms` of `runtime=rust` app-priority runs at most 400 ms over 7 days, same ordered actions in `tests/app-priority.bats`.
   - **Hypothesis**: the slow tail comes from one identifiable step; removing it cuts the 7-day mean from 698 ms to at most 400 ms.

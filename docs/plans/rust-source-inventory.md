@@ -371,3 +371,8 @@ revision and includes an offline vendor copy. Its hosted check verifies the
 locked build and a missing embedded-identity control. This is a dependency
 step only. It does not discover source, create the component manifest, or
 complete `rust-source-inventory`.
+
+The tracked-tree adapter enumerates every path in one committed Git tree,
+including extensionless files and symlinks. It does not read working-tree
+changes or identify executable bodies, generated targets, owners, or callers.
+Those remain required before the inventory can pass.

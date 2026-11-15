@@ -14,6 +14,10 @@ source "$_hook_dir/bootstrap-endpoint-path.sh"
 input=$(cat)
 command="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract tool_input.command raw -o - -- - 2>/dev/null || true)"
+if [ -z "$command" ]; then
+  printf '%s\n' 'BLOCKED: missing or invalid command input.' >&2
+  exit 2
+fi
 hook_cwd="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract cwd raw -o - -- - 2>/dev/null || true)"
 

@@ -376,3 +376,8 @@ The tracked-tree adapter enumerates every path in one committed Git tree,
 including extensionless files and symlinks. It does not read working-tree
 changes or identify executable bodies, generated targets, owners, or callers.
 Those remain required before the inventory can pass.
+
+The snapshot bridge compares every tracked path and independently supplied
+embedded and generated observations with reviewed entries. It rejects missing
+entries and stale source identities. Observation completeness and the reviewed
+manifest remain open; the bridge alone is not a completed inventory.

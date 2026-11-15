@@ -10,10 +10,10 @@ static scanning cannot prove that discovery is complete.
 
 | Measure | Value |
 |---|---:|
-| Tracked paths with a review and a state | 2,232 of 2,232 |
+| Tracked paths with a review and a state | 2,234 of 2,234 |
 | Unclassified paths | 0 |
 | `ported` | 5 (Rust `app-priority` and its wrapper) |
-| `exception` | 773, each naming a [Recorded exceptions](rust-migration.md#recorded-exceptions) row |
+| `exception` | 775, each naming a [Recorded exceptions](rust-migration.md#recorded-exceptions) row |
 | `grandfathered` | 8 (the four pre-gate fixture crates) |
 | `out-of-scope` | 1,446 (data, docs, vendored packages, shell and editor configuration) |
 | Embedded programs recorded | 233 (93 from the five earlier boundary reviews, 140 new) |

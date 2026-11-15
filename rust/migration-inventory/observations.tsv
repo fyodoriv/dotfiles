@@ -446,7 +446,7 @@ review	docs/plans/rust-cold-profile-fixture-audit.md	3d3a75acad0c58ee32302e02d3b
 review	docs/plans/rust-current-bin-receipt.md	9517fe075640714245759a09b40b013bbcb7b78c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-current-bin-source-receipt.json	416959ef7c582caf346bb0b8cc09a6f7b5da1f30	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-document-ledger-prediction.md	58c2799cd78db29e5226fd7557eab2756be598ef	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
-review	docs/plans/rust-embedded-discovery-review.json	3cee798388738789a58dfa06de9d96b65665fa32	rule-classification	docs/plans/rust-source-classification.md
+review	docs/plans/rust-embedded-discovery-review.json	ab17266d5130c8d2dd25f3405e57169af631a8ab	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-git-hook-receipt.md	86ae0ea9d4d3fbb7fa2b73358251a9aea9c2a720	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-git-hook-source-receipt.json	0ec90fac2d5cffea39f1e7e7660ba4cfee890298	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-hook-baseline-2026-11-11.md	75eb068fd8337981b9492fe5642c06f1f37c72e7	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
@@ -457,7 +457,7 @@ review	docs/plans/rust-library-caller-receipt.json	22cdcc342d9264c89a20327b56255
 review	docs/plans/rust-library-caller-receipt.md	7c4e60b269530fbe1194b16016c13a7839b2407d	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-library-receipt.md	336efa577bc469588ee18dfdf014a39d8973285a	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-library-source-receipt.json	f115b19545822da6d8a9888d77d9d59054e80bc6	rule-classification	docs/plans/rust-source-classification.md
-review	docs/plans/rust-migration.md	e2b046027e781e6814d455f432a2988e6b256fb7	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/plans/rust-migration.md	793505fbaea8ab37786871b0a4511eac9596ecd5	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-partial-ledger-prediction.md	775ed3acfc2aa8fed994ae45a24d10aa4128c7e5	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-plugin-workspace-boundary-review.json	471c49868bc335ab118770e68adc69a17f44f3de	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-root-source-receipt.json	ce0c3af51b2c6407d831f0d9e1c768923f04df38	rule-classification	docs/plans/rust-source-classification.md
@@ -471,7 +471,7 @@ review	docs/plans/rust-shared-core-ownership-review.json	2795725125057b95a361b10
 review	docs/plans/rust-shell-cold-boundary-review.json	a5b1ab0b4da17cf1264394ba52e417040f701d60	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-shell-embedded-review.json	61ee63beaed03ca5ba6463f6b890eeeeeda15357	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-shell-tooling-boundary-review.json	cecb05e6172ef1d102b8a2162ee6fd82ccfa3d1d	rule-classification	docs/plans/rust-source-classification.md
-review	docs/plans/rust-source-classification.md	031dade9912f0791fd248907696c912c7904fd99	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/plans/rust-source-classification.md	edd6c775257c6c2f6bbe655cc060826c2d2ae7d4	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-source-inventory-evidence.json	7e9cda89f49d276d4c92edeafadca27757181329	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-source-inventory.md	bf8ec54f38d16725b1a63815fd146c4df07f406b	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-vendor-ledger-prediction.md	6423f557121c2d051205f451d95af1f10bc5df6c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md

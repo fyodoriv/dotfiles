@@ -122,6 +122,7 @@ _check_command_text() {
     bash .chezmoiscripts/run_after_agent-hooks.sh
   [ "$status" -eq 0 ]
   [ -L "$scratch/.config/dotfiles/hooks/plain-document-write.jq" ]
+  [ -L "$scratch/.config/dotfiles/hooks/python-document-boundaries.py" ]
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
   payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
   run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
@@ -230,4 +231,76 @@ _check_command_text() {
     [ "$status" -eq 2 ] || { echo "expected block for invalid input; got $status"; return 1; }
     [[ "$output" == *"BLOCKED: missing or invalid command input."* ]]
   done
+}
+
+@test "allows safe branch and quoted document creation" {
+  local command
+  command=$(cat <<'COMMAND'
+git switch -c codex/inventory-tracked-snapshot && python3 - <<'PY'
+from pathlib import Path
+Path('docs/plans/inventory-tracked-snapshot-prediction.md').write_text('''# Tracked inventory snapshot prediction
+
+Registered before implementation on 2026-11-15 for `rust-source-inventory`.
+The shared comparison core cannot discover source by itself. The existing
+candidate receipt is pinned to an older revision and omits some source forms.
+
+**Hypothesis:** A small adapter over Git's committed tree can enumerate every
+tracked path and its object identity, including extensionless files and
+symlinks, without running repository source. This provides a conservative input
+for review, not a completed executable inventory.
+
+**Measurement:** Hosted Rust controls parse fixed tree records with ordinary,
+extensionless, symlink, and generated-source paths, and reject malformed or
+unsupported records. A hosted integration check reads the current commit.
+
+**Success:** All planted paths are present exactly once; malformed records and
+unsupported path encodings fail closed; no source is executed. **Pivot:** Any
+missed tracked path or silent malformed-record acceptance rejects the adapter.
+
+Embedded program boundaries, generated outputs, ownership, callers, dirty or
+untracked work, and the five-state manifest remain open. A passing snapshot
+must not be reported as a completed inventory.
+
+**Anchor:** `rust-source-inventory` in `TASKS.md`; Git `ls-tree` plumbing;
+Basili, Caldiera, Rombach 1994; Munafò et al. 2017.
+''')
+PY
+git add docs/plans/inventory-tracked-snapshot-prediction.md && git commit -m 'docs: register tracked inventory snapshot adapter'
+COMMAND
+  )
+  _check_command_text "$command"
+  [ "$status" -eq 0 ] || { echo "guard returned $status: $output"; return 1; }
+}
+
+@test "literal document boundary keeps destructive commands visible" {
+  local command
+  command=$(cat <<'COMMAND'
+git switch -c codex/example && python3 - <<'PY'
+from pathlib import Path
+Path('docs/plans/example.md').write_text('git branch -D main')
+PY
+git add docs/plans/example.md && git commit -m 'docs'
+COMMAND
+  )
+  _check_command_text "$command"
+  [ "$status" -eq 2 ]
+  command="$command && git branch -D main"
+  _check_command_text "$command"
+  [ "$status" -eq 2 ]
+}
+
+@test "executable Python heredoc does not qualify as a literal writer" {
+  local command
+  command=$(cat <<'COMMAND'
+git switch -c codex/example && python3 - <<'PY'
+from pathlib import Path
+import os
+os.system('git branch -D main')
+Path('docs/plans/example.md').write_text('example')
+PY
+git add docs/plans/example.md && git commit -m 'docs'
+COMMAND
+  )
+  _check_command_text "$command"
+  [ "$status" -eq 2 ]
 }

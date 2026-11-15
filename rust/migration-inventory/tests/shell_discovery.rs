@@ -24,6 +24,42 @@ fn shfmt_tree_reports_bodies_outputs_and_dynamic_calls_without_running_source() 
 }
 
 #[test]
+fn interpreter_flags_do_not_replace_the_inline_program() {
+    let Some(shfmt) = std::env::var_os("INVENTORY_SHFMT") else { return; };
+    let source = concat!(
+        "jq -e --argjson want \"$VALUE\" '.env' input\n",
+        "jq -ce --arg name value '.name' input\n",
+        "jq -e --slurpfile config input.json '.config' input\n",
+        "jq -e --arg name value '.one' input\n",
+        "jq -e --argjson n 1 '.two' input\n",
+        "jq -e --arg n 1 '.three' input\n",
+        "jq -e --arg n 1 '.four' input\n",
+        "perl -MTime::HiRes=clock_gettime -e 'print 1'\n",
+        "perl -MTime::HiRes=time -e 'print 2'\n",
+        "perl -pe 's/a/b/'\n",
+        "perl -eprint\\ 3\n",
+        "jq --unknown value '.unknown' input\n",
+    );
+    let mut child = Command::new(shfmt).args(["-ln", "bash", "--to-json"])
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+    child.stdin.take().unwrap().write_all(source.as_bytes()).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    let report = inspect(source.len(), &output.stdout).unwrap();
+    let bodies: Vec<_> = report.findings.iter().filter(|f| f.kind == FindingKind::Embedded)
+        .map(|f| &source[f.start..f.end]).collect();
+    for expected in ["'.env'", "'.name'", "'.config'", "'.one'", "'.two'", "'.three'", "'.four'", "'print 1'", "'print 2'", "'s/a/b/'"] {
+        assert!(bodies.contains(&expected), "missing {expected}: {bodies:?}");
+    }
+    for flag in ["--arg", "--argjson", "--slurpfile", "-e"] {
+        assert!(!bodies.contains(&flag), "option was reported as code: {flag}");
+    }
+    assert!(report.findings.iter().any(|f| f.category == "unsupported-jq-option"));
+    assert!(report.findings.iter().any(|f| f.category == "interpreter-input"));
+    assert!(!report.complete);
+}
+
+#[test]
 fn scans_a_committed_shell_blob_with_a_trusted_parser() {
     let Some(shfmt) = std::env::var_os("INVENTORY_SHFMT") else { return; };
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

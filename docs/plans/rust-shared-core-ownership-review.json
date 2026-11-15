@@ -1,0 +1,17 @@
+{
+  "upstream_repository": "https://github.com/fyodoriv/agentbrew",
+  "upstream_revision": "f1e3f257210de4c689724f8d1a1ac6445e7b528d",
+  "upstream_source": "rust/inventory-core/src/lib.rs",
+  "upstream_source_blob": "be07e96507ccccbe955fc0c671bed3961ea43cd5",
+  "vendor_source": "rust/migration-inventory/vendor/migration-inventory-core-0.1.0/src/lib.rs",
+  "vendor_files": {
+    "rust/migration-inventory/vendor/migration-inventory-core-0.1.0/.cargo-checksum.json": "7e2a62c9592f2fcd4dde181e879fc93d2a6ffff2",
+    "rust/migration-inventory/vendor/migration-inventory-core-0.1.0/Cargo.lock": "fac8960be707f54c4dae773c1f6d3d54d4ae7e1c",
+    "rust/migration-inventory/vendor/migration-inventory-core-0.1.0/Cargo.toml": "32e5eba648b6cd01de84ce140094a4327433ec39",
+    "rust/migration-inventory/vendor/migration-inventory-core-0.1.0/src/lib.rs": "be07e96507ccccbe955fc0c671bed3961ea43cd5"
+  },
+  "owner": "agentbrew",
+  "state": "out-of-scope",
+  "reason": "Agentbrew owns the shared core; dotfiles pins a vendored dependency.",
+  "limits": "The upstream blob was compared at the pinned revision; hosted checks validate the local pin and vendor identities without fetching upstream."
+}

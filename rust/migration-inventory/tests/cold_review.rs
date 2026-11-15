@@ -16,6 +16,9 @@ fn cold_boundary_review_matches_the_committed_sources() {
     check_review(&root, "rust-plugin-workspace-boundary-review.json", 10, |path| {
         matches!(path, "lib/plugin-extensions.sh" | "lib/plugin.sh" | "lib/weekly-metrics.sh" | "lib/workspace-discovery.sh")
     });
+    check_review(&root, "rust-safety-boundary-review.json", 3, |path| {
+        matches!(path, "lib/gh-public-leak.sh" | "lib/secret-scan.sh")
+    });
 }
 
 fn check_review(root: &std::path::Path, name: &str, expected: usize, valid_path: impl Fn(&str) -> bool) {

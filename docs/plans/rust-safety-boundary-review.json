@@ -1,0 +1,39 @@
+{
+  "baseline_revision": "b9179902aca6e895c6a94f76ac2002b56a235ac1",
+  "scope": "Selected public-write and doctor redaction expressions only; not complete discovery or proof of execution.",
+  "entries": [
+    {
+      "path": "lib/gh-public-leak.sh",
+      "source_object": "1835ffdb076c35a2c01f3e18a035a43843acfc81",
+      "language": "jq",
+      "start": 21706,
+      "end": 21720,
+      "owner": "dotfiles",
+      "caller": "gh wrapper for write-shaped requests",
+      "state": "exception",
+      "reason": "Unmeasured cold path; gh-public-write-safety exception in rust-migration.md."
+    },
+    {
+      "path": "lib/gh-public-leak.sh",
+      "source_object": "1835ffdb076c35a2c01f3e18a035a43843acfc81",
+      "language": "jq",
+      "start": 21819,
+      "end": 21855,
+      "owner": "dotfiles",
+      "caller": "gh wrapper for write-shaped requests",
+      "state": "exception",
+      "reason": "Unmeasured cold path; gh-public-write-safety exception in rust-migration.md."
+    },
+    {
+      "path": "lib/secret-scan.sh",
+      "source_object": "c0f99534c7b95a327168dbbdb05b7bc0d821efda",
+      "language": "perl",
+      "start": 1027,
+      "end": 1092,
+      "owner": "dotfiles",
+      "caller": "security doctor redaction check",
+      "state": "exception",
+      "reason": "Unmeasured cold path; doctor-core exception in rust-migration.md."
+    }
+  ]
+}

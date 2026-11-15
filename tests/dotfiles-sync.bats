@@ -3,6 +3,10 @@
 # Runs via LaunchAgent; exercises git operations in isolated repos.
 
 load test_helper
+
+# These jobs skip while a real-time app runs (lib/realtime-hold.sh); keep
+# them running here even when a game is open on this Mac.
+export DOTFILES_REALTIME_HOLD=0
 # These tests check stats writes, so they turn the stats log back on.
 export DOTFILES_STATS_LOG=1
 

@@ -8,6 +8,10 @@
 
 load test_helper
 
+# These jobs skip while a real-time app runs (lib/realtime-hold.sh); keep
+# them running here even when a game is open on this Mac.
+export DOTFILES_REALTIME_HOLD=0
+
 REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)"
 SYNC_LABEL="com.dotfiles.dotfiles-sync"
 LAUNCHAGENT_TMPL="$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"

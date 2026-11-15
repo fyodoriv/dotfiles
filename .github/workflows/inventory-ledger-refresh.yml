@@ -2,9 +2,10 @@ name: Inventory ledger refresh
 
 # The Rust inventory ledgers pin Git blob ids, so every source edit makes
 # them stale. Once a day this job regenerates them on feat/chezmoi and
-# pushes a commit that changes only the three generated files. Branch
-# protection is off and Actions cannot open pull requests in this repo, so
-# this is the one bot commit straight to feat/chezmoi (docs/ci-setup.md).
+# pushes commits that change only the three generated files
+# (scripts/inventory-ledger-refresh.sh). Branch protection is off and
+# Actions cannot open pull requests in this repo, so this is the one bot
+# commit straight to feat/chezmoi (docs/ci-setup.md).
 on:
   schedule:
     - cron: "17 9 * * *"
@@ -27,6 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: feat/chezmoi
+          persist-credentials: false
       - name: Install shell parser
         run: brew install shfmt
       - name: Build the scanner offline
@@ -35,29 +37,17 @@ jobs:
           mkdir -p "$CARGO_HOME"
           cd rust/migration-inventory
           cargo build --locked --offline --release
-      - name: Regenerate the ledgers
+      - name: Regenerate and commit the ledgers
         run: |
-          python3 scripts/inventory-ledger.py --write
-          python3 scripts/inventory-ledger.py --write
-          python3 scripts/inventory-ledger.py --check
-      - name: Push only the generated files
-        run: |
-          allowed='rust/migration-inventory/inventory.tsv
-          rust/migration-inventory/observations.tsv
-          docs/plans/rust-embedded-discovery-review.json'
-          changed="$(git status --porcelain | cut -c4-)"
-          if [ -z "$changed" ]; then
-            echo "inventory ledgers already current"
-            exit 0
-          fi
-          extra="$(printf '%s\n' "$changed" | grep -vxF "$(printf '%s\n' "$allowed" | sed 's/^ *//')" || true)"
-          if [ -n "$extra" ]; then
-            echo "::error::refusing to commit files other than the ledgers:"
-            printf '%s\n' "$extra"
-            exit 1
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          printf '%s\n' "$changed" | xargs git add --
-          git commit -m "chore: refresh the Rust inventory ledgers"
-          git push origin HEAD:feat/chezmoi
+          bash scripts/inventory-ledger-refresh.sh
+      - name: Push the ledger commits
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(git rev-list --count origin/feat/chezmoi..HEAD)" -eq 0 ]; then
+            echo "nothing to push"
+            exit 0
+          fi
+          git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:feat/chezmoi

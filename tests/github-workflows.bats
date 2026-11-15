@@ -162,20 +162,13 @@ test_job_adds_repo_bin() {
 }
 
 # The ledger refresh is the one workflow that pushes to feat/chezmoi
-# (docs/ci-setup.md). Fork code must never reach its write token, and it
-# may commit only the three generated ledger files.
-@test "workflow files: the inventory ledger refresh writes only its ledgers" {
-  local file="$REPO_ROOT/.github/workflows/inventory-ledger-refresh.yml"
-  ! workflow_code "$file" | grep -qE '^[[:space:]]*(pull_request|push):' || {
-    echo "the refresh must run only on schedule or by hand"
-    return 1
-  }
-  workflow_code "$file" | grep -qE "^permissions:"
+# (docs/ci-setup.md). Fork code must never reach its write token: it runs
+# only on a schedule or by hand, and keeps no token in .git/config.
+@test "workflow files: the inventory ledger refresh runs only on schedule or by hand" {
+  local file="$REPO_ROOT/.github/workflows/inventory-ledger-refresh.yml" triggers
+  triggers=$(awk '/^on:/ { in_on = 1; next } in_on && /^[^[:space:]]/ { exit } in_on && /^  [a-z_]+:/ { sub(/:.*/, ""); sub(/^ +/, ""); print }' "$file" | LC_ALL=C sort | tr '\n' ' ')
+  [ "$triggers" = "schedule workflow_dispatch " ] || { echo "triggers: $triggers"; return 1; }
   [ "$(workflow_code "$file" | grep -cE 'contents:[[:space:]]*write')" -eq 1 ]
-  grep -q 'refusing to commit files other than the ledgers' "$file"
-  for f in rust/migration-inventory/inventory.tsv rust/migration-inventory/observations.tsv \
-    docs/plans/rust-embedded-discovery-review.json; do
-    grep -qF "$f" "$file"
-  done
-  grep -q 'inventory-ledger.py --check' "$file"
+  [ "$(grep -c 'persist-credentials: false' "$file")" -eq "$(workflow_code "$file" | grep -c 'uses: actions/checkout@')" ]
+  grep -q 'scripts/inventory-ledger-refresh.sh' "$file"
 }

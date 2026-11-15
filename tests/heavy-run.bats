@@ -626,6 +626,32 @@ release_all() {
   release_all
 }
 
+@test "heavy-run: slots: low free memory holds extra runs but never the first" {
+  echo 10 >"$BATS_TEST_TMPDIR/free"
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_FREE_PROBE="cat '$BATS_TEST_TMPDIR/free'"
+  start_holder
+  wait_held 1
+  marker="$BATS_TEST_TMPDIR/second"
+  "$SCRIPT" touch "$marker" &
+  wait_queued 1
+  run "$SCRIPT" --status
+  [[ "${lines[2]}" == "queue 1: "*"(waiting: free memory 10% below 25%)" ]]
+  [ ! -e "$marker" ]
+  echo 60 >"$BATS_TEST_TMPDIR/free"
+  for i in $(seq 50); do [ -e "$marker" ] && break; sleep 0.1; done
+  [ -e "$marker" ]
+  release_all
+}
+
+@test "heavy-run: slots: HEAVY_RUN_MIN_FREE_PCT=0 turns the free memory check off" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_MIN_FREE_PCT=0 HEAVY_RUN_FREE_PROBE="echo 1"
+  start_holder
+  wait_held 1
+  run "$SCRIPT" echo ran
+  [ "$output" = "ran" ]
+  release_all
+}
+
 @test "heavy-run: slots: the ramp spaces out run starts" {
   export HEAVY_RUN_SLOTS=4 HEAVY_RUN_RAMP=30
   start_holder

@@ -18,8 +18,8 @@
 # Rules, in order: a real-time app holds every run; an exclusive run (active
 # or next) holds the rest; a project at its cap lets later projects go first;
 # then a free slot, and, while other runs are going, the ramp
-# (HEAVY_RUN_RAMP seconds since the last start), the 1-minute load, and memory
-# pressure. The first run always starts. There is one slot unless
+# (HEAVY_RUN_RAMP seconds since the last start), the 1-minute load, memory
+# pressure, and free memory (HEAVY_RUN_MIN_FREE_PCT). The first run always starts. There is one slot unless
 # HEAVY_RUN_SLOTS or heavy_run_slots asks for more: an automatic count of 4
 # froze a 32 GB Mac twice. `heavy-run --exclusive` takes an
 # exclusive flock on $dir/lock (normal runs take it shared): it starts when no
@@ -77,6 +77,10 @@
 #                       by git common dir) holds at once; its next run lets later
 #                       projects go first (setting heavy_run_project_slots; default 3)
 #   HEAVY_RUN_PROJECT   project name to use instead of the git common dir
+#   HEAVY_RUN_MIN_FREE_PCT  free memory (percent of RAM) below which no extra run
+#                       starts; 0 = off (setting heavy_run_min_free_pct; default 25)
+#   HEAVY_RUN_FREE_PROBE  a command that prints the free memory percent; replaces
+#                       the built-in reading (kern.memorystatus_level, MemAvailable)
 #   HEAVY_RUN_MEMORY_GUARD  1 = under memory pressure stop every run but the
 #                       oldest until it clears; 0 = off (setting heavy_run_memory_guard)
 #   HEAVY_RUN_PAUSE_APPS  real-time apps (process names, comma-separated) that
@@ -84,7 +88,8 @@
 #                       until they quit (default GeForceNOW; empty = off)
 #   HEAVY_RUN_KEEP_ORPHAN  1 = a waiter keeps its place after its caller dies (default 0)
 #   HEAVY_RUN_PROBE     a command whose non-empty output is a reason to wait;
-#                       replaces the built-in memory pressure check
+#                       replaces the built-in memory pressure check (and,
+#                       unless HEAVY_RUN_FREE_PROBE is set, the free memory check)
 #   HEAVY_RUN_WAIT_LOG  wait log (default ~/.local/state/dotfiles/heavy-run-waits.log,
 #                       or $HEAVY_RUN_DIR/waits.log when HEAVY_RUN_DIR is set)
 
@@ -176,6 +181,20 @@ common_code='
       return "low free memory" if $k{MemTotal} && defined $k{MemAvailable} && $k{MemAvailable} < $k{MemTotal} / 10;
     }
     return "";
+  }
+  # Free memory in percent of RAM, or -1 when it cannot be read.
+  sub free_pct {
+    if (defined $ENV{HEAVY_RUN_FREE_PROBE} && $ENV{HEAVY_RUN_FREE_PROBE} ne "") {
+      my $r = cmd_out($ENV{HEAVY_RUN_FREE_PROBE}); return $r =~ /^\s*(\d+(?:\.\d+)?)\s*$/ ? $1 : -1;
+    }
+    return -1 if defined $ENV{HEAVY_RUN_PROBE} && $ENV{HEAVY_RUN_PROBE} ne "";
+    my $lvl = cmd_out("sysctl -n kern.memorystatus_level");
+    return $1 if $lvl =~ /^\s*(\d+)\s*$/;
+    if (open(my $m, "<", "/proc/meminfo")) {
+      my %k; while (<$m>) { $k{$1} = $2 if /^(\w+):\s+(\d+)/; }
+      return int(100 * $k{MemAvailable} / $k{MemTotal}) if $k{MemTotal} && defined $k{MemAvailable};
+    }
+    return -1;
   }
   # Empty when no real-time app runs, else why heavy runs wait. A real-time app
   # (a game stream) froze the Mac when heavy runs shared it (5 restarts in one
@@ -366,6 +385,7 @@ exec perl -e "$common_code"'
   my $is_slots = sub { $_[0] =~ /^\d+$/ && $_[0] >= 1 && $_[0] <= 64 };
   my $is_num = sub { $_[0] =~ /^(\d+\.?\d*|\.\d+)$/ };
   my $is_bit = sub { $_[0] =~ /^[01]$/ };
+  my $is_pct = sub { $_[0] =~ /^\d+$/ && $_[0] <= 90 };
   sub setting {
     my ($env, $key, $def, $ok) = @_;
     if (time != $cfg_at) {
@@ -383,7 +403,8 @@ exec perl -e "$common_code"'
             setting("HEAVY_RUN_RAMP", "heavy_run_ramp_seconds", 15, $is_num),
             setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, $is_num),
             setting("HEAVY_RUN_PROJECT_SLOTS", "heavy_run_project_slots", 3, $is_slots),
-            setting("HEAVY_RUN_MEMORY_GUARD", "heavy_run_memory_guard", 1, $is_bit));
+            setting("HEAVY_RUN_MEMORY_GUARD", "heavy_run_memory_guard", 1, $is_bit),
+            setting("HEAVY_RUN_MIN_FREE_PCT", "heavy_run_min_free_pct", 25, $is_pct));
   }
   # Machine checks asked at most once a second: each one is a fork.
   my %memo;
@@ -433,7 +454,7 @@ exec perl -e "$common_code"'
   # tickets behind it too, or ("skip", why) that lets later tickets go first.
   sub decide {
     my ($s, $t, $set) = @_;
-    my ($n, $ramp, $maxload, $pcap) = @$set;
+    my ($n, $ramp, $maxload, $pcap, undef, $minfree) = @$set;
     if ((my $r = realtime()) ne "") { return ("wait", $r); }
     return ("wait", "queue project metadata unavailable") if $s->{invalid_project};
     return ("wait", "an exclusive run is active") if $s->{excl};
@@ -454,6 +475,10 @@ exec perl -e "$common_code"'
       return ("wait", sprintf("ramp: last run started %ds ago, next after %ds", $age, $ramp)) if $age < $ramp;
       if ($maxload > 0 && (my $l = memo("load", \&load1)) > $maxload) { return ("wait", "load $l above $maxload"); }
       if ((my $pr = memo("pressure", \&pressure)) ne "") { return ("wait", $pr); }
+      if ($minfree) {
+        my $fp = memo("free", \&free_pct);
+        return ("wait", "free memory $fp% below $minfree%") if $fp >= 0 && $fp < $minfree;
+      }
     }
     my ($free) = grep { !$s->{used}{$_} } 1 .. $n;
     return ("grant", "s$free");

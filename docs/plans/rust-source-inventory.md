@@ -428,3 +428,9 @@ The [tooling-boundary review](rust-shell-tooling-boundary-review.json) records
 16 candidates in six CI, fixture, benchmark and proof scripts under the
 existing test-build-tooling or developer-utilities exception. The same source
 identity and range check guards both reviews. Other tooling remains unreviewed.
+
+The [setup and service review](rust-setup-service-boundary-review.json) and
+[plugin and workspace review](rust-plugin-workspace-boundary-review.json)
+classify 33 more candidates under the existing cold-path exceptions. Their
+source identities and ranges share the same hosted check. Dynamic inputs and
+unreviewed source forms remain open.

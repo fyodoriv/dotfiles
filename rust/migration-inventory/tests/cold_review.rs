@@ -10,6 +10,12 @@ fn cold_boundary_review_matches_the_committed_sources() {
     check_review(&root, "rust-shell-tooling-boundary-review.json", 16, |path| {
         path.starts_with(".github/scripts/") || matches!(path, "scripts/app-priority-candidate.sh" | "scripts/benchmark-run.sh" | "scripts/proof.sh")
     });
+    check_review(&root, "rust-setup-service-boundary-review.json", 23, |path| {
+        matches!(path, "lib/apply-defaults.sh" | "lib/brew-cask-adoption.sh" | "lib/mac-baseline.sh" | "lib/launchagent-args.sh" | "lib/launchagent-duplicates.sh" | "macos-apps.sh")
+    });
+    check_review(&root, "rust-plugin-workspace-boundary-review.json", 10, |path| {
+        matches!(path, "lib/plugin-extensions.sh" | "lib/plugin.sh" | "lib/weekly-metrics.sh" | "lib/workspace-discovery.sh")
+    });
 }
 
 fn check_review(root: &std::path::Path, name: &str, expected: usize, valid_path: impl Fn(&str) -> bool) {

@@ -1,0 +1,116 @@
+{
+  "baseline_revision": "114bad20f5ddca06aa11b134f754a29af86c9244",
+  "scope": "Scanner candidates in selected plugin, weekly metrics and workspace libraries; not complete discovery or proof of execution.",
+  "entries": [
+    {
+      "path": "lib/plugin-extensions.sh",
+      "source_object": "19ea424fededa49cad6c759f1a3df52b3c4b682a",
+      "language": "jq",
+      "start": 8519,
+      "end": 8566,
+      "owner": "dotfiles",
+      "caller": "plugin extension checks and VS Code doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "source_object": "19ea424fededa49cad6c759f1a3df52b3c4b682a",
+      "language": "jq",
+      "start": 8865,
+      "end": 8914,
+      "owner": "dotfiles",
+      "caller": "plugin extension checks and VS Code doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "source_object": "19ea424fededa49cad6c759f1a3df52b3c4b682a",
+      "language": "jq",
+      "start": 9098,
+      "end": 9262,
+      "owner": "dotfiles",
+      "caller": "plugin extension checks and VS Code doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "source_object": "19ea424fededa49cad6c759f1a3df52b3c4b682a",
+      "language": "jq",
+      "start": 9372,
+      "end": 9663,
+      "owner": "dotfiles",
+      "caller": "plugin extension checks and VS Code doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "source_object": "19ea424fededa49cad6c759f1a3df52b3c4b682a",
+      "language": "jq",
+      "start": 14318,
+      "end": 14688,
+      "owner": "dotfiles",
+      "caller": "plugin extension checks and VS Code doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin.sh",
+      "source_object": "c0004f17fc48f7000948dda8d6fc95b968bf2ae8",
+      "language": "jq",
+      "start": 2642,
+      "end": 3982,
+      "owner": "dotfiles",
+      "caller": "plugin command, validation and doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust and doctor-core exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin.sh",
+      "source_object": "c0004f17fc48f7000948dda8d6fc95b968bf2ae8",
+      "language": "jq",
+      "start": 4284,
+      "end": 4285,
+      "owner": "dotfiles",
+      "caller": "plugin command, validation and doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; plugin-trust and doctor-core exception in rust-migration.md."
+    },
+    {
+      "path": "lib/weekly-metrics.sh",
+      "source_object": "fee76a4ea6e0bd7cfcb1ec2d3e3ea3033e2e7e14",
+      "language": "jq",
+      "start": 2978,
+      "end": 3441,
+      "owner": "dotfiles",
+      "caller": "weekly metrics from full doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/weekly-metrics.sh",
+      "source_object": "fee76a4ea6e0bd7cfcb1ec2d3e3ea3033e2e7e14",
+      "language": "jq",
+      "start": 2719,
+      "end": 2757,
+      "owner": "dotfiles",
+      "caller": "weekly metrics from full doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/workspace-discovery.sh",
+      "source_object": "55e582ab32a5ce21a7ebf68bb25c60842b7fe72d",
+      "language": "jq",
+      "start": 2385,
+      "end": 2643,
+      "owner": "dotfiles",
+      "caller": "workspace command and doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; repository-discovery and doctor-core exception in rust-migration.md."
+    }
+  ]
+}

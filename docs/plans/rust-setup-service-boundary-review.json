@@ -1,0 +1,259 @@
+{
+  "baseline_revision": "114bad20f5ddca06aa11b134f754a29af86c9244",
+  "scope": "Scanner candidates in selected setup and service libraries; not complete discovery or proof of execution.",
+  "entries": [
+    {
+      "path": "lib/apply-defaults.sh",
+      "source_object": "89ce0a7c6a4518d7ac0e484ae6f4263354c3d09f",
+      "language": "jq",
+      "start": 882,
+      "end": 1677,
+      "owner": "dotfiles",
+      "caller": "macOS settings apply",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install exception in rust-migration.md."
+    },
+    {
+      "path": "lib/apply-defaults.sh",
+      "source_object": "89ce0a7c6a4518d7ac0e484ae6f4263354c3d09f",
+      "language": "jq",
+      "start": 3538,
+      "end": 3770,
+      "owner": "dotfiles",
+      "caller": "macOS settings apply",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install exception in rust-migration.md."
+    },
+    {
+      "path": "lib/brew-cask-adoption.sh",
+      "source_object": "d117213f6c9367dfa88abb55c82e848336d478c6",
+      "language": "jq",
+      "start": 859,
+      "end": 885,
+      "owner": "dotfiles",
+      "caller": "chezmoi package lifecycle",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install exception in rust-migration.md."
+    },
+    {
+      "path": "lib/brew-cask-adoption.sh",
+      "source_object": "d117213f6c9367dfa88abb55c82e848336d478c6",
+      "language": "jq",
+      "start": 1063,
+      "end": 1285,
+      "owner": "dotfiles",
+      "caller": "chezmoi package lifecycle",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install exception in rust-migration.md."
+    },
+    {
+      "path": "lib/launchagent-args.sh",
+      "source_object": "e374b14017385d89e5a10c118e18dd426129210d",
+      "language": "jq",
+      "start": 1329,
+      "end": 1400,
+      "owner": "dotfiles",
+      "caller": "launchagent reload and drift commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; services-power exception in rust-migration.md."
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "source_object": "3509d2d9332c3c44b9c9b92f3c446f2075e25152",
+      "language": "sed",
+      "start": 1428,
+      "end": 1432,
+      "owner": "dotfiles",
+      "caller": "launchagent lifecycle and workflow doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; services-power and doctor-core exception in rust-migration.md."
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "source_object": "3509d2d9332c3c44b9c9b92f3c446f2075e25152",
+      "language": "sed",
+      "start": 1436,
+      "end": 1440,
+      "owner": "dotfiles",
+      "caller": "launchagent lifecycle and workflow doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; services-power and doctor-core exception in rust-migration.md."
+    },
+    {
+      "path": "lib/launchagent-duplicates.sh",
+      "source_object": "3509d2d9332c3c44b9c9b92f3c446f2075e25152",
+      "language": "sed",
+      "start": 1444,
+      "end": 1455,
+      "owner": "dotfiles",
+      "caller": "launchagent lifecycle and workflow doctor",
+      "state": "exception",
+      "reason": "Unmeasured cold path; services-power and doctor-core exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 10696,
+      "end": 10721,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 10756,
+      "end": 10782,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 10817,
+      "end": 10848,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 10878,
+      "end": 10901,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 10929,
+      "end": 10947,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 10981,
+      "end": 11008,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 11240,
+      "end": 11271,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 11294,
+      "end": 11304,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 11637,
+      "end": 11669,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 11764,
+      "end": 11795,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 11894,
+      "end": 11928,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 12031,
+      "end": 12068,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 12564,
+      "end": 12600,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "lib/mac-baseline.sh",
+      "source_object": "da99f94ca600f167393e33ac993c57c0b4cc5956",
+      "language": "jq",
+      "start": 12770,
+      "end": 12866,
+      "owner": "dotfiles",
+      "caller": "install and metrics commands",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "macos-apps.sh",
+      "source_object": "fd6a1b74b05dbeaf9787f319b0142ecbacb9b574",
+      "language": "osascript",
+      "start": 2217,
+      "end": 2287,
+      "owner": "dotfiles",
+      "caller": "macOS app settings apply",
+      "state": "exception",
+      "reason": "Unmeasured cold path; apply-install exception in rust-migration.md."
+    }
+  ]
+}

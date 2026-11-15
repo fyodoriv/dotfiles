@@ -389,6 +389,6 @@ The `migration-check inventory --check` command reads both review ledgers from
 one committed Git tree. It requires a source review for each tracked path and
 compares independently recorded embedded and generated identities with the
 manifest. The ledgers are not complete yet, so the command fails closed when
-they are missing. A structural pass is not proof that source discovery or the
-manual reviews are complete. Uncommitted and untracked work needs a separate
+they are missing and continues to fail until independent discovery exists. A
+structural pass is not proof that source discovery or the manual reviews are complete. Uncommitted and untracked work needs a separate
 audit.

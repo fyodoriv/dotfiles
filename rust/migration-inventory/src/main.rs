@@ -23,8 +23,8 @@ fn run() -> Result<(), &'static str> {
     let observations = ledger(&root, &snapshot, OBSERVATION_LEDGER)?;
     let inventory = ledger(&root, &snapshot, INVENTORY_LEDGER)?;
     review::check(&snapshot, &observations, &inventory)?;
-    println!("inventory records match committed source reviews; independent discovery still requires audit");
-    Ok(())
+    // Do not report a completed inventory before independent discovery exists.
+    Err("independent embedded and generated discovery remains incomplete")
 }
 
 fn main() -> ExitCode {

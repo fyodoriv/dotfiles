@@ -70,6 +70,7 @@ solve one task, reference lists facts, explanation gives the reasons.
 | [competition/](competition/) | The competitive scorecard and how it is measured | both |
 | [decisions/](decisions/) | Why the hard-to-reverse choices were made (ADRs) | both |
 | [plans/](plans/) | Plans for non-trivial tasks (one per task ID) | agent |
+| [Heavy-run native status experiment](plans/heavy-hook-native-status-prediction.md) | Can a native fast path preserve parser failures and meet the hook budget? | agent |
 | [Heavy-run read-only reference](plans/heavy-run-read-only-reference.md) | Narrow search allowance and safety controls | agent |
 | [App-priority snapshot prediction](plans/app-priority-snapshot-prediction.md) | Safety and measurement plan for a cheaper process lookup | agent |
 | [App-priority native delivery](plans/app-priority-native-delivery.md) | Install, rollback, and full-command measurement prediction | agent |

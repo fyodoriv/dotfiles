@@ -382,33 +382,6 @@ them. -->
   - **Anchor**: tooling-checkup agent time review 2026-10-20; Forsgren, Humble, Kim 2018 (lead time); perf-review skill known fixes.
   - **Competitive-goal**: none — agent gate speed (docs/metrics.md gate row), not a scorecard metric.
 
-- [ ] Cut the dotfiles hook wait on every agent Bash call by half
-  - **ID**: rust-agent-hooks
-  - **Tags**: migration, rust, performance
-  - **Mode**: AFK
-  - **Details**: Step 1 of the [Rust migration](docs/plans/rust-migration.md). `agent-hooks/require-heavy-run.sh` and `agent-hooks/block-dangerous-git.sh` run on each agent Bash call and start Perl, `shfmt` or `jq`. First prove 20 A/A runs of the gate (base and head at the same commit) with 0 failures and commit the absolute baseline of both rows. The gate uses minimums and paired median differences; a failed A/A is still a real risk. A port PR must not change a row's command path. If the PR adds Rust code, it also adds the cargo step to the Makefile, and `make check` must build Rust only when `rust/` changed. Then weigh a shell fast path that exits before any interpreter start for a command that cannot match. Port a hook to Rust only when the fast path misses the number. Keep every deny, allow and unknown verdict. The [agent-hook source receipt](docs/plans/agent-hook-source-receipt.md) lists the source boundaries. The [native preflight](docs/plans/rust-hook-status-experiment.md#heavy-run-native-preflight-2026-11-15) measured 0.688 on a bypassed comparison path and was rejected; it did not run the unchanged gate, so the second hook remains open.
-  - **Output**: code
-  - **Acceptance**: Gate G in the plan. The affected Bats tests pass with 0 changed verdicts. Hostile heredocs, substitutions and absent tools keep their result. The old script stays until rollback is proven. A Rust binary opens the deferred native delivery step first.
-  - **Hypothesis**: Removing the per-call interpreter starts cuts the fastest run of each of the two hook rows by at least 50% against the merge-base, with 100% verdict parity and 0 new false permits.
-  - **Measurement**: `scripts/perf-gate.sh --force --json` (rows `hook-require-heavy-run` and `hook-block-dangerous-git`) and `bin/bats-affected origin/feat/chezmoi | xargs heavy-run bats`; for peak RSS, the peak RSS command in the plan's "Commands that run today" (median of 15 runs of `/usr/bin/time -l` on the row's command), once at the base and once at the head.
-  - **Success**: 20 of 20 A/A runs pass first; `ratio` at most 0.50 for both rows; affected tests 100% green; R_M (candidate median peak RSS / baseline median) at most 1.10 after an A/A ratio from 0.95 to 1.05.
-  - **Pivot**: 1 or more A/A failures in 20 runs -> stop before any hook change; the result is inconclusive until the run conditions are fixed, and the thresholds stay. `ratio` above 0.80 for a hook after the fast path and one port attempt -> abandon that hook's port and add it as a recorded exception row in the plan with its measured number. Any new false permit -> stop and change the parser boundary, never an allow rule.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
-  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
-
-- [ ] Cut the background cost of app-priority to under half a second per run
-  - **ID**: rust-app-priority
-  - **Tags**: migration, rust, performance
-  - **Mode**: AFK
-  - **Details**: Step 2 of the [Rust migration](docs/plans/rust-migration.md). The owner requested completion today and removed the seven-day waits on 2026-11-14. The preregistered [same-day experiment](docs/plans/app-priority-same-day.md) found the two six-hour baseline windows unstable; use its controlled fixture fallback and keep in-use benefit unverified. Keep the same nice and QoS decisions for the same processes.
-  - **Output**: code
-  - **Acceptance**: Gate G in the plan. `bats tests/app-priority.bats` passes with the same priority decisions on the same fixture process table. No process outside the owned rules changes priority.
-  - **Hypothesis**: One process-table pass cuts the post-change mean to at most 400 ms and at most 40% of the lower qualifying six-hour before window, with identical priority decisions in the fixture.
-  - **Measurement**: Run the timestamped jq commands in [same-day experiment](docs/plans/app-priority-same-day.md), plus the registered fixture checks and hosted CI.
-  - **Success**: Two six-hour before windows each have at least 200 samples and differ by at most 20% of the larger; the 15-minute post-change window has at least 10 samples, mean at most 400 ms and at most 40% of the lower before window; 0 changed fixture decisions.
-  - **Pivot**: If either before window lacks 200 samples or differs by more than 20%, use the preregistered controlled fixture benchmark and label in-use benefit unverified. If the snapshot cannot preserve action and identity safety, retain the old command; do not claim a port or benefit.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks and guard metrics).
-  - **Competitive-goal**: none — agent wait time and background CPU (docs/metrics.md), not a scorecard metric.
 - [ ] Account for every executable with a manifest and a thin validator adapter
   - **ID**: rust-source-inventory
   - **Tags**: migration, rust
@@ -430,7 +403,7 @@ them. -->
   - **Mode**: AFK
   - **Details**: Step 5 of the [Rust migration](docs/plans/rust-migration.md). Reconcile the manifest, each ported slice's receipts, generated and installed entrypoints and docs. Retire only proven unused implementations. The five audit states (`ported`, `exception`, `frozen`, `grandfathered`, `out-of-scope`) were confirmed by the owner on 2026-11-12. A slice that ended at its Pivot counts as `exception`. The audit reports each measured hot path as ported or as a supported exception. It never claims "all code is Rust".
   - **Output**: measurement
-  - **Blocked by**: rust-agent-hooks, rust-app-priority, rust-source-inventory
+  - **Blocked by**: rust-source-inventory
   - **Acceptance**: Every owned component in the manifest has one of the five states; `ported` has receipts and `exception` has a plan row. Every ported slice still meets its number on the current tree. No temporary bridge remains without a deletion condition.
   - **Hypothesis**: Reconciling the manifest with the tree exposes every gap: 0 unrecorded owned components, and 100% of ported slices still at or under their registered number.
   - **Measurement**: `heavy-run rust/target/release/migration-check inventory --check` (runnable after the inventory step merges), `scripts/perf-gate.sh --force --json` and `heavy-run make check`.
@@ -483,6 +456,32 @@ them. -->
 
 
 ## P3
+
+- [ ] Bring the Rust app-priority mean run time under 400 ms in daily use
+  - **ID**: app-priority-rust-tail
+  - **Tags**: rust, performance, launchagents
+  - **Details**: Follow-up from `rust-app-priority` (closed 2026-11-15, owner ruling: count downsides as tasks). In daily use the Rust path has median 302 ms but mean 698 ms and p95 2,476 ms (n=1,579, 2026-11-14 to 2026-11-15). The registered target was a mean of at most 400 ms. Long runs drive the mean. Find which runs are slow (load, process lookup fallback to `pgrep`, or priority syscalls) before changing code. See [app-priority same-day experiment](docs/plans/app-priority-same-day.md#live-result-2026-11-15).
+  - **Output**: code
+  - **Acceptance**: mean `duration_ms` of `runtime=rust` app-priority runs at most 400 ms over 7 days, same ordered actions in `tests/app-priority.bats`.
+  - **Hypothesis**: the slow tail comes from one identifiable step; removing it cuts the 7-day mean from 698 ms to at most 400 ms.
+  - **Measurement**: `rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms")|.duration_ms]|add/length'` over the 7 days after the change.
+  - **Success**: mean at most 400 ms with p95 at most 1,500 ms.
+  - **Pivot**: no single step explains over half of the runs above 1 s -> record the mean as a measured exception in the migration plan and close.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
+  - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
+
+- [ ] Reopen the agent-hook Rust port only with a full parser port
+  - **ID**: rust-agent-hooks-full-port
+  - **Tags**: rust, performance, agents
+  - **Details**: Follow-up from `rust-agent-hooks` (closed 2026-11-15 as a recorded exception by owner ruling). Measured attempts missed the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. Each kept the Perl parser or an integrity check on every call. A full Rust parser port could reach the target but must keep every deny, allow and unknown verdict. The heavy-run status path costs about 27 ms median per agent Bash call (docs/plans/rust-hook-status-experiment.md), small next to agentbrew's hook chain, so do this only after agentbrew's hook dispatcher work lands (an agentbrew task, outside this repo). See [Recorded exceptions](docs/plans/rust-migration.md#recorded-exceptions).
+  - **Output**: code
+  - **Acceptance**: gate ratio at most 0.50 for both `hook-require-heavy-run` and `hook-block-dangerous-git`, 100% verdict parity in the affected Bats tests, 0 new false permits.
+  - **Hypothesis**: a Rust parser with the integrity check moved to install time cuts each hook row to at most 0.50 of the shell path.
+  - **Measurement**: `scripts/perf-gate.sh --force --json` (the two hook rows) and `bin/bats-affected origin/feat/chezmoi | xargs heavy-run bats`.
+  - **Success**: both ratios at most 0.50 and 0 changed verdicts.
+  - **Pivot**: a ratio above 0.80 or any changed verdict -> keep the shell hooks and close this task.
+  - **Anchor**: Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks).
+  - **Competitive-goal**: none — agent wait time (docs/metrics.md), not a scorecard metric.
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
   - **ID**: dashboard-chart-gate-hardening

@@ -706,3 +706,30 @@ candidate median and 442.00 ms shell median, ratio 0.267. See the
 [hosted comparison](https://github.com/fyodoriv/dotfiles/actions/runs/43621417697)
 and [offline checks](https://github.com/fyodoriv/dotfiles/actions/runs/43621417760).
 Installation, live side effects and in-use benefit remain unverified.
+
+## Live result (2026-11-15)
+
+The checksum-verified Rust path has run on the owner's Mac since
+2026-11-14T18:33Z (`bin/app-priority` dispatches to
+`~/.local/share/dotfiles/native/app-priority/current`). Every run logs
+`duration_ms` with `timing_source` `monotonic-ms` and its `runtime`.
+
+| Runtime | Runs | Median | p95 | Mean | Window (UTC) |
+|---|---|---|---|---|---|
+| shell | 3,828 | 920 ms | 5,831 ms | 1,844 ms | 2026-11-12T00:35 to 2026-11-14T18:42 |
+| rust | 1,579 | 302 ms | 2,476 ms | 698 ms | 2026-11-14T18:33 to 2026-11-15T21:30 |
+
+The median ratio is 0.33 and the p95 ratio 0.42. The windows are
+consecutive days, not a controlled comparison, so load differences remain.
+The registered mean target (at most 400 ms) is not met in daily use: long
+runs drive the mean. By owner ruling on 2026-11-15 the slice closes as
+`ported` on the controlled fixture result (0.267) and this downside is task
+`app-priority-rust-tail`.
+
+```sh
+rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s -r '
+  [.[] | select(.timing_source == "monotonic-ms")] | group_by(.runtime // "shell") | .[] |
+  (map(.duration_ms) | sort) as $d |
+  "\(.[0].runtime // "shell") n=\($d|length) median=\($d[($d|length)/2|floor]) p95=\($d[(($d|length)*0.95)|floor]) mean=\(($d|add)/($d|length)|floor)"'
+```
+

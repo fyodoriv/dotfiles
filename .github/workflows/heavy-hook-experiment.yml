@@ -1,0 +1,50 @@
+name: Heavy hook native preflight
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - rust/hook-status/**
+      - agent-hooks/require-heavy-run.sh
+      - agent-hooks/heavy-native-dispatch.sh
+      - bin/hook-heavy-native
+      - scripts/heavy-hook-native-preflight.py
+      - tests/hook-heavy-native.bats
+      - .github/workflows/heavy-hook-experiment.yml
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install test tools
+        run: brew install bats-core jq shfmt
+      - name: Build and test offline
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          mkdir -p "$CARGO_HOME"
+          cd rust
+          ../bin/heavy-run cargo test --locked --offline --manifest-path hook-status/Cargo.toml
+          ../bin/heavy-run cargo build --locked --offline --release --manifest-path hook-status/Cargo.toml
+      - name: Exercise installed path and collect preflight evidence
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
+          export XDG_DATA_HOME="$RUNNER_TEMP/native-heavy-data"
+          ./bin/hook-heavy-native install
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/hook-heavy-native.bats tests/agent-hooks-require-heavy-run.bats
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/heavy-hook-native-preflight.py > "$RUNNER_TEMP/heavy-hook-preflight.json"
+          ./bin/hook-heavy-native rollback
+      - name: Save preflight evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: heavy-hook-preflight
+          path: ${{ runner.temp }}/heavy-hook-preflight.json
+          if-no-files-found: ignore

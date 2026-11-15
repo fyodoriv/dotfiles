@@ -27,6 +27,9 @@ from timing alone.
 safe: the old hook can fail when that invocation fails. Preserve its effective
 program, input, exit status and stderr; require a completion receipt and fall
 back or block safely on uncertainty. Avoid changing the hook row's command path.
+Do not dispatch this hook to an already installed status-only binary: it can
+allow without running Perl. Use a distinct capability and retain the old hook
+when that capability is absent. Keep bootstrap and opt-out behavior intact.
 
 **Anchor:** `rust-agent-hooks` and [gate G](rust-migration.md#gate-g); Basili,
 Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).

@@ -99,3 +99,20 @@ command. Its [hosted performance run](https://github.com/fyodoriv/dotfiles/actio
 measured a 0.840 ratio, above the required 0.50. The registered pivot retains
 the existing hook. This is a failed cheaper fix, not a Rust port attempt or a
 completed exception decision.
+
+## Heavy-run native preflight (2026-11-15)
+
+The [native draft](https://github.com/fyodoriv/dotfiles/pull/700) kept the Perl
+parser and used a separate installed capability. Its [hosted preflight](https://github.com/fyodoriv/dotfiles/actions/runs/43690201477)
+passed the tested exit, output, parser-failure and guard controls. Across 30
+paired runs, the status medians were 27.510 ms for the bypassed comparison
+path and 18.918 ms for the candidate: ratio 0.688, above the 0.50 target.
+The three other status ratios were 0.688, 0.691 and 0.691. The memory A/A ratio
+was 1.000 and candidate ratio 0.629.
+
+The comparison path used the candidate hook with native dispatch bypassed;
+it was not the unchanged performance gate or an exact base checkout. The
+candidate missed the preflight target and was rejected. It was not installed
+on the owner's Mac. This does not establish a formal gate result or complete
+the second-hook task. Reopen the task with a different measured approach;
+retain the existing guard and its parser-failure behavior.

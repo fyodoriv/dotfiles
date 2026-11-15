@@ -172,7 +172,7 @@ Then it waited for an exclusive slot in the shared `heavy-run` queue. It had
 printed no JSON when this revision was committed. The
 [gate docs](../observability.md#performance-gate) say `--json` prints
 `base_min` and `ratio` per row; this plan did not confirm that by a
-finished run. The task `rust-agent-hooks` runs the gate before any change.
+finished run. The closed task `rust-agent-hooks` ran this gate; `rust-agent-hooks-full-port` must run it again before any change.
 
 ```sh
 jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timing_source == "monotonic-ms" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl
@@ -319,7 +319,7 @@ about three tail samples, and measured noise on this Mac was 19-50%.
   slice's crate takes at most 120 s and a warm build at most 15 s under
   `heavy-run`. `make check` must build Rust only when `rust/` changed. The
   Makefile has no cargo step today. The first port task that adds Rust code
-  (`rust-agent-hooks` or `rust-app-priority`) adds that step with this
+  (`rust-agent-hooks-full-port`; app-priority already shipped its Rust) adds that step with this
   condition.
 
 **Named exemptions.** G as a whole applies to port slices only: steps 1
@@ -349,7 +349,7 @@ is no separate "move tests to Rust" step.
 | Step / task ID | Why and change | User-benefit metric, number and command | Depends on |
 |---|---|---|---|
 | 1. `rust-agent-hooks` (closed 2026-11-15: recorded exception) | Two hooks run on each agent Bash call and start Perl, `shfmt` or `jq`. Remove those starts. Weigh a shell fast path first. | `hook-require-heavy-run` and `hook-block-dangerous-git` `ratio` at most 0.50 each, from `scripts/perf-gate.sh --force --json`, after 20 clean A/A runs. The rows keep their command paths. | none |
-| 2. `rust-app-priority` (closed 2026-11-15: ported) | `app-priority` runs every 60 seconds. The owner requested completion today. The [same-day baseline](app-priority-same-day.md) failed its stability limit, so use its registered controlled fixture fallback. | On hosted macOS, preserve every ordered action across 30 pairs and reach a candidate/base median of at most 0.40 and candidate median of at most 400 ms. In-use benefit remains unverified. | none; parallel with 1 |
+| 2. `rust-app-priority` (closed 2026-11-15: ported) | `app-priority` runs every 60 seconds. The owner requested completion today. The [same-day baseline](app-priority-same-day.md) failed its stability limit, so use its registered controlled fixture fallback. | On hosted macOS, preserve every ordered action across 30 pairs and reach a candidate/base median of at most 0.40 and candidate median of at most 400 ms. In use: median 302 ms vs 920 ms (ratio 0.33); the 400 ms mean target is missed (task `app-priority-rust-tail`). | none; parallel with 1 |
 | 3. `rust-cold-path-profile` | Doctor, apply, sync, upgrade and the queue lack qualified child-span coverage. The registered pivot retains them as exceptions. | Not separable with the currently evidenced method; local p50 and owned share are unknown. Reopen only with a qualified measurement. | none; pivot recorded |
 | 4. `rust-source-inventory` | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
 | 5. `rust-final-audit` | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the confirmed owner ruling |
@@ -441,7 +441,7 @@ names as classification labels; this table gives each label its state.
 
 | Slice (old task suffix) | Reason | Cheaper option to weigh first |
 |---|---|---|
-| agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. Each hook costs about 27 ms per agent Bash call. | A full Rust parser port after agentbrew's hook dispatcher; task `rust-agent-hooks-full-port`. |
+| agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. The heavy-run status path costs about 27 ms median per agent Bash call ([experiment](rust-hook-status-experiment.md)). | A full Rust parser port after agentbrew's hook dispatcher; task `rust-agent-hooks-full-port`. |
 | process-primitives | No measured cost of its own. | None needed. |
 | shared-queue | The owned share is not separable with the current method. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
 | repository-discovery | Rare, agent-driven tools. | None needed. |

@@ -203,3 +203,34 @@ run_hook() {
   done
   [ "$failures" -eq 0 ]
 }
+
+# 2026-11-15: an agent ran a gate script under `nice -n 15` outside heavy-run
+# beside another heavy job, and the Mac froze (forced power-off). Project gate
+# scripts and parallel pytest runs must queue like npm and cargo runs do.
+@test "blocks unwrapped project gate scripts and parallel or whole-suite pytest" {
+  local c failures=0
+  for c in "scripts/check.sh" "scripts/check.sh fast" "./scripts/check.sh" "bash scripts/check.sh fast" \
+           "nice -n 15 scripts/check.sh" "CHECK_STEPS=unit scripts/check.sh" "scripts/e2e.sh" \
+           "nice -n 15 scripts/public-readiness.sh --release --released --first-run" \
+           "uv run pytest -q -n 8 tests/unit" "uv run pytest -n auto" "uv run pytest -q" \
+           "uv run --frozen pytest tests/unit" "pytest --numprocesses=4 tests/a.py" \
+           "python -m pytest -n 8 tests/a.py" "cd app && uv run pytest"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; failures=$((failures + 1)); }
+  done
+  [ "$failures" -eq 0 ]
+}
+
+@test "allows single pytest files, light gate modes and self-queuing scripts" {
+  local c failures=0
+  for c in "uv run pytest tests/unit/test_a.py::test_b -q" "uv run pytest -q tests/a.py tests/b.py" \
+           "pytest -n 0 tests/a.py" "uv run pytest -k version -q" "scripts/check.sh inputs unit" \
+           "scripts/check.sh --help" "scripts/public-readiness.sh" "scripts/public-readiness.sh --tree HEAD" \
+           "scripts/batch-gate.sh 1 2" "heavy-run scripts/check.sh fast" \
+           "heavy-run nice -n 15 scripts/public-readiness.sh --first-run" "uv run ruff check ." \
+           "uv run careerbrew actions" "grep -n check.sh AGENTS.md"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
+  done
+  [ "$failures" -eq 0 ]
+}

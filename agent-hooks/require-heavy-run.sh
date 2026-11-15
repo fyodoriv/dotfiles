@@ -49,6 +49,28 @@ _one_test_args() {
   return 1
 }
 
+# True when pytest arguments run in parallel (-n N, N > 0) or name no test
+# file and no -k filter (the whole suite or a folder).
+_pytest_heavy() {
+  local a narrowed=0
+  while [ $# -gt 0 ]; do
+    a="$1"; shift
+    case "$a" in
+      -n|--numprocesses)
+        case "${1:-}" in 0) shift ;; *) return 0 ;; esac ;;
+      -n0|--numprocesses=0) ;;
+      -n*|--numprocesses=*) return 0 ;;
+      -k) [ -n "${1:-}" ] && narrowed=1; shift || true ;;
+      -k*) narrowed=1 ;;
+      -m|-p|-c|-o|-W|--rootdir|--basetemp|--deselect|--ignore|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout)
+        shift || true ;;
+      -*) ;;
+      *.py|*.py::*) narrowed=1 ;;
+    esac
+  done
+  [ "$narrowed" -eq 0 ]
+}
+
 # True when the script name is a test or build script.
 _heavy_script() {
   case "$1" in test|test:*|test-*|t|build|verify|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac
@@ -115,6 +137,26 @@ _is_heavy() {
   # A path runs the same program: ./node_modules/.bin/playwright, /usr/bin/make.
   w[0]="${w[0]##*/}"
   [ "${w[0]}" = heavy-run ] && return 1
+  # uv run / uvx / python -m pytest / bash <script>.sh run the program after them.
+  case "${w[0]}" in
+    uv)
+      [ "${w[1]:-}" = run ] || return 1
+      w=("${w[@]:2}"); _skip_flags --with --with-requirements --project --directory -p --python --package --extra --group --env-file
+      [ "${#w[@]}" -gt 0 ] || return 1
+      _is_heavy "${w[*]}" && return 0
+      return 1 ;;
+    uvx)
+      w=("${w[@]:1}"); _skip_flags --with --from -p --python
+      [ "${#w[@]}" -gt 0 ] || return 1
+      _is_heavy "${w[*]}" && return 0
+      return 1 ;;
+    python|python3|python3.*)
+      [ "${w[1]:-}" = -m ] && [ "${w[2]:-}" = pytest ] && w=("${w[@]:2}") ;;
+    bash|sh|zsh)
+      if [ "${#w[@]}" -gt 1 ] && [[ "${w[1]}" == *.sh ]]; then
+        w=("${w[@]:1}"); w[0]="${w[0]##*/}"
+      fi ;;
+  esac
   case "${w[0]}" in npx|bunx) w=("${w[@]:1}"); _skip_flags -p --package -c --call ;; esac
   [ "${#w[@]}" -gt 0 ] || return 1
   local tool="${w[0]##*/}" a
@@ -130,6 +172,16 @@ _is_heavy() {
     rest+=("${raw[$i]}"); i=$((i + 1))
   done
   case "$tool" in
+    # Project gate scripts (2026-11-15 freeze). batch-gate.sh queues itself.
+    check.sh|e2e.sh)
+      case "${raw[0]:-}" in inputs|--help|-h) return 1 ;; esac
+      return 0 ;;
+    public-readiness.sh)
+      for a in ${raw[@]+"${raw[@]}"}; do [ "$a" = --first-run ] && return 0; done
+      return 1 ;;
+    pytest|py.test)
+      _pytest_heavy ${raw[@]+"${raw[@]}"} && return 0
+      return 1 ;;
     cargo)
       rest=(${raw[@]+"${raw[@]}"})
       # Toolchain selection does not make compilation a light command.

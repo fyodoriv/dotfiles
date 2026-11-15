@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+serde_json = "=1.0.154"
 migration-inventory-core = { git = "https://github.com/fyodoriv/agentbrew.git", rev = "f1e3f257210de4c689724f8d1a1ac6445e7b528d" }
 
 [[bin]]

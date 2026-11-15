@@ -445,6 +445,7 @@ names as classification labels; this table gives each label its state.
 | plugin-trust | Rare actions; trust rules gain nothing from a port. | None needed. |
 | services-power | Launchd jobs wait on system tools. `app-priority` moved to step 2. | Profile first (step 3). |
 | git-security-guards | The two agent hooks moved to step 1. Git hooks run once per commit or push. | A budget row per git hook before any port. |
+| gh-public-write-safety | Runs for write-shaped `gh` requests; no qualified user-benefit measurement exists. Preserve its fail-closed leak checks. | Profile this path before considering a port. |
 | browser-native | Time is in the browser and in macOS events. | None needed. |
 | local-ai-runtime | Time is in the model. | None needed. |
 | metrics-checkup | Runs every few days. | None needed. |

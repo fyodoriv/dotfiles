@@ -434,3 +434,8 @@ The [setup and service review](rust-setup-service-boundary-review.json) and
 classify 33 more candidates under the existing cold-path exceptions. Their
 source identities and ranges share the same hosted check. Dynamic inputs and
 unreviewed source forms remain open.
+
+The [safety-boundary review](rust-safety-boundary-review.json) records three
+expressions in the public-write guard and the security doctor's redaction
+helper. The public-write path has its own recorded exception in the migration
+plan; its leak checks remain fail-closed. Source discovery is still incomplete.

@@ -65,11 +65,10 @@ _pytest_heavy() {
       -n0|--numprocesses=0) ;;
       -n*|--numprocesses=*) return 0 ;;
       # An empty -k value vanishes with its quotes: the next flag is not a filter.
-      # A quoted -k value (Q) may hide an empty filter, so it filters nothing here.
-      -k) case "${1:-}" in ""|-*|*/*) ;; Q) shift ;; *) kfilter=1; shift ;; esac ;;
+      -k) case "${1:-}" in ""|-*|*/*) ;; *) kfilter=1; shift ;; esac ;;
       -k*) kfilter=1 ;;
       -m|-p|-c|-o|-W|-r|--rootdir|--basetemp|--deselect|--ignore|--ignore-glob|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout|--cov|--cov-report|--tb|--import-mode)
-        shift || true ;;
+        shift || true; after_long=0 ;;
       # A redirection and its target are not test paths.
       '>'|'>>'|'<'|[0-9]'>'|[0-9]'>>'|'&>') shift || true ;;
       *'>'*|*'<'*) ;;
@@ -310,9 +309,12 @@ _strip_text() {
       $s =~ s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
         my $q = $1; my $pre = $`; my $in = substr($q, 1, -1);
         my $dq = substr($q, 0, 1) eq "\"";
-        # A quoted pytest file or test id keeps its text so the pytest check can read it.
+        # A quoted path (one word with a slash), a pytest file or test id, or the
+        # word pytest keeps its text so the command checks can read it.
         my $r = $in =~ m{^\.\*?$} ? $in
-          : $in =~ m{^[\w.\x2f-]+\.py(?:::[^\s"\x27\$`\\]*)?$} ? $in
+          : $in =~ m{^[\w.\x2f\$\{\}-]+\.py::[^"\x27`\\]*$} ? $in =~ s{\s}{_}gr
+          : $in =~ m{^[\w.\$\{\}-]*\x2f[\w.\x2f\$\{\}-]*$} ? $in
+          : $in =~ m{^(?:[\w.\x2f\$\{\}-]+\.py|pytest|py\.test)$} ? $in
           : length($in) ? "Q" : "";
         if ($dq) {
           while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }

@@ -222,7 +222,8 @@ run_hook() {
            "pytest tests/unit/test_a.py tests/e2e" "pytest --ignore-glob setup.py" \
            "pytest -k '' -n 8" "pytest -k '' tests/" "python3 -Im pytest" "python3 -Bm pytest" \
            'pytest "tests/"' 'uv run pytest -q "tests/unit"' 'pytest "$TESTS"' 'pytest --log-cli-level "INFO"' \
-           "pytest -k '' \"tests/\"" "pytest tests/a.py unit" "pytest tests/a.py src"; do
+           "pytest -k '' \"tests/\"" "pytest tests/a.py unit" "pytest tests/a.py src" \
+           "pytest tests/a.py --rootdir . tests" 'bash "scripts/check.sh"' '"scripts/check.sh" fast' 'uv run "pytest"'; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; failures=$((failures + 1)); }
   done
@@ -243,7 +244,8 @@ run_hook() {
            "pytest tests/a.py -q 2>/dev/null" "pytest tests/a.py --log-cli-level INFO" "pytest tests/a.py --count 3" \
            "pytest 'tests/a.py::test_x[case-1]'" "python3 -m pip install x" "pytest 'tests/a.py'" \
            'pytest tests/a.py -m "not slow"' 'pytest tests/a.py -k "foo or bar"' "pytest tests/a.py --log-cli-level INFO" \
-           "pytest -v tests/a.py tests/b.py >> log.txt"; do
+           "pytest -v tests/a.py tests/b.py >> log.txt" \
+           'pytest -k "test_foo"' 'pytest "$PWD/tests/a.py"' 'pytest "tests/a.py::test_x[a b]"' 'git commit -m "scripts/check.sh"'; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
   done

@@ -50,3 +50,7 @@ The shortcut handles only conservative status input. Other commands still run
 the original shell guard, so this result does not complete the full hook port.
 Lesson: qualify the actual supervised entry point, including its setup and
 fallback, rather than extrapolating from a direct binary fixture.
+
+The hosted hook build-budget check uses a fresh target and empty Cargo home.
+It measures the locked offline release build in an exclusive queue slot. The
+registered limits are 120 seconds cold and 15 seconds warm.

@@ -15,6 +15,11 @@ esac
 export DOTFILES_ERRORS_LOG=0
 export DOTFILES_STATS_LOG=0
 
+# Periodic jobs skip while a real-time app runs (lib/realtime-hold.sh); tests
+# that check the skip set it back to 1 with a stub pgrep.
+export DOTFILES_REALTIME_HOLD=0
+
+
 # Create isolated temp environment for each test
 setup() {
   TEST_DIR="$(mktemp -d)"

@@ -41,6 +41,13 @@ source "$DOTFILES_DIR/lib/push-error-classify.sh"
 source "$DOTFILES_DIR/lib/zshrc-appends.sh"
 # shellcheck source=../lib/apply-state.sh
 source "$DOTFILES_DIR/lib/apply-state.sh"
+# shellcheck source=../lib/realtime-hold.sh
+source "$DOTFILES_DIR/lib/realtime-hold.sh"
+
+if _rt_app="$(realtime_app_running)"; then
+  echo "[sync] skipped: $_rt_app is running (a real-time app); the next run retries"
+  exit 0
+fi
 
 cd "$DOTFILES_DIR" || { warn "[sync] Cannot cd to dotfiles dir"; exit 1; }
 

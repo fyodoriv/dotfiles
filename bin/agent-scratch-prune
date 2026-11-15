@@ -266,6 +266,14 @@ agent_scratch_prune_main() {
     *) echo "unknown option: $1 (try --help)" >&2; return 2 ;;
   esac
   _settings
+  # A game stream lags beside a disk scan; skip until it quits.
+  # shellcheck source=../lib/realtime-hold.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/realtime-hold.sh"
+  local rt_app
+  if rt_app="$(realtime_app_running)"; then
+    echo "agent-scratch-prune: skipped: $rt_app is running (a real-time app)"
+    return 0
+  fi
   # Keep the LaunchAgent log bounded (it appends one line per removal).
   # Trim in place: launchd holds this file open as our stdout, so a `mv`
   # over it sends every later line to a deleted file.

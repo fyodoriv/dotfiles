@@ -266,6 +266,12 @@ A game stream (GeForce NOW 2.0.90) next to heavy runs crashed it 5 times the sam
 `HEAVY_RUN_PAUSE_APPS` runs (default `GeForceNOW`): no new run starts, and a running one
 gets SIGSTOP until the app quits. Set `HEAVY_RUN_PAUSE_APPS=""` to turn it off.
 
+The periodic jobs `dotfiles-sync`, `tooling-sync` and `agent-scratch-prune` use the same
+list through `lib/realtime-hold.sh`: while a listed app runs, each skips its run and prints
+`skipped: <app> is running`; the next interval retries. On 2026-11-15 a `git` process at
+about six cores ran beside GeForce NOW and the stream lagged. `DOTFILES_REALTIME_HOLD=0`
+turns this skip off; `tooling-sync --force` ignores it.
+
 Each controller caches the app check for at most two seconds. A successful
 check must return process IDs, or report no matches with no output. A failed,
 missing or invalid check holds new runs with `real-time app probe unavailable`.

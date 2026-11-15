@@ -418,7 +418,7 @@ them. -->
   - **Blocked**: none — the shared validator and adapter are merged. Independent discovery and reviewed ledgers remain incomplete; the check fails closed until they are ready.
   - **Acceptance**: Unclassified owned executable components 0; every component has one owner and one of the five states. The validator rejects every planted embedded, extensionless and generated-code omission. `cargo build --locked --offline` works from the vendored copy.
   - **Hypothesis**: A source-and-caller inventory makes unclassified owned executable components reach 0, including extensionless and embedded code, without changing runtime behavior.
-  - **Measurement**: From `rust/migration-inventory`, run `heavy-run cargo build --locked --offline --release` and `./target/release/migration-check inventory --check`. The latter fails closed until independent discovery and reviewed ledgers are complete.
+  - **Measurement**: From `rust/migration-inventory`, run `heavy-run cargo build --locked --offline --release`. From the repository root, run `rust/migration-inventory/target/release/migration-check inventory --check`. The latter fails closed until independent discovery and reviewed ledgers are complete.
   - **Success**: Unclassified owned executable components 0; unrecorded exceptions 0; every planted omission rejected; cold build at most 120 s.
   - **Pivot**: Any missed component or blanket exception changes the inventory method to execution/caller analysis before a replacement starts.
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration); Forsgren, Humble, Kim 2018 (performance and stability).

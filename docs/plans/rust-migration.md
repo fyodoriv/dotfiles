@@ -224,7 +224,8 @@ complete; a successful build is not a completed inventory.
 ```sh
 cd rust/migration-inventory
 heavy-run cargo build --locked --offline --release
-./target/release/migration-check inventory --check
+cd ../..
+rust/migration-inventory/target/release/migration-check inventory --check
 ```
 
 ### Command that runs after the deferred measurement runner merges

@@ -1,8 +1,8 @@
 {
   "scope": "Embedded programs the static shell scanner confirmed in tracked shell sources, outside the five earlier boundary reviews. Not complete discovery: dynamic arguments and unparsed files stay unresolved.",
   "generator": "scripts/inventory-ledger.py",
-  "unparsed_shell_files": 370,
-  "unresolved_findings": 14817,
+  "unparsed_shell_files": 371,
+  "unresolved_findings": 14827,
   "entries": [
     {
       "path": "agent-hooks/block-dangerous-git.sh",

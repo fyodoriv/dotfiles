@@ -50,6 +50,7 @@ review	.github/workflows/ci.yml	978a77248a0ba37078f47543f6df23f456b95d2c	rule-cl
 review	.github/workflows/guard-standalone.yml	b010858013e34ae4d58a566e6b4b9c613e7dc5e5	rule-classification	docs/plans/rust-source-classification.md
 review	.github/workflows/hook-build-budget.yml	49f39133eba365e73dc2a6c3c2e6ec0d3fa13217	rule-classification	docs/plans/rust-source-classification.md
 review	.github/workflows/hook-status-fixture.yml	bb4d4e2aef0e1fe6846303671bc3e7d647446404	rule-classification	docs/plans/rust-source-classification.md
+review	.github/workflows/inventory-ledger-refresh.yml	8a38179a6a5fba2b5cd564a35d2756efcd50cc73	rule-classification	docs/plans/rust-source-classification.md
 review	.github/workflows/migration-inventory.yml	70beb3e6629257aa539be0008d8a14b8be7e58b7	rule-classification	docs/plans/rust-source-classification.md
 review	.github/workflows/opencode-managed-trial.yml	ca330ef1102bb51e50bf9446153d16c99fe81381	rule-classification	docs/plans/rust-source-classification.md
 review	.github/workflows/oss-readiness.yml	4c47c3781f3117d64676798d7787977d0da902a3	rule-classification	docs/plans/rust-source-classification.md
@@ -75,7 +76,7 @@ review	Makefile	6f5f1d68a60a671201a852da1a3c62187a64df3d	rule-classification	doc
 review	README.md	90eaf6c7cc913a868a3449069ac1ab6b5a5b53c3	rule-classification	docs/plans/rust-source-classification.md
 review	ROADMAP.md	d548b28eaeefdaf8f8bd9b5a759bc5014b8406f2	rule-classification	docs/plans/rust-source-classification.md
 review	SECURITY.md	83edb5beec387c02345cae1fa85ffdef4bba37bd	rule-classification	docs/plans/rust-source-classification.md
-review	TASKS.md	74b4f772bc6bf21f3745a0b55855757cccf1be29	rule-classification	docs/plans/rust-source-classification.md
+review	TASKS.md	b9096bf3d69cdadc2674ab7f88a0a3d3a7d5d5b3	rule-classification	docs/plans/rust-source-classification.md
 review	VISION.md	654f171e021176fad82d09f5e186a7dfef7bc4f2	rule-classification	docs/plans/rust-source-classification.md
 review	agent-hooks/block-dangerous-git.sh	a1c8deb846855153583a89f738ad98b22c7d9939	rule-classification	docs/plans/rust-source-classification.md
 review	agent-hooks/bootstrap-endpoint-path.sh	16139a7bc922c1a68d9a7bd8a0df9c47c848712b	rule-classification	docs/plans/rust-source-classification.md
@@ -276,7 +277,7 @@ review	docs/audits/local-ai-speedup-research-2026-05-11.md	88b78d80d2d8e05c14012
 review	docs/audits/local-ai-task-runs-2026-05-11.md	9d23371b11c059611914981f775d8187c3bf6be2	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/audits/spotlight-wt-noindex-mdworker-2026-10-16.md	b9a35dd3aa7e747d73927e7f3879c0f3c819e28b	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/changelog-archive.md	36bab51c1b91a3a2fe47371873acddaff2576170	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
-review	docs/ci-setup.md	41652bf05cad99093f20040b298f8be58133ae87	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/ci-setup.md	f54f91fffdab8eca696f92a4173a442ef082447f	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/competition/scorecard.md	997db9a76e9d8ba8a28be99e73af2a6e60ea4268	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/constitution.md	a6c9ace18618047575c2649a1fb62b4b0f89ad8b	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/decisions/0001-canonical-branch-feat-chezmoi.md	b83faeb5dd5e7da1eff2e4c113937efbf73d9492	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
@@ -457,7 +458,7 @@ review	docs/plans/rust-library-caller-receipt.json	22cdcc342d9264c89a20327b56255
 review	docs/plans/rust-library-caller-receipt.md	7c4e60b269530fbe1194b16016c13a7839b2407d	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-library-receipt.md	336efa577bc469588ee18dfdf014a39d8973285a	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-library-source-receipt.json	f115b19545822da6d8a9888d77d9d59054e80bc6	rule-classification	docs/plans/rust-source-classification.md
-review	docs/plans/rust-migration.md	793505fbaea8ab37786871b0a4511eac9596ecd5	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/plans/rust-migration.md	2e44281a759191df6a366a3fd23e9fb7a55fd10e	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-partial-ledger-prediction.md	775ed3acfc2aa8fed994ae45a24d10aa4128c7e5	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-plugin-workspace-boundary-review.json	471c49868bc335ab118770e68adc69a17f44f3de	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-root-source-receipt.json	ce0c3af51b2c6407d831f0d9e1c768923f04df38	rule-classification	docs/plans/rust-source-classification.md
@@ -471,7 +472,7 @@ review	docs/plans/rust-shared-core-ownership-review.json	2795725125057b95a361b10
 review	docs/plans/rust-shell-cold-boundary-review.json	a5b1ab0b4da17cf1264394ba52e417040f701d60	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-shell-embedded-review.json	61ee63beaed03ca5ba6463f6b890eeeeeda15357	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-shell-tooling-boundary-review.json	cecb05e6172ef1d102b8a2162ee6fd82ccfa3d1d	rule-classification	docs/plans/rust-source-classification.md
-review	docs/plans/rust-source-classification.md	edd6c775257c6c2f6bbe655cc060826c2d2ae7d4	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/plans/rust-source-classification.md	bc58f0868847e6be3fd0b31681647749eb4397a6	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-source-inventory-evidence.json	7e9cda89f49d276d4c92edeafadca27757181329	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-source-inventory.md	bf8ec54f38d16725b1a63815fd146c4df07f406b	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-vendor-ledger-prediction.md	6423f557121c2d051205f451d95af1f10bc5df6c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
@@ -1743,6 +1744,7 @@ review	scripts/check-pr-vision-trace.mjs	ac6982d160646c7173f7201991fb1dff6748b49
 review	scripts/gate-timed.sh	e8caec9037ef8a72439aa5ba8059ff6ad9899447	rule-classification	docs/plans/rust-source-classification.md
 review	scripts/heavy-run-bench.sh	bc8296f43215113775e8fe008747b9bb9f74e995	rule-classification	docs/plans/rust-source-classification.md
 review	scripts/hook-status-owned-benchmark.py	f8cd48faede4129dfc0afb5fae259e5d2f3c8421	rule-classification	docs/plans/rust-source-classification.md
+review	scripts/inventory-ledger-refresh.sh	0cdb0222f5f8ee2ae2a35ca01e691c469b624ee9	rule-classification	docs/plans/rust-source-classification.md
 review	scripts/inventory-ledger.py	71f537b98923af3f35e066dfa9ebf550ab65d028	rule-classification	docs/plans/rust-source-classification.md
 review	scripts/perf-gate.pl	8f15ee6db9a6242f5aa131b4394f59678908d190	rule-classification	docs/plans/rust-source-classification.md
 review	scripts/perf-gate.sh	2b3ace735cb9247bb1ef0edebd5298aa4e20fb4c	rule-classification	docs/plans/rust-source-classification.md
@@ -1988,7 +1990,7 @@ review	tests/git-wrapper.bats	d807d5f175b8286f6ebc9718ff3d98880383b66c	rule-clas
 review	tests/git_blob_batch_test.py	22a806c6a9cdb337e60e8ce607f65ff13e73e1ac	rule-classification	docs/plans/rust-source-classification.md
 review	tests/gitconfig-github-https.bats	7d5a0e449064db45a0b47ac18aec75d09c93b1a6	rule-classification	docs/plans/rust-source-classification.md
 review	tests/github-auth-example.bats	6f8568265980d712b008ea8a2ed6df732b5b8cf5	rule-classification	docs/plans/rust-source-classification.md
-review	tests/github-workflows.bats	d5855ab3f83114fe3c30119c16c191a07afae71c	rule-classification	docs/plans/rust-source-classification.md
+review	tests/github-workflows.bats	0730205c8b34fea56642bfc9b458b3ed4953d89e	rule-classification	docs/plans/rust-source-classification.md
 review	tests/glove80-fixture.bats	1671309b440f73d543da514f3b11d65a7671b3eb	rule-classification	docs/plans/rust-source-classification.md
 review	tests/glove80-private-log.bats	e9b4d93db1c802e11f6ff54a123affeaf0ef71c2	rule-classification	docs/plans/rust-source-classification.md
 review	tests/glove80.bats	87ffc523ff76568f7d4b6fc3bf1f4b15535a12fc	rule-classification	docs/plans/rust-source-classification.md
@@ -2017,6 +2019,7 @@ review	tests/hotfix.bats	775c1412b783c5031fb8de26b3f54de52b1d7166	rule-classific
 review	tests/install-deps.bats	920515caa54d5936d03d0d5433435ba94f9eb57a	rule-classification	docs/plans/rust-source-classification.md
 review	tests/install-e2e-guard.bats	71ad8be14be065ba7aca8605d242df900bea44c7	rule-classification	docs/plans/rust-source-classification.md
 review	tests/integration.bats	b69d0c53ea7d0e60ac2aad22068844e29fc0e0df	rule-classification	docs/plans/rust-source-classification.md
+review	tests/inventory-ledger-refresh.bats	3cc199e666f5546e7c117fc4b14117f24acd2453	rule-classification	docs/plans/rust-source-classification.md
 review	tests/iteration-speed-standard.bats	7ebda9c76faa391ba5831df3bc38f80f5a479d9b	rule-classification	docs/plans/rust-source-classification.md
 review	tests/jetbrains-install-plugins.bats	e6b19b6afb53339093c9b6d4c05a453bae0b4228	rule-classification	docs/plans/rust-source-classification.md
 review	tests/keep-awake-tools.bats	19a0a4d7c646dffb5a0cc49f16a53eb5d190a308	rule-classification	docs/plans/rust-source-classification.md

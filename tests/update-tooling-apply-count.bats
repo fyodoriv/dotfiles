@@ -43,6 +43,9 @@ setup() {
   # A host chezmoi apply would make the step wait up to 5 minutes.
   printf '#!/bin/bash\nexit 1\n' > "$TEST_DIR/fakebin/pgrep"
   chmod +x "$TEST_DIR/fakebin/pgrep"
+  # The step queues on heavy-run; the stub runs the command at once.
+  printf '#!/bin/bash\nexec "$@"\n' > "$TEST_DIR/fakebin/heavy-run"
+  chmod +x "$TEST_DIR/fakebin/heavy-run"
   export PATH="$TEST_DIR/fakebin:$PATH"
 
   # The step as the skill writes it.

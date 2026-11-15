@@ -188,6 +188,14 @@ Unknown Rust tool invocations also refuse. Only the bounded version, help,
 metadata, project-location and sysroot inspection forms in the
 [caller coverage contract](plans/queue-caller-coverage.md) pass unwrapped.
 The exact `verify` package script must queue even with a filename argument.
+Project gate scripts must queue too: `check.sh` (any mode but `inputs` and
+`--help`), `e2e.sh`, and `public-readiness.sh --first-run`, also through
+`bash`, `nice`, or `VAR=x` prefixes. `batch-gate.sh` queues itself and passes.
+`pytest` (also as `uv run pytest`, `uvx pytest`, or `python -m pytest`) must
+queue when it runs in parallel (`-n N` with N above 0) or names no test file
+and no `-k` filter. One or more named `.py` files without `-n` pass. Added
+after the 2026-11-15 freeze: a gate run under `nice -n 15` outside the queue
+beside another heavy job, and the Mac had to be forced off.
 Read-only discovery passes unwrapped: `command -v` or `command -V` (also with
 `-p`) followed only by literal names and output redirections such as
 `>/dev/null 2>&1`, and a lone `bats --version`, `-v`, `--help`, or `-h`.

@@ -144,3 +144,11 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   run jq -e '[.evals[] | select(.expectations | any(contains("dotfiles-launchagent-drift")))] | length >= 1' "$EVALS"
   [ "$status" -eq 0 ]
 }
+
+@test "update-tooling queues the apply and the doctor on heavy-run and never bypasses it" {
+  grep -F -q 'heavy-run env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply --if-changed' "$SKILL"
+  grep -F -q 'heavy-run env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" doctor --module agentbrew' "$SKILL"
+  grep -F -q 'Never bypass the queue, even with the user' "$SKILL"
+  run jq -e '[.evals[] | select(.expectations | any(contains("heavy-run")))] | length >= 1' "$EVALS"
+  [ "$status" -eq 0 ]
+}

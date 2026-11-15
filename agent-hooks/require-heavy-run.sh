@@ -49,6 +49,43 @@ _one_test_args() {
   return 1
 }
 
+# True when pytest arguments run in parallel (-n N, N > 0) or name no test
+# file and no -k filter (the whole suite or a folder).
+_pytest_heavy() {
+  local a kfilter=0 files=0 folders=0 after_long=0 prev_long
+  while [ $# -gt 0 ]; do
+    a="$1"; shift
+    prev_long=$after_long; after_long=0
+    case "$a" in --*=*) ;; --*) after_long=1 ;; esac
+    case "$a" in
+      # Info and collect-only forms run no tests.
+      --version|-V|--help|-h|--collect-only|--co|--fixtures|--markers) return 1 ;;
+      -n|--numprocesses)
+        case "${1:-}" in 0) shift ;; *) return 0 ;; esac ;;
+      -n0|--numprocesses=0) ;;
+      -n*|--numprocesses=*) return 0 ;;
+      # An empty -k value vanishes with its quotes: the next flag is not a filter.
+      -k) case "${1:-}" in ""|-*|*/*) ;; *) kfilter=1; shift ;; esac ;;
+      -k*) kfilter=1 ;;
+      -m|-p|-c|-o|-W|-r|--rootdir|--basetemp|--deselect|--ignore|--ignore-glob|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout|--cov|--cov-report|--tb|--import-mode)
+        shift || true; after_long=0 ;;
+      # A redirection and its target are not test paths.
+      '>'|'>>'|'<'|[0-9]'>'|[0-9]'>>'|'&>') shift || true ;;
+      *'>'*|*'<'*) ;;
+      -*) ;;
+      *.py|*.py::*) files=$((files + 1)) ;;
+      # A path-like word is a folder. Another word right after a long flag
+      # is its value (--count 3); elsewhere it is a folder (Q: any other
+      # quoted word, see _strip_text).
+      */*|.|..) folders=$((folders + 1)) ;;
+      *) [ "$prev_long" -eq 1 ] || folders=$((folders + 1)) ;;
+    esac
+  done
+  [ "$kfilter" -eq 1 ] && return 1
+  [ "$files" -gt 0 ] && [ "$folders" -eq 0 ] && return 1
+  return 0
+}
+
 # True when the script name is a test or build script.
 _heavy_script() {
   case "$1" in test|test:*|test-*|t|build|verify|e2e|e2e:*|e2e-*|ui|ui:*|ui-*) return 0 ;; esac
@@ -115,6 +152,43 @@ _is_heavy() {
   # A path runs the same program: ./node_modules/.bin/playwright, /usr/bin/make.
   w[0]="${w[0]##*/}"
   [ "${w[0]}" = heavy-run ] && return 1
+  # uv run / uvx / python -m pytest / bash <script>.sh run the program after them.
+  case "${w[0]}" in
+    uv|uvx)
+      if [ "${w[0]}" = uvx ]; then w=("${w[@]:1}")
+      elif [ "${w[1]:-}" = run ]; then w=("${w[@]:2}")
+      elif [ "${w[1]:-}" = tool ] && [ "${w[2]:-}" = run ]; then w=("${w[@]:3}")
+      else return 1; fi
+      _skip_flags --with --with-editable --with-requirements --from --project --directory -p --python \
+        --package --extra --no-extra --group --no-group --only-group --env-file --index \
+        --default-index --index-url --extra-index-url -f --find-links --python-platform --config-file
+      [ "${#w[@]}" -gt 0 ] || return 1
+      _is_heavy "${w[*]}" && return 0
+      return 1 ;;
+    python|python[0-9]*)
+      w=("${w[@]:1}")
+      while [ "${#w[@]}" -gt 0 ]; do
+        case "${w[0]}" in
+          -m|-[A-Za-z]*m) w=("${w[@]:1}"); break ;;
+          -m*) w[0]="${w[0]#-m}"; break ;;
+          -X|-W) w=("${w[@]:2}") ;;
+          -c) return 1 ;;
+          -*) w=("${w[@]:1}") ;;
+          *) return 1 ;;
+        esac
+      done
+      [ "${w[0]:-}" = pytest ] || return 1 ;;
+    bash|sh|zsh|source|.)
+      w=("${w[@]:1}")
+      # -n reads the script for syntax and runs nothing.
+      for a in ${w[@]+"${w[@]}"}; do
+        [[ "$a" == -* ]] || break
+        [[ "$a" =~ ^-[a-zA-Z]*n[a-zA-Z]*$ ]] && return 1
+      done
+      _skip_flags -o -O --rcfile --init-file
+      [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == *.sh ]] || return 1
+      w[0]="${w[0]##*/}" ;;
+  esac
   case "${w[0]}" in npx|bunx) w=("${w[@]:1}"); _skip_flags -p --package -c --call ;; esac
   [ "${#w[@]}" -gt 0 ] || return 1
   local tool="${w[0]##*/}" a
@@ -130,6 +204,16 @@ _is_heavy() {
     rest+=("${raw[$i]}"); i=$((i + 1))
   done
   case "$tool" in
+    # Project gate scripts (2026-11-15 freeze). batch-gate.sh queues itself.
+    check.sh|e2e.sh)
+      case "${raw[0]:-}" in inputs|--help|-h) return 1 ;; esac
+      return 0 ;;
+    public-readiness.sh)
+      for a in ${raw[@]+"${raw[@]}"}; do [ "$a" = --first-run ] && return 0; done
+      return 1 ;;
+    pytest|py.test)
+      _pytest_heavy ${raw[@]+"${raw[@]}"} && return 0
+      return 1 ;;
     cargo)
       rest=(${raw[@]+"${raw[@]}"})
       # Toolchain selection does not make compilation a light command.
@@ -225,7 +309,15 @@ _strip_text() {
       $s =~ s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
         my $q = $1; my $pre = $`; my $in = substr($q, 1, -1);
         my $dq = substr($q, 0, 1) eq "\"";
-        my $r = $in =~ m{^\.\*?$} ? $in : length($in) ? "Q" : "";
+        # A quoted path (one word with a slash), a pytest file or test id, or a
+        # program or gate script name keeps its text so the command checks can
+        # read it. ${X} becomes $X: braces and parentheses split commands.
+        my $n = $in =~ s{\$\{(\w+)\}}{\$$1}gr;
+        my $r = $in =~ m{^\.\*?$} ? $in
+          : $n =~ m{^[\w.\x2f\$-]+\.py::[^"\x27`\\]*$} ? $n =~ s{[\s(){};&|<>]}{_}gr
+          : $n =~ m{^[\w.\$-]*\x2f[\w.\x2f\$-]*$} ? $n
+          : $n =~ m{^(?:[\w.\x2f\$-]+\.py|pytest|py\.test|python[\d.]*|uvx?|bash|sh|zsh|(?:check|e2e|public-readiness|batch-gate)\.sh)$} ? $n
+          : length($in) ? "Q" : "";
         if ($dq) {
           while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }
         }

@@ -203,3 +203,53 @@ run_hook() {
   done
   [ "$failures" -eq 0 ]
 }
+
+# 2026-11-15: an agent ran a gate script under `nice -n 15` outside heavy-run
+# beside another heavy job, and the Mac froze (forced power-off). Project gate
+# scripts and parallel pytest runs must queue like npm and cargo runs do.
+@test "blocks unwrapped project gate scripts and parallel or whole-suite pytest" {
+  local c failures=0
+  for c in "scripts/check.sh" "scripts/check.sh fast" "./scripts/check.sh" "bash scripts/check.sh fast" \
+           "nice -n 15 scripts/check.sh" "CHECK_STEPS=unit scripts/check.sh" "scripts/e2e.sh" \
+           "nice -n 15 scripts/public-readiness.sh --release --released --first-run" \
+           "uv run pytest -q -n 8 tests/unit" "uv run pytest -n auto" "uv run pytest -q" \
+           "uv run --frozen pytest tests/unit" "pytest --numprocesses=4 tests/a.py" \
+           "python -m pytest -n 8 tests/a.py" "cd app && uv run pytest" \
+           "bash -x scripts/check.sh" "sh -e scripts/check.sh fast" "bash --noprofile scripts/check.sh" \
+           "source scripts/check.sh" ". scripts/check.sh" "python -I -m pytest" "python3 -X dev -m pytest" \
+           "python3 -mpytest" "uv tool run pytest" "uv run --with-editable . pytest" "uv run --no-group dev pytest" \
+           "uv run --index https://x.example.com pytest" "pytest tests/unit tests/unit/test_a.py" \
+           "pytest tests/unit/test_a.py tests/e2e" "pytest --ignore-glob setup.py" \
+           "pytest -k '' -n 8" "pytest -k '' tests/" "python3 -Im pytest" "python3 -Bm pytest" \
+           'pytest "tests/"' 'uv run pytest -q "tests/unit"' 'pytest "$TESTS"' 'pytest --log-cli-level "INFO"' \
+           "pytest -k '' \"tests/\"" "pytest tests/a.py unit" "pytest tests/a.py src" \
+           "pytest tests/a.py --rootdir . tests" 'bash "scripts/check.sh"' '"scripts/check.sh" fast' 'uv run "pytest"' \
+           'bash "check.sh"' '"python3" -m pytest' '"uv" run pytest' '"${ROOT}/scripts/check.sh" fast'; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; failures=$((failures + 1)); }
+  done
+  [ "$failures" -eq 0 ]
+}
+
+@test "allows single pytest files, light gate modes and self-queuing scripts" {
+  local c failures=0
+  for c in "uv run pytest tests/unit/test_a.py::test_b -q" "uv run pytest -q tests/a.py tests/b.py" \
+           "pytest -n 0 tests/a.py" "uv run pytest -k version -q" "scripts/check.sh inputs unit" \
+           "scripts/check.sh --help" "scripts/public-readiness.sh" "scripts/public-readiness.sh --tree HEAD" \
+           "scripts/batch-gate.sh 1 2" "heavy-run scripts/check.sh fast" \
+           "heavy-run nice -n 15 scripts/public-readiness.sh --first-run" "uv run ruff check ." \
+           "uv run careerbrew actions" "grep -n check.sh AGENTS.md" "pytest --version" "pytest -V" \
+           "pytest --help" "uv run pytest -q --co" "pytest --collect-only" "pytest --fixtures" "pytest --markers" \
+           "uv sync" "uv run python script.py" "bash -n scripts/check.sh" "bash -x -n scripts/check.sh" \
+           "uv run pytest tests/x.py -q 2>&1 | tail -20" "uv run pytest tests/x.py -q > out.log 2>&1" \
+           "pytest tests/a.py -q 2>/dev/null" "pytest tests/a.py --log-cli-level INFO" "pytest tests/a.py --count 3" \
+           "pytest 'tests/a.py::test_x[case-1]'" "python3 -m pip install x" "pytest 'tests/a.py'" \
+           'pytest tests/a.py -m "not slow"' 'pytest tests/a.py -k "foo or bar"' "pytest tests/a.py --log-cli-level INFO" \
+           "pytest -v tests/a.py tests/b.py >> log.txt" \
+           'pytest -k "test_foo"' 'pytest "$PWD/tests/a.py"' 'pytest "tests/a.py::test_x[a b]"' 'git commit -m "scripts/check.sh"' \
+           'echo "${ROOT}/scripts/check.sh"' 'pytest "${ROOT}/tests/a.py"' 'git commit -m "tests/a.py::test_x (pytest)"' 'git commit -m "bash"'; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
+  done
+  [ "$failures" -eq 0 ]
+}

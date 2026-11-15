@@ -392,3 +392,6 @@ manifest. The ledgers are not complete yet, so the command fails closed when
 they are missing and continues to fail until independent discovery exists. A
 structural pass is not proof that source discovery or the manual reviews are complete. Uncommitted and untracked work needs a separate
 audit.
+
+Hosted Linux controls provide an early offline compiler and test signal while
+the macOS gate remains required.

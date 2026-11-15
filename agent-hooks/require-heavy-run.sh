@@ -52,23 +52,28 @@ _one_test_args() {
 # True when pytest arguments run in parallel (-n N, N > 0) or name no test
 # file and no -k filter (the whole suite or a folder).
 _pytest_heavy() {
-  local a narrowed=0
+  local a kfilter=0 files=0 folders=0
   while [ $# -gt 0 ]; do
     a="$1"; shift
     case "$a" in
+      # Info and collect-only forms run no tests.
+      --version|-V|--help|-h|--collect-only|--co|--fixtures|--markers) return 1 ;;
       -n|--numprocesses)
         case "${1:-}" in 0) shift ;; *) return 0 ;; esac ;;
       -n0|--numprocesses=0) ;;
       -n*|--numprocesses=*) return 0 ;;
-      -k) [ -n "${1:-}" ] && narrowed=1; shift || true ;;
-      -k*) narrowed=1 ;;
-      -m|-p|-c|-o|-W|--rootdir|--basetemp|--deselect|--ignore|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout)
+      -k) [ -n "${1:-}" ] && kfilter=1; shift || true ;;
+      -k*) kfilter=1 ;;
+      -m|-p|-c|-o|-W|-r|--rootdir|--basetemp|--deselect|--ignore|--ignore-glob|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout|--cov|--cov-report|--tb|--import-mode)
         shift || true ;;
       -*) ;;
-      *.py|*.py::*) narrowed=1 ;;
+      *.py|*.py::*) files=$((files + 1)) ;;
+      *) folders=$((folders + 1)) ;;
     esac
   done
-  [ "$narrowed" -eq 0 ]
+  [ "$kfilter" -eq 1 ] && return 1
+  [ "$files" -gt 0 ] && [ "$folders" -eq 0 ] && return 1
+  return 0
 }
 
 # True when the script name is a test or build script.
@@ -139,23 +144,37 @@ _is_heavy() {
   [ "${w[0]}" = heavy-run ] && return 1
   # uv run / uvx / python -m pytest / bash <script>.sh run the program after them.
   case "${w[0]}" in
-    uv)
-      [ "${w[1]:-}" = run ] || return 1
-      w=("${w[@]:2}"); _skip_flags --with --with-requirements --project --directory -p --python --package --extra --group --env-file
+    uv|uvx)
+      if [ "${w[0]}" = uvx ]; then w=("${w[@]:1}")
+      elif [ "${w[1]:-}" = run ]; then w=("${w[@]:2}")
+      elif [ "${w[1]:-}" = tool ] && [ "${w[2]:-}" = run ]; then w=("${w[@]:3}")
+      else return 1; fi
+      _skip_flags --with --with-editable --with-requirements --from --project --directory -p --python \
+        --package --extra --no-extra --group --no-group --only-group --env-file --index \
+        --default-index --index-url --extra-index-url -f --find-links --python-platform --config-file
       [ "${#w[@]}" -gt 0 ] || return 1
       _is_heavy "${w[*]}" && return 0
       return 1 ;;
-    uvx)
-      w=("${w[@]:1}"); _skip_flags --with --from -p --python
-      [ "${#w[@]}" -gt 0 ] || return 1
-      _is_heavy "${w[*]}" && return 0
-      return 1 ;;
-    python|python3|python3.*)
-      [ "${w[1]:-}" = -m ] && [ "${w[2]:-}" = pytest ] && w=("${w[@]:2}") ;;
-    bash|sh|zsh)
-      if [ "${#w[@]}" -gt 1 ] && [[ "${w[1]}" == *.sh ]]; then
-        w=("${w[@]:1}"); w[0]="${w[0]##*/}"
-      fi ;;
+    python|python[0-9]*)
+      w=("${w[@]:1}")
+      while [ "${#w[@]}" -gt 0 ]; do
+        case "${w[0]}" in
+          -m) w=("${w[@]:1}"); break ;;
+          -m*) w[0]="${w[0]#-m}"; break ;;
+          -X|-W) w=("${w[@]:2}") ;;
+          -c) return 1 ;;
+          -*) w=("${w[@]:1}") ;;
+          *) return 1 ;;
+        esac
+      done
+      [ "${w[0]:-}" = pytest ] || return 1 ;;
+    bash|sh|zsh|source|.)
+      w=("${w[@]:1}")
+      # -n reads the script for syntax and runs nothing.
+      [[ "${w[0]:-}" =~ ^-[a-zA-Z]*n[a-zA-Z]*$ ]] && return 1
+      _skip_flags -o -O --rcfile --init-file
+      [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == *.sh ]] || return 1
+      w[0]="${w[0]##*/}" ;;
   esac
   case "${w[0]}" in npx|bunx) w=("${w[@]:1}"); _skip_flags -p --package -c --call ;; esac
   [ "${#w[@]}" -gt 0 ] || return 1

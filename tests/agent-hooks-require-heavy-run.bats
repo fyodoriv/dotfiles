@@ -214,7 +214,12 @@ run_hook() {
            "nice -n 15 scripts/public-readiness.sh --release --released --first-run" \
            "uv run pytest -q -n 8 tests/unit" "uv run pytest -n auto" "uv run pytest -q" \
            "uv run --frozen pytest tests/unit" "pytest --numprocesses=4 tests/a.py" \
-           "python -m pytest -n 8 tests/a.py" "cd app && uv run pytest"; do
+           "python -m pytest -n 8 tests/a.py" "cd app && uv run pytest" \
+           "bash -x scripts/check.sh" "sh -e scripts/check.sh fast" "bash --noprofile scripts/check.sh" \
+           "source scripts/check.sh" ". scripts/check.sh" "python -I -m pytest" "python3 -X dev -m pytest" \
+           "python3 -mpytest" "uv tool run pytest" "uv run --with-editable . pytest" "uv run --no-group dev pytest" \
+           "uv run --index https://x.example.com pytest" "pytest tests/unit tests/unit/test_a.py" \
+           "pytest tests/unit/test_a.py tests/e2e" "pytest --ignore-glob setup.py"; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; failures=$((failures + 1)); }
   done
@@ -228,7 +233,9 @@ run_hook() {
            "scripts/check.sh --help" "scripts/public-readiness.sh" "scripts/public-readiness.sh --tree HEAD" \
            "scripts/batch-gate.sh 1 2" "heavy-run scripts/check.sh fast" \
            "heavy-run nice -n 15 scripts/public-readiness.sh --first-run" "uv run ruff check ." \
-           "uv run careerbrew actions" "grep -n check.sh AGENTS.md"; do
+           "uv run careerbrew actions" "grep -n check.sh AGENTS.md" "pytest --version" "pytest -V" \
+           "pytest --help" "uv run pytest -q --co" "pytest --collect-only" "pytest --fixtures" "pytest --markers" \
+           "uv sync" "uv run python script.py" "bash -n scripts/check.sh"; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
   done

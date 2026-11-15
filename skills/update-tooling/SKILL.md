@@ -250,6 +250,12 @@ edit generated agent configuration directories directly.
 Keep the development and applied checkouts separate. The applied checkout is
 the one returned by `chezmoi source-path`.
 
+The apply and the doctor run through `heavy-run`, like every build and suite.
+Never bypass the queue, even with the user's permission: on 2026-11-15 an
+apply ran beside an unqueued gate, the apply died with exit 137, and the Mac
+froze until the user forced it off. When the queue waits (for example for a
+real-time app), report the step as waiting, not as applied.
+
 The `dotfiles-sync` LaunchAgent runs `chezmoi apply` every 30 minutes and
 holds the chezmoi state lock while it runs. Then `chezmoi source-path` fails
 with "timeout obtaining persistent state lock" and prints nothing. Wait for
@@ -262,7 +268,7 @@ DOTFILES_APPLIED="$(chezmoi source-path)"
 [ -n "$DOTFILES_APPLIED" ] || { echo "chezmoi source-path failed; is chezmoi still locked?"; exit 1; }
 CHECKED="$DOTFILES_APPLIED/bin/dotfiles-lock-checked"
 env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles-sync"
-cd "$HOME" && env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply --if-changed
+cd "$HOME" && heavy-run env -u DOTFILES_DIR "$CHECKED" -- "$DOTFILES_APPLIED/bin/dotfiles" apply --if-changed
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-reload-launchagents"
 ```
 
@@ -388,7 +394,7 @@ else
   env -u DOTFILES_DIR "$APPLIED_AGENTBREW" measure context
 fi
 
-env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" doctor --module agentbrew \
+heavy-run env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles" doctor --module agentbrew \
   --module terminal --module agent-browser --module chrome --module resilience \
   --module security --fix
 env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-heal-stuck-agents" --fix --quiet

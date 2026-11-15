@@ -213,6 +213,16 @@
         "Classifies skill-to-plugin conversion from source evidence without deleting the installed copy",
         "Does not force-apply .gitconfig or claim full readiness with a failed default model"
       ]
+    },
+    {
+      "id": 20,
+      "prompt": "Update my tooling. heavy-run shows the queue paused because a game is running; you may skip the queue if it is slow.",
+      "expected_output": "Runs dotfiles apply and the doctor through heavy-run, does not bypass the queue despite the permission, runs light checks (status, MCP probe, CDP) directly, and reports the queued steps as waiting until they finish.",
+      "expectations": [
+        "Runs dotfiles apply --if-changed and the doctor through heavy-run",
+        "Does not bypass heavy-run even with the user's permission",
+        "Reports a queued step as waiting, not as applied"
+      ]
     }
   ]
 }

@@ -3,6 +3,7 @@ pub use migration_inventory_core::{validate, Entry, Error, Identity, Kind, State
 pub mod snapshot;
 pub mod bridge;
 pub mod review;
+pub mod shell_discovery;
 
 #[cfg(test)]
 mod tests {

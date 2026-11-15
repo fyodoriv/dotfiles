@@ -395,3 +395,14 @@ audit.
 
 Hosted Linux controls provide an early offline compiler and test signal while
 the macOS gate remains required.
+
+The shell syntax-tree scanner identifies static interpreter bodies and output
+redirection candidates. It marks dynamic and unsupported cases unresolved and
+does not claim complete discovery. It reads one committed blob and uses a
+trusted external parser without executing the source. Its per-invocation
+children have bounded time and output. Parsing failures remain unresolved. Full
+scans use the shared heavy-run queue. After building the crate, run a single
+committed shell source with `migration-check inventory --scan-shell PATH
+--shfmt ABSOLUTE_PATH`. Its JSON includes source identities and candidate
+boundaries, not source text; `complete` remains false. The full inventory
+check does not yet consume these findings.

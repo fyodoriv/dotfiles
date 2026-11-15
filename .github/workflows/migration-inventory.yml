@@ -18,8 +18,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install shell parser
+        run: brew install shfmt
       - name: Check the pinned source offline
         run: |
+          export INVENTORY_SHFMT="$(command -v shfmt)"
           export CARGO_HOME="$RUNNER_TEMP/empty-cargo"
           export CARGO_TARGET_DIR="$RUNNER_TEMP/inventory-target"
           mkdir -p "$CARGO_HOME"

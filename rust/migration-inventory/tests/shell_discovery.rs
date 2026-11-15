@@ -31,5 +31,7 @@ fn scans_a_committed_shell_blob_with_a_trusted_parser() {
     let report = scan_committed_shell(&root, &snapshot, "agent-hooks/require-heavy-run.sh", std::path::Path::new(&shfmt)).unwrap();
     assert!(report.findings.iter().any(|f| f.kind == FindingKind::Embedded && f.category == "perl"));
     assert!(!report.complete);
-    assert!(scan_committed_shell(&root, &snapshot, "agent-hooks/require-heavy-run.sh", &root.join("bin/dotfiles")).is_err());
+    let in_repo_tool = root.join("rust/migration-inventory/tests/fixtures/shfmt");
+    assert!(scan_committed_shell(&root, &snapshot, "agent-hooks/require-heavy-run.sh", &in_repo_tool).is_err());
+    assert!(scan_committed_shell(&root.join("agent-hooks"), &snapshot, "agent-hooks/require-heavy-run.sh", std::path::Path::new(&shfmt)).is_err());
 }

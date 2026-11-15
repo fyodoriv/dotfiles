@@ -185,12 +185,15 @@ pub fn scan_committed_shell(root: &Path, snapshot: &Snapshot, path: &str, shfmt:
     if matches.next().is_some() || !matches!(entry.mode.as_str(), "100644" | "100755") { return Err("source is not one regular tracked file"); }
     if !matches!(entry.object.len(), 40 | 64) || !entry.object.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) { return Err("invalid source identity"); }
     let root = root.canonicalize().map_err(|_| "invalid repository root")?;
+    let root_text = root.to_str().ok_or("unsupported repository path")?;
+    let git = Path::new("/usr/bin/git");
+    let top = run_tool(git, &["-C", root_text, "rev-parse", "--show-toplevel"], Vec::new(), 4096)?;
+    let top = std::str::from_utf8(&top).map_err(|_| "unsupported repository path")?.strip_suffix('\n').ok_or("invalid repository root")?;
+    if Path::new(top).canonicalize().map_err(|_| "invalid repository root")? != root { return Err("repository root required"); }
     let tool = shfmt.canonicalize().map_err(|_| "shell parser unavailable")?;
     if tool.starts_with(&root) || tool.file_name().and_then(|name| name.to_str()) != Some("shfmt") || !tool.is_file() {
         return Err("external trusted shell parser required");
     }
-    let root_text = root.to_str().ok_or("unsupported repository path")?;
-    let git = Path::new("/usr/bin/git");
     let size = run_tool(git, &["-C", root_text, "cat-file", "-s", &entry.object], Vec::new(), 128)?;
     let size = std::str::from_utf8(&size).map_err(|_| "invalid source size")?.trim().parse::<usize>().map_err(|_| "invalid source size")?;
     if size > MAX_SOURCE { return Err("source exceeds discovery limit"); }

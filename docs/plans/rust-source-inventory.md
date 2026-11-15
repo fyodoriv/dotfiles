@@ -463,3 +463,7 @@ The [documentation-ledger prediction](rust-document-ledger-prediction.md)
 defines a bounded review for regular Markdown documentation. It excludes
 executable-mode and shebang paths from that group; other source discovery
 continues separately.
+
+The [Bats file-ledger prediction](rust-bats-file-ledger-prediction.md) records
+the test files as test tooling. It does not claim that their embedded programs,
+generated files, or migrated-slice test parity have been reviewed.

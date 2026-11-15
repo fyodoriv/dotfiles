@@ -1025,7 +1025,7 @@ review	rust/vendor/zmij/src/traits.rs	22d89fef587aa40073f219bf2d5d1b2335256bcb	o
 review	rust/vendor/zmij/tests/exhaustive.rs	fec958208c176d8b7e37a44aecb661db3ed3d4dc	ownership-review	docs/plans/rust-vendor-ownership-review.json
 review	rust/vendor/zmij/tests/ryu_comparison.rs	e370817e5992eec1f56bd751715185803f9135de	ownership-review	docs/plans/rust-vendor-ownership-review.json
 review	rust/vendor/zmij/tests/test.rs	7ed01e03409be6728d5f619b3a4b1b04401db9e7	ownership-review	docs/plans/rust-vendor-ownership-review.json
-review	docs/README.md	42670aad6b69515c555513200303c4916b45a9a1	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/README.md	34963d1c3cfdcbe99c2845fa4e749698e412ae4e	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/adoption-checklist.md	1f33fc22a37169351bb48e0f2720fd26f9112738	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/agent-browser-policy.md	6c995461541d2a0eafb2a5c6547a740ae3b78006	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/agent-hooks.md	10cb985e005e11c4d85ab8e5b5d009106fc6fe44	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
@@ -1181,6 +1181,7 @@ review	docs/plans/replace-relocate-update-tooling-orchestration.md	625703295d5a5
 review	docs/plans/resilience-manual-advisory-475.md	9c08633688050d68763b4a378eb04a5a5737e788	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/resilience-unattended-475.md	3ce98c9c8efdcdfbc68d5bef8f82af7df0b56fc6	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/retire-usage-tip-overlay.md	22211b71503dcc91d88b9337aa2f4e63b2bb4081	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/plans/rust-bats-file-ledger-prediction.md	b70d6e884a2689dcca8390c1ad1d93f215005b06	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-cold-profile-fixture-audit.md	3d3a75acad0c58ee32302e02d3bd2cfe1f4fdc3f	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-current-bin-receipt.md	9517fe075640714245759a09b40b013bbcb7b78c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-document-ledger-prediction.md	58c2799cd78db29e5226fd7557eab2756be598ef	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
@@ -1196,7 +1197,7 @@ review	docs/plans/rust-partial-ledger-prediction.md	775ed3acfc2aa8fed994ae45a24d
 review	docs/plans/rust-root-source-receipt.md	0234ade7b6d201d19648670fed14a71a185b64a7	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-scripts-receipt.md	e328a59e6f4af519fdfe348e61561d898a38669c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-shared-core-ownership-prediction.md	3ea9220834f4b1b491305f60188edad56d2ccd18	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
-review	docs/plans/rust-source-inventory.md	f0ce065745b9053e4357a72e311620d98cdf06a2	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
+review	docs/plans/rust-source-inventory.md	5df7e1e0a783f69cf8069be2b6ddbea202389d33	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-vendor-ledger-prediction.md	6423f557121c2d051205f451d95af1f10bc5df6c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-vendor-ownership-prediction.md	a6c31c3725da6f12e59d95f1bda904d2d322a0df	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/self-metrics-competitive-benchmark.md	17cc63eb690b60f4989dc564b187274bcd216a0a	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md

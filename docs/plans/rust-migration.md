@@ -1,8 +1,16 @@
 # Measured Rust migration plan
 
-**Status (2026-11-11): the owner started execution; measurement is in progress.**
+**Status (2026-11-15): execution is incomplete.** The app-priority Rust path
+and a narrow dangerous-Git hook fast path are installed. Their controlled
+hosted results are recorded in [priority evidence](app-priority-same-day.md)
+and [hook evidence](rust-hook-status-experiment.md). In-use priority benefit
+and complete process-identity parity are not established. The heavy-run hook,
+source classification, final audit and agentbrew plan update remain open.
+The inventory adapter and partial shell discovery are merged, but
+`inventory --check` still fails closed until discovery and review are complete.
+
 This plan was rewritten on 2026-11-10 after the
-[validation review](#validation-review-2026-11-09). No code is ported yet.
+[validation review](#validation-review-2026-11-09). At that time no code had been ported.
 The re-plan Pivot did not apply: gate G stays. A first independent review of
 this rewrite found five of the seven MUST findings only partly resolved. This
 revision applies its fixes. A second independent review on 2026-11-10 graded all
@@ -206,16 +214,17 @@ row. This is the **peak RSS command**. Change the hook path to the row's
 command. The agent sandbox blocks `/usr/bin/time -l`; run it outside the
 sandbox.
 
-### Commands that run after the agentbrew inventory step merges
+### Inventory commands
 
-`rust/Cargo.toml` and `migration-check` do not exist yet. These commands are
-**runnable after the agentbrew task `rust-source-inventory` merges** and the
-dotfiles adapter pins it. Until then no task may cite one as a command that
-runs now.
+The shared validator and dotfiles adapter have merged. Run Cargo from the
+crate directory so it loads the offline vendor configuration. The check is
+expected to fail until independent discovery and the reviewed ledgers are
+complete; a successful build is not a completed inventory.
 
 ```sh
-heavy-run cargo build --locked --offline --release --manifest-path rust/Cargo.toml --bin migration-check
-heavy-run rust/target/release/migration-check inventory --check
+cd rust/migration-inventory
+heavy-run cargo build --locked --offline --release
+./target/release/migration-check inventory --check
 ```
 
 ### Command that runs after the deferred measurement runner merges

@@ -1,0 +1,30 @@
+name: Standalone Git guard suite
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+    paths:
+      - tests/agent-hooks-block-dangerous-git.bats
+      - tests/fixtures/guard-*.sh.txt
+      - agent-hooks/block-dangerous-git.sh
+      - agent-hooks/python-document-boundaries.py
+      - .github/workflows/guard-standalone.yml
+
+permissions:
+  contents: read
+
+jobs:
+  standalone:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install guard test tools
+        run: brew install bats-core jq shfmt
+      - name: Run all standalone guard tests
+        run: |
+          ./bin/heavy-run bats --tap tests/agent-hooks-block-dangerous-git.bats > "$RUNNER_TEMP/guard-standalone.tap"
+          cat "$RUNNER_TEMP/guard-standalone.tap"
+          grep -qx '1\.\.37' "$RUNNER_TEMP/guard-standalone.tap"

@@ -68,6 +68,10 @@ guard checks each proven command boundary separately. It still checks the
 Python body and commit message. Unknown syntax or a missing checker keeps the
 original conservative check.
 
+The Git-guard suite keeps multiline command samples in fixture files. Hosted CI
+also runs the suite as a standalone Bats invocation so its parser and complete
+test count are checked independently of the affected-test runner.
+
 `agent-hooks/block-dangerous-git.sh` blocks `git reset --hard`,
 `git clean -f`, `git checkout .`, `git restore .`, and the force-delete of a
 local branch. A force-delete passes only when every named branch is proven

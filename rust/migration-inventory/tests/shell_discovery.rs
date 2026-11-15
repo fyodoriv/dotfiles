@@ -35,3 +35,17 @@ fn scans_a_committed_shell_blob_with_a_trusted_parser() {
     assert!(scan_committed_shell(&root, &snapshot, "agent-hooks/require-heavy-run.sh", &in_repo_tool).is_err());
     assert!(scan_committed_shell(&root.join("agent-hooks"), &snapshot, "agent-hooks/require-heavy-run.sh", std::path::Path::new(&shfmt)).is_err());
 }
+
+#[test]
+fn command_reports_committed_findings_without_source_text() {
+    let Some(shfmt) = std::env::var_os("INVENTORY_SHFMT") else { return; };
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let output = Command::new(env!("CARGO_BIN_EXE_migration-check"))
+        .current_dir(root).args(["inventory", "--scan-shell", "agent-hooks/require-heavy-run.sh", "--shfmt"])
+        .arg(shfmt).output().unwrap();
+    assert!(output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["complete"], false);
+    assert!(value["findings"].as_array().unwrap().iter().any(|f| f["kind"] == "embedded" && f["category"] == "perl"));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("sub strip"));
+}

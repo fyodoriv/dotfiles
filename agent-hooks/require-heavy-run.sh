@@ -52,9 +52,11 @@ _one_test_args() {
 # True when pytest arguments run in parallel (-n N, N > 0) or name no test
 # file and no -k filter (the whole suite or a folder).
 _pytest_heavy() {
-  local a kfilter=0 files=0 folders=0
+  local a kfilter=0 files=0 folders=0 after_long=0 prev_long
   while [ $# -gt 0 ]; do
     a="$1"; shift
+    prev_long=$after_long; after_long=0
+    case "$a" in --*=*) ;; --*) after_long=1 ;; esac
     case "$a" in
       # Info and collect-only forms run no tests.
       --version|-V|--help|-h|--collect-only|--co|--fixtures|--markers) return 1 ;;
@@ -63,7 +65,8 @@ _pytest_heavy() {
       -n0|--numprocesses=0) ;;
       -n*|--numprocesses=*) return 0 ;;
       # An empty -k value vanishes with its quotes: the next flag is not a filter.
-      -k) case "${1:-}" in ""|-*|*/*) ;; *) kfilter=1; shift ;; esac ;;
+      # A quoted -k value (Q) may hide an empty filter, so it filters nothing here.
+      -k) case "${1:-}" in ""|-*|*/*) ;; Q) shift ;; *) kfilter=1; shift ;; esac ;;
       -k*) kfilter=1 ;;
       -m|-p|-c|-o|-W|-r|--rootdir|--basetemp|--deselect|--ignore|--ignore-glob|--maxfail|--confcutdir|--junitxml|--durations|--log-level|--timeout|--cov|--cov-report|--tb|--import-mode)
         shift || true ;;
@@ -71,10 +74,12 @@ _pytest_heavy() {
       '>'|'>>'|'<'|[0-9]'>'|[0-9]'>>'|'&>') shift || true ;;
       *'>'*|*'<'*) ;;
       -*) ;;
-      # Q is a quoted word (see _strip_text): treat a quoted id as one file.
-      *.py|*.py::*|Q) files=$((files + 1)) ;;
-      # Only a path-like word is a folder; other words are flag values.
-      */*|.|..|test|tests|testing) folders=$((folders + 1)) ;;
+      *.py|*.py::*) files=$((files + 1)) ;;
+      # A path-like word is a folder. Another word right after a long flag
+      # is its value (--count 3); elsewhere it is a folder (Q: any other
+      # quoted word, see _strip_text).
+      */*|.|..) folders=$((folders + 1)) ;;
+      *) [ "$prev_long" -eq 1 ] || folders=$((folders + 1)) ;;
     esac
   done
   [ "$kfilter" -eq 1 ] && return 1
@@ -305,7 +310,10 @@ _strip_text() {
       $s =~ s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
         my $q = $1; my $pre = $`; my $in = substr($q, 1, -1);
         my $dq = substr($q, 0, 1) eq "\"";
-        my $r = $in =~ m{^\.\*?$} ? $in : length($in) ? "Q" : "";
+        # A quoted pytest file or test id keeps its text so the pytest check can read it.
+        my $r = $in =~ m{^\.\*?$} ? $in
+          : $in =~ m{^[\w.\x2f-]+\.py(?:::[^\s"\x27\$`\\]*)?$} ? $in
+          : length($in) ? "Q" : "";
         if ($dq) {
           while ($in =~ m{\$\(([^)]*)\)|`([^`]*)`}g) { push @extra, defined $1 ? $1 : $2; }
         }

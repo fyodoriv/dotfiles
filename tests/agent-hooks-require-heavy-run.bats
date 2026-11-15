@@ -220,7 +220,9 @@ run_hook() {
            "python3 -mpytest" "uv tool run pytest" "uv run --with-editable . pytest" "uv run --no-group dev pytest" \
            "uv run --index https://x.example.com pytest" "pytest tests/unit tests/unit/test_a.py" \
            "pytest tests/unit/test_a.py tests/e2e" "pytest --ignore-glob setup.py" \
-           "pytest -k '' -n 8" "pytest -k '' tests/" "python3 -Im pytest" "python3 -Bm pytest"; do
+           "pytest -k '' -n 8" "pytest -k '' tests/" "python3 -Im pytest" "python3 -Bm pytest" \
+           'pytest "tests/"' 'uv run pytest -q "tests/unit"' 'pytest "$TESTS"' 'pytest --log-cli-level "INFO"' \
+           "pytest -k '' \"tests/\"" "pytest tests/a.py unit" "pytest tests/a.py src"; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; failures=$((failures + 1)); }
   done
@@ -239,7 +241,9 @@ run_hook() {
            "uv sync" "uv run python script.py" "bash -n scripts/check.sh" "bash -x -n scripts/check.sh" \
            "uv run pytest tests/x.py -q 2>&1 | tail -20" "uv run pytest tests/x.py -q > out.log 2>&1" \
            "pytest tests/a.py -q 2>/dev/null" "pytest tests/a.py --log-cli-level INFO" "pytest tests/a.py --count 3" \
-           "pytest 'tests/a.py::test_x[case-1]'" "python3 -m pip install x"; do
+           "pytest 'tests/a.py::test_x[case-1]'" "python3 -m pip install x" "pytest 'tests/a.py'" \
+           'pytest tests/a.py -m "not slow"' 'pytest tests/a.py -k "foo or bar"' "pytest tests/a.py --log-cli-level INFO" \
+           "pytest -v tests/a.py tests/b.py >> log.txt"; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c ($output)"; failures=$((failures + 1)); }
   done

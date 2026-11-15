@@ -485,7 +485,7 @@ them. -->
   - **ID**: dangerous-git-safe-document-false-block
   - **Tags**: agent-hooks, reliability, security
   - **Mode**: AFK
-  - **Details**: On 2026-11-15 a command combined a safe branch creation, a quoted Python heredoc writing a local plan, and a normal commit. The guard reported a prohibited force-delete operation even though the command contained none. Splitting the safe operations worked. Reproduce the original shape in a synthetic fixture and retain the real delete protections.
+  - **Details**: On 2026-11-15 a command combined a safe branch creation, a quoted Python heredoc writing a local plan, and a normal commit. The guard reported a prohibited force-delete operation even though the command contained none. Splitting the safe operations worked. [Draft PR 691](https://github.com/fyodoriv/dotfiles/pull/691) reproduced the full command in hosted CI; a shortened document did not reproduce it. Source review points to a backtick in the quoted Python document being treated as a possible Git subcommand, with a later command's flag counted with it. A plain text split could hide a real destructive command, so retain the guard until a syntax-aware fix preserves those protections.
   - **Output**: code
   - **Acceptance**: The safe combined fixture is allowed. Existing destructive Git and hostile heredoc fixtures keep their decisions.
   - **Hypothesis**: Correcting the inert-text boundary reduces the reproduced false blocks from one to zero without a new false permit.

@@ -453,3 +453,8 @@ records the agentbrew-owned source blob and the dotfiles vendor file identities.
 The source blob was compared with the pinned agentbrew revision. Hosted checks
 verify the local file set and pin without fetching upstream. This is ownership
 evidence, not proof that the remaining inventory is complete.
+
+The partial ledgers also include the tracked files covered by these two vendor
+ownership reviews. The [vendor-ledger prediction](rust-vendor-ledger-prediction.md)
+requires each path and source identity to match those reviews. Other source
+reviews and independent discovery remain incomplete.

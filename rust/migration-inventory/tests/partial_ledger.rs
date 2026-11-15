@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 use std::process::Command;
 
-fn lines(path: &std::path::Path) -> BTreeSet<String> {
+fn lines(path: &std::path::Path, prefix: &str) -> BTreeSet<String> {
     std::fs::read_to_string(path).unwrap().lines()
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .filter(|line| line.starts_with(prefix))
         .map(str::to_owned).collect()
 }
 
@@ -24,8 +24,8 @@ fn reviewed_boundaries_match_the_partial_ledgers_and_remain_incomplete() {
             assert!(expected_inventory.insert(format!("{identity}\t{}\t{}\t{}\t{}", text("owner"), text("caller"), text("state"), text("reason"))));
         }
     }
-    let observed = lines(&root.join("rust/migration-inventory/observations.tsv"));
-    let inventory = lines(&root.join("rust/migration-inventory/inventory.tsv"));
+    let observed = lines(&root.join("rust/migration-inventory/observations.tsv"), "observation\t");
+    let inventory = lines(&root.join("rust/migration-inventory/inventory.tsv"), "embedded\t");
     assert_eq!(observed, expected_observed);
     assert_eq!(inventory, expected_inventory);
     let mut missing = inventory.clone();

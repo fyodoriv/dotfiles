@@ -1,8 +1,8 @@
 {
   "scope": "Embedded programs the static shell scanner confirmed in tracked shell sources, outside the five earlier boundary reviews. Not complete discovery: dynamic arguments and unparsed files stay unresolved.",
   "generator": "scripts/inventory-ledger.py",
-  "unparsed_shell_files": 369,
-  "unresolved_findings": 14784,
+  "unparsed_shell_files": 370,
+  "unresolved_findings": 14817,
   "entries": [
     {
       "path": "agent-hooks/block-dangerous-git.sh",
@@ -28,10 +28,10 @@
     },
     {
       "path": "agent-hooks/require-heavy-run.sh",
-      "source_object": "3946d61397de855f64c475b3069fa5e57d005d89",
+      "source_object": "b837abdaa8793bd7b4c39257d4378f803c53e37a",
       "language": "perl",
-      "start": 8406,
-      "end": 9957,
+      "start": 11972,
+      "end": 14096,
       "owner": "dotfiles",
       "caller": "agent hook",
       "state": "exception",
@@ -919,10 +919,10 @@
     },
     {
       "path": "bin/dotfiles-sync",
-      "source_object": "c2744a3076b12171fe87d42f7ddcf3ccff113dbe",
+      "source_object": "576cb224380b64bf6fdc7ae7b7b0a8f0b677f442",
       "language": "perl",
-      "start": 2352,
-      "end": 2381,
+      "start": 2581,
+      "end": 2610,
       "owner": "dotfiles",
       "caller": "launchd job",
       "state": "exception",

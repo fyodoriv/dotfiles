@@ -413,3 +413,7 @@ expressions or interpreter bodies and nine option tokens. A flag may also hide
 the actual expression that follows it. The [option correction prediction](inventory-shell-options-prediction.md)
 registers the next scanner change. This review covers neither other source forms
 nor migration-state classification.
+
+The scanner handles a bounded set of jq flags before its filter and treats
+unknown options as unresolved. Perl module switches are not inline code.
+Unsupported interpreter forms remain unresolved rather than complete.

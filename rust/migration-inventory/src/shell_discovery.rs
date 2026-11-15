@@ -70,6 +70,43 @@ fn push(findings: &mut Vec<Finding>, kind: FindingKind, node: &Value, len: usize
     Ok(())
 }
 
+fn jq_filter(args: &[Value], words: &[Option<String>], len: usize, findings: &mut Vec<Finding>) -> Result<bool, &'static str> {
+    let mut index = 1;
+    while index < words.len() {
+        let Some(word) = words[index].as_deref() else {
+            push(findings, FindingKind::Unresolved, &args[index], len, "dynamic-jq-option-or-filter")?;
+            return Ok(true);
+        };
+        if word == "--" { index += 1; break; }
+        if matches!(word, "--arg" | "--argjson" | "--slurpfile" | "--rawfile" | "--argfile") {
+            if index + 2 >= words.len() {
+                push(findings, FindingKind::Unresolved, &args[index], len, "missing-jq-option-value")?;
+                return Ok(true);
+            }
+            index += 3;
+        } else if matches!(word, "-L" | "--indent" | "--tab") {
+            if word == "--tab" { index += 1; continue; }
+            if index + 1 >= words.len() {
+                push(findings, FindingKind::Unresolved, &args[index], len, "missing-jq-option-value")?;
+                return Ok(true);
+            }
+            index += 2;
+        } else if matches!(word, "--exit-status" | "--raw-output" | "--compact-output" | "--null-input" | "--slurp" | "--raw-input" | "--join-output" | "--sort-keys" | "--monochrome-output" | "--color-output" | "--ascii-output" | "--unbuffered")
+            || (word.starts_with('-') && !word.starts_with("--") && word.len() > 1 && word[1..].bytes().all(|c| b"ercnsRjSMCa".contains(&c))) {
+            index += 1;
+        } else if word.starts_with('-') {
+            push(findings, FindingKind::Unresolved, &args[index], len, "unsupported-jq-option")?;
+            return Ok(true);
+        } else { break; }
+    }
+    if let Some(argument) = args.get(index) {
+        let kind = if words[index].is_some() { FindingKind::Embedded } else { FindingKind::Unresolved };
+        push(findings, kind, argument, len, "jq")?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 fn inspect_statement(statement: &Value, len: usize, findings: &mut Vec<Finding>) -> Result<(), &'static str> {
     let Some(command) = statement.get("Cmd").filter(|c| c.get("Type").and_then(Value::as_str) == Some("CallExpr")) else { return Ok(()); };
     let args = match command.get("Args") {
@@ -106,9 +143,14 @@ fn inspect_statement(statement: &Value, len: usize, findings: &mut Vec<Finding>)
                 found = true;
             }
         }
+        if language == "jq" && jq_filter(args, &words, len, findings)? { found = true; }
         for (index, word) in words.iter().enumerate().skip(1) {
             let Some(flag) = word.as_deref() else { continue; };
-            let inline = matches!(flag, "-c" | "-e") || (language == "perl" && flag.starts_with('-') && !flag.starts_with("--") && flag.contains('e'));
+            if language == "jq" { continue; }
+            let inline = if language == "perl" {
+                flag.starts_with('-') && flag.ends_with('e') && flag.len() > 1
+                    && flag[1..flag.len()-1].bytes().all(|c| b"acdfilnpsStuUvWwxX0123456789".contains(&c))
+            } else { matches!(flag, "-c" | "-e") };
             if inline {
                 if let Some(argument) = args.get(index + 1) {
                     let kind = if words[index + 1].is_some() { FindingKind::Embedded } else { FindingKind::Unresolved };

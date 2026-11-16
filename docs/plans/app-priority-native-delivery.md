@@ -70,6 +70,15 @@ and the warm build to 15 seconds. Queue wait is excluded.
 integrity-checked delivery path. The native binary is installed on the owner's
 Mac; `dotfiles priority-native rollback` restores the shell path.
 
+**Updates reach the Mac on apply (2026-11-16).** The single-scan fix
+(#725) merged on 2026-11-16 but this Mac still ran the 2026-11-14 build:
+nothing rebuilt the binary after a merge. `dotfiles apply` now runs
+`.chezmoiscripts/run_onchange_after_app-priority-native.sh.tmpl`, which
+hashes every `rust/app-priority` source file and reruns
+`dotfiles priority-native install` when one changes. It does nothing on a
+Mac without the native link (never installed, or rolled back), and a failed
+build keeps the previous build active.
+
 The [30-pair hosted fixture](https://github.com/fyodoriv/dotfiles/actions/runs/43626223966)
 preserved ten ordered simulated actions in every pair, with the former shell
 rules removed from the scratch candidate. The shell median was 526.10 ms and

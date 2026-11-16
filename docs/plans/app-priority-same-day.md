@@ -808,6 +808,10 @@ task: the registered 400 ms mean is already met in the replay.
 no build id, so the window starts at the native install time of this
 commit's build: the mtime of the `current` link that
 `dotfiles priority-native install` writes.
+The single-scan build was installed on this Mac only on 2026-11-16
+21:20 UTC (the link pointed at the 2026-11-14 build until then), so the
+window starts there. A check that day still showed the old build: n 3,000,
+mean 515 ms, p95 1,629 ms.
 
 ```sh
 since=$(TZ=UTC stat -f %Sm -t %Y-%m-%dT%H:%M:%SZ ~/.local/share/dotfiles/native/app-priority/current)

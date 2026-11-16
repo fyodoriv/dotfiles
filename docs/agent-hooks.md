@@ -185,9 +185,11 @@ exits 2 and tells the agent to run `make lint`, push, and read CI
 - Allowed: `make lint*`, `shellcheck`, `bash -n`, `make -n`, `bats --version`,
   and read-only commands such as `rg bats`. Quoted text (a commit message that
   names `make check`) is data.
-- It also reads `xargs` (with its flags, including `-I{}` and `--replace`),
-  `find ... -exec/-execdir`, `npx`, `bunx`, `npm exec`/`npm x` (and the
-  `pnpm` forms) and `eval` as launchers of the command they start.
+- It also reads `xargs` (with its flags, including `-I{}`, `--replace`,
+  `-R`, `-S` and `--max-chars`), `find ... -exec/-execdir`, `npx`, `bunx`,
+  `npm exec`/`npm x` and `pnpm exec`/`pnpm dlx` (also after global flags such
+  as `--prefix`), and `eval` as launchers of the command they start. The
+  quoted string after `npx -c` or `npm exec -c` is read as a command.
 - It is a guardrail against mistakes, not a security boundary. It fails open:
   with no `plutil` or `perl`, malformed input, or a stripped `PATH` it allows
   the command. Known gaps: a command name built at run time (`$(which bats)`)

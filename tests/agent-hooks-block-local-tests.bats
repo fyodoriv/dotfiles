@@ -45,7 +45,10 @@ run_hook() {
 
 @test "blocks tests started through xargs --replace and npm exec" {
   for c in "ls | xargs --replace bats {}" "ls | xargs -I{} bats {}" "ls | xargs -I {} bats {}" \
-           "npm exec bats tests/x.bats" "npm exec -- bats tests/x.bats" "npm x bats tests/x.bats"; do
+           "npm exec bats tests/x.bats" "npm exec -- bats tests/x.bats" "npm x bats tests/x.bats" \
+           "npm exec -c 'bats tests/x.bats'" "npx -c 'make check'" "npm --prefix . exec bats x" \
+           "npm -w a exec bats x" "pnpm dlx bats x" "pnpm exec bats x" \
+           "ls | xargs -I{} -R 1 bats {}" "ls | xargs --max-chars 100 bats"; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
   done
@@ -54,7 +57,8 @@ run_hook() {
 @test "allows xargs and find -exec that start other commands" {
   for c in "ls | xargs rg bats" "find . -exec rg bats {} +" "echo 'make check' | xargs echo" \
            "xargs -n1 shellcheck" "ls | xargs --replace rg bats {}" "npm exec eslint ." \
-           "npm run lint" "rg bats tests/" "cat tests/x.bats"; do
+           "npm run lint" "rg bats tests/" "cat tests/x.bats" "npx -c 'eslint .'" \
+           "npm --prefix . exec eslint" "pnpm dlx prettier ."; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c: $output"; return 1; }
   done

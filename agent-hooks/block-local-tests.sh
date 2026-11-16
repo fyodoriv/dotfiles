@@ -37,7 +37,8 @@ cwd="$(printf '%s' "$input" \
 [ -n "$cwd" ] || cwd="$PWD"
 
 # Quoted text is data, not a command: drop heredoc bodies and replace each
-# quoted string with Q. The string after `bash -c`, `sh -c` or `eval` runs as a command,
+# quoted string with Q. The string after `bash -c`, `sh -c`, `eval` or
+# `npx -c`/`npm exec -c` runs as a command,
 # so it moves to its own line at the end. Quoted words that look like a path
 # stay, so `cd "~/apps/dotfiles"` still names its folder.
 _strip_text() {
@@ -46,6 +47,8 @@ _strip_text() {
     s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
     s/\b(?:ba|z|da)?sh[ \t]+(?:-\w+[ \t]+)*-\w*c\w*[ \t]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my $q = $1; push @extra, substr($q, 1, -1); "sh -c Q"/gse;
+    s/\b((?:npx|bunx|npm|pnpm)\b[^;&|\n]*?[ \t])(?:-c|--call)[ \t=]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
+      my ($p, $q) = ($1, $2); push @extra, substr($q, 1, -1); "${p}-c Q"/gse;
     s/\beval[ \t]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my $q = $1; push @extra, substr($q, 1, -1); "eval Q"/gse;
     s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
@@ -106,8 +109,16 @@ _is_test_run() {
   local tool="${w[0]##*/}" a
   case "$tool" in
     npm|pnpm)
-      # `npm exec X` and `npm x X` start X, like npx.
-      case "${w[1]:-}" in exec|x) _is_test_run "npx ${w[*]:2}"; return ;; esac
+      # `npm exec X`, `npm x X` and `pnpm dlx X` start X, like npx. Global
+      # flags (and the values of the common ones) may come first.
+      w=("${w[@]:1}")
+      while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do
+        case "${w[0]}" in
+          --prefix|-w|--workspace|-C|--dir|--filter|-F) w=("${w[@]:2}") ;;
+          *) w=("${w[@]:1}") ;;
+        esac
+      done
+      case "${w[0]:-}" in exec|x|dlx) _is_test_run "npx ${w[*]:1}"; return ;; esac
       return 1 ;;
     xargs|npx|bunx)
       # A launcher: skip its own flags (and their values), then judge the
@@ -115,7 +126,7 @@ _is_test_run() {
       w=("${w[@]:1}")
       while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do
         case "$tool:${w[0]}" in
-          xargs:-[adEIJLnPs]|xargs:--arg-file|xargs:--delimiter|xargs:--max-args|xargs:--max-procs) w=("${w[@]:2}") ;;
+          xargs:-[adEIJLnPRSs]|xargs:--arg-file|xargs:--delimiter|xargs:--max-args|xargs:--max-chars|xargs:--max-procs) w=("${w[@]:2}") ;;
           # GNU `--replace` takes no separate value (`--replace=R` is one word).
           *) w=("${w[@]:1}") ;;
         esac
@@ -154,7 +165,8 @@ while IFS= read -r line; do
     seg="${seg#"${seg%%[![:space:]]*}"}"
     [ -n "$seg" ] || continue
     if _is_test_run "$seg"; then hit="$seg"; break 2; fi
-  done < <(printf '%s\n' "$line" | sed -E 's/(&&|\|\||;|\||[(){}])/\n/g')
+  # An empty {} is an xargs or find placeholder, not a brace group.
+  done < <(printf '%s\n' "$line" | sed -E 's/\{\}/ARG/g; s/(&&|\|\||;|\||[(){}])/\n/g')
 done <<< "$stripped"
 [ -n "$hit" ] || exit 0
 

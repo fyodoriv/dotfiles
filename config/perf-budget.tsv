@@ -40,4 +40,3 @@ PERF_GATE_PATH=scripts/perf-gate.pl
 # A PR that changes scripts/perf-gate.sh, scripts/perf-gate.pl, or
 # tests/perf-gate.bats changes its own judge. It needs the line
 # PERF_GATE_ALLOW=perf-gate:<reason>.
-PERF_GATE_ALLOW=perf-gate:tests/perf-gate.bats moves to a virtual clock so no hosted verdict depends on runner speed (TASKS perf-gate-hosted-runner-noise)

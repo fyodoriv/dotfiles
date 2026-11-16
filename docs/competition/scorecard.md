@@ -21,14 +21,15 @@ and the fewest human steps. The metric set follows Goal-Question-Metric
 (Basili, Caldiera, Rombach 1994). The metrics are outcomes, not activity
 counts (Forsgren, Humble, Kim 2018, *Accelerate*).
 
-Goal and pivot use the 2026-10-16 results below. A metric with no measured
+Goal and pivot were set from the 2026-10-16 results. The "now" values are
+from the 2026-11-16 run below. A metric with no measured
 value prints `(stub)` in `dotfiles metrics --table`; it never counts as 0.
 
 | Question | Metric | Better | Goal | Pivot | Command |
 |---|---|---|---|---|---|
-| How fast does a fresh home get the files? | `cold_apply_ms` | lower | ≤ chezmoi (2326 on 2026-10-16) by 2027-04-30 (now 2401) | > 1.5 × chezmoi | `jq '.dotfiles.metrics.cold_apply_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
-| How much does a no-change re-apply cost? | `noop_reapply_ms` | lower | ≤ chezmoi + 5 ms by 2027-04-30 (now 57 vs 45, 2026-10-16) | > chezmoi + 50 ms | `jq '.dotfiles.metrics.noop_reapply_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
-| How fast does the tool report a hand edit? | `drift_detect_ms` (null when the tool misses the edit) | lower | ≤ chezmoi + 5 ms (now 41 vs 32, 2026-10-16) | > chezmoi + 50 ms, or null | `jq '.dotfiles.metrics.drift_detect_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How fast does a fresh home get the files? | `cold_apply_ms` | lower | ≤ chezmoi (2326 on 2026-10-16) by 2027-04-30 (now 2142 vs 2262, met 2026-11-16) | > 1.5 × chezmoi | `jq '.dotfiles.metrics.cold_apply_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How much does a no-change re-apply cost? | `noop_reapply_ms` | lower | ≤ chezmoi + 5 ms by 2027-04-30 (now 70 vs 38, 2026-11-16) | > chezmoi + 50 ms | `jq '.dotfiles.metrics.noop_reapply_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
+| How fast does the tool report a hand edit? | `drift_detect_ms` (null when the tool misses the edit) | lower | ≤ chezmoi + 5 ms (now 46 vs 30, 2026-11-16) | > chezmoi + 50 ms, or null | `jq '.dotfiles.metrics.drift_detect_ms \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | Does the tool see the hand edit at all? | `drift_detected` | true | true | false | `jq '.dotfiles.metrics.drift_detected \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | Do two fresh homes get identical files? | `reproducibility_pct` | higher | 100 | < 100 | `jq '.dotfiles.metrics.reproducibility_pct \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
 | How many commands does a person type on a fresh Mac? | `manual_bootstrap_steps` | lower | 1 by 2027-01-31 (now 1, met 2026-10-16) | ≥ 3 on 2027-01-31 | `jq '.dotfiles.metrics.manual_bootstrap_steps \| if . == null then error("no value") else . end' ~/.local/state/dotfiles/scorecard.json` |
@@ -85,22 +86,23 @@ Count of commands on a fresh Mac that already has Homebrew and git. The dotfiles
 
 ## Latest results
 
-Host: Darwin-arm64. Workload: 120 files, 3 runs, median. Date: 2026-10-16.
+Host: Darwin-arm64. Workload: 120 files, 3 runs, median. Date: 2026-11-16.
 
 | Tool | Status | Cold apply (ms) | No-op re-apply (ms) | Drift detect (ms) | Reproducible (%) | Manual steps |
 |---|---|---|---|---|---|---|
-| dotfiles | ok | 2401 | 57 | 41 | 100 | 1 |
-| chezmoi | ok | 2326 | 45 | 32 | 100 | 1 |
-| GNU Stow | ok | 48 | 47 | 47 | 100 | 3 |
-| yadm | ok | 4164 | 445 | 442 | 100 | 2 |
-| dotbot | ok | 66 | 56 | 56 | 100 | 2 |
+| dotfiles | ok | 2142 | 70 | 46 | 100 | 1 |
+| chezmoi | ok | 2262 | 38 | 30 | 100 | 1 |
+| GNU Stow | ok | 54 | 51 | 50 | 100 | 3 |
+| yadm | ok | 3732 | 396 | 392 | 100 | 2 |
+| dotbot | ok | 73 | 60 | 61 | 100 | 2 |
 | home-manager | blocked | — | — | — | — | 5 |
 
 Blocked: home-manager. Nix is not installed. Installing it needs admin rights
 and a new APFS volume, which is outside the benchmark budget.
 
-North star: dotfiles beats the best competitor on **0 of 5** metrics. It now
-ties chezmoi on manual steps (1 each).
+North star: dotfiles beats the best competitor on **0 of 5** metrics. It
+ties chezmoi on manual steps (1 each). Its cold apply is now faster than
+chezmoi's (2142 vs 2262 ms), but the symlink tools stay far ahead (54 ms).
 
 ## Where dotfiles is behind
 
@@ -109,8 +111,9 @@ ties chezmoi on manual steps (1 each).
 - **Cold apply.** Copy-mode tools (dotfiles, chezmoi, yadm) are 30–60 times
   slower than symlink tools (stow, dotbot) on a fresh home. dotfiles uses
   chezmoi, so it shares chezmoi's cost.
-- **Wrapper overhead.** `dotfiles apply` adds about 20 ms over plain chezmoi
-  (lock handling and the wrapper start). Drift checks add about 10 ms.
+- **Wrapper overhead.** A no-change `dotfiles apply` takes 70 ms against
+  38 ms for plain chezmoi (lock handling and the wrapper start; 2026-11-16).
+  Drift checks add about 16 ms.
 - **What the workload does not show.** dotfiles adds doctor health checks,
   self-repair, macOS settings, and LaunchAgents. Competitors have no
   equivalent, so those are not in the shared metrics. They do not count as a

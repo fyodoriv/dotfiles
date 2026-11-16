@@ -11,7 +11,7 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 | Job | Runner | When | What it does |
 |-----|--------|------|-------------|
 | **lint** | ubuntu-latest | every run | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-latest | every run | Restores the Homebrew and per-file caches, installs the tools, writes a chezmoi config (`chezmoi init --promptDefaults`), adds the checkout's `heavy-run` to PATH. A pull request runs `make check` (lint, perf gate, the affected tests). A push to `feat/chezmoi` runs `make check` and then `make test-all` (the full Bats suite; files that passed in `make check` are skipped by the cache). The nightly and manual runs run `make test-all`. No test file is skipped. A step prints the test tool versions first |
+| **test** | macos-latest | every run | Restores the Homebrew and per-file caches, installs the tools, writes a chezmoi config (`chezmoi init --promptDefaults`), adds the checkout's `heavy-run` to PATH. A pull request runs `make check` (lint, perf gate, the affected tests). A push to `feat/chezmoi`, the nightly run and a manual run run `make test-all` (the full Bats suite) and not `make check`, which the full suite covers. The job does not run on the weekly coverage cron, which traces the full suite already. No test file is skipped. A step prints the test tool versions first |
 | **doctor** | macos-latest | push, nightly, manual | `chezmoi init`, `chezmoi apply --exclude=scripts` (files only: lifecycle scripts install packages and change macOS settings, which `tests/e2e` covers in a sandbox), `dotfiles-doctor --report` for the modules a files-only apply can satisfy (security, ssh, workflow, agent-browser, chezmoi, chrome, editor, memory, personal-machine, plugins, shell, sync, upgrade; the others check an installed machine: git identity, gh login, brew tools, LaunchAgents, power settings, and failed 50 checks on the first runner), shell startup benchmark |
 | **audit** | ubuntu-latest | every run except the weekly one | `DOTFILES_AUDIT_REPO_ONLY=1 dotfiles-audit`: the repo-content checks (secrets in tracked files, tracked `.env` files). Checks of an installed machine (shims, LaunchAgents, `~/.ssh` rights) are skipped and listed as skipped |
 | **coverage** | macos-latest | weekly (Sunday), manual | `bin/dotfiles-coverage` + the full Bats suite under `set -x` tracing, with the shell coverage floor check, as a report artifact |
@@ -33,11 +33,11 @@ or active until its behavior, resource and delivery gates pass.
 ### Homebrew download cache
 
 The macOS jobs restore `~/Library/Caches/Homebrew` with `actions/cache` (pinned
-by SHA like every action) before `brew install`. The key holds the runner OS and
+by SHA like every action) before `brew install`. The cache is per job: the key starts with the job name (`github.job`), so `doctor` (3 packages) saving first never leaves `test` with an exact hit on a partial cache. The key also holds the runner OS and
 architecture, the ISO week (fresh bottles each week) and the hash of `ci.yml`
 (a changed tool list). A miss falls back to the newest entry of the same week,
 then of any week. Bottles still get poured, so the saving is the download time
-only. Measured on the `test` job's "Install dependencies" step: 31 s and 23 s before the cache (runs of 2026-11-15), 33 s on a cold first run, and 18 s and 33 s on warm runs (43925770666, 43906255985). The gain is small and noisy: bottle download is a minor part of the step.
+only. Pivot: drop the cache if 5 warm runs do not save at least 10 s on the install step. Measured on the `test` job's "Install dependencies" step: 31 s and 23 s before the cache (runs of 2026-11-15), 33 s on a cold first run, and 18 s and 33 s on warm runs (43925770666, 43906255985). The gain is small and noisy: bottle download is a minor part of the step.
 The `cached-run` cache above is unchanged.
 
 ### Hosted timing and the perf gate

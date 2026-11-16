@@ -103,10 +103,15 @@ retry, the 900 s interval, the long measurement, and the gate cases).
 - Task `telemetry-sink-managed-shell-gates` is closed: the gates read the
   policy file, a trace test shows no new process on the no-policy path, and
   20 of 20 runs passed.
-- Task `telemetry-gains-timeout-test-load-sensitive`: stays open in `TASKS.md`. Its Success is 20 of 20 while a second full
-  Bats run is active. The earlier loop ran at a load of 3 to 4 against 2
-  files for most cases, which is not that. A second hosted run (throwaway PR,
-  closed) passed 20 of 20, but its background full run ended early: the load
-  fell from 50 to 2 by run 8, so about 2 runs were under real load. So the
-  criterion is not met as written, and the block says what to rerun.
+- Task `telemetry-gains-timeout-test-load-sensitive` is closed on its
+  Acceptance as written: the case "takes over 5 seconds" passed 20 of 20 on a
+  hosted macOS runner while a full `bats -r tests` loop was active (CI run
+  43892672730, a throwaway PR, closed). Each sample showed 2 full-suite Bats
+  processes. The first-minute load averages were 38.2, 19.2, 10.1, 6.6, 5.7,
+  7.4; then 3.3, 1.7, 1.1, 1.4, 1.3, 1.6, 1.9, 1.9, 1.7, 2.0, 1.8, 1.8,
+  1.7. The suite is mostly one test at a time, so after the start its load
+  stayed near 1 to 2. The stricter "load above 4 in every sample" was not met
+  (6 of 20 samples); the floor that held in every sample is a running full
+  suite (2 processes). An earlier attempt (run 43885239912) is not evidence:
+  its background run ended early.
 - Still to measure after the apply: the metric in `docs/metrics.md`.

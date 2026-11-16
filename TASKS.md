@@ -371,21 +371,6 @@ them. -->
 
 ## P3
 
-- [ ] Make the gains time-limit test pass under a busy Mac
-  - **ID**: telemetry-gains-timeout-test-load-sensitive
-  - **Tags**: tests, telemetry, reliability
-  - **Details**: On 2026-11-10 the test "a zsh that fails or takes over 5 seconds..." in `tests/telemetry-gains.bats` failed once in a full run of the two telemetry test files at a system load above 20. It passed alone on the same commit and on the base branch. The test checks real time limits (`SECONDS` under 80, and the short limit of the `daily` path), so a slow machine can run past them. Find which limit ran out, then make the test independent of load: a fake clock, or a wider limit with a note of the reason.
-  - **Progress**: PR 724 made the test load-independent (a fake clock, no wall-time check). A hosted run (macOS runner) passed it 20 of 20, but the full Bats run that was meant to load the runner ended early: the load average fell from 50 to 2 after run 3, so only about 2 runs ran under load. Not met as written; rerun with a load source that lasts (a CPU stress loop, or a full run known to be active) before closing.
-  - **Files**: `tests/telemetry-gains.bats`, `bin/dotfiles-telemetry`.
-  - **Output**: code
-  - **Acceptance**: the test passes 20 of 20 times while another full Bats run is active.
-  - **Hypothesis**: a load-independent limit moves failures of this test from 1 of 2 full runs under load to 0 of 20.
-  - **Measurement**: `for i in $(seq 20); do heavy-run bats tests/telemetry-gains.bats -f "takes over 5 seconds" || echo FAIL; done | grep -c FAIL`, with a second full Bats run active.
-  - **Success**: the command prints 0.
-  - **Pivot**: 2 or more failures after the change means the limit is not the cause; trace the `daily` path with `bash -x` and file what it shows.
-  - **Anchor**: Luo, Hariri, Eloussi and Marinov (2014), An Empirical Analysis of Flaky Tests; Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — test stability, not a scorecard metric.
-
 - [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback
   - **ID**: app-priority-field-check
   - **Tags**: performance, launchagents

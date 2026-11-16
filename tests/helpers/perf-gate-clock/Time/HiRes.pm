@@ -9,7 +9,8 @@ use Exporter 'import';
 our @EXPORT_OK = qw(time sleep usleep);
 my $clock = $ENV{PERF_GATE_FAKE_CLOCK};
 my $start = CORE::time();
-sub time {
+# The empty prototype matters: `time - $t0` must parse as a subtraction.
+sub time() {
   my $sum = 0;
   if (defined $clock && open(my $fh, "<", $clock)) {
     while (my $line = <$fh>) { $sum += $line if $line =~ /^[0-9.]+$/; }

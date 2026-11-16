@@ -28,10 +28,12 @@ jobs:
           persist-credentials: false
 
       - name: Install bats
-        # From source, as in ci.yml: no package-server lookup, so a runner
+        # From source at a pinned commit: no package-server lookup, so a runner
         # DNS failure for the Ubuntu archive cannot stop the leak gate.
         run: |
-          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats
+          # Pinned to the v1.14.0 release commit.
+          git clone https://github.com/bats-core/bats-core.git /tmp/bats
+          git -C /tmp/bats checkout eb7f42f8d608ac693d7a4b67474f6714ea68cfc5
           sudo /tmp/bats/install.sh /usr/local
 
       - name: Run no-internal-refs bats

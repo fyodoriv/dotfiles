@@ -981,7 +981,7 @@ age() {
   run bash -c 'cd "$1" && PATH="$3:$PATH" PERF_GATE_HEAVY_RUN=1 "$2"' _ "$FIX" "$GATE" "$TEST_DIR/bin"
   [ "$status" -eq 0 ]
   [[ "$output" == *"waiting for an exclusive heavy-run slot"* ]]
-  [[ "$(cat "$TEST_DIR/heavy-run.calls")" == "--exclusive /usr/bin/perl "*"/scripts/perf-gate.pl "* ]]
+  [[ "$(cat "$TEST_DIR/heavy-run.calls")" == "--exclusive $TEST_DIR/fake-perl "*"/scripts/perf-gate.pl "* ]]
   [ "$(wc -c < "$TEST_DIR/heavy-run.calls" | tr -d ' ')" -lt 600 ]
 
   run bash -c 'cd "$1" && PATH="$3:$PATH" PERF_GATE_HEAVY_RUN=1 HEAVY_RUN_SLOT=1 "$2"' _ "$FIX" "$GATE" "$TEST_DIR/bin"

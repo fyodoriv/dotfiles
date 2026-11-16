@@ -206,9 +206,11 @@ jobs:
 
   audit:
     # The repo-content checks only (secrets in tracked files, tracked .env
-    # files). The checks of an installed machine are skipped and shown.
+    # files). The checks of an installed machine are skipped and shown. It runs
+    # on Linux: it reads only tracked files, and a macOS slot was lost to
+    # runner capacity three times on 2026-11-16.
     if: github.event.schedule != '53 6 * * 0'
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

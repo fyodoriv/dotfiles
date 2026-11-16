@@ -20,7 +20,7 @@ added by `adopt-minsky-constitutional-rules-link`.
 
 3. **Never hardcode `$HOME` paths** — use `~`, environment variables, helper resolvers, or chezmoi templates. Absolute operator paths make the repo non-forkable and can leak private layout. **Agentbrew counterpart**: global source-routing and generated-output boundary rules. **Minsky anchor**: rule #2 "Every dependency behind an interface" applied to filesystem locations. **CS anchor**: Twelve-Factor config separation and portability-by-configuration. **Gate/status**: `make check` runs `tests/smoke.bats` and `tests/chezmoiscripts.bats`, which catch hardcoded operator paths in scripts and chezmoi lifecycle files.
 
-4. **Hosted CI runs `make check` on every pull request; merge only when it is green.** `make check` is the default verification gate: shellcheck + TASKS.md lint + affected Bats tests. Before a commit, run `make lint` and the Bats files you touched; that keeps local work out of the shared queue. Run the full `make check` locally only when GitHub Actions is off, or to reproduce a hosted failure. Never merge on a pending or red hosted check. **Agentbrew counterpart**: global "Verification" rule. **Minsky anchor**: rule #3 "Test-first, metric-first, doc-first" and rule #10 deterministic enforcement. **CS anchor**: red/green/refactor and continuous integration. **Gate/status**: hosted CI runs `make check` on every pull request and every push to `feat/chezmoi` (see README "Where tests run").
+4. **Hosted CI runs `make check` on every pull request; merge only when it is green.** `make check` is the default verification gate: shellcheck + TASKS.md lint + affected Bats tests. **Lint local, tests on CI (owner decision 2026-11-16):** agents run only `make lint` (and `shellcheck`, `bash -n`) on this Mac. The hook `agent-hooks/block-local-tests.sh` refuses Bats, `bin/bats-affected`, `make check`, `make test*` and `make e2e` inside a dotfiles checkout and tells the agent to push and read CI. Only a human sets `DOTFILES_ALLOW_LOCAL_TESTS=1`. Never merge on a pending or red hosted check. **Agentbrew counterpart**: global "Verification" rule. **Minsky anchor**: rule #3 "Test-first, metric-first, doc-first" and rule #10 deterministic enforcement. **CS anchor**: red/green/refactor and continuous integration. **Gate/status**: hosted CI runs `make check` on every pull request and every push to `feat/chezmoi` (see README "Where tests run").
 
 5. **Update docs with every behavior change, in the same PR.** Doc drift is a bug: the README is the front door for setup, troubleshooting, and adoption, and `AGENTS.md` is the front door for agents. Behavior changes that affect user-facing commands, modules, LaunchAgents, safety gates, or agent config update the doc that the `AGENTS.md` routing table names, in the same PR. A gotcha that cost time goes into `AGENTS.md` § Gotchas or becomes a test. Every PR body has a `## Docs` section (the docs changed, or `Docs: none — <reason>`), and a new top-level `docs/*.md` gets a row in `docs/README.md`. **Agentbrew counterpart**: global "Output quality is UX" belief. **Minsky anchor**: rule #3 doc-first. **CS anchor**: executable documentation / living documentation discipline. **Gate/status**: `tests/docs-contract.bats` (agent guide sections and size, docs map, README opening) and the agentbrew `gh-pr-body-requires-docs` hook; partially gated by `tests/user-stories.bats` for claim drift; docs carry no counts to keep in sync; semantic README drift is reviewer/advisory until a deterministic assertion exists.
 
@@ -152,15 +152,17 @@ directly.
 - Never edit generated agent config under `~/.claude/`, or other agent directories to make a dotfiles change.
 ## Verification Gates
 
-- `make check` is the default gate for code, docs that affect behavior, hooks,
-  doctor modules, and tests.
+- Locally, the gate is `make lint`. Hosted CI runs `make check` (the affected
+  tests) on every pull request and the full suite on every push to
+  `feat/chezmoi` and nightly. Agents do not run tests on this Mac; the hook
+  `block-local-tests.sh` refuses them (`docs/agent-hooks.md`).
 - `make lint-tasks` is required for `TASKS.md` edits; it runs the pinned
   `npx -y @tasks-md/lint@<version> TASKS.md` command from
   `.tasks-lint-version` and the rule-9 metadata gate (every priority).
-- Targeted bats runs are useful while iterating, but do not replace `make check`
-  before committing.
+- Prove a bug with CI: push the failing test first (a red run is the proof),
+  then push the fix.
 - For `Agentfile.yaml` edits, also run `dotfiles apply` or the lifecycle fallback
-  so generated config drift is caught locally.
+  so generated config drift is caught.
 - Doctor CLI fixtures load `test_helper` and use a per-test scratch HOME.
   This keeps their log-trim files separate from the owner's logs and other
   fixtures. Perl timer fixtures reset SIGALRM even for a safety deadline.

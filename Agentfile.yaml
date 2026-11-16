@@ -16,6 +16,9 @@ hooks:
     matcher: Bash
     command: "~/.config/dotfiles/hooks/require-heavy-run.sh"
   - event: PreToolUse
+    matcher: Bash
+    command: "~/.config/dotfiles/hooks/block-local-tests.sh"
+  - event: PreToolUse
     matcher: Shell
     command: "~/.config/dotfiles/hooks/prepend-endpoint-path.sh"
     agents: [claude-code]

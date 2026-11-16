@@ -169,6 +169,41 @@ Known gaps (the same as before this change; none is newly allowed):
 Tests: `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.
 
+## block-local-tests (dotfiles hook)
+
+`agent-hooks/block-local-tests.sh` is a `PreToolUse` Bash hook from the
+dotfiles Agentfile. Owner decision 2026-11-16: "Lint local, tests on CI". Inside
+a dotfiles checkout or worktree it refuses `bats`, `bin/bats-affected`,
+`make check`, `make test`, `make test-*` and `make e2e` (also behind `heavy-run`,
+`time`, `nice`, `env`, `bash -c`, `cd <checkout> &&` and `make -C <checkout>`). It
+exits 2 and tells the agent to run `make lint`, push, and read CI
+(`gh pr checks <n> --watch`, `gh run view <id> --log-failed`).
+
+- A checkout is a folder, or a parent of the session folder, that holds both
+  `agent-hooks/require-heavy-run.sh` and `bin/dotfiles-doctor`. Other repos are
+  not affected.
+- Allowed: `make lint*`, `shellcheck`, `bash -n`, `make -n`, `bats --version`,
+  and read-only commands such as `rg bats`. Quoted text (a commit message that
+  names `make check`) is data.
+- It also reads `xargs` (with its flags), `find ... -exec/-execdir`, `npx`,
+  `bunx` and `eval` as launchers of the command they start.
+- It is a guardrail against mistakes, not a security boundary. It fails open:
+  with no `plutil` or `perl`, malformed input, or a stripped `PATH` it allows
+  the command. Known gaps: a command name built at run time (`$(which bats)`)
+  and a script piped to a shell (`echo make check | sh`). A command that is
+  in a dotfiles checkout by session folder and also `cd`s elsewhere still
+  blocks.
+- It applies to Claude Code and Codex, because both run the PreToolUse hooks
+  from this Agentfile.
+- `DOTFILES_ALLOW_LOCAL_TESTS=1` turns the hook off. It works only when you
+  export it before you start Claude or Codex: the hook reads its own
+  environment, so an agent that writes the variable inside a command still gets
+  blocked. A human's own terminal has no hook, so tests run there as usual.
+- CI is not affected: hooks run only inside an agent session, and hosted
+  runners start no agent.
+
+Tests: `tests/agent-hooks-block-local-tests.bats`.
+
 ## require-heavy-run (dotfiles hook)
 
 `agent-hooks/require-heavy-run.sh` is a `PreToolUse` Bash hook from the

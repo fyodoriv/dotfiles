@@ -4,6 +4,23 @@ How to enable and configure CI (continuous integration) on your team's fork of t
 
 ---
 
+## Tests run on CI only (owner decision 2026-11-16)
+
+"Lint local, tests on CI." An agent on a dev Mac runs only `make lint`,
+`shellcheck` and `bash -n`. The hook `agent-hooks/block-local-tests.sh`
+refuses `bats`, `bin/bats-affected`, `make check`, `make test*` and `make e2e`
+inside a dotfiles checkout and tells the agent to push and read CI
+([agent-hooks.md](agent-hooks.md#block-local-tests-dotfiles-hook)). Only a
+human sets `DOTFILES_ALLOW_LOCAL_TESTS=1` in a terminal to run tests by hand.
+The hook runs only in an agent session, so CI is not affected.
+
+The loop for an agent: `make lint`, push the branch, then
+`gh pr checks <n> --repo fyodoriv/dotfiles --watch` and, on red,
+`gh run view <id> --log-failed`. To prove a bug, push the failing test first (a
+red run is the proof), then push the fix. This also retires the task
+`speed-up-make-check`: agents no longer run `make check` locally, so its
+local-gate speed has no consumer.
+
 ## How CI works in this repo
 
 The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/chezmoi`, on every push to `feat/chezmoi`, and by hand (`gh workflow run ci.yml`):
@@ -247,7 +264,7 @@ runs-on: [self-hosted, macOS]
 
 **`lint` job fails**: Run `make lint` for shellcheck errors and `make lint-tasks` for `TASKS.md` queue format errors. Fix and push.
 
-**`test` job fails**: Run `make test-all` locally. If tests pass locally but fail in CI, compare the "Show test tool versions" step with your machine, then rerun the failing files with an empty config folder (`XDG_CONFIG_HOME=$(mktemp -d) bats <files>`): a test that reads your own `~/.config`, or that writes into your real `HOME`, fails only on the runner.
+**`test` job fails**: Read the log first: `gh run view <id> --log-failed`. Compare the "Show test tool versions" step with what the test expects. A test that reads the owner's `~/.config`, or that writes into the real `HOME`, fails only on the runner. A human who must reproduce it by hand sets `DOTFILES_ALLOW_LOCAL_TESTS=1` in a terminal and runs the failing files with an empty config folder (`XDG_CONFIG_HOME=$(mktemp -d) bats <files>`).
 
 **`doctor` job fails**: The doctor job runs `chezmoi apply` first, then `dotfiles doctor --report`. Failures usually mean a module check assumes something about the environment that CI runners don't have. The `DOTFILES_CI=1` env var is set so modules can skip CI-incompatible checks.
 

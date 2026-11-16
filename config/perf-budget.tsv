@@ -17,6 +17,7 @@ dotfiles-config	150	bin/dotfiles config
 heavy-run-status	120	bin/heavy-run --status
 hook-require-heavy-run	120	agent-hooks/require-heavy-run.sh	{"tool_input":{"command":"git status"},"cwd":"/tmp"}
 hook-block-dangerous-git	120	agent-hooks/block-dangerous-git.sh	{"tool_input":{"command":"git status"},"cwd":"/tmp"}
+hook-block-local-tests	120	agent-hooks/block-local-tests.sh	{"tool_input":{"command":"git status"},"cwd":"/tmp"}
 
 # Runtime paths: the gate times the commands only when the diff touches one.
 # The gate uses this list and the list at the merge-base together. config/ is

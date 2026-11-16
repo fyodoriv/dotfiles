@@ -1,6 +1,7 @@
 #!/bin/bash
 # Regenerate company plugin outputs that must follow plugins.lock on every
-# apply (issue #145, step 6): the shell fragment loader.
+# apply (issue #145, step 6): the shell fragment loader and the org
+# telemetry sink policy.
 set -euo pipefail
 
 DOTFILES_DIR="${CHEZMOI_SOURCE_DIR:-$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)}"
@@ -11,3 +12,4 @@ for lib in plugin plugin-capabilities plugin-extensions; do
   source "$DOTFILES_DIR/lib/$lib.sh"
 done
 plugin_shell_pass || echo "⚠ Some plugin shell fragments were not loaded (see above)"
+plugin_telemetry_sink_pass || echo "⚠ The plugin telemetry sink policy was not installed (see above)"

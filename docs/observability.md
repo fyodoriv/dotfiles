@@ -311,6 +311,12 @@ PostHog. The overlay drops one settings file. The base repo holds only this
 generic setting. With no file, nothing changes: the request is the same as
 before.
 
+A company plugin ships the file with `contributes.telemetry_sink` and the
+capability `telemetry_sink: true`. `dotfiles apply` checks the policy and
+installs it with mode 600; a `splunk-hec` host must also be in the plugin's
+`network_hosts` ([plugins.md](plugins.md#extension-points)). The steps for a
+company are in [plans/plugin-update-plan.md](plans/plugin-update-plan.md).
+
 **Not tested against a real Splunk server.** The tests use a fake receiver
 and follow Splunk's public HTTP Event Collector (HEC) format.
 

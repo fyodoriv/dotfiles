@@ -28,6 +28,7 @@
         "network_hosts": { "$ref": "#/$defs/names" },
         "sudo": { "type": "boolean" },
         "shell_fragment": { "type": "boolean" },
+        "telemetry_sink": { "type": "boolean" },
         "hooks": { "$ref": "#/$defs/names" },
         "secrets": { "$ref": "#/$defs/names" }
       }
@@ -49,6 +50,7 @@
           }
         },
         "shell": { "$ref": "#/$defs/relPath" },
+        "telemetry_sink": { "$ref": "#/$defs/relPath" },
         "options": { "type": "object" },
         "leak_patterns": { "$ref": "#/$defs/relPath" },
         "blocked_software": { "$ref": "#/$defs/relPath" },

@@ -19,3 +19,15 @@ setup() {
   echo "$output"
   [ "$status" -eq 0 ]
 }
+
+@test "a shipped telemetry sink policy is valid for the core" {
+  sink="$(yq -r '.contributes.telemetry_sink // ""' "$ROOT/dotfiles-plugin.yaml")"
+  [ -n "$sink" ] || skip "this plugin ships no telemetry sink policy"
+  tmp="$(mktemp -d)"
+  install -m 600 "$ROOT/$sink" "$tmp/sink.json"
+  run env HOME="$tmp" DOTFILES_TELEMETRY_SINK_FILE="$tmp/sink.json" bash "$CORE/bin/dotfiles-telemetry" status
+  rm -rf "$tmp"
+  echo "$output"
+  [[ "$output" == *"sink: "* ]]
+  [[ "$output" != *"sink: invalid policy"* ]]
+}

@@ -109,7 +109,9 @@ All three targets finish the selected peer files before running the entire
 `tests/doctor.bats` file alone, with no within-file parallelism. This keeps its
 real-machine timing budget separate from peer-suite I/O. Selected files still
 run once when a peer fails, and either phase can fail the target. Existing
-caches and the serial fallback remain active.
+caches and the serial fallback remain active. `JOBS=1` forces the same serial
+route when GNU parallel is installed: the Makefile then omits the parallel flags
+that Bats 1.14 rejects with one job.
 
 Hook targets are explicit in `Agentfile.yaml`. The legacy Shell, Task, and
 SessionStart PATH handlers stay Claude-only. Codex receives the Bash PATH

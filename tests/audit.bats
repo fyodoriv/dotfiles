@@ -65,6 +65,24 @@ MOD
   [[ "$output" == *"passed"* ]]
 }
 
+@test "dotfiles-audit with DOTFILES_AUDIT_REPO_ONLY=1 skips machine-state checks and keeps the repo checks" {
+  mkdir -p "$HOME/.ssh"
+  chmod 755 "$HOME/.ssh"
+  DOTFILES_AUDIT_REPO_ONLY=1 run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No secrets detected in tracked files"* ]]
+  [[ "$output" == *".ssh directory permissions (installed-machine check)"* ]]
+  [[ "$output" == *"0 failed"* ]]
+}
+
+@test "dotfiles-audit with DOTFILES_AUDIT_REPO_ONLY=1 still fails on a tracked .env file" {
+  printf 'X=1\n' > "$FAKE_DOTFILES/leak.env"
+  git -C "$FAKE_DOTFILES" add leak.env
+  DOTFILES_AUDIT_REPO_ONLY=1 run bash "$FAKE_DOTFILES/bin/dotfiles-audit"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"leak.env"* ]]
+}
+
 @test "dotfiles-audit detects correct .ssh directory permissions" {
   mkdir -p "$HOME/.ssh"
   chmod 700 "$HOME/.ssh"

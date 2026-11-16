@@ -1,7 +1,16 @@
 name: CI
 
-# The hosted copy of the local gate. Standard GitHub-hosted runners are free
-# for public repositories. See docs/ci-setup.md.
+# Tests run here, not on a dev Mac ("Lint local, tests on CI", 2026-11-16).
+# Standard GitHub-hosted runners are free for public repositories; never use a
+# larger (billed) runner. See docs/ci-setup.md.
+#
+# When what runs:
+# - Pull request: lint, `make check` (the affected tests), audit.
+# - Push to feat/chezmoi and nightly: the full suite (`make test-all`, not
+#   `make check`), doctor, audit.
+# - Weekly (Sunday): shell coverage, which traces the full suite (so the plain
+#   full suite and doctor do not run again that day).
+# - By hand (`gh workflow run ci.yml --ref <branch>`): everything.
 #
 # Safety:
 # - No secrets are used. A fork PR gets a read-only token and no secrets.
@@ -15,13 +24,18 @@ on:
     branches: [feat/chezmoi]
   push:
     branches: [feat/chezmoi]
+  schedule:
+    - cron: "31 6 * * *"   # nightly: full suite and doctor
+    - cron: "53 6 * * 0"   # weekly: shell coverage
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # A scheduled run has its own group (the cron line), so it never replaces a
+  # pending push run of the same ref.
+  group: ci-${{ github.event.pull_request.number || github.event.schedule || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -50,6 +64,8 @@ jobs:
         continue-on-error: true
 
   test:
+    # Not on the weekly coverage cron: that run traces the full suite already.
+    if: github.event.schedule != '53 6 * * 0'
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -59,10 +75,27 @@ jobs:
           # origin/feat/chezmoi.
           fetch-depth: 0
           persist-credentials: false
+      - name: Week for the Homebrew cache key
+        id: week
+        run: echo "w=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore the Homebrew download cache
+        # Bottle downloads are the slow part of the install step. The key
+        # changes each ISO week (fresh bottles) and when this file changes.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-
+            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: Install dependencies
         # bash: the git hooks and the coverage harness need Homebrew bash;
         # the runner has only /bin/bash 3.2. coreutils: tests call gtimeout.
         run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd shfmt ripgrep git-cliff
+      - name: Write the chezmoi config
+        # `dotfiles managed` and a few other tests need a chezmoi config, as
+        # on any installed machine. Default answers, no prompt.
+        run: chezmoi init --source "$PWD" --no-tty --promptDefaults
       - name: Show test tool versions
         # Hosted-only test failures usually come from a different tool on
         # the runner. Print what the tests will find first on PATH.
@@ -97,39 +130,54 @@ jobs:
       - name: Verify timing queue is available
         run: test "$(command -v heavy-run)" = "$RUNNER_TEMP/timing-tools/heavy-run"
       - name: Gate (make check)
-        env:
-          # A push run compares with the commit before the push. Compared
-          # with origin/feat/chezmoi (itself), it would select no test.
-          BATS_AFFECTED_BASE: ${{ github.event_name == 'push' && github.event.before || 'origin/feat/chezmoi' }}
-          # perf-gate.bats times 100 ms sleeps. On this runner they took up to
-          # 241 ms, and other tests failed in each of 3 runs. It stays a local
-          # test until TASKS.md perf-gate-hosted-runner-noise. make reads
-          # this variable from the environment.
-          TEST_SKIP_FILE: tests/perf-gate.bats
+        # Pull requests only: the affected tests. Every other run starts the
+        # full suite below, which covers them.
+        if: github.event_name == 'pull_request'
         run: make check
-      - name: Full suite (manual runs only)
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          # Same reason as the gate step: hosted timing noise.
-          TEST_SKIP_FILE: tests/perf-gate.bats
+      - name: Full suite (make test-all)
+        if: github.event_name != 'pull_request'
         run: make test-all
 
   doctor:
-    # Applies the whole config to the runner. Manual start only: a clean
-    # runner has no chezmoi config yet (TASKS.md hosted-doctor-audit-clean-runner).
-    if: github.event_name == 'workflow_dispatch'
+    # Deploys the config files to a clean runner and runs the doctor. Pushes,
+    # the nightly run and manual runs; not pull requests (it takes the second
+    # macOS slot for minutes). Lifecycle scripts are left out: they install
+    # packages and change macOS settings, which tests/e2e covers in a sandbox.
+    if: github.event_name != 'pull_request' && github.event.schedule != '53 6 * * 0'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Week for the Homebrew cache key
+        id: week
+        run: echo "w=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore the Homebrew download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-
+            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: Install chezmoi
         run: brew install chezmoi jq fd
+      - name: Write the chezmoi config
+        run: chezmoi init --source "$PWD" --no-tty --promptDefaults
       - name: Deploy configs
-        run: chezmoi apply --source "$PWD" --force
+        run: chezmoi apply --source "$PWD" --force --exclude=scripts
       - name: Run doctor
-        run: ./bin/dotfiles-doctor --report
+        # Only the modules whose checks the files-only apply can satisfy. The
+        # others check an installed machine (git identity, gh login, brew
+        # tools, LaunchAgents, power settings): 50 checks failed there on the
+        # first runner, so `dotfiles doctor` on a real Mac covers them.
+        run: |
+          status=0
+          for m in security ssh workflow agent-browser chezmoi chrome editor memory personal-machine plugins shell sync upgrade; do
+            ./bin/dotfiles-doctor --report --module "$m" || status=1
+          done
+          exit "$status"
       - name: Shell startup benchmark
         run: |
           # Measure zsh startup time (interactive + login shell)
@@ -158,43 +206,58 @@ jobs:
           echo "OK (under ${threshold}ms threshold)"
 
   audit:
-    # Checks an installed machine, so it fails on a clean runner. Manual
-    # start only (TASKS.md hosted-doctor-audit-clean-runner).
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
+    # The repo-content checks only (secrets in tracked files, tracked .env
+    # files). The checks of an installed machine are skipped and shown. It runs
+    # on Linux: it reads only tracked files, and a macOS slot was lost to
+    # runner capacity three times on 2026-11-16.
+    if: github.event.schedule != '53 6 * * 0'
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Security audit
+        env:
+          DOTFILES_AUDIT_REPO_ONLY: "1"
         run: ./bin/dotfiles-audit
 
   coverage:
-    # Manual only: the traced full suite did not finish in 45 minutes on a
-    # hosted runner. TASKS.md hosted-coverage-job-time.
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Weekly and by hand: the traced full suite (`--jobs 1`, set -x) is far
+    # slower than the plain suite, so it stays off pull requests. The suite
+    # targets macOS, so the job runs there with the same Homebrew tools as
+    # `test` (the packaged Bats; no clone of bats-core).
+    if: github.event.schedule == '53 6 * * 0' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Some tests read pinned older commits, so the clone needs history.
+          fetch-depth: 0
           persist-credentials: false
+      - name: Week for the Homebrew cache key
+        id: week
+        run: echo "w=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore the Homebrew download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-
+            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq fd-find python3
-          sudo ln -sf "$(command -v fdfind)" /usr/local/bin/fd
-          # Install bats from source (apt version is often outdated)
-          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats
-          sudo /tmp/bats/install.sh /usr/local
+        run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd shfmt ripgrep git-cliff
+      - name: Write the chezmoi config
+        run: chezmoi init --source "$PWD" --no-tty --promptDefaults
       - name: Run tests with coverage
         run: |
           # bin/dotfiles-coverage uses BASH_ENV + set -x to capture line
           # coverage portably (see lib/coverage-trap.sh and docs/ci-setup.md).
-          # We replaced kcov because kcov 43 produced empty JSON on macOS Tahoe
-          # local runs; the new harness works identically here and locally.
-          ./bin/dotfiles-coverage run tests/
+          # The `test` job gates test results. This job gates the coverage
+          # floor, so a test that fails only under tracing is a warning here.
+          ./bin/dotfiles-coverage run tests/ || echo "::warning::some tests failed under tracing; the test job gates test results"
       - name: Extract coverage percentage
         id: coverage
         run: |

@@ -200,9 +200,9 @@ than appending them after `/bin`. The explicit plugin target still selects
 syntax errors as product failures. Use a fresh cache after an interpreter
 correction when prior cache provenance is uncertain.
 
-Bats 1.14 rejects `--jobs 1` with its file-parallel flags. For a single-worker
-gate, `JOBS=1 heavy-run make check BATS_JOBS= TEST_FILE_JOBS=` selects plain
-serial Bats and retains every gate step. This invocation does not raise the
+Bats 1.14 rejects `--jobs 1` with its file-parallel flags. `JOBS=1 make check`
+selects plain serial Bats and retains every gate step (the Makefile omits the
+parallel flags at one job). This invocation does not raise the
 shared heavy-job limit or prove that consumer worker budgeting is complete.
 
 ### Doctor test contracts

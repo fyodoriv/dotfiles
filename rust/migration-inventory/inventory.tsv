@@ -680,7 +680,7 @@ file	docs/plans/rust-cold-profile-fixture-audit.md	tracked-file	3d3a75acad0c58ee
 file	docs/plans/rust-current-bin-receipt.md	tracked-file	9517fe075640714245759a09b40b013bbcb7b78c	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/rust-current-bin-source-receipt.json	tracked-file	416959ef7c582caf346bb0b8cc09a6f7b5da1f30	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	docs/plans/rust-document-ledger-prediction.md	tracked-file	58c2799cd78db29e5226fd7557eab2756be598ef	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/plans/rust-embedded-discovery-review.json	tracked-file	ab85211fdad8fb352580d4fce4cd4d9a21d975ac	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	docs/plans/rust-embedded-discovery-review.json	tracked-file	7ef596006c1a3ece3fa0aef193b4ae2cf4fdad5e	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	docs/plans/rust-git-hook-receipt.md	tracked-file	86ae0ea9d4d3fbb7fa2b73358251a9aea9c2a720	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/rust-git-hook-source-receipt.json	tracked-file	0ec90fac2d5cffea39f1e7e7660ba4cfee890298	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	docs/plans/rust-hook-baseline-2026-11-11.md	tracked-file	75eb068fd8337981b9492fe5642c06f1f37c72e7	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.

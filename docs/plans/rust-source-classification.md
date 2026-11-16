@@ -10,15 +10,15 @@ static scanning cannot prove that discovery is complete.
 
 | Measure | Value |
 |---|---:|
-| Tracked paths with a review and a state | 2,234 of 2,234 |
+| Tracked paths with a review and a state | 2,238 of 2,238 (2,234 when first classified) |
 | Unclassified paths | 0 |
 | `ported` | 5 (Rust `app-priority` and its wrapper) |
-| `exception` | 775, each naming a [Recorded exceptions](rust-migration.md#recorded-exceptions) row |
+| `exception` | 777, each naming a [Recorded exceptions](rust-migration.md#recorded-exceptions) row |
 | `grandfathered` | 8 (the four pre-gate fixture crates) |
-| `out-of-scope` | 1,446 (data, docs, vendored packages, shell and editor configuration) |
+| `out-of-scope` | 1,448 (data, docs, vendored packages, shell and editor configuration) |
 | Embedded programs recorded | 233 (93 from the five earlier boundary reviews, 140 new) |
-| Shell files the scanner cannot parse | 369 (mostly `.bats` files and chezmoi templates) |
-| Unresolved scanner findings | 14,784 (mostly dynamic arguments) |
+| Shell files the scanner cannot parse | 371 (369 of them `.bats` files) |
+| Unresolved scanner findings | 14,830 (almost all dynamic arguments in plain scripts) |
 
 Counts come from `python3 scripts/inventory-ledger.py --check`.
 
@@ -62,12 +62,32 @@ closes the task anyway. Caller analysis is the follow-up task below.
 
 ## What stays open
 
-`migration-check inventory --check` now passes the source review step and
+`migration-check inventory --check` passes the source review step and
 stops at `independent embedded and generated discovery remains incomplete`.
 That gap is the recorded `embedded-discovery` exception in
-[rust-migration.md](rust-migration.md#recorded-exceptions): 14,784 unresolved
-findings and 369 unparsed shell files cannot be settled by static analysis.
-Task `rust-inventory-dynamic-discovery` tracks it.
+[rust-migration.md](rust-migration.md#recorded-exceptions): 14,830 unresolved
+findings and 371 unparsed shell files.
+
+Task `rust-inventory-dynamic-discovery` closed by its pivot on 2026-11-16.
+The cheaper option ran first, on the tree at `ce60ef9`:
+
+```sh
+chezmoi execute-template --source . --file <template> > scratch/<name>.sh   # 14 shell templates
+migration-check inventory --scan-shell <name>.sh --shfmt "$(command -v shfmt)"   # in a scratch git repo
+```
+
+| Measure | Raw templates | Rendered templates |
+|---|---:|---:|
+| Templates the scanner parses | 13 of 14 | 14 of 14 |
+| Unresolved findings in the templates | 192 | 194 |
+
+The whole tree stays at 14,830 unresolved findings (14,830 - 192 + 194 =
+14,832, far above the 5,000 pivot line) and 370 unparsed files, 369 of them
+`.bats`. Templates hold 1.3% of the findings. The rest are dynamic
+arguments in plain scripts, so rendering cannot reach the line. Treating
+`.bats` bodies as test tooling would clear the 369 unparsed files and leave
+the unresolved count unchanged. Reopen only with a method that a
+measurement shows will go below 500.
 
 The ledgers pin blob ids, so each merge makes them stale. The daily
 `.github/workflows/inventory-ledger-refresh.yml` job reruns the generator on

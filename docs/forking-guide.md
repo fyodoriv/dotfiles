@@ -367,7 +367,7 @@ You can open a PR to `fyodoriv/dotfiles` or `fyodoriv/agentbrew` from your own M
 ```bash
 cd ~/apps/dotfiles
 git switch -c fix/short-name
-# edit, then: make check
+# edit, then: make lint (this repo runs tests on CI; a fork may also run make check)
 git commit -m "fix: what changed"
 dotfiles contribute --dry-run         # prints each git and gh step
 dotfiles contribute                   # asks y/N, then forks, pushes to your fork, opens the PR

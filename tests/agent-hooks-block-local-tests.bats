@@ -34,6 +34,32 @@ run_hook() {
   done
 }
 
+@test "blocks tests started through xargs, find -exec, npx and eval" {
+  for c in "ls tests | xargs bats" "xargs -a list bats" "xargs -n1 -I{} make test-all" \
+           "find . -exec bats {} +" "find . -name x -execdir make check \\;" \
+           "npx bats tests/x.bats" "eval make check" "eval 'make check'" "eval \"bats tests/x.bats\""; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+}
+
+@test "allows xargs and find -exec that start other commands" {
+  for c in "ls | xargs rg bats" "find . -exec rg bats {} +" "echo 'make check' | xargs echo" \
+           "xargs -n1 shellcheck"; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "blocked: $c: $output"; return 1; }
+  done
+}
+
+# Documented gaps (docs/agent-hooks.md): the hook is a guardrail, not a
+# security boundary. These pass on purpose; if one starts to block, update the doc.
+@test "known gaps: a command name built at run time and a script piped to a shell pass" {
+  for c in 'x=$(which bats); $x tests/x.bats' 'echo make check | sh' '$(which bats) tests/x.bats'; do
+    run_hook "$c"
+    [ "$status" -eq 0 ] || { echo "now blocked (update docs/agent-hooks.md): $c"; return 1; }
+  done
+}
+
 @test "allows lint, shellcheck and read-only commands in a dotfiles checkout" {
   for c in "make lint" "make lint-tasks" "make lint-full" "shellcheck bin/dotfiles" \
            "bash -n bin/dotfiles" "rg bats tests" "rg -n 'make check' docs" \

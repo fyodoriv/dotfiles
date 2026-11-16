@@ -185,9 +185,20 @@ exits 2 and tells the agent to run `make lint`, push, and read CI
 - Allowed: `make lint*`, `shellcheck`, `bash -n`, `make -n`, `bats --version`,
   and read-only commands such as `rg bats`. Quoted text (a commit message that
   names `make check`) is data.
-- `DOTFILES_ALLOW_LOCAL_TESTS=1` turns the hook off. It is for a human in a
-  terminal. The hook reads its own environment, so an agent that writes the
-  variable inside a command still gets blocked.
+- It also reads `xargs` (with its flags), `find ... -exec/-execdir`, `npx`,
+  `bunx` and `eval` as launchers of the command they start.
+- It is a guardrail against mistakes, not a security boundary. It fails open:
+  with no `plutil` or `perl`, malformed input, or a stripped `PATH` it allows
+  the command. Known gaps: a command name built at run time (`$(which bats)`)
+  and a script piped to a shell (`echo make check | sh`). A command that is
+  in a dotfiles checkout by session folder and also `cd`s elsewhere still
+  blocks.
+- It applies to Claude Code and Codex, because both run the PreToolUse hooks
+  from this Agentfile.
+- `DOTFILES_ALLOW_LOCAL_TESTS=1` turns the hook off. It works only when you
+  export it before you start Claude or Codex: the hook reads its own
+  environment, so an agent that writes the variable inside a command still gets
+  blocked. A human's own terminal has no hook, so tests run there as usual.
 - CI is not affected: hooks run only inside an agent session, and hosted
   runners start no agent.
 

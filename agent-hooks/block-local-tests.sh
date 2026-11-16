@@ -30,7 +30,7 @@ cwd="$(printf '%s' "$input" \
 [ -n "$cwd" ] || cwd="$PWD"
 
 # Quoted text is data, not a command: drop heredoc bodies and replace each
-# quoted string with Q. The string after `bash -c` / `sh -c` runs as a command,
+# quoted string with Q. The string after `bash -c`, `sh -c` or `eval` runs as a command,
 # so it moves to its own line at the end. Quoted words that look like a path
 # stay, so `cd "~/apps/dotfiles"` still names its folder.
 _strip_text() {
@@ -39,6 +39,8 @@ _strip_text() {
     s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
     s/\b(?:ba|z|da)?sh[ \t]+(?:-\w+[ \t]+)*-\w*c\w*[ \t]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my $q = $1; push @extra, substr($q, 1, -1); "sh -c Q"/gse;
+    s/\beval[ \t]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
+      my $q = $1; push @extra, substr($q, 1, -1); "eval Q"/gse;
     s/("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my $in = substr($1, 1, -1);
       $in =~ m{^[\w.~\x2f\$-]*\x2f[\w.~\x2f\$-]*$} ? $in : length($in) ? "Q" : ""/gse;
@@ -85,7 +87,7 @@ _is_test_run() {
   read -r -a w <<< "$1" || true
   while [ "${#w[@]}" -gt 0 ]; do
     case "${w[0]}" in
-      *=*|if|while|until|then|do|else|elif|'!'|time|nohup|exec|command|sudo|caffeinate|env|heavy-run|--exclusive)
+      *=*|if|while|until|then|do|else|elif|'!'|time|nohup|exec|command|sudo|caffeinate|env|eval|heavy-run|--exclusive)
         w=("${w[@]:1}") ;;
       nice|timeout) w=("${w[@]:1}")
         while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* || "${w[0]}" =~ ^[0-9.]+[smhd]?$ ]]; do w=("${w[@]:1}"); done ;;
@@ -96,6 +98,28 @@ _is_test_run() {
   [ "${#w[@]}" -gt 0 ] || return 1
   local tool="${w[0]##*/}" a
   case "$tool" in
+    xargs|npx|bunx)
+      # A launcher: skip its own flags (and their values), then judge the
+      # command it starts.
+      w=("${w[@]:1}")
+      while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do
+        case "$tool:${w[0]}" in
+          xargs:-[adEIJLnPs]|xargs:--arg-file|xargs:--delimiter|xargs:--max-args|xargs:--max-procs|xargs:--replace) w=("${w[@]:2}") ;;
+          *) w=("${w[@]:1}") ;;
+        esac
+      done
+      [ "${#w[@]}" -gt 0 ] || return 1
+      _is_test_run "${w[*]}"
+      return ;;
+    find)
+      # `find ... -exec CMD ...` starts CMD.
+      local i
+      for i in "${!w[@]}"; do
+        case "${w[$i]}" in -exec|-execdir|-ok|-okdir)
+          _is_test_run "${w[*]:$((i + 1))}" && return 0 ;;
+        esac
+      done
+      return 1 ;;
     bats|bats-affected|bats-affected.sh)
       # A lone version or help flag runs no tests.
       case "${w[*]:1}" in --version|-v|--help|-h) return 1 ;; esac

@@ -56,7 +56,7 @@ Run through this before announcing to the team:
 - [ ] Test the install on a fresh macOS account or VM
 - [ ] Run `dotfiles doctor --fix` and confirm all checks pass
 - [ ] Run `dotfiles validate --quick` during customization for fast checks of hardcoded user paths in shared config, enterprise hostnames, secrets, tracked `.env` files, and script hygiene
-- [ ] Run full `dotfiles validate` before announcing the fork; it includes lint and the full bats suite, so it replaces a separate `make check`
+- [ ] Run full `dotfiles validate` before announcing the fork; it includes lint and the full bats suite. This repo's own rule is lint locally, then push and read CI; a fork without the hook may run tests locally
 - [ ] If your organization ships a private overlay, complete its pilot gate before announcing
 - [ ] If the team will use AI tooling, validate [agentbrew setup and recovery](agentbrew-setup.md) on one pilot machine
 - [ ] Write your Slack announcement (see template below)

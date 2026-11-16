@@ -186,7 +186,7 @@ load test_helper
 ## Step 6 — Verify
 
 ```bash
-make check                          # lint + test must pass
+make lint                           # local gate; CI runs the tests (a fork may also run `make check`)
 dotfiles doctor                     # see your new checks
 dotfiles doctor --fix               # verify auto-fix works
 dotfiles doctor --list | grep mymod # verify check IDs appear
@@ -206,4 +206,4 @@ dotfiles doctor --list | grep mymod # verify check IDs appear
 - Check IDs must be globally unique
 - Every fix command should be idempotent (safe to run multiple times)
 - Use `checks.yaml` for declarative checks, `doctor.sh` for dynamic/runtime checks
-- Run `make lint` and the touched tests before committing; hosted CI runs `make check` on the pull request
+- In this repo: run `make lint`, push, and read CI (`make check` runs there). A fork or team machine without the hook may still run tests locally

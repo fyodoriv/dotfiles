@@ -108,7 +108,7 @@ chezmoi's (2142 vs 2262 ms), but the symlink tools stay far ahead (54 ms).
 
 - **Bootstrap steps.** dotfiles now needs 1 command (the README quick-start
   line; 2026-10-16), the same as chezmoi. A tie does not count as a win.
-- **Cold apply.** Copy-mode tools (dotfiles, chezmoi, yadm) are 30–60 times
+- **Cold apply.** Copy-mode tools (dotfiles, chezmoi, yadm) are 40–70 times
   slower than symlink tools (stow, dotbot) on a fresh home. dotfiles uses
   chezmoi, so it shares chezmoi's cost.
 - **Wrapper overhead.** A no-change `dotfiles apply` takes 70 ms against

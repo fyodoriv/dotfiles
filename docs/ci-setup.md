@@ -83,7 +83,7 @@ links in `README.md` and `docs/*.md` so onboarding links fail fast in CI.
 
 The coverage job runs bats through `bin/dotfiles-coverage`, which writes
 `coverage/bats/coverage.json` (kcov-compatible shape) and enforces the shell
-coverage floor from `.shell-coverage-floor`. The job runs weekly (Sunday) and by hand, on macOS. To see the same floor check, run `gh workflow run ci.yml --ref <branch>` and read the `coverage` job. `.shell-coverage-floor` must be a measured ratchet:
+coverage floor from `.shell-coverage-floor`. The job runs weekly (Sunday) and by hand, on macOS. It is a weekly job by the pivot of task hosted-coverage-job-time: serial tracing of all 5073 tests took 69 minutes on a free macOS runner (run 43880935397), far over the 20 minute pull request target. The job limit is 150 minutes. The aggregation step caches path resolution per trace path; before that it ran past 20 minutes without finishing. To see the same floor check, run `gh workflow run ci.yml --ref <branch>` and read the `coverage` job. `.shell-coverage-floor` must be a measured ratchet:
 set it from the current full `make coverage` percentage with up to a 1.0 point
 buffer for runner noise, then raise it only after adding tests that keep CI
 green at the new threshold.

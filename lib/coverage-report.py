@@ -14,6 +14,7 @@ ratchet semantics matter more than the absolute number.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -53,6 +54,7 @@ def count_executable_lines(path: Path) -> int:
         return 0
 
 
+@functools.lru_cache(maxsize=None)
 def relativize(path: str, repo_root: Path) -> str | None:
     """Convert an absolute or relative trace path to repo-relative form.
 

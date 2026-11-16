@@ -67,7 +67,7 @@ jobs:
         # Hosted-only test failures usually come from a different tool on
         # the runner. Print what the tests will find first on PATH.
         run: |
-          for t in bash bats jq yq chezmoi git gh node npm git-cliff plutil; do
+          for t in bash bats jq yq chezmoi git gh node npm git-cliff; do
             printf '%-10s %s: ' "$t" "$(command -v "$t" || echo missing)"
             "$t" --version 2>&1 | head -1 || true
           done

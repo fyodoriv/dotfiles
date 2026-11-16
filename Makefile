@@ -109,9 +109,10 @@ endif
 # Keep Bats' non-recursive root/plugin selection, with doctor isolated last.
 BATS_ALL_FILES := $(wildcard tests/*.bats tests/plugin/*.bats)
 # TEST_SKIP_FILE leaves one file out of the full run too (hosted CI: perf-gate.bats).
-BATS_PEER_FILES = $(filter-out tests/doctor.bats $(TEST_SKIP_FILE),$(BATS_ALL_FILES))
+BATS_PEER_FILES = $(filter-out tests/doctor.bats $(patsubst $(CURDIR)/%,%,$(TEST_SKIP_FILE)),$(BATS_ALL_FILES))
 define BATS_FULL_RUN
 [ $(words $(BATS_ALL_FILES)) -gt 0 ] || exit 1; \
+$(if $(TEST_SKIP_FILE),echo "⚠ Skipping $(TEST_SKIP_FILE) (TEST_SKIP_FILE is set)";) \
 result=0; \
 if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) $(BATS_PEER_FILES) || result=$$?; fi; \
 if [ -n "$(filter tests/doctor.bats,$(BATS_ALL_FILES))" ]; then \

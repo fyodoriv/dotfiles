@@ -47,11 +47,15 @@ _make_dry_run() {
 }
 
 @test "full-suite targets leave out TEST_SKIP_FILE" {
+  local skip
+  for skip in tests/perf-gate.bats "$(cd "$REPO_ROOT" && pwd)/tests/perf-gate.bats"; do
   for target in test-all test-force; do
-    run env PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" make -C "$REPO_ROOT" -n --no-print-directory "$target" TEST_SKIP_FILE=tests/perf-gate.bats
+    run env PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" make -C "$REPO_ROOT" -n --no-print-directory "$target" TEST_SKIP_FILE="$skip"
     [ "$status" -eq 0 ]
     [[ "$output" == *"tests/heavy-run.bats"* ]]
-    [[ "$output" != *"tests/perf-gate.bats"* ]]
+    [[ "$output" == *"Skipping"* ]]
+    ! printf '%s\n' "$output" | grep -v 'Skipping' | grep -q 'perf-gate.bats'
+  done
   done
 }
 

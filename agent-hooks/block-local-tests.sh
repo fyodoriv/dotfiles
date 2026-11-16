@@ -11,9 +11,6 @@
 # effect: the hook reads its own environment, not the command text.
 
 set -euo pipefail
-_hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=bootstrap-endpoint-path.sh
-source "$_hook_dir/bootstrap-endpoint-path.sh"
 
 [ "${DOTFILES_ALLOW_LOCAL_TESTS:-}" = 1 ] && exit 0
 
@@ -27,6 +24,12 @@ case "$command" in
   *bats*|*make*) ;;
   *) exit 0 ;;
 esac
+
+# Load the shared PATH setup only past the fast exit: the steps above use
+# absolute paths, and the bootstrap doubles the hook's time.
+_hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=bootstrap-endpoint-path.sh
+source "$_hook_dir/bootstrap-endpoint-path.sh"
 
 cwd="$(printf '%s' "$input" \
   | /usr/bin/plutil -extract cwd raw -o - -- - 2>/dev/null || true)"

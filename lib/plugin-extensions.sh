@@ -185,8 +185,10 @@ plugin_shell_pass() {
 #   - bin/dotfiles-telemetry accepts the policy (status shows no
 #     "invalid policy" line);
 #   - a splunk-hec URL host is listed in capabilities.network_hosts;
-#   - the file in place is missing or was written by this pass (a policy a
-#     person or an older overlay wrote is never replaced).
+#   - the file in place is missing, was written by this pass, or has the
+#     same bytes (adopted); any other policy a person or an older overlay
+#     wrote is never replaced.
+# A plugin still in plugins.lock that fails verification keeps its file.
 # The pass records "<plugin>\t<sha256>" in plugin_sink_state_file. When the
 # plugin goes away and the file still matches that hash, the file goes too.
 # A new or changed sink takes effect on the next send. The hourly sender
@@ -207,7 +209,11 @@ _plugin_sha256() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
 _plugin_sink_check() {
   local name="$1" file="$2" core out sink host
   core="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-  out="$(DOTFILES_TELEMETRY_SINK_FILE="$file" bash "$core/bin/dotfiles-telemetry" status 2>&1)" || true
+  # DO_NOT_TRACK and a placeholder key keep status from reading any token or
+  # key (no Keychain prompt during an unattended apply); the sink line still
+  # shows whether the policy is valid.
+  out="$(DO_NOT_TRACK=1 DOTFILES_POSTHOG_KEY=phc_policycheck DOTFILES_TELEMETRY_SINK_FILE="$file" \
+    bash "$core/bin/dotfiles-telemetry" status 2>&1)" || true
   sink="$(printf '%s\n' "$out" | sed -n 's/^sink: //p' | head -n 1)"
   case "$sink" in
     "") echo "the policy did not load (dotfiles telemetry status shows no sink line)"; return 0 ;;
@@ -233,6 +239,12 @@ plugin_telemetry_sink_pass() {
   [ ! -f "$state" ] || IFS=$'\t' read -r old_name old_sha < "$state" || true
 
   if [ "$n" -eq 0 ]; then
+    # A plugin that is still in plugins.lock but fails verification (a stale
+    # lock after an update) keeps its policy: removing it would fail open to
+    # the public default.
+    if [ -n "$old_name" ] && plugin_lock_names | grep -qxF -- "$old_name"; then
+      return 0
+    fi
     # The plugin that installed the policy is gone: remove its file, unless
     # someone changed it since.
     if [ -n "$old_sha" ] && [ -f "$target" ] && [ "$(_plugin_sha256 "$target")" = "$old_sha" ]; then
@@ -249,6 +261,11 @@ plugin_telemetry_sink_pass() {
   name="$found_name" src="$found_src"
   plugin_require "$name" telemetry_sink || return 3
   [ -f "$src" ] || { echo "plugin $name: telemetry sink policy missing: $src" >&2; return 1; }
+  # A file with the same bytes as the plugin's policy (a lost state file, or
+  # the old overlay's copy) is adopted, not refused.
+  if [ -f "$target" ] && [ "$(_plugin_sha256 "$target")" = "$(_plugin_sha256 "$src")" ]; then
+    old_sha="$(_plugin_sha256 "$target")"
+  fi
   if [ -f "$target" ] && { [ -z "$old_sha" ] || [ "$(_plugin_sha256 "$target")" != "$old_sha" ]; }; then
     echo "plugin $name: $target exists and was not written by a plugin; it was left as it is (remove it to let the plugin manage it)" >&2
     return 1
@@ -263,7 +280,11 @@ plugin_telemetry_sink_pass() {
     return 1
   fi
   sha="$(_plugin_sha256 "$tmp")"
-  if [ -f "$target" ] && [ "$sha" = "$old_sha" ]; then rm -f "$tmp"; return 0; fi
+  if [ -f "$target" ] && [ "$sha" = "$old_sha" ]; then
+    rm -f "$tmp"
+    printf '%s\t%s\n' "$name" "$sha" > "$state"
+    return 0
+  fi
   mv -f "$tmp" "$target" || { rm -f "$tmp"; return 1; }
   printf '%s\t%s\n' "$name" "$sha" > "$state"
   echo "installed the telemetry sink policy of plugin $name"

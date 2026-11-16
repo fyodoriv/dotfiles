@@ -108,10 +108,11 @@ others cannot read, or an env var name.
    ```
 
 3. If a machine already has `~/.config/dotfiles/telemetry-sink.json` from the
-   old overlay, apply leaves it alone and says so: a policy that a person or
-   an older overlay wrote is never replaced. Remove that file once in the
-   rollout (step 6), then apply installs the plugin's copy and from then on
-   manages it.
+   old overlay, apply adopts it when it has the same bytes as the plugin's
+   policy. If it differs, apply leaves it alone and says so: a policy that a
+   person or an older overlay wrote is never replaced. Then remove that file
+   once in the rollout (step 6), and apply installs the plugin's copy and from
+   then on manages it.
 4. **If the company uses a log forwarder and not HEC**: ship `"kind": "file"`
    with `"path": "~/Library/Logs/org-telemetry/dotfiles.jsonl"` (no `url`, no
    `token`, no `network_hosts` entry), and point the forwarder at that file.

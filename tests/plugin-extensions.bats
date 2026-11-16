@@ -510,6 +510,48 @@ sink_target() { printf '%s' "$HOME/.config/dotfiles/telemetry-sink.json"; }
   grep -q '"off"' "$(sink_target)"
 }
 
+@test "6f: a locked plugin that fails verification keeps its policy" {
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  ext plugin_telemetry_sink_pass
+  # Change the manifest so plugin_verify fails, as after a partial update.
+  printf 'description: changed\n' >> "$PLUGIN/dotfiles-plugin.yaml"
+  run ext plugin_telemetry_sink_pass
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped plugin acme"* ]]
+  cmp "$PLUGIN/sink.json" "$(sink_target)"
+  grep -q "^acme	" "$HOME/.local/state/dotfiles/plugin-telemetry-sink"
+}
+
+@test "6f: a policy with the plugin's exact bytes is adopted and recorded" {
+  mkdir -p "$HOME/.config/dotfiles"
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  cp "$PLUGIN/sink.json" "$(sink_target)"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  echo "$output"
+  [ "$status" -eq 0 ]
+  grep -q "^acme	" "$HOME/.local/state/dotfiles/plugin-telemetry-sink"
+  # Adopted: removing the plugin now removes the unchanged file.
+  bash "$CLI" remove acme --yes >/dev/null
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -eq 0 ]
+  [ ! -e "$(sink_target)" ]
+}
+
+@test "6f: the policy check never reads a token or the Keychain" {
+  printf '%s\n' "$SINK_HEC" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true
+  network_hosts: [splunk.example.com]' '  telemetry_sink: sink.json'
+  printf '#!/bin/sh\necho called >> "%s/security-calls"\nexit 1\n' "$TEST_DIR" > "$TEST_DIR/fake-security"
+  chmod +x "$TEST_DIR/fake-security"
+  DOTFILES_TELEMETRY_SECURITY="$TEST_DIR/fake-security" run ext plugin_telemetry_sink_pass
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ ! -e "$TEST_DIR/security-calls" ]
+}
+
 @test "6f: two plugins with a sink is a conflict and installs neither" {
   printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
   install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'

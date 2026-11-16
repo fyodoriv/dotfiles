@@ -415,6 +415,20 @@ them. -->
 
 ## P3
 
+- [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback
+  - **ID**: app-priority-field-check
+  - **Tags**: performance, launchagents
+  - **Blocked**: needs-owner-mac — due 2026-11-23: the check reads `~/.dotfiles-stats.jsonl` on the owner's Mac and needs the native build of the single-scan commit (`dotfiles priority-native install`). An agent on another machine cannot run it.
+  - **Details**: Follow-up from `app-priority-rust-tail` (closed by the single-scan fix; replay mean 301 to 111 ms, 751 to 246 ms under load). Run the command in [the tail analysis](docs/plans/app-priority-same-day.md#tail-analysis-and-fix-2026-11-16). On success, delete the shell fallback in `bin/app-priority` and its rollback tests in a separate PR. On a miss, file a new task with the numbers.
+  - **Output**: code
+  - **Acceptance**: the command prints n above 5,000, mean at most 400 ms and p95 at most 1,500 ms for Rust runs since the install time; then `bin/app-priority` has no shell fallback and `tests/app-priority.bats` keeps the same ordered actions.
+  - **Hypothesis**: the Rust daily mean falls from 540 ms (2026-11-14 to 2026-11-16, n=2,511) to at most 400 ms because the process table is read once per run instead of 17 times.
+  - **Measurement**: the command in the tail analysis (needs `~/.dotfiles-stats.jsonl`; it prints `{n:0}` when no rows match).
+  - **Success**: n above 5,000, mean at most 400 ms, p95 at most 1,500 ms.
+  - **Pivot**: mean above 540 ms (no better than before) -> revert to the previous lookup and record the mean as a measured exception in the migration plan. A mean between 400 and 540 ms -> keep the fix and record the mean as a measured exception.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
+  - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
+
 - [ ] Settle the embedded programs that static scanning leaves unresolved
   - **ID**: rust-inventory-dynamic-discovery
   - **Tags**: rust, migration
@@ -427,19 +441,6 @@ them. -->
   - **Pivot**: unresolved still above 5,000 after template rendering -> keep the exception and close this task.
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
   - **Competitive-goal**: none — migration scope honesty, not a scorecard metric.
-
-- [ ] Bring the Rust app-priority mean run time under 400 ms in daily use
-  - **ID**: app-priority-rust-tail
-  - **Tags**: rust, performance, launchagents
-  - **Details**: Follow-up from `rust-app-priority` (closed 2026-11-15, owner ruling: count downsides as tasks). The shell fallback in `bin/app-priority` stays until this task closes. In daily use the Rust path has median 302 ms but mean 698 ms and p95 2,476 ms (n=1,579, 2026-11-14 to 2026-11-15). The registered target was a mean of at most 400 ms. Long runs drive the mean. Find which runs are slow (load, process lookup fallback to `pgrep`, or priority syscalls) before changing code. See [app-priority same-day experiment](docs/plans/app-priority-same-day.md#live-result-2026-11-15).
-  - **Output**: code
-  - **Acceptance**: mean `duration_ms` of `runtime=rust` app-priority runs at most 400 ms over 7 days, same ordered actions in `tests/app-priority.bats`.
-  - **Hypothesis**: the slow tail comes from one identifiable step; removing it cuts the 7-day mean from 698 ms to at most 400 ms.
-  - **Measurement**: `rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms")|.duration_ms]|add/length'` over the 7 days after the change.
-  - **Success**: mean at most 400 ms with p95 at most 1,500 ms.
-  - **Pivot**: no single step explains over half of the runs above 1 s -> record the mean as a measured exception in the migration plan and close.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
-  - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
 
 - [ ] Reopen the agent-hook Rust port only with a full parser port
   - **ID**: rust-agent-hooks-full-port

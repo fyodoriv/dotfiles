@@ -147,6 +147,21 @@ them. -->
 
 ## P2
 
+- [ ] Keep or drop the per-job Homebrew cache in hosted CI
+  - **ID**: ci-homebrew-cache-decision
+  - **Tags**: ci, performance
+  - **Mode**: AFK
+  - **Details**: #722 (2026-11-16) added a per-job Homebrew cache to `.github/workflows/ci.yml`. The install step took 31 s and 23 s before it and 18 s and 33 s on warm runs: noise so far. `docs/ci-setup.md` records the pivot. After 5 warm `test` runs, compare the "Install dependencies" step time with the pre-cache runs and keep or remove the cache steps. Also count jobs cancelled with "not acquired by Runner" in the same window; if macOS capacity cancels more than 1 in 10 jobs, move more steps to `ubuntu-latest`.
+  - **Files**: `.github/workflows/ci.yml`, `docs/ci-setup.md`.
+  - **Output**: decision, then code
+  - **Acceptance**: the cache steps stay with a measured gain of 10 s or more, or are removed; the capacity-cancel count is in `docs/ci-setup.md`.
+  - **Hypothesis**: a per-job cache cuts the median install step by 10 s or more (from about 27 s).
+  - **Measurement**: `gh run list --repo fyodoriv/dotfiles -w ci.yml -s success -L 10 --json databaseId` then `gh run view <id> --json jobs --jq '.jobs[]|select(.name=="test")|.steps[]|select(.name|test("Install"))|((.completedAt|fromdate)-(.startedAt|fromdate))'` for 5 warm runs. In use: the hosted CI time row in `docs/metrics.md`.
+  - **Success**: median warm install step ≤ 17 s.
+  - **Pivot**: median > 17 s after 5 warm runs → remove the cache steps.
+  - **Anchor**: Forsgren, Humble and Kim 2018 (Accelerate, lead time); Basili, Caldiera and Rombach 1994 (GQM).
+  - **Competitive-goal**: none — CI cost and speed.
+
 - [ ] Block the two remaining local-test bypasses in the CI-only hook
   - **ID**: block-local-tests-xargs-npm-exec
   - **Tags**: agent-hooks, ci, testing

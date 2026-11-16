@@ -514,8 +514,10 @@ sink_target() { printf '%s' "$HOME/.config/dotfiles/telemetry-sink.json"; }
   printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
   install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
   ext plugin_telemetry_sink_pass
-  # Change the manifest so plugin_verify fails, as after a partial update.
-  printf 'description: changed\n' >> "$PLUGIN/dotfiles-plugin.yaml"
+  # Change the capabilities so plugin_verify fails, as after a partial update.
+  sed -i.bak 's/^capabilities:$/capabilities:\
+  sudo: true/' "$PLUGIN/dotfiles-plugin.yaml" && rm -f "$PLUGIN/dotfiles-plugin.yaml.bak"
+  grep -q '^  sudo: true$' "$PLUGIN/dotfiles-plugin.yaml"
   run ext plugin_telemetry_sink_pass
   echo "$output"
   [ "$status" -eq 0 ]

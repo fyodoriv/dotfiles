@@ -372,44 +372,19 @@ them. -->
 
 ## P3
 
-- [ ] Settle the embedded programs that static scanning leaves unresolved
-  - **ID**: rust-inventory-dynamic-discovery
-  - **Tags**: rust, migration
-  - **Details**: Follow-up from `rust-source-inventory` (closed 2026-11-15; owner ruling: count downsides as tasks). Every tracked path is classified, but `migration-check inventory --check` still fails closed at discovery: the static scanner leaves 14,784 unresolved findings (mostly dynamic arguments) and cannot parse 369 shell files (mostly `.bats` and chezmoi templates). See [classification](docs/plans/rust-source-classification.md) and the `embedded-discovery` row in [Recorded exceptions](docs/plans/rust-migration.md#recorded-exceptions). Weigh a cheaper option first: render templates before scanning, and treat `.bats` bodies as test tooling.
+- [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback
+  - **ID**: app-priority-field-check
+  - **Tags**: performance, launchagents
+  - **Blocked**: needs-owner-mac — due 2026-11-23: the check reads `~/.dotfiles-stats.jsonl` on the owner's Mac and needs the native build of the single-scan commit (`dotfiles priority-native install`). An agent on another machine cannot run it.
+  - **Details**: Follow-up from `app-priority-rust-tail` (closed by the single-scan fix; replay mean 301 to 111 ms, 751 to 246 ms under load). Run the command in [the tail analysis](docs/plans/app-priority-same-day.md#tail-analysis-and-fix-2026-11-16). On success, delete the shell fallback in `bin/app-priority` and its rollback tests in a separate PR. On a miss, file a new task with the numbers.
   - **Output**: code
-  - **Acceptance**: `migration-check inventory --check` exits 0 only with a discovery method that accounts for every unresolved finding and unparsed file, and still rejects every planted omission.
-  - **Hypothesis**: rendering templates and an execution trace of `make check` cut unresolved findings from 14,784 to under 500 and unparsed files from 369 to 0.
-  - **Measurement**: `python3 scripts/inventory-ledger.py --check` (prints `unresolved_findings` and `unparsed_shell_files`).
-  - **Success**: unresolved under 500, unparsed 0, every planted omission rejected.
-  - **Pivot**: unresolved still above 5,000 after template rendering -> keep the exception and close this task.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
-  - **Competitive-goal**: none — migration scope honesty, not a scorecard metric.
-
-- [ ] Bring the Rust app-priority mean run time under 400 ms in daily use
-  - **ID**: app-priority-rust-tail
-  - **Tags**: rust, performance, launchagents
-  - **Details**: Follow-up from `rust-app-priority` (closed 2026-11-15, owner ruling: count downsides as tasks). The shell fallback in `bin/app-priority` stays until this task closes. In daily use the Rust path has median 302 ms but mean 698 ms and p95 2,476 ms (n=1,579, 2026-11-14 to 2026-11-15). The registered target was a mean of at most 400 ms. Long runs drive the mean. Find which runs are slow (load, process lookup fallback to `pgrep`, or priority syscalls) before changing code. See [app-priority same-day experiment](docs/plans/app-priority-same-day.md#live-result-2026-11-15).
-  - **Output**: code
-  - **Acceptance**: mean `duration_ms` of `runtime=rust` app-priority runs at most 400 ms over 7 days, same ordered actions in `tests/app-priority.bats`.
-  - **Hypothesis**: the slow tail comes from one identifiable step; removing it cuts the 7-day mean from 698 ms to at most 400 ms.
-  - **Measurement**: `rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms")|.duration_ms]|add/length'` over the 7 days after the change.
-  - **Success**: mean at most 400 ms with p95 at most 1,500 ms.
-  - **Pivot**: no single step explains over half of the runs above 1 s -> record the mean as a measured exception in the migration plan and close.
+  - **Acceptance**: the command prints n above 5,000, mean at most 400 ms and p95 at most 1,500 ms for Rust runs since the install time; then `bin/app-priority` has no shell fallback and `tests/app-priority.bats` keeps the same ordered actions.
+  - **Hypothesis**: the Rust daily mean falls from 540 ms (2026-11-14 to 2026-11-16, n=2,511) to at most 400 ms because the process table is read once per run instead of 17 times.
+  - **Measurement**: the command in the tail analysis (needs `~/.dotfiles-stats.jsonl`; it prints `{n:0}` when no rows match).
+  - **Success**: n above 5,000, mean at most 400 ms, p95 at most 1,500 ms.
+  - **Pivot**: mean above 540 ms (no better than before) -> revert to the previous lookup and record the mean as a measured exception in the migration plan. A mean between 400 and 540 ms -> keep the fix and record the mean as a measured exception.
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
   - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
-
-- [ ] Reopen the agent-hook Rust port only with a full parser port
-  - **ID**: rust-agent-hooks-full-port
-  - **Tags**: rust, performance, agents
-  - **Details**: Follow-up from `rust-agent-hooks` (closed 2026-11-15 as a recorded exception by owner ruling). Measured attempts missed the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. Each kept the Perl parser or an integrity check on every call. A full Rust parser port could reach the target but must keep every deny, allow and unknown verdict. The heavy-run status path costs about 27 ms median per agent Bash call (docs/plans/rust-hook-status-experiment.md), small next to agentbrew's hook chain, so do this only after agentbrew's hook dispatcher work lands (an agentbrew task, outside this repo). See [Recorded exceptions](docs/plans/rust-migration.md#recorded-exceptions).
-  - **Output**: code
-  - **Acceptance**: gate ratio at most 0.50 for both `hook-require-heavy-run` and `hook-block-dangerous-git`, 100% verdict parity in the affected Bats tests, 0 new false permits.
-  - **Hypothesis**: a Rust parser with the integrity check moved to install time cuts each hook row to at most 0.50 of the shell path.
-  - **Measurement**: `scripts/perf-gate.sh --force --json` (the two hook rows) and `bin/bats-affected origin/feat/chezmoi | xargs heavy-run bats`.
-  - **Success**: both ratios at most 0.50 and 0 changed verdicts.
-  - **Pivot**: a ratio above 0.80 or any changed verdict -> keep the shell hooks and close this task.
-  - **Anchor**: Munafò et al. 2017 (pre-registration); Kohavi, Tang, Xu 2020 (A/A checks).
-  - **Competitive-goal**: none — agent wait time (docs/metrics.md), not a scorecard metric.
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
   - **ID**: dashboard-chart-gate-hardening

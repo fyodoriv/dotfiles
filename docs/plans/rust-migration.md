@@ -6,12 +6,12 @@ daily use runs at a 302 ms median against 920 ms for the shell (ratio 0.33,
 [live result](app-priority-same-day.md#live-result-2026-11-15)). The two agent
 hooks stay in shell as a [recorded exception](#recorded-exceptions) by owner
 ruling: their measured attempts reached 0.63 to 0.84 against a 0.50 target.
-Each downside is a task (`app-priority-rust-tail`, `rust-agent-hooks-full-port`).
+Each downside became a task. The hook-port and inventory-discovery tasks were closed on 2026-11-16 (see [Recorded exceptions](#recorded-exceptions)); `app-priority-rust-tail` closed with a fix, and its field check and fallback deletion moved to task `app-priority-field-check` ([tail analysis](app-priority-same-day.md)).
 Source classification is closed too: all 2,234 tracked paths have an owner and
 one of the five states, and 233 embedded programs have records
 ([classification](rust-source-classification.md)). `inventory --check` now
 stops only at static discovery, a recorded `embedded-discovery` exception
-(task `rust-inventory-dynamic-discovery`). The final audit is below in
+(closed on 2026-11-16 by its pivot). The final audit is below in
 [Final audit](#final-audit-2026-11-15).
 
 This plan was rewritten on 2026-11-10 after the
@@ -176,7 +176,7 @@ Then it waited for an exclusive slot in the shared `heavy-run` queue. It had
 printed no JSON when this revision was committed. The
 [gate docs](../observability.md#performance-gate) say `--json` prints
 `base_min` and `ratio` per row; this plan did not confirm that by a
-finished run. The closed task `rust-agent-hooks` ran this gate; `rust-agent-hooks-full-port` must run it again before any change.
+finished run. The closed task `rust-agent-hooks` ran this gate; any reopened hook port must run it again before any change.
 
 ```sh
 jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timing_source == "monotonic-ms" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl
@@ -323,7 +323,7 @@ about three tail samples, and measured noise on this Mac was 19-50%.
   slice's crate takes at most 120 s and a warm build at most 15 s under
   `heavy-run`. `make check` must build Rust only when `rust/` changed. The
   Makefile has no cargo step today. The first port task that adds Rust code
-  (`rust-agent-hooks-full-port`; app-priority already shipped its Rust) adds that step with this
+  (the next Rust port; app-priority already shipped its Rust) adds that step with this
   condition.
 
 **Named exemptions.** G as a whole applies to port slices only: steps 1
@@ -353,7 +353,7 @@ is no separate "move tests to Rust" step.
 | Step / task ID | Why and change | User-benefit metric, number and command | Depends on |
 |---|---|---|---|
 | 1. `rust-agent-hooks` (closed 2026-11-15: recorded exception) | Two hooks run on each agent Bash call and start Perl, `shfmt` or `jq`. Remove those starts. Weigh a shell fast path first. | `hook-require-heavy-run` and `hook-block-dangerous-git` `ratio` at most 0.50 each, from `scripts/perf-gate.sh --force --json`, after 20 clean A/A runs. The rows keep their command paths. | none |
-| 2. `rust-app-priority` (closed 2026-11-15: ported) | `app-priority` runs every 60 seconds. The owner requested completion today. The [same-day baseline](app-priority-same-day.md) failed its stability limit, so use its registered controlled fixture fallback. | On hosted macOS, preserve every ordered action across 30 pairs and reach a candidate/base median of at most 0.40 and candidate median of at most 400 ms. In use: median 302 ms vs 920 ms (ratio 0.33); the 400 ms mean target is missed (task `app-priority-rust-tail`). | none; parallel with 1 |
+| 2. `rust-app-priority` (closed 2026-11-15: ported) | `app-priority` runs every 60 seconds. The owner requested completion today. The [same-day baseline](app-priority-same-day.md) failed its stability limit, so use its registered controlled fixture fallback. | On hosted macOS, preserve every ordered action across 30 pairs and reach a candidate/base median of at most 0.40 and candidate median of at most 400 ms. In use: median 302 ms vs 920 ms (ratio 0.33); the 400 ms mean target was missed in the first window. Task `app-priority-rust-tail` found the lookup step (17 full process-table scans per run) and replaced it with one scan; in replay the mean fell from 301 to 111 ms and from 751 to 246 ms under heavy load ([tail analysis](app-priority-same-day.md#tail-analysis-and-fix-2026-11-16)). Field check due 2026-11-23. | none; parallel with 1 |
 | 3. `rust-cold-path-profile` | Doctor, apply, sync, upgrade and the queue lack qualified child-span coverage. The registered pivot retains them as exceptions. | Not separable with the currently evidenced method; local p50 and owned share are unknown. Reopen only with a qualified measurement. | none; pivot recorded |
 | 4. `rust-source-inventory` (closed 2026-11-15: all paths classified; discovery is a recorded exception) | Keep scope honest with a manifest and a thin pinned adapter to agentbrew's small validator. No full harness. | Recorded exception: preparation. Done when `migration-check inventory --check` rejects every planted omission. | Source collection: none. The check: agentbrew `rust-source-inventory`. |
 | 5. `rust-final-audit` (closed 2026-11-15: see [Final audit](#final-audit-2026-11-15)) | Prove that every owned executable has one of the five audit states. | Recorded exception: audit. Done when unrecorded components are 0 and every ported slice still meets its number. | 1, 2, 3, 4, and the confirmed owner ruling |
@@ -445,8 +445,8 @@ names as classification labels; this table gives each label its state.
 
 | Slice (old task suffix) | Reason | Cheaper option to weigh first |
 |---|---|---|
-| agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. The heavy-run status path costs about 27 ms median per agent Bash call ([experiment](rust-hook-status-experiment.md)). | A full Rust parser port after agentbrew's hook dispatcher; task `rust-agent-hooks-full-port`. |
-| embedded-discovery | Static shell scanning cannot settle 14,784 unresolved findings (mostly dynamic arguments) or parse 369 shell files (mostly `.bats` and templates), so `inventory --check` keeps failing closed at discovery. Every tracked path is still classified. | Execution tracing or a parser for the unparsed files; task `rust-inventory-dynamic-discovery`. |
+| agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. The heavy-run status path costs about 27 ms median per agent Bash call ([experiment](rust-hook-status-experiment.md)). Task `rust-agent-hooks-full-port` closed as unattempted on 2026-11-16: its dependency, agentbrew's `rust-hook-dispatcher`, is still an open, paused task (blocked by `rust-hook-chain-timing`), and every earlier attempt missed the 0.50 target (0.63 to 0.84). No parser port was tried, so its own pivot line (ratio above 0.80) was not measured. Baseline for the unchanged shell hooks, `scripts/perf-gate.sh --force --json` A/A on 2026-11-16, 15 runs per row: `hook-require-heavy-run` base 39.5 ms (ratio 0.986), `hook-block-dangerous-git` base 32.7 ms (ratio 1.003). The `rust/hook-status` candidate stays opt-in and unshipped. | Reopen with a new task when the dispatcher ships; the 0.50 target and the 100% verdict-parity rule stay. |
+| embedded-discovery | Closed by the pivot of task `rust-inventory-dynamic-discovery` on 2026-11-16. Static shell scanning leaves 14,830 unresolved findings (almost all dynamic arguments in plain `.sh` scripts) and cannot parse 371 shell files (369 of them `.bats`), so `inventory --check` keeps failing closed at discovery. Rendering the 14 shell templates with `chezmoi execute-template` before scanning moved their unresolved findings from 192 to 194 and parsed the 1 template that failed, so the pivot line (still above 5,000 after template rendering) applied; the command and totals are in [the classification note](rust-source-classification.md#what-stays-open). Every tracked path is still classified. | Execution tracing of `make check`, or a shell parser that resolves arguments. Reopen with a new task only when a qualified method names a number below 500. |
 | process-primitives | No measured cost of its own. | None needed. |
 | shared-queue | The owned share is not separable with the current method. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
 | repository-discovery | Rare, agent-driven tools. | None needed. |
@@ -475,11 +475,10 @@ The final step audits the finished state. It never claims that all code is Rust.
 | Every `exception` names a row in [Recorded exceptions](#recorded-exceptions) | yes; the generator writes only row names from that table |
 | `ported` slices still meet their number on the current tree | `app-priority`: live median 213 ms over 573 runs from 2026-11-15 12:00 UTC (the earlier 302 ms is the 2026-11-14 to 2026-11-15 window; number: at most 400 ms); Rust code unchanged since the measured commit `fa9c743` |
 | Performance gate, every tracked command | `scripts/perf-gate.sh --force --json`: `ok`, ratios 0.986 to 1.007, no problems |
-| Temporary bridges have a deletion condition | the shell `app-priority` fallback goes when `app-priority-rust-tail` closes; the unshipped `rust/hook-status` candidate goes when `rust-agent-hooks-full-port` hits its Pivot |
+| Temporary bridges have a deletion condition | the shell `app-priority` fallback goes when task `app-priority-field-check` passes (2026-11-23); the unshipped, opt-in `rust/hook-status` candidate stays until agentbrew's `rust-hook-dispatcher` decides the hook path |
 | `migration-check inventory --check` | fails closed at discovery only, the recorded `embedded-discovery` exception |
 
-Open follow-ups: `app-priority-rust-tail`, `rust-agent-hooks-full-port`,
-`rust-inventory-dynamic-discovery`. The daily `inventory-ledger-refresh.yml`
+Open Rust port tasks: the `app-priority` field check (task `app-priority-field-check`, 2026-11-23, [command](app-priority-same-day.md)). `github-connector-machine-credentials` is tagged `rust` but is not a port task. The daily `inventory-ledger-refresh.yml`
 workflow keeps the ledgers current ([ci-setup.md](../ci-setup.md)).
 
 ## Rollout, security and regression coverage

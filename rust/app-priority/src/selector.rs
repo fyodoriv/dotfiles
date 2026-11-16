@@ -72,49 +72,75 @@ fn arguments(pid: u32) -> Option<Vec<Vec<u8>>> {
     Some(args)
 }
 
-fn matches(pid: u32, info: &Details, expression: &Expression, full: bool) -> bool {
-    let args = arguments(pid).unwrap_or_default();
-    let value = if !full {
-        let first = args.first().filter(|a| !a.is_empty()).unwrap_or(&info.name);
+fn value_of(args: &[Vec<u8>], name: &[u8], full: bool) -> Vec<u8> {
+    if !full {
+        let first = args.first().filter(|a| !a.is_empty()).map_or(name, |a| a.as_slice());
         first.rsplit(|b| *b == b'/').next().unwrap_or_default().to_vec()
     } else if args.is_empty() {
-        info.name.clone()
+        name.to_vec()
     } else {
         args.join(&b' ')
-    };
-    expression.matches(&value, !full)
+    }
 }
 
-pub fn find(query: &OsStr, full: bool) -> Result<BTreeMap<u32, Identity>, ()> {
-    let expression = Expression::compile(query)?;
-    // SAFETY: querying the count uses no output buffer.
-    let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
-    if count <= 0 { #[cfg(test)] eprintln!("process list count failed"); return Err(()); }
-    let mut pids = vec![0i32; count as usize + 128];
-    let bytes = pids.len().checked_mul(std::mem::size_of::<i32>()).ok_or(())?;
-    if bytes > i32::MAX as usize { return Err(()); }
-    // SAFETY: pids contains bytes writable bytes for the returned PID list.
-    let count = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), bytes as i32) };
-    if count <= 0 || count as usize >= pids.len() { #[cfg(test)] eprintln!("process list read failed"); return Err(()); }
-    pids.truncate(count as usize);
-    let mut ancestors = BTreeSet::new();
-    let mut current = std::process::id();
-    while current != 0 {
-        if !ancestors.insert(current) { #[cfg(test)] eprintln!("ancestor cycle"); return Err(()); }
-        if current == 1 { break; }
-        current = details(current).map_err(|_| { #[cfg(test)] eprintln!("ancestor details failed"); })?.parent;
-    }
-    let mut result = BTreeMap::new();
-    for pid in pids.into_iter().filter(|pid| *pid > 0).map(|pid| pid as u32) {
-        if ancestors.contains(&pid) { continue; }
-        let Ok(before) = details(pid) else { continue };
-        if before.system || !matches(pid, &before, &expression, full) { continue; }
-        let after = details(pid).map_err(|_| { #[cfg(test)] eprintln!("candidate details failed"); })?;
-        if before.identity == after.identity && !after.system && matches(pid, &after, &expression, full) {
-            result.insert(pid, after.identity);
+fn matches(pid: u32, info: &Details, expression: &Expression, full: bool) -> bool {
+    let args = arguments(pid).unwrap_or_default();
+    expression.matches(&value_of(&args, &info.name, full), !full)
+}
+
+struct Entry { pid: u32, identity: Identity, name: Vec<u8>, args: Vec<Vec<u8>> }
+
+/// One read of the process table, shared by every rule of a run (per-run scope).
+/// Each hit is re-read before it is returned, so a reused or exited PID is
+/// dropped exactly as in a fresh per-rule scan.
+pub struct Snapshot { entries: Vec<Entry> }
+
+impl Snapshot {
+    pub fn take() -> Result<Self, ()> {
+        // SAFETY: querying the count uses no output buffer.
+        let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
+        if count <= 0 { return Err(()); }
+        let mut pids = vec![0i32; count as usize + 128];
+        let bytes = pids.len().checked_mul(std::mem::size_of::<i32>()).ok_or(())?;
+        if bytes > i32::MAX as usize { return Err(()); }
+        // SAFETY: pids contains bytes writable bytes for the returned PID list.
+        let count = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), bytes as i32) };
+        if count <= 0 || count as usize >= pids.len() { return Err(()); }
+        pids.truncate(count as usize);
+        let mut ancestors = BTreeSet::new();
+        let mut current = std::process::id();
+        while current != 0 {
+            if !ancestors.insert(current) { return Err(()); }
+            if current == 1 { break; }
+            current = details(current)?.parent;
         }
+        let mut entries = Vec::new();
+        for pid in pids.into_iter().filter(|pid| *pid > 0).map(|pid| pid as u32) {
+            if ancestors.contains(&pid) { continue; }
+            let Ok(info) = details(pid) else { continue };
+            if info.system { continue; }
+            entries.push(Entry { pid, identity: info.identity, name: info.name, args: arguments(pid).unwrap_or_default() });
+        }
+        Ok(Self { entries })
     }
-    Ok(result)
+
+    pub fn find(&self, query: &OsStr, full: bool) -> Result<BTreeMap<u32, Identity>, ()> {
+        let expression = Expression::compile(query)?;
+        let mut result = BTreeMap::new();
+        for entry in &self.entries {
+            if !expression.matches(&value_of(&entry.args, &entry.name, full), !full) { continue; }
+            let Ok(after) = details(entry.pid) else { continue };
+            if after.identity == entry.identity && !after.system && matches(entry.pid, &after, &expression, full) {
+                result.insert(entry.pid, after.identity);
+            }
+        }
+        Ok(result)
+    }
+}
+
+#[cfg(test)]
+pub fn find(query: &OsStr, full: bool) -> Result<BTreeMap<u32, Identity>, ()> {
+    Snapshot::take()?.find(query, full)
 }
 
 pub fn same(pid: u32, expected: Identity, query: &OsStr, full: bool) -> bool {

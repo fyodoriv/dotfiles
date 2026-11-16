@@ -11,7 +11,7 @@ Source classification is closed too: all 2,234 tracked paths have an owner and
 one of the five states, and 233 embedded programs have records
 ([classification](rust-source-classification.md)). `inventory --check` now
 stops only at static discovery, a recorded `embedded-discovery` exception
-(task `rust-inventory-dynamic-discovery`). The final audit is below in
+(closed on 2026-11-16 by its pivot). The final audit is below in
 [Final audit](#final-audit-2026-11-15).
 
 This plan was rewritten on 2026-11-10 after the
@@ -176,7 +176,7 @@ Then it waited for an exclusive slot in the shared `heavy-run` queue. It had
 printed no JSON when this revision was committed. The
 [gate docs](../observability.md#performance-gate) say `--json` prints
 `base_min` and `ratio` per row; this plan did not confirm that by a
-finished run. The closed task `rust-agent-hooks` ran this gate; `rust-agent-hooks-full-port` must run it again before any change.
+finished run. The closed task `rust-agent-hooks` ran this gate; any reopened hook port must run it again before any change.
 
 ```sh
 jq -c -s --argjson to 0 '(now - ($to + 7) * 86400 | todate) as $a | (now - $to * 86400 | todate) as $b | [.[] | select(.task == "app-priority" and .timing_source == "monotonic-ms" and .timestamp >= $a and .timestamp < $b) | .duration_ms] | {runs: length, mean: (if length > 0 then add / length else null end), zeros: (map(select(. == 0)) | length)}' ~/.dotfiles-stats.jsonl
@@ -323,7 +323,7 @@ about three tail samples, and measured noise on this Mac was 19-50%.
   slice's crate takes at most 120 s and a warm build at most 15 s under
   `heavy-run`. `make check` must build Rust only when `rust/` changed. The
   Makefile has no cargo step today. The first port task that adds Rust code
-  (`rust-agent-hooks-full-port`; app-priority already shipped its Rust) adds that step with this
+  (the next Rust port; app-priority already shipped its Rust) adds that step with this
   condition.
 
 **Named exemptions.** G as a whole applies to port slices only: steps 1
@@ -445,8 +445,8 @@ names as classification labels; this table gives each label its state.
 
 | Slice (old task suffix) | Reason | Cheaper option to weigh first |
 |---|---|---|
-| agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. The heavy-run status path costs about 27 ms median per agent Bash call ([experiment](rust-hook-status-experiment.md)). | A full Rust parser port after agentbrew's hook dispatcher; task `rust-agent-hooks-full-port`. |
-| embedded-discovery | Static shell scanning cannot settle 14,784 unresolved findings (mostly dynamic arguments) or parse 369 shell files (mostly `.bats` and templates), so `inventory --check` keeps failing closed at discovery. Every tracked path is still classified. | Execution tracing or a parser for the unparsed files; task `rust-inventory-dynamic-discovery`. |
+| agent-hooks (`require-heavy-run`, `block-dangerous-git`) | Owner ruling 2026-11-15: count downsides as tasks and continue. Measured against the 0.50 target: dangerous-Git native dispatch 0.698 and 0.631; heavy-run shortcut 0.840; heavy-run native preflight 0.688. The heavy-run status path costs about 27 ms median per agent Bash call ([experiment](rust-hook-status-experiment.md)). Task `rust-agent-hooks-full-port` closed as unattempted on 2026-11-16: its dependency, agentbrew's `rust-hook-dispatcher`, is still an open, paused task (blocked by `rust-hook-chain-timing`), and every earlier attempt missed the 0.50 target (0.63 to 0.84). No parser port was tried, so its own pivot line (ratio above 0.80) was not measured. Baseline for the unchanged shell hooks, `scripts/perf-gate.sh --force --json` A/A on 2026-11-16, 15 runs per row: `hook-require-heavy-run` base 39.5 ms (ratio 0.986), `hook-block-dangerous-git` base 32.7 ms (ratio 1.003). The `rust/hook-status` candidate stays opt-in and unshipped. | Reopen with a new task when the dispatcher ships; the 0.50 target and the 100% verdict-parity rule stay. |
+| embedded-discovery | Closed by the pivot of task `rust-inventory-dynamic-discovery` on 2026-11-16. Static shell scanning leaves 14,830 unresolved findings (almost all dynamic arguments in plain `.sh` scripts) and cannot parse 371 shell files (369 of them `.bats`), so `inventory --check` keeps failing closed at discovery. Rendering the 14 shell templates with `chezmoi execute-template` before scanning moved their unresolved findings from 192 to 194 and parsed the 1 template that failed, so the pivot line (still above 5,000 after template rendering) applied; the command and totals are in [the classification note](rust-source-classification.md#what-stays-open). Every tracked path is still classified. | Execution tracing of `make check`, or a shell parser that resolves arguments. Reopen with a new task only when a qualified method names a number below 500. |
 | process-primitives | No measured cost of its own. | None needed. |
 | shared-queue | The owned share is not separable with the current method. Current queue fixes ship first. `app-priority` moved to step 2. | The `heavy-run-status` budget row guards it. |
 | repository-discovery | Rare, agent-driven tools. | None needed. |

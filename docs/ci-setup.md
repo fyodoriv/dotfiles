@@ -37,7 +37,7 @@ by SHA like every action) before `brew install`. The key holds the runner OS and
 architecture, the ISO week (fresh bottles each week) and the hash of `ci.yml`
 (a changed tool list). A miss falls back to the newest entry of the same week,
 then of any week. Bottles still get poured, so the saving is the download time
-only. Measured on the `test` job's "Install dependencies" step: BEFORE_INSTALL.
+only. Measured on the `test` job's "Install dependencies" step: 31 s and 23 s before the cache (runs of 2026-11-15), 33 s on a cold first run, and 18 s and 33 s on warm runs (43925770666, 43906255985). The gain is small and noisy: bottle download is a minor part of the step.
 The `cached-run` cache above is unchanged.
 
 ### Hosted timing and the perf gate
@@ -48,7 +48,7 @@ The `cached-run` cache above is unchanged.
 writing N to a file, so no verdict depends on the speed of the runner. One test
 runs the real clock with wide margins (a 5 s and a 10 ms ceiling around a 0.3 s
 sleep). The real `make perf-gate` step of `make check` times real commands on
-the hosted runner: PERF_GATE_DECISION.
+the hosted runner: it passed on the hosted runner in every green run of this branch, so the gate stays on and the hosted skip of `tests/perf-gate.bats` is gone. Its rule (fastest run and paired median both over the limit) filters runner load noise.
 
 ### Cost, limits, and what stays local
 

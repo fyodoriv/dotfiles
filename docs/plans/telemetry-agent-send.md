@@ -68,4 +68,31 @@ retry, the 900 s interval, the long measurement, and the gate cases).
 
 ## Results
 
-Filled in after CI: see the PR.
+- Red before the fix: CI run 43873234863, 13 new tests failed on the old code.
+- Green after the fix: CI run 43876051767 (the PR's head at that time).
+- Stability on a hosted macOS runner (a throwaway draft PR, run
+  43876114691, closed unmerged), 20 runs of each case with two copies of
+  `telemetry.bats` and `telemetry-sink.bats` looping in the background; the
+  first two groups ran at a load average of 25 to 44 (4 cores), the rest at a
+  load of 3 to 4 (the background copies had ended their runs):
+
+  | Case | Runs | Passed |
+  |---|---|---|
+  | `telemetry.bats` a normal command on a terminal asks once (the task `telemetry-terminal-request-count-diagnostic`) | 20 | 20 |
+  | `telemetry.bats` request count diagnostic | 20 | 20 |
+  | `telemetry-gains.bats` a zsh that fails or takes over 5 seconds (the task `telemetry-gains-timeout-test-load-sensitive`) | 20 | 20 |
+  | `telemetry-gains.bats` a long measurement leaves the gains request its full limit | 20 | 20 |
+  | `telemetry-sink.bats` gates (the task `telemetry-sink-managed-shell-gates`) | 20 | 20 |
+  | `telemetry.bats` every daily-path case | 20 | 20 |
+  | `telemetry.bats` a failed request logs the curl exit code | 20 | 20 |
+  | `telemetry.bats` a hung request | 20 | 20 |
+
+- Closed tasks: `telemetry-terminal-request-count-diagnostic` (the receipt
+  shipped in #591; 40 of 40 runs of its two cases passed, so the cause stays
+  unknown and nothing in the send path changed for it),
+  `telemetry-gains-timeout-test-load-sensitive` (the test compares no wall
+  time now; 20 of 20; the old cause was the same 3 second budget plus a
+  tick-based zsh limit),
+  `telemetry-sink-managed-shell-gates` (the gates read the policy file; no
+  new process on the no-policy path, shown by a trace test; 20 of 20).
+- Still to measure after the apply: the metric in `docs/metrics.md`.

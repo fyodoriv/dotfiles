@@ -77,6 +77,9 @@ others cannot read, or an env var name.
    checks a shipped telemetry sink policy against the core.
 6. Run no tests on the laptop: push a branch and read the CI result. Locally
    run only `shellcheck` and `dotfiles plugin lint <name>`.
+   The core hook `block-local-tests.sh` guards only core checkouts (it
+   looks for `bin/dotfiles-doctor`), so in the plugin repo this is a rule,
+   not a hook.
 7. Check: the plugin CI is green on the pull request, and the first weekly
    run (Monday 06:17 UTC, against the newest core) is green.
 

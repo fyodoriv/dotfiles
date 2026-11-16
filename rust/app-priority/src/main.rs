@@ -18,7 +18,7 @@ trait Backend {
 /// Per-step wall time and call counts. Printed to stderr only when
 /// `DOTFILES_APP_PRIORITY_TRACE` is set; the run owns it (per-run scope).
 #[derive(Default)]
-struct Trace { find: (u32, u128), info: (u32, u128), background: (u32, u128), nice: (u32, u128) }
+struct Trace { find: (u32, u128), info: (u32, u128), background: (u32, u128), nice: (u32, u128), pgrep_fallbacks: u32 }
 impl Trace {
     fn time<T>(slot: &mut (u32, u128), work: impl FnOnce() -> T) -> T {
         let start = std::time::Instant::now();
@@ -28,9 +28,10 @@ impl Trace {
         result
     }
     fn report(&self) {
-        let ms = |slot: (u32, u128)| format!("{}x{}.{:03}ms", slot.0, slot.1 / 1000, slot.1 % 1000);
-        eprintln!("app-priority-trace find={} info={} background={} nice={}",
-            ms(self.find), ms(self.info), ms(self.background), ms(self.nice));
+        let step = |name: &str, slot: (u32, u128)| format!("{name}={} total={}.{:03}ms", slot.0, slot.1 / 1000, slot.1 % 1000);
+        eprintln!("app-priority-trace {} {} {} {} pgrep_fallbacks={}",
+            step("find", self.find), step("info", self.info), step("background", self.background),
+            step("nice", self.nice), self.pgrep_fallbacks);
     }
 }
 
@@ -78,6 +79,7 @@ impl System {
             }
             self.identities = None;
         }
+        self.trace.pgrep_fallbacks += 1;
         Command::new("pgrep").arg(if full { "-f" } else { "-x" }).arg(query)
             .stdin(Stdio::null()).stderr(Stdio::null()).output().ok()
             .map(|out| out.stdout.split(|b| *b == b'\n')
@@ -172,7 +174,7 @@ fn run() -> std::io::Result<()> {
     let mut backend = System::default();
     if config.is_file() { custom(&mut backend, &std::fs::read(config)?); }
     else { defaults(&mut backend); }
-    if std::env::var_os("DOTFILES_APP_PRIORITY_TRACE").is_some() { backend.trace.report(); }
+    if std::env::var_os("DOTFILES_APP_PRIORITY_TRACE").as_deref() == Some(OsStr::new("1")) { backend.trace.report(); }
     Ok(())
 }
 

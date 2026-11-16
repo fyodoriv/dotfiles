@@ -737,7 +737,9 @@ rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s -r '
 ## Tail analysis and fix (2026-11-16)
 
 Task `app-priority-rust-tail` registered this question: does one step explain
-the slow runs? Aggregates only; the log stays on the owner's Mac.
+the slow runs? It closed with the fix below; task `app-priority-field-check`
+owns the field check and the deletion of the shell fallback. Aggregates only;
+the log stays on the owner's Mac.
 
 **Which runs are slow.** `~/.dotfiles-stats.jsonl` and
 `~/.local/state/dotfiles/load-samples.tsv`, 2026-11-14 18:33 to
@@ -756,8 +758,15 @@ cores):
 68% of the runs over 1 s (167 of 245 joined) ran at a load of 15 or more.
 Load is the condition. The code step that pays for it comes next.
 
+The trace below is one 245 ms run at load about 25, repeated 5 times, not a
+sample of the runs over 1 s. The log has no per-step time, so the pivot test
+("one step explains over half of the runs above 1 s") is inferred, not
+measured on those runs: the lookup is the only step that scales with load
+and process count, and replay under load 70 shows its removal cuts the mean
+3x. The field check below is the direct test.
+
 **Which step.** A per-step trace (`DOTFILES_APP_PRIORITY_TRACE=1` prints call
-counts and wall time to stderr; it is off by default) on the unchanged code at
+counts, wall time and `pgrep` fallbacks to stderr; it is off otherwise) on the unchanged code at
 load about 25:
 
 | Step | Calls | Time per run |
@@ -767,7 +776,7 @@ load about 25:
 | `taskpolicy` / priority calls | 7 | 10 ms |
 | `setpriority` (nice) | 7 | 0.2 ms |
 
-The trace does not count `pgrep` fallbacks; 11 ms per rule fits the native scan. Each of the 17 rules scanned
+The trace now counts `pgrep` fallbacks (`pgrep_fallbacks=0` in the replay runs after the change; the earlier 5-run trace did not count them). Each of the 17 rules scanned
 the whole process table again: one `proc_pidinfo` and two `KERN_PROCARGS2`
 reads per process, per rule. That cost grows with load, because each
 syscall waits for a CPU. This is the single step: it holds more than half of
@@ -785,24 +794,27 @@ owner's Mac with no queue slot (the shared queue held an exclusive wait for
 over 20 minutes, so `heavy-run --exclusive` could not start; alternating pairs
 cancel most of the ambient load):
 
-| Condition | Old mean (median, p95) | New mean (median, p95) | Ratio of means |
+| Condition | Old mean (median, worst) | New mean (median, worst) | Ratio of means |
 |---|---|---|---|
-| ambient load about 45 | 301 ms (279, 590 max) | 111 ms (107, 192 max) | 0.37 |
-| plus 32 busy loops, load about 70 | 751 ms (737, 913) | 246 ms (215, 372) | 0.33 |
+| ambient load about 45 | 301 ms (279, 590) | 111 ms (107, 192) | 0.37 |
+| plus 32 busy loops, load about 70 | 751 ms (737, 1,065) | 246 ms (215, 383) | 0.33 |
 
-The mean under heavy load drops by 3x, and the p95 under heavy load is far
-below the 1,500 ms target. What remains is `ps` and `taskpolicy` child
+The mean under heavy load drops by 3x, and the worst run under heavy load
+(383 ms, 20 runs) is far below the 1,500 ms target. What remains is `ps` and `taskpolicy` child
 processes (about 45% of the new run), a smaller follow-up with no recorded
 task: the registered 400 ms mean is already met in the replay.
 
-**Field check, due 2026-11-23** (7 days after the change reaches the owner's
-Mac by `dotfiles priority-native install`; the check needs a native build
-from this commit):
+**Field check, due 2026-11-23** (task `app-priority-field-check`). The log has
+no build id, so the window starts at the native install time of this
+commit's build: the mtime of the `current` link that
+`dotfiles priority-native install` writes.
 
 ```sh
-rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms" and .timestamp>="2026-11-17")|.duration_ms] | sort as $d | {n:length, mean:(add/length), p95:$d[(length*0.95|floor)]}'
+since=$(TZ=UTC stat -f %Sm -t %Y-%m-%dT%H:%M:%SZ ~/.local/share/dotfiles/native/app-priority/current)
+rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s --arg since "$since" '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms" and .timestamp>=$since)|.duration_ms] | sort as $d | if length==0 then {n:0} else {n:length, mean:(add/length), p95:$d[(length*0.95|floor)]} end'
 ```
 
-Success: mean at most 400 ms and p95 at most 1,500 ms. If it misses, reopen
-the task with the new numbers. The shell fallback in `bin/app-priority`
-stays until that check passes; it is the rollback.
+Success: n above 5,000 (about 3.5 days of minute runs), mean at most 400 ms
+and p95 at most 1,500 ms. If it misses, reopen with the new numbers. The
+shell fallback in `bin/app-priority` stays until that check passes; it is the
+rollback.

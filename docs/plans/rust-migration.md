@@ -6,7 +6,7 @@ daily use runs at a 302 ms median against 920 ms for the shell (ratio 0.33,
 [live result](app-priority-same-day.md#live-result-2026-11-15)). The two agent
 hooks stay in shell as a [recorded exception](#recorded-exceptions) by owner
 ruling: their measured attempts reached 0.63 to 0.84 against a 0.50 target.
-Each downside is a task (`app-priority-rust-tail`, `rust-agent-hooks-full-port`).
+Each downside became a task. The hook-port and inventory-discovery tasks were closed on 2026-11-16 (see [Recorded exceptions](#recorded-exceptions)); `app-priority-rust-tail` closed with a fix, and its field check and fallback deletion moved to task `app-priority-field-check` ([tail analysis](app-priority-same-day.md)).
 Source classification is closed too: all 2,234 tracked paths have an owner and
 one of the five states, and 233 embedded programs have records
 ([classification](rust-source-classification.md)). `inventory --check` now
@@ -475,11 +475,10 @@ The final step audits the finished state. It never claims that all code is Rust.
 | Every `exception` names a row in [Recorded exceptions](#recorded-exceptions) | yes; the generator writes only row names from that table |
 | `ported` slices still meet their number on the current tree | `app-priority`: live median 213 ms over 573 runs from 2026-11-15 12:00 UTC (the earlier 302 ms is the 2026-11-14 to 2026-11-15 window; number: at most 400 ms); Rust code unchanged since the measured commit `fa9c743` |
 | Performance gate, every tracked command | `scripts/perf-gate.sh --force --json`: `ok`, ratios 0.986 to 1.007, no problems |
-| Temporary bridges have a deletion condition | the shell `app-priority` fallback goes when `app-priority-rust-tail` closes; the unshipped `rust/hook-status` candidate goes when `rust-agent-hooks-full-port` hits its Pivot |
+| Temporary bridges have a deletion condition | the shell `app-priority` fallback goes when task `app-priority-field-check` passes (2026-11-23); the unshipped, opt-in `rust/hook-status` candidate stays until agentbrew's `rust-hook-dispatcher` decides the hook path |
 | `migration-check inventory --check` | fails closed at discovery only, the recorded `embedded-discovery` exception |
 
-Open follow-ups: `app-priority-rust-tail`, `rust-agent-hooks-full-port`,
-`rust-inventory-dynamic-discovery`. The daily `inventory-ledger-refresh.yml`
+Open Rust port tasks: the `app-priority` field check (task `app-priority-field-check`, 2026-11-23, [command](app-priority-same-day.md)). `github-connector-machine-credentials` is tagged `rust` but is not a port task. The daily `inventory-ledger-refresh.yml`
 workflow keeps the ledgers current ([ci-setup.md](../ci-setup.md)).
 
 ## Rollout, security and regression coverage

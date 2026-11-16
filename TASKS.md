@@ -415,6 +415,20 @@ them. -->
 
 ## P3
 
+- [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback
+  - **ID**: app-priority-field-check
+  - **Tags**: performance, launchagents
+  - **Blocked**: needs-owner-mac — due 2026-11-23: the check reads `~/.dotfiles-stats.jsonl` on the owner's Mac and needs the native build of the single-scan commit (`dotfiles priority-native install`). An agent on another machine cannot run it.
+  - **Details**: Follow-up from `app-priority-rust-tail` (closed by the single-scan fix; replay mean 301 to 111 ms, 751 to 246 ms under load). Run the command in [the tail analysis](docs/plans/app-priority-same-day.md#tail-analysis-and-fix-2026-11-16). On success, delete the shell fallback in `bin/app-priority` and its rollback tests in a separate PR. On a miss, file a new task with the numbers.
+  - **Output**: code
+  - **Acceptance**: the command prints n above 5,000, mean at most 400 ms and p95 at most 1,500 ms for Rust runs since the install time; then `bin/app-priority` has no shell fallback and `tests/app-priority.bats` keeps the same ordered actions.
+  - **Hypothesis**: the Rust daily mean falls from 540 ms (2026-11-14 to 2026-11-16, n=2,511) to at most 400 ms because the process table is read once per run instead of 17 times.
+  - **Measurement**: the command in the tail analysis (needs `~/.dotfiles-stats.jsonl`; it prints `{n:0}` when no rows match).
+  - **Success**: n above 5,000, mean at most 400 ms, p95 at most 1,500 ms.
+  - **Pivot**: mean above 540 ms (no better than before) -> revert to the previous lookup and record the mean as a measured exception in the migration plan. A mean between 400 and 540 ms -> keep the fix and record the mean as a measured exception.
+  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
+  - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
+
 - [ ] Settle the embedded programs that static scanning leaves unresolved
   - **ID**: rust-inventory-dynamic-discovery
   - **Tags**: rust, migration

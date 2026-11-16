@@ -143,8 +143,10 @@ _telemetry_top() {
   body="${body#"${body%%[![:space:]]*}"}"
   [[ "$body" == "{"* ]] || return 1
   local i c depth=0 out=""
-  for ((i = 0; i < ${#body}; i++)); do
+  i=0
+  while [ "$i" -lt "${#body}" ]; do
     c="${body:i:1}"
+    i=$((i + 1))
     case "$c" in
       "{") depth=$((depth + 1)); [ "$depth" -gt 1 ] || continue ;;
       "}") depth=$((depth - 1)); [ "$depth" -ge 0 ] || return 1; [ "$depth" -ge 1 ] || continue ;;

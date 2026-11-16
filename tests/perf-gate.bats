@@ -1,5 +1,9 @@
 #!/usr/bin/env bats
 # scripts/perf-gate.sh: a tracked command may not get slower than the merge-base.
+# The timer runs on a virtual clock (tests/helpers/perf-gate-clock): a fixture
+# tool "takes" N seconds by writing N to $CLOCK (the `nap` helper), so every
+# measured time is exact and no verdict depends on the speed of the machine.
+# One test at the end runs the real clock with a generous ceiling.
 # Each test builds a small git repo with one tracked script that sleeps, so the
 # times are known: 100 ms at the base, 200 ms in a slowed head. The seeded
 # slowdown is large on purpose: these tests run next to other bats jobs, and a
@@ -23,6 +27,12 @@ setup() {
   export GIT_CONFIG_GLOBAL=/dev/null
   export XDG_CACHE_HOME="$TEST_DIR/cache"
   export PERF_GATE_BASE=main PERF_GATE_RUNS=3 PERF_GATE_WARMUPS=0 PERF_GATE_HEAVY_RUN=0
+  # The timer runs on the virtual clock. Fixture tools append their seconds to $CLOCK.
+  CLOCK="$TEST_DIR/clock"
+  export PERF_GATE_FAKE_CLOCK="$CLOCK"
+  printf '#!/bin/bash\nexec /usr/bin/perl -I"%s" "$@"\n' "$BATS_TEST_DIRNAME/helpers/perf-gate-clock" > "$TEST_DIR/fake-perl"
+  chmod +x "$TEST_DIR/fake-perl"
+  export PERF_GATE_PERL="$TEST_DIR/fake-perl"
   unset HEAVY_RUN_SLOT PERF_GATE_NO_BASE
   git init -q -b main "$FIX"
   mkdir -p "$FIX/config"
@@ -37,9 +47,12 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
-# tool <seconds> [file]: write a tracked script that sleeps that long.
+# nap <seconds>: the shell line that makes a fixture tool take that long on the virtual clock.
+nap() { printf 'echo %s >> "%s"' "$1" "$CLOCK"; }
+
+# tool <seconds> [file]: write a tracked script that takes that long.
 tool() {
-  printf '#!/bin/bash\nsleep %s\n' "$1" > "$FIX/${2:-tool.sh}"
+  printf '#!/bin/bash\n%s\n' "$(nap "$1")" > "$FIX/${2:-tool.sh}"
   chmod +x "$FIX/${2:-tool.sh}"
 }
 
@@ -89,7 +102,7 @@ gate() {
 @test "perf gate gives both trees the same ignored executable links" {
   mkdir -p "$FIX/bin"
   printf 'bin/tool-link\n' > "$FIX/.gitignore"
-  printf '#!/bin/bash\n[ -L bin/tool-link ] || exit 23\nsleep 0.1\n' > "$FIX/tool.sh"
+  printf '#!/bin/bash\n[ -L bin/tool-link ] || exit 23\n%s\n' "$(nap 0.1)" > "$FIX/tool.sh"
   chmod +x "$FIX/tool.sh"
   merge 'link fixture'
   ln -s /bin/echo "$FIX/bin/tool-link"
@@ -177,7 +190,7 @@ gate() {
   printf 'bin/tool-link\n' > "$FIX/.gitignore"
   printf '#!/bin/bash\nexit 0\n' > "$TEST_DIR/external-tool"
   chmod +x "$TEST_DIR/external-tool"
-  printf '#!/bin/bash\nprintf "#\\n" >> "%s"\nsleep 0.1\n' "$TEST_DIR/external-tool" > "$FIX/tool.sh"
+  printf '#!/bin/bash\nprintf "#\\n" >> "%s"\n%s\n' "$TEST_DIR/external-tool" "$(nap 0.1)" > "$FIX/tool.sh"
   chmod +x "$FIX/tool.sh"
   merge 'mutable link fixture'
   ln -s "$TEST_DIR/external-tool" "$FIX/bin/tool-link"
@@ -287,7 +300,7 @@ gate() {
 #!/bin/bash
 n=\$((\$(cat "$TEST_DIR/count" 2>/dev/null || echo 0) + 1))
 echo "\$n" > "$TEST_DIR/count"
-if [ "\$n" = 2 ]; then sleep 0.20; else sleep 0.30; fi
+if [ "\$n" = 2 ]; then echo 0.20 >> "$CLOCK"; else echo 0.30 >> "$CLOCK"; fi
 TOOL
   merge "a base with one fast run"
   tool 0.30
@@ -460,7 +473,7 @@ TOOL
   gate
   [ "$status" -eq 0 ]
   # Someone slows the tool inside the cached checkout, so a slow head looks equal.
-  printf '#!/bin/bash\nsleep 0.20\n' > "$CACHE/$sha/tool.sh"
+  printf '#!/bin/bash\n%s\n' "$(nap 0.20)" > "$CACHE/$sha/tool.sh"
   tool 0.20
   gate
   [ "$status" -eq 1 ]
@@ -952,7 +965,7 @@ age() {
 # ── How the commands run ─────────────────────────────────────────────
 
 @test "the commands run with a scratch HOME and without the caller's environment" {
-  printf '#!/bin/bash\nsleep 0.30\n[ -z "${BASH_ENV:-}" ] && [ -z "${SECRET_THING:-}" ] && [ "$DO_NOT_TRACK" = 1 ] && [ "$HOME" != "%s" ]\n' "$HOME" > "$FIX/tool.sh"
+  printf '#!/bin/bash\n%s\n[ -z "${BASH_ENV:-}" ] && [ -z "${SECRET_THING:-}" ] && [ "$DO_NOT_TRACK" = 1 ] && [ "$HOME" != "%s" ]\n' "$(nap 0.30)" "$HOME" > "$FIX/tool.sh"
   merge "env probe"
   printf '# a comment\n' >> "$FIX/tool.sh"
   run bash -c 'cd "$1" && BASH_ENV=/nonexistent SECRET_THING=x "$2"' _ "$FIX" "$GATE"
@@ -1008,4 +1021,17 @@ age() {
 
 @test "the base checkout cache is a .noindex folder, so Spotlight skips it" {
   grep -qF 'dotfiles/perf-gate.noindex' "$GATE"
+}
+
+@test "the real clock still times a tool: a generous ceiling passes and a tight one fails" {
+  # The only test on the real timer. The margins are wide, so load cannot flip the verdict.
+  unset PERF_GATE_PERL PERF_GATE_FAKE_CLOCK
+  printf '#!/bin/bash\nsleep 0.3\n' > "$FIX/tool.sh"
+  budget 'tool	5000	./tool.sh'
+  commit 'real sleep'
+  PERF_GATE_BASE=origin/nowhere PERF_GATE_NO_BASE=1 gate
+  [ "$status" -eq 0 ]
+  budget 'tool	10	./tool.sh'
+  PERF_GATE_BASE=origin/nowhere PERF_GATE_NO_BASE=1 gate
+  [ "$status" -eq 1 ]
 }

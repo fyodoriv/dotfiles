@@ -156,9 +156,10 @@ MOCK
 
 @test "dotfiles managed lists files" {
   # chezmoi can list files only after `chezmoi init` wrote this machine's
-  # config. A clean machine (a hosted runner) has none.
-  # A config that exists but is broken must still fail this test.
-  chezmoi cat-config >/dev/null 2>&1 ||
+  # config. The hosted jobs write one (`chezmoi init --promptDefaults`), so on
+  # CI this test never skips. A config that exists but is broken must still
+  # fail it.
+  [ -n "${DOTFILES_CI:-}" ] || chezmoi cat-config >/dev/null 2>&1 ||
     skip "no chezmoi config on this machine"
   run bash "$CLI" managed
   [ "$status" -eq 0 ]

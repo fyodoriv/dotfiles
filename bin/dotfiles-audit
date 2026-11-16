@@ -22,11 +22,25 @@ source "$DOTFILES_DIR/lib/stats.sh"
 # shellcheck source=../lib/output.sh
 source "$DOTFILES_DIR/lib/output.sh"
 
+# DOTFILES_AUDIT_REPO_ONLY=1 (the hosted CI job) runs only the checks of the
+# repo's own content: secrets in tracked files and tracked .env files. Every
+# other check reads the state of an installed machine (shims, LaunchAgents,
+# ~/.ssh rights) that a clean runner does not have, so it is skipped and shown.
+_audit_skipped_here() {
+  [ "${DOTFILES_AUDIT_REPO_ONLY:-0}" = 1 ] || return 1
+  case "$1" in
+    security.secret_in_file.* | security.no_secrets | security.tracked_env.* | security.no_env_tracked) return 1 ;;
+  esac
+  return 0
+}
+
 # Provide check()/check_advisory() for standalone use (doctor defines its own)
 # shellcheck disable=SC2034  # id accepted to match doctor signature, unused here
 check() {
   local id="$1" desc="$2" test_cmd="$3"
-  if eval "$test_cmd" >/dev/null 2>&1; then
+  if _audit_skipped_here "$id"; then
+    skipped "$desc (installed-machine check)"
+  elif eval "$test_cmd" >/dev/null 2>&1; then
     pass "$desc"
   else
     fail "$desc"
@@ -36,7 +50,9 @@ check() {
 # shellcheck disable=SC2034  # id accepted to match doctor signature, unused here
 check_advisory() {
   local id="$1" desc="$2" test_cmd="$3" remediation="${4:-}"
-  if eval "$test_cmd" >/dev/null 2>&1; then
+  if _audit_skipped_here "$id"; then
+    skipped "$desc (installed-machine check)"
+  elif eval "$test_cmd" >/dev/null 2>&1; then
     pass "$desc"
   else
     audit_warn "$desc" "$remediation"

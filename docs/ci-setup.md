@@ -6,20 +6,21 @@ How to enable and configure CI (continuous integration) on your team's fork of t
 
 ## How CI works in this repo
 
-The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/chezmoi`, on every push to `feat/chezmoi`, and by hand (`gh workflow run ci.yml`):
+The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/chezmoi`, on every push to `feat/chezmoi`, nightly, weekly, and by hand (`gh workflow run ci.yml --ref <branch>`; a manual run starts every job):
 
-| Job | Runner | What it does |
-|-----|--------|-------------|
-| **lint** | ubuntu-latest | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-latest | Installs `shfmt` for guard parity, adds the checkout's `heavy-run` to PATH, then runs `make check`; runs `make test-all` (full bats suite) on a manual run only (`gh workflow run ci.yml --ref <branch>`); a step first prints the test tool versions |
-| **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (manual start only: a clean runner has no chezmoi config) |
-| **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
-| **coverage** | ubuntu-latest | Manual runs only (`gh workflow run ci.yml`): `bin/dotfiles-coverage` + bats -- shell coverage report artifact. It did not finish in 45 minutes on a hosted runner (task `hosted-coverage-job-time`) |
+| Job | Runner | When | What it does |
+|-----|--------|------|-------------|
+| **lint** | ubuntu-latest | every run | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
+| **test** | macos-latest | every run | Restores the Homebrew and per-file caches, installs the tools, writes a chezmoi config (`chezmoi init --promptDefaults`), adds the checkout's `heavy-run` to PATH. A pull request runs `make check` (lint, perf gate, the affected tests). A push to `feat/chezmoi` runs `make check` and then `make test-all` (the full Bats suite; files that passed in `make check` are skipped by the cache). The nightly and manual runs run `make test-all`. No test file is skipped. A step prints the test tool versions first |
+| **doctor** | macos-latest | push, nightly, manual | `chezmoi init`, `chezmoi apply --exclude=scripts` (files only: lifecycle scripts install packages and change macOS settings, which `tests/e2e` covers in a sandbox), `dotfiles-doctor --report`, shell startup benchmark |
+| **audit** | macos-latest | every run except the weekly one | `DOTFILES_AUDIT_REPO_ONLY=1 dotfiles-audit`: the repo-content checks (secrets in tracked files, tracked `.env` files). Checks of an installed machine (shims, LaunchAgents, `~/.ssh` rights) are skipped and listed as skipped |
+| **coverage** | macos-latest | weekly (Sunday), manual | `bin/dotfiles-coverage` + the full Bats suite under `set -x` tracing, with the shell coverage floor check, as a report artifact |
 
 ### What the hosted gate leaves out
 
-- `tests/perf-gate.bats` (`TEST_SKIP_FILE=tests/perf-gate.bats make check`). Its fixtures time 100 ms sleeps. On the hosted macOS runner such a sleep took 174 to 241 ms, and other tests failed in each of 3 runs. Run it locally when you change the perf gate. Task: `perf-gate-hosted-runner-noise`.
-- The `doctor`, `audit` and `coverage` jobs (manual runs only; see the table).
+- The private-pattern leak gates (see "Cost, limits" below).
+- Anything that needs `sudo` or a login session: the lifecycle scripts run in `tests/e2e` only, inside a sandbox.
+- A pull request runs the affected tests, not the full suite. The full suite runs on every push to `feat/chezmoi` and nightly, so a gap shows within a day.
 
 ### Step cache (like nx)
 
@@ -29,17 +30,37 @@ or active until its behavior, resource and delivery gates pass.
 
 `bin/cached-run` records each test or lint file that passed, keyed on its content and on every file it reads. A later run skips a file whose inputs did not change. Lint files, the bash 3.2 plugin suites and the install e2e gain most. The key of a test file also holds the commit, so a test is skipped only when the same commit runs again (a re-run of a job). On a new pull request commit the lint entries are reused and the affected tests run. The `test` job keeps that record between runs with `actions/cache` (`~/.cache/cached-run`). A cache entry cannot be changed, so each run saves a new entry and restores the newest one. A pull request can read the entries of `feat/chezmoi` and its own; it cannot write to the entries of `feat/chezmoi`. The summary line shows the effect: `cached-run: N files: M unchanged (passed before), K checked`. To run everything, delete the entries: `gh cache delete --all`.
 
+### Homebrew download cache
+
+The macOS jobs restore `~/Library/Caches/Homebrew` with `actions/cache` (pinned
+by SHA like every action) before `brew install`. The key holds the runner OS and
+architecture, the ISO week (fresh bottles each week) and the hash of `ci.yml`
+(a changed tool list). A miss falls back to the newest entry of the same week,
+then of any week. Bottles still get poured, so the saving is the download time
+only. Measured on the `test` job's "Install dependencies" step: BEFORE_INSTALL.
+The `cached-run` cache above is unchanged.
+
+### Hosted timing and the perf gate
+
+`tests/perf-gate.bats` runs on every hosted run: its timer uses a virtual clock
+(`tests/helpers/perf-gate-clock`, a stand-in for `Time::HiRes` that
+`PERF_GATE_PERL` puts first in `@INC`). A fixture tool "takes" N seconds by
+writing N to a file, so no verdict depends on the speed of the runner. One test
+runs the real clock with wide margins (a 5 s and a 10 ms ceiling around a 0.3 s
+sleep). The real `make perf-gate` step of `make check` times real commands on
+the hosted runner: PERF_GATE_DECISION.
+
 ### Cost, limits, and what stays local
 
 - **Cost: zero.** Standard GitHub-hosted runners are free and unlimited for public repositories, macOS included ([GitHub docs](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)). Never switch a job to a larger runner: those are billed.
-- **Limits on the free plan** ([GitHub docs](https://docs.github.com/en/actions/reference/limits)): 20 jobs at a time, of which 5 on macOS; 6 hours per job; 10 GB of cache per repository. A pull request uses one macOS job (`test`). A new push to a pull request cancels its older `ci.yml` run.
+- **Limits on the free plan** ([GitHub docs](https://docs.github.com/en/actions/reference/limits)): 20 jobs at a time, of which 5 on macOS; 6 hours per job; 10 GB of cache per repository. A pull request uses two macOS jobs (`test`, `audit`); a push to `feat/chezmoi` or a manual run adds `doctor`; the weekly run adds `coverage`. That stays under 5 even with several runs at once, and `ci.yml` never starts more than one macOS job per job name per ref. A new push to a pull request cancels its older `ci.yml` run. A scheduled run has its own concurrency group, so it never replaces a pending push run.
 - **No secrets.** No workflow reads a secret. A pull request from a fork gets a read-only token.
 - **Leak gates stay local.** The private-pattern file lives only on the owner's machine and is never uploaded. A hosted runner cannot run that gate, so the pre-commit hook, the pre-push hook, and `bin/gh` stay the authority ([privacy-gates.md](privacy-gates.md)). No step prints the environment.
-- **Actions are pinned.** Every `uses:` names a full commit SHA, and only GitHub-owned actions are used. `tests/github-workflows.bats` enforces this. Dependabot proposes the SHA updates.
+- **Actions and cloned code are pinned.** Every `uses:` names a full commit SHA, and only GitHub-owned actions are used. A workflow that runs `git clone` must also check out a full commit SHA. The coverage job uses the Homebrew Bats, not a clone. `tests/github-workflows.bats` enforces all of this. Dependabot proposes the SHA updates.
 - **Also armed when Actions is on**: `brew-audit.yml` runs on the 1st of each month and may open a public issue. `release.yml` creates a GitHub release when a `v*` tag is pushed.
 - **Bot commits to `feat/chezmoi`**: `inventory-ledger-refresh.yml` runs daily (and by hand: `gh workflow run inventory-ledger-refresh.yml`). It runs `scripts/inventory-ledger-refresh.sh`, which regenerates the Rust inventory ledgers and commits them until `--check` passes; the job pushes only when they changed. It refuses to commit any file other than the three generated ledgers, and it has no pull request trigger, so fork code never gets its write token. Branch protection is off and Actions cannot open pull requests here, so this is the one exception to the PR-only rule.
 - **Local only**: the leak gates above, and anything that needs `sudo` or a login session.
-- **Turn it off**: `gh api -X PUT repos/fyodoriv/dotfiles/actions/permissions -F enabled=false`. `make check` is then the only gate again.
+- **Turn it off**: `gh api -X PUT repos/fyodoriv/dotfiles/actions/permissions -F enabled=false`. Tests then run nowhere unless a human sets `DOTFILES_ALLOW_LOCAL_TESTS=1` and runs `make check` by hand.
 
 Organization-specific branch-protection / approval workflows belong in your private overlay (see your overlay's `.github/workflows/`).
 
@@ -62,8 +83,7 @@ links in `README.md` and `docs/*.md` so onboarding links fail fast in CI.
 
 The coverage job runs bats through `bin/dotfiles-coverage`, which writes
 `coverage/bats/coverage.json` (kcov-compatible shape) and enforces the shell
-coverage floor from `.shell-coverage-floor`. Run `make coverage` locally to
-see the same floor check. `.shell-coverage-floor` must be a measured ratchet:
+coverage floor from `.shell-coverage-floor`. The job runs weekly (Sunday) and by hand, on macOS. To see the same floor check, run `gh workflow run ci.yml --ref <branch>` and read the `coverage` job. `.shell-coverage-floor` must be a measured ratchet:
 set it from the current full `make coverage` percentage with up to a 1.0 point
 buffer for runner noise, then raise it only after adding tests that keep CI
 green at the new threshold.

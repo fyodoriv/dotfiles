@@ -118,14 +118,20 @@ STUB
 printf '%s\n' "$*" >> "$SCHEDULER_STATE/bats-args"
 files=()
 jobs=1
+within_files=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --jobs|-j) jobs="$2"; shift 2 ;;
-    --no-parallelize-within-files|--print-output-on-failure) shift ;;
-    --) shift; break ;;
+    --no-parallelize-within-files) within_files=1; shift ;;
+    --print-output-on-failure) shift ;;
+    --) echo "Error: Bad command line option '--'" >&2; exit 2 ;;
     *) break ;;
   esac
 done
+if [ "$jobs" -eq 1 ] && [ "$within_files" -eq 1 ]; then
+  echo 'Error: --no-parallelize-within-files requires --jobs > 1' >&2
+  exit 2
+fi
 for path in "$@"; do
   if [ -d "$path" ]; then
     for file in "${path%/}"/*.bats; do [ ! -f "$file" ] || files+=("$file"); done
@@ -181,7 +187,7 @@ _scheduler_make() {
     PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" CACHED_RUN_DIR="$SCHED_STATE/cache" \
     SCHEDULER_RELATIVE="${SCHEDULER_RELATIVE:-false}" \
     SCHEDULER_STATE="$SCHED_STATE" SCHEDULER_REPO="$SCHED_REPO" SCHEDULER_FAIL_FILE="${SCHEDULER_FAIL_FILE:-}" \
-    make -C "$SCHED_REPO" --no-print-directory "$1" JOBS=2 FULLPOWER=
+    make -C "$SCHED_REPO" --no-print-directory "$1" JOBS="${SCHEDULER_JOBS:-2}" FULLPOWER=
 }
 
 _scheduler_exact_coverage() {
@@ -191,6 +197,32 @@ _scheduler_exact_coverage() {
   done < "$SCHED_STATE/selected"
   [ "$(grep -c '^end ' "$SCHED_STATE/events")" -eq "$(wc -l < "$SCHED_STATE/selected" | tr -d ' ')" ] || return 1
   ! grep -q '^overlap ' "$SCHED_STATE/events"
+}
+
+@test "one-job recipes execute selected tests serially" {
+  for target in test test-all test-force; do
+    _scheduler_fixture "$target"
+    run env PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" \
+      make -C "$REPO_ROOT" -n --no-print-directory "$target" JOBS=1
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"--jobs"* ]]
+    SCHEDULER_JOBS=1 run _scheduler_make "$target"
+    if [ "$status" -ne 0 ] || ! _scheduler_exact_coverage; then
+      echo 'expected all one-job recipes to run serially'
+      return 1
+    fi
+    ! grep -q -- '--jobs\|--no-parallelize-within-files' "$SCHED_STATE/bats-args"
+  done
+}
+
+@test "multi-job recipes retain parallel Bats options" {
+  for target in test test-all test-force; do
+    _scheduler_fixture "$target"
+    SCHEDULER_JOBS=2 run _scheduler_make "$target"
+    [ "$status" -eq 0 ] || { echo "$target: $output"; return 1; }
+    _scheduler_exact_coverage
+    grep -q -- '--jobs 2 --no-parallelize-within-files' "$SCHED_STATE/bats-args"
+  done
 }
 
 @test "actual make recipes finish peers before running doctor exactly once" {

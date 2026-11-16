@@ -97,7 +97,12 @@ JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # without `parallel` on PATH the test targets run bats serially (slower, same
 # tests). Install it with `brew install parallel` or `make install-deps`.
 HAS_PARALLEL := $(shell command -v parallel >/dev/null 2>&1 && echo yes)
-ifeq ($(HAS_PARALLEL),yes)
+# Bats 1.14 rejects --no-parallelize-within-files with --jobs 1: one job runs plain serial.
+ifeq ($(JOBS),1)
+BATS_JOBS :=
+JOBS_LABEL := serial: one job
+TEST_FILE_JOBS :=
+else ifeq ($(HAS_PARALLEL),yes)
 BATS_JOBS := --jobs $(JOBS) --no-parallelize-within-files
 JOBS_LABEL := $(JOBS) jobs
 TEST_FILE_JOBS := --jobs $(JOBS)
@@ -108,7 +113,7 @@ TEST_FILE_JOBS :=
 endif
 # Keep Bats' non-recursive root/plugin selection, with doctor isolated last.
 BATS_ALL_FILES := $(wildcard tests/*.bats tests/plugin/*.bats)
-# TEST_SKIP_FILE leaves one file out of the full run too (hosted CI: perf-gate.bats).
+# TEST_SKIP_FILE leaves one file out of the full run too (a local debugging aid; hosted CI skips none).
 BATS_PEER_FILES = $(filter-out tests/doctor.bats $(patsubst $(CURDIR)/%,%,$(TEST_SKIP_FILE)),$(BATS_ALL_FILES))
 # --print-output-on-failure: a hosted-only failure shows the output of its
 # last `run`, so it can be fixed from the CI log.
@@ -127,8 +132,8 @@ endef
 # with the same content of the changed files that select it
 # (bin/bats-affected --pairs feeds them to bin/cached-run --per-file --deps).
 # A fix to one file re-runs only the tests that file selects.
-# TEST_SKIP_FILE=<path> leaves one affected file out and says so. Hosted CI
-# uses it for tests/perf-gate.bats (TASKS.md perf-gate-hosted-runner-noise).
+# TEST_SKIP_FILE=<path> leaves one affected file out and says so (a debugging
+# aid: hosted CI skips no file).
 test: ## Run affected tests only (skips tests that passed with the same inputs)
 	@pairs=$$(mktemp "$${TMPDIR:-/tmp}/bats-pairs.XXXXXX") || exit 1; \
 	trap 'rm -f "$$pairs"' EXIT; \

@@ -12,6 +12,7 @@ teardown() { rm -rf "$TEST_DIR"; }
   sha="$(sed -nE 's/.*up to commit ([0-9a-f]{12})\. Do not edit by hand.*/\1/p' "$REPO_ROOT/CHANGELOG.md")"
   [ -n "$sha" ] || { echo "CHANGELOG.md does not name its source commit"; return 1; }
   git -C "$REPO_ROOT" cat-file -e "$sha^{commit}" 2>/dev/null || skip "commit $sha is not in this clone"
+  command -v git-cliff >/dev/null || skip "git-cliff is not installed"
   run bash -c "cd '$REPO_ROOT' && '$GEN' '$sha'"
   [ "$status" -eq 0 ]
   diff <(printf '%s\n' "$output") "$REPO_ROOT/CHANGELOG.md" || { echo "CHANGELOG.md was edited by hand; run make changelog"; return 1; }

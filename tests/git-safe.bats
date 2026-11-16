@@ -10,7 +10,7 @@ setup() {
   TEST_REPO="$TEST_DIR/repo"
 
   mkdir -p "$TEST_REPO"
-  git -C "$TEST_REPO" init --quiet
+  git -C "$TEST_REPO" init --quiet -b main
   git -C "$TEST_REPO" commit --no-verify --allow-empty -m "chore: initial" --quiet
 
   export PATH="$BATS_TEST_DIRNAME/../bin:$PATH"

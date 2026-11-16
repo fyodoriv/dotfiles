@@ -29,6 +29,20 @@ them. -->
 
 ## P1
 
+- [ ] update-tooling rebuilds a stale agentbrew dist even when the checkout is current
+  - **ID**: update-tooling-stale-agentbrew-dist
+  - **Tags**: update-tooling, agentbrew, native, stability
+  - **Mode**: AFK
+  - **Details**: Found 2026-11-16 in agentbrew PR #1031 (Rust closeout). `skills/update-tooling/SKILL.md` rebuilds agentbrew (`npm run build`) only when the applied checkout moves. If the checkout is already at `origin/main` but `dist/` is stale (someone pulled without building), the skill prints "current" and skips the build, so a merged native change never reaches the machine. Compare `dist/build-info.json` `commit` with the checkout's build inputs (agentbrew `BUILD_INPUTS` in `src/cli-build-health.ts`) or run `agentbrew health --fix`, which already rebuilds in that case.
+  - **Output**: code
+  - **Acceptance**: with the checkout at `origin/main` and a build input changed after the `dist/build-info.json` commit, update-tooling rebuilds and reports it; with no changed input it stays "current".
+  - **Hypothesis**: Stale-dist runs that update-tooling reports as "current" drop from 1 seen (2026-11-16 audit) to 0.
+  - **Measurement**: A Bats case with a fake agentbrew checkout at origin/main and a `build-info.json` older than a changed input asserts a rebuild; run on hosted CI.
+  - **Success**: 100% of planted stale cases rebuild; 0 rebuilds in the current case.
+  - **Pivot**: If build-input detection cannot be read from agentbrew reliably, call `agentbrew health --fix` every run and measure its added time; drop it if it adds more than 5 s.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Forsgren, Humble and Kim 2018 (deployment lead time).
+  - **Competitive-goal**: none: local install freshness.
+
 - [ ] Stop an exclusive heavy-run from waiting forever behind one long run
   - **ID**: heavy-run-exclusive-starvation
   - **Tags**: heavy-run, speed, stability

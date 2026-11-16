@@ -46,6 +46,15 @@ _make_dry_run() {
   done
 }
 
+@test "full-suite targets leave out TEST_SKIP_FILE" {
+  for target in test-all test-force; do
+    run env PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" make -C "$REPO_ROOT" -n --no-print-directory "$target" TEST_SKIP_FILE=tests/perf-gate.bats
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tests/heavy-run.bats"* ]]
+    [[ "$output" != *"tests/perf-gate.bats"* ]]
+  done
+}
+
 @test "CONTRIBUTING documents the serial fallback without parallel" {
   grep -q 'serial' "$REPO_ROOT/CONTRIBUTING.md"
   grep -q 'parallel' "$REPO_ROOT/CONTRIBUTING.md"

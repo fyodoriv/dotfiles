@@ -108,8 +108,10 @@ jobs:
           TEST_SKIP_FILE: tests/perf-gate.bats
         run: make check
       - name: Full suite (manual runs only)
-        # Fails today: TASKS.md full-suite-bats-argument-compatibility.
         if: github.event_name == 'workflow_dispatch'
+        env:
+          # Same reason as the gate step: hosted timing noise.
+          TEST_SKIP_FILE: tests/perf-gate.bats
         run: make test-all
 
   doctor:

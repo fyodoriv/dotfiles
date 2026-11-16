@@ -11,7 +11,7 @@ The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/ch
 | Job | Runner | What it does |
 |-----|--------|-------------|
 | **lint** | ubuntu-latest | `make lint-full` + `make lint-tasks` -- shellcheck scripts and validate `TASKS.md` |
-| **test** | macos-latest | Installs `shfmt` for guard parity, adds the checkout's `heavy-run` to PATH, then runs `make check`; runs `make test-all` (full bats suite) on a manual run only, until task `full-suite-bats-argument-compatibility` lands |
+| **test** | macos-latest | Installs `shfmt` for guard parity, adds the checkout's `heavy-run` to PATH, then runs `make check`; runs `make test-all` (full bats suite) on a manual run only (`gh workflow run ci.yml --ref <branch>`); a step first prints the test tool versions |
 | **doctor** | macos-latest | `chezmoi apply` + `dotfiles doctor --report` + shell startup benchmark (manual start only: a clean runner has no chezmoi config) |
 | **audit** | macos-latest | `dotfiles-audit` -- security and repo-hygiene scan of an installed machine (manual start only: it fails on a clean runner) |
 | **coverage** | ubuntu-latest | Manual runs only (`gh workflow run ci.yml`): `bin/dotfiles-coverage` + bats -- shell coverage report artifact. It did not finish in 45 minutes on a hosted runner (task `hosted-coverage-job-time`) |
@@ -247,7 +247,7 @@ runs-on: [self-hosted, macOS]
 
 **`lint` job fails**: Run `make lint` for shellcheck errors and `make lint-tasks` for `TASKS.md` queue format errors. Fix and push.
 
-**`test` job fails**: Run `make test-all` locally. If tests pass locally but fail in CI, check for differences in brew package versions between your machine and the runner.
+**`test` job fails**: Run `make test-all` locally. If tests pass locally but fail in CI, compare the "Show test tool versions" step with your machine, then rerun the failing files with an empty config folder (`XDG_CONFIG_HOME=$(mktemp -d) bats <files>`): a test that reads your own `~/.config`, or that writes into your real `HOME`, fails only on the runner.
 
 **`doctor` job fails**: The doctor job runs `chezmoi apply` first, then `dotfiles doctor --report`. Failures usually mean a module check assumes something about the environment that CI runners don't have. The `DOTFILES_CI=1` env var is set so modules can skip CI-incompatible checks.
 

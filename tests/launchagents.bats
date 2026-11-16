@@ -111,6 +111,12 @@ _program_resolves() {
       # runner has none yet. The script that makes it must exist.
       [ -f "$REPO_ROOT/.chezmoiscripts/run_after_claude-wrapper.sh" ]
       ;;
+    "$HOME/.opencode/bin/opencode")
+      # Installed by OpenCode's own installer, not dotfiles. The LaunchAgent
+      # install script skips opencode-serve when this binary is missing.
+      grep -qF '[ ! -x "$HOME/.opencode/bin/opencode" ] && return 0' \
+        "$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+      ;;
     /*)
       # Absolute path — it must exist as an executable file. The
       # sleepwatcher plist is special: chezmoi templating picks

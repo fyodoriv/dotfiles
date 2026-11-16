@@ -182,6 +182,12 @@ starts. Doctor resolves the source path before it adjusts PATH. Telemetry
 test diagnostics print only bounded counts and fixed status labels. A sender
 marker proves it reached that marker, not that it exited.
 
+A suite must set `HOME` (and any config dir it reads) to a temp folder
+before it runs a shim linker, installer or `chezmoi`. A shim linked into the
+real `~/.local/bin` breaks every later suite in a full run; on 2026-11-15 one
+such `jq` stub caused most of the hosted full-suite failures. Never read the
+machine's own `~/.config` (chezmoi data, private patterns): a runner has none.
+
 Interpreter test wrappers must resolve and export the original interpreter
 before prefixing `PATH`. Check staged fixtures for rewritten machine paths.
 

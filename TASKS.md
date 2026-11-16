@@ -147,6 +147,21 @@ them. -->
 
 ## P2
 
+- [ ] Block the two remaining local-test bypasses in the CI-only hook
+  - **ID**: block-local-tests-xargs-npm-exec
+  - **Tags**: agent-hooks, ci, testing
+  - **Mode**: AFK
+  - **Details**: `agent-hooks/block-local-tests.sh` (the hook that keeps tests on hosted CI) blocks direct `bats`, `make check`, `make test*`, `make e2e`, `xargs bats`, and `find -exec bats`. Review on 2026-11-16 found two forms it still lets through: `xargs --replace bats` (and `xargs -I{} bats`) and `npm exec bats` / `npx bats`. Add both to the matcher and keep read-only references (for example `rg bats`) allowed.
+  - **Files**: `agent-hooks/block-local-tests.sh`, `tests/agent-hooks-block-local-tests.bats`.
+  - **Output**: code
+  - **Acceptance**: the four planted forms are blocked; `rg bats tests/` and `cat tests/x.bats` still pass.
+  - **Hypothesis**: matching the runner after `xargs` options and after `npm exec`/`npx` moves planted bypasses that pass from 2 of 2 to 0 of 2.
+  - **Measurement**: new cases in `tests/agent-hooks-block-local-tests.bats`, run on hosted CI. In use, the hook's block message is the event: it should fire for each planted form.
+  - **Success**: 0 planted bypasses pass and 0 read-only references are blocked.
+  - **Pivot**: if a fix blocks any read-only reference, keep the current matcher and document the bypass in `docs/agent-hooks.md`.
+  - **Anchor**: Basili, Caldiera and Rombach 1994 (Goal Question Metric); `agent-hooks/require-heavy-run.sh`.
+  - **Competitive-goal**: none — local agent workflow stability.
+
 - [ ] Distinguish read-only test-runner references from test runs
   - **ID**: heavy-run-read-only-reference
   - **Tags**: agent-hooks, heavy-run, false-positive

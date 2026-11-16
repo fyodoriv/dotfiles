@@ -91,6 +91,36 @@ workflow_code() {
   done
 }
 
+@test "workflow files: a git clone is pinned to a full commit SHA" {
+  # actions are pinned by the test above; code fetched by a run step must be too.
+  local wf
+  for wf in "$REPO_ROOT"/.github/workflows/*.yml; do
+    if workflow_code "$wf" | grep -qE 'git[[:space:]]+clone'; then
+      workflow_code "$wf" | grep -qE 'git[^|;&]*checkout[[:space:]]+[0-9a-f]{40}([[:space:]]|$)' || {
+        echo "$(basename "$wf") clones a repository without checking out a pinned commit"
+        return 1
+      }
+    fi
+  done
+}
+
+@test "workflow files: ci.yml skips no test file and runs the full suite off pull requests" {
+  local file="$REPO_ROOT/.github/workflows/ci.yml"
+  ! workflow_code "$file" | grep -q 'TEST_SKIP_FILE' || {
+    echo "ci.yml sets TEST_SKIP_FILE: no hosted test file may be skipped"
+    return 1
+  }
+  workflow_code "$file" | grep -qE '^[[:space:]]+schedule:' || {
+    echo "ci.yml has no schedule trigger (nightly full suite)"
+    return 1
+  }
+  # make test-all runs only when the event is not a pull request.
+  workflow_code "$file" | grep -B6 'run: make test-all' | grep -qF "github.event_name != 'pull_request'" || {
+    echo "make test-all must be guarded by event_name != 'pull_request'"
+    return 1
+  }
+}
+
 @test "workflow files: every workflow sets top-level permissions" {
   local wf
   for wf in "$REPO_ROOT"/.github/workflows/*.yml; do

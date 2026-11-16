@@ -150,7 +150,7 @@ others cannot read, or an env var name.
    falls back to shell, and the agent hooks stay in shell by decision
    ([rust-migration.md](rust-migration.md#recorded-exceptions)).
    After the core update, `dotfiles apply` rebuilds the native app-priority
-   on Macs that installed it (`run_onchange_after_app-priority-native`). In
+   on Macs that installed it (`run_after_app-priority-native`). In
    step 7, check the `current` link under
    `~/.local/share/dotfiles/native/app-priority/` is dated after the rollout.
 4. A plugin adds no Rust code of its own. The core's migration inventory

@@ -1,42 +1,71 @@
 #!/usr/bin/env bats
 # `dotfiles apply` rebuilds the opt-in native app-priority when its source changes.
+# shellcheck disable=SC2016  # fake installers expand $1 when they run
 
 ROOT="$BATS_TEST_DIRNAME/.."
-SCRIPT="$ROOT/.chezmoiscripts/run_onchange_after_app-priority-native.sh.tmpl"
+SCRIPT="$ROOT/.chezmoiscripts/run_after_app-priority-native.sh.tmpl"
 
-@test "the apply script hashes every app-priority Rust source file" {
+setup() {
+  SRC="$BATS_TEST_TMPDIR/src"
+  DATA="$BATS_TEST_TMPDIR/data"
+  NATIVE="$DATA/dotfiles/native/app-priority"
+  mkdir -p "$SRC/bin" "$NATIVE"
+  sed -e "s|{{ .chezmoi.sourceDir }}|$SRC|g" -e 's/{{[^}]*}}/H/g' "$SCRIPT" > "$BATS_TEST_TMPDIR/refresh.sh"
+}
+
+fake_installer() {
+  printf '#!/bin/bash\n%s\n' "$1" > "$SRC/bin/app-priority-native"
+}
+
+refresh() {
+  XDG_DATA_HOME="$DATA" DOTFILES_NATIVE_BUILD_MAX_WAIT="${1:-30}" run bash "$BATS_TEST_TMPDIR/refresh.sh"
+}
+
+@test "the apply script hashes every app-priority crate file" {
   local f rel
-  for f in "$ROOT"/rust/app-priority/Cargo.toml "$ROOT"/rust/app-priority/Cargo.lock "$ROOT"/rust/app-priority/src/*.rs; do
+  while IFS= read -r f; do
     rel="${f#"$ROOT"/}"
     grep -qF "include \"$rel\" | sha256sum" "$SCRIPT" || { echo "not hashed: $rel"; return 1; }
-  done
+  done < <(git -C "$ROOT" ls-files --full-name rust/.cargo rust/app-priority \
+    | grep -v '/\.gitignore$' | sed "s|^|$ROOT/|")
 }
 
 @test "the apply script does nothing on a Mac without the native install" {
-  sed 's/{{[^}]*}}//g' "$SCRIPT" > "$BATS_TEST_TMPDIR/refresh.sh"
-  XDG_DATA_HOME="$BATS_TEST_TMPDIR/empty" run bash "$BATS_TEST_TMPDIR/refresh.sh"
+  fake_installer 'echo "ran $1"'
+  refresh
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
-@test "a failed rebuild keeps apply going and names the retry command" {
-  mkdir -p "$BATS_TEST_TMPDIR/src/bin" "$BATS_TEST_TMPDIR/data/dotfiles/native/app-priority"
-  printf '#!/bin/bash\nexit 1\n' > "$BATS_TEST_TMPDIR/src/bin/app-priority-native"
-  ln -s app-priority-x "$BATS_TEST_TMPDIR/data/dotfiles/native/app-priority/current"
-  sed -e "s|{{ .chezmoi.sourceDir }}|$BATS_TEST_TMPDIR/src|g" -e 's/{{[^}]*}}//g' "$SCRIPT" > "$BATS_TEST_TMPDIR/refresh.sh"
-  XDG_DATA_HOME="$BATS_TEST_TMPDIR/data" run bash "$BATS_TEST_TMPDIR/refresh.sh"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"previous build stays active"* ]]
-  [[ "$output" == *"dotfiles priority-native install"* ]]
-}
-
-@test "a successful rebuild runs the install command" {
-  mkdir -p "$BATS_TEST_TMPDIR/src/bin" "$BATS_TEST_TMPDIR/data/dotfiles/native/app-priority"
-  # shellcheck disable=SC2016  # $1 belongs to the fake installer
-  printf '#!/bin/bash\necho "ran $1"\n' > "$BATS_TEST_TMPDIR/src/bin/app-priority-native"
-  ln -s app-priority-x "$BATS_TEST_TMPDIR/data/dotfiles/native/app-priority/current"
-  sed -e "s|{{ .chezmoi.sourceDir }}|$BATS_TEST_TMPDIR/src|g" -e 's/{{[^}]*}}//g' "$SCRIPT" > "$BATS_TEST_TMPDIR/refresh.sh"
-  XDG_DATA_HOME="$BATS_TEST_TMPDIR/data" run bash "$BATS_TEST_TMPDIR/refresh.sh"
+@test "a good rebuild records the source hash and the next apply skips it" {
+  fake_installer 'echo "ran $1"'
+  ln -s app-priority-x "$NATIVE/current"
+  refresh
   [ "$status" -eq 0 ]
   [[ "$output" == *"ran install"* ]]
+  [ -f "$NATIVE/source-hash" ]
+  refresh
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "a failed rebuild keeps apply going and is retried on the next apply" {
+  fake_installer 'echo "ran $1"; exit 1'
+  ln -s app-priority-x "$NATIVE/current"
+  refresh
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"rebuild failed; the previous build stays active"* ]]
+  [[ "$output" == *"dotfiles priority-native install"* ]]
+  [ ! -f "$NATIVE/source-hash" ]
+  refresh
+  [[ "$output" == *"ran install"* ]]
+}
+
+@test "a build stuck waiting for a slot stops after the time limit" {
+  fake_installer 'sleep 20 & wait'
+  ln -s app-priority-x "$NATIVE/current"
+  refresh 1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"timed out after 1s"* ]]
+  [ ! -f "$NATIVE/source-hash" ]
 }

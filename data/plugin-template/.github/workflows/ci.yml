@@ -1,17 +1,49 @@
 name: plugin-ci
-on: [push, pull_request]
+# Tests run here, not on a laptop (dotfiles docs/ci-setup.md). Every action
+# is pinned to a commit SHA. Two core versions are checked:
+#   - pull requests and pushes: the core commit in CORE_REF, the one this
+#     release is built for (bump it when you adopt a new core);
+#   - weekly: the newest core, so a core change that breaks this plugin
+#     shows up before the next `dotfiles upgrade` on people's Macs.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: plugin-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CORE_REF: feat/chezmoi   # replace with a full commit SHA of dotfiles
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
 jobs:
   check:
-    runs-on: macos-14
+    runs-on: macos-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/checkout@v4
-        with: { repository: fyodoriv/dotfiles, ref: feat/chezmoi, path: .dotfiles-core }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fyodoriv/dotfiles
+          ref: ${{ github.event_name == 'schedule' && 'feat/chezmoi' || env.CORE_REF }}
+          path: .dotfiles-core
+          persist-credentials: false
+      - name: Cache Homebrew downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: brew-${{ runner.os }}-
       - run: brew install bats-core shellcheck yq jq gitleaks
-      - name: Schema, options, lint
+      - name: Schema, options, lint, telemetry sink policy
         run: DOTFILES_CORE="$PWD/.dotfiles-core" bats tests/
       - name: Shellcheck
         run: find . -name '*.sh' -not -path './.dotfiles-core/*' -print0 | xargs -0 -r shellcheck -S warning

@@ -419,3 +419,107 @@ STUB
   run ext plugin_lint "$PLUGIN"
   [ "$status" -eq 0 ]
 }
+
+# ── 6f. Org telemetry sink policy ──────────────────────────────────────
+
+SINK_HEC='{"version":1,"kind":"splunk-hec","consent":"managed","url":"https://splunk.example.com:8088/services/collector/event","token":{"env":"ORG_TEST_TOKEN"},"index":"devtools"}'
+SINK_FILE_KIND='{"version":1,"kind":"file","consent":"managed","path":"~/Library/Logs/org-telemetry/dotfiles.jsonl"}'
+
+sink_target() { printf '%s' "$HOME/.config/dotfiles/telemetry-sink.json"; }
+
+@test "6f: a declared file-kind sink policy is installed with mode 600 and recorded" {
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"installed the telemetry sink policy of plugin acme"* ]]
+  cmp "$PLUGIN/sink.json" "$(sink_target)"
+  mode="$(stat -f %Lp "$(sink_target)" 2>/dev/null || stat -c %a "$(sink_target)")"
+  [ "$mode" = 600 ]
+  grep -q "^acme	" "$HOME/.local/state/dotfiles/plugin-telemetry-sink"
+  # A second pass with the same policy changes nothing and says nothing.
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "6f: a splunk-hec host must be listed in network_hosts" {
+  printf '%s\n' "$SINK_HEC" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true
+  network_hosts: [other.example.com]' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"capability not declared: network_hosts splunk.example.com (plugin acme)"* ]]
+  [ ! -e "$(sink_target)" ]
+  bash "$CLI" remove acme --yes >/dev/null
+  install_plugin '  telemetry_sink: true
+  network_hosts: [splunk.example.com]' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  echo "$output"
+  [ "$status" -eq 0 ]
+  cmp "$PLUGIN/sink.json" "$(sink_target)"
+}
+
+@test "6f: a sink without capabilities.telemetry_sink is refused" {
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  sudo: false' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"capability not declared: telemetry_sink (plugin acme)"* ]]
+  [ ! -e "$(sink_target)" ]
+}
+
+@test "6f: an invalid policy is refused and nothing is written" {
+  printf '%s\n' '{"version":1,"kind":"file","path":"/etc/x.jsonl"}' > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"telemetry sink refused: the policy is invalid"* ]]
+  [ ! -e "$(sink_target)" ]
+  [ -z "$(find "$HOME/.config/dotfiles" -name 'telemetry-sink.json.*' 2>/dev/null)" ]
+}
+
+@test "6f: a policy the plugin did not write is never replaced" {
+  mkdir -p "$HOME/.config/dotfiles"
+  printf '%s\n' '{"version":1,"kind":"off"}' > "$(sink_target)"
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"was not written by a plugin"* ]]
+  grep -q '"off"' "$(sink_target)"
+}
+
+@test "6f: removing the plugin removes its unchanged policy, keeps a changed one" {
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  ext plugin_telemetry_sink_pass
+  bash "$CLI" remove acme --yes >/dev/null
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -eq 0 ]
+  [ ! -e "$(sink_target)" ]
+  [ ! -e "$HOME/.local/state/dotfiles/plugin-telemetry-sink" ]
+  # A changed file stays.
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  ext plugin_telemetry_sink_pass
+  printf '%s\n' '{"version":1,"kind":"off"}' > "$(sink_target)"
+  bash "$CLI" remove acme --yes >/dev/null
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -eq 0 ]
+  grep -q '"off"' "$(sink_target)"
+}
+
+@test "6f: two plugins with a sink is a conflict and installs neither" {
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  OTHER="$TEST_DIR/dotfiles-beta"
+  mkdir -p "$OTHER"
+  cp "$PLUGIN/sink.json" "$OTHER/sink.json"
+  printf 'schema: 1\nname: beta\nversion: 1.0.0\ncapabilities:\n  telemetry_sink: true\ncontributes:\n  telemetry_sink: sink.json\n' > "$OTHER/dotfiles-plugin.yaml"
+  bash "$CLI" add --dev "$OTHER" --yes >/dev/null
+  run ext plugin_telemetry_sink_pass
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"more than one plugin ships a policy"* ]]
+  [ ! -e "$(sink_target)" ]
+}

@@ -352,3 +352,18 @@ lookup() {
   [ -e "$DEST" ]
   [ "$(yq -r '.plugins | length' "$LOCK")" = 1 ]
 }
+
+@test "10b: the plugin template CI pins every action, caches Homebrew and checks the newest core weekly" {
+  wf="$REPO_ROOT/data/plugin-template/.github/workflows/ci.yml"
+  n=0
+  while IFS= read -r line; do
+    n=$((n + 1))
+    [[ "$line" =~ uses:\ actions/[A-Za-z0-9._/-]+@[0-9a-f]{40}\ \#\ v[0-9] ]] || {
+      echo "not pinned to a SHA: $line"; return 1; }
+  done < <(grep -E '^[[:space:]]*(-[[:space:]]*)?uses:' "$wf")
+  [ "$n" -ge 3 ]
+  grep -qE '^[[:space:]]+- cron: ' "$wf"
+  grep -q 'Library/Caches/Homebrew' "$wf"
+  grep -q 'persist-credentials: false' "$wf"
+  grep -qE '^permissions:' "$wf"
+}

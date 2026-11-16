@@ -1002,8 +1002,8 @@ SH
 @test "a hung request killed by the watchdog is logged as killed, not as a bad answer" {
   say_yes
   printf '#!/bin/bash\nexec sleep 600\n' >"$FAKE"
-  DOTFILES_TELEMETRY_TEST_REQUEST_TIMEOUT=1 run bash "$TEL" send
-  [[ "$output" == *"send failed (http 000) curl exit 143 (killed after the limit) limit 1s after "* ]] || { echo "$output"; return 1; }
+  DOTFILES_TELEMETRY_TEST_REQUEST_TIMEOUT=1 run bash "$TEL" daily
+  grep -q "send failed (http 000) curl exit 143 (killed after the limit) limit 1s after " "$TEST_DIR/telemetry.log" || { cat "$TEST_DIR/telemetry.log"; return 1; }
 }
 
 @test "after a failed daily try, the next try waits 10 minutes; after a good try, an hour" {

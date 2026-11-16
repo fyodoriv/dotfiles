@@ -802,14 +802,13 @@ gate_calls() {
   wait_gate_call control
   grep -c "^$1 " "$TEST_DIR/gate.calls" || true
 }
-# gate_trace CALL: run a gate function and print its trace. The trace goes to
-# a file (BASH_XTRACEFD). PATH holds no command, so nothing really starts, and
-# every command the gate would start shows as a "+ " line.
+# gate_trace CALL: run a gate function and print its trace (stderr). PATH
+# holds no command, so nothing really starts, and every command the gate would
+# start shows as a "+ " line. The stderr of the detached send is /dev/null, so
+# only what the gate runs before it shows.
 gate_trace() {
-  : >"$TEST_DIR/xtrace"
   DOTFILES_STATS_LOG=1 DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1 DOTFILES_TELEMETRY_TEST_UID=1000 \
-    /bin/bash -c "source '$GATE/lib/stats.sh'; PATH='$TEST_DIR/no-commands'; exec 9>>'$TEST_DIR/xtrace'; BASH_XTRACEFD=9; PS4='+ '; set -x; $1; set +x" >/dev/null 2>&1
-  cat "$TEST_DIR/xtrace"
+    /bin/bash -c "source '$GATE/lib/stats.sh'; PATH='$TEST_DIR/no-commands'; PS4='+ '; set -x; $1; set +x" 2>&1
 }
 # No start shows in the trace: not the script, not a command substitution, and
 # no direct call of bash or date.

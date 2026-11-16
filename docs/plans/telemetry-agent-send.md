@@ -1,9 +1,9 @@
 # Telemetry agent send failures, 2026-11-16
 
 The hourly LaunchAgent `com.dotfiles.telemetry` sent nothing from
-2026-11-11 to 2026-11-16. `telemetry.log` held 9 lines `send failed (http 000)`
-and 63 events were pending. A manual `dotfiles telemetry send` at 2026-11-16
-sent 65 events in 4.7 s.
+2026-11-11 to 2026-11-16. `telemetry.log` held only `send failed (http 000)`
+entries (9 tries in 5 days) and events were pending. A manual `dotfiles
+telemetry send` on 2026-11-16 sent them in 4.7 s.
 
 ## Pre-registered
 

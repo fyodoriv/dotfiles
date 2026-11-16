@@ -2,7 +2,7 @@
   "scope": "Embedded programs the static shell scanner confirmed in tracked shell sources, outside the five earlier boundary reviews. Not complete discovery: dynamic arguments and unparsed files stay unresolved.",
   "generator": "scripts/inventory-ledger.py",
   "unparsed_shell_files": 371,
-  "unresolved_findings": 14827,
+  "unresolved_findings": 14830,
   "entries": [
     {
       "path": "agent-hooks/block-dangerous-git.sh",
@@ -710,7 +710,7 @@
     },
     {
       "path": "bin/dotfiles-doctor",
-      "source_object": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "source_object": "c7521a521cfe34ab54c7c18e06c08253b2912b4d",
       "language": "jq",
       "start": 18069,
       "end": 18244,
@@ -721,7 +721,7 @@
     },
     {
       "path": "bin/dotfiles-doctor",
-      "source_object": "67f8e4f82a061fcf951031457efdae7c42c54861",
+      "source_object": "c7521a521cfe34ab54c7c18e06c08253b2912b4d",
       "language": "jq",
       "start": 18576,
       "end": 18620,
@@ -1249,10 +1249,10 @@
     },
     {
       "path": "bin/heavy-run",
-      "source_object": "927c5e979195b86de9f1595bff04f143e5186325",
+      "source_object": "1a676801bd534c8089cfe1b4b83540146714ea78",
       "language": "perl",
-      "start": 15683,
-      "end": 15787,
+      "start": 16831,
+      "end": 16935,
       "owner": "dotfiles",
       "caller": "cli",
       "state": "exception",

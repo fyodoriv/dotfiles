@@ -11,12 +11,14 @@ telemetry send` on 2026-11-16 sent them in 4.7 s.
   (what was left of a 3 second budget), and a busy Mac needs more. With no
   request under 5 seconds and a 30 second budget, failed hourly sends fall from
   9 of 9 logged tries to 0 over the next day.
-- **Measurement**: `awk -v s="$(date -u -v-24H +%FT%TZ)" '$1>=s && /send failed/{n++} END{print n+0}' ~/.local/state/dotfiles/telemetry.log`
-  (the row in `docs/metrics.md`), and `dotfiles telemetry status` (pending 0,
-  last send today).
-- **Success**: 0 failed sends in 24 hours after the apply, and `last_send` is
-  today.
-- **Pivot**: 3 or more `send failed` lines in 24 hours with the new line shape
+- **Measurement**: `dotfiles telemetry status` (last send today, pending 0)
+  is the primary check. The number is in `docs/metrics.md`: days since the
+  last successful send, from `last_send` in the state file. The old row
+  counted `send failed` lines in 24 hours; that misfires at a 15 minute
+  cadence, where one bad day gives dozens of lines.
+- **Success**: `last_send` is today after the apply, and the metric stays at 1
+  or less.
+- **Pivot**: 2 or more days since the last send, with the new log line shape
   (`curl exit N`): the cause is then the network at those moments, not the
   budget. Read the exit codes, and make the agent wait for the network.
 - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Nygard 2018, *Release
@@ -62,9 +64,16 @@ retry, the 900 s interval, the long measurement, and the gate cases).
 - The failure line names curl's exit code and its limit:
   `send failed (http 000) curl exit 28 (timed out) limit 10s after 4s`.
 - A failed daily try is repeated after 10 minutes (the gate used to wait an
-  hour); the agent runs every 15 minutes (it was every hour).
+  hour); the agent runs every 15 minutes (it was every hour). Each later
+  failure in the same UTC day waits longer: 10 minutes, then an hour, then 6
+  hours. An HTTP 4xx waits for the next UTC day. A good send resets the run
+  of failures, and there is at most one good send a day. So a lasting failure
+  costs at most 4 tries a day, not 96.
 - The daily and the first-run gates in `lib/stats.sh` read the org policy file
-  (task `telemetry-sink-managed-shell-gates`).
+  (task `telemetry-sink-managed-shell-gates`). They skip the consent question
+  only for a top-level `consent: managed` that appears once; a nested key, a
+  repeated key, or text that is not one JSON object means "not sure", and the
+  question is asked. The send side stays safe either way (`not_now`).
 
 ## Results
 
@@ -80,19 +89,24 @@ retry, the 900 s interval, the long measurement, and the gate cases).
   |---|---|---|
   | `telemetry.bats` a normal command on a terminal asks once (the task `telemetry-terminal-request-count-diagnostic`) | 20 | 20 |
   | `telemetry.bats` request count diagnostic | 20 | 20 |
-  | `telemetry-gains.bats` a zsh that fails or takes over 5 seconds (the task `telemetry-gains-timeout-test-load-sensitive`) | 20 | 20 |
+  | `telemetry-gains.bats` a zsh that fails or takes over 5 seconds (the task `telemetry-gains-timeout-test-load-sensitive`; load as described below) | 20 | 20 |
   | `telemetry-gains.bats` a long measurement leaves the gains request its full limit | 20 | 20 |
   | `telemetry-sink.bats` gates (the task `telemetry-sink-managed-shell-gates`) | 20 | 20 |
   | `telemetry.bats` every daily-path case | 20 | 20 |
   | `telemetry.bats` a failed request logs the curl exit code | 20 | 20 |
   | `telemetry.bats` a hung request | 20 | 20 |
 
-- Closed tasks: `telemetry-terminal-request-count-diagnostic` (the receipt
-  shipped in #591; 40 of 40 runs of its two cases passed, so the cause stays
-  unknown and nothing in the send path changed for it),
-  `telemetry-gains-timeout-test-load-sensitive` (the test compares no wall
-  time now; 20 of 20; the old cause was the same 3 second budget plus a
-  tick-based zsh limit),
-  `telemetry-sink-managed-shell-gates` (the gates read the policy file; no
-  new process on the no-policy path, shown by a trace test; 20 of 20).
+- Task `telemetry-terminal-request-count-diagnostic` is closed because its
+  Success shipped in #591 (the receipt that prints the request count). The
+  cause of that flaky count is not known, and nothing in the send path
+  changed for it. Its two cases passed 20 of 20 in the loop above.
+- Task `telemetry-sink-managed-shell-gates` is closed: the gates read the
+  policy file, a trace test shows no new process on the no-policy path, and
+  20 of 20 runs passed.
+- Task `telemetry-gains-timeout-test-load-sensitive`: stays open in `TASKS.md`. Its Success is 20 of 20 while a second full
+  Bats run is active. The earlier loop ran at a load of 3 to 4 against 2
+  files for most cases, which is not that. A second hosted run (throwaway PR,
+  closed) passed 20 of 20, but its background full run ended early: the load
+  fell from 50 to 2 by run 8, so about 2 runs were under real load. So the
+  criterion is not met as written, and the block says what to rerun.
 - Still to measure after the apply: the metric in `docs/metrics.md`.

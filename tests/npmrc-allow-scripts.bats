@@ -80,12 +80,13 @@ EOF
 
   mkdir -p "$FIXTURE/reg"
   _pack_script_cli 1.0.0
-  python3 -I "$REGISTRY_PY" "$FIXTURE/reg" > "$FIXTURE/port" 2>/dev/null &
+  python3 -I "$REGISTRY_PY" "$FIXTURE/reg" > "$FIXTURE/port" 2> "$FIXTURE/registry.err" &
   REGISTRY_PID=$!
   # Up to 30 s: a loaded hosted runner was slower than 5 s.
   for _ in $(seq 1 60); do [ -s "$FIXTURE/port" ] && break; sleep 0.5; done
   port="$(cat "$FIXTURE/port")"
-  [ -n "$port" ]
+  # Show why the registry did not start (its stderr) when the test fails.
+  [ -n "$port" ] || { echo "registry did not start: $(command -v python3)"; cat "$FIXTURE/registry.err"; ls -la "$FIXTURE/reg"; return 1; }
 
   echo '[{"package":"script-cli","bin":"script-cli"}]' > "$FIXTURE/list.json"
   DOTFILES_NPM_ALLOW_SCRIPTS_DATA="$FIXTURE/list.json" sh "$MODIFY" </dev/null > "$FIXTURE/npmrc"

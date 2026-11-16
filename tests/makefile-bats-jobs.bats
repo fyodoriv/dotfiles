@@ -121,7 +121,7 @@ jobs=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --jobs|-j) jobs="$2"; shift 2 ;;
-    --no-parallelize-within-files) shift ;;
+    --no-parallelize-within-files|--print-output-on-failure) shift ;;
     --) shift; break ;;
     *) break ;;
   esac

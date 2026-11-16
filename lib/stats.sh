@@ -142,17 +142,29 @@ _telemetry_top() {
   [[ "$body" == *[![:space:]]* ]] || return 1
   body="${body#"${body%%[![:space:]]*}"}"
   [[ "$body" == "{"* ]] || return 1
-  local i c depth=0 out=""
+  local i c depth=0 out="" instr=0
   i=0
   while [ "$i" -lt "${#body}" ]; do
     c="${body:i:1}"
     i=$((i + 1))
+    if [ "$instr" -eq 1 ]; then
+      # Inside a string: a backslash takes the next character with it, and
+      # braces count for nothing.
+      case "$c" in
+        "\\") i=$((i + 1)) ;;
+        '"') instr=0 ;;
+      esac
+      [ "$depth" -ne 1 ] || out="$out$c"
+      continue
+    fi
     case "$c" in
+      '"') instr=1 ;;
       "{") depth=$((depth + 1)); [ "$depth" -gt 1 ] || continue ;;
       "}") depth=$((depth - 1)); [ "$depth" -ge 0 ] || return 1; [ "$depth" -ge 1 ] || continue ;;
     esac
-    [ "$depth" -le 1 ] && [ "$c" != "{" ] && [ "$c" != "}" ] && out="$out$c"
+    [ "$depth" -eq 1 ] && out="$out$c"
   done
+  [ "$instr" -eq 0 ] || return 1
   [ "$depth" -eq 0 ] || return 1
   body="$out"
   _TELEMETRY_TOP="$body"

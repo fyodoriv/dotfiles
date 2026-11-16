@@ -1007,6 +1007,8 @@ SH
 }
 
 @test "after a failed daily try, the next try waits 10 minutes; after a good try, an hour" {
+  # A pinned wall clock (midday UTC), so no step depends on the time of day.
+  export DOTFILES_TELEMETRY_TEST_NOW=$((20400 * 86400 + 43200))
   say_yes
   FAKE_CODE=503 bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
@@ -1020,15 +1022,17 @@ SH
   set_state '.last_try = .last_try - 400'
   bash "$TEL" daily
   [ "$(requests)" -eq 2 ]
-  [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "$(date -u +%F)" ]
+  [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "$(date -u -r "$DOTFILES_TELEMETRY_TEST_NOW" +%F)" ]
   # After a good try the gate keeps its hour.
   echo "{\"task\":\"sync\",\"timestamp\":\"$NOW\",\"units\":5}" >>"$DOTFILES_STATS_FILE"
-  set_state '.last_send = "" | .last_try = (now | floor) - 1000'
+  set_state ".last_send = \"\" | .last_try = $DOTFILES_TELEMETRY_TEST_NOW - 1000"
   bash "$TEL" daily
   [ "$(requests)" -eq 2 ]
 }
 
 @test "failed daily tries back off: 10 minutes, then an hour, then 6 hours" {
+  # A pinned wall clock (midday UTC), so no step depends on the time of day.
+  export DOTFILES_TELEMETRY_TEST_NOW=$((20400 * 86400 + 43200))
   say_yes
   FAKE_CODE=503 bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
@@ -1062,11 +1066,13 @@ SH
 }
 
 @test "an HTTP 4xx answer waits for the next UTC day" {
+  # A pinned wall clock (midday UTC), so no step depends on the time of day.
+  export DOTFILES_TELEMETRY_TEST_NOW=$((20400 * 86400 + 43200))
   say_yes
   FAKE_CODE=401 bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
-  # The gate opens at the next UTC midnight, give or take a few seconds.
-  run jq -r '(.last_try + 3600) - ((now | floor) / 86400 | floor + 1) * 86400 | if . > -30 and . <= 30 then "ok" else "off \(.)" end' "$DOTFILES_TELEMETRY_STATE"
+  # The gate opens at the next UTC midnight exactly.
+  run jq -r '(.last_try + 3600) - ((env.DOTFILES_TELEMETRY_TEST_NOW | tonumber) / 86400 | floor + 1) * 86400 | if . == 0 then "ok" else "off \(.)" end' "$DOTFILES_TELEMETRY_STATE"
   [ "$output" = "ok" ]
   set_state '.last_try = .last_try - 3000'
   bash "$TEL" daily

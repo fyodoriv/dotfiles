@@ -429,7 +429,8 @@ gates in `lib/stats.sh` read the policy file in plain bash, with no new
 process. The detached daily send starts for a managed org sink with no stored
 answer (a stored no still stops it). The first-run question needs no public
 key when an org sink is set, and a managed policy never asks. The gates read
-`kind` and `consent` only as top-level keys that appear once; a key inside a
+`kind` and `consent` only as top-level keys that appear once (braces and
+quotes inside string values are skipped); a key inside a
 nested object, a repeated key, or text that is not one JSON object counts as
 "not sure", and then the question is asked. With no policy
 file a run adds only one file test to each gate. The script checks every
@@ -507,7 +508,8 @@ nothing is sent. The key is never printed or logged.
   busy Mac.) A request that hangs is killed. After a try it waits one hour. After
   a failed one it waits longer each time in the same UTC day: 10 minutes, then
   an hour, then 6 hours. An HTTP 4xx answer (the server refused the request)
-  waits for the next UTC day. A good send ends the run of failures; there is
+  waits for the next UTC day. A changed sink (a fixed policy file) clears
+  the wait and the count, so a repaired config is tried at once. A good send ends the run of failures; there is
   at most one good send a day. A manual `dotfiles telemetry send` allows
   10 seconds per request.
 - **A failed send names its cause.** The line in `telemetry.log` is

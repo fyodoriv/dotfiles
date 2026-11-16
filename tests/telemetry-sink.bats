@@ -763,6 +763,21 @@ SH
   [ "$(request_count)" -eq 1 ]
 }
 
+@test "rule 14: a changed sink clears the retry wait and the failure count" {
+  export DOTFILES_TELEMETRY_TEST_NOW=$((20400 * 86400 + 43200))
+  hec_policy '.consent = "managed"'
+  bash "$TEL" send >/dev/null
+  printf '{"task":"sync","timestamp":"%s","units":1}\n' "$NOW" >>"$DOTFILES_STATS_FILE"
+  set_state '.last_try = 0'
+  FAKE_CODE=401 bash "$TEL" daily
+  # The refused request waits for the next UTC day.
+  jq -e --argjson now "$DOTFILES_TELEMETRY_TEST_NOW" '.fails == 1 and .last_try > $now + 1000' "$DOTFILES_TELEMETRY_STATE"
+  # A fixed (changed) sink does not wait that out.
+  file_policy '.consent = "managed"'
+  bash "$TEL" daily
+  jq -e --argjson now "$DOTFILES_TELEMETRY_TEST_NOW" '(.fails // 0) == 0 and .last_try <= $now' "$DOTFILES_TELEMETRY_STATE"
+}
+
 # ── The shell-side gates in lib/stats.sh follow the policy file ─────────
 # Two gates start a process from a terminal run: the detached daily send
 # (_telemetry_daily) and the consent question (dotfiles_telemetry_ask). Both
@@ -923,6 +938,11 @@ refute_start() {
   run gate_trace "dotfiles_telemetry_ask stats"
   [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
   write_policy '{"version":1,"kind":"file","path":"a \"consent\": \"managed\""}'
+  run gate_trace "dotfiles_telemetry_ask stats"
+  [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
+  # Braces inside a string value do not end or open an object: this reads
+  # consent as nested, so it is asked.
+  write_policy '{"kind":"file","token":{"a":"}","consent":"managed","b":"{"}}'
   run gate_trace "dotfiles_telemetry_ask stats"
   [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
   # A real top-level managed consent after a nested token still skips it.

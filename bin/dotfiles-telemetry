@@ -133,6 +133,15 @@ if [ -n "${BATS_TEST_FILENAME:-}" ]; then
   AUTO_REQUEST_TIMEOUT="${DOTFILES_TELEMETRY_TEST_REQUEST_TIMEOUT:-$AUTO_REQUEST_TIMEOUT}"
   CLOCK_FILE="${DOTFILES_TELEMETRY_TEST_CLOCK:-}"
 fi
+# DOTFILES_TELEMETRY_TEST_NOW (bats only): the wall clock as whole epoch
+# seconds, so a test of the retry gate does not depend on the time of day.
+epoch_now() {
+  if [ -n "${BATS_TEST_FILENAME:-}" ] && [[ "${DOTFILES_TELEMETRY_TEST_NOW:-}" =~ ^[0-9]{9,11}$ ]]; then
+    printf '%s' "$DOTFILES_TELEMETRY_TEST_NOW"
+  else
+    date +%s
+  fi
+}
 # The day the install and gains events shipped. A yes from before this day
 # was given to a text without the baseline exception, so it does not cover
 # them.
@@ -162,7 +171,13 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-today() { date -u +%F; }
+today() {
+  if [ -n "${BATS_TEST_FILENAME:-}" ] && [[ "${DOTFILES_TELEMETRY_TEST_NOW:-}" =~ ^[0-9]{9,11}$ ]]; then
+    date -u -r "$DOTFILES_TELEMETRY_TEST_NOW" +%F 2>/dev/null || date -u -d "@$DOTFILES_TELEMETRY_TEST_NOW" +%F
+  else
+    date -u +%F
+  fi
+}
 line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 
 # ── State ───────────────────────────────────────────────────────────────
@@ -629,11 +644,14 @@ err_cursor_set() {
 # sink_sync: when the sink changed (first sight, a changed or a removed
 # policy), move every send cursor to the end of its log and remember the new
 # fingerprint, so events recorded under one destination never go to another.
+# A new destination also clears the retry wait and the failure count: a fixed
+# sink config must not wait out the backoff of the broken one.
 # Returns 1 when the state could not be written; then nothing is sent.
 sink_sync() {
   sink_changed || return 0
   state_set S_SENT "$(line_count "$STATS")" S_SENT_COMMANDS "$(line_count "$COMMANDS")" \
-    S_SINK "$SINK_FP" S_ERR_CURSORS "$(err_cursors_at_end)"
+    S_SINK "$SINK_FP" S_ERR_CURSORS "$(err_cursors_at_end)" \
+    S_LAST_TRY 0 S_FAILS 0 S_FAIL_DAY ""
 }
 
 # sink_track: every run of this script notes a changed sink, also when the
@@ -1142,7 +1160,7 @@ request_limit() {
 # the request, so a repeat would fail too) waits for the next UTC day.
 retry_delay() {
   case "$2" in
-    4??) echo $((86400 - $(date -u +%s) % 86400)); return 0 ;;
+    4??) echo $((86400 - $(epoch_now) % 86400)); return 0 ;;
   esac
   case "$1" in
     1) echo "$RETRY_FAILED_SECONDS" ;;
@@ -1307,7 +1325,7 @@ send_all() {
   # The try time is saved before the key lookup, so a Mac with no key looks
   # for one (and may ask the Keychain) at most once per RETRY_SECONDS. The
   # try hour lets lib/stats.sh skip the next start with no new process.
-  state_set S_LAST_TRY "$(date +%s)" S_TRY_HOUR "$(date -u +%FT%H)"
+  state_set S_LAST_TRY "$(epoch_now)" S_TRY_HOUR "$(date -u +%FT%H)"
   clock_now
   RUN_START="$CLOCK"
   if is_org_sink; then
@@ -1338,7 +1356,7 @@ send_all() {
     fails="$S_FAILS"
     [ "$S_FAIL_DAY" = "$(today)" ] || fails=0
     fails=$((fails + 1))
-    state_set S_LAST_TRY "$(($(date +%s) - RETRY_SECONDS + $(retry_delay "$fails" "$FAILED_CODE")))" \
+    state_set S_LAST_TRY "$(($(epoch_now) - RETRY_SECONDS + $(retry_delay "$fails" "$FAILED_CODE")))" \
       S_FAILS "$fails" S_FAIL_DAY "$(today)"
   fi
   unlock
@@ -1478,7 +1496,7 @@ cmd_daily() {
   local hour
   hour="$(date -u +%FT%H)"
   if [ -n "$(not_now)" ] || [ "$S_LAST_SEND" = "$(today)" ] ||
-    [ $(($(date +%s) - S_LAST_TRY)) -lt "$RETRY_SECONDS" ]; then
+    [ $(($(epoch_now) - S_LAST_TRY)) -lt "$RETRY_SECONDS" ]; then
     ! consent_yes || [ "$S_TRY_HOUR" = "$hour" ] || state_set S_TRY_HOUR "$hour" || true
     return 0
   fi

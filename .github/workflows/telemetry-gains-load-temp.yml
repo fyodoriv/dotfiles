@@ -1,0 +1,43 @@
+name: telemetry-gains-load-temp
+# Temporary proof, never merge: the gains time-limit case 20 times while a
+# full Bats run loops in the same job.
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+permissions:
+  contents: read
+env:
+  DOTFILES_CI: "1"
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_ANALYTICS: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+jobs:
+  load:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd shfmt ripgrep git-cliff
+      - name: Gains case 20 times under a full Bats run
+        run: |
+          set +e
+          files=$(ls tests/*.bats | grep -v -e perf-gate -e telemetry-gains)
+          # shellcheck disable=SC2086
+          ( while :; do bats $files >/dev/null 2>&1; echo $? >>"$RUNNER_TEMP/full.rc"; done ) &
+          loop=$!
+          sleep 20
+          fail=0
+          for i in $(seq 20); do
+            uptime | sed 's/.*load/load/' | sed "s/^/run $i /"
+            if bats tests/telemetry-gains.bats -f "takes over 5 seconds" >"$RUNNER_TEMP/out.$i" 2>&1; then echo "run $i pass"; else echo "run $i FAIL"; cat "$RUNNER_TEMP/out.$i"; fail=$((fail+1)); fi
+            kill -0 "$loop" 2>/dev/null || echo "background loop ended at run $i"
+          done
+          echo "background full runs finished: $(wc -l <"$RUNNER_TEMP/full.rc" 2>/dev/null || echo 0)"
+          echo "bats processes still running: $(pgrep -fc 'bats ' )"
+          kill "$loop" 2>/dev/null; pkill -f 'bats ' 2>/dev/null
+          echo "FAILURES=$fail"
+          [ "$fail" -eq 0 ]

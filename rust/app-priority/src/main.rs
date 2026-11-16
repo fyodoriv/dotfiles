@@ -15,16 +15,63 @@ trait Backend {
     fn nice(&mut self, pid: u32, value: i32);
 }
 
+/// Per-step wall time and call counts. Printed to stderr only when
+/// `DOTFILES_APP_PRIORITY_TRACE` is set; the run owns it (per-run scope).
+#[derive(Default)]
+struct Trace { find: (u32, u128), info: (u32, u128), background: (u32, u128), nice: (u32, u128) }
+impl Trace {
+    fn time<T>(slot: &mut (u32, u128), work: impl FnOnce() -> T) -> T {
+        let start = std::time::Instant::now();
+        let result = work();
+        slot.0 += 1;
+        slot.1 += start.elapsed().as_micros();
+        result
+    }
+    fn report(&self) {
+        let ms = |slot: (u32, u128)| format!("{}x{}.{:03}ms", slot.0, slot.1 / 1000, slot.1 % 1000);
+        eprintln!("app-priority-trace find={} info={} background={} nice={}",
+            ms(self.find), ms(self.info), ms(self.background), ms(self.nice));
+    }
+}
+
 #[derive(Default)]
 struct System {
+    trace: Trace,
+    #[cfg(target_os = "macos")]
+    snapshot: Option<Option<selector::Snapshot>>,
     #[cfg(target_os = "macos")]
     identities: Option<(std::collections::BTreeMap<u32, selector::Identity>, std::ffi::OsString, bool)>,
 }
 impl Backend for System {
     fn find(&mut self, query: &OsStr, full: bool) -> Vec<u32> {
+        let mut slot = self.trace.find;
+        let result = Trace::time(&mut slot, || self.find_inner(query, full));
+        self.trace.find = slot;
+        result
+    }
+    fn info(&mut self, pid: u32, field: &str) -> Vec<u8> {
+        let mut slot = self.trace.info;
+        let result = Trace::time(&mut slot, || System::info_inner(pid, field));
+        self.trace.info = slot;
+        result
+    }
+    fn background(&mut self, pid: u32, enabled: bool) {
+        let mut slot = self.trace.background;
+        Trace::time(&mut slot, || if self.current(pid) { platform::background(pid, enabled); });
+        self.trace.background = slot;
+    }
+    fn nice(&mut self, pid: u32, value: i32) {
+        let mut slot = self.trace.nice;
+        Trace::time(&mut slot, || if self.current(pid) { platform::nice(pid, value); });
+        self.trace.nice = slot;
+    }
+}
+impl System {
+    fn find_inner(&mut self, query: &OsStr, full: bool) -> Vec<u32> {
         #[cfg(target_os = "macos")]
         {
-            if let Ok(found) = selector::find(query, full) {
+            let snapshot = self.snapshot.get_or_insert_with(|| selector::Snapshot::take().ok());
+            if let Some(Ok(found)) = snapshot.as_ref().map(|snapshot| snapshot.find(query, full)) {
                 let pids = found.keys().copied().collect();
                 self.identities = Some((found, query.to_owned(), full));
                 return pids;
@@ -37,16 +84,10 @@ impl Backend for System {
                 .filter_map(|line| std::str::from_utf8(line).ok()?.parse::<u32>().ok())
                 .filter(|pid| *pid > 0).collect()).unwrap_or_default()
     }
-    fn info(&mut self, pid: u32, field: &str) -> Vec<u8> {
+    fn info_inner(pid: u32, field: &str) -> Vec<u8> {
         Command::new("ps").args(["-p", &pid.to_string(), "-o", field])
             .stdin(Stdio::null()).stderr(Stdio::null()).output()
             .map(|out| out.stdout).unwrap_or_default()
-    }
-    fn background(&mut self, pid: u32, enabled: bool) {
-        if self.current(pid) { platform::background(pid, enabled); }
-    }
-    fn nice(&mut self, pid: u32, value: i32) {
-        if self.current(pid) { platform::nice(pid, value); }
     }
 }
 impl System {
@@ -131,6 +172,7 @@ fn run() -> std::io::Result<()> {
     let mut backend = System::default();
     if config.is_file() { custom(&mut backend, &std::fs::read(config)?); }
     else { defaults(&mut backend); }
+    if std::env::var_os("DOTFILES_APP_PRIORITY_TRACE").is_some() { backend.trace.report(); }
     Ok(())
 }
 

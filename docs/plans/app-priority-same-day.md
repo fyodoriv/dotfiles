@@ -733,3 +733,76 @@ rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s -r '
   "\(.[0].runtime // "shell") n=\($d|length) median=\($d[($d|length)/2|floor]) p95=\($d[(($d|length)*0.95)|floor]) mean=\(($d|add)/($d|length)|floor)"'
 ```
 
+
+## Tail analysis and fix (2026-11-16)
+
+Task `app-priority-rust-tail` registered this question: does one step explain
+the slow runs? Aggregates only; the log stays on the owner's Mac.
+
+**Which runs are slow.** `~/.dotfiles-stats.jsonl` and
+`~/.local/state/dotfiles/load-samples.tsv`, 2026-11-14 18:33 to
+2026-11-16 UTC: 2,511 Rust runs, median 270 ms, mean 540 ms, p95 1,737 ms.
+254 runs took over 1 s. Each run was joined to the nearest load sample (10
+cores):
+
+| 1-minute load | Runs | Mean | p95 | Runs over 1 s |
+|---|---|---|---|---|
+| under 3 | 319 | 252 ms | 285 ms | 0 |
+| 3 to 6 | 497 | 314 ms | 777 ms | 14 |
+| 6 to 10 | 496 | 427 ms | 1,257 ms | 34 |
+| 10 to 15 | 359 | 480 ms | 1,501 ms | 30 |
+| 15 and above | 824 | 842 ms | 3,248 ms | 167 |
+
+68% of the runs over 1 s (167 of 245 joined) ran at a load of 15 or more.
+Load is the condition. The code step that pays for it comes next.
+
+**Which step.** A per-step trace (`DOTFILES_APP_PRIORITY_TRACE=1` prints call
+counts and wall time to stderr; it is off by default) on the unchanged code at
+load about 25:
+
+| Step | Calls | Time per run |
+|---|---|---|
+| process lookup (`find`) | 17 | 190 to 198 ms (78% of a 245 ms run) |
+| `ps` ancestry reads | 11 | 23 to 24 ms |
+| `taskpolicy` / priority calls | 7 | 10 ms |
+| `setpriority` (nice) | 7 | 0.2 ms |
+
+The trace does not count `pgrep` fallbacks; 11 ms per rule fits the native scan. Each of the 17 rules scanned
+the whole process table again: one `proc_pidinfo` and two `KERN_PROCARGS2`
+reads per process, per rule. That cost grows with load, because each
+syscall waits for a CPU. This is the single step: it holds more than half of
+every run's time, and the 17 repeats are the multiplier.
+
+**Fix.** Read the process table once per run (`selector::Snapshot`), then
+match every rule against that copy. Each hit is still re-read (identity and
+arguments) before any action, and `same()` still guards each action, so a
+reused or exited PID is dropped as before. A process that starts after the
+snapshot waits for the next minute's run. Rule order and the action list are
+unchanged.
+
+**Replay.** Old and new binaries, 20 order-alternated pairs, run on the
+owner's Mac with no queue slot (the shared queue held an exclusive wait for
+over 20 minutes, so `heavy-run --exclusive` could not start; alternating pairs
+cancel most of the ambient load):
+
+| Condition | Old mean (median, p95) | New mean (median, p95) | Ratio of means |
+|---|---|---|---|
+| ambient load about 45 | 301 ms (279, 590 max) | 111 ms (107, 192 max) | 0.37 |
+| plus 32 busy loops, load about 70 | 751 ms (737, 913) | 246 ms (215, 372) | 0.33 |
+
+The mean under heavy load drops by 3x, and the p95 under heavy load is far
+below the 1,500 ms target. What remains is `ps` and `taskpolicy` child
+processes (about 45% of the new run), a smaller follow-up with no recorded
+task: the registered 400 ms mean is already met in the replay.
+
+**Field check, due 2026-11-23** (7 days after the change reaches the owner's
+Mac by `dotfiles priority-native install`; the check needs a native build
+from this commit):
+
+```sh
+rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms" and .timestamp>="2026-11-17")|.duration_ms] | sort as $d | {n:length, mean:(add/length), p95:$d[(length*0.95|floor)]}'
+```
+
+Success: mean at most 400 ms and p95 at most 1,500 ms. If it misses, reopen
+the task with the new numbers. The shell fallback in `bin/app-priority`
+stays until that check passes; it is the rollback.

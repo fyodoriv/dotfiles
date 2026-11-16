@@ -428,19 +428,6 @@ them. -->
   - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
   - **Competitive-goal**: none — migration scope honesty, not a scorecard metric.
 
-- [ ] Bring the Rust app-priority mean run time under 400 ms in daily use
-  - **ID**: app-priority-rust-tail
-  - **Tags**: rust, performance, launchagents
-  - **Details**: Follow-up from `rust-app-priority` (closed 2026-11-15, owner ruling: count downsides as tasks). The shell fallback in `bin/app-priority` stays until this task closes. In daily use the Rust path has median 302 ms but mean 698 ms and p95 2,476 ms (n=1,579, 2026-11-14 to 2026-11-15). The registered target was a mean of at most 400 ms. Long runs drive the mean. Find which runs are slow (load, process lookup fallback to `pgrep`, or priority syscalls) before changing code. See [app-priority same-day experiment](docs/plans/app-priority-same-day.md#live-result-2026-11-15).
-  - **Output**: code
-  - **Acceptance**: mean `duration_ms` of `runtime=rust` app-priority runs at most 400 ms over 7 days, same ordered actions in `tests/app-priority.bats`.
-  - **Hypothesis**: the slow tail comes from one identifiable step; removing it cuts the 7-day mean from 698 ms to at most 400 ms.
-  - **Measurement**: `rg '"task":"app-priority"' ~/.dotfiles-stats.jsonl | jq -s '[.[]|select(.runtime=="rust" and .timing_source=="monotonic-ms")|.duration_ms]|add/length'` over the 7 days after the change.
-  - **Success**: mean at most 400 ms with p95 at most 1,500 ms.
-  - **Pivot**: no single step explains over half of the runs above 1 s -> record the mean as a measured exception in the migration plan and close.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
-  - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
-
 - [ ] Reopen the agent-hook Rust port only with a full parser port
   - **ID**: rust-agent-hooks-full-port
   - **Tags**: rust, performance, agents

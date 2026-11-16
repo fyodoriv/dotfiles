@@ -117,6 +117,12 @@ _program_resolves() {
       grep -qF '[ ! -x "$HOME/.opencode/bin/opencode" ] && return 0' \
         "$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
       ;;
+    /opt/homebrew/*|/usr/local/*)
+      # A Homebrew program: present, or installed by the inlined Brewfile
+      # (a clean runner has not run it).
+      [ -x "$prog" ] || grep -qF "brew \"$(basename "$prog")\"" \
+        "$REPO_ROOT/.chezmoiscripts/run_onchange_brew.sh.tmpl"
+      ;;
     /*)
       # Absolute path — it must exist as an executable file. The
       # sleepwatcher plist is special: chezmoi templating picks

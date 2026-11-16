@@ -78,11 +78,11 @@ const legacy = [
   'SessionStart:* ~/.config/dotfiles/hooks/session-endpoint-path.sh',
 ];
 const claude = filterHooksForTarget(hooks, 'claude-code');
-assert.equal(claude.length, 6, 'Claude keeps all six dotfiles handlers');
+assert.equal(claude.length, 7, 'Claude keeps all seven dotfiles handlers');
 assert.deepEqual(claude.map(identity), hooks.map(identity));
 const native = filterHooksForTarget(hooks, 'codex');
 assert.deepEqual(native.filter(hook => legacy.includes(identity(hook))).map(identity), [], 'no legacy native handlers');
-assert.equal(native.length, 3, 'all three supported dotfiles Bash handlers remain');
+assert.equal(native.length, 4, 'all four supported dotfiles Bash handlers remain');
 assert.ok(native.every(hook => hook.event === 'PreToolUse' && hook.matcher === 'Bash'));
 // The sync fixture uses the real manifest policy with isolated module-run state.
 const fixtureRepo = join(scratch, 'agentbrew-fixture');
@@ -97,11 +97,11 @@ saveState({ ...defaultState(), hooks, agents: AGENT_DEFINITIONS.filter(agent => 
 await syncHooks({ quiet: true, prune: false });
 const flatten = config => Object.entries(config).flatMap(([event, groups]) => groups.flatMap(group => group.hooks.map(hook => ({ event, matcher: group.matcher, command: hook.command }))));
 const nativeSynced = flatten(JSON.parse(readFileSync(join(process.env.HOME, '.codex/hooks.json'), 'utf8')).hooks);
-assert.equal(nativeSynced.length, 4, 'native sync keeps exactly four supported policies');
+assert.equal(nativeSynced.length, 5, 'native sync keeps exactly five supported policies');
 assert.ok(nativeSynced.every(hook => hook.event === 'PreToolUse' && hook.matcher === 'Bash'));
 const claudeSynced = flatten(JSON.parse(readFileSync(join(process.env.HOME, '.claude/settings.json'), 'utf8')).hooks);
 assert.deepEqual(claudeSynced.filter(hook => hooks.some(source => identity(source) === identity(hook))).map(identity).sort(), hooks.map(identity).sort(), 'Claude sync keeps every original source hook');
-assert.equal(claudeSynced.length, 7, 'Claude sync also retains the manifest policy');
+assert.equal(claudeSynced.length, 8, 'Claude sync also retains the manifest policy');
 console.log('legacy Codex 0; native policies 4; Claude source handlers 6; real sync passed');
 NODE
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }

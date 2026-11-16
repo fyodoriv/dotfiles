@@ -1616,10 +1616,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and editing rules. See [
 
 Bats and shellcheck run in two places:
 
-- **Your machine**: `make lint` and the Bats files you touched, before a commit. The private-pattern leak gates (pre-commit, pre-push, `bin/gh`) run only here.
+- **Your machine**: `make lint` before a commit. Agents run nothing else here: the hook `agent-hooks/block-local-tests.sh` refuses Bats and `make check`/`test*`/`e2e` in a dotfiles checkout (a human sets `DOTFILES_ALLOW_LOCAL_TESTS=1` to run tests by hand). The private-pattern leak gates (pre-commit, pre-push, `bin/gh`) run only here.
 - **GitHub Actions** on `fyodoriv/dotfiles`: the same `make check` on a hosted macOS runner for every pull request and every push to `feat/chezmoi`. Hosted runners are free for public repositories. Jobs, limits, and what stays local: [docs/ci-setup.md](docs/ci-setup.md).
 
-So run the affected `bats` files before you push, and merge only when the hosted checks are green. Run the full `make check` locally only when GitHub Actions is off, or to reproduce a hosted failure.
+So push, read the hosted result (`gh pr checks <n> --watch`), and merge only when the hosted checks are green.
 
 `make install-deps` installs the Homebrew tools used by local validation:
 required for `make check`/tests (`shellcheck`, `bats-core`, `parallel`,

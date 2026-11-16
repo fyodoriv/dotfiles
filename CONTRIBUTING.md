@@ -65,15 +65,16 @@ Make your first change in five steps:
 # 1. Clone (if you haven't already)
 git clone https://github.com/<your-org>/dotfiles.git ~/apps/dotfiles
 
-# 2. Verify everything passes
+# 2. Verify the lint passes (tests run on hosted CI; see "Running tests")
 cd ~/apps/dotfiles
-make check
+make lint
 
 # 3. Make a change — for example, add a check to a doctor module
 echo 'check "mymod.test" "my test check" "true" ""' >> modules/tools/doctor.sh
 
-# 4. Run affected tests
-make test
+# 4. Push the branch and read the CI result (or run `make test` in your
+#    own terminal, see "Running tests")
+git push -u origin HEAD
 
 # 5. Apply your change and see it live
 dotfiles apply
@@ -356,6 +357,13 @@ Test files live in `tests/*.bats`:
 
 ### Running tests
 
+Tests run on hosted CI: `make check` (affected tests) on every pull request,
+the full suite on every push to `feat/chezmoi` and nightly. AI agents never run
+them on a dev Mac: the hook `agent-hooks/block-local-tests.sh` refuses `bats`,
+`make check`, `make test*` and `make e2e` in a dotfiles checkout. You, a human
+in a terminal, can set `DOTFILES_ALLOW_LOCAL_TESTS=1` to run them yourself.
+Agents run `make lint` only.
+
 ```bash
 make test                     # affected tests only (fast, git-aware)
 make test-all                 # full suite (cached)
@@ -364,7 +372,7 @@ bats tests/doctor.bats        # run a single test file
 bats tests/doctor.bats -f "check passes"   # run tests matching a filter
 ```
 
-`make test` uses `bats-affected` to detect which test files cover your changed files. If you change shared infrastructure (`test_helper.bash`, `Makefile`, `lib/`), all tests run. It skips a test file that already passed on the same commit with the same content of the changed files that select it, so after a fix only the tests that the fixed file selects run again. The install e2e in `make check` works the same way: it reruns only when a file that `tests/e2e/needs-e2e.sh` counts changed since its last pass. Run `make lint` and `bats tests/<name>.bats` locally; hosted CI runs `make check` on the pull request.
+`make test` uses `bats-affected` to detect which test files cover your changed files. If you change shared infrastructure (`test_helper.bash`, `Makefile`, `lib/`), all tests run. It skips a test file that already passed on the same commit with the same content of the changed files that select it, so after a fix only the tests that the fixed file selects run again. The install e2e in `make check` works the same way: it reruns only when a file that `tests/e2e/needs-e2e.sh` counts changed since its last pass. Hosted CI runs `make check` on the pull request.
 
 ### Writing tests
 
@@ -471,7 +479,7 @@ Some modules depend on others. Verify before removing:
 - **Commit on `main`** — no feature branches for small changes
 - **Conventional commits** — `feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`
 - **Header ≤72 characters**
-- **Run `make lint` and the touched tests before every commit**; hosted CI runs `make check`
+- **Run `make lint` before every commit**; hosted CI runs the tests (`make check`)
 - **Use `fd` instead of `find`** everywhere
 - **Never hardcode `$HOME` paths**
 - **No company-internal URLs** in tracked files — use `~/.zshenv.secrets` (gitignored)

@@ -14,11 +14,8 @@ Always loaded: open only the doc the routing table names.
 
 | Task | Command (from the repo root) |
 |---|---|
-| CI gate | `make check` (lint + affected tests, commits ahead of base included) |
-| Inner loop, not `make check` | `make lint`, `bats tests/<name>.bats`, `bats -f '<test>' tests/<name>.bats` |
-| Full suite (background) | `heavy-run make test-all` |
-| Install e2e (real chezmoi and doctor) in a scratch HOME | `heavy-run make e2e` (`make check` runs it when an installer path changes) |
-| Plugin suites on macOS `/bin/bash` 3.2 | `make test-plugins-bash32` (`make check` runs it on plugin changes) |
+| Local gate (the only one) | `make lint` |
+| Tests | Push the branch, then `gh pr checks <n> --repo fyodoriv/dotfiles --watch` and `gh run view <id> --log-failed`. CI runs `make check` (affected tests) per PR and `make test-all` on each push to `feat/chezmoi` and nightly |
 | TASKS.md only | `make lint-tasks` |
 | Review the task queue | `/review-tasks` |
 | Apply to this Mac | `dotfiles apply` (after `Agentfile.yaml` edits) |
@@ -26,7 +23,7 @@ Always loaded: open only the doc the routing table names.
 
 ### Verification gates
 
-Name known pre-existing failures (see Gotchas). No completion claim without fresh command output. Full text: [docs/constitution.md](docs/constitution.md#verification-gates).
+Lint local, tests on CI: agents never run Bats, `make check`, `make test*` or `make e2e` here (hook `block-local-tests.sh` refuses them). Name known pre-existing failures. No completion claim without fresh lint output and a green CI run. Full text: [docs/constitution.md](docs/constitution.md#verification-gates).
 
 ## Where to change what
 
@@ -62,7 +59,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 1. **Prefer the modern CLI cohort** (`fd`, `rg`, `sd`, `xh`, …); POSIX only as a fallback.
 2. **Quote pip specs** (`pip install 'pkg>=1.2.3'`); keep command output out of the repo root.
 3. **Never hardcode `$HOME` paths**; use `~`, env vars, resolvers, or chezmoi templates.
-4. **[CI](docs/ci-setup.md) runs `make check` per PR.** Locally: lint, touched tests.
+4. **[CI](docs/ci-setup.md) runs the tests.** Locally: `make lint` only. Push, then read CI.
 5. **Update docs with every behavior change, in the same PR** (see Docs upkeep).
 6. **New modules need `modules/<name>/doctor.sh`.**
 7. **The Brewfile is inlined** in `.chezmoiscripts/run_onchange_brew.sh.tmpl`.
@@ -101,8 +98,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - [Declared skills](docs/user-stories/README.md#agent-workflow-acceptance).
 - **Worktrees**: use `~/apps/tooling/wt/<name>`. Never edit the live checkout: `dotfiles-sync` auto-commits its tracked changes every 30 minutes.
 - **Global hooks**: `core.hooksPath` points at the live checkout's `git-hooks/`. To commit a hook change, run `git -c core.hooksPath=$PWD/git-hooks commit`.
-- **`make test` misses committed changes**: it tests uncommitted files only. On a branch: `bin/bats-affected origin/feat/chezmoi | xargs bats`.
-- **Agent sandbox**: bats `mktemp` fails inside it. Run bats unsandboxed.
+- **Local tests are blocked on purpose**: the hook refuses Bats and `make check`/`test*`/`e2e` in a dotfiles checkout. A human sets `DOTFILES_ALLOW_LOCAL_TESTS=1` in a terminal; an agent never does. Prove a bug with a red CI run, then push the fix.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
 - FIFO tests hold through observations; teardown releases/waits; keep the queue guard.
 - Tests: [Bash, PATH, serial Bats](docs/constitution.md#test-command-shims).
@@ -117,8 +113,8 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 ## Delivery
 
 1. Branch `type/description` (`feat`, `fix`, `docs`, `chore`, …) in a worktree; commit `type: description` (≤72 chars).
-2. Run `make lint` and touched tests; red is a real regression.
-3. Push the branch and open a PR to `feat/chezmoi`. PR body: `## Summary` (why + what), `## Details`, `## Docs`, then validation and `## Visual proof`. Template: [docs/ship-it-reference.md](docs/ship-it-reference.md).
+2. Run `make lint`. Push, then read CI; red is a real regression. Do not run tests locally.
+3. Open a PR to `feat/chezmoi`. PR body: `## Summary` (why + what), `## Details`, `## Docs`, then validation and `## Visual proof`. Template: [docs/ship-it-reference.md](docs/ship-it-reference.md).
 4. Squash-merge on green CI, remove the worktree and branch, `git pull` the live checkout.
 
 Tasks: `TASKS.md` (tasks.md shape); delete a task block in the same commit as its fix; non-trivial tasks get `docs/plans/<task-id>.md`. [docs/constitution.md](docs/constitution.md#task-queue).

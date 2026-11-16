@@ -169,6 +169,30 @@ Known gaps (the same as before this change; none is newly allowed):
 Tests: `tests/agent-hooks-block-dangerous-git.bats`,
 `tests/agent-hooks-block-dangerous-git-merged.bats`.
 
+## block-local-tests (dotfiles hook)
+
+`agent-hooks/block-local-tests.sh` is a `PreToolUse` Bash hook from the
+dotfiles Agentfile. Owner decision 2026-11-16: "Lint local, tests on CI". Inside
+a dotfiles checkout or worktree it refuses `bats`, `bin/bats-affected`,
+`make check`, `make test`, `make test-*` and `make e2e` (also behind `heavy-run`,
+`time`, `nice`, `env`, `bash -c`, `cd <checkout> &&` and `make -C <checkout>`). It
+exits 2 and tells the agent to run `make lint`, push, and read CI
+(`gh pr checks <n> --watch`, `gh run view <id> --log-failed`).
+
+- A checkout is a folder, or a parent of the session folder, that holds both
+  `agent-hooks/require-heavy-run.sh` and `bin/dotfiles-doctor`. Other repos are
+  not affected.
+- Allowed: `make lint*`, `shellcheck`, `bash -n`, `make -n`, `bats --version`,
+  and read-only commands such as `rg bats`. Quoted text (a commit message that
+  names `make check`) is data.
+- `DOTFILES_ALLOW_LOCAL_TESTS=1` turns the hook off. It is for a human in a
+  terminal. The hook reads its own environment, so an agent that writes the
+  variable inside a command still gets blocked.
+- CI is not affected: hooks run only inside an agent session, and hosted
+  runners start no agent.
+
+Tests: `tests/agent-hooks-block-local-tests.bats`.
+
 ## require-heavy-run (dotfiles hook)
 
 `agent-hooks/require-heavy-run.sh` is a `PreToolUse` Bash hook from the

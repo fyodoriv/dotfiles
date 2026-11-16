@@ -878,12 +878,15 @@ ask_starts() {
   say_yes
   # The fake records its own pid (exec keeps it), so the check never matches
   # a "sleep 60" of another process on this Mac.
-  printf '#!/bin/bash\necho "$$" >>"%s/hung.calls"\nexec sleep 60\n' "$TEST_DIR" >"$FAKE"
+  printf '#!/bin/bash\necho "$$" >>"%s/hung.calls"\nexec sleep 600\n' "$TEST_DIR" >"$FAKE"
+  # The daily request limit is 10 seconds; a test seam shortens it.
+  export DOTFILES_TELEMETRY_TEST_REQUEST_TIMEOUT=2
   start="$(date +%s)"
   run bash "$TEL" daily
   [ "$status" -eq 0 ]
   [ -z "$output" ]
-  [ $(($(date +%s) - start)) -le 8 ]
+  # Far under the 600 s of the hung fake, whatever the load: it was killed.
+  [ $(($(date +%s) - start)) -lt 300 ]
   [ "$(wc -l <"$TEST_DIR/hung.calls" | tr -d ' ')" -eq 1 ]
   [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" = "0" ]
   [ ! -e "$DOTFILES_TELEMETRY_STATE.lock" ]
@@ -891,30 +894,84 @@ ask_starts() {
   ! kill -0 "$hung_pid" 2>/dev/null || { kill "$hung_pid"; false; }
 }
 
-@test "the daily send stops after 3 seconds in total; the rest goes later" {
-  say_yes
-  seed_lines 2000
+# A fake clock for the daily budget (a seam for tests only): the script reads
+# its seconds from $TEST_DIR/clock, not from the real clock, so no result here
+# depends on how busy the machine is. The fake curl moves the clock: each
+# request takes the next number of seconds from $TEST_DIR/ticks (0 when the
+# list is empty). A request that takes longer than its --max-time fails with
+# curl's exit 28, as the real curl does.
+fake_clock_curl() {
+  printf '0\n' >"$TEST_DIR/clock"
+  : >"$TEST_DIR/ticks"
+  export DOTFILES_TELEMETRY_TEST_CLOCK="$TEST_DIR/clock"
   cat >"$FAKE" <<'SH'
 #!/bin/bash
-cat >>"${FAKE_LOG:?}"
+printf '%s\n' "$*" >>"${FAKE_LOG:?}.args"
+cat >>"$FAKE_LOG"
 echo >>"$FAKE_LOG"
-sleep 2
-printf 200
+limit="${*##*--max-time }"
+limit="${limit%% *}"
+tick="$(head -n 1 "$TEST_DIR/ticks")"
+sed -i.bak 1d "$TEST_DIR/ticks"
+tick="${tick:-0}"
+clock="$(cat "$TEST_DIR/clock")"
+if [ "$tick" -gt "$limit" ]; then
+  echo $((clock + limit)) >"$TEST_DIR/clock"
+  printf 000
+  exit 28
+fi
+echo $((clock + tick)) >"$TEST_DIR/clock"
+printf '%s' "${FAKE_CODE:-200}"
 SH
-  bash "$TEL" daily
-  [ "$(requests)" -le 2 ]
-  [ "$(requests)" -ge 1 ]
-  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" -ge 500 ]
-  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" -le 1000 ]
-  [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "" ]
+  export TEST_DIR
 }
 
-@test "daily sends once a day, with a 3 second limit; manual send allows 10" {
+@test "the daily send stops after 30 seconds in total; the rest goes later, with no failure" {
+  say_yes
+  seed_lines 2000
+  fake_clock_curl
+  printf '10\n10\n10\n10\n' >"$TEST_DIR/ticks"
+  bash "$TEL" daily
+  [ "$(requests)" -eq 3 ]
+  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" -eq 1500 ]
+  [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "" ]
+  [ ! -s "$TEST_DIR/telemetry.log" ]
+}
+
+# Regression (2026-11-16): the hourly agent logged "send failed (http 000)" 9
+# times in 5 days. The 3 second budget left a late request 1 or 2 seconds, and
+# a request that needs 0.4 s on a quiet Mac timed out on a busy one. Now no
+# request starts with less than 5 seconds left; the send stops instead.
+@test "the daily send starts no request with under 5 seconds left" {
+  say_yes
+  seed_lines 2000
+  fake_clock_curl
+  printf '26\n' >"$TEST_DIR/ticks"
+  bash "$TEL" daily
+  [ "$(requests)" -eq 1 ]
+  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" -eq 500 ]
+  [ ! -s "$TEST_DIR/telemetry.log" ]
+  ! grep -Eq -- '--max-time [0-4] ' "$FAKE_LOG.args"
+}
+
+@test "every daily request may take up to 10 seconds, and slow ones within the budget finish" {
+  say_yes
+  seed_lines 2000
+  fake_clock_curl
+  printf '8\n8\n8\n8\n' >"$TEST_DIR/ticks"
+  bash "$TEL" daily
+  [ "$(requests)" -eq 4 ]
+  [ "$(jq -r .sent "$DOTFILES_TELEMETRY_STATE")" -eq 2000 ]
+  [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "$(date -u +%F)" ]
+  ! grep -Eq -- '--max-time [0-4] ' "$FAKE_LOG.args"
+  grep -q -- "--max-time 10 " "$FAKE_LOG.args"
+}
+
+@test "daily sends once a day; a manual send allows 10 seconds per request" {
   say_yes
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
-  # 3 seconds in total: on a slow machine a second or two is gone before the request.
-  grep -Eq -- "--max-time [1-3] " "$FAKE_LOG.args"
+  grep -q -- "--max-time 10 " "$FAKE_LOG.args"
   echo "{\"task\":\"sync\",\"timestamp\":\"$NOW\",\"units\":1}" >>"$DOTFILES_STATS_FILE"
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
@@ -923,16 +980,52 @@ SH
   grep -q -- "--max-time 10 " "$FAKE_LOG.args"
 }
 
-@test "after a failed daily try, the next try waits an hour" {
+# The curl exit code was thrown away: every failure showed as "http 000".
+@test "a failed request logs the curl exit code, its words and its limit, and no content" {
+  say_yes
+  local code words
+  for pair in "28:timed out" "6:could not resolve host" "7:could not connect" "35:TLS handshake failed" "99:curl error"; do
+    code="${pair%%:*}" words="${pair#*:}"
+    printf '#!/bin/bash\ncat >/dev/null\nprintf 000\nexit %s\n' "$code" >"$FAKE"
+    run bash "$TEL" send
+    [[ "$output" == *"send failed (http 000) curl exit $code ($words) limit 10s after "* ]] || { echo "$output"; return 1; }
+    grep -q "send failed (http 000) curl exit $code ($words) limit 10s after " "$TEST_DIR/telemetry.log"
+  done
+  # An HTTP answer that is not 2xx has no curl error to name.
+  printf '#!/bin/bash\ncat >/dev/null\nprintf 503\n' >"$FAKE"
+  run bash "$TEL" send
+  [[ "$output" == *"send failed (http 503); will retry"* ]] || { echo "$output"; return 1; }
+  run grep -c canary "$TEST_DIR/telemetry.log"
+  [ "$output" = "0" ]
+}
+
+@test "a hung request killed by the watchdog is logged as killed, not as a bad answer" {
+  say_yes
+  printf '#!/bin/bash\nexec sleep 600\n' >"$FAKE"
+  DOTFILES_TELEMETRY_TEST_REQUEST_TIMEOUT=1 run bash "$TEL" send
+  [[ "$output" == *"send failed (http 000) curl exit 143 (killed after the limit) limit 1s after "* ]] || { echo "$output"; return 1; }
+}
+
+@test "after a failed daily try, the next try waits 10 minutes; after a good try, an hour" {
   say_yes
   FAKE_CODE=503 bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
   bash "$TEL" daily
   [ "$(requests)" -eq 1 ]
-  set_state '.last_try = (now | floor) - 3601'
+  # The failed try is dated so that the gate opens 10 minutes after it. The
+  # margins are minutes, so a slow machine cannot change the outcome.
+  set_state '.last_try = .last_try - 300'
+  bash "$TEL" daily
+  [ "$(requests)" -eq 1 ]
+  set_state '.last_try = .last_try - 400'
   bash "$TEL" daily
   [ "$(requests)" -eq 2 ]
   [ "$(jq -r .last_send "$DOTFILES_TELEMETRY_STATE")" = "$(date -u +%F)" ]
+  # After a good try the gate keeps its hour.
+  echo "{\"task\":\"sync\",\"timestamp\":\"$NOW\",\"units\":5}" >>"$DOTFILES_STATS_FILE"
+  set_state '.last_send = "" | .last_try = (now | floor) - 1000'
+  bash "$TEL" daily
+  [ "$(requests)" -eq 2 ]
 }
 
 @test "a big backlog: only the newest 2,000 go, 500 per request, and the rest is skipped for good" {
@@ -1258,6 +1351,8 @@ wait_for_last_send() {
   bash "$TEL" on >/dev/null
   [ -s "$PLIST" ]
   grep -q '<string>daily</string>' "$PLIST"
+  # Every 15 minutes: after a failed send the script retries after 10.
+  grep -q '<integer>900</integer>' "$PLIST"
   grep -q "^bootstrap gui/$(id -u) $PLIST\$" "$TEST_DIR/launchctl.log"
   bash "$TEL" off >/dev/null
   [ ! -e "$PLIST" ]

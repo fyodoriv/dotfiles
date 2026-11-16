@@ -1,0 +1,53 @@
+name: Telemetry stability (temporary)
+
+# Throwaway proof for the telemetry tests: each focused case runs many times
+# on a hosted runner while a second copy of a telemetry test file loops in
+# the background (the "busy Mac"). Never merged.
+
+on:
+  pull_request:
+    branches: [feat/chezmoi]
+
+permissions:
+  contents: read
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_ANALYTICS: "1"
+
+jobs:
+  stability:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: brew install bash coreutils bats-core jq
+      - name: Repeat the focused cases under load
+        run: |
+          set +e
+          # Background load: a full telemetry file, again and again.
+          ( while :; do bats tests/telemetry.bats >/dev/null 2>&1; done ) &
+          ( while :; do bats tests/telemetry-sink.bats >/dev/null 2>&1; done ) &
+          sleep 5
+          rep() { # N FILE FILTER: run the filtered cases N times, print pass counts
+            local n="$1" file="$2" filter="$3" pass=0 fail=0 i
+            for i in $(seq "$n"); do
+              if bats "$file" -f "$filter" >"$RUNNER_TEMP/out.txt" 2>&1; then pass=$((pass + 1)); else fail=$((fail + 1)); cat "$RUNNER_TEMP/out.txt"; fi
+            done
+            echo "RESULT $file [$filter] runs=$n pass=$pass fail=$fail load=$(uptime | sed 's/.*averages: //')"
+            [ "$fail" -eq 0 ]
+          }
+          bad=0
+          rep 20 tests/telemetry.bats "a normal command on a terminal asks once" || bad=1
+          rep 20 tests/telemetry.bats "request count diagnostic" || bad=1
+          rep 20 tests/telemetry-gains.bats "takes over 5 seconds" || bad=1
+          rep 20 tests/telemetry-gains.bats "long measurement leaves" || bad=1
+          rep 20 tests/telemetry-sink.bats "gates:" || bad=1
+          rep 20 tests/telemetry.bats "daily" || bad=1
+          rep 20 tests/telemetry.bats "failed request logs" || bad=1
+          rep 20 tests/telemetry.bats "hung" || bad=1
+          kill $(jobs -p) 2>/dev/null
+          exit $bad

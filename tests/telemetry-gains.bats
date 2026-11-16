@@ -23,6 +23,7 @@ setup() {
   FAKE="$TEST_DIR/fake-curl"
   cat >"$FAKE" <<'SH'
 #!/bin/bash
+printf '%s\n' "$*" >>"${FAKE_LOG:?}.args"
 cat >>"${FAKE_LOG:?}"
 echo >>"$FAKE_LOG"
 printf '%s' "${FAKE_CODE:-200}"
@@ -52,13 +53,15 @@ else
   echo start >>"$TEST_DIR/zsh.log"
 fi
 echo "\$\$" >"$TEST_DIR/zsh.pid"
+# A fake clock for the daily budget: each timed start moves it by FAKE_ZSH_TICK.
+[ -z "\${FAKE_ZSH_TICK:-}" ] || [ -z "\${DOTFILES_TELEMETRY_TEST_CLOCK:-}" ] || echo \$((\$(cat "\$DOTFILES_TELEMETRY_TEST_CLOCK") + FAKE_ZSH_TICK)) >"\$DOTFILES_TELEMETRY_TEST_CLOCK"
 [ -z "\${FAKE_ZSH_DEAF:-}" ] || trap '' TERM
 [ -z "\${FAKE_ZSH_SLEEP:-}" ] || exec sleep "\$FAKE_ZSH_SLEEP"
 exit "\${FAKE_ZSH_EXIT:-0}"
 SH
   chmod +x "$TEST_DIR/bin/zsh"
   export PATH="$TEST_DIR/bin:$PATH" DOTFILES_BASELINE_ZSH_RUNS=1 DOTFILES_BASELINE_ZSH_MIN_RUNS=1
-  unset FAKE_ZSH_SLEEP FAKE_ZSH_EXIT FAKE_ZSH_DEAF FAKE_ZSH_STOCK_SLEEP
+  unset FAKE_ZSH_SLEEP FAKE_ZSH_EXIT FAKE_ZSH_DEAF FAKE_ZSH_STOCK_SLEEP FAKE_ZSH_TICK
 }
 refute() { if "$@" 2>/dev/null; then return 1; fi; }
 # Timed zsh starts so far: now runs, and stock runs (with an empty ZDOTDIR).
@@ -305,21 +308,38 @@ SH
   [ "$(zsh_starts)" = "2" ]
   rm -f "$FAKE_LOG"
   set_state '.gains_day = "" | .last_send = ""'
-  # The slow zsh is stopped at the limit: the send does not wait for it.
-  # (The time bound is loose: the test queue can pause a run.)
-  SECONDS=0
-  FAKE_ZSH_SLEEP=90 run bash "$TEL" send
-  [ "$SECONDS" -lt 80 ] || { echo "took $SECONDS s"; return 1; }
+  # The slow zsh is stopped at the limit: the send does not wait for it. The
+  # fake sleeps 10 minutes, so a limit that never fires makes this run last
+  # 10 minutes, and a dead pid proves it fired, whatever the load. No wall
+  # time is compared.
+  FAKE_ZSH_SLEEP=600 run bash "$TEL" send
   refute kill -0 "$(cat "$TEST_DIR/zsh.pid")"
   [[ "$output" == *"sent 1 event(s)"* ]] || { echo "$output"; return 1; }
   run sent_events dotfiles.gains
   [ "$(jq -c '.[0].properties | [has("zsh_ms_now"), .zsh_ms_before]' <<<"$output")" = "[false,412]" ] || { echo "$output"; return 1; }
-  # The daily path has its own short limit; the measurement does not use it up.
+  # The daily path has its own limit, kept on a fake clock that stands still
+  # here: the measurement does not use it up, and a busy Mac cannot either.
   rm -f "$FAKE_LOG"
+  printf '0\n' >"$TEST_DIR/clock"
   set_state '.gains_day = "" | .last_send = "" | .last_try = 0 | .try_hour = ""'
-  FAKE_ZSH_SLEEP=90 bash "$TEL" daily
+  DOTFILES_TELEMETRY_TEST_CLOCK="$TEST_DIR/clock" FAKE_ZSH_SLEEP=600 bash "$TEL" daily
   refute kill -0 "$(cat "$TEST_DIR/zsh.pid")"
   [ "$(sent_events dotfiles.gains | jq length)" = "1" ] || { cat "$FAKE_LOG"; return 1; }
+}
+
+# Regression (2026-11-16): the measurement is not counted in the 3 second
+# budget, but the request after it got what was left of the budget, 1 or 2
+# seconds, and timed out on a busy Mac. The daily send logged "http 000" 9
+# times in 5 days. Here the measurement takes 30 fake seconds.
+@test "a long measurement leaves the gains request its full limit" {
+  receipt
+  say_yes
+  printf '0\n' >"$TEST_DIR/clock"
+  DOTFILES_TELEMETRY_TEST_CLOCK="$TEST_DIR/clock" FAKE_ZSH_TICK=10 bash "$TEL" daily
+  [ "$(sent_events dotfiles.gains | jq length)" = "1" ] || { cat "$FAKE_LOG.args"; return 1; }
+  [ "$(cat "$TEST_DIR/clock")" -ge 20 ]
+  ! grep -Eq -- '--max-time [0-4] ' "$FAKE_LOG.args"
+  grep -q -- '--max-time 10 ' "$FAKE_LOG.args"
 }
 
 @test "a receipt day that is not a real date drops only its own event" {

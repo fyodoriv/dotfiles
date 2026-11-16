@@ -119,9 +119,29 @@ CURL="${DOTFILES_TELEMETRY_CURL:-curl}"
 BATCH_SIZE=500       # events per request
 MAX_EVENTS=2000      # newest events per log that one send may take
 MAX_AGE_DAYS=30      # older events are never sent
-AUTO_TIMEOUT=3       # seconds in total for one automatic daily send
+AUTO_TIMEOUT=30      # seconds in total for one automatic daily send
+AUTO_REQUEST_TIMEOUT=10  # seconds per request on the daily path
+MIN_REQUEST_SECONDS=5    # the daily path starts no request with less than this left
 MANUAL_TIMEOUT=10    # seconds per request for `telemetry send`
 RETRY_SECONDS=3600   # the daily path tries at most once in this time
+RETRY_FAILED_SECONDS=600  # ...after a failed try, once in this time
+# Test seams (bats only): a shorter daily request limit, and a fake clock for
+# the daily budget. The fake clock is a file holding whole seconds, so no test
+# depends on how busy the machine is.
+CLOCK_FILE=""
+if [ -n "${BATS_TEST_FILENAME:-}" ]; then
+  AUTO_REQUEST_TIMEOUT="${DOTFILES_TELEMETRY_TEST_REQUEST_TIMEOUT:-$AUTO_REQUEST_TIMEOUT}"
+  CLOCK_FILE="${DOTFILES_TELEMETRY_TEST_CLOCK:-}"
+fi
+# DOTFILES_TELEMETRY_TEST_NOW (bats only): the wall clock as whole epoch
+# seconds, so a test of the retry gate does not depend on the time of day.
+epoch_now() {
+  if [ -n "${BATS_TEST_FILENAME:-}" ] && [[ "${DOTFILES_TELEMETRY_TEST_NOW:-}" =~ ^[0-9]{9,11}$ ]]; then
+    printf '%s' "$DOTFILES_TELEMETRY_TEST_NOW"
+  else
+    date +%s
+  fi
+}
 # The day the install and gains events shipped. A yes from before this day
 # was given to a text without the baseline exception, so it does not cover
 # them.
@@ -151,14 +171,20 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-today() { date -u +%F; }
+today() {
+  if [ -n "${BATS_TEST_FILENAME:-}" ] && [[ "${DOTFILES_TELEMETRY_TEST_NOW:-}" =~ ^[0-9]{9,11}$ ]]; then
+    date -u -r "$DOTFILES_TELEMETRY_TEST_NOW" +%F 2>/dev/null || date -u -d "@$DOTFILES_TELEMETRY_TEST_NOW" +%F
+  else
+    date -u +%F
+  fi
+}
 line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 
 # ── State ───────────────────────────────────────────────────────────────
 # Script-scope copies of the state file fields. load_state fills them;
 # state_set changes some and writes the file.
 S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_CONSENT_TIME="" S_LAST_SEND="" S_LAST_TRY=0
-S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}'
+S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}' S_FAILS=0 S_FAIL_DAY=""
 # READ_FAILED: jq could not run on the file, so its content is unknown.
 # STATE_INVALID: jq ran and the content is not a state object.
 READ_FAILED=0 STATE_INVALID=0
@@ -195,10 +221,12 @@ save_state() {
       --arg try_hour "$S_TRY_HOUR" --argjson asks "$S_ASKS" --arg asked_day "$S_ASKED_DAY" \
       --arg install_sent "$S_INSTALL_SENT" --arg gains_day "$S_GAINS_DAY" \
       --arg sink "$S_SINK" --argjson err_cursors "$S_ERR_CURSORS" \
+      --argjson fails "$S_FAILS" --arg fail_day "$S_FAIL_DAY" \
       '{install_id: $id, consent: $consent, consent_at: $consent_at, consent_time: $consent_time, sent: $sent,
         sent_commands: $sent_commands, last_send: $last_send, last_try: $last_try,
         try_hour: $try_hour, asks: $asks, asked_day: $asked_day,
         install_sent: $install_sent, gains_day: $gains_day}
+       + (if $fails > 0 then {fails: $fails, fail_day: $fail_day} else {} end)
        + (if $sink != "" then {sink: $sink} else {} end)
        + (if ($err_cursors | length) > 0 then {err_cursors: $err_cursors} else {} end)' \
       >"$tmp" && mv -f "$tmp" "$STATE"
@@ -222,7 +250,7 @@ load_state() {
   local fields="" rc=0
   READ_FAILED=0 STATE_INVALID=0
   S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_CONSENT_TIME="" S_LAST_SEND="" S_LAST_TRY=0
-  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}'
+  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}' S_FAILS=0 S_FAIL_DAY=""
   [ -n "$S_ID" ] || S_ID="$(new_install_id)"
   [ -e "$STATE" ] || return 0
   # The file is read as raw text and parsed inside jq, so jq exits 0 for any
@@ -251,7 +279,8 @@ load_state() {
            (.err_cursors | if type == "object"
             then with_entries(select((.key | test("^[a-z.]{1,40}$"))
                  and (.value | type == "number" and . >= 0 and . == floor and . < 1000000000000))) | tojson
-            else "{}" end)]
+            else "{}" end),
+           ([(.fails | count), 99] | min), (.fail_day | day)]
         | map(tostring) | join(" ")
       else "invalid" end' "$STATE" 2>/dev/null)" || rc=$?
   if [ "$rc" -ne 0 ] || [ -z "$fields" ]; then
@@ -264,7 +293,7 @@ load_state() {
     S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
     return 0
   fi
-  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY S_CONSENT_TIME S_SINK S_ERR_CURSORS <<<"$fields"
+  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY S_CONSENT_TIME S_SINK S_ERR_CURSORS S_FAILS S_FAIL_DAY <<<"$fields"
   [ "$S_SINK" != "-" ] || S_SINK=""
   [ "$S_SENT" != "-1" ] || S_SENT="$(line_count "$STATS")"
   [ "$S_SENT_COMMANDS" != "-1" ] || S_SENT_COMMANDS="$(line_count "$COMMANDS")"
@@ -275,6 +304,7 @@ load_state() {
   [ "$S_INSTALL_SENT" != "-" ] || S_INSTALL_SENT=""
   [ "$S_GAINS_DAY" != "-" ] || S_GAINS_DAY=""
   [ "$S_CONSENT_TIME" != "-" ] || S_CONSENT_TIME=""
+  [ "$S_FAIL_DAY" != "-" ] || S_FAIL_DAY=""
 }
 
 # One state change at a time, across runs: a mkdir lock held for the read,
@@ -614,11 +644,14 @@ err_cursor_set() {
 # sink_sync: when the sink changed (first sight, a changed or a removed
 # policy), move every send cursor to the end of its log and remember the new
 # fingerprint, so events recorded under one destination never go to another.
+# A new destination also clears the retry wait and the failure count: a fixed
+# sink config must not wait out the backoff of the broken one.
 # Returns 1 when the state could not be written; then nothing is sent.
 sink_sync() {
   sink_changed || return 0
   state_set S_SENT "$(line_count "$STATS")" S_SENT_COMMANDS "$(line_count "$COMMANDS")" \
-    S_SINK "$SINK_FP" S_ERR_CURSORS "$(err_cursors_at_end)"
+    S_SINK "$SINK_FP" S_ERR_CURSORS "$(err_cursors_at_end)" \
+    S_LAST_TRY 0 S_FAILS 0 S_FAIL_DAY ""
 }
 
 # sink_track: every run of this script notes a changed sink, also when the
@@ -1029,22 +1062,24 @@ hec_header_config() {
 }
 
 # deliver SECONDS: the body on stdin goes to the sink; prints an HTTP-style
-# status (200 for a file append that worked, 000 for one that did not).
+# status and an exit code, "200 0" for a file append that worked and "000 1"
+# for one that did not (see post for the request case).
 deliver() {
   if [ "$SINK_KIND" = "file" ] && is_org_sink; then
-    if sink_file_append; then printf '200'; else printf '000'; fi
+    if sink_file_append; then printf '200 0'; else printf '000 1'; fi
   else
     post "$1"
   fi
 }
 
-# POST stdin to the endpoint within $1 seconds; prints the HTTP status, or
-# nothing when the request could not run. The body (with the key) reaches curl
+# POST stdin to the endpoint within $1 seconds; prints "HTTP_STATUS CURL_EXIT"
+# (the status is 000 or empty when curl got no answer, and the exit code is
+# curl's own, 143 when the watchdog killed it). The body (with the key) reaches curl
 # on stdin, and jq got the key through its environment, so the key is never
 # an argument of any process. curl has its own time
 # limit; a watchdog also kills a request that is still there one second later.
 post() {
-  local pid watchdog
+  local pid watchdog rc
   exec 7<&0
   if [ "$SINK_KIND" = "splunk-hec" ] && is_org_sink; then
     # The token reaches curl as a config on a pipe (-K), never as an argument.
@@ -1065,8 +1100,10 @@ post() {
   ) >/dev/null 2>&1 &
   watchdog=$!
   wait "$pid" 2>/dev/null
+  rc=$?
   kill "$watchdog" 2>/dev/null
   wait "$watchdog" 2>/dev/null
+  printf ' %s' "$rc"
   return 0
 }
 
@@ -1093,9 +1130,85 @@ lock() {
 # the answer is no longer yes (STOPPED_WHY) or the time is up: DEADLINE is a
 # value of $SECONDS, 0 for no limit.
 SENT_COUNT=0 SKIPPED_COUNT=0 FAILED_CODE="" STOPPED_WHY="" DEADLINE=0
+FAILED_RC="" FAILED_LIMIT="" FAILED_AT="" RUN_START=0 REQ_LIMIT=0 CLOCK=0
+
+# clock_now sets CLOCK to the seconds of this run: $SECONDS, or the fake clock
+# in a test.
+clock_now() {
+  CLOCK="$SECONDS"
+  [ -z "$CLOCK_FILE" ] || { read -r CLOCK <"$CLOCK_FILE" 2>/dev/null || CLOCK=0; }
+  [[ "$CLOCK" =~ ^[0-9]{1,9}$ ]] || CLOCK=0
+}
+
+# request_limit SECONDS sets REQ_LIMIT: the time one request may take. On the
+# daily path (DEADLINE set) it is never more than what is left of the budget,
+# and the request does not start at all with less than MIN_REQUEST_SECONDS
+# left: a short limit does not make a request faster, it only makes it fail
+# (the cause of the failures from 2026-11-11 to 2026-11-16). Returns 1 then.
+request_limit() {
+  local left
+  REQ_LIMIT="$1"
+  [ "$DEADLINE" -gt 0 ] || return 0
+  clock_now
+  left=$((DEADLINE - CLOCK))
+  [ "$left" -ge "$MIN_REQUEST_SECONDS" ] || return 1
+  [ "$REQ_LIMIT" -le "$left" ] || REQ_LIMIT="$left"
+}
+
+# retry_delay FAILS HTTP: seconds to wait after the FAILS-th failed try of the
+# day: 10 minutes, then an hour, then 6 hours. An HTTP 4xx (the server refused
+# the request, so a repeat would fail too) waits for the next UTC day.
+retry_delay() {
+  case "$2" in
+    4??) echo $((86400 - $(epoch_now) % 86400)); return 0 ;;
+  esac
+  case "$1" in
+    1) echo "$RETRY_FAILED_SECONDS" ;;
+    2) echo 3600 ;;
+    *) echo 21600 ;;
+  esac
+}
+
+# note_failure RESULT LIMIT: keep what a failed request tells: the HTTP status
+# (000 for none), curl's exit code, the limit, and the seconds into the run.
+# RESULT is the "HTTP_STATUS CURL_EXIT" that deliver printed. No payload and no
+# URL: only numbers.
+note_failure() {
+  local http="${1%% *}" rc=""
+  case "$1" in *" "*) rc="${1##* }" ;; esac
+  [[ "$http" =~ ^[0-9]{3}$ ]] || http="000"
+  [[ "$rc" =~ ^[0-9]{1,3}$ ]] || rc=""
+  FAILED_CODE="$http" FAILED_RC="$rc" FAILED_LIMIT="$2"
+  clock_now
+  FAILED_AT=$((CLOCK - RUN_START))
+}
+
+# failure_words prints the log words after "send failed (http NNN)": curl's
+# exit code with a name, the limit, and the seconds into the run. Nothing for
+# an HTTP answer (curl exit 0).
+failure_words() {
+  local name
+  { [ -n "$FAILED_RC" ] && [ "$FAILED_RC" != "0" ]; } || return 0
+  case "$FAILED_RC" in
+    6) name="could not resolve host" ;;
+    7) name="could not connect" ;;
+    28) name="timed out" ;;
+    35 | 51 | 58 | 60 | 77) name="TLS handshake failed" ;;
+    52) name="empty reply" ;;
+    56) name="receive error" ;;
+    126 | 127) name="curl could not run" ;;
+    137 | 143) name="killed after the limit" ;;
+    *) name="curl error" ;;
+  esac
+  printf ' curl exit %s (%s) limit %ss after %ss' "$FAILED_RC" "$name" "$FAILED_LIMIT" "$FAILED_AT"
+}
+
+# result_ok RESULT: true for an HTTP 2xx.
+result_ok() { [[ "${1%% *}" =~ ^2[0-9][0-9]$ ]]; }
+
 send_log() {
   local file="$1" cursor_name="$2" event="$3" timeout="$4"
-  local cursor from total count body code left events
+  local cursor from total count body code events
   [ -z "$STOPPED_WHY" ] || return 0
   cursor="${!2}"
   read -r from total <<<"$(plan "$file" "$cursor")"
@@ -1105,23 +1218,18 @@ send_log() {
   fi
   while [ "$from" -lt "$total" ]; do
     consent_yes || { STOPPED_WHY="turned off during the send"; return 0; }
-    if [ "$DEADLINE" -gt 0 ]; then
-      left=$((DEADLINE - SECONDS))
-      [ "$left" -gt 0 ] || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
-      [ "$timeout" -le "$left" ] || timeout="$left"
-    fi
+    request_limit "$timeout" || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
     count=$((total - from))
     [ "$count" -le "$BATCH_SIZE" ] || count="$BATCH_SIZE"
     body="$(build_body "$file" "$from" "$count" "$event" "$KEY")"
     if [ -n "$body" ]; then
-      code="$(printf '%s' "$body" | deliver "$timeout")"
-      if [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+      code="$(printf '%s' "$body" | deliver "$REQ_LIMIT")"
+      if result_ok "$code"; then
         # Count events, not log lines: a line that is not an event sends nothing.
         events="$(count_events "$body")"
         SENT_COUNT=$((SENT_COUNT + ${events:-0}))
       else
-        [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
-        FAILED_CODE="$code"
+        note_failure "$code" "$REQ_LIMIT"
         return 1
       fi
     fi
@@ -1140,17 +1248,14 @@ send_log() {
 # measurements (in extras_body) do not count against the time limit of the
 # daily send.
 send_extras() {
-  local timeout="$1" body code left started names
+  local timeout="$1" body code started names
   local -a changes=()
   [ -z "$STOPPED_WHY" ] || return 0
   extras_plan
   [ -n "$EXTRA_INSTALL" ] || [ "$EXTRA_GAINS" -eq 1 ] || return 0
-  if [ "$DEADLINE" -gt 0 ]; then
-    left=$((DEADLINE - SECONDS))
-    [ "$left" -gt 0 ] || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
-    [ "$timeout" -le "$left" ] || timeout="$left"
-  fi
-  started="$SECONDS"
+  request_limit "$timeout" || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
+  clock_now
+  started="$CLOCK"
   body="$(extras_body "$KEY")"
   names="$(jq -r '[.batch[].event] | join(" ")' <<<"$body" 2>/dev/null || true)"
   if [ "$EXTRA_GAINS" -eq 1 ]; then
@@ -1161,15 +1266,13 @@ send_extras() {
   load_state
   consent_yes || { STOPPED_WHY="turned off during the send"; return 0; }
   if [ "$DEADLINE" -gt 0 ]; then
-    DEADLINE=$((DEADLINE + SECONDS - started))
-    left=$((DEADLINE - SECONDS))
-    [ "$timeout" -le "$left" ] || timeout="$left"
-    [ "$timeout" -ge 1 ] || timeout=1
+    clock_now
+    DEADLINE=$((DEADLINE + CLOCK - started))
   fi
-  code="$(shape_body "$body" | deliver "$timeout")"
-  if [[ ! "$code" =~ ^2[0-9][0-9]$ ]]; then
-    [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
-    FAILED_CODE="$code"
+  request_limit "$timeout" || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
+  code="$(shape_body "$body" | deliver "$REQ_LIMIT")"
+  if ! result_ok "$code"; then
+    note_failure "$code" "$REQ_LIMIT"
     return 1
   fi
   case " $names " in *" dotfiles.install "*) changes+=(S_INSTALL_SENT "$EXTRA_INSTALL"); SENT_COUNT=$((SENT_COUNT + 1)) ;; esac
@@ -1184,7 +1287,7 @@ send_extras() {
 # never leaves. A file that shrank (the tool trimmed it) restarts at its top.
 # The cursor moves only after a 2xx. Same stop rules as send_log.
 send_errors() {
-  local timeout="$1" budget="$ERR_LINES_PER_SEND" name file total cursor take body code left
+  local timeout="$1" budget="$ERR_LINES_PER_SEND" name file total cursor take body code
   is_org_sink && [ "$SINK_ERRLOGS" -eq 1 ] || return 0
   for name in $ERR_FILE_NAMES; do
     [ -z "$STOPPED_WHY" ] || return 0
@@ -1196,19 +1299,14 @@ send_errors() {
     if [ "$cursor" -gt "$total" ]; then cursor=0; err_cursor_set "$name" 0 || true; fi
     [ "$cursor" -lt "$total" ] || continue
     consent_yes || { STOPPED_WHY="turned off during the send"; return 0; }
-    if [ "$DEADLINE" -gt 0 ]; then
-      left=$((DEADLINE - SECONDS))
-      [ "$left" -gt 0 ] || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
-      [ "$timeout" -le "$left" ] || timeout="$left"
-    fi
+    request_limit "$timeout" || { STOPPED_WHY="out of time; the rest goes later"; return 0; }
     take=$((total - cursor))
     [ "$take" -le "$budget" ] || take="$budget"
     body="$(err_batch "$file" "$name" "$cursor" "$take" | sink_shape "dotfiles:error_log")"
     if [ -n "$body" ]; then
-      code="$(printf '%s' "$body" | deliver "$timeout")"
-      if [[ ! "$code" =~ ^2[0-9][0-9]$ ]]; then
-        [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
-        FAILED_CODE="$code"
+      code="$(printf '%s' "$body" | deliver "$REQ_LIMIT")"
+      if ! result_ok "$code"; then
+        note_failure "$code" "$REQ_LIMIT"
         return 1
       fi
       SENT_COUNT=$((SENT_COUNT + $(count_events "$body")))
@@ -1220,14 +1318,16 @@ send_errors() {
 
 # send_all TIMEOUT: prints one result line. Never fails.
 send_all() {
-  local timeout="$1" why skipped=""
+  local timeout="$1" why skipped="" fails
   why="$(not_now)"
   [ -z "$why" ] || { echo "telemetry: not sent ($why)"; return 0; }
   lock || { echo "telemetry: not sent (another send is running)"; return 0; }
   # The try time is saved before the key lookup, so a Mac with no key looks
   # for one (and may ask the Keychain) at most once per RETRY_SECONDS. The
   # try hour lets lib/stats.sh skip the next start with no new process.
-  state_set S_LAST_TRY "$(date +%s)" S_TRY_HOUR "$(date -u +%FT%H)"
+  state_set S_LAST_TRY "$(epoch_now)" S_TRY_HOUR "$(date -u +%FT%H)"
+  clock_now
+  RUN_START="$CLOCK"
   if is_org_sink; then
     # The PostHog key is never read on this path.
     KEY="" KEY_SOURCE="none"
@@ -1244,12 +1344,20 @@ send_all() {
     elif [ "$SENT_COUNT" -eq 0 ]; then
       echo "telemetry: nothing new$skipped"
     else
-      state_set S_LAST_SEND "$(today)"
+      state_set S_LAST_SEND "$(today)" S_FAILS 0 S_FAIL_DAY ""
       echo "telemetry: sent $SENT_COUNT event(s)$skipped"
     fi
   else
-    log_error "send failed (http $FAILED_CODE)"
-    echo "telemetry: send failed (http $FAILED_CODE); will retry"
+    log_error "send failed (http $FAILED_CODE)$(failure_words)"
+    echo "telemetry: send failed (http $FAILED_CODE)$(failure_words); will retry"
+    # The daily path waits longer after each failed try in a day, and until
+    # the next UTC day after an HTTP 4xx: the try is dated so that its gate
+    # opens that much later.
+    fails="$S_FAILS"
+    [ "$S_FAIL_DAY" = "$(today)" ] || fails=0
+    fails=$((fails + 1))
+    state_set S_LAST_TRY "$(($(epoch_now) - RETRY_SECONDS + $(retry_delay "$fails" "$FAILED_CODE")))" \
+      S_FAILS "$fails" S_FAIL_DAY "$(today)"
   fi
   unlock
 }
@@ -1377,7 +1485,9 @@ cmd_send() {
 }
 
 # The automatic path: quiet, at most one working send a day, at most
-# AUTO_TIMEOUT seconds in total, and after a try it waits RETRY_SECONDS.
+# AUTO_TIMEOUT seconds in total (30), each request at most AUTO_REQUEST_TIMEOUT
+# (10), and no request starts with less than MIN_REQUEST_SECONDS (5) left.
+# After a try it waits RETRY_SECONDS; after a failed one, RETRY_FAILED_SECONDS.
 # Every return path leaves this clock hour in the state file, so lib/stats.sh
 # starts no new process for the rest of the hour. Only with a stored yes:
 # without one that gate stops earlier, and a wake must never create a state
@@ -1386,12 +1496,13 @@ cmd_daily() {
   local hour
   hour="$(date -u +%FT%H)"
   if [ -n "$(not_now)" ] || [ "$S_LAST_SEND" = "$(today)" ] ||
-    [ $(($(date +%s) - S_LAST_TRY)) -lt "$RETRY_SECONDS" ]; then
+    [ $(($(epoch_now) - S_LAST_TRY)) -lt "$RETRY_SECONDS" ]; then
     ! consent_yes || [ "$S_TRY_HOUR" = "$hour" ] || state_set S_TRY_HOUR "$hour" || true
     return 0
   fi
-  DEADLINE=$((SECONDS + AUTO_TIMEOUT))
-  send_all "$AUTO_TIMEOUT" >/dev/null 2>&1 || true
+  clock_now
+  DEADLINE=$((CLOCK + AUTO_TIMEOUT))
+  send_all "$AUTO_REQUEST_TIMEOUT" >/dev/null 2>&1 || true
 }
 
 # record_consent yes|no: one locked read, change, and write. A new yes covers

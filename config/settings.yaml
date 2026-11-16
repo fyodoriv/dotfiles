@@ -205,6 +205,11 @@ settings:
     default: ""
     optional: true
     description: 1-minute load average above which heavy-run starts no extra run. Empty or 0 = off (memory pressure still applies). HEAVY_RUN_MAX_LOAD wins.
+  heavy_run_min_free_pct:
+    type: int:0-90
+    default: ""
+    optional: true
+    description: Free memory, in percent of RAM, below which heavy-run starts no extra run while others run (the first run always starts). Empty = 25; 0 = off. HEAVY_RUN_MIN_FREE_PCT wins.
   heavy_run_project_slots:
     type: int:1-64
     default: ""

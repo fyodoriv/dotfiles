@@ -66,6 +66,10 @@
 {{- if hasKey . "heavy_run_project_slots" -}}
 {{-   $heavyRunProjectSlots = .heavy_run_project_slots -}}
 {{- end -}}
+{{- $heavyRunMinFreePct := "" -}}
+{{- if hasKey . "heavy_run_min_free_pct" -}}
+{{-   $heavyRunMinFreePct = .heavy_run_min_free_pct -}}
+{{- end -}}
 {{- $heavyRunMemoryGuard := "" -}}
 {{- if hasKey . "heavy_run_memory_guard" -}}
 {{-   $heavyRunMemoryGuard = .heavy_run_memory_guard -}}
@@ -286,6 +290,9 @@ data:
 {{- end }}
 {{- if $heavyRunProjectSlots }}
   heavy_run_project_slots: {{ $heavyRunProjectSlots }}
+{{- end }}
+{{- if ne (toString $heavyRunMinFreePct) "" }}
+  heavy_run_min_free_pct: {{ $heavyRunMinFreePct }}
 {{- end }}
 {{- if ne (toString $heavyRunMemoryGuard) "" }}
   heavy_run_memory_guard: {{ $heavyRunMemoryGuard }}

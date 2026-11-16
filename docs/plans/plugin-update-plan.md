@@ -18,7 +18,7 @@ company plugin must follow. A plugin that does nothing keeps working, but:
 | Public repo | The core is public. Its leak gates fail closed. | Nothing breaks. The rules below keep company data out of the core. |
 | CI | Tests run on hosted CI, not on laptops. The plugin template's CI pins actions, caches Homebrew and checks the newest core weekly. | Unpinned actions (`@v4`), no cache, and no early warning when a core change breaks the plugin. |
 | Telemetry | A plugin can ship the org log sink policy (`contributes.telemetry_sink`). The hourly sender works again. | Company Macs send the opt-in events to the public PostHog project instead of the company log system, or send nothing. |
-| Rust migration | Every core path is classified. app-priority runs in Rust. The agent hooks stay in shell. | Nothing, unless the plugin calls a core script by path (step 4 checks that). |
+| Rust migration | Every core path is classified. app-priority runs in Rust. The agent hooks stay in shell. | Nothing, unless the plugin calls a core script by path (see step 4). |
 | Docs and metrics | The docs map, metrics and the scorecard are current. | Employee docs point at old commands. |
 
 ## Before you start

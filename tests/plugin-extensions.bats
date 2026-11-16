@@ -543,15 +543,36 @@ sink_target() { printf '%s' "$HOME/.config/dotfiles/telemetry-sink.json"; }
 }
 
 @test "6f: the policy check never reads a token or the Keychain" {
-  printf '%s\n' "$SINK_HEC" > "$PLUGIN/sink.json"
+  printf '%s\n' '{"version":1,"kind":"splunk-hec","consent":"managed","url":"https://splunk.example.com:8088/services/collector/event","token":{"keychain":{"service":"s","account":"a"}},"index":"devtools"}' > "$PLUGIN/sink.json"
   install_plugin '  telemetry_sink: true
   network_hosts: [splunk.example.com]' '  telemetry_sink: sink.json'
   printf '#!/bin/sh\necho called >> "%s/security-calls"\nexit 1\n' "$TEST_DIR" > "$TEST_DIR/fake-security"
   chmod +x "$TEST_DIR/fake-security"
-  DOTFILES_TELEMETRY_SECURITY="$TEST_DIR/fake-security" run ext plugin_telemetry_sink_pass
+  # Control: a plain status on this policy does read the Keychain (CI is
+  # cleared, because CI=true alone already skips the token read).
+  CI="" DO_NOT_TRACK="" DOTFILES_TELEMETRY_SECURITY="$TEST_DIR/fake-security" \
+    DOTFILES_TELEMETRY_SINK_FILE="$PLUGIN/sink.json" bash "$REPO_ROOT/bin/dotfiles-telemetry" status >/dev/null 2>&1 || true
+  [ -e "$TEST_DIR/security-calls" ]
+  rm -f "$TEST_DIR/security-calls"
+  CI="" DO_NOT_TRACK="" DOTFILES_TELEMETRY_SECURITY="$TEST_DIR/fake-security" run ext plugin_telemetry_sink_pass
   echo "$output"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"installed the telemetry sink policy of plugin acme"* ]]
   [ ! -e "$TEST_DIR/security-calls" ]
+}
+
+@test "6f: a verified plugin that drops its sink loses the policy" {
+  printf '%s\n' "$SINK_FILE_KIND" > "$PLUGIN/sink.json"
+  install_plugin '  telemetry_sink: true' '  telemetry_sink: sink.json'
+  ext plugin_telemetry_sink_pass
+  [ -e "$(sink_target)" ]
+  # Same capabilities (still locked and verified), no sink contribution.
+  sed -i.bak 's/^  telemetry_sink: sink.json$/  shell: shell.zsh/' "$PLUGIN/dotfiles-plugin.yaml" && rm -f "$PLUGIN/dotfiles-plugin.yaml.bak"
+  ! grep -q 'telemetry_sink: sink.json' "$PLUGIN/dotfiles-plugin.yaml"
+  run ext plugin_telemetry_sink_pass
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ ! -e "$(sink_target)" ]
 }
 
 @test "6f: two plugins with a sink is a conflict and installs neither" {

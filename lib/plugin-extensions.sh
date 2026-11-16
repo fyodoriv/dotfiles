@@ -227,11 +227,12 @@ _plugin_sink_check() {
 }
 
 plugin_telemetry_sink_pass() {
-  local name path src target state tmp why sha old_name old_sha n=0 found_name="" found_src=""
+  local name path src target state tmp why sha old_name old_sha n=0 found_name="" found_src="" verified=" "
   target="$(plugin_sink_target)"
   state="$(plugin_sink_state_file)"
   while IFS=$'\t' read -r name path; do
     [ -n "$name" ] || continue
+    verified="$verified$name "
     src="$(plugin_contribution "$path" telemetry_sink)" || continue
     n=$((n + 1)); found_name="$name"; found_src="$src"
   done < <(plugin_verified_list)
@@ -242,7 +243,9 @@ plugin_telemetry_sink_pass() {
     # A plugin that is still in plugins.lock but fails verification (a stale
     # lock after an update) keeps its policy: removing it would fail open to
     # the public default.
-    if [ -n "$old_name" ] && plugin_lock_names | grep -qxF -- "$old_name"; then
+    # A verified plugin that dropped its sink loses the policy as usual.
+    if [ -n "$old_name" ] && [ "${verified#* "$old_name" }" = "$verified" ] &&
+      plugin_lock_names | grep -qxF -- "$old_name"; then
       return 0
     fi
     # The plugin that installed the policy is gone: remove its file, unless

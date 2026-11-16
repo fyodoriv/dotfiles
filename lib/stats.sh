@@ -118,6 +118,31 @@ _telemetry_read_state() {
   if [ -r "$_TELEMETRY_STATE_PATH" ]; then IFS= read -r _TELEMETRY_STATE_LINE <"$_TELEMETRY_STATE_PATH" 2>/dev/null || true; fi
 }
 
+# Read the org policy file (the same file bin/dotfiles-telemetry checks) into
+# _TELEMETRY_POLICY, in plain bash: no new process, and nothing at all when
+# there is no file. Only a first look: the script checks every rule again
+# (the full policy, the mode of the file, the token), so a policy that this
+# reads as managed but is invalid sends nothing.
+# Shell-variable scope: it lives for this script run only.
+_TELEMETRY_POLICY=""
+_telemetry_read_policy() {
+  _TELEMETRY_POLICY=""
+  local file="${DOTFILES_TELEMETRY_SINK_FILE:-$HOME/.config/dotfiles/telemetry-sink.json}"
+  [ -r "$file" ] || return 0
+  IFS= read -r -d '' -n 8192 _TELEMETRY_POLICY <"$file" 2>/dev/null || true
+}
+# _telemetry_policy_org: the policy names an org sink (splunk-hec or file).
+_telemetry_policy_org() {
+  local re='"kind"[[:space:]]*:[[:space:]]*"(splunk-hec|file)"'
+  [[ "$_TELEMETRY_POLICY" =~ $re ]]
+}
+# _telemetry_policy_managed: an org sink with consent managed, so no stored
+# yes is needed.
+_telemetry_policy_managed() {
+  local re='"consent"[[:space:]]*:[[:space:]]*"managed"'
+  _telemetry_policy_org && [[ "$_TELEMETRY_POLICY" =~ $re ]]
+}
+
 # The repo root, from this file's own path, in plain bash (no new process).
 _stats_repo_root() {
   _STATS_REPO_ROOT="${BASH_SOURCE[0]}"
@@ -156,7 +181,12 @@ _telemetry_daily() {
   [ "${DOTFILES_TELEMETRY:-}" != "0" ] || return 0
   case "${DO_NOT_TRACK:-}" in "" | 0) ;; *) return 0 ;; esac
   _telemetry_read_state
-  case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'*) ;; *) return 0 ;; esac
+  # A stored yes, or an org policy that manages consent (and no stored no).
+  case "$_TELEMETRY_STATE_LINE" in
+    *'"consent":"yes"'*) ;;
+    *'"consent":"no"'*) return 0 ;;
+    *) _telemetry_read_policy; _telemetry_policy_managed || return 0 ;;
+  esac
   case "$_TELEMETRY_STATE_LINE" in *"\"last_send\":\"$day\""* | *"\"try_hour\":\"$hour\""*) return 0 ;; esac
   _stats_repo_root
   tel="$_STATS_REPO_ROOT/bin/dotfiles-telemetry"
@@ -205,10 +235,19 @@ dotfiles_telemetry_ask() {
   if [ -z "${DOTFILES_POSTHOG_KEY:-}" ]; then
     arg="${DOTFILES_TELEMETRY_KEY_FILE:-$_STATS_REPO_ROOT/config/telemetry-key}"
     if [ -r "$arg" ]; then IFS= read -r key_line <"$arg" 2>/dev/null || true; fi
-    [ -n "$key_line" ] || return 0
+    if [ -z "$key_line" ]; then
+      # No public key: nothing could go to the public default. An org sink
+      # needs no such key, so only a policy that names one lets the question
+      # go on.
+      _telemetry_read_policy
+      _telemetry_policy_org || return 0
+    fi
   fi
   _telemetry_read_state
   case "$_TELEMETRY_STATE_LINE" in *'"consent":"yes"'* | *'"consent":"no"'* | *'"asks":3'*) return 0 ;; esac
+  # A managed org policy never asks: the send needs no answer.
+  _telemetry_read_policy
+  ! _telemetry_policy_managed || return 0
   # A question was dismissed before: it may come back once on a later day.
   case "$_TELEMETRY_STATE_LINE" in
     *'"asked_day":"2'*)

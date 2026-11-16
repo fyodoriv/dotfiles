@@ -243,7 +243,9 @@ the gains event.
   5 seconds, so a gains event adds at most 15 seconds. When one fails or
   takes longer, it is stopped. A fastest-of-7 number then uses the runs that
   finished; with none, that field is left out. The send goes on.
-  This time does not count against the 3-second limit of the daily send.
+  This time does not count against the 30-second budget of the daily send,
+  and it never leaves the request after it a shorter limit (see the daily
+  send rules below).
 - **No number, no event.** With no receipt and no measurement there is no
   gains event. The gains day is still set, so the measurements are tried at
   most once a day. The pending count of `status` counts a gains event that
@@ -416,9 +418,13 @@ kind only (`keychain`, `file`, or `env`). The Keychain read is
 no); with `kind: off` or an invalid policy it is not installed. The agent does
 not see your shell env, so the policy is read from the file
 (`dotfiles-telemetry agent-wanted`, used by `dotfiles apply`). For now a
-managed Mac with no stored answer sends from this hourly agent only: the
-shell-side daily send still looks at the stored yes (task
-`telemetry-sink-managed-shell-gates`).
+managed Mac with no stored answer also sends from a terminal run: the two
+gates in `lib/stats.sh` read the policy file in plain bash, with no new
+process. The detached daily send starts for a managed org sink with no stored
+answer (a stored no still stops it). The first-run question needs no public
+key when an org sink is set, and a managed policy never asks. With no policy
+file a run adds only one file test to each gate. The script checks every
+rule again, so a policy that fails a check sends nothing.
 
 **Check it.** `dotfiles telemetry status` shows the sink (kind and host, or
 the file path with `~`), the consent source, error logs on or off, and the
@@ -484,16 +490,28 @@ nothing is sent. The key is never printed or logged.
   as root (`--no-telemetry`, `DOTFILES_TELEMETRY=0`, `DO_NOT_TRACK`) cannot
   be saved either: one line says so and names the fix, `dotfiles telemetry
   off` as your user.
-- The daily send happens at most once a day. It stops after 3 seconds in
-  total; what is left goes on a later run. A request that hangs is killed.
-  After a try it waits one hour. A manual `dotfiles telemetry send` allows
+- The daily send happens at most once a day. It has a budget of 30 seconds
+  in total, and each request may take up to 10. No request starts with less
+  than 5 seconds of the budget left: the send stops with no failure and what
+  is left goes on a later run. (Until 2026-11-16 the budget was 3 seconds in
+  total, so a late request got a limit of 1 or 2 seconds and timed out on a
+  busy Mac.) A request that hangs is killed. After a try it waits one hour;
+  after a failed one, 10 minutes. A manual `dotfiles telemetry send` allows
   10 seconds per request.
+- **A failed send names its cause.** The line in `telemetry.log` is
+  `send failed (http 000) curl exit 28 (timed out) limit 10s after 4s`: curl's
+  own exit code (6 could not resolve host, 7 could not connect, 28 timed out,
+  35 TLS handshake failed, 143 killed by the watchdog after the limit), the
+  limit of that request, and the seconds into the run. An HTTP answer that is
+  not 2xx has no curl exit code: `send failed (http 503)`. The line holds
+  numbers only: no payload, key, or URL.
 - Every way out of the daily path marks the clock hour in the state file, so
   for the rest of that hour a `dotfiles` run starts no process for the send.
   With `DO_NOT_TRACK`, `CI`, or `DOTFILES_TELEMETRY=0` set, a run never
   starts one.
-- **Who starts it.** The LaunchAgent `com.dotfiles.telemetry` (every hour and
-  at load; the script sends at most once a day). Also a `dotfiles` run on a
+- **Who starts it.** The LaunchAgent `com.dotfiles.telemetry` (every 15
+  minutes and at load; the script sends at most once a day, and tries at
+  most once an hour, or once in 10 minutes after a failed try). Also a `dotfiles` run on a
   terminal, as a fully detached child (its own process group, SIGHUP ignored,
   no open terminal), so it lives on when the run ends. A scheduled job never
   starts a send: launchd kills what a job leaves behind when it exits, and

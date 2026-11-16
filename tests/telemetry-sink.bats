@@ -767,20 +767,43 @@ SH
 # Two gates start a process from a terminal run: the detached daily send
 # (_telemetry_daily) and the consent question (dotfiles_telemetry_ask). Both
 # read the policy file in plain bash. A copy of lib/ next to a stub of the
-# telemetry script shows what each gate would start. The trace prints a line
-# for every start, and a command substitution shows as "++". No test here
-# waits for a clock, except the one that starts the stub for real.
+# telemetry script shows what each gate starts: the stub logs a tag and its
+# arguments. The detached send is asynchronous, so "it did not start" is
+# shown by a control: a run with a stored yes, which does start, ends this
+# test's observation only after its own line is in the log, and an earlier
+# run that did not start left no line. No test here waits for a clock.
 gate_root() {
   GATE="$TEST_DIR/gate"
   [ ! -d "$GATE" ] || return 0
   mkdir -p "$GATE/bin" "$GATE/lib" "$TEST_DIR/no-commands"
   cp "$REPO"/lib/*.sh "$GATE/lib/"
-  printf '#!/bin/bash\necho "$*" >>"%s/gate.calls"\n' "$TEST_DIR" >"$GATE/bin/dotfiles-telemetry"
+  printf '#!/bin/bash\necho "${GATE_TAG:-} $*" >>"%s/gate.calls"\n' "$TEST_DIR" >"$GATE/bin/dotfiles-telemetry"
   chmod +x "$GATE/bin/dotfiles-telemetry"
+  : >"$TEST_DIR/gate.calls"
 }
-# gate_trace CALL: run the gate function and print its trace. The trace goes
-# to a file (BASH_XTRACEFD), because the gate sends the stderr of the send it
-# starts to /dev/null. PATH holds no command, so nothing really starts, and
+# gate_daily TAG: a terminal run reaches the daily gate.
+gate_daily() {
+  GATE_TAG="$1" DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1 DOTFILES_TELEMETRY_TEST_UID=1000 \
+    bash -c "source '$GATE/lib/stats.sh'; _telemetry_daily '$NOW'"
+}
+wait_gate_call() {
+  local tries=0
+  until grep -q "^$1 " "$TEST_DIR/gate.calls" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 600 ] || { echo "no call tagged $1"; return 1; }
+    sleep 0.05
+  done
+}
+# gate_calls TAG: how many times a run tagged TAG started the script, after a
+# control run with a stored yes (which does start) has shown up.
+gate_calls() {
+  printf '{"install_id":"0123456789abcdef0123456789abcdef","consent":"yes"}\n' >"$TEST_DIR/control.json"
+  DOTFILES_TELEMETRY_STATE="$TEST_DIR/control.json" gate_daily control
+  wait_gate_call control
+  grep -c "^$1 " "$TEST_DIR/gate.calls" || true
+}
+# gate_trace CALL: run a gate function and print its trace. The trace goes to
+# a file (BASH_XTRACEFD). PATH holds no command, so nothing really starts, and
 # every command the gate would start shows as a "+ " line.
 gate_trace() {
   : >"$TEST_DIR/xtrace"
@@ -800,55 +823,55 @@ refute_start() {
   gate_root
   hec_policy '.consent = "managed"'
   [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
-  run gate_trace "_telemetry_daily '$NOW'"
-  [[ "$output" == *"dotfiles-telemetry daily"* ]] || { echo "$output"; return 1; }
-  # The policy read starts no process of its own.
-  [[ "$output" != *"++ "* ]] || { echo "$output"; return 1; }
+  gate_daily hec
+  wait_gate_call hec
+  grep -q '^hec daily$' "$TEST_DIR/gate.calls"
   # The same with a file sink, and with a policy that is pretty-printed.
   file_policy '.consent = "managed"'
-  run gate_trace "_telemetry_daily '$NOW'"
-  [[ "$output" == *"dotfiles-telemetry daily"* ]] || { echo "$output"; return 1; }
+  gate_daily file
+  wait_gate_call file
   jq . "$DOTFILES_TELEMETRY_SINK_FILE" >"$TEST_DIR/pretty.json" && mv "$TEST_DIR/pretty.json" "$DOTFILES_TELEMETRY_SINK_FILE"
   chmod 600 "$DOTFILES_TELEMETRY_SINK_FILE"
-  run gate_trace "_telemetry_daily '$NOW'"
-  [[ "$output" == *"dotfiles-telemetry daily"* ]] || { echo "$output"; return 1; }
+  gate_daily pretty
+  wait_gate_call pretty
 }
 
-@test "gates: the daily send really starts, and the script it starts is the daily one" {
+@test "gates: the policy read of the daily gate starts no process of its own" {
   gate_root
   hec_policy '.consent = "managed"'
-  : >"$TEST_DIR/gate.calls"
-  DOTFILES_TELEMETRY_SPAWN=1 DOTFILES_TELEMETRY_TTY=1 DOTFILES_TELEMETRY_TEST_UID=1000 \
-    bash -c "source '$GATE/lib/stats.sh'; _telemetry_daily '$NOW'"
-  local tries=0
-  until [ -s "$TEST_DIR/gate.calls" ]; do tries=$((tries + 1)); [ "$tries" -lt 600 ]; sleep 0.05; done
-  [ "$(cat "$TEST_DIR/gate.calls")" = "daily" ]
+  run gate_trace "_telemetry_daily '$NOW'"
+  [[ "$output" != *"++ "* ]] || { echo "$output"; return 1; }
+  [[ "$output" != *"+ date"* ]] || { echo "$output"; return 1; }
+  # With no policy file, the same.
+  rm -f "$DOTFILES_TELEMETRY_SINK_FILE"
+  run gate_trace "_telemetry_daily '$NOW'"
+  refute_start "$output"
 }
 
 @test "gates: a stored no stops a managed policy; an ask policy and no policy start nothing" {
   gate_root
   hec_policy '.consent = "managed"'
   printf '{"install_id":"0123456789abcdef0123456789abcdef","consent":"no"}\n' >"$DOTFILES_TELEMETRY_STATE"
-  run gate_trace "_telemetry_daily '$NOW'"
-  refute_start "$output"
+  gate_daily stored-no
   rm -f "$DOTFILES_TELEMETRY_STATE"
   hec_policy
-  run gate_trace "_telemetry_daily '$NOW'"
-  refute_start "$output"
+  gate_daily ask-policy
   rm -f "$DOTFILES_TELEMETRY_SINK_FILE"
-  run gate_trace "_telemetry_daily '$NOW'"
-  refute_start "$output"
+  gate_daily no-policy
   # A managed policy that is not an org sink (the rule needs one) starts nothing.
   write_policy '{"version":1,"kind":"posthog","consent":"managed"}'
-  run gate_trace "_telemetry_daily '$NOW'"
-  refute_start "$output"
+  gate_daily not-org
+  [ "$(gate_calls stored-no)" -eq 0 ]
+  [ "$(grep -c '^ask-policy ' "$TEST_DIR/gate.calls" || true)" -eq 0 ]
+  [ "$(grep -c '^no-policy ' "$TEST_DIR/gate.calls" || true)" -eq 0 ]
+  [ "$(grep -c '^not-org ' "$TEST_DIR/gate.calls" || true)" -eq 0 ]
 }
 
 @test "gates: a stored yes with no policy still starts the daily send, as before" {
   gate_root
   printf '{"install_id":"0123456789abcdef0123456789abcdef","consent":"yes"}\n' >"$DOTFILES_TELEMETRY_STATE"
-  run gate_trace "_telemetry_daily '$NOW'"
-  [[ "$output" == *"dotfiles-telemetry daily"* ]] || { echo "$output"; return 1; }
+  gate_daily yes
+  wait_gate_call yes
 }
 
 @test "gates: with an org sink and an empty key file, the first-run question is asked" {
@@ -857,11 +880,11 @@ refute_start() {
   hec_policy
   run gate_trace "dotfiles_telemetry_ask stats"
   [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
+  # The policy read starts no process before the question.
+  [[ "$output" != *"++ "* ]] || { echo "$output"; return 1; }
   file_policy
   run gate_trace "dotfiles_telemetry_ask stats"
   [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
-  # The policy read starts no process before the question.
-  [[ "$output" != *"++ "* ]] || { echo "$output"; return 1; }
 }
 
 @test "gates: with no policy, or an unusable one, and an empty key file, nobody is asked" {

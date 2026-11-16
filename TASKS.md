@@ -44,20 +44,6 @@ them. -->
   - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Courtois, Heymans and Parnas 1971 (readers-writers starvation).
   - **Competitive-goal**: none: local queue fairness.
 
-- [ ] Diagnose the terminal telemetry test's request-count failure
-  - **ID**: telemetry-terminal-request-count-diagnostic
-  - **Tags**: telemetry, testing, stability
-  - **Mode**: AFK
-  - **Details**: A local full gate failed `tests/telemetry.bats` at the assertion that two requests were recorded. The test did not report the actual count; it passed when run alone. The cause is unknown. The [registered diagnostic](docs/plans/telemetry-count-diagnostic.md) uses synthetic events and a fake transport to report bounded counts and foreground return. It disables the detached sender in this case; a separate owned fixture observes a final marker. A marker does not prove process exit. Investigate any future mismatch before changing timing or send behavior.
-  - **Output**: instrumentation
-  - **Acceptance**: A planted count mismatch produces a bounded numeric receipt without payloads, credentials or user data. The test proves whether its detached sender finished before checking requests. Production consent and send behavior stay unchanged.
-  - **Hypothesis**: A content-free receipt and explicit sender-completion observation identify every planted count mismatch without disclosing synthetic canaries.
-  - **Measurement**: Register the fake-transport cases and focused Bats command before instrumentation; run those cases and `heavy-run bats tests/telemetry.bats`.
-  - **Success**: 100% of planted mismatches report the expected count and completion state; zero canary disclosures; the existing suite passes.
-  - **Pivot**: Any unowned process action, raw payload or missing completion evidence stops the approach; keep the cause unknown and redesign the fixture.
-  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
-  - **Competitive-goal**: none — telemetry test stability, not a scorecard metric.
-
 - [ ] Diagnose the intermittent custom keyboard-layout test failure
   - **ID**: glove80-custom-layout-test-diagnostic
   - **Tags**: testing, stability
@@ -383,35 +369,6 @@ them. -->
   - **Pivot**: if any older private-host case stops failing closed, drop the change and document the workaround (keep the host in a variable) in `docs/privacy-gates.md` instead.
   - **Anchor**: PR #562 push block on 2026-11-10; Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — correctness of an existing privacy gate, not a scorecard metric.
-
-- [ ] Make the gains time-limit test pass under a busy Mac
-  - **ID**: telemetry-gains-timeout-test-load-sensitive
-  - **Tags**: tests, telemetry, reliability
-  - **Details**: On 2026-11-10 the test "a zsh that fails or takes over 5 seconds..." in `tests/telemetry-gains.bats` failed once in a full run of the two telemetry test files at a system load above 20. It passed alone on the same commit and on the base branch. The test checks real time limits (`SECONDS` under 80, and the short limit of the `daily` path), so a slow machine can run past them. Find which limit ran out, then make the test independent of load: a fake clock, or a wider limit with a note of the reason.
-  - **Files**: `tests/telemetry-gains.bats`, `bin/dotfiles-telemetry`.
-  - **Output**: code
-  - **Acceptance**: the test passes 20 of 20 times while another full Bats run is active.
-  - **Hypothesis**: a load-independent limit moves failures of this test from 1 of 2 full runs under load to 0 of 20.
-  - **Measurement**: `for i in $(seq 20); do heavy-run bats tests/telemetry-gains.bats -f "takes over 5 seconds" || echo FAIL; done | grep -c FAIL`, with a second full Bats run active.
-  - **Success**: the command prints 0.
-  - **Pivot**: 2 or more failures after the change means the limit is not the cause; trace the `daily` path with `bash -x` and file what it shows.
-  - **Anchor**: Luo, Hariri, Eloussi and Marinov (2014), An Empirical Analysis of Flaky Tests; Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — test stability, not a scorecard metric.
-
-- [ ] Make the shell-side telemetry gates follow a managed org sink
-  - **ID**: telemetry-sink-managed-shell-gates
-  - **Tags**: telemetry, org-sink
-  - **Details**: The org log sink (`bin/dotfiles-telemetry`, rule 14) installs the `com.dotfiles.telemetry` LaunchAgent for `consent: managed`, so the hourly agent sends. Two gates in `lib/stats.sh` still read the stored answer or the PostHog key only: `_telemetry_daily` (the detached send after a terminal run) needs `"consent":"yes"` in the state line, and `dotfiles_telemetry_ask` returns with no PostHog key even when an org sink does not use one. So a managed Mac with no stored answer gets sends only from the agent, and a fork that empties `config/telemetry-key` never asks the consent question for `consent: ask` with an org sink. Make both gates read the policy file the same way `agent-wanted` does, in plain bash, with no new process on the common path.
-  - **Files**: `lib/stats.sh`, `bin/dotfiles-telemetry`, `tests/telemetry-sink.bats`, `tests/stats.bats`.
-  - **Output**: code
-  - **Acceptance**: with a managed policy and no stored answer, a terminal run starts the detached daily send; with an org sink and an empty key file, the first-run question is asked; a run with no policy file starts no extra process.
-  - **Hypothesis**: managed Macs whose events leave within one day of a terminal run, without relying on the hourly agent, go from 0 to all.
-  - **Measurement**: `heavy-run bats tests/telemetry-sink.bats tests/stats.bats`, with new cases for both gates and the existing no-new-process cases.
-  - **Success**: all cases pass and the no-policy path keeps its process count.
-  - **Pivot**: if the policy read adds more than 1 ms to a command with no policy file, drop the gate change and document that the agent is the only managed sender.
-  - **Anchor**: Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — org-overlay support, not a scorecard metric.
-
 
 ## P3
 

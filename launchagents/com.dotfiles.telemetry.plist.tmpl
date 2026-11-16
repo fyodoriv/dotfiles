@@ -2,9 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   com.dotfiles.telemetry — the one scheduled sender of the anonymous
-  performance numbers (bin/dotfiles-telemetry daily). It runs every hour and
-  at load; the script itself sends at most once a day, only with a key, and
-  stops after 3 seconds. It is installed only while the stored telemetry
+  performance numbers (bin/dotfiles-telemetry daily). It runs every 15
+  minutes and at load; the script itself sends at most once a day, only with
+  a key, tries at most once an hour (10 minutes after a failed try), and
+  stops after 30 seconds. It is installed only while the stored telemetry
   answer is yes, or an org policy manages consent and no no is stored
   (`dotfiles-telemetry agent-wanted`): `dotfiles telemetry on` loads it,
   `off` removes it, and apply skips it otherwise (should_skip_agent). Kind off
@@ -25,7 +26,7 @@
         <string>daily</string>
     </array>
     <key>StartInterval</key>
-    <integer>3600</integer>
+    <integer>900</integer>
     <key>RunAtLoad</key>
     <true/>
     <key>Nice</key>

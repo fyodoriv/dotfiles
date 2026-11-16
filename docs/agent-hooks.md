@@ -193,7 +193,10 @@ exits 2 and tells the agent to run `make lint`, push, and read CI
 - It is a guardrail against mistakes, not a security boundary. It fails open:
   with no `plutil` or `perl`, malformed input, or a stripped `PATH` it allows
   the command. Known gaps: a command name built at run time (`$(which bats)`)
-  and a script piped to a shell (`echo make check | sh`). A command that is
+  and a script piped to a shell (`echo make check | sh`). Known false
+  blocks: a launcher flag value read as the command
+  (`npx --package bats -- eslint .`) and `bash -c` or `npx -c` text quoted
+  inside a commit message. A command that is
   in a dotfiles checkout by session folder and also `cd`s elsewhere still
   blocks.
 - It applies to Claude Code and Codex, because both run the PreToolUse hooks

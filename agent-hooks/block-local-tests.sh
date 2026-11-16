@@ -47,7 +47,7 @@ _strip_text() {
     s/<<-?\s*(["\x27]?)(\w+)\1([^\n]*\n)(?:.*?\n)??[ \t]*\2[ \t]*$/ $3/gms;
     s/\b(?:ba|z|da)?sh[ \t]+(?:-\w+[ \t]+)*-\w*c\w*[ \t]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my $q = $1; push @extra, substr($q, 1, -1); "sh -c Q"/gse;
-    s/\b((?:npx|bunx|npm|pnpm)\b[^;&|\n]*?[ \t])(?:-c|--call)[ \t=]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
+    s/\b((?:npx|bunx|(?:npm|pnpm)(?:[ \t]+(?:--prefix|-w|--workspace|-C|--dir|--filter|-F|--loglevel)[ \t]+[^\s;&|]+|[ \t]+-[^\s;&|]+)*[ \t]+(?:exec|x|dlx))(?:[ \t]+-[^\s;&|]+)*?[ \t])(?:-c|--call)[ \t=]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my ($p, $q) = ($1, $2); push @extra, substr($q, 1, -1); "${p}-c Q"/gse;
     s/\beval[ \t]+("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/
       my $q = $1; push @extra, substr($q, 1, -1); "eval Q"/gse;
@@ -114,7 +114,7 @@ _is_test_run() {
       w=("${w[@]:1}")
       while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do
         case "${w[0]}" in
-          --prefix|-w|--workspace|-C|--dir|--filter|-F) w=("${w[@]:2}") ;;
+          --prefix|-w|--workspace|-C|--dir|--filter|-F|--loglevel) w=("${w[@]:2}") ;;
           *) w=("${w[@]:1}") ;;
         esac
       done

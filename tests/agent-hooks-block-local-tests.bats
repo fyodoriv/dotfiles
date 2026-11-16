@@ -48,7 +48,9 @@ run_hook() {
            "npm exec bats tests/x.bats" "npm exec -- bats tests/x.bats" "npm x bats tests/x.bats" \
            "npm exec -c 'bats tests/x.bats'" "npx -c 'make check'" "npm --prefix . exec bats x" \
            "npm -w a exec bats x" "pnpm dlx bats x" "pnpm exec bats x" \
-           "ls | xargs -I{} -R 1 bats {}" "ls | xargs --max-chars 100 bats"; do
+           "ls | xargs -I{} -R 1 bats {}" "ls | xargs --max-chars 100 bats" \
+           "npm --loglevel silent exec bats x" "npm exec --call='bats tests'" \
+           "pnpm --filter a exec -c 'bats x'"; do
     run_hook "$c"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
   done
@@ -58,7 +60,9 @@ run_hook() {
   for c in "ls | xargs rg bats" "find . -exec rg bats {} +" "echo 'make check' | xargs echo" \
            "xargs -n1 shellcheck" "ls | xargs --replace rg bats {}" "npm exec eslint ." \
            "npm run lint" "rg bats tests/" "cat tests/x.bats" "npx -c 'eslint .'" \
-           "npm --prefix . exec eslint" "pnpm dlx prettier ."; do
+           "npm --prefix . exec eslint" "pnpm dlx prettier ." \
+           "git commit -m 'npm -c \"make check\"'" "grep npm -c 'make check' docs" \
+           "npm run build -- -c 'bats'"; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c: $output"; return 1; }
   done

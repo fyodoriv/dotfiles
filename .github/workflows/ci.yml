@@ -167,7 +167,16 @@ jobs:
       - name: Deploy configs
         run: chezmoi apply --source "$PWD" --force --exclude=scripts
       - name: Run doctor
-        run: ./bin/dotfiles-doctor --report
+        # Only the modules whose checks the files-only apply can satisfy. The
+        # others check an installed machine (git identity, gh login, brew
+        # tools, LaunchAgents, power settings): 50 checks failed there on the
+        # first runner, so `dotfiles doctor` on a real Mac covers them.
+        run: |
+          status=0
+          for m in security ssh workflow agent-browser chezmoi chrome editor memory personal-machine plugins shell sync upgrade; do
+            ./bin/dotfiles-doctor --report --module "$m" || status=1
+          done
+          exit "$status"
       - name: Shell startup benchmark
         run: |
           # Measure zsh startup time (interactive + login shell)

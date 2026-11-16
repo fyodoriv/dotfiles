@@ -318,6 +318,8 @@ Sweeps every chezmoi-managed symlink. Catches links left behind when the repo mo
 | `chezmoi.managed_symlinks_inventory` | advisory — lists the broken managed symlinks, when any | — |
 | `chezmoi.managed_symlinks_current` | Managed symlinks point into chezmoi's current source checkout | `chezmoi apply --exclude=scripts` |
 
+The doctor also adds each `chezmoi doctor` result as `chezmoi.<check>`. `chezmoi.latest-version` asks GitHub, so its error (a rate limit, no network) is only a warning.
+
 ### local-bin
 
 | ID | What it checks | Auto-fix |

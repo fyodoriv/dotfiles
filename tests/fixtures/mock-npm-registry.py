@@ -6,7 +6,7 @@ Each tarball needs a `<tarball>.json` sidecar with its package.json fields
 
 Usage: python3 -I tests/fixtures/mock-npm-registry.py <root> > port.txt &
 """
-import base64, hashlib, http.server, json, os, sys
+import base64, hashlib, http.server, json, os, socketserver, sys
 
 root = sys.argv[1]
 
@@ -38,6 +38,14 @@ class H(http.server.BaseHTTPRequestHandler):
             ctype = 'application/json'
         self.send_response(200); self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data)
-s = http.server.HTTPServer(('127.0.0.1', 0), H)
+class S(http.server.HTTPServer):
+    # HTTPServer.server_bind does a reverse DNS lookup (socket.getfqdn). On a
+    # hosted runner it can hang past the 30 s wait, so no port is printed.
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+s = S(('127.0.0.1', 0), H)
 print(s.server_address[1], flush=True)
 s.serve_forever()

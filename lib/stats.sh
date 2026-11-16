@@ -131,16 +131,53 @@ _telemetry_read_policy() {
   [ -r "$file" ] || return 0
   IFS= read -r -d '' -n 8192 _TELEMETRY_POLICY <"$file" 2>/dev/null || true
 }
+# _telemetry_top: _TELEMETRY_TOP is the policy without anything inside a
+# nested object, so a key is read only at the top level. The text is checked
+# again by the script, so this errs on the side of asking: a key that appears
+# twice, or a policy that is not one JSON object, is "not sure".
+_TELEMETRY_TOP=""
+_telemetry_top() {
+  local body="$_TELEMETRY_POLICY"
+  _TELEMETRY_TOP=""
+  [[ "$body" == *[![:space:]]* ]] || return 1
+  body="${body#"${body%%[![:space:]]*}"}"
+  [[ "$body" == "{"* ]] || return 1
+  local i c depth=0 out=""
+  for ((i = 0; i < ${#body}; i++)); do
+    c="${body:i:1}"
+    case "$c" in
+      "{") depth=$((depth + 1)); [ "$depth" -gt 1 ] || continue ;;
+      "}") depth=$((depth - 1)); [ "$depth" -ge 0 ] || return 1; [ "$depth" -ge 1 ] || continue ;;
+    esac
+    [ "$depth" -le 1 ] && [ "$c" != "{" ] && [ "$c" != "}" ] && out="$out$c"
+  done
+  [ "$depth" -eq 0 ] || return 1
+  body="$out"
+  _TELEMETRY_TOP="$body"
+}
+# _telemetry_top_value KEY: succeed when KEY is a top-level key exactly once;
+# its string value is in _TELEMETRY_VALUE.
+_TELEMETRY_VALUE=""
+_telemetry_top_value() {
+  local re="\"$1\"[[:space:]]*:[[:space:]]*\"([a-z-]*)\"" rest
+  _TELEMETRY_VALUE=""
+  [[ "$_TELEMETRY_TOP" =~ $re ]] || return 1
+  _TELEMETRY_VALUE="${BASH_REMATCH[1]}"
+  rest="${_TELEMETRY_TOP#*\"$1\"}"
+  [[ "$rest" != *"\"$1\""* ]]
+}
 # _telemetry_policy_org: the policy names an org sink (splunk-hec or file).
 _telemetry_policy_org() {
-  local re='"kind"[[:space:]]*:[[:space:]]*"(splunk-hec|file)"'
-  [[ "$_TELEMETRY_POLICY" =~ $re ]]
+  _telemetry_top || return 1
+  _telemetry_top_value kind || return 1
+  [ "$_TELEMETRY_VALUE" = "splunk-hec" ] || [ "$_TELEMETRY_VALUE" = "file" ]
 }
-# _telemetry_policy_managed: an org sink with consent managed, so no stored
-# yes is needed.
+# _telemetry_policy_managed: an org sink with consent managed (a top-level
+# key, once), so no stored yes is needed. Not sure means not managed.
 _telemetry_policy_managed() {
-  local re='"consent"[[:space:]]*:[[:space:]]*"managed"'
-  _telemetry_policy_org && [[ "$_TELEMETRY_POLICY" =~ $re ]]
+  _telemetry_policy_org || return 1
+  _telemetry_top_value consent || return 1
+  [ "$_TELEMETRY_VALUE" = "managed" ]
 }
 
 # The repo root, from this file's own path, in plain bash (no new process).

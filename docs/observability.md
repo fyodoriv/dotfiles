@@ -422,7 +422,10 @@ managed Mac with no stored answer also sends from a terminal run: the two
 gates in `lib/stats.sh` read the policy file in plain bash, with no new
 process. The detached daily send starts for a managed org sink with no stored
 answer (a stored no still stops it). The first-run question needs no public
-key when an org sink is set, and a managed policy never asks. With no policy
+key when an org sink is set, and a managed policy never asks. The gates read
+`kind` and `consent` only as top-level keys that appear once; a key inside a
+nested object, a repeated key, or text that is not one JSON object counts as
+"not sure", and then the question is asked. With no policy
 file a run adds only one file test to each gate. The script checks every
 rule again, so a policy that fails a check sends nothing.
 
@@ -495,8 +498,11 @@ nothing is sent. The key is never printed or logged.
   than 5 seconds of the budget left: the send stops with no failure and what
   is left goes on a later run. (Until 2026-11-16 the budget was 3 seconds in
   total, so a late request got a limit of 1 or 2 seconds and timed out on a
-  busy Mac.) A request that hangs is killed. After a try it waits one hour;
-  after a failed one, 10 minutes. A manual `dotfiles telemetry send` allows
+  busy Mac.) A request that hangs is killed. After a try it waits one hour. After
+  a failed one it waits longer each time in the same UTC day: 10 minutes, then
+  an hour, then 6 hours. An HTTP 4xx answer (the server refused the request)
+  waits for the next UTC day. A good send ends the run of failures; there is
+  at most one good send a day. A manual `dotfiles telemetry send` allows
   10 seconds per request.
 - **A failed send names its cause.** The line in `telemetry.log` is
   `send failed (http 000) curl exit 28 (timed out) limit 10s after 4s`: curl's
@@ -511,7 +517,7 @@ nothing is sent. The key is never printed or logged.
   starts one.
 - **Who starts it.** The LaunchAgent `com.dotfiles.telemetry` (every 15
   minutes and at load; the script sends at most once a day, and tries at
-  most once an hour, or once in 10 minutes after a failed try). Also a `dotfiles` run on a
+  most once an hour; after failed tries it waits 10 minutes, then an hour, then 6 hours). Also a `dotfiles` run on a
   terminal, as a fully detached child (its own process group, SIGHUP ignored,
   no open terminal), so it lives on when the run ends. A scheduled job never
   starts a send: launchd kills what a job leaves behind when it exits, and

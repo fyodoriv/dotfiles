@@ -911,6 +911,26 @@ refute_start() {
   refute_start "$output"
 }
 
+@test "gates: only a top-level managed consent skips the question; when unsure, it is asked" {
+  gate_root
+  export DOTFILES_POSTHOG_KEY=""
+  # Managed in a nested object, managed once and ask once, and a quoted key
+  # inside a value are all "not sure": the question is asked.
+  write_policy '{"version":1,"kind":"file","consent":"ask","path":"/x","token":{"consent":"managed"}}'
+  run gate_trace "dotfiles_telemetry_ask stats"
+  [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
+  write_policy '{"version":1,"kind":"file","consent":"ask","consent":"managed","path":"/x"}'
+  run gate_trace "dotfiles_telemetry_ask stats"
+  [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
+  write_policy '{"version":1,"kind":"file","path":"a \"consent\": \"managed\""}'
+  run gate_trace "dotfiles_telemetry_ask stats"
+  [[ "$output" == *"dotfiles-telemetry ask --first-run"* ]] || { echo "$output"; return 1; }
+  # A real top-level managed consent after a nested token still skips it.
+  write_policy '{"version":1,"kind":"splunk-hec","url":"https://hec.example.com/x","token":{"env":"HEC_TOKEN"},"consent":"managed"}'
+  run gate_trace "dotfiles_telemetry_ask stats"
+  refute_start "$output"
+}
+
 @test "gates: a run with no policy file adds no process to either gate" {
   gate_root
   export DOTFILES_POSTHOG_KEY="phc_publicCanaryKey1"

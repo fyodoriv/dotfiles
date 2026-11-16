@@ -1028,6 +1028,51 @@ SH
   [ "$(requests)" -eq 2 ]
 }
 
+@test "failed daily tries back off: 10 minutes, then an hour, then 6 hours" {
+  say_yes
+  FAKE_CODE=503 bash "$TEL" daily
+  [ "$(requests)" -eq 1 ]
+  [ "$(jq -r .fails "$DOTFILES_TELEMETRY_STATE")" = "1" ]
+  # Margins are minutes, so a slow machine cannot change the outcome.
+  set_state '.last_try = .last_try - 700'
+  FAKE_CODE=503 bash "$TEL" daily
+  [ "$(requests)" -eq 2 ]
+  [ "$(jq -r .fails "$DOTFILES_TELEMETRY_STATE")" = "2" ]
+  set_state '.last_try = .last_try - 3000'
+  FAKE_CODE=503 bash "$TEL" daily
+  [ "$(requests)" -eq 2 ]
+  set_state '.last_try = .last_try - 700'
+  FAKE_CODE=503 bash "$TEL" daily
+  [ "$(requests)" -eq 3 ]
+  [ "$(jq -r .fails "$DOTFILES_TELEMETRY_STATE")" = "3" ]
+  set_state '.last_try = .last_try - 20000'
+  FAKE_CODE=503 bash "$TEL" daily
+  [ "$(requests)" -eq 3 ]
+  set_state '.last_try = .last_try - 2000'
+  FAKE_CODE=503 bash "$TEL" daily
+  [ "$(requests)" -eq 4 ]
+  # A good try ends the run of failures, and one send a day is the limit.
+  set_state '.last_try = .last_try - 30000'
+  bash "$TEL" daily
+  [ "$(requests)" -eq 5 ]
+  [ "$(jq -r '.fails // 0' "$DOTFILES_TELEMETRY_STATE")" = "0" ]
+  set_state '.last_try = .last_try - 30000'
+  bash "$TEL" daily
+  [ "$(requests)" -eq 5 ]
+}
+
+@test "an HTTP 4xx answer waits for the next UTC day" {
+  say_yes
+  FAKE_CODE=401 bash "$TEL" daily
+  [ "$(requests)" -eq 1 ]
+  # The gate opens at the next UTC midnight, give or take a few seconds.
+  run jq -r '(.last_try + 3600) - ((now | floor) / 86400 | floor + 1) * 86400 | if . > -30 and . <= 30 then "ok" else "off \(.)" end' "$DOTFILES_TELEMETRY_STATE"
+  [ "$output" = "ok" ]
+  set_state '.last_try = .last_try - 3000'
+  bash "$TEL" daily
+  [ "$(requests)" -eq 1 ]
+}
+
 @test "a big backlog: only the newest 2,000 go, 500 per request, and the rest is skipped for good" {
   say_yes
   seed_lines 2600

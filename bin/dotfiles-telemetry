@@ -169,7 +169,7 @@ line_count() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 # Script-scope copies of the state file fields. load_state fills them;
 # state_set changes some and writes the file.
 S_ID="" S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_CONSENT_TIME="" S_LAST_SEND="" S_LAST_TRY=0
-S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}'
+S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}' S_FAILS=0 S_FAIL_DAY=""
 # READ_FAILED: jq could not run on the file, so its content is unknown.
 # STATE_INVALID: jq ran and the content is not a state object.
 READ_FAILED=0 STATE_INVALID=0
@@ -206,10 +206,12 @@ save_state() {
       --arg try_hour "$S_TRY_HOUR" --argjson asks "$S_ASKS" --arg asked_day "$S_ASKED_DAY" \
       --arg install_sent "$S_INSTALL_SENT" --arg gains_day "$S_GAINS_DAY" \
       --arg sink "$S_SINK" --argjson err_cursors "$S_ERR_CURSORS" \
+      --argjson fails "$S_FAILS" --arg fail_day "$S_FAIL_DAY" \
       '{install_id: $id, consent: $consent, consent_at: $consent_at, consent_time: $consent_time, sent: $sent,
         sent_commands: $sent_commands, last_send: $last_send, last_try: $last_try,
         try_hour: $try_hour, asks: $asks, asked_day: $asked_day,
         install_sent: $install_sent, gains_day: $gains_day}
+       + (if $fails > 0 then {fails: $fails, fail_day: $fail_day} else {} end)
        + (if $sink != "" then {sink: $sink} else {} end)
        + (if ($err_cursors | length) > 0 then {err_cursors: $err_cursors} else {} end)' \
       >"$tmp" && mv -f "$tmp" "$STATE"
@@ -233,7 +235,7 @@ load_state() {
   local fields="" rc=0
   READ_FAILED=0 STATE_INVALID=0
   S_SENT=0 S_SENT_COMMANDS=0 S_CONSENT=unset S_CONSENT_AT="" S_CONSENT_TIME="" S_LAST_SEND="" S_LAST_TRY=0
-  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}'
+  S_TRY_HOUR="" S_ASKS=0 S_ASKED_DAY="" S_INSTALL_SENT="" S_GAINS_DAY="" S_SINK="" S_ERR_CURSORS='{}' S_FAILS=0 S_FAIL_DAY=""
   [ -n "$S_ID" ] || S_ID="$(new_install_id)"
   [ -e "$STATE" ] || return 0
   # The file is read as raw text and parsed inside jq, so jq exits 0 for any
@@ -262,7 +264,8 @@ load_state() {
            (.err_cursors | if type == "object"
             then with_entries(select((.key | test("^[a-z.]{1,40}$"))
                  and (.value | type == "number" and . >= 0 and . == floor and . < 1000000000000))) | tojson
-            else "{}" end)]
+            else "{}" end),
+           ([(.fails | count), 99] | min), (.fail_day | day)]
         | map(tostring) | join(" ")
       else "invalid" end' "$STATE" 2>/dev/null)" || rc=$?
   if [ "$rc" -ne 0 ] || [ -z "$fields" ]; then
@@ -275,7 +278,7 @@ load_state() {
     S_SENT="$(line_count "$STATS")" S_SENT_COMMANDS="$(line_count "$COMMANDS")"
     return 0
   fi
-  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY S_CONSENT_TIME S_SINK S_ERR_CURSORS <<<"$fields"
+  read -r S_ID S_SENT S_SENT_COMMANDS S_CONSENT S_CONSENT_AT S_LAST_SEND S_LAST_TRY S_TRY_HOUR S_ASKS S_ASKED_DAY S_INSTALL_SENT S_GAINS_DAY S_CONSENT_TIME S_SINK S_ERR_CURSORS S_FAILS S_FAIL_DAY <<<"$fields"
   [ "$S_SINK" != "-" ] || S_SINK=""
   [ "$S_SENT" != "-1" ] || S_SENT="$(line_count "$STATS")"
   [ "$S_SENT_COMMANDS" != "-1" ] || S_SENT_COMMANDS="$(line_count "$COMMANDS")"
@@ -286,6 +289,7 @@ load_state() {
   [ "$S_INSTALL_SENT" != "-" ] || S_INSTALL_SENT=""
   [ "$S_GAINS_DAY" != "-" ] || S_GAINS_DAY=""
   [ "$S_CONSENT_TIME" != "-" ] || S_CONSENT_TIME=""
+  [ "$S_FAIL_DAY" != "-" ] || S_FAIL_DAY=""
 }
 
 # One state change at a time, across runs: a mkdir lock held for the read,
@@ -1133,6 +1137,20 @@ request_limit() {
   [ "$REQ_LIMIT" -le "$left" ] || REQ_LIMIT="$left"
 }
 
+# retry_delay FAILS HTTP: seconds to wait after the FAILS-th failed try of the
+# day: 10 minutes, then an hour, then 6 hours. An HTTP 4xx (the server refused
+# the request, so a repeat would fail too) waits for the next UTC day.
+retry_delay() {
+  case "$2" in
+    4??) echo $((86400 - $(date -u +%s) % 86400)); return 0 ;;
+  esac
+  case "$1" in
+    1) echo "$RETRY_FAILED_SECONDS" ;;
+    2) echo 3600 ;;
+    *) echo 21600 ;;
+  esac
+}
+
 # note_failure RESULT LIMIT: keep what a failed request tells: the HTTP status
 # (000 for none), curl's exit code, the limit, and the seconds into the run.
 # RESULT is the "HTTP_STATUS CURL_EXIT" that deliver printed. No payload and no
@@ -1282,7 +1300,7 @@ send_errors() {
 
 # send_all TIMEOUT: prints one result line. Never fails.
 send_all() {
-  local timeout="$1" why skipped=""
+  local timeout="$1" why skipped="" fails
   why="$(not_now)"
   [ -z "$why" ] || { echo "telemetry: not sent ($why)"; return 0; }
   lock || { echo "telemetry: not sent (another send is running)"; return 0; }
@@ -1308,15 +1326,20 @@ send_all() {
     elif [ "$SENT_COUNT" -eq 0 ]; then
       echo "telemetry: nothing new$skipped"
     else
-      state_set S_LAST_SEND "$(today)"
+      state_set S_LAST_SEND "$(today)" S_FAILS 0 S_FAIL_DAY ""
       echo "telemetry: sent $SENT_COUNT event(s)$skipped"
     fi
   else
     log_error "send failed (http $FAILED_CODE)$(failure_words)"
     echo "telemetry: send failed (http $FAILED_CODE)$(failure_words); will retry"
-    # The daily path tries again after RETRY_FAILED_SECONDS, not after a whole
-    # RETRY_SECONDS: the try is dated so that its gate opens that much later.
-    state_set S_LAST_TRY "$(($(date +%s) - RETRY_SECONDS + RETRY_FAILED_SECONDS))"
+    # The daily path waits longer after each failed try in a day, and until
+    # the next UTC day after an HTTP 4xx: the try is dated so that its gate
+    # opens that much later.
+    fails="$S_FAILS"
+    [ "$S_FAIL_DAY" = "$(today)" ] || fails=0
+    fails=$((fails + 1))
+    state_set S_LAST_TRY "$(($(date +%s) - RETRY_SECONDS + $(retry_delay "$fails" "$FAILED_CODE")))" \
+      S_FAILS "$fails" S_FAIL_DAY "$(today)"
   fi
   unlock
 }

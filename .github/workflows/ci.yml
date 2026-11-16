@@ -75,19 +75,6 @@ jobs:
           # origin/feat/chezmoi.
           fetch-depth: 0
           persist-credentials: false
-      - name: Week for the Homebrew cache key
-        id: week
-        run: echo "w=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
-      - name: Restore the Homebrew download cache
-        # Bottle downloads are the slow part of the install step. The key
-        # changes each ISO week (fresh bottles) and when this file changes.
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/Library/Caches/Homebrew
-          key: brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-
-            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: Install dependencies
         # bash: the git hooks and the coverage harness need Homebrew bash;
         # the runner has only /bin/bash 3.2. coreutils: tests call gtimeout.
@@ -150,17 +137,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Week for the Homebrew cache key
-        id: week
-        run: echo "w=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
-      - name: Restore the Homebrew download cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/Library/Caches/Homebrew
-          key: brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-
-            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: Install chezmoi
         run: brew install chezmoi jq fd
       - name: Write the chezmoi config
@@ -236,17 +212,6 @@ jobs:
           # Some tests read pinned older commits, so the clone needs history.
           fetch-depth: 0
           persist-credentials: false
-      - name: Week for the Homebrew cache key
-        id: week
-        run: echo "w=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
-      - name: Restore the Homebrew download cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/Library/Caches/Homebrew
-          key: brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.week.outputs.w }}-
-            brew-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
       - name: Install dependencies
         run: brew install bash coreutils shellcheck bats-core parallel chezmoi jq fd shfmt ripgrep git-cliff
       - name: Write the chezmoi config

@@ -2,7 +2,8 @@
 # Blocks local test runs inside a dotfiles checkout. Tests run on hosted CI
 # only (owner decision 2026-11-16: "Lint local, tests on CI").
 # Receives Claude Code PreToolUse tool input as JSON on stdin.
-# Blocked there: bats, bin/bats-affected, make check, make test*, make e2e.
+# Blocked there: bats, bin/bats-affected, make check, make test*, make e2e,
+# also when started by xargs, find -exec, npx, bunx, npm exec or eval.
 # Allowed: make lint*, shellcheck, rg bats, and any command outside a dotfiles
 # checkout. A checkout is a folder (or a parent of it) that holds both
 # agent-hooks/require-heavy-run.sh and bin/dotfiles-doctor.
@@ -104,13 +105,18 @@ _is_test_run() {
   [ "${#w[@]}" -gt 0 ] || return 1
   local tool="${w[0]##*/}" a
   case "$tool" in
+    npm|pnpm)
+      # `npm exec X` and `npm x X` start X, like npx.
+      case "${w[1]:-}" in exec|x) _is_test_run "npx ${w[*]:2}"; return ;; esac
+      return 1 ;;
     xargs|npx|bunx)
       # A launcher: skip its own flags (and their values), then judge the
       # command it starts.
       w=("${w[@]:1}")
       while [ "${#w[@]}" -gt 0 ] && [[ "${w[0]}" == -* ]]; do
         case "$tool:${w[0]}" in
-          xargs:-[adEIJLnPs]|xargs:--arg-file|xargs:--delimiter|xargs:--max-args|xargs:--max-procs|xargs:--replace) w=("${w[@]:2}") ;;
+          xargs:-[adEIJLnPs]|xargs:--arg-file|xargs:--delimiter|xargs:--max-args|xargs:--max-procs) w=("${w[@]:2}") ;;
+          # GNU `--replace` takes no separate value (`--replace=R` is one word).
           *) w=("${w[@]:1}") ;;
         esac
       done

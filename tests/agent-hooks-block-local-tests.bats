@@ -43,9 +43,18 @@ run_hook() {
   done
 }
 
+@test "blocks tests started through xargs --replace and npm exec" {
+  for c in "ls | xargs --replace bats {}" "ls | xargs -I{} bats {}" "ls | xargs -I {} bats {}" \
+           "npm exec bats tests/x.bats" "npm exec -- bats tests/x.bats" "npm x bats tests/x.bats"; do
+    run_hook "$c"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+  done
+}
+
 @test "allows xargs and find -exec that start other commands" {
   for c in "ls | xargs rg bats" "find . -exec rg bats {} +" "echo 'make check' | xargs echo" \
-           "xargs -n1 shellcheck"; do
+           "xargs -n1 shellcheck" "ls | xargs --replace rg bats {}" "npm exec eslint ." \
+           "npm run lint" "rg bats tests/" "cat tests/x.bats"; do
     run_hook "$c"
     [ "$status" -eq 0 ] || { echo "blocked: $c: $output"; return 1; }
   done

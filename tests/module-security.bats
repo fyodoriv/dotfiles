@@ -9,6 +9,9 @@ setup() {
   TEST_DOTFILES="$TEST_DIR/dotfiles"
 
   mkdir -p "$TEST_HOME/.ssh" "$TEST_DIR/fakebin"
+  # Before any shim runs: dotfiles-link-*-shim also links into $HOME/.local/bin,
+  # so with the real HOME this setup put its echo stubs on the real PATH.
+  export HOME="$TEST_HOME"
   mkdir -p "$TEST_DOTFILES/lib"
   mkdir -p "$TEST_DOTFILES/bin"
   cp "$BATS_TEST_DIRNAME/../lib/brew-bottle-audit.sh" "$TEST_DOTFILES/lib/brew-bottle-audit.sh"
@@ -71,7 +74,6 @@ EOF
   DOTFILES_UV_PYTHON="$TEST_HOME/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/bin/python3.13" \
     "$TEST_DOTFILES/bin/dotfiles-link-python-shim"
 
-  export HOME="$TEST_HOME"
   export DOTFILES_DIR="$TEST_DOTFILES"
   cat > "$TEST_DIR/fakebin/chezmoi" <<FAKE
 #!/bin/bash
@@ -1198,4 +1200,10 @@ _locale_warning() {
   [ "$(_locale_warning | wc -l | tr -d ' ')" -eq 1 ]
   _locale_warning | grep -qF "com.example.a com.example.b"
   [ "$before" = "$(cat "$TEST_HOME/Library/LaunchAgents/com.example.a.plist")" ]
+}
+
+@test "setup links the jq shim into the test HOME, never the real one" {
+  # Regression: setup ran dotfiles-link-jq-shim before it set HOME, so the
+  # real ~/.local/bin/jq became an echo stub and broke jq in later suites.
+  [ "$(readlink "$TEST_HOME/.local/bin/jq")" = "$TEST_DOTFILES/stubs/opt/homebrew/bin/jq" ]
 }

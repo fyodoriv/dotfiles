@@ -32,6 +32,33 @@ _make_dry_run() {
   done
 }
 
+# Bats 1.14 refuses a bare `--` before the files ("Bad command line option").
+# cached-run --per-file strips its own `--`; the full-run targets call bats
+# directly, so they must not pass one.
+@test "full-suite targets call bats without a -- separator" {
+  printf '#!/bin/bash\nexit 0\n' > "$FAKE_BIN/parallel"
+  chmod +x "$FAKE_BIN/parallel"
+  for target in test-all test-force; do
+    run _make_dry_run "$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" "$target"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"bats --jobs"*" -- tests/"* ]]
+    [[ "$output" != *"bats -- tests/"* ]]
+  done
+}
+
+@test "full-suite targets leave out TEST_SKIP_FILE" {
+  local skip
+  for skip in tests/perf-gate.bats "$(cd "$REPO_ROOT" && pwd -P)/tests/perf-gate.bats"; do
+  for target in test-all test-force; do
+    run env PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" make -C "$REPO_ROOT" -n --no-print-directory "$target" TEST_SKIP_FILE="$skip"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tests/heavy-run.bats"* ]]
+    [[ "$output" == *"Skipping"* ]]
+    ! printf '%s\n' "$output" | grep -v 'Skipping' | grep -q 'perf-gate.bats' || false
+  done
+  done
+}
+
 @test "CONTRIBUTING documents the serial fallback without parallel" {
   grep -q 'serial' "$REPO_ROOT/CONTRIBUTING.md"
   grep -q 'parallel' "$REPO_ROOT/CONTRIBUTING.md"
@@ -94,7 +121,7 @@ jobs=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --jobs|-j) jobs="$2"; shift 2 ;;
-    --no-parallelize-within-files) shift ;;
+    --no-parallelize-within-files|--print-output-on-failure) shift ;;
     --) shift; break ;;
     *) break ;;
   esac

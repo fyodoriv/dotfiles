@@ -108,13 +108,17 @@ TEST_FILE_JOBS :=
 endif
 # Keep Bats' non-recursive root/plugin selection, with doctor isolated last.
 BATS_ALL_FILES := $(wildcard tests/*.bats tests/plugin/*.bats)
-BATS_PEER_FILES = $(filter-out tests/doctor.bats,$(BATS_ALL_FILES))
+# TEST_SKIP_FILE leaves one file out of the full run too (hosted CI: perf-gate.bats).
+BATS_PEER_FILES = $(filter-out tests/doctor.bats $(patsubst $(CURDIR)/%,%,$(TEST_SKIP_FILE)),$(BATS_ALL_FILES))
+# --print-output-on-failure: a hosted-only failure shows the output of its
+# last `run`, so it can be fixed from the CI log.
 define BATS_FULL_RUN
-[ -n "$(BATS_ALL_FILES)" ] || exit 1; \
+[ $(words $(BATS_ALL_FILES)) -gt 0 ] || exit 1; \
+$(if $(TEST_SKIP_FILE),echo "⚠ Skipping $(TEST_SKIP_FILE) (TEST_SKIP_FILE is set)";) \
 result=0; \
-if [ -n "$(BATS_PEER_FILES)" ]; then bats $(BATS_JOBS) -- $(BATS_PEER_FILES) || result=$$?; fi; \
+if [ -n "$(BATS_PEER_FILES)" ]; then bats --print-output-on-failure $(BATS_JOBS) $(BATS_PEER_FILES) || result=$$?; fi; \
 if [ -n "$(filter tests/doctor.bats,$(BATS_ALL_FILES))" ]; then \
-  bats -- tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
+  bats --print-output-on-failure tests/doctor.bats || { doctor_result=$$?; [ "$$result" -ne 0 ] || result=$$doctor_result; }; \
 fi; \
 exit "$$result"
 endef

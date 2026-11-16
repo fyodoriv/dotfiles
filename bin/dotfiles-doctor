@@ -977,6 +977,11 @@ if command -v chezmoi &>/dev/null && ! $LIST_MODE; then
     check_name=$(echo "$line" | awk '{print $2}')
     message="${line#*"$check_name"}"
     message="${message# }"
+    # latest-version asks GitHub; a rate limit or no network is not a
+    # problem with this machine, so report it as a warning.
+    if [ "$check_name" = latest-version ] && { [ "$result" = error ] || [ "$result" = failed ]; }; then
+      result=warning
+    fi
     case "$result" in
       ok)      $JSON_MODE && _json_add "chezmoi.$check_name" "pass" "chezmoi $check_name: $message"; pass "chezmoi $check_name: $message" ;;
       error)   $JSON_MODE && _json_add "chezmoi.$check_name" "fail" "chezmoi $check_name: $message"; fail "chezmoi $check_name: $message — fix: run chezmoi doctor and follow its hint" ;;

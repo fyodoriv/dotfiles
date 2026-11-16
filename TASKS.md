@@ -162,19 +162,6 @@ them. -->
 
 ## P2
 
-- [ ] Make the full Bats suite pass on hosted macOS CI
-  - **ID**: hosted-full-suite-green
-  - **Tags**: ci, tests
-  - **Details**: Found 2026-11-15 in PR #714. An edit to `tests/test_helper.bash` makes every Bats file "affected", so `make check` ran the whole suite on hosted `macos-latest` (run 43764639249). 164 failures appeared there, in `gh-wrapper.bats`, `gh-wrapper-stacked-skill.bats`, `doctor-quiet-summary.bats`, `doctor-notification.bats`, `changelog.bats` and others. The same suites pass locally (59 of 59 for three of them). So the hosted full suite is red for environment reasons that per-PR affected runs never show. Read the first failure of each file and fix the missing tool, env var or path. Until then, any PR that touches a shared test helper cannot go green.
-  - **Output**: code
-  - **Acceptance**: a manual hosted full-suite run (`workflow_dispatch`, "Full suite") on `feat/chezmoi` has 0 failures.
-  - **Hypothesis**: a few shared causes (missing tools on the runner, HOME or PATH differences) explain most of the 164 failures; fixing them takes the hosted full suite from 164 failures to 0.
-  - **Measurement**: `gh run view <run> --log-failed | rg -c '^.*not ok'` on a fresh `workflow_dispatch` run of `ci.yml`.
-  - **Success**: 0 failures in one hosted full run, then 0 again in a second run.
-  - **Pivot**: more than 20 failures left after fixing the top 3 causes -> mark the remaining suites `skip` on hosted CI with a reason each and a follow-up per suite.
-  - **Anchor**: Forsgren, Humble, Kim 2018 (change failure rate); Kohavi, Tang, Xu 2020 (A/A checks).
-  - **Competitive-goal**: none — gate reliability (docs/metrics.md gate row), not a scorecard metric.
-
 - [ ] Distinguish read-only test-runner references from test runs
   - **ID**: heavy-run-read-only-reference
   - **Tags**: agent-hooks, heavy-run, false-positive
@@ -259,20 +246,6 @@ them. -->
   - **Pivot**: if no layout finishes under 20 minutes, keep coverage as a weekly scheduled run and check the floor there.
   - **Anchor**: Forsgren, Humble and Kim (2018), Accelerate (change failure rate); Basili, Caldiera and Rombach (1994), Goal Question Metric.
   - **Competitive-goal**: none — CI coverage, not a scorecard metric.
-
-- [ ] Restore the full Bats suite with the installed CLI argument parser
-  - **ID**: full-suite-bats-argument-compatibility
-  - **Tags**: tests, reliability, tooling
-  - **Details**: On 2026-11-08, both the unchanged base and the readiness-retro branch failed `heavy-run make test-all` before test execution with `Error: Bad command line option '--'` (exit 2). The required `make check` gate passed on the branch. Inventory every Bats `--` separator and installed-version contract; preserve safe path handling and affected-test selection. This is distinct from the one-job parallel-flag task.
-  - **Files**: `Makefile`, `tests/makefile-bats-jobs.bats`, contributor test guidance.
-  - **Output**: code
-  - **Acceptance**: the installed Bats version accepts every full-suite invocation, all selected tests run, and paths or fixtures requiring an option separator retain a safe supported form. The same correction covers cached, serial, parallel, plugin, and e2e callers selected by the Makefile.
-  - **Hypothesis**: replacing unsupported Bats argument separators with the installed CLI's supported invocation reduces argument-parser failures from 2 observed full-suite attempts to 0 without dropping selected tests.
-  - **Measurement**: add a failing argument-parser reproduction to `tests/makefile-bats-jobs.bats`, run it red on the unchanged base, then run `heavy-run make test-all` after the fix and compare selected test counts.
-  - **Success**: the new reproduction passes after the fix and `heavy-run make test-all` exits 0 with every selected test executed.
-  - **Pivot**: if the installed Bats release lacks a safe compatible form, abandon separator removal and use a reviewed version-pinned runner or upgrade path instead.
-  - **Anchor**: installed Bats help output from 2026-11-08; Basili, Caldiera and Rombach (1994), Goal Question Metric.
-  - **Competitive-goal**: none — restores the existing full-test gate, not a scorecard metric.
 
 - [ ] Make one-job test runs work with GNU parallel installed
   - **ID**: make-check-one-job-bats

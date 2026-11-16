@@ -24,12 +24,31 @@ LAUNCHAGENTS="$REPO_ROOT/launchagents"
 
 # Render a plist (template or plain) into a fresh temp file and echo
 # the path. Caller is responsible for removing the result.
+# Render with a fixed config, not the machine's chezmoi.yaml: a hosted
+# runner has none, so `.dotfiles_dir` was missing there. dotfiles_dir points
+# at this checkout, so ProgramArguments resolve to the files under test.
+setup_file() {
+  local root rel
+  root="$(cd "$REPO_ROOT" && pwd -P)"
+  rel="${root#"$(cd "$HOME" && pwd -P)"/}"
+  [ "$rel" != "$root" ] || { echo "launchagents.bats: the checkout must be under HOME ($root)" >&2; return 1; }
+  export LAUNCHAGENT_TEST_CONFIG="$BATS_FILE_TMPDIR/chezmoi.yaml"
+  cat > "$LAUNCHAGENT_TEST_CONFIG" <<YAML
+data:
+  dotfiles_dir: "$rel"
+  agent_scratch_idle_days: 30
+  local_models_prune_days: 14
+  morning_hour: 8
+  morning_minute: 30
+YAML
+}
+
 _render_plist() {
   local src="$1"
   local out
   out=$(mktemp)
   if [[ "$src" == *.tmpl ]]; then
-    chezmoi execute-template --source "$REPO_ROOT" < "$src" > "$out"
+    chezmoi execute-template --config "$LAUNCHAGENT_TEST_CONFIG" --source "$REPO_ROOT" < "$src" > "$out"
   else
     cp "$src" "$out"
   fi
@@ -87,12 +106,30 @@ _program_resolves() {
       # shape; we don't fail when the binary itself is absent.
       return 0
       ;;
+    "$HOME/bin/claude")
+      # Written at apply time by run_after_claude-wrapper.sh, so a clean
+      # runner has none yet. The script must write this exact path.
+      grep -qF 'WRAPPER="$HOME/bin/claude"' "$REPO_ROOT/.chezmoiscripts/run_after_claude-wrapper.sh"
+      ;;
+    "$HOME/.opencode/bin/opencode")
+      # Installed by OpenCode's own installer, not dotfiles. The LaunchAgent
+      # install script skips opencode-serve when this binary is missing.
+      grep -qF '[ ! -x "$HOME/.opencode/bin/opencode" ] && return 0' \
+        "$REPO_ROOT/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+      ;;
+    /opt/homebrew/*|/usr/local/*)
+      # A Homebrew program (sleepwatcher: chezmoi picks /opt/homebrew/sbin
+      # when present, else /usr/local/sbin). When its formula is installed
+      # the rendered path must exist. Only a clean runner, where the inlined
+      # Brewfile has not run, may lack it, and then the Brewfile must list it.
+      local name
+      name="$(basename "$prog")"
+      [ -x "$prog" ] && return 0
+      [ ! -d "/opt/homebrew/Cellar/$name" ] && [ ! -d "/usr/local/Cellar/$name" ] &&
+        grep -qF "brew \"$name\"" "$REPO_ROOT/.chezmoiscripts/run_onchange_brew.sh.tmpl"
+      ;;
     /*)
-      # Absolute path — it must exist as an executable file. The
-      # sleepwatcher plist is special: chezmoi templating picks
-      # /opt/homebrew/sbin/sleepwatcher when present, falling back to
-      # /usr/local/sbin/sleepwatcher; whichever path the renderer
-      # chose is the one we expect to find.
+      # Absolute path — it must exist as an executable file.
       [ -x "$prog" ]
       ;;
     *)

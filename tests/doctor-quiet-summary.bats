@@ -56,3 +56,22 @@ teardown() {
   [[ "${lines[0]}" == *"passed"*"skipped"* ]]
   [[ "${lines[0]}" != *"failing:"* ]]
 }
+
+@test "quiet: a GitHub rate limit on chezmoi latest-version is only a warning" {
+  local mod="$TEST_DIR/extra/quiet-green"
+  mkdir -p "$mod" "$TEST_DIR/bin"
+  printf 'check "quiet-green.ok" "synthetic pass" "true" ""\n' > "$mod/doctor.sh"
+  # A chezmoi whose doctor reports what a rate-limited hosted runner saw.
+  cat > "$TEST_DIR/bin/chezmoi" <<'STUB'
+#!/bin/bash
+[ "$1" = doctor ] || exit 0
+printf 'RESULT   CHECK            MESSAGE\n'
+printf 'ok       version          v2.74.0\n'
+printf 'error    latest-version   GitHub rate limit exceeded\n'
+STUB
+  chmod +x "$TEST_DIR/bin/chezmoi"
+  export DOTFILES_DOCTOR_FIXTURE_DIR="$TEST_DIR/extra"
+  PATH="$TEST_DIR/bin:$PATH" run "$REPO_ROOT/bin/dotfiles-doctor" --module quiet-green --quiet
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" != *"failing:"* ]]
+}

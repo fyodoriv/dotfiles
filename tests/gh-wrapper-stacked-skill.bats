@@ -6,6 +6,13 @@ GH_WRAPPER="$BATS_TEST_DIRNAME/../bin/gh"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
+  # A fixture private-pattern file, so the leak gate does not depend on the
+  # machine's ~/.config/oss-readiness (a hosted runner has none, and the
+  # gate then fails closed on every agent write).
+  export OSS_READINESS_ENV_FILE="$TEST_DIR/oss-readiness.env"
+  printf '%s\n' "OSS_READINESS_INTERNAL_PATTERN='zzfixture-private-marker'" \
+    "OSS_READINESS_PATTERN_VERSION=$(cat "$BATS_TEST_DIRNAME/../config/oss-readiness-min-version")" \
+    > "$OSS_READINESS_ENV_FILE"
   GH_STUB="$TEST_DIR/real-gh"
   GH_ARGS="$TEST_DIR/gh-args.txt"
   GH_BODY="$TEST_DIR/gh-body.md"

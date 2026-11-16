@@ -62,10 +62,24 @@ refresh() {
 }
 
 @test "a build stuck waiting for a slot stops after the time limit" {
-  fake_installer 'sleep 20 & wait'
+  # The child sleep keeps the output pipe open, so a fast return proves the
+  # whole process group stopped.
+  fake_installer 'sleep 30 & wait'
   ln -s app-priority-x "$NATIVE/current"
+  local start=$SECONDS
   refresh 1
   [ "$status" -eq 0 ]
   [[ "$output" == *"timed out after 1s"* ]]
   [ ! -f "$NATIVE/source-hash" ]
+  [ $((SECONDS - start)) -lt 15 ]
+}
+
+@test "a build that ignores TERM is forced to stop" {
+  fake_installer 'trap "" TERM; sleep 30 & wait'
+  ln -s app-priority-x "$NATIVE/current"
+  local start=$SECONDS
+  refresh 1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"timed out after 1s"* ]]
+  [ $((SECONDS - start)) -lt 15 ]
 }

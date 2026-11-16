@@ -14,6 +14,7 @@
 #   brew_cask     capabilities.brew.casks is true
 #   sudo          capabilities.sudo is true (the helper also asks at a TTY)
 #   shell_fragment capabilities.shell_fragment is true
+#   telemetry_sink capabilities.telemetry_sink is true
 #
 # Uses lib/plugin.sh (lock helpers). Source that first.
 
@@ -41,7 +42,7 @@ plugin_capability_allows() {
       V="$value" yq -e '(.capabilities.brew.taps // []) | any_c(. == strenv(V))' "$manifest" >/dev/null 2>&1 ;;
     brew_cask)
       [ "$(yq -r '.capabilities.brew.casks // false' "$manifest")" = true ] ;;
-    sudo | shell_fragment)
+    sudo | shell_fragment | telemetry_sink)
       K="$kind" yq -e '.capabilities[strenv(K)] == true' "$manifest" >/dev/null 2>&1 ;;
     *)
       return 1 ;;

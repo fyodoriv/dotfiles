@@ -176,6 +176,123 @@ plugin_shell_pass() {
   return "$failed"
 }
 
+# ── 6f. Org telemetry sink policy ──────────────────────────────────────
+# A plugin with capabilities.telemetry_sink: true may ship the org log sink
+# policy (contributes.telemetry_sink, the JSON format in
+# docs/observability.md#org-log-sink). The core installs it at
+# ~/.config/dotfiles/telemetry-sink.json (mode 600) only when:
+#   - exactly one verified plugin contributes a sink (two is a conflict);
+#   - bin/dotfiles-telemetry accepts the policy (status shows no
+#     "invalid policy" line);
+#   - a splunk-hec URL host is listed in capabilities.network_hosts;
+#   - the file in place is missing, was written by this pass, or has the
+#     same bytes (adopted); any other policy a person or an older overlay
+#     wrote is never replaced.
+# A plugin still in plugins.lock that fails verification keeps its file.
+# The pass records "<plugin>\t<sha256>" in plugin_sink_state_file. When the
+# plugin goes away and the file still matches that hash, the file goes too.
+# A new or changed sink takes effect on the next send. The hourly sender
+# LaunchAgent follows on the next apply (dotfiles-sync runs one every 30 min).
+
+plugin_sink_target() {
+  printf '%s' "${DOTFILES_TELEMETRY_SINK_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/telemetry-sink.json}"
+}
+
+plugin_sink_state_file() {
+  printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/plugin-telemetry-sink"
+}
+
+_plugin_sha256() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
+
+# _plugin_sink_check <name> <policy file (mode 600)>: prints why the policy is
+# refused, or nothing when it may be installed.
+_plugin_sink_check() {
+  local name="$1" file="$2" core out sink host
+  core="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  # DO_NOT_TRACK and a placeholder key keep status from reading any token or
+  # key (no Keychain prompt during an unattended apply); the sink line still
+  # shows whether the policy is valid.
+  out="$(DO_NOT_TRACK=1 DOTFILES_POSTHOG_KEY=phc_policycheck DOTFILES_TELEMETRY_SINK_FILE="$file" \
+    bash "$core/bin/dotfiles-telemetry" status 2>&1)" || true
+  sink="$(printf '%s\n' "$out" | sed -n 's/^sink: //p' | head -n 1)"
+  case "$sink" in
+    "") echo "the policy did not load (dotfiles telemetry status shows no sink line)"; return 0 ;;
+    "invalid policy"*) echo "the policy is invalid: ${sink#invalid policy }"; return 0 ;;
+    "splunk-hec at "*)
+      host="${sink#splunk-hec at }"
+      plugin_capability_allows "$name" network_hosts "$host" ||
+        echo "capability not declared: network_hosts $host (plugin $name)"
+      return 0 ;;
+  esac
+}
+
+plugin_telemetry_sink_pass() {
+  local name path src target state tmp why sha old_name old_sha n=0 found_name="" found_src="" verified=" "
+  target="$(plugin_sink_target)"
+  state="$(plugin_sink_state_file)"
+  while IFS=$'\t' read -r name path; do
+    [ -n "$name" ] || continue
+    verified="$verified$name "
+    src="$(plugin_contribution "$path" telemetry_sink)" || continue
+    n=$((n + 1)); found_name="$name"; found_src="$src"
+  done < <(plugin_verified_list)
+  old_name="" old_sha=""
+  [ ! -f "$state" ] || IFS=$'\t' read -r old_name old_sha < "$state" || true
+
+  if [ "$n" -eq 0 ]; then
+    # A plugin that is still in plugins.lock but fails verification (a stale
+    # lock after an update) keeps its policy: removing it would fail open to
+    # the public default.
+    # A verified plugin that dropped its sink loses the policy as usual.
+    if [ -n "$old_name" ] && [ "${verified#* "$old_name" }" = "$verified" ] &&
+      plugin_lock_names | grep -qxF -- "$old_name"; then
+      return 0
+    fi
+    # The plugin that installed the policy is gone: remove its file, unless
+    # someone changed it since.
+    if [ -n "$old_sha" ] && [ -f "$target" ] && [ "$(_plugin_sha256 "$target")" = "$old_sha" ]; then
+      rm -f "$target"
+      echo "removed the telemetry sink policy of plugin $old_name (the plugin is gone)"
+    fi
+    [ -z "$old_sha" ] || rm -f "$state"
+    return 0
+  fi
+  if [ "$n" -gt 1 ]; then
+    echo "telemetry sink: more than one plugin ships a policy; none was installed" >&2
+    return 1
+  fi
+  name="$found_name" src="$found_src"
+  plugin_require "$name" telemetry_sink || return 3
+  [ -f "$src" ] || { echo "plugin $name: telemetry sink policy missing: $src" >&2; return 1; }
+  # A file with the same bytes as the plugin's policy (a lost state file, or
+  # the old overlay's copy) is adopted, not refused.
+  if [ -f "$target" ] && [ "$(_plugin_sha256 "$target")" = "$(_plugin_sha256 "$src")" ]; then
+    old_sha="$(_plugin_sha256 "$target")"
+  fi
+  if [ -f "$target" ] && { [ -z "$old_sha" ] || [ "$(_plugin_sha256 "$target")" != "$old_sha" ]; }; then
+    echo "plugin $name: $target exists and was not written by a plugin; it was left as it is (remove it to let the plugin manage it)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$target")" "$(dirname "$state")" || return 1
+  tmp="$(mktemp "$target.XXXXXX")" || return 1
+  if ! { cp "$src" "$tmp" && chmod 600 "$tmp"; }; then rm -f "$tmp"; return 1; fi
+  why="$(_plugin_sink_check "$name" "$tmp")"
+  if [ -n "$why" ]; then
+    rm -f "$tmp"
+    echo "plugin $name: telemetry sink refused: $why" >&2
+    return 1
+  fi
+  sha="$(_plugin_sha256 "$tmp")"
+  if [ -f "$target" ] && [ "$sha" = "$old_sha" ]; then
+    rm -f "$tmp"
+    printf '%s\t%s\n' "$name" "$sha" > "$state"
+    return 0
+  fi
+  mv -f "$tmp" "$target" || { rm -f "$tmp"; return 1; }
+  printf '%s\t%s\n' "$name" "$sha" > "$state"
+  echo "installed the telemetry sink policy of plugin $name"
+}
+
 # ── 6c. Settings merge with priorities ─────────────────────────────────
 # A plugin contributes a JSON settings file per target
 # (contributes.settings.<target>, today: vscode). Layers merge deep, in

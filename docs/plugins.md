@@ -40,6 +40,7 @@ capabilities:                 # deny by default
   network_hosts: [git.acme.example.com]
   hooks: [pre-push]
   shell_fragment: true
+  telemetry_sink: true        # may ship the org log sink policy
   sudo: false
   secrets: [keychain:acme-jira-token]   # names only, never values
 contributes:
@@ -50,6 +51,7 @@ contributes:
   hooks: hooks                # hooks/<git hook name>
   settings: {vscode: settings/vscode.json}
   shell: shell/zshrc.zsh
+  telemetry_sink: telemetry-sink.json # org log sink policy (docs/observability.md)
   options: {chrome.restore_session: true, mas.skip_ids: ["123456789"]}
   blocked_software: blocked.yaml
   leak_patterns: leak-patterns.yaml   # reserved
@@ -210,6 +212,7 @@ Only verified plugins contribute (`lib/plugin-extensions.sh`).
 | LaunchAgents | The core renders templates (`@HOME@`, `@PLUGIN_DIR@`), checks each `Label`, installs, and reloads only on change. Plugins never edit core plists. |
 | Settings (VS Code) | Deep merge, later wins: core default < plugin < user (`~/.config/dotfiles/settings/vscode.user.json`) < a plugin's `_force`. Conflicts show as doctor warnings. |
 | Shell | One generated loader (`~/.local/state/dotfiles/plugin-shell.zsh`), sourced by `home/zshrc` before `~/.zshrc.local`. Needs `shell_fragment: true`. |
+| Telemetry sink | `contributes.telemetry_sink` is the org log sink policy ([observability.md](observability.md#org-log-sink)). Apply installs it at `~/.config/dotfiles/telemetry-sink.json` (mode 600) when: the plugin declares `telemetry_sink: true`; it is the only plugin with a sink; `dotfiles telemetry status` accepts it; a `splunk-hec` URL host is in `network_hosts`; and the file there is missing, was written by this step, or has the same bytes (then it is adopted). Any other policy a person wrote is never replaced. When the plugin leaves `plugins.lock`, the next apply removes its unchanged policy; a plugin that is locked but fails verification keeps it. The hourly sender follows on the next apply. |
 | Git hooks | The core pre-commit and pre-push run the plugin's `hooks/<name>` (declared in `capabilities.hooks`) after the leak gates, then the repo-local hook. |
 | Agentfile | `contributes.agentbrew/Agentfile.yaml` is merged into `~/.config/agentbrew/Agentfile.yaml` on apply, before `agentbrew sync`. It may add to the shared layer (hooks, MCP servers, skills), never take from it: see [Agentfile rules](#agentfile-rules). |
 | Blocked software | `apps`, `casks`, `formulae` lists; the doctor check `plugins.<name>.blocked_software` fails while any is installed. |
@@ -323,8 +326,13 @@ its own healer.
 
 `dotfiles plugin new <name>` creates a repo with the manifest, a
 `.gitignore`, example doctor and validate code, `tests/plugin.bats` (schema,
-options, and lint against a core checkout in `DOTFILES_CORE`), and a CI
-workflow (those tests, shellcheck, gitleaks).
+options, lint, and a shipped telemetry sink policy, against a core checkout in
+`DOTFILES_CORE`), and a CI workflow (those tests, shellcheck, gitleaks). The
+workflow pins every action to a commit SHA, caches Homebrew downloads, runs
+on pull requests against the core commit in `CORE_REF`, and runs weekly
+against the newest core. Tests run there, not on a laptop. A plugin made
+before 2026-11-16 updates by the steps in
+[plans/plugin-update-plan.md](plans/plugin-update-plan.md).
 
 ## Migrating from the v1 overlay
 

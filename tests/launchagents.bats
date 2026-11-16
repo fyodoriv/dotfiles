@@ -106,6 +106,11 @@ _program_resolves() {
       # shape; we don't fail when the binary itself is absent.
       return 0
       ;;
+    "$HOME/bin/claude")
+      # Written at apply time by run_after_claude-wrapper.sh, so a clean
+      # runner has none yet. The script that makes it must exist.
+      [ -f "$REPO_ROOT/.chezmoiscripts/run_after_claude-wrapper.sh" ]
+      ;;
     /*)
       # Absolute path — it must exist as an executable file. The
       # sleepwatcher plist is special: chezmoi templating picks

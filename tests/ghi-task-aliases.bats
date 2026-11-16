@@ -111,6 +111,9 @@ teardown() {
   
   tasks() { printf '%s\n' "$@" > "$TASKS_ARGS"; }
   export -f tasks
+  # A fixed login: the real `gh api user` needs a signed-in gh (none on a
+  # hosted runner, and a network call on a dev machine).
+  gh() { echo tester; }
   
   task-mine
   

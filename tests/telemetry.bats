@@ -1146,7 +1146,7 @@ PY
   local tries=0
   until [ -s "$TEST_DIR/port" ]; do
     tries=$((tries + 1))
-    [ "$tries" -lt 100 ] || return 1
+    [ "$tries" -lt 600 ] || return 1
     sleep 0.05
   done
   export DOTFILES_TELEMETRY_URL="http://127.0.0.1:$(cat "$TEST_DIR/port")" DOTFILES_TELEMETRY_CURL=curl

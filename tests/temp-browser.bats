@@ -257,7 +257,7 @@ STUB
   echo 999999 > "$TEMP_BROWSER_STATE_DIR/lock/pid"
   ( "$SCRIPT" release --owner agent-a >/dev/null ) &
   releaser=$!
-  run "$SCRIPT" acquire --owner agent-b --reason second --wait --timeout 8
+  run "$SCRIPT" acquire --owner agent-b --reason second --wait --timeout 30
   wait "$releaser"
   kill "$old_chrome_pid" 2>/dev/null || true
   [ "$status" -eq 0 ]

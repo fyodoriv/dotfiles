@@ -128,6 +128,7 @@ teardown() {
 @test "terminal: skips overridden checks" {
   echo "tool.tmux" >> "$OVERRIDES_FILE"
   echo "symlink.tmux" >> "$OVERRIDES_FILE"
+  echo "tool.ghostty" >> "$OVERRIDES_FILE"
   echo "managed.ghostty" >> "$OVERRIDES_FILE"
   echo "apps.no_rosetta_override" >> "$OVERRIDES_FILE"
   echo "tool.ghostty.arch" >> "$OVERRIDES_FILE"

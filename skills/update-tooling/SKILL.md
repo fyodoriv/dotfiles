@@ -156,10 +156,34 @@ elif [ -n "$(git -C "$AGENTBREW_APPLIED" status --porcelain)" ]; then
   echo "preserved applied AgentBrew checkout: dirty"
 elif ! git -C "$AGENTBREW_APPLIED" merge-base --is-ancestor HEAD origin/main; then
   echo "preserved applied AgentBrew checkout: ahead or diverged"
-elif ! git -C "$AGENTBREW_APPLIED" diff --quiet HEAD origin/main; then
-  git -C "$AGENTBREW_APPLIED" merge --ff-only origin/main
+else
+  build_needed=false
+  if ! git -C "$AGENTBREW_APPLIED" diff --quiet HEAD origin/main; then
+    if git -C "$AGENTBREW_APPLIED" merge --ff-only origin/main; then
+      build_needed=true
+    else
+      echo "preserved applied AgentBrew checkout and build: fast-forward failed"
+    fi
+  elif ! $ENDPOINT_NODE_SAFE_MODE; then
+    if (
+      cd "$AGENTBREW_APPLIED" || exit 1
+      node --import tsx --input-type=module -e '
+        import { checkCliBuildDrift } from "./src/cli-build-health.ts";
+        process.exitCode = checkCliBuildDrift(process.cwd()).length ? 3 : 0;
+      '
+    ); then
+      echo "applied AgentBrew checkout and build are current"
+    elif [ "$?" -eq 3 ]; then
+      echo "applied AgentBrew checkout is current, but its build is stale"
+      build_needed=true
+    else
+      echo "cannot verify applied AgentBrew build freshness; old dist preserved"
+    fi
+  fi
   if $ENDPOINT_NODE_SAFE_MODE; then
     echo "deferred applied AgentBrew build: endpoint Node safe mode is active"
+  elif ! $build_needed; then
+    :
   elif [ "$(uname -s)-$(uname -m)" = Darwin-arm64 ] && ! (
     cd "$AGENTBREW_APPLIED" || exit 1
     if [ -f scripts/native-build-tools.mjs ]; then
@@ -172,12 +196,15 @@ elif ! git -C "$AGENTBREW_APPLIED" diff --quiet HEAD origin/main; then
   else
     (cd "$AGENTBREW_APPLIED" && heavy-run npm run build)
   fi
-else
-  echo "applied AgentBrew checkout is current"
 fi
 ```
 
-On Apple Silicon, check the advanced checkout's native build capability before
+For a checkout already at the target source, use AgentBrew's current build
+input check. A docs-only difference between the build and checkout commits
+needs no rebuild. If the source check is unavailable, report the build
+freshness as unknown.
+
+On Apple Silicon, check the applied checkout's native build capability before
 building. Its source-bound verifier accepts an existing toolchain or a verified
 prebuilt pair when that release supports one. For older releases without that
 verifier, Cargo must be on PATH. If the check fails, preserve the old `dist/`,

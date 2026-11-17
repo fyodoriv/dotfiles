@@ -488,12 +488,11 @@ diagnosed. Sign-in and
 the GUI app are advisory; config and hook files remain owned by agentbrew.
 
 The `codex.agent_access` advisory checks the configured network policy.
-The `codex.network_proxy` check detects a missing proxy for ChatGPT Work
-chats. When the setting is missing, DNS requests can fail with npm
-`ENOTFOUND` or curl exit 6. `dotfiles doctor --fix` adds the missing proxy
-setting to an existing valid config and keeps a backup. It preserves an
-explicitly disabled proxy, the sandbox policy, and the approval policy.
-Restart the ChatGPT app after the repair.
+The `codex.network_proxy` advisory checks whether the ChatGPT Work proxy
+has a setting. If the key is missing and Work chats cannot resolve hostnames,
+run `codex features enable network_proxy` and restart the ChatGPT app.
+Both advisory checks read the config. Dotfiles leaves configuration writes
+to Codex or Agentbrew. An explicit proxy setting takes precedence.
 
 Use `dotfiles doctor --full --module codex` to execute the version and
 sign-in probes (sign-in is bounded to two seconds). Routine audits use local

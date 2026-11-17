@@ -7,7 +7,6 @@ MODULE="$BATS_TEST_DIRNAME/../modules/codex/doctor.sh"
 setup() {
   TEST_DIR="$(mktemp -d)"
   export HOME="$TEST_DIR/home" DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
-  export CODEX_HOME="$HOME/.codex"
   export DOTFILES_CODEX_APP_DIR="$TEST_DIR/ChatGPT.app"
   export DOTFILES_DOCTOR_FULL=true
   mkdir -p "$HOME/.local/bin" "$HOME/.codex" "$DOTFILES_CODEX_APP_DIR"
@@ -144,52 +143,24 @@ STUB
   [[ "$failed_ids" != *codex.agent_access* ]]
 }
 
-@test "codex proxy repair adds only the missing proxy and is idempotent" {
+@test "codex proxy advisory does not write the configuration" {
   local config="$HOME/.codex/config.toml"
-  printf 'model = "example"\n[features]\njs_repl = false\n' > "$config"
-  chmod 600 "$config"
+  printf 'sandbox_mode = "workspace-write"\napproval_policy = "on-request"\n[features]\njs_repl = false\n' > "$config"
   cp "$config" "$TEST_DIR/before.toml"
-
-  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access" --check
-  [ "$status" -eq 1 ]
-  cmp "$config" "$TEST_DIR/before.toml"
-  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access"
-  [ "$status" -eq 0 ]
-  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access" --check
-  [ "$status" -eq 0 ]
-  cp "$config" "$TEST_DIR/after.toml"
-  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access"
-  [ "$status" -eq 0 ]
-  cmp "$config" "$TEST_DIR/after.toml"
-  local backups=("$config".bak-*)
-  [ "${#backups[@]}" -eq 1 ]
-  cmp "${backups[0]}" "$TEST_DIR/before.toml"
-  python3 - "$config" "$TEST_DIR/before.toml" <<'PYCODE'
-import pathlib, sys, tomllib
-actual, before = [pathlib.Path(arg) for arg in sys.argv[1:]]
-with actual.open("rb") as f:
-    changed = tomllib.load(f)
-with before.open("rb") as f:
-    expected = tomllib.load(f)
-expected["features"]["network_proxy"] = {"enabled": True}
-assert changed == expected
-assert actual.stat().st_mode & 0o777 == 0o600
-PYCODE
-}
-
-@test "codex proxy repair preserves an explicitly disabled setting" {
-  local config="$HOME/.codex/config.toml"
-  printf 'sandbox_mode = "workspace-write"\napproval_policy = "on-request"\n[features.network_proxy]\nenabled = false\n' > "$config"
-  cp "$config" "$TEST_DIR/before.toml"
-  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access"
-  [ "$status" -eq 1 ]
+  run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --fix --module codex --json
+  [[ "$output" == *codex.network_proxy* ]]
   cmp "$config" "$TEST_DIR/before.toml"
   [ -z "$(find "$HOME/.codex" -name 'config.toml.bak-*' -print)" ]
 }
 
-@test "codex proxy check does not create a missing config" {
-  rm "$HOME/.codex/config.toml"
-  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access" --check
-  [ "$status" -eq 1 ]
-  [ ! -e "$HOME/.codex/config.toml" ]
+@test "codex proxy advisory accepts an explicit inline disabled setting" {
+  printf 'features = { network_proxy = { enabled = false } }\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.network_proxy* ]]
+}
+
+@test "codex proxy advisory accepts an explicit enabled flag" {
+  printf '[features]\nnetwork_proxy = true\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.network_proxy* ]]
 }

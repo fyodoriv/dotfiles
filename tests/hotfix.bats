@@ -57,6 +57,33 @@ teardown() {
   [[ "$branch" == hotfix/* ]]
 }
 
+@test "hotfix branches from the only origin branch without origin HEAD" {
+  cd "$TEST_REPO"
+  git -C "$REMOTE_REPO" symbolic-ref HEAD refs/heads/master
+  git branch -m master
+  git push --quiet --set-upstream origin master
+  git push --quiet origin --delete main
+  git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  git checkout --quiet -b feature
+
+  run "$HOTFIX_CMD" "fix: resolve crash"
+  [ "$status" -eq 0 ]
+  [ "$(git branch --show-current)" = "hotfix/fix-resolve-crash" ]
+  [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/master)" ]
+}
+
+@test "hotfix asks to resolve an ambiguous origin before changing branches" {
+  cd "$TEST_REPO"
+  git checkout --quiet -b feature
+  git push --quiet origin feature
+  git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+
+  run "$HOTFIX_CMD" "fix: resolve crash"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"git remote set-head origin -a"* ]]
+  [ "$(git branch --show-current)" = "feature" ]
+}
+
 @test "hotfix branch name is sanitized from message" {
   cd "$TEST_REPO"
   run "$HOTFIX_CMD" "fix: resolve crash on startup"

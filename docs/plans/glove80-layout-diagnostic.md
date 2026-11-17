@@ -25,3 +25,9 @@ why a step failed. The intermittent cause remains open until evidence shows it.
 
 Anchor: the `glove80-custom-layout-test-diagnostic` task; Basili, Caldiera and
 Rombach 1994 (GQM); Munafò et al. 2017 (pre-registration).
+
+## Delivery
+
+[PR #592](https://github.com/fyodoriv/dotfiles/pull/592) merged with
+green hosted checks. The controls verify bounded receipts for synthetic
+failures. The original intermittent failure retains an unknown cause.

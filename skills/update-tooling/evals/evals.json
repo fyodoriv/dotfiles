@@ -65,7 +65,7 @@
       "expectations": [
         "Treats the detached read-only agentbrew clone as the applied checkout",
         "Uses git merge --ff-only origin/main without rebasing, resetting, or checking out the detached worktree",
-        "Runs npm run build only after the applied worktree advances",
+        "Rebuilds the advanced applied worktree through heavy-run after qualifying the host",
         "Reports and preserves dirty, ahead, diverged, malformed, or fetch-failed applied worktree state",
         "Records a global agentbrew mismatch and uses the verified applied dist/cli.js explicitly rather than silently using another build"
       ]
@@ -222,6 +222,17 @@
         "Runs dotfiles apply --if-changed and the doctor through heavy-run",
         "Does not bypass heavy-run even with the user's permission",
         "Reports a queued step as waiting, not as applied"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "The clean applied AgentBrew checkout already matches origin/main. Its distribution predates a change to an AgentBrew build input. Refresh without changing unrelated settings.",
+      "expected_output": "Checks freshness against the current source and queues the native-qualified build through heavy-run. An already current build stays in place.",
+      "expectations": [
+        "Uses the current applied source build-input check instead of the stale CLI bundle",
+        "Rebuilds on reported stale inputs even though the checkout already matches origin/main",
+        "Preserves the current build when the check reports no drift",
+        "Reports unavailable freshness and respects endpoint safe mode"
       ]
     }
   ]

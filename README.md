@@ -1477,7 +1477,7 @@ through the shell.
 |--------|-------------|
 | `oc` / `dotfiles-opencode` | Open the shared service supported by the installed OpenCode version, including from noninteractive shells |
 | `git-safe` | Guard destructive git commands in multi-agent repos |
-| `hotfix` | Branch from main, stash current work, prep a quick hotfix |
+| `hotfix` | Branch from the default branch, stash current work, prep a quick hotfix |
 | `land` | Human-only: push feature branches of github.com checkouts whose push URL is `DISABLED`, and open their PRs |
 | `pr` | Commit tracked/staged changes, push, and open a draft GitHub PR |
 | `review` | Checkout a PR, show diff, optionally run tests |

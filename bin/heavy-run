@@ -71,6 +71,7 @@
 #   HEAVY_RUN_SLOTS     parallel slots, 1-64 (setting heavy_run_slots; default 1)
 #   HEAVY_RUN_RAMP      seconds between run starts while others run, 0-3600
 #                       (setting heavy_run_ramp_seconds; default 15)
+#   HEAVY_RUN_EXCLUSIVE_WAIT  exclusive wait limit in seconds (default 900).
 #   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
 #                       (setting heavy_run_max_load; default 0)
 #   HEAVY_RUN_PROJECT_SLOTS  most slots one project (a repo and its worktrees,
@@ -275,6 +276,11 @@ case "${1:-}" in
     ;;
   --status)
     exec perl -e "$common_code"'
+      sub elapsed {
+        my ($start) = @_;
+        return "" unless defined $start && $start =~ /^\d+(?:\.\d+)?$/ && int($start) <= time;
+        return sprintf(" (running: %ds)", time - int($start));
+      }
       my ($dir, $lock, $owner, $queue, $set) = @ARGV;
       my $n = slot_count($set);
       my @busy;
@@ -282,7 +288,7 @@ case "${1:-}" in
         next unless held("$dir/slots/s$s");
         my %f = fields("$dir/slots/s$s.owner");
         my $p = read1("$dir/slots/s$s.paused");
-        push @busy, "slot $s: " . ($f{line} // "") . ($p ne "" ? " (paused: $p)" : "");
+        push @busy, "slot $s: " . ($f{line} // "") . elapsed($f{start}) . ($p ne "" ? " (paused: $p)" : "");
       }
       for my $s (slot_files("$dir/slots")) {
         next unless held("$dir/slots/$s");
@@ -290,7 +296,8 @@ case "${1:-}" in
       }
       my $excl = "";
       if (!@busy && -e $lock && held($lock, LOCK_SH)) {
-        $excl = read1($owner) || "an older heavy-run";
+        my %f = fields($owner);
+        $excl = ($f{line} || "an older heavy-run") . elapsed($f{start});
         my $p = read1("$dir/exclusive.paused");
         $excl .= " (paused: $p)" if $p ne "";
       }
@@ -373,6 +380,7 @@ exec perl -e "$common_code"'
   use Time::HiRes ();
   my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $exclusive, @cmd) = @ARGV;
   my $t0 = time;
+  my $wait_started = $exclusive ? Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) : 0;
   my $slotdir = "$dir/slots";
   my $last_start = "$dir/last-start";
   my $gate_open = "$dir/gate-open";
@@ -386,6 +394,7 @@ exec perl -e "$common_code"'
   my $is_num = sub { $_[0] =~ /^(\d+\.?\d*|\.\d+)$/ };
   my $is_bit = sub { $_[0] =~ /^[01]$/ };
   my $is_pct = sub { $_[0] =~ /^\d+$/ && $_[0] <= 90 };
+  my $is_wait = sub { $is_num->($_[0]) && $_[0] > 0 && $_[0] <= 86400 };
   sub setting {
     my ($env, $key, $def, $ok) = @_;
     if (time != $cfg_at) {
@@ -652,6 +661,8 @@ exec perl -e "$common_code"'
     for my $sig (keys %signo) { $SIG{$sig} = sub { unlink $ticket, "$ticket.grant", "$ticket.why"; ungate(); exit(128 + $signo{$sig}) }; }
   }
   my $hinted = 0;
+  my $exclusive_wait = $exclusive
+    ? setting("HEAVY_RUN_EXCLUSIVE_WAIT", "heavy_run_exclusive_wait_seconds", 900, $is_wait) : 0;
   while (1) {
     if (!$keep && getppid() != $caller) { unlink $ticket, "$ticket.grant", "$ticket.why" if $ticket; ungate(); exit 129; }
     if ($ticket) {
@@ -670,6 +681,12 @@ exec perl -e "$common_code"'
       # No queue: decide for this run alone.
       my ($what, $arg) = decide(snapshot(), { project => $proj, project_id => $proj_id, exclusive => $exclusive }, [settings()]);
       if ($what eq "grant") { ($slot, $sfh) = take($arg); last if defined $slot; }
+    }
+    if ($exclusive && Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $wait_started >= $exclusive_wait) {
+      if ($ticket) { unlink $ticket, "$ticket.grant", "$ticket.why"; close $tfh; }
+      ungate();
+      print STDERR "heavy-run: exclusive wait reached ${exclusive_wait}s; check heavy-run --status and retry later\n";
+      exit 75;
     }
     select(undef, undef, undef, 0.2);
   }

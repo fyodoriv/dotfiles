@@ -20,7 +20,7 @@ setup() {
   export HOME="$BATS_TEST_TMPDIR/home" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
   # No real-time app holds the tests, even while one runs on this Mac.
   export HEAVY_RUN_PAUSE_APPS=""
-  unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD
+  unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD HEAVY_RUN_EXCLUSIVE_WAIT
   unset HEAVY_RUN_HELD FIFO_RELEASE
   unset BATS_RT_PROBE_ROOT BATS_RT_PROBE_CHILDREN
 }
@@ -583,6 +583,28 @@ release_all() {
   release_all
   run "$SCRIPT" --status
   [ "$output" = "free: 0/4 slots busy" ]
+}
+
+@test "heavy-run: exclusive deadline retires only the waiting run" {
+  export HEAVY_RUN_SLOTS=2
+  start_holder
+  wait_held 1
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" =~ ^slot.*\(running:\ [0-9]+s\)$ ]]
+
+  marker="$BATS_TEST_TMPDIR/exclusive-started"
+  run timeout 15 env HEAVY_RUN_EXCLUSIVE_WAIT=5 "$SCRIPT" --exclusive touch "$marker"
+  [ "$status" -eq 75 ]
+  [[ "$output" == *'exclusive wait reached 5s'* ]]
+  [ ! -e "$marker" ]
+  run "$SCRIPT" --status
+  [ "${lines[0]}" = "busy: 1/2 slots" ]
+  [[ "$output" != *'queue '* ]]
+
+  run timeout 15 "$SCRIPT" echo next
+  [ "$status" -eq 0 ]
+  [ "$output" = next ]
+  release_all
 }
 
 @test "heavy-run: slots: a SIGKILLed run frees its slot at once" {

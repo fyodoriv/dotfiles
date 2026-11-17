@@ -33,7 +33,11 @@ except (OSError, subprocess.TimeoutExpired):
 PYCODE
 }
 _codex_config_check() {
-  python3 - "$HOME/.codex/config.toml" "$1" <<'PY'
+  local config="$HOME/.codex/config.toml"
+  if [ "$1" = network_proxy ]; then
+    config="${CODEX_HOME:-$HOME/.codex}/config.toml"
+  fi
+  python3 - "$config" "$1" <<'PY'
 import os
 import sys
 import tomllib
@@ -59,6 +63,10 @@ if sys.argv[2] == "paths":
             return all(paths_exist(item) for item in value)
         return True
     sys.exit(0 if paths_exist(config) else 1)
+if sys.argv[2] == "network_proxy":
+    features = config.get("features", {})
+    configured = isinstance(features, dict) and "network_proxy" in features
+    sys.exit(0 if configured else 1)
 if sys.argv[2] == "agent_access":
     # Without these, Codex agent threads get a sandbox with no network,
     # so npm, curl, and git fetch or push fail.
@@ -85,6 +93,9 @@ check "codex.cli_paths" "CODEX_CLI_PATH entries point to executable files" \
 check_advisory "codex.agent_access" "Codex agents can reach the network (sandbox_mode or network_access)" \
   "_codex_config_check agent_access" \
   "add 'sandbox_mode = \"danger-full-access\"' or '[sandbox_workspace_write] network_access = true' to ~/.codex/config.toml"
+check_advisory "codex.network_proxy" "ChatGPT Work network proxy has an explicit setting" \
+  "_codex_config_check network_proxy" \
+  "if you use ChatGPT Work and DNS fails, run 'codex features enable network_proxy' and restart the app"
 check "codex.hooks_writable" "Codex hooks.json writable, or its parent writable when absent" \
   "if [ -e \"\$HOME/.codex/hooks.json\" ]; then [ -w \"\$HOME/.codex/hooks.json\" ]; else [ -w \"\$HOME/.codex\" ]; fi" ""
 check_advisory "codex.app" "ChatGPT.app installed (Codex GUI host)" \

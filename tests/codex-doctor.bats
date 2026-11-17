@@ -7,12 +7,13 @@ MODULE="$BATS_TEST_DIRNAME/../modules/codex/doctor.sh"
 setup() {
   TEST_DIR="$(mktemp -d)"
   export HOME="$TEST_DIR/home" DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
+  export CODEX_HOME="$HOME/.codex"
   export DOTFILES_CODEX_APP_DIR="$TEST_DIR/ChatGPT.app"
   export DOTFILES_DOCTOR_FULL=true
   mkdir -p "$HOME/.local/bin" "$HOME/.codex" "$DOTFILES_CODEX_APP_DIR"
   printf '#!/bin/bash\ncase "$1" in --version) echo codex-cli 1.2.3;; login) exit 0;; esac\n' > "$HOME/.local/bin/codex"
   chmod +x "$HOME/.local/bin/codex"
-  printf 'model = "example"\nsandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
+  printf 'model = "example"\nsandbox_mode = "danger-full-access"\napproval_policy = "never"\n[sandbox_workspace_write]\nnetwork_access = true\n[features.network_proxy]\nenabled = true\n' > "$HOME/.codex/config.toml"
   touch "$HOME/.codex/hooks.json"
   export PATH="$HOME/.local/bin:$PATH"
   failed_ids=""
@@ -136,16 +137,44 @@ STUB
   [[ "$output" == *"Codex CLI runs (codex --version)"* ]]
 }
 
-@test "doctor flags a Codex config that leaves agents without network" {
+@test "doctor flags a missing proxy even when the sandbox has network access" {
+  printf 'model = "example"\n[sandbox_workspace_write]\nnetwork_access = true\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" == *codex.network_proxy* ]]
+  [[ "$failed_ids" != *codex.agent_access* ]]
+}
+
+@test "codex proxy advisory does not write the configuration" {
+  local config="$HOME/.codex/config.toml"
+  printf 'sandbox_mode = "workspace-write"\napproval_policy = "on-request"\n[features]\njs_repl = false\n' > "$config"
+  cp "$config" "$TEST_DIR/before.toml"
+  printf '#!/bin/bash\n[ "$1" = source-path ] && { (cd "%s" && pwd -P); exit 0; }\nexit 0\n' "$DOTFILES_DIR" > "$HOME/.local/bin/chezmoi"
+  chmod +x "$HOME/.local/bin/chezmoi"
+  run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --fix --module codex --json
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'report-only'* ]]
+  jq -e 'any(.[]; .id == "codex.network_proxy" and .status == "warn")' <<< "$output"
+  cmp "$config" "$TEST_DIR/before.toml"
+  [ -z "$(find "$HOME/.codex" -name 'config.toml.bak-*' -print)" ]
+}
+
+@test "codex proxy advisory accepts an explicit inline disabled setting" {
+  printf 'features = { network_proxy = { enabled = false } }\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.network_proxy* ]]
+}
+
+@test "codex proxy advisory accepts an explicit enabled flag" {
+  printf '[features]\nnetwork_proxy = true\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.network_proxy* ]]
+}
+
+@test "codex proxy advisory respects a custom Codex home and proxy table" {
+  export CODEX_HOME="$TEST_DIR/alternate-codex"
+  mkdir -p "$CODEX_HOME"
+  printf '[features.network_proxy]\nproxy_url = "https://proxy.example.com"\n' > "$CODEX_HOME/config.toml"
   printf 'model = "example"\n' > "$HOME/.codex/config.toml"
   source "$MODULE"
-  [[ "$failed_ids" == *codex.agent_access* ]]
-  printf 'sandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
-  failed_ids=""
-  source "$MODULE"
-  [[ "$failed_ids" != *codex.agent_access* ]]
-  printf '[sandbox_workspace_write]\nnetwork_access = true\n' > "$HOME/.codex/config.toml"
-  failed_ids=""
-  source "$MODULE"
-  [[ "$failed_ids" != *codex.agent_access* ]]
+  [[ "$failed_ids" != *codex.network_proxy* ]]
 }

@@ -57,7 +57,7 @@ teardown() {
   [[ "$branch" == hotfix/* ]]
 }
 
-@test "hotfix branches from the only origin branch without origin HEAD" {
+@test "hotfix asks origin for its master default when origin HEAD is missing" {
   cd "$TEST_REPO"
   git -C "$REMOTE_REPO" symbolic-ref HEAD refs/heads/master
   git branch -m master
@@ -65,6 +65,7 @@ teardown() {
   git push --quiet origin --delete main
   git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
   git checkout --quiet -b feature
+  git commit --no-verify --quiet --allow-empty -m "chore: diverge feature"
 
   run "$HOTFIX_CMD" "fix: resolve crash"
   [ "$status" -eq 0 ]
@@ -72,15 +73,31 @@ teardown() {
   [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/master)" ]
 }
 
-@test "hotfix asks to resolve an ambiguous origin before changing branches" {
+@test "hotfix ignores the only local origin ref in a narrowed clone" {
+  cd "$TEST_REPO"
+  git checkout --quiet -b release
+  git commit --no-verify --quiet --allow-empty -m "chore: diverge release"
+  git push --quiet origin release
+  git clone --quiet --no-local --single-branch --branch release "$REMOTE_REPO" "$TEST_DIR/narrow"
+  cd "$TEST_DIR/narrow"
+  git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  [ "$(git for-each-ref --format='%(refname:short)' refs/remotes/origin)" = "origin/release" ]
+
+  run "$HOTFIX_CMD" "fix: resolve crash"
+  [ "$status" -eq 0 ]
+  [ "$(git rev-parse HEAD)" = "$(git -C "$REMOTE_REPO" rev-parse refs/heads/main)" ]
+}
+
+@test "hotfix refuses an origin with no default before changing branches" {
   cd "$TEST_REPO"
   git checkout --quiet -b feature
   git push --quiet origin feature
   git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  git -C "$REMOTE_REPO" symbolic-ref HEAD refs/heads/missing
 
   run "$HOTFIX_CMD" "fix: resolve crash"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"git remote set-head origin -a"* ]]
+  [[ "$output" == *"Cannot determine the default branch from origin"* ]]
   [ "$(git branch --show-current)" = "feature" ]
 }
 

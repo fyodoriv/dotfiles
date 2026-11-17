@@ -29,7 +29,7 @@ For any git repo under `~/apps/tooling`, an agent-owned change is complete only 
 hotfix "fix: resolve crash on startup"
 ```
 
-Detects the default branch from `origin/HEAD` or the sole local origin branch, stashes current work, pulls latest, creates a `hotfix/fix-resolve-crash-on-startup` branch, and pops the stash. If origin has no recorded default and the local refs are ambiguous or missing, run `git remote set-head origin -a`. You make your fix, then `pr` to ship it.
+Reads the default branch from `origin/HEAD` or asks the remote when that reference is missing. It fetches that branch and creates `hotfix/fix-resolve-crash-on-startup` from the fetched commit. Any stashed work follows you to the new branch. If origin has no default, the command stops before moving your work. Make your fix, then run `pr` to ship it.
 
 ## Review a PR
 

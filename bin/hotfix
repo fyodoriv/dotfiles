@@ -20,16 +20,21 @@ message="${1:?Usage: hotfix \"fix: description\"}"
 #   2. Lowercase, then truncate to 50 chars to keep branch names short.
 branch_name="hotfix/$(echo "$message" | sed -E 's/[^a-zA-Z0-9]+/-/g' | tr '[:upper:]' '[:lower:]' | head -c 50)"
 
-# Prefer the recorded default. A single origin branch is an unambiguous fallback.
+# Ask the remote when this clone has no record of its default.
 if default_ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD); then
   default_branch=${default_ref#refs/remotes/origin/}
 else
-  default_branch=$(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin)
+  default_branch=$(
+    git ls-remote --symref origin HEAD |
+      awk '$1 == "ref:" && $2 ~ /^refs\/heads\// && $3 == "HEAD" { sub(/^refs\/heads\//, "", $2); print $2 }'
+  ) || default_branch=""
   if [[ -z "$default_branch" || "$default_branch" == *$'\n'* ]]; then
-    echo "Cannot determine the default branch. Run: git remote set-head origin -a" >&2
+    echo "Cannot determine the default branch from origin. Check that it is reachable and has a default branch." >&2
     exit 1
   fi
 fi
+git fetch --no-tags origin "refs/heads/$default_branch"
+base_commit=$(git rev-parse --verify FETCH_HEAD)
 
 original_branch=$(git branch --show-current 2>/dev/null || git rev-parse --short HEAD)
 stashed=false
@@ -46,9 +51,7 @@ cleanup() {
 }
 trap cleanup ERR
 
-git checkout "$default_branch"
-git pull --rebase
-git checkout -b "$branch_name"
+git checkout -b "$branch_name" "$base_commit"
 trap - ERR
 $stashed && git stash pop 2>/dev/null || true
 

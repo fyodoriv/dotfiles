@@ -1,56 +1,57 @@
 #!/bin/bash
-# Give Codex / ChatGPT app agent threads network, git, and npm access.
-# Adds only the missing keys to ~/.codex/config.toml; safe to rerun.
 # Usage: dotfiles-codex-agent-access [--check]
 set -euo pipefail
 
-config="${CODEX_HOME:-$HOME/.codex}/config.toml"
-mode="${1:-fix}"
-mkdir -p "$(dirname "$config")"
-[ -e "$config" ] || : >"$config"
+case "${1:-}" in
+  ""|--check) ;;
+  *) echo "Usage: dotfiles-codex-agent-access [--check]" >&2; exit 2 ;;
+esac
 
-python3 - "$config" "$mode" <<'PY'
-import shutil, sys, time, tomllib
+python3 - "${CODEX_HOME:-$HOME/.codex}/config.toml" "${1:-}" <<'PY'
+from pathlib import Path
+import os
+import shutil
+import sys
+import tempfile
+import tomllib
 
-path, mode = sys.argv[1], sys.argv[2]
-with open(path, "rb") as f:
-    config = tomllib.load(f)
+path = Path(sys.argv[1]).resolve()
+try:
+    original = path.read_bytes()
+    config = tomllib.loads(original.decode("utf-8"))
+except (OSError, ValueError):
+    sys.exit("Codex config is missing or invalid")
 
-top = []
-if "sandbox_mode" not in config:
-    top.append('sandbox_mode = "danger-full-access"')
-if "approval_policy" not in config:
-    top.append('approval_policy = "never"')
-
-tail = []
-workspace = config.get("sandbox_workspace_write")
-if workspace is None:
-    tail.append("[sandbox_workspace_write]\nnetwork_access = true")
-elif workspace.get("network_access") is not True:
-    sys.exit("sandbox_workspace_write.network_access is set but not true; edit it by hand")
-
-# ChatGPT app Work chats run commands through a local executor. With the
-# network proxy feature off, every DNS lookup fails (npm ENOTFOUND, curl 6).
 features = config.get("features", {})
-proxy = features.get("network_proxy")
-if proxy is None:
-    tail.append("[features.network_proxy]\nenabled = true")
-elif not (proxy is True or (isinstance(proxy, dict) and proxy.get("enabled") is True)):
-    sys.exit("features.network_proxy is set but not enabled; edit it by hand")
+if not isinstance(features, dict):
+    sys.exit("Codex features must be a table")
+if "network_proxy" in features:
+    proxy = features["network_proxy"]
+    if proxy is True or isinstance(proxy, dict) and proxy.get("enabled") is True:
+        sys.exit(0)
+    sys.exit("Codex network proxy has an explicit setting; review it in config.toml")
 
-if not top and not tail:
-    sys.exit(0)
-if mode == "--check":
+if sys.argv[2] == "--check":
     sys.exit(1)
 
-shutil.copy2(path, f"{path}.bak-{int(time.time())}")
-with open(path) as f:
-    text = f.read()
-new = ("\n".join(top) + "\n" if top else "") + text
-if tail:
-    new = new.rstrip("\n") + "\n\n" + "\n\n".join(tail) + "\n"
-tomllib.loads(new)
-with open(path, "w") as f:
-    f.write(new)
-print("updated", path, "- restart the ChatGPT app to apply")
+updated = original.rstrip(b"\r\n") + b"\n\n[features.network_proxy]\nenabled = true\n"
+try:
+    tomllib.loads(updated.decode("utf-8"))
+except ValueError:
+    sys.exit("Codex config cannot accept a separate network proxy table")
+
+with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as staged:
+    temporary = Path(staged.name)
+    try:
+        staged.write(updated)
+        staged.close()
+        shutil.copymode(path, temporary)
+        if path.read_bytes() != original:
+            sys.exit("Codex config changed during repair; run the check again")
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f"{path.name}.bak-", delete=False) as saved:
+            saved.write(original)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+print("Added the Codex network proxy. Restart the ChatGPT app to apply it.")
 PY

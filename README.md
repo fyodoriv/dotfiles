@@ -1516,7 +1516,7 @@ scratch work.
 | `dotfiles-mcp-launch` | Start an MCP server with secrets read by reference (`--secret NAME=keychain:<item>`), an optional CA bundle and minimal PATH; refuses `@latest` and unpinned `npx -y`. Secrets never go into shell profiles |
 | `dotfiles-pnpm-global-update` | Update global pnpm packages; skip cleanly when none are installed (topgrade custom step) |
 | `dotfiles-install-codex` | Install the npm Codex CLI and restore `~/.local/bin/codex`; `--upgrade` updates it. ChatGPT.app keeps its separate bundled CLI. See [Codex health checks](docs/module-reference.md#codex) |
-| `dotfiles-codex-agent-access` | Give Codex and ChatGPT app agents network, git, and npm access; adds missing `~/.codex/config.toml` keys. `--check` only reports. See [Codex health checks](docs/module-reference.md#codex) |
+| `dotfiles-codex-agent-access` | Add the missing ChatGPT Work network proxy to an existing Codex config. `--check` only reports. See [Codex health checks](docs/module-reference.md#codex) |
 | `dotfiles-node-upgrade` | Switch Node (latest LTS or a version) in one step: fnm default, `~/.node-version`, `~/.local/bin/{node,npm,npx,codex}`, and the `com.agentbrew.*` plists. Reinstalls the managed Codex CLI on the new Node. Old versions stay installed. Also `dotfiles upgrade --node [VERSION]` |
 
 **Build and test infrastructure**

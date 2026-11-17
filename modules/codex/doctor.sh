@@ -59,6 +59,12 @@ if sys.argv[2] == "paths":
             return all(paths_exist(item) for item in value)
         return True
     sys.exit(0 if paths_exist(config) else 1)
+if sys.argv[2] == "agent_access":
+    # Without these, Codex agent threads get a sandbox with no network,
+    # so npm, curl, and git fetch or push fail.
+    workspace = config.get("sandbox_workspace_write", {})
+    full = config.get("sandbox_mode") == "danger-full-access"
+    sys.exit(0 if full or workspace.get("network_access") is True else 1)
 PY
 }
 
@@ -76,7 +82,10 @@ check "codex.config_valid" "Codex config.toml parses (Python 3.11+ tomllib)" \
   "_codex_config_check parse" ""
 check "codex.cli_paths" "CODEX_CLI_PATH entries point to executable files" \
   "_codex_config_check paths" ""
-check "codex.agent_access" "Codex agents can reach the network (sandbox, network_access, network_proxy)" \
+check_advisory "codex.agent_access" "Codex agents can reach the network (sandbox_mode or network_access)" \
+  "_codex_config_check agent_access" \
+  "add 'sandbox_mode = \"danger-full-access\"' or '[sandbox_workspace_write] network_access = true' to ~/.codex/config.toml"
+check "codex.network_proxy" "ChatGPT Work network proxy is enabled" \
   "bash '$DOTFILES_DIR/bin/dotfiles-codex-agent-access' --check" \
   "bash '$DOTFILES_DIR/bin/dotfiles-codex-agent-access'"
 check "codex.hooks_writable" "Codex hooks.json writable, or its parent writable when absent" \

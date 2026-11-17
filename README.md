@@ -895,7 +895,7 @@ Use a browser screenshot for UI behavior or a terminal screenshot for non-UI beh
 
 It runs grounded evals and resumes from memory on the next invocation. The helper detects repositories before pruning dependencies and lazily fingerprints only current-revision candidates, so a large fleet scan does not hang on unnecessary work.
 
-The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
+The `update-tooling` skill safely refreshes primary tooling checkouts, applies the current dotfiles and agentbrew state, verifies machine health, and ranks the next AgentBrew or dotfiles task. It also rebuilds a stale applied AgentBrew distribution when the checkout is already current. It preserves dirty, ahead, diverged, and linked worktrees; it does not upgrade packages or publish work by default.
 
 The `tooling-checkup` skill (`/tooling-checkup`) is the one command to run by hand every few days. To end any session, `/wrap-up` (agentbrew) delivers finished work and leaves the rest in a leak-checked draft PR plus a task. It ships outstanding tooling work and tries to finish each of your open pull requests (conflicts, red checks, review threads, then merge).
 

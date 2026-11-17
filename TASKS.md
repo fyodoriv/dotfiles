@@ -29,20 +29,6 @@ them. -->
 
 ## P1
 
-- [ ] update-tooling rebuilds a stale agentbrew dist even when the checkout is current
-  - **ID**: update-tooling-stale-agentbrew-dist
-  - **Tags**: update-tooling, agentbrew, native, stability
-  - **Mode**: AFK
-  - **Details**: Found 2026-11-16 in agentbrew PR #1031 (Rust closeout). `skills/update-tooling/SKILL.md` rebuilds agentbrew (`npm run build`) only when the applied checkout moves. If the checkout is already at `origin/main` but `dist/` is stale (someone pulled without building), the skill prints "current" and skips the build, so a merged native change never reaches the machine. Compare `dist/build-info.json` `commit` with the checkout's build inputs (agentbrew `BUILD_INPUTS` in `src/cli-build-health.ts`) or run `agentbrew health --fix`, which already rebuilds in that case.
-  - **Output**: code
-  - **Acceptance**: with the checkout at `origin/main` and a build input changed after the `dist/build-info.json` commit, update-tooling rebuilds and reports it; with no changed input it stays "current".
-  - **Hypothesis**: Stale-dist runs that update-tooling reports as "current" drop from 1 seen (2026-11-16 audit) to 0.
-  - **Measurement**: A Bats case with a fake agentbrew checkout at origin/main and a `build-info.json` older than a changed input asserts a rebuild; run on hosted CI.
-  - **Success**: 100% of planted stale cases rebuild; 0 rebuilds in the current case.
-  - **Pivot**: If build-input detection cannot be read from agentbrew reliably, call `agentbrew health --fix` every run and measure its added time; drop it if it adds more than 5 s.
-  - **Anchor**: Basili, Caldiera and Rombach 1994 (GQM); Forsgren, Humble and Kim 2018 (deployment lead time).
-  - **Competitive-goal**: none: local install freshness.
-
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability
@@ -118,21 +104,6 @@ them. -->
   - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
 
 ## P2
-
-- [ ] Distinguish read-only test-runner references from test runs
-  - **ID**: heavy-run-read-only-reference
-  - **Tags**: agent-hooks, heavy-run, false-positive
-  - **Mode**: AFK
-  - **Details**: On 2026-11-13 the heavy-run hook blocked a read-only command that combined a runner lookup with a search of the runner's script. The command mentioned `bats` but did not run a test. The explicit `rg --no-config --` alternative passes after the guarded change; the original unqualified form still refuses. Reproduce the exact matcher behavior with synthetic hook input; keep actual heavy test and build commands guarded.
-  - **Output**: code
-  - **Acceptance**: Read-only runner lookup and file-search inputs pass. Real unqueued heavy test and build commands remain blocked. No user files or live tests are used in the planted controls.
-  - **Hypothesis**: Recognizing command position removes this observed false block while keeping all planted heavy-run blocks.
-  - **Measurement**: Add focused cases to `tests/agent-hooks-heavy-build-callers.bats`, then run `heavy-run bats tests/agent-hooks-heavy-build-callers.bats` and hosted CI. In use, the hook's block message is the observable event: the read-only fixture should produce it zero times.
-  - **Success**: At least three read-only references pass and three real heavy invocations remain blocked; zero planted bypasses pass.
-  - **Pivot**: If the hook cannot distinguish an invocation from a reference without allowing a heavy command through, keep the guard fail-closed and record the counterexample.
-  - **Anchor**: `agent-hooks/require-heavy-run.sh`; Basili, Caldiera and Rombach 1994 (Goal Question Metric).
-  - **Competitive-goal**: none — local agent workflow stability.
-
 
 - [ ] Prove agent continuity through a battery lid close with Power Protect
   - **ID**: keepawake-power-protect-physical-validation

@@ -161,21 +161,6 @@ them. -->
 
 ## P2
 
-- [ ] Distinguish read-only test-runner references from test runs
-  - **ID**: heavy-run-read-only-reference
-  - **Tags**: agent-hooks, heavy-run, false-positive
-  - **Mode**: AFK
-  - **Details**: On 2026-11-13 the heavy-run hook blocked a read-only command that combined a runner lookup with a search of the runner's script. The command mentioned `bats` but did not run a test. The explicit `rg --no-config --` alternative passes after the guarded change; the original unqualified form still refuses. Reproduce the exact matcher behavior with synthetic hook input; keep actual heavy test and build commands guarded.
-  - **Output**: code
-  - **Acceptance**: Read-only runner lookup and file-search inputs pass. Real unqueued heavy test and build commands remain blocked. No user files or live tests are used in the planted controls.
-  - **Hypothesis**: Recognizing command position removes this observed false block while keeping all planted heavy-run blocks.
-  - **Measurement**: Add focused cases to `tests/agent-hooks-heavy-build-callers.bats`, then run `heavy-run bats tests/agent-hooks-heavy-build-callers.bats` and hosted CI. In use, the hook's block message is the observable event: the read-only fixture should produce it zero times.
-  - **Success**: At least three read-only references pass and three real heavy invocations remain blocked; zero planted bypasses pass.
-  - **Pivot**: If the hook cannot distinguish an invocation from a reference without allowing a heavy command through, keep the guard fail-closed and record the counterexample.
-  - **Anchor**: `agent-hooks/require-heavy-run.sh`; Basili, Caldiera and Rombach 1994 (Goal Question Metric).
-  - **Competitive-goal**: none — local agent workflow stability.
-
-
 - [ ] Prove agent continuity through a battery lid close with Power Protect
   - **ID**: keepawake-power-protect-physical-validation
   - **Blocked**: physical-validation — needs a person on the test laptop to complete any missing Power Protect installation with administrator authentication, disconnect power, and close the lid for a controlled comparison while actual agent progress is recorded. Check readiness first; do not ask to repeat an installation that is already present.

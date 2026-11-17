@@ -250,6 +250,10 @@ One narrow alternative passes: `rg --no-config -- 'term' "$(command -v bats)"`,
 optionally with `-n` or `-l` before `--` and an initial `command -v bats &&`.
 The term uses only letters, numbers, underscores, dots, or hyphens. Searches
 without either safety flag and forms with extra shell syntax still refuse.
+The hosted runner-search fixture shows why the original search needs both
+flags. A configured ripgrep preprocessor can run a command when it opens
+the named file. `--no-config` disables the configured preprocessor and `--`
+keeps the search term separate from command options.
 Literal quoted Rust executable paths are recognized at a bare command boundary;
 inert documentation strings remain ignored. Each hook invocation owns only
 its input text and decision. This does not prove queue ownership or cover

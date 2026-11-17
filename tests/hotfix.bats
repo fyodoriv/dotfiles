@@ -82,10 +82,15 @@ teardown() {
   cd "$TEST_DIR/narrow"
   git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
   [ "$(git for-each-ref --format='%(refname:short)' refs/remotes/origin)" = "origin/release" ]
+  git fetch --quiet origin release
+  local previous_fetch
+  previous_fetch=$(git rev-parse FETCH_HEAD)
 
   run "$HOTFIX_CMD" "fix: resolve crash"
   [ "$status" -eq 0 ]
   [ "$(git rev-parse HEAD)" = "$(git -C "$REMOTE_REPO" rev-parse refs/heads/main)" ]
+  [ "$(git rev-parse FETCH_HEAD)" = "$previous_fetch" ]
+  [ -z "$(git for-each-ref --format='%(refname)' refs/dotfiles/hotfix)" ]
 }
 
 @test "hotfix refuses an origin with no default before changing branches" {

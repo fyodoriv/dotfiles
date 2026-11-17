@@ -33,8 +33,10 @@ else
     exit 1
   fi
 fi
-git fetch --no-tags origin "refs/heads/$default_branch"
-base_commit=$(git rev-parse --verify FETCH_HEAD)
+base_ref="refs/dotfiles/hotfix/$$"
+git fetch --no-tags --no-write-fetch-head origin "refs/heads/$default_branch:$base_ref"
+base_commit=$(git rev-parse --verify "$base_ref^{commit}")
+git update-ref -d "$base_ref" "$base_commit"
 
 original_branch=$(git branch --show-current 2>/dev/null || git rev-parse --short HEAD)
 stashed=false

@@ -161,6 +161,8 @@ else
   if ! git -C "$AGENTBREW_APPLIED" diff --quiet HEAD origin/main; then
     if git -C "$AGENTBREW_APPLIED" merge --ff-only origin/main; then
       build_needed=true
+    else
+      echo "preserved applied AgentBrew checkout and build: fast-forward failed"
     fi
   elif ! $ENDPOINT_NODE_SAFE_MODE; then
     if (

@@ -12,7 +12,8 @@ setup() {
   cat > "$tools/git" <<'STUB'
 #!/bin/bash
 case "$3" in
-  fetch|status|merge-base|merge) exit 0 ;;
+  fetch|status|merge-base) exit 0 ;;
+  merge) exit "${FIXTURE_MERGE:-0}" ;;
   diff) exit "${FIXTURE_DIFF:-1}" ;;
   *) exit 65 ;;
 esac
@@ -49,7 +50,7 @@ _run_build() {
   run /usr/bin/env -u BASH_ENV -u ENV PATH="$tools" HOME="$fixture/home" \
     AGENTBREW_APPLIED="$applied" FIXTURE_EVENTS="$fixture/events" \
     FIXTURE_VERIFY="${probe_status:-1}" FIXTURE_OS="${host_os:-Darwin}" \
-    FIXTURE_DIFF="${checkout_diff:-1}" FIXTURE_FRESHNESS="${freshness:-0}" \
+    FIXTURE_DIFF="${checkout_diff:-1}" FIXTURE_FRESHNESS="${freshness:-0}" FIXTURE_MERGE="${merge_status:-0}" \
     /bin/bash "$fixture/build.sh"
 }
 
@@ -132,6 +133,13 @@ _preserved() {
   _run_build
   _preserved
   [[ "$output" == *'cannot verify applied AgentBrew build freshness'* ]]
+}
+
+@test "failed fast-forward preserves the build and explains why" {
+  merge_status=1
+  _run_build
+  _preserved
+  [[ "$output" == *'preserved applied AgentBrew checkout and build: fast-forward failed'* ]]
 }
 
 @test "endpoint safe mode skips checking a current checkout" {

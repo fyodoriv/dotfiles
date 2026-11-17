@@ -57,6 +57,55 @@ teardown() {
   [[ "$branch" == hotfix/* ]]
 }
 
+@test "hotfix asks origin for its master default when origin HEAD is missing" {
+  cd "$TEST_REPO"
+  git -C "$REMOTE_REPO" symbolic-ref HEAD refs/heads/master
+  git branch -m master
+  git push --quiet --set-upstream origin master
+  git push --quiet origin --delete main
+  git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  git checkout --quiet -b feature
+  git commit --no-verify --quiet --allow-empty -m "chore: diverge feature"
+
+  run "$HOTFIX_CMD" "fix: resolve crash"
+  [ "$status" -eq 0 ]
+  [ "$(git branch --show-current)" = "hotfix/fix-resolve-crash" ]
+  [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/master)" ]
+}
+
+@test "hotfix ignores the only local origin ref in a narrowed clone" {
+  cd "$TEST_REPO"
+  git checkout --quiet -b release
+  git commit --no-verify --quiet --allow-empty -m "chore: diverge release"
+  git push --quiet origin release
+  git clone --quiet --no-local --single-branch --branch release "$REMOTE_REPO" "$TEST_DIR/narrow"
+  cd "$TEST_DIR/narrow"
+  git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  [ "$(git for-each-ref --format='%(refname:short)' refs/remotes/origin)" = "origin/release" ]
+  git fetch --quiet origin release
+  local previous_fetch
+  previous_fetch=$(git rev-parse FETCH_HEAD)
+
+  run "$HOTFIX_CMD" "fix: resolve crash"
+  [ "$status" -eq 0 ]
+  [ "$(git rev-parse HEAD)" = "$(git -C "$REMOTE_REPO" rev-parse refs/heads/main)" ]
+  [ "$(git rev-parse FETCH_HEAD)" = "$previous_fetch" ]
+  [ -z "$(git for-each-ref --format='%(refname)' refs/dotfiles/hotfix)" ]
+}
+
+@test "hotfix refuses an origin with no default before changing branches" {
+  cd "$TEST_REPO"
+  git checkout --quiet -b feature
+  git push --quiet origin feature
+  git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  git -C "$REMOTE_REPO" symbolic-ref HEAD refs/heads/missing
+
+  run "$HOTFIX_CMD" "fix: resolve crash"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Cannot determine the default branch from origin"* ]]
+  [ "$(git branch --show-current)" = "feature" ]
+}
+
 @test "hotfix branch name is sanitized from message" {
   cd "$TEST_REPO"
   run "$HOTFIX_CMD" "fix: resolve crash on startup"

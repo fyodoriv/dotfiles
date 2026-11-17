@@ -292,7 +292,8 @@ case "${1:-}" in
       }
       for my $s (slot_files("$dir/slots")) {
         next unless held("$dir/slots/$s");
-        push @busy, "slot $s (older heavy-run): " . read1("$dir/slots/$s.owner");
+        my %f = fields("$dir/slots/$s.owner");
+        push @busy, "slot $s (older heavy-run): " . ($f{line} // "") . elapsed($f{start});
       }
       my $excl = "";
       if (!@busy && -e $lock && held($lock, LOCK_SH)) {
@@ -607,13 +608,32 @@ exec perl -e "$common_code"'
     if (open(my $f, "<", $p)) { unlink $p if flock($f, LOCK_EX | LOCK_NB); }
   }
 
+  my $exclusive_wait = $exclusive
+    ? setting("HEAVY_RUN_EXCLUSIVE_WAIT", "heavy_run_exclusive_wait_seconds", 900, $is_wait) : 0;
+  sub enforce_exclusive_deadline {
+    return unless $exclusive && Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $wait_started >= $exclusive_wait;
+    if ($ticket) { unlink $ticket, "$ticket.grant", "$ticket.why"; close $tfh; }
+    ungate();
+    print STDERR "heavy-run: exclusive wait reached ${exclusive_wait}s. Check heavy-run --status and retry later\n";
+    exit 75;
+  }
+
   # Take the next ticket number. The ticket is written and locked under a
   # temporary name, then renamed, so no sweeper sees it before it is locked.
   my $info = sprintf("pid=%d cwd=%s cmd=%s%s", $$, $ENV{PWD} // "", join(" ", @cmd), $exclusive ? " [exclusive]" : "");
   my $queued = eval {
     -d $queue or mkdir $queue or die "cannot create $queue: $!\n";
     sysopen(my $sf, $seqfile, O_RDWR | O_CREAT, 0600) or die "cannot open $seqfile: $!\n";
-    flock($sf, LOCK_EX) or die "cannot lock $seqfile: $!\n";
+    if ($exclusive) {
+      while (!flock($sf, LOCK_EX | LOCK_NB)) {
+        die "cannot lock $seqfile: $!\n" unless $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
+        enforce_exclusive_deadline();
+        select(undef, undef, undef, 0.2);
+      }
+      enforce_exclusive_deadline();
+    } else {
+      flock($sf, LOCK_EX) or die "cannot lock $seqfile: $!\n";
+    }
     my $max = scalar <$sf> // 0; $max = 0 unless $max =~ /^\d+/;
     if (opendir(my $qd, $queue)) {
       for my $t (readdir $qd) { $max = $1 + 0 if $t =~ /^(\d+)-\d+$/ && $1 + 0 > $max; }
@@ -661,10 +681,9 @@ exec perl -e "$common_code"'
     for my $sig (keys %signo) { $SIG{$sig} = sub { unlink $ticket, "$ticket.grant", "$ticket.why"; ungate(); exit(128 + $signo{$sig}) }; }
   }
   my $hinted = 0;
-  my $exclusive_wait = $exclusive
-    ? setting("HEAVY_RUN_EXCLUSIVE_WAIT", "heavy_run_exclusive_wait_seconds", 900, $is_wait) : 0;
   while (1) {
     if (!$keep && getppid() != $caller) { unlink $ticket, "$ticket.grant", "$ticket.why" if $ticket; ungate(); exit 129; }
+    enforce_exclusive_deadline();
     if ($ticket) {
       step();
       # Until the scheduler gets to this ticket, show a first reason (it never grants).
@@ -682,14 +701,9 @@ exec perl -e "$common_code"'
       my ($what, $arg) = decide(snapshot(), { project => $proj, project_id => $proj_id, exclusive => $exclusive }, [settings()]);
       if ($what eq "grant") { ($slot, $sfh) = take($arg); last if defined $slot; }
     }
-    if ($exclusive && Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $wait_started >= $exclusive_wait) {
-      if ($ticket) { unlink $ticket, "$ticket.grant", "$ticket.why"; close $tfh; }
-      ungate();
-      print STDERR "heavy-run: exclusive wait reached ${exclusive_wait}s; check heavy-run --status and retry later\n";
-      exit 75;
-    }
     select(undef, undef, undef, 0.2);
   }
+  enforce_exclusive_deadline();
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = "DEFAULT"; }
   if ($ticket) { unlink "$ticket.grant", "$ticket.why", $ticket; close $tfh; }
   if (open(my $ls, ">", $last_start)) { close $ls; }

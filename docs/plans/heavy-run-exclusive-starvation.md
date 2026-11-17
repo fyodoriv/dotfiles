@@ -7,3 +7,7 @@
 - Anchor: task `heavy-run-exclusive-starvation` and the existing exclusive FIFO fixture.
 
 Use the monotonic clock for the wait deadline. Report elapsed run time from the existing owner record. Preserve capacity and memory decisions.
+
+Check the exclusive deadline before and after admission. A busy sequence lock
+has the same limit. The hosted test keeps both the original holder and a later
+waiter in the same isolated queue while the exclusive request expires.

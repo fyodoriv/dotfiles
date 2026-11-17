@@ -34,3 +34,9 @@ change orphan retention or infer a production bug from this fixture alone.
 Anchor: `heavy-run-interrupted-caller-cleanup`, existing orphan and signal
 controls in `tests/heavy-run.bats`; Basili, Caldiera and Rombach 1994 (GQM);
 Munafò et al. 2017 (pre-registration).
+
+## Delivery
+
+[PR #593](https://github.com/fyodoriv/dotfiles/pull/593) merged with
+green hosted checks, including the 20 interrupted-waiter trials. The original
+shared-log observation remains unlinked to a specific invocation.

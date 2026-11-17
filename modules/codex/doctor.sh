@@ -33,7 +33,11 @@ except (OSError, subprocess.TimeoutExpired):
 PYCODE
 }
 _codex_config_check() {
-  python3 - "$HOME/.codex/config.toml" "$1" <<'PY'
+  local config="$HOME/.codex/config.toml"
+  if [ "$1" = network_proxy ]; then
+    config="${CODEX_HOME:-$HOME/.codex}/config.toml"
+  fi
+  python3 - "$config" "$1" <<'PY'
 import os
 import sys
 import tomllib
@@ -61,8 +65,7 @@ if sys.argv[2] == "paths":
     sys.exit(0 if paths_exist(config) else 1)
 if sys.argv[2] == "network_proxy":
     features = config.get("features", {})
-    proxy = features.get("network_proxy") if isinstance(features, dict) else None
-    configured = isinstance(proxy, bool) or isinstance(proxy, dict) and isinstance(proxy.get("enabled"), bool)
+    configured = isinstance(features, dict) and "network_proxy" in features
     sys.exit(0 if configured else 1)
 if sys.argv[2] == "agent_access":
     # Without these, Codex agent threads get a sandbox with no network,

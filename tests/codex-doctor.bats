@@ -7,6 +7,7 @@ MODULE="$BATS_TEST_DIRNAME/../modules/codex/doctor.sh"
 setup() {
   TEST_DIR="$(mktemp -d)"
   export HOME="$TEST_DIR/home" DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
+  export CODEX_HOME="$HOME/.codex"
   export DOTFILES_CODEX_APP_DIR="$TEST_DIR/ChatGPT.app"
   export DOTFILES_DOCTOR_FULL=true
   mkdir -p "$HOME/.local/bin" "$HOME/.codex" "$DOTFILES_CODEX_APP_DIR"
@@ -147,8 +148,12 @@ STUB
   local config="$HOME/.codex/config.toml"
   printf 'sandbox_mode = "workspace-write"\napproval_policy = "on-request"\n[features]\njs_repl = false\n' > "$config"
   cp "$config" "$TEST_DIR/before.toml"
+  printf '#!/bin/bash\n[ "$1" = source-path ] && { (cd "%s" && pwd -P); exit 0; }\nexit 0\n' "$DOTFILES_DIR" > "$HOME/.local/bin/chezmoi"
+  chmod +x "$HOME/.local/bin/chezmoi"
   run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --fix --module codex --json
-  [[ "$output" == *codex.network_proxy* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'report-only'* ]]
+  jq -e 'any(.[]; .id == "codex.network_proxy" and .status == "warn")' <<< "$output"
   cmp "$config" "$TEST_DIR/before.toml"
   [ -z "$(find "$HOME/.codex" -name 'config.toml.bak-*' -print)" ]
 }
@@ -161,6 +166,15 @@ STUB
 
 @test "codex proxy advisory accepts an explicit enabled flag" {
   printf '[features]\nnetwork_proxy = true\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.network_proxy* ]]
+}
+
+@test "codex proxy advisory respects a custom Codex home and proxy table" {
+  export CODEX_HOME="$TEST_DIR/alternate-codex"
+  mkdir -p "$CODEX_HOME"
+  printf '[features.network_proxy]\nproxy_url = "https://proxy.example.com"\n' > "$CODEX_HOME/config.toml"
+  printf 'model = "example"\n' > "$HOME/.codex/config.toml"
   source "$MODULE"
   [[ "$failed_ids" != *codex.network_proxy* ]]
 }

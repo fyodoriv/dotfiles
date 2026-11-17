@@ -46,7 +46,8 @@ short version every contributor needs:
    hook fails closed: a missing or outdated pattern file (version below
    `config/oss-readiness-min-version`) blocks the push. Generic markers
    (home paths, enterprise hosts, `git@` remotes) run on pushed lines and
-   messages with no pattern file. See `SECURITY.md` § "Private pattern
+   messages with no pattern file. The SSH marker treats an escaped dot inside a
+   host like a plain dot before applying the same public host list. See `SECURITY.md` § "Private pattern
    file". The hook then runs the overlay's `hooks/pre-push`, then the
    repo-local `hooks/pre-push`; both get the per-ref payload on stdin.
    No environment variable bypasses the gates. A person who read the text

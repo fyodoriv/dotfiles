@@ -59,10 +59,11 @@ BEGIN {
     }
   }
   s = lc
-  while (match(s, /(ssh:\/\/)?git@[a-z0-9.-]+/)) {
+  while (match(s, /(ssh:\/\/)?git@([a-z0-9.-]|\\[.])+/)) {
     m = substr(s, RSTART, RLENGTH); nxt = substr(s, RSTART + RLENGTH, 1)
     viassh = (m ~ /^ssh:/)
     sub(/^(ssh:\/\/)?git@/, "", m)
+    gsub(/\\[.]/, ".", m)
     if ((viassh || nxt == ":") && m !~ /^(github\.com|ssh\.github\.com|gitlab\.com|bitbucket\.org|codeberg\.org|host|hostname)$/ && !placeholder(m)) { hit("ssh host"); break }
     s = substr(s, RSTART + RLENGTH)
   }

@@ -487,6 +487,12 @@ also skips an absent CLI on a full profile; an existing broken link still gets
 diagnosed. Sign-in and
 the GUI app are advisory; config and hook files remain owned by agentbrew.
 
+The advisory `codex.agent_access` check warns when `~/.codex/config.toml`
+leaves agent threads without network. Without `sandbox_mode =
+"danger-full-access"` or `[sandbox_workspace_write] network_access = true`,
+ChatGPT/Codex threads cannot run npm or curl. Under workspace-write, the
+sandbox also keeps `.git` read-only, so git commits fail.
+
 Use `dotfiles doctor --full --module codex` to execute the version and
 sign-in probes (sign-in is bounded to two seconds). Routine audits use local
 file checks to stay within the module's 500 ms budget. `--list` includes the

@@ -12,7 +12,7 @@ setup() {
   mkdir -p "$HOME/.local/bin" "$HOME/.codex" "$DOTFILES_CODEX_APP_DIR"
   printf '#!/bin/bash\ncase "$1" in --version) echo codex-cli 1.2.3;; login) exit 0;; esac\n' > "$HOME/.local/bin/codex"
   chmod +x "$HOME/.local/bin/codex"
-  printf 'model = "example"\n' > "$HOME/.codex/config.toml"
+  printf 'model = "example"\nsandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
   touch "$HOME/.codex/hooks.json"
   export PATH="$HOME/.local/bin:$PATH"
   failed_ids=""
@@ -134,4 +134,18 @@ STUB
   WATCH_MAX_ITERATIONS=1 run bash "$DOTFILES_DIR/bin/dotfiles-doctor" --watch --full --module codex
   [ "$status" -eq 0 ]
   [[ "$output" == *"Codex CLI runs (codex --version)"* ]]
+}
+
+@test "doctor flags a Codex config that leaves agents without network" {
+  printf 'model = "example"\n' > "$HOME/.codex/config.toml"
+  source "$MODULE"
+  [[ "$failed_ids" == *codex.agent_access* ]]
+  printf 'sandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
+  failed_ids=""
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.agent_access* ]]
+  printf '[sandbox_workspace_write]\nnetwork_access = true\n' > "$HOME/.codex/config.toml"
+  failed_ids=""
+  source "$MODULE"
+  [[ "$failed_ids" != *codex.agent_access* ]]
 }

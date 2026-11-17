@@ -277,6 +277,22 @@ make_checkout() {
   assert_blocked "body: ssh host"
 }
 
+@test "allows plain and regex-escaped dots in public ssh hosts" {
+  local scheme=ssh:// host
+  for host in github.com gitlab.com bitbucket.org codeberg.org; do
+    run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "${scheme}git@$host/group/tool.git"
+    assert_posted
+    run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "${scheme}git@${host//./\\.}/group/tool.git"
+    assert_posted
+  done
+}
+
+@test "still blocks a private ssh host with regex-escaped dots" {
+  local scheme=ssh:// host=git.widgetco.net
+  run "$GH_WRAPPER" pr comment 8 -R octo/tool --body "${scheme}git@${host//./\\.}/group/tool.git"
+  assert_blocked "body: ssh host"
+}
+
 @test "blocks an enterprise host gh is signed in to" {
   run "$GH_WRAPPER" issue comment 3 -R octo/tool --body "Docs at code.widgetco-sso.net/team"
   assert_blocked "body: enterprise host"

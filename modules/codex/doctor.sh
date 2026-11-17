@@ -85,6 +85,9 @@ check "codex.cli_paths" "CODEX_CLI_PATH entries point to executable files" \
 check_advisory "codex.agent_access" "Codex agents can reach the network (sandbox_mode or network_access)" \
   "_codex_config_check agent_access" \
   "add 'sandbox_mode = \"danger-full-access\"' or '[sandbox_workspace_write] network_access = true' to ~/.codex/config.toml"
+check "codex.network_proxy" "ChatGPT Work network proxy is enabled" \
+  "bash '$DOTFILES_DIR/bin/dotfiles-codex-agent-access' --check" \
+  "bash '$DOTFILES_DIR/bin/dotfiles-codex-agent-access'"
 check "codex.hooks_writable" "Codex hooks.json writable, or its parent writable when absent" \
   "if [ -e \"\$HOME/.codex/hooks.json\" ]; then [ -w \"\$HOME/.codex/hooks.json\" ]; else [ -w \"\$HOME/.codex\" ]; fi" ""
 check_advisory "codex.app" "ChatGPT.app installed (Codex GUI host)" \

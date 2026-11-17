@@ -1,0 +1,56 @@
+#!/bin/bash
+# Give Codex / ChatGPT app agent threads network, git, and npm access.
+# Adds only the missing keys to ~/.codex/config.toml; safe to rerun.
+# Usage: dotfiles-codex-agent-access [--check]
+set -euo pipefail
+
+config="${CODEX_HOME:-$HOME/.codex}/config.toml"
+mode="${1:-fix}"
+mkdir -p "$(dirname "$config")"
+[ -e "$config" ] || : >"$config"
+
+python3 - "$config" "$mode" <<'PY'
+import shutil, sys, time, tomllib
+
+path, mode = sys.argv[1], sys.argv[2]
+with open(path, "rb") as f:
+    config = tomllib.load(f)
+
+top = []
+if "sandbox_mode" not in config:
+    top.append('sandbox_mode = "danger-full-access"')
+if "approval_policy" not in config:
+    top.append('approval_policy = "never"')
+
+tail = []
+workspace = config.get("sandbox_workspace_write")
+if workspace is None:
+    tail.append("[sandbox_workspace_write]\nnetwork_access = true")
+elif workspace.get("network_access") is not True:
+    sys.exit("sandbox_workspace_write.network_access is set but not true; edit it by hand")
+
+# ChatGPT app Work chats run commands through a local executor. With the
+# network proxy feature off, every DNS lookup fails (npm ENOTFOUND, curl 6).
+features = config.get("features", {})
+proxy = features.get("network_proxy")
+if proxy is None:
+    tail.append("[features.network_proxy]\nenabled = true")
+elif not (proxy is True or (isinstance(proxy, dict) and proxy.get("enabled") is True)):
+    sys.exit("features.network_proxy is set but not enabled; edit it by hand")
+
+if not top and not tail:
+    sys.exit(0)
+if mode == "--check":
+    sys.exit(1)
+
+shutil.copy2(path, f"{path}.bak-{int(time.time())}")
+with open(path) as f:
+    text = f.read()
+new = ("\n".join(top) + "\n" if top else "") + text
+if tail:
+    new = new.rstrip("\n") + "\n\n" + "\n\n".join(tail) + "\n"
+tomllib.loads(new)
+with open(path, "w") as f:
+    f.write(new)
+print("updated", path, "- restart the ChatGPT app to apply")
+PY

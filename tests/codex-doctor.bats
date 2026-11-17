@@ -12,7 +12,7 @@ setup() {
   mkdir -p "$HOME/.local/bin" "$HOME/.codex" "$DOTFILES_CODEX_APP_DIR"
   printf '#!/bin/bash\ncase "$1" in --version) echo codex-cli 1.2.3;; login) exit 0;; esac\n' > "$HOME/.local/bin/codex"
   chmod +x "$HOME/.local/bin/codex"
-  printf 'model = "example"\nsandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
+  printf 'model = "example"\nsandbox_mode = "danger-full-access"\napproval_policy = "never"\n[sandbox_workspace_write]\nnetwork_access = true\n[features.network_proxy]\nenabled = true\n' > "$HOME/.codex/config.toml"
   touch "$HOME/.codex/hooks.json"
   export PATH="$HOME/.local/bin:$PATH"
   failed_ids=""
@@ -137,15 +137,21 @@ STUB
 }
 
 @test "doctor flags a Codex config that leaves agents without network" {
-  printf 'model = "example"\n' > "$HOME/.codex/config.toml"
+  printf 'model = "example"\nsandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
   source "$MODULE"
   [[ "$failed_ids" == *codex.agent_access* ]]
-  printf 'sandbox_mode = "danger-full-access"\n' > "$HOME/.codex/config.toml"
-  failed_ids=""
-  source "$MODULE"
-  [[ "$failed_ids" != *codex.agent_access* ]]
-  printf '[sandbox_workspace_write]\nnetwork_access = true\n' > "$HOME/.codex/config.toml"
-  failed_ids=""
-  source "$MODULE"
-  [[ "$failed_ids" != *codex.agent_access* ]]
+}
+
+@test "codex agent access fix adds missing keys and is idempotent" {
+  printf 'model = "example"\n[features]\njs_repl = false\n' > "$HOME/.codex/config.toml"
+  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access" --check
+  [ "$status" -eq 1 ]
+  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access"
+  [ "$status" -eq 0 ]
+  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access" --check
+  [ "$status" -eq 0 ]
+  before="$(cat "$HOME/.codex/config.toml")"
+  run bash "$DOTFILES_DIR/bin/dotfiles-codex-agent-access"
+  [ "$(cat "$HOME/.codex/config.toml")" = "$before" ]
+  python3 -c 'import sys,tomllib; c=tomllib.load(open(sys.argv[1],"rb")); assert c["features"]["network_proxy"]["enabled"] is True and c["features"]["js_repl"] is False' "$HOME/.codex/config.toml"
 }

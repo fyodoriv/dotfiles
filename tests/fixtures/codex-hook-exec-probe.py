@@ -206,17 +206,32 @@ def run(root, mode):
             thread.join(timeout=3)
     logfile=root/"hook-events"
     events=[json.loads(line) for line in logfile.read_text().splitlines()] if logfile.exists() else []
+    events_from_cli=[json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
+    command_receipts=[row["item"] for row in events_from_cli
+                      if row.get("type")=="item.completed" and
+                      row.get("item",{}).get("type")=="command_execution"]
+    def marker(output):
+        if isinstance(output,str):
+            value=output.strip()
+            for name in ("original","rewritten"):
+                if value==f"codex-fixture-{name}":
+                    return name
+        return "unobserved"
+    receipts=[{"exit":item.get("exit_code"),"marker":marker(item.get("aggregated_output"))}
+              for item in command_receipts]
     response={"case":mode,"status":result.returncode,"requests":requests,
-              "routes":paths,"events":events,"execution":outputs,"diagnostics":output_diagnostics}
+              "routes":paths,"events":events,"execution":outputs,"command_receipts":receipts,
+              "diagnostics":output_diagnostics}
     if result.returncode:
         response["error_labels"]=[row[:230] for row in result.stderr.splitlines()
                                   if row.startswith(("Error:","sandbox-exec:"))][:4]
         response["event_types"]=[json.loads(row).get("type") for row in result.stdout.splitlines()
                                   if row.startswith("{")][:12]
     print(json.dumps(response),flush=True)
-    return result.returncode==0 and requests==["proposal","result"] and outputs==[
-        "rewritten" if mode=="rewrite" else "original"
-    ] and sorted(x["phase"] for x in events)==["observe","post","update"]
+    expected="rewritten" if mode=="rewrite" else "original"
+    return (result.returncode==0 and requests==["proposal","result"] and outputs==[expected]
+            and receipts==[{"exit":0,"marker":expected}]
+            and sorted(x["phase"] for x in events)==["observe","post","update"])
 
 
 with tempfile.TemporaryDirectory(prefix="benign-codex-hook-",dir="/tmp") as folder:

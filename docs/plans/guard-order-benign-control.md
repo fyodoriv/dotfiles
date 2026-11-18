@@ -31,3 +31,24 @@ commands print fixed markers. They write no files and use no network.
 This first control exercises the documented Claude hook output. It can
 qualify how a benign rewrite reaches the executor. It leaves the configured
 Dotfiles path hook's exact response and all other host versions open.
+
+## Check the configured Dotfiles path hook
+
+- **Hypothesis**: The configured Dotfiles hook changes the path used by
+  the Bash executor on Claude Code 2.1.312. Both harmless variants can
+  run through the same independently bounded fixture.
+- **Measurement**: Copy the exact default-branch hook and the two files
+  it sources into the disposable workspace. Run the real hook on the
+  local scripted Bash input and forward its exact response. Record only
+  the response form and whether it proposed a path change. The Bash
+  command checks for a fixture-only path and prints one of two markers.
+  Compare with the documented Claude output control above.
+- **Success**: One actual hook rewrite is received and one execution
+  marker shows the fixture-only path. The plain case still shows the
+  original marker. No unknown input or extra execution occurs.
+- **Pivot**: A response that proposes the fixture path while Bash
+  executes with the original path establishes a compatibility failure
+  for this host. Keep the run isolated and record the exact distinction
+  before changing any adapter.
+- **Anchor**: Dotfiles `agent-hooks/prepend-endpoint-path.sh` at
+  `dff45d70` and the native Claude Code control above.

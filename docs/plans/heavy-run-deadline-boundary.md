@@ -27,9 +27,8 @@ not start.
 
 ## Hosted Linux result
 
-The first runner had a non-GNU utility at the generic timeout name.
-The [second run](https://github.com/fyodoriv/dotfiles/actions/runs/44346155414)
-selected the separate GNU binary and observed coreutils 9.7. A short
+The original lookup could not find GNU timeout. The updated lookup
+found GNU coreutils 9.7 in the [second run](https://github.com/fyodoriv/dotfiles/actions/runs/44346155414). A short
 command returned 7. A normal command and its descendant both stopped
 on TERM. For the TERM-resistant primary, Python reported -9 for
 the timeout wrapper, which a shell reports as 137. The primary was
@@ -38,5 +37,7 @@ no longer active. The separate group was still active after the controls.
 The counterexample returned 124 with one of its two group members
 still active. The primary command exited on TERM, so GNU timeout
 returned before its grace timer could signal the resistant descendant.
+The [GNU wait loop](https://github.com/coreutils/coreutils/blob/v9.7/src/timeout.c#L531-L580)
+waits for the primary process.
 That descendant reached its own fixture deadline. This rejects using
 the wrapper alone to release a heavy-run slot. A Mac replay is queued.

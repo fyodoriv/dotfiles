@@ -35,29 +35,18 @@ plugin_signers_for() {
     }' "$file"
 }
 
-# plugin_trust_signer <name> <key>: idempotent.
-plugin_trust_signer() {
-  local name="$1" key file
-  key="$(plugin_normalize_key "$2")" || { echo "not an SSH public key" >&2; return 1; }
-  plugin_signers_for "$name" | grep -qxF -- "$key" && return 0
-  file="$(plugin_signers_file)"
-  mkdir -p "$(dirname "$file")"
-  (umask 077; printf '%s namespaces="git" %s\n' "$name" "$key" >> "$file")
+_plugin_write_signer() {
+  local action="$1" name="$2" key helper
+  key="$(plugin_normalize_key "$3")" || { echo "not an SSH public key" >&2; return 1; }
+  helper="$(dirname "${BASH_SOURCE[0]}")/plugin-signer-write.pl"
+  perl "$helper" "$action" "$(plugin_signers_file)" "$name" "$key"
 }
 
-# plugin_revoke_signer <name> <key>: fails when the key was not trusted.
-plugin_revoke_signer() {
-  local name="$1" key file tmp
-  key="$(plugin_normalize_key "$2")" || { echo "not an SSH public key" >&2; return 1; }
-  plugin_signers_for "$name" | grep -qxF -- "$key" || { echo "signer is not trusted for $name" >&2; return 1; }
-  file="$(plugin_signers_file)"
-  tmp="$(mktemp "$file.XXXXXX")"
-  awk -v p="$name" -v k="$key" '{
-      i = 2; if ($i ~ /^namespaces=/) i++
-      if ($1 == p && ($i " " $(i + 1)) == k) next
-      print
-    }' "$file" > "$tmp" && mv "$tmp" "$file"
-}
+# Trust this key for the plugin. Repeated trust keeps the existing entry.
+plugin_trust_signer() { _plugin_write_signer trust "$@"; }
+
+# Revoke this key for the plugin. Refuse if the key is absent.
+plugin_revoke_signer() { _plugin_write_signer revoke "$@"; }
 
 _plugin_key_fingerprint() {
   local tmp fp

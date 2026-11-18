@@ -98,3 +98,16 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -q 'git add` skips a gitignored file' "$REF"
   grep -q 'git check-ignore -v <path>' "$REF"
 }
+
+@test "ship-it checks individual review recipients before a PR leaves draft" {
+  grep -F -q 'Check review recipients before opening or marking a PR ready' "$CMD"
+  grep -F -q 'Request reviews only from named GitHub users' "$REF"
+  grep -F -q 'Keep the PR in draft' "$REF"
+  grep -F -q 'Leave GitHub-assigned reviewers and review requirements in place' "$REF"
+  local eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
+  jq -e '.evals | any(
+    (.prompt | contains("CODEOWNERS"))
+    and (.expectations | any(contains("named GitHub user")))
+    and (.expectations | any(contains("Unknown rules")))
+    and (.expectations | any(contains("existing team request"))))' "$eval_file" >/dev/null
+}

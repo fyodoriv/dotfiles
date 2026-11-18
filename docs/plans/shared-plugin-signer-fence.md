@@ -69,3 +69,24 @@ script. Keep the Bash 3.2 cache dependency explicit.
   cross-tool claim. Live publisher activation remains a separate check.
 - **Anchor**: The previous cross-tool writer and selected signer tests,
   plus the native publisher's private owner and signed scratch fixture.
+
+### Combined result
+
+The [hosted result](https://github.com/fyodoriv/agentbrew/actions/runs/44401181354)
+passed both focused cases on Linux and Mac. It used Agentbrew main
+`1a6b3bcdfa5fe24f1981036b25a25c0335820b74` and Dotfiles
+`e76d872f7761fb84480860694fb97458e6122b07`. The scratch branch
+added the test and workflow. The publisher and signer implementations
+were the default-branch versions.
+
+Both Dotfiles commands returned 75 during the real selected write and
+left the registry bytes and lock identity unchanged. After the write
+finished, both commands returned 0 and preserved the unrelated signer.
+A second fixture performed a real payload write and injected an
+exception. Dotfiles then revoked the signer while the mode-0600 owner
+record stayed byte-for-byte unchanged. The next publisher refused with
+zero writes. Independent review confirmed the file and command scope.
+
+This result qualifies shared signer ordering and emergency revocation
+with a retained record. Live activation and recovery after abrupt
+process death still need their own evidence.

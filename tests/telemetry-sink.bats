@@ -684,7 +684,7 @@ err_fixture() {
   [[ "$output" == *"consent: not asked (org policy turns telemetry off)"* ]]
   [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
 
-  printf '%s\n' '{"consent":"yes","consent_at":"2026-01-01"}' >"$DOTFILES_TELEMETRY_STATE"
+  printf '%s\n' '{"install_id":"1234567890abcdef1234567890abcdef","consent":"yes","consent_at":"2026-01-01"}' >"$DOTFILES_TELEMETRY_STATE"
   cp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
   run bash "$TEL" status
   [ "$status" -eq 0 ]

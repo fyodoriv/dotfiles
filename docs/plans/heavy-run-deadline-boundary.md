@@ -98,3 +98,23 @@ run time before TERM. The next job acquired the same slot after all
 owned workers had stopped. The three jobs exited 0, 137 and 0. This
 qualifies admission timing and successor handoff for the prototype on
 Linux. The run also contains the Mac replay.
+
+## Check the prototype while the scheduler pauses its group
+
+- **Hypothesis**: When heavy-run pauses the command tree, it also pauses
+  a deadline controller placed inside that tree. The deadline can pass
+  before the controller sends its first signal.
+- **Measurement**: On hosted Linux, start the prototype under the real
+  queue with a three-second limit. Launch a uniquely named fixture
+  process that triggers the existing real-time pause signal. Observe the
+  pause mark and the controller's stopped status. Keep the probe active
+  past the deadline. Remove only the fixture process and check teardown.
+- **Success**: The controller is stopped before three seconds. It sends
+  no deadline signal while paused. After release, the signal timestamp
+  exceeds three seconds and all owned workers stop.
+- **Pivot**: No pause, unreliable timestamps, an early deadline signal,
+  or a surviving worker invalidates the result. A stopped-controller
+  result rejects placement inside the paused command tree for a wall
+  clock deadline.
+- **Anchor**: Temporal admission control above and the process-tree
+  pause logic in `bin/heavy-run`.

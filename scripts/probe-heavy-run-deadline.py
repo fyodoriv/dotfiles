@@ -48,11 +48,14 @@ def member_active(identity):
 
 
 def run_controls():
-    limit = shutil.which("gtimeout") or shutil.which("timeout")
-    if not limit:
-        raise SystemExit("GNU timeout is unavailable")
-    version = subprocess.check_output([limit, "--version"], text=True, timeout=2).splitlines()[0]
-    if "GNU coreutils" not in version:
+    for program in ("gtimeout", "gnutimeout", "timeout"):
+        limit = shutil.which(program)
+        if not limit:
+            continue
+        version = subprocess.check_output([limit, "--version"], text=True, timeout=2).splitlines()[0]
+        if "GNU coreutils" in version:
+            break
+    else:
         raise SystemExit("GNU timeout is unavailable")
     print(version, flush=True)
     with tempfile.TemporaryDirectory(prefix="deadline-control-") as owned:

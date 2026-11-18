@@ -148,3 +148,22 @@ process outside that tree must own the timer.
 
 This measures an existing limitation. It installs no watchdog and sends
 no signal to a process outside the scratch queue.
+
+## Test a surviving slot owner in the scratch queue
+
+- **Hypothesis**: A separate waiting owner can retain the two inherited
+  slot locks until its exact worker exits after launcher loss. The worker
+  can still run outside the waiting owner's own pause scope.
+- **Measurement**: Add the waiting owner to the scratch copy of heavy-run.
+  It must close inherited scheduler gate and leadership handles and wait
+  only for its worker. Repeat the ordinary and launcher-loss controls on
+  both hosts. Bound the fixture and keep the worker active after the
+  launcher dies until the test releases it.
+- **Success**: An active worker reports after the controller is gone.
+  There are zero early admissions in two cases on each host. The same slot
+  starts the successor after worker exit. Both known worker releases finish.
+- **Pivot**: Any early successor, missed worker activity, unhealthy
+  ordinary case, wrong process ownership, or handle leak rejects the
+  candidate. Descendant teardown and group eligibility remain separate.
+- **Anchor**: The real Linux launcher-loss job, and the current
+  `heavy-run` slot, leadership and child-wait paths.

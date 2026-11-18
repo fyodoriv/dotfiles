@@ -219,6 +219,11 @@ Tests: `tests/agent-hooks-block-local-tests.bats`.
 
 ## require-heavy-run (dotfiles hook)
 
+The heavy-run controller creates private queue records. A wrapped program
+receives its caller's file-creation mask, including inside exclusive and
+already-held runs. Set the mask explicitly before calling heavy-run when
+the program's output must stay private.
+
 `agent-hooks/require-heavy-run.sh` is a `PreToolUse` Bash hook from the
 dotfiles Agentfile. It blocks full test suites and builds that do not start
 with `heavy-run`: `npm test`, `npm run test*`, `yarn`/`pnpm` test or build

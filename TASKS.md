@@ -29,6 +29,21 @@ them. -->
 
 ## P1
 
+- [ ] Allow read-only branch metadata checks in delivery preflights
+  - **ID**: git-guard-read-only-branch-preflight
+  - **Tags**: hooks, git, reliability
+  - **Blocked**: needs-verified-parser-boundary — first prove a narrow literal read-only shape using the shared shell parser. Keep the existing handling for unknown inputs until an independent review confirms the repair.
+  - **Details**: On 2026-11-17 a delivery preflight compared the current branch name with a pull request's branch name and received the branch-deletion refusal. Separate read-only metadata queries succeeded. Git state did not change. The false block is recorded without a repair or a claim about other shell shapes.
+  - **Files**: `agent-hooks/block-dangerous-git.sh`, its existing Bats suites and `docs/agent-hooks.md` when a repair is qualified.
+  - **Output**: code
+  - **Acceptance**: The isolated hook recognizes the documented read-only forms. Unknown inputs keep the existing behavior, and the destructive-command guard still passes its existing suite.
+  - **Hypothesis**: A parser-proven literal read-only form removes the false block with zero changes to existing guard decisions.
+  - **Measurement**: Register three benign hook-input fixtures, then run the affected Bats suites on hosted CI. Require the observed form to fail before implementation and pass after the repair.
+  - **Success**: Three of three documented benign controls pass, zero existing guard regressions, and the required hosted gate passes.
+  - **Pivot**: Any uncertain parse, loosened guard decision or missed benign control rejects the repair. Retain the existing behavior.
+  - **Anchor**: The 2026-11-17 delivery preflight, the current hook, and its existing regression suites.
+  - **Competitive-goal**: none — command guard accuracy.
+
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability

@@ -17,3 +17,29 @@ selector currently starts a search for every changed-file/test pair.
   retains the old selector. Do not skip Rust checks or alter their gates.
 - **Anchor:** [hosted run 43621586222](https://github.com/fyodoriv/dotfiles/actions/runs/43621586222),
   `bin/bats-affected`, and the existing `tests/bats-affected.bats` contracts.
+
+## Keep the benchmark runnable after the optimization ships
+
+The required selector job for the signer writer passed 91 Bats checks.
+Its timed fixture then failed at `scripts/benchmark-bats-affected.py:32`.
+The candidate picked `rust/vendor/itoa/benches/bench.rs` first and
+treated it as relative to `rust/vendor/libc`. The local path-only check
+reproduced the same exception. The PR base also already includes the
+prefilter from #674. Comparing that base with a small maintenance change
+cannot measure the original twofold gain.
+
+- **Hypothesis**: Keep one known changed file under the generated test's
+  declared root, and use the original prefilter parent as the timing
+  baseline. Compare current-base and candidate outputs independently.
+- **Measurement**: Run the required benchmark on hosted macOS inside
+  its existing exclusive reservation. Check exact results for both
+  output modes across the historical, current-base and candidate
+  selectors. Record six timed samples for each timed selector.
+- **Success**: All 20 files are staged, both output modes match, the
+  planted dependency is selected, and the existing at-most-half and
+  30-second limits pass against the original prefilter parent
+  `1a96d12a8bf0b42df0fba340bf933d4c79ecd2d2`.
+- **Pivot**: Missing parity, missing changed dependency or a failed
+  original timing limit blocks the work. Do not lower this threshold.
+- **Anchor**: [selector job 134601446885](https://github.com/fyodoriv/dotfiles/actions/runs/44244922576/job/134601446885)
+  and [original optimization #674](https://github.com/fyodoriv/dotfiles/pull/674).

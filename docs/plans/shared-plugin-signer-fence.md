@@ -39,3 +39,10 @@ failed all three scratch cases. The first
 passed them. Independent review added explicit cache inputs, ordinary
 exit status preservation, and direct inode and permission assertions.
 The cross-tool publication and revocation decision is still open.
+
+The [final shell candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44244426770)
+passed all three cases. The lock's device, inode, owner and mode stayed
+the same across refusal, trust and revoke. Registry ownership and mode
+also stayed the same. A temporary Git index with only the Perl helper
+changed selected both plugin Bats suites through the real affected-test
+script. Keep the Bash 3.2 cache dependency explicit.

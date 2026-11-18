@@ -353,7 +353,8 @@ group or others can write makes the policy **invalid**. Then nothing is sent
 anywhere (not to PostHog either), no question is asked, and
 `dotfiles telemetry status` says `off (sink policy invalid: <reason code>)`.
 It never prints the file content. `kind: off` sends nothing and asks
-nothing; status says `off by org policy`.
+nothing. Status says `off by org policy` and explains why it has not asked
+for consent. If you already answered, it still shows your recorded answer.
 
 **`splunk-hec`.** One POST to `url` with `Authorization: Splunk <token>` and
 `content-type: application/json`. The body is one JSON object per event,

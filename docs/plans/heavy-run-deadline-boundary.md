@@ -24,3 +24,19 @@ not start.
 - **Anchor**: [Dotfiles issue #741](https://github.com/fyodoriv/dotfiles/issues/741),
   [GNU timeout](https://www.gnu.org/software/coreutils/manual/html_node/timeout-invocation.html),
   and the existing parent and slot ownership in `bin/heavy-run`.
+
+## Hosted Linux result
+
+The first runner had a non-GNU utility at the generic timeout name.
+The [second run](https://github.com/fyodoriv/dotfiles/actions/runs/44346155414)
+selected the separate GNU binary and observed coreutils 9.7. A short
+command returned 7. A normal command and its descendant both stopped
+on TERM. The TERM-resistant primary command stopped on signal 9,
+which Python reports as -9 and a shell reports as 137. The separate
+group stayed active until fixture cleanup.
+
+The counterexample returned 124 with one of its two group members
+still active. The primary command exited on TERM, so GNU timeout
+returned before its grace timer could signal the resistant descendant.
+That descendant reached its own fixture deadline. This rejects using
+the wrapper alone to release a heavy-run slot. A Mac replay is queued.

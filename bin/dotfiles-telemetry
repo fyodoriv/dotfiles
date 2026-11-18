@@ -1456,7 +1456,13 @@ cmd_status() {
   else
     case "$S_CONSENT" in
       yes | no) echo "consent: $S_CONSENT (given ${S_CONSENT_AT:-on an unknown day})" ;;
-      *) echo "consent: unset (not asked yet; answer: dotfiles telemetry on, or off)" ;;
+      *)
+        if [ "$SINK_STATE" = "valid" ] && [ "$SINK_KIND" = "off" ]; then
+          echo "consent: not asked (org policy turns telemetry off)"
+        else
+          echo "consent: unset (not asked yet; answer: dotfiles telemetry on, or off)"
+        fi
+        ;;
     esac
   fi
   echo "key: $KEY_SOURCE"

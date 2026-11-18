@@ -670,6 +670,30 @@ err_fixture() {
   [[ "$output" != *"$HOME"* ]]
 }
 
+@test "rule 13: status under an off policy explains why consent is unset" {
+  run bash "$TEL" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"answer: dotfiles telemetry on, or off"* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+
+  write_policy '{"version":1,"kind":"off"}'
+  run bash "$TEL" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sink: off by org policy"* ]]
+  [[ "$output" != *"dotfiles telemetry on"* ]]
+  [[ "$output" == *"consent: not asked (org policy turns telemetry off)"* ]]
+  [ ! -e "$DOTFILES_TELEMETRY_STATE" ]
+
+  printf '%s\n' '{"install_id":"1234567890abcdef1234567890abcdef","consent":"yes","consent_at":"2026-01-01"}' >"$DOTFILES_TELEMETRY_STATE"
+  cp "$DOTFILES_TELEMETRY_STATE" "$TEST_DIR/before.json"
+  run bash "$TEL" status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sink: off by org policy"* ]]
+  [[ "$output" == *"consent: yes (given 2026-01-01)"* ]]
+  cmp "$TEST_DIR/before.json" "$DOTFILES_TELEMETRY_STATE"
+  [ "$(request_count)" -eq 0 ]
+}
+
 # ── Rule 14: the LaunchAgent follows the policy ────────────────────────
 
 @test "rule 14: agent-wanted: managed is yes unless a stored no; off and invalid are no" {

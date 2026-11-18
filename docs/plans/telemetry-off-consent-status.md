@@ -15,3 +15,13 @@ still tell a person with no recorded answer to turn reporting on.
   state or network request rejects the fix.
 - **Anchor**: [Dotfiles issue #729](https://github.com/fyodoriv/dotfiles/issues/729)
   and the [telemetry status contract](../observability.md).
+
+## Hosted result
+
+The [old command](https://github.com/fyodoriv/dotfiles/actions/runs/44367312063)
+printed `dotfiles telemetry on` under the off policy and failed the focused
+check. The first candidate exposed an incomplete test state. A saved answer
+needs a valid synthetic install ID. With that fixture corrected, the
+[candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44367710796)
+passed the no-policy, off-policy and recorded-answer cases with zero requests
+and no consent state changes.

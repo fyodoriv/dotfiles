@@ -135,3 +135,18 @@ sandbox refused the Bash launch. That run supplied no executor marker.
 - **Pivot**: A sandbox failure, missing or duplicate execution, changed
   hook input, or unknown source leaves this platform unqualified.
 - **Anchor**: Codex 0.167.0 native hook discovery and the Mac launch receipt.
+
+The [hosted Linux control](https://github.com/fyodoriv/dotfiles/actions/runs/44411528315)
+passed with the pinned Codex CLI. The test verified that loopback was the
+only network interface before loading the fixture. The configured hook
+list contained only the three expected synthetic handlers.
+
+In both cases the two before-tool handlers received the original input.
+The plain case printed the original marker. The rewrite case printed
+the replacement marker, and the after-tool hook recorded the rewritten
+input. The scripted endpoint received one proposal and one tool result
+in each case. The read-only Codex shell remained enabled.
+
+This verifies the selected Codex hook behavior on the hosted Linux
+fixture. The local Mac sandbox still refused the shell launch, and
+the full configured guard-order check remains open.

@@ -134,3 +134,34 @@ load test_helper
     .hookSpecificOutput.permissionDecision == "allow" and
     (.hookSpecificOutput | has("updatedInput") | not)'
 }
+
+@test "prepend-endpoint-path: Claude keeps the native tool arguments and existing approval rules" {
+  mkdir -p "$TEST_DOTFILES/bin"
+  local payload='{"hook_event_name":"PreToolUse","permission_mode":"default","transcript_path":"/tmp/fixture.jsonl","tool_name":"Bash","tool_input":{"command":"echo ready","description":"Print a fixture","timeout":4000}}'
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e --arg prefix "$TEST_DOTFILES/bin" '
+    .hookSpecificOutput.hookEventName == "PreToolUse" and
+    (.hookSpecificOutput | has("permissionDecision") | not) and
+    (.hookSpecificOutput.updatedInput.command | contains($prefix) and contains("echo ready")) and
+    .hookSpecificOutput.updatedInput.description == "Print a fixture" and
+    .hookSpecificOutput.updatedInput.timeout == 4000 and
+    (has("updated_input") | not)'
+}
+
+@test "prepend-endpoint-path: Claude no-op makes no approval decision" {
+  local payload='{"hook_event_name":"PreToolUse","permission_mode":"default","transcript_path":"/tmp/fixture.jsonl","tool_name":"Read","tool_input":{}}'
+  run bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '. == {}'
+}
+
+@test "prepend-endpoint-path: Claude auto mode makes no path or approval decision" {
+  mkdir -p "$TEST_DOTFILES/bin"
+  local payload='{"hook_event_name":"PreToolUse","permission_mode":"auto","transcript_path":"/tmp/fixture.jsonl","tool_name":"Bash","tool_input":{"command":"echo ready"}}'
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '. == {}'
+}

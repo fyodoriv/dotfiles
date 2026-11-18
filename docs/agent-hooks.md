@@ -303,15 +303,19 @@ Still not seen by the hook: `yarn workspace <pkg> <script>`, a single spec run t
 with `--filter` (it reads as a full run), a program started by a script (`node run.js`), and `eval`.
 The doctor check is the net for these.
 
-## Codex PATH hook output
+## PATH hook output
 
 `prepend-endpoint-path.sh` recognizes Codex hook input by its nonempty
 `turn_id`. Native Codex `PreToolUse` calls for shell execution use `Bash` and
 `tool_input.command`. The hook returns `hookSpecificOutput` with
 `hookEventName: PreToolUse`, `permissionDecision: allow`, and an
-`updatedInput.command` when it adds PATH or rewrites a managed shim. Other
-agents keep the existing `permission` and `updated_input` response. Unchanged
-Codex input gets native allow without an input update.
+`updatedInput.command` when it adds PATH or rewrites a managed shim.
+Unchanged Codex input gets native allow without an input update. Claude
+Code uses its native `updatedInput` response when the envelope includes
+the PreToolUse event, permission mode, and a transcript path. The hook
+retains Claude's other tool arguments and leaves the approval decision to
+Claude. Auto mode keeps its command and approval behavior. Inputs with the
+legacy envelope keep the existing response.
 
 The response is based on the [Codex hooks protocol](https://learn.chatgpt.com/docs/hooks).
 Input detection and temporary output files are scoped to one hook process.

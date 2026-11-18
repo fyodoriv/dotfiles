@@ -33,6 +33,7 @@ them. -->
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability
   - **Details**: The Agentfile registers the heavy-run guard and a path hook for Bash. The path hook can return updated command input. The public hook contract documents updated input, but the effect of hook ordering on the final executed command has not been established for the configured agents. This is a verification gap, not a demonstrated bypass. Use only synthetic commands, a scratch agent configuration and canaries; never run a destructive command. The hooks emit different response formats for Claude and Codex; qualify each host and version separately.
+  - **Progress**: The [Claude Code 2.1.312 harmless check](docs/plans/guard-order-benign-control.md) observed the original command in the before-tool hooks and the replacement in the executor. The configured path hook now uses the native response in the measured default mode. Codex execution and the full guard matrix remain open.
   - **Files**: `Agentfile.yaml`, `agent-hooks/require-heavy-run.sh`, `agent-hooks/prepend-endpoint-path.sh`, their tests and hook guidance as needed.
   - **Output**: code
   - **Acceptance**: A qualified scratch invocation records each guard input and proves the final command was delivered to a harmless canary executor, including benign path rewrites and synthetic attempted rewrites. A guard decision cannot be used as proof for an unguarded final command. Untested hosts and missing ordering evidence remain unqualified.

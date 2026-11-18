@@ -41,3 +41,23 @@ The [GNU wait loop](https://github.com/coreutils/coreutils/blob/v9.7/src/timeout
 waits for the primary process.
 That descendant reached its own fixture deadline. This rejects using
 the wrapper alone to release a heavy-run slot. A Mac replay is queued.
+
+## Keep the fixture process group owned through the deadline
+
+- **Hypothesis**: An isolated supervisor stays alive through TERM, so
+  the deadline continues to cover the original process group after
+  the command it started exits.
+- **Measurement**: Run the same synthetic commands on hosted Linux and
+  Mac. Use a supervisor in a distinct session. Check all group members
+  after TERM and again after its grace interval. Keep a separate
+  negative-control group and compare start behavior, exit status, and
+  active workers under the same deadline.
+- **Success**: A normal command keeps exit 7, the default TERM case returns
+  124, the two resistant cases require bounded escalation and return
+  137, the owned group has zero active workers at exit in all cases,
+  and the separate group remains active.
+- **Pivot**: A lost supervisor, reused or uncertain group identity,
+  unobserved completion, surviving worker, or unexpected signal rejects
+  the prototype. Leave the real scheduler out of this experiment.
+- **Anchor**: The hosted wrapper counterexample above and the existing
+  slot-parent fork and wait in `bin/heavy-run`.

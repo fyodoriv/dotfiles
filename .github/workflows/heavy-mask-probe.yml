@@ -1,0 +1,16 @@
+name: Heavy-run command mask probe
+on:
+  push:
+    branches: [probe/heavy-run-command-umask]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y bats
+      - run: PATH="$PWD/bin:$PATH" heavy-run bats -f 'caller mask|the state folder is private' tests/heavy-run.bats

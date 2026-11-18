@@ -1,0 +1,25 @@
+name: Scratch Codex executor control
+on:
+  push:
+    branches: [probe/codex-hook-executor]
+permissions:
+  contents: read
+jobs:
+  executor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.21.0
+      - name: Install the pinned disposable executable
+        run: npm install --prefix "$RUNNER_TEMP/codex-fixture" @openai/codex@0.167.0
+      - name: Run exact harmless markers in an isolated network namespace
+        run: |
+          sudo unshare --net -- /bin/bash -c '
+            ip link set lo up
+            exec runuser -u "$1" -- "$2" "$3" "$4" "$5"
+          ' bash "$USER" "$(command -v python3)" "$PWD/tests/fixtures/codex-hook-exec-probe.py"             "$RUNNER_TEMP/codex-fixture/node_modules/.bin/codex" "$(command -v node)"

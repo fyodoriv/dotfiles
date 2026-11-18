@@ -108,7 +108,7 @@ level="${HEAVY_RUN_NICE:-15}"
 export HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"
 
 usage() {
-  echo "Usage: heavy-run [--exclusive] <command...> | heavy-run --status"
+  echo "Usage: heavy-run [--exclusive] <command...> | heavy-run status (or --status)"
 }
 
 # Settings: env first, then the chezmoi data, then the default. A trailing
@@ -267,6 +267,10 @@ common_code='
   sub read1 { my ($p) = @_; open(my $f, "<", $p) or return ""; my $l = <$f> // ""; chomp $l; return $l; }
   our $GATE = "0000000000-0";
 '
+
+if [ "$#" -eq 1 ] && [ "$1" = status ]; then
+  set -- --status
+fi
 
 case "${1:-}" in
   "" | -h | --help)

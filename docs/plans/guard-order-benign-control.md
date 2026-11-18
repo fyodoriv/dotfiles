@@ -93,3 +93,25 @@ scope. Keep the path hook neutral in that mode.
   rewrite rejects this scope.
 - **Anchor**: The documented auto-mode response contract and the
   independent adapter review.
+
+## Observed result
+
+The unmodified Claude Code process ran all three registered inputs.
+The plain control printed the original marker. The native reference
+control printed the replacement marker. With the candidate Dotfiles
+hook, both before-tool observers saw the original command. The hook
+returned a native prefix, preserved the other Bash arguments, and made
+no approval decision. The executor printed the changed-path marker
+once, and the post-tool event recorded the prefixed command.
+
+The scripted service was the only reachable network endpoint. A separate
+local listener received no connection, and the client reported permission
+refusal. The first run stopped before starting Claude because the Darwin
+network profile rejected an IP literal in its rule. The verified profile
+used the supported `localhost` address and a specific fixture port.
+
+A direct adapter test required an empty auto-mode reply. It first found
+an update, then passed after the auto scope guard. The same adapter
+check passed default Claude, Codex and legacy responses. The runtime
+result covers the harmless Claude default-mode cases. Codex execution
+order, auto-mode rewriting and general guard ordering remain open.

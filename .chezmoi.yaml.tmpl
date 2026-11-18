@@ -58,6 +58,10 @@
 {{- if hasKey . "heavy_run_ramp_seconds" -}}
 {{-   $heavyRunRamp = .heavy_run_ramp_seconds -}}
 {{- end -}}
+{{- $heavyRunExclusiveWait := "" -}}
+{{- if hasKey . "heavy_run_exclusive_wait_seconds" -}}
+{{-   $heavyRunExclusiveWait = .heavy_run_exclusive_wait_seconds -}}
+{{- end -}}
 {{- $heavyRunMaxLoad := "" -}}
 {{- if hasKey . "heavy_run_max_load" -}}
 {{-   $heavyRunMaxLoad = .heavy_run_max_load -}}
@@ -284,6 +288,9 @@ data:
 {{- end }}
 {{- if $heavyRunRamp }}
   heavy_run_ramp_seconds: {{ $heavyRunRamp }}
+{{- end }}
+{{- if $heavyRunExclusiveWait }}
+  heavy_run_exclusive_wait_seconds: {{ $heavyRunExclusiveWait }}
 {{- end }}
 {{- if $heavyRunMaxLoad }}
   heavy_run_max_load: {{ $heavyRunMaxLoad }}

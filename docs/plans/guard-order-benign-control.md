@@ -115,3 +115,23 @@ an update, then passed after the auto scope guard. The same adapter
 check passed default Claude, Codex and legacy responses. The runtime
 result covers the harmless Claude default-mode cases. Codex execution
 order, auto-mode rewriting and general guard ordering remain open.
+
+## Check the Codex executor on isolated Linux
+
+Codex 0.167.0 reported the exact configured scratch hooks. In a separate
+Mac control the dispatcher observed the original benign input, then
+passed the replacement to the post-tool record. The nested macOS
+sandbox refused the Bash launch. That run supplied no executor marker.
+
+- **Hypothesis**: The stock Codex 0.167.0 executor accepts the same
+  harmless control in a Linux network namespace with only loopback.
+- **Measurement**: Install the pinned Codex CLI in the hosted test
+  directory, then isolate the runtime with read-only shell permissions
+  and a loopback-only namespace. Check exact hook metadata before running
+  the scripted local provider. Run plain and rewritten marker cases.
+- **Success**: Exactly one original execution and one replacement
+  execution. One receipt per configured observer, no unexpected inputs,
+  no interface beyond loopback, and no live account or trust changes.
+- **Pivot**: A sandbox failure, missing or duplicate execution, changed
+  hook input, or unknown source leaves this platform unqualified.
+- **Anchor**: Codex 0.167.0 native hook discovery and the Mac launch receipt.

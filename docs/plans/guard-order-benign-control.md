@@ -74,3 +74,22 @@ executor in the same run. The observed Claude envelope had the
   approval, or any compatibility regression rejects the adapter.
 - **Anchor**: The old-path native receipt and the documented Claude
   `PreToolUse` output contract.
+
+### Keep the existing auto-mode behavior
+
+[Claude Code's auto-mode contract](https://code.claude.com/docs/en/hooks#pretooluse-updatedinput-in-auto-mode)
+allows some changed calls to be denied because the server reviewed the
+original input. A live auto-mode session is outside this fixture's
+scope. Keep the path hook neutral in that mode.
+
+- **Hypothesis**: The default-mode rewrite stays active. A Claude
+  auto-mode payload returns no update and makes no approval decision.
+- **Measurement**: Invoke the same adapter with the fixed harmless Bash
+  input under default and auto envelopes. Replay the native default-mode
+  case and run the hosted hook compatibility suite.
+- **Success**: One native default rewrite; zero auto updates and approval
+  decisions; the native Codex and legacy fixtures pass.
+- **Pivot**: Any auto rewrite, unsolicited approval, or lost ordinary
+  rewrite rejects this scope.
+- **Anchor**: The documented auto-mode response contract and the
+  independent adapter review.

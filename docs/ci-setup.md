@@ -21,6 +21,11 @@ red run is the proof), then push the fix. This also retires the task
 `speed-up-make-check`: agents no longer run `make check` locally, so its
 local-gate speed has no consumer.
 
+The per-file ShellCheck cache from [PR #257](https://github.com/fyodoriv/dotfiles/pull/257)
+met the follow-up target. Across 42 recorded `make lint` calls in the seven
+days ending Nov 17, 2026, the daily total averaged 29 seconds. The target
+was under 60 seconds. CI still uses `make lint-full`.
+
 ## How CI works in this repo
 
 The workflow (`.github/workflows/ci.yml`) runs on every pull request to `feat/chezmoi`, on every push to `feat/chezmoi`, nightly, weekly, and by hand (`gh workflow run ci.yml --ref <branch>`; a manual run starts every job):

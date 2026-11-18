@@ -10,8 +10,8 @@ Separate metadata lookups allowed delivery to continue.
   read-only controls and preserve every existing guard decision.
 - **Measurement**: Send the sanitized command strings only as JSON input
   to the hook. Never evaluate the input. Use the observed chain, the
-  standalone comparison and the comparison followed by a standalone
-  Git status check. Run these controls on hosted macOS before the repair,
+  standalone comparison and the existing standalone branch lookup. Run
+  these controls on hosted macOS before the repair,
   then run the same cases and both existing Git guard suites.
 - **Success**: The observed case reproduces exit 2 on the old hook. The
   updated hook accepts all three controls with zero fixture command
@@ -28,3 +28,8 @@ the original input with the ordinary guard. During branch classification,
 only the first parser-proven comparison may be removed from the detector
 view. Keep the complete suffix, any other guards and the pre-existing
 refusal when the parser cannot prove this exact structure.
+
+In hosted baseline run 44227377503, both comparison controls failed.
+The existing standalone branch lookup passed. The original live refusal
+reported branch deletion, and neither source lookup ran in the hosted
+fixture.

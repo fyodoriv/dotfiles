@@ -68,6 +68,13 @@ guard checks each proven command boundary separately. It still checks the
 Python body and commit message. Unknown syntax or a missing checker keeps the
 original conservative check.
 
+The guard recognizes one literal comparison between the current branch and a
+pull request's head branch. It can stand alone or start an `&&` chain. The
+shell parser must prove the first condition's boundary before the branch
+scanner omits that comparison. The remaining commands still go through the
+guard. If the parser is unavailable or the comparison differs, the existing
+decision applies. Separate metadata lookups also work.
+
 The Git-guard suite keeps multiline command samples in fixture files. Hosted CI
 also runs the suite as a standalone Bats invocation so its parser and complete
 test count are checked independently of the affected-test runner.

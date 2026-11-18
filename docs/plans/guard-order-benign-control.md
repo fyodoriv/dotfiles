@@ -52,3 +52,25 @@ Dotfiles path hook's exact response and all other host versions open.
   before changing any adapter.
 - **Anchor**: Dotfiles `agent-hooks/prepend-endpoint-path.sh` at
   `dff45d70` and the native Claude Code control above.
+
+## Qualify the native Claude response
+
+The original path hook proposed the fixture prefix under its legacy
+`updated_input` field. Claude Code ran the original command and Bash
+printed the original marker. The independent native rewrite reached the
+executor in the same run. The observed Claude envelope had the
+`PreToolUse` event, a permission mode and a transcript path.
+
+- **Hypothesis**: A native response changes the configured fixture command
+  and preserves its other arguments without making an approval decision.
+- **Measurement**: Replay the exact local fixture with the candidate
+  script and compare the hook reply, executor marker and post-tool input.
+  Run the hosted hook suite with a synthetic Claude envelope, a native
+  Codex envelope and the existing legacy controls.
+- **Success**: The real Claude executor prints the changed-path marker
+  once. The response keeps all other tool inputs and omits a permission
+  decision. Existing Codex and legacy fixtures pass.
+- **Pivot**: An unchanged executor marker, missing argument, unsolicited
+  approval, or any compatibility regression rejects the adapter.
+- **Anchor**: The old-path native receipt and the documented Claude
+  `PreToolUse` output contract.

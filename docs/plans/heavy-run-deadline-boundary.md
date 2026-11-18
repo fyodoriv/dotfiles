@@ -61,3 +61,11 @@ the wrapper alone to release a heavy-run slot. A Mac replay is queued.
   the prototype. Leave the real scheduler out of this experiment.
 - **Anchor**: The hosted wrapper counterexample above and the existing
   slot-parent fork and wait in `bin/heavy-run`.
+
+The [hosted Linux supervisor control](https://github.com/fyodoriv/dotfiles/actions/runs/44354733342)
+returned 7 for the short command, 124 for the cooperative group,
+and 137 for both resistant cases. All four checks ended with zero
+active workers in the owned group. The independent group remained
+active after the controls. The fixture starts its signal check once
+the workers are ready. It qualifies teardown on Linux. Queue timing,
+the real scheduler entry point, and the Mac result need separate proof.

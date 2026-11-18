@@ -91,3 +91,10 @@ correctly while paused, and retains ownership through a launcher failure.
   the control. This fixture does not change the production scheduler.
 - **Anchor**: The Linux and Mac group supervisor controls and the
   slot lifetime in `bin/heavy-run`.
+
+The [hosted admission control](https://github.com/fyodoriv/dotfiles/actions/runs/44356622795)
+observed 1.663 seconds in the Linux queue, followed by 1.000 seconds of
+run time before TERM. The next job acquired the same slot after all
+owned workers had stopped. The three jobs exited 0, 137 and 0. This
+qualifies admission timing and successor handoff for the prototype on
+Linux. The run also contains the Mac replay.

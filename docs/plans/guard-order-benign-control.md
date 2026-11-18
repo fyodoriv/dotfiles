@@ -135,3 +135,12 @@ sandbox refused the Bash launch. That run supplied no executor marker.
 - **Pivot**: A sandbox failure, missing or duplicate execution, changed
   hook input, or unknown source leaves this platform unqualified.
 - **Anchor**: Codex 0.167.0 native hook discovery and the Mac launch receipt.
+
+### Bind both markers to the command result
+
+The first hosted run found the expected marker in each tool result.
+Check the structured command receipts separately. Predict one completed
+command per case, with exit code 0 and output equal to the exact
+original or replacement marker. A marker in command metadata or in a
+failed result is insufficient. Keep the before-tool and post-tool
+checks, the exact version and the loopback-only boundary.

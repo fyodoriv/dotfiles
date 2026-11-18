@@ -35,11 +35,16 @@ cannot measure the original twofold gain.
   its existing exclusive reservation. Check exact results for both
   output modes across the historical, current-base and candidate
   selectors. Record six timed samples for each timed selector.
-- **Success**: All 20 files are staged, both output modes match, the
-  planted dependency is selected, and the existing at-most-half and
+- **Success**: Stage the fixed fixture (`vendor_paths: 20`). Both output
+  modes match, the planted dependency is selected, and at-most-half and
   30-second limits pass against the original prefilter parent
   `1a96d12a8bf0b42df0fba340bf933d4c79ecd2d2`.
 - **Pivot**: Missing parity, missing changed dependency or a failed
   original timing limit blocks the work. Do not lower this threshold.
 - **Anchor**: [selector job 134601446885](https://github.com/fyodoriv/dotfiles/actions/runs/44244922576/job/134601446885)
   and [original optimization #674](https://github.com/fyodoriv/dotfiles/pull/674).
+
+The [corrected hosted benchmark](https://github.com/fyodoriv/dotfiles/actions/runs/44246096665/job/134605298771)
+matched both output formats against the PR base. The median changed from
+26.51 s to 1.64 s, a ratio of 0.062 against the original timing baseline.
+The ordinary documentation gate also checks this plan's wording.

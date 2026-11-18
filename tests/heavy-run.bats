@@ -524,6 +524,39 @@ release_all() {
   wait
 }
 
+@test "heavy-run: bare status reads an idle queue without creating state" {
+  run env HEAVY_RUN_NICE=invalid "$SCRIPT" status
+  [ "$status" -eq 0 ]
+  [ "$output" = "free: 0/1 slots busy" ]
+  [ ! -e "$HEAVY_RUN_DIR" ]
+}
+
+@test "heavy-run: bare status reads a busy queue without a ticket" {
+  start_holder
+  if ! wait_held 1; then
+    release_all
+    return 1
+  fi
+  local before after
+  before=$(find "$HEAVY_RUN_DIR/queue" -type f -print | sort)
+  run env HEAVY_RUN_NICE=invalid "$SCRIPT" status
+  after=$(find "$HEAVY_RUN_DIR/queue" -type f -print | sort)
+  release_all
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "busy: 1/1 slots" ]
+  [ "$before" = "$after" ]
+}
+
+@test "heavy-run: bare status alias still allows a status program with an argument" {
+  local mock_bin="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$mock_bin"
+  printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$1"' > "$mock_bin/status"
+  chmod 700 "$mock_bin/status"
+  run env PATH="$mock_bin:$PATH" "$SCRIPT" status fixture-argument
+  [ "$status" -eq 0 ]
+  [ "$output" = fixture-argument ]
+}
+
 @test "heavy-run: slots: three runs share three slots at once, a fourth waits for a free slot" {
   export HEAVY_RUN_SLOTS=3
   start_holder; start_holder; start_holder

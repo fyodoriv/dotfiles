@@ -1004,7 +1004,8 @@ caller_mask_file() {
 
 @test "heavy-run: nested command keeps its immediate caller mask" {
   local file="$BATS_TEST_TMPDIR/nested"
-  run sh -c 'umask 022; exec "$1" sh -c '\''umask 027; exec "$1" sh -c ": > \"\$1\"" sh "$2"'\'' sh "$1" "$2"' sh "$SCRIPT" "$file"
+  local nested='umask 027; exec "$1" sh -c "$2" sh "$3"'
+  run sh -c 'umask 022; exec "$@"' sh "$SCRIPT" sh -c "$nested" sh "$SCRIPT" ': > "$1"' "$file"
   [ "$status" -eq 0 ]
   [ "$(perl -e 'printf "%o\n", (stat $ARGV[0])[2] & 07777' "$file")" = 640 ]
 }

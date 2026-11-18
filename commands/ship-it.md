@@ -28,6 +28,10 @@ Planning adds no stop before requested implementation or delivery.
 
 **review lessons (2a) → verify → commit → push/PR → CI → review (6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?” or “should I push?”, or hand the user delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
 
+Check review recipients before opening or marking a PR ready. Request only
+named people. Follow Step 5 in the reference for automatic review requests
+and when to keep a PR in draft.
+
 ### Push early, let CI verify (IRON LAW)
 
 **While the PR has no review, push every commit as soon as it is committed.**

@@ -986,6 +986,33 @@ make_fake_app() {
   [ "$status" -eq 2 ] && [[ "$output" == *"HEAVY_RUN_MEMORY_GUARD must be 0 or 1"* ]]
 }
 
+caller_mask_file() {
+  local mask="$1" file="$2" mode="$3"
+  shift 3
+  run sh -c 'umask "$1"; shift; exec "$@"' sh "$mask" "$SCRIPT" "$@" sh -c ': > "$1"' sh "$file"
+  [ "$status" -eq 0 ]
+  [ "$(perl -e 'printf "%o\n", (stat $ARGV[0])[2] & 07777' "$file")" = "$mode" ]
+}
+
+@test "heavy-run: normal command keeps the caller mask" {
+  caller_mask_file 022 "$BATS_TEST_TMPDIR/normal" 644
+}
+
+@test "heavy-run: exclusive command keeps the caller mask" {
+  caller_mask_file 027 "$BATS_TEST_TMPDIR/exclusive" 640 --exclusive
+}
+
+@test "heavy-run: nested command keeps its immediate caller mask" {
+  local file="$BATS_TEST_TMPDIR/nested"
+  run sh -c 'umask 022; exec "$1" sh -c '\''umask 027; exec "$1" sh -c ": > \"\$1\"" sh "$2"'\'' sh "$1" "$2"' sh "$SCRIPT" "$file"
+  [ "$status" -eq 0 ]
+  [ "$(perl -e 'printf "%o\n", (stat $ARGV[0])[2] & 07777' "$file")" = 640 ]
+}
+
+@test "heavy-run: a restrictive caller mask stays restrictive" {
+  caller_mask_file 077 "$BATS_TEST_TMPDIR/private" 600
+}
+
 @test "heavy-run: the state folder is private: folder 0700, files 0600" {
   mkdir -p "$HEAVY_RUN_DIR"
   chmod 755 "$HEAVY_RUN_DIR"

@@ -46,3 +46,26 @@ the same across refusal, trust and revoke. Registry ownership and mode
 also stayed the same. A temporary Git index with only the Perl helper
 changed selected both plugin Bats suites through the real affected-test
 script. Keep the Bash 3.2 cache dependency explicit.
+
+## Run both writers inside a real native publication
+
+- **Hypothesis**: The selected native publisher holds the same short
+  signer lock that Dotfiles trust and revoke use. The lock releases after
+  a publication fault even while the private publisher record remains.
+- **Measurement**: On hosted Linux and Mac, use the real selected native
+  publisher with a signed plugin in a scratch home. At its first real
+  payload write, call the current Dotfiles trust and revoke commands.
+  Compare registry bytes and lock identity. After a normal return, retry
+  both commands. In a separate scratch case after a real payload write,
+  interrupt publication, revoke the signer, and verify the retained record
+  and refused publisher retry.
+- **Success**: Both writers return 75 with zero changed registry bytes
+  during publication and return 0 after release. Revocation after the
+  interrupted write returns 0 without changing the private owner record.
+  The next publisher refuses with zero additional writes. Both hosts
+  preserve the signer lock identity and unrelated rows.
+- **Pivot**: A competing write, lost row, replaced signer lock, blocked
+  emergency revocation, or changed output after refused retry rejects a
+  cross-tool claim. Live publisher activation remains a separate check.
+- **Anchor**: The previous cross-tool writer and selected signer tests,
+  plus the native publisher's private owner and signed scratch fixture.

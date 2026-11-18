@@ -32,6 +32,10 @@ setup() {
 }
 
 teardown() {
+  if [ -n "${SIGNER_FENCE_PID:-}" ]; then
+    touch "$TEST_DIR/signer-fence.release"
+    wait "$SIGNER_FENCE_PID" || true
+  fi
   rm -rf "$TEST_DIR"
 }
 
@@ -253,6 +257,80 @@ lookup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"approval needed"* ]]
   [ ! -f "$SIGNERS" ]
+}
+
+hold_shared_signer_fence() {
+  local file="$1" trial
+  perl -MFcntl=:flock -e '
+    umask 0077;
+    open(my $lock, ">>", $ARGV[0]) or die "fixture lock open failed";
+    flock($lock, LOCK_EX | LOCK_NB) or die "fixture lock busy";
+    open(my $ready, ">", $ARGV[1]) or die "fixture readiness failed";
+    close $ready;
+    for (1..200) {
+      exit 0 if -e $ARGV[2];
+      select(undef, undef, undef, 0.025);
+    }
+    exit 2;
+  ' "$file.agentbrew-signer-v1.lock" "$TEST_DIR/signer-fence.ready" "$TEST_DIR/signer-fence.release" 3>&- &
+  SIGNER_FENCE_PID=$!
+  for ((trial = 0; trial < 100; trial++)); do
+    [ ! -f "$TEST_DIR/signer-fence.ready" ] || return 0
+    sleep 0.025
+  done
+  return 1
+}
+
+release_shared_signer_fence() {
+  touch "$TEST_DIR/signer-fence.release"
+  wait "$SIGNER_FENCE_PID"
+  unset SIGNER_FENCE_PID
+}
+
+@test "shared signer fence refuses trust and revoke while another process owns it" {
+  mkdir -p "$(dirname "$SIGNERS")"
+  printf 'acme namespaces="git" %s\nneighbor namespaces="git" %s\n' "${KEY% *}" "${OTHER% *}" > "$SIGNERS"
+  cp "$SIGNERS" "$TEST_DIR/before"
+  hold_shared_signer_fence "$SIGNERS"
+
+  run bash "$CLI" trust acme --signer "$OTHER" --yes
+  [ "$status" -eq 75 ]
+  cmp -s "$SIGNERS" "$TEST_DIR/before"
+  run bash "$CLI" trust acme --signer "$KEY" --revoke
+  [ "$status" -eq 75 ]
+  cmp -s "$SIGNERS" "$TEST_DIR/before"
+  release_shared_signer_fence
+
+  run bash "$CLI" trust acme --signer "$OTHER" --yes
+  [ "$status" -eq 0 ]
+  run bash "$CLI" trust acme --signer "$KEY" --revoke
+  [ "$status" -eq 0 ]
+  printf 'neighbor namespaces="git" %s\nacme namespaces="git" %s\n' "${OTHER% *}" "${OTHER% *}" > "$TEST_DIR/after"
+  cmp -s "$SIGNERS" "$TEST_DIR/after"
+  [ -f "$SIGNERS.agentbrew-signer-v1.lock" ]
+}
+
+@test "shared signer fence follows the configured registry path" {
+  export AGENT_PLUGINS_ALLOWED_SIGNERS="$TEST_DIR/custom_signers"
+  hold_shared_signer_fence "$AGENT_PLUGINS_ALLOWED_SIGNERS"
+  run bash "$CLI" trust acme --signer "$KEY" --yes
+  [ "$status" -eq 75 ]
+  [ ! -e "$AGENT_PLUGINS_ALLOWED_SIGNERS" ]
+  release_shared_signer_fence
+  run bash "$CLI" trust acme --signer "$KEY" --yes
+  [ "$status" -eq 0 ]
+  [ -f "$AGENT_PLUGINS_ALLOWED_SIGNERS" ]
+  [ ! -e "$SIGNERS" ]
+}
+
+@test "shared signer fence refuses an unknown lock file type" {
+  mkdir -p "$SIGNERS.agentbrew-signer-v1.lock"
+  printf 'neighbor namespaces="git" %s\n' "${OTHER% *}" > "$SIGNERS"
+  cp "$SIGNERS" "$TEST_DIR/before"
+  run bash "$CLI" trust acme --signer "$KEY" --yes
+  [ "$status" -ne 0 ]
+  cmp -s "$SIGNERS" "$TEST_DIR/before"
+  [ -d "$SIGNERS.agentbrew-signer-v1.lock" ]
 }
 
 @test "10: plugin new scaffolds a plugin whose own tests pass against this core" {

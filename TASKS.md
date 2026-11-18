@@ -29,21 +29,6 @@ them. -->
 
 ## P1
 
-- [ ] Coordinate shared plugin signer changes with native publication
-  - **ID**: shared-plugin-signer-commit-fence
-  - **Tags**: plugins, security, reliability
-  - **Details**: Dotfiles and Agentbrew write the same signer registry. Follow the [shared signer fence plan](docs/plans/shared-plugin-signer-fence.md) so a selected native publisher cannot certify output after a cooperating revocation.
-  - **Files**: `lib/plugin-signers.sh`, signer writer, `tests/plugin-v2.bats`, and the plugin guide.
-  - **Output**: code
-  - **Acceptance**: Both tools serialize signer mutations with native publication. An interrupted publisher record does not disable revocation.
-  - **Hypothesis**: Two tested conflicting shell writes cause zero unauthorized registry changes.
-  - **Measurement**: Run the registered scratch signer tests and the matching Agentbrew publication and revocation controls.
-  - **Success**: Both conflicts refuse before writes, both free retries succeed, and the integrated publication order passes on its supported hosts.
-  - **Pivot**: Any lost signer row, unsafe takeover, or blocked emergency revocation rejects integration.
-  - **Anchor**: Dotfiles signer library and the Agentbrew coordination plan.
-  - **Competitive-goal**: none — plugin trust and safe publication.
-
-
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability

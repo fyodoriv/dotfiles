@@ -70,3 +70,24 @@ active after the controls. The fixture starts its signal check once
 the workers are ready. It qualifies teardown in the fixture on both hosts. The real
 scheduler must still prove the timer starts after admission, behaves
 correctly while paused, and retains ownership through a launcher failure.
+
+## Observe the deadline through the real queue
+
+- **Hypothesis**: With one slot, a command can wait longer than its
+  configured run limit, then get its full run time. A later ticket
+  starts only after the deadline controller has verified group teardown.
+- **Measurement**: Run the real heavy-run entry point in a private
+  hosted fixture with one slot. Start an owned short holder, then a
+  prototype deadline controller, then a successor. Record monotonic
+  times at queue submission, job start, deadline, teardown, and
+  successor start. Keep the same resistant descendant as the
+  primary-exit control.
+- **Success**: Time queued exceeds one second. The one-second deadline
+  is measured after the controller starts. All owned workers are gone
+  before the successor starts. The successor uses the same slot and
+  exits zero. Each process belongs to the fixture.
+- **Pivot**: A deadline spent in queue, an early successor, a surviving
+  worker, an unowned process, or unavailable timing evidence rejects
+  the control. This fixture does not change the production scheduler.
+- **Anchor**: The Linux and Mac group supervisor controls and the
+  slot lifetime in `bin/heavy-run`.

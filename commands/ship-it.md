@@ -28,16 +28,16 @@ Planning adds no stop before requested implementation or delivery.
 
 **review lessons (2a) → verify → commit → push/PR → CI → review (6a) → merge when allowed → Steps 12–13.** Do not ask “ready to commit?” or “should I push?”, or hand the user delivery commands. Scoped `/ship-it fix …` still ships that scope end-to-end.
 
+Check review recipients before opening or marking a PR ready. See Step 5.
+
 ### Push early, let CI verify (IRON LAW)
 
 **While the PR has no review, push every commit as soon as it is committed.**
 CI is the verification loop; local builds, tests and browser runs need not
 pass first.
 
-- Never hold a commit for a local check. Commit, push, then fix; red CI on an
-  unreviewed PR costs nothing. "Half finished" commits still get pushed.
-- Push every commit, not one batch; avoid long unpushed local iteration.
-- Never go quiet: before the user asks, say whether a push happened and why.
+- Commit, push, then fix. Push half-finished commits too, one at a time.
+- Tell the user whether you pushed and why before they ask.
 
 **Once the PR has a review or review comment**, stop pushing silently: a
 reviewer is reading a moving target. Batch changes and say what is coming.

@@ -281,7 +281,10 @@ The selected deployment still needs proof of consumer ownership and invocation. 
 transport depends on the shared bounded Darwin worker. The installed
 `launchctl(1)` contract takes the value in `setenv key value`. A native refresh
 requires a secret-safe writer. Selected removal requires exact callback
-coverage and verified readback. Production issue #693 stays open.
+coverage and verified readback. The
+[Agentbrew source issue #693](https://github.com/fyodoriv/agentbrew/issues/693)
+closed on Fri Nov 6. The [Dotfiles task](../../TASKS.md#p1) stays open for
+the selected machine credential work above.
 
 Observed after transfer prediction `05cc929` on 2026-11-04. All three
 input hashes matched the original sealed bytes. The generated standalone

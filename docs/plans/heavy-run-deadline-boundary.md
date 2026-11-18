@@ -125,3 +125,25 @@ stopped the controller at 1.631 seconds. It sent its first TERM at
 the group. All owned workers stopped. A controller inside the stopped
 tree cannot enforce a wall clock deadline. The scheduler or another
 process outside that tree must own the timer.
+
+## Check whether the slot survives launcher loss
+
+The [baseline control](https://github.com/fyodoriv/dotfiles/actions/runs/44372914392)
+started two jobs in a private one-slot queue on Linux and Mac. In the
+ordinary case, the second job saw that the first worker had finished.
+When the fixture killed its own verified launcher, the second job took
+the same slot while the first worker was still active. The first worker
+confirmed activity after the admission and exited on fixture release.
+
+The [separate-owner prototype](https://github.com/fyodoriv/dotfiles/actions/runs/44375573656)
+kept both inherited slot locks in a waiting process. That process closed
+its copies of the scheduler leadership and gate handles and waited on its
+direct worker. On both hosts, the first worker confirmed activity after
+the launcher died. The second job waited and took the same slot only
+after the first worker exited. The ordinary control also passed.
+
+A deadline needs a surviving owner that holds the slot until its whole
+process group is drained. The prototype qualifies ownership through the
+direct worker's exit. It leaves descendant teardown, deadline delivery,
+loss of the waiting owner, and pause control after launcher loss open.
+Keep the prototype on its scratch branch until those checks pass.

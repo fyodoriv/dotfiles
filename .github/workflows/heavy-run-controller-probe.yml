@@ -1,0 +1,20 @@
+name: Scratch heavy-run launcher loss
+on:
+  push:
+    branches: [probe/heavy-run-controller-loss]
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Observe exact fixture controller loss
+        run: python3 scripts/probe-heavy-run-controller-loss.py

@@ -497,6 +497,32 @@ literal_search_only() {
 }
 literal_search_only && exit 0
 
+# Read the first condition of one foreground && chain. Check both the parser
+# boundary and its exact literal text before the branch scanner can omit it.
+read_only_branch_prefix_end() {
+  local shfmt_bin="$1" jq_bin="$2" end prefix
+  local comparison='^test "\$\(git branch --show-current\)" = "\$\(gh pr view [1-9][0-9]* --json headRefName --jq \.headRefName\)"$'
+  # shellcheck disable=SC2016
+  case "$command" in 'test "$(git branch --show-current)" = "$(gh pr view '*) ;; *) return 1 ;; esac
+  end=$(printf '%s' "$command" | "$shfmt_bin" --to-json 2>/dev/null | "$jq_bin" -er '
+    def first_condition:
+      select(.Background != true and .Coprocess != true and .Negated != true and
+        ((.Redirs // []) | length) == 0)
+      | if .Cmd.Type == "BinaryCmd" and .Cmd.Op == "&&"
+        then .Cmd.X | first_condition
+        else .
+        end;
+    select(.Type == "File" and (.Stmts | length) == 1)
+    | .Stmts[0] | first_condition
+    | select(.Cmd.Type == "CallExpr" and .Pos.Offset == 0)
+    | .End.Offset
+  ' 2>/dev/null) || return 1
+  [[ "$end" =~ ^[0-9]+$ ]] || return 1
+  prefix=${command:0:end}
+  [[ "$prefix" =~ $comparison ]] || return 1
+  printf '%s' "$end"
+}
+
 case "$command" in
   *"git reset --hard"*)   block "git reset --hard" ;;
   *"git clean -f"*)       block "git clean -f" ;;
@@ -517,6 +543,13 @@ if looks_like_branch_delete; then
   for _tool in /opt/homebrew/bin/jq /usr/local/bin/jq; do
     if [ -x "$_tool" ]; then _boundary_jq="$_tool"; break; fi
   done
+  if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
+    _prefix_end=$(read_only_branch_prefix_end "$_boundary_shfmt" "$_boundary_jq"); then
+    _original_command="$command"
+    command="test 1 = 1${command:_prefix_end}"
+    if ! looks_like_branch_delete; then exit 0; fi
+    command="$_original_command"
+  fi
   case "$command" in
     *'<<'*)
       if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&

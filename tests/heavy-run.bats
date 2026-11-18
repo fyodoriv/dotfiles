@@ -20,7 +20,7 @@ setup() {
   export HOME="$BATS_TEST_TMPDIR/home" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
   # No real-time app holds the tests, even while one runs on this Mac.
   export HEAVY_RUN_PAUSE_APPS=""
-  unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD
+  unset XDG_CONFIG_HOME HEAVY_RUN_MAX_LOAD HEAVY_RUN_EXCLUSIVE_WAIT
   unset HEAVY_RUN_HELD FIFO_RELEASE
   unset BATS_RT_PROBE_ROOT BATS_RT_PROBE_CHILDREN
 }
@@ -583,6 +583,59 @@ release_all() {
   release_all
   run "$SCRIPT" --status
   [ "$output" = "free: 0/4 slots busy" ]
+}
+
+@test "heavy-run: exclusive deadline retires only the waiting run" {
+  export HEAVY_RUN_SLOTS=2 HEAVY_RUN_FREE_PROBE='echo 99'
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_exclusive_wait_seconds: 12\n' > "$HOME/.config/chezmoi/chezmoi.yaml"
+  start_holder
+  wait_held 1
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" =~ ^slot.*\(running:\ [0-9]+s\)$ ]]
+
+  local waiter next retry=0 next_status=0
+  marker="$BATS_TEST_TMPDIR/exclusive-started"
+  timeout 15 env HEAVY_RUN_EXCLUSIVE_WAIT=5 "$SCRIPT" --exclusive touch "$marker" > "$BATS_TEST_TMPDIR/expired" 2>&1 &
+  waiter=$!
+  wait_queued 1
+  timeout 15 "$SCRIPT" touch "$BATS_TEST_TMPDIR/next-started" &
+  next=$!
+  wait "$waiter" || retry=$?
+  wait "$next" || next_status=$?
+  run "$SCRIPT" --status
+  release_all
+
+  [ "$retry" -eq 75 ]
+  [ "$next_status" -eq 0 ]
+  grep -q 'exclusive wait reached 5s' "$BATS_TEST_TMPDIR/expired"
+  [ ! -e "$marker" ]
+  [ -e "$BATS_TEST_TMPDIR/next-started" ]
+  [ "${lines[0]}" = "busy: 1/2 slots" ]
+  [[ "$output" != *'queue '* ]]
+}
+
+@test "heavy-run: exclusive deadline applies while the ticket sequence is locked" {
+  mkdir -p "$HEAVY_RUN_DIR"
+  local holder
+  perl -MFcntl=:flock -e '
+    alarm 15;
+    open(my $seq, ">", $ARGV[0]) or die $!;
+    flock($seq, LOCK_EX) or die $!;
+    open(my $ready, ">", $ARGV[1]) or die $!;
+    close $ready;
+    until (-e $ARGV[2]) { select undef, undef, undef, 0.05 }
+  ' "$HEAVY_RUN_DIR/seq" "$BATS_TEST_TMPDIR/ready" "$BATS_TEST_TMPDIR/release-seq" &
+  holder=$!
+  for i in $(seq 50); do [ -e "$BATS_TEST_TMPDIR/ready" ] && break; sleep 0.1; done
+  [ -e "$BATS_TEST_TMPDIR/ready" ]
+
+  run timeout 8 env HEAVY_RUN_EXCLUSIVE_WAIT=2 "$SCRIPT" --exclusive touch "$BATS_TEST_TMPDIR/exclusive-started"
+  : > "$BATS_TEST_TMPDIR/release-seq"
+  wait "$holder"
+  [ "$status" -eq 75 ]
+  [[ "$output" == *'exclusive wait reached 2s'* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/exclusive-started" ]
 }
 
 @test "heavy-run: slots: a SIGKILLed run frees its slot at once" {

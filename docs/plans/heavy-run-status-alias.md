@@ -19,3 +19,8 @@ The existing `--status` reads the queue without requesting admission.
   this change.
 - **Anchor**: Issue #741, current `--status` path, and the existing
   Dotfiles queue fixture.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44328598305)
+returned nonzero for both read cases. A command called status with an
+argument ran and received it. The fix sends only the exact one-word
+status alias to the existing read-only path.

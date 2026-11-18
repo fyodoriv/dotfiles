@@ -185,7 +185,7 @@ test-force: ## Run full test suite (no cache)
 PLUGIN_BASH32_TESTS = tests/plugin-update.bats tests/plugin-v2.bats
 # Every file these suites run or read: cached-run's own scan misses `source`
 # paths with a variable in them and bats `load`, so list them here.
-PLUGIN_BASH32_DEPS = bin/dotfiles-plugin $(wildcard lib/plugin*.sh) lib/confirm.sh lib/blocked-software.sh \
+PLUGIN_BASH32_DEPS = bin/dotfiles-plugin $(wildcard lib/plugin*.sh) lib/plugin-signer-write.pl lib/confirm.sh lib/blocked-software.sh \
   modules/plugins/doctor.sh tests/test_helper.bash tests/host-load.bash tests/bash32/bash \
   $(shell find data/plugin-template -type f 2>/dev/null | LC_ALL=C sort)
 test-plugins-bash32: ## Run the plugin bats suites with /bin/bash 3.2 (only when a plugin file changed)

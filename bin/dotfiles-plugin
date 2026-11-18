@@ -605,7 +605,7 @@ cmd_trust() {
   [ -n "$name" ] && [ -n "$key" ] || die "usage: dotfiles plugin trust <name> --signer <key> [--revoke]"
   key="$(plugin_normalize_key "$key")" || die "--signer is not an SSH public key"
   if [ "$revoke" = 1 ]; then
-    plugin_revoke_signer "$name" "$key" || exit 1
+    plugin_revoke_signer "$name" "$key" || return $?
     echo "✓ Revoked signer for $name. A plugin signed by it is now disabled."
     return 0
   fi

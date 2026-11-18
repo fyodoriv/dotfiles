@@ -34,6 +34,8 @@ def worker(folder):
         if (folder / "release").exists():
             (folder / "done").touch()
             return
+        if (folder / "activity-request").exists():
+            (folder / "activity-after-loss").touch()
         if (folder / "successor").exists():
             (folder / "activity-after-successor").touch()
         time.sleep(0.03)
@@ -75,7 +77,10 @@ def run_case(folder, controller_lost):
         controller = start("worker")
         wait_for((folder / "ready").exists, 4)
         ready = json.loads((folder / "ready").read_text())
-        if ready["parent"] != controller.pid or controller.poll() is not None:
+        retained_parent = subprocess.check_output(
+            ["ps", "-o", "ppid=", "-p", str(ready["parent"])], text=True,
+        ).strip()
+        if retained_parent != str(controller.pid) or controller.poll() is not None:
             raise RuntimeError("cannot verify the fixture worker's exact controller")
         next_run = start("successor")
         wait_for(has_waiter, 4)
@@ -85,11 +90,11 @@ def run_case(folder, controller_lost):
         if controller_lost:
             controller.kill()
             assert controller.wait(timeout=4) == -signal.SIGKILL
-            wait_for((folder / "activity-after-successor").exists, 4)
+            (folder / "activity-request").touch()
+            wait_for((folder / "activity-after-loss").exists, 4)
             assert not (folder / "done").exists()
-        else:
-            time.sleep(0.6)
-            assert not (folder / "successor").exists()
+        time.sleep(0.6)
+        assert not (folder / "successor").exists()
 
         (folder / "release").touch()
         wait_for((folder / "done").exists, 4)
@@ -98,8 +103,9 @@ def run_case(folder, controller_lost):
             assert controller.wait(timeout=4) == 0
         record = json.loads((folder / "successor").read_text())
         assert record["slot"] == ready["slot"]
-        assert record["worker_done"] is (not controller_lost)
+        assert record["worker_done"] is True
         return {"controller_lost": controller_lost,
+                "worker_active_after_loss": (folder / "activity-after-loss").exists(),
                 "successor_saw_worker_done": record["worker_done"],
                 "worker_active_after_successor": (folder / "activity-after-successor").exists(),
                 "fixture_worker_finished": (folder / "done").exists(),

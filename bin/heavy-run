@@ -726,11 +726,32 @@ exec perl -e "$common_code"'
   # Block signals across fork so none can kill the parent before it forwards.
   my $set_sig = POSIX::SigSet->new(POSIX::SIGTERM(), POSIX::SIGINT(), POSIX::SIGHUP());
   POSIX::sigprocmask(POSIX::SIG_BLOCK(), $set_sig);
-  my $pid = fork() // die "heavy-run: cannot fork: $!\n";
-  if ($pid == 0) {
-    POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
-    exec("perl", "-e", $priority_code, $level, $command_umask, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
+  # Scratch only. Retain the slot locks while the worker is active.
+  pipe(my $child_read, my $child_write) or die "scratch lease pipe: $!\n";
+  my $retainer = fork() // die "scratch lease fork: $!\n";
+  if ($retainer == 0) {
+    close $child_read;
+    close $lead if $lead;
+    close $gfh if $gfh;
+    my $child = fork() // POSIX::_exit(125);
+    if ($child == 0) {
+      close $child_write;
+      POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
+      exec("perl", "-e", $priority_code, $level, $command_umask, @cmd) or POSIX::_exit(125);
+    }
+    print $child_write "$child\n";
+    close $child_write;
+    my $result;
+    do { $result = waitpid($child, 0); } while ($result == -1 && $!{EINTR});
+    POSIX::_exit(125) if $result != $child;
+    my $status = $?;
+    POSIX::_exit(POSIX::WIFSIGNALED($status) ? 128 + POSIX::WTERMSIG($status) : POSIX::WEXITSTATUS($status));
   }
+  close $child_write;
+  my $pid = <$child_read>;
+  close $child_read;
+  die "scratch lease did not report a process\n" unless defined $pid && $pid =~ /^([1-9]\d*)\n$/;
+  $pid = $1;
   my $stopped = 0;
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid; kill "CONT", tree($pid) if $stopped; }; }
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
@@ -742,8 +763,8 @@ exec perl -e "$common_code"'
   # The run keeps the scheduler going while it leads, and stops (SIGSTOP) its
   # process tree while the scheduler marks it paused; it goes on (SIGCONT) after.
   while (1) {
-    my $r = waitpid($pid, POSIX::WNOHANG());
-    last if $r == $pid;
+    my $r = waitpid($retainer, POSIX::WNOHANG());
+    last if $r == $retainer;
     if ($r == -1) { next if $!{EINTR}; last; }
     step() if $ticket;
     my $why = $ticket ? read1($mark) : "";

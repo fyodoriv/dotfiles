@@ -22,3 +22,9 @@ doctor check reports a difference.
   directory or job change, or failed required check rejects the patch.
 - **Anchor**: Issue #731, the existing queue privacy test, and the
   `umask` before the current Perl controller.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44327322421)
+failed the normal, exclusive and nested caller-mode controls. The
+restrictive case and queue privacy control passed. The fix changes only
+the mask immediately before starting the command. Scheduler state keeps
+its private mask.

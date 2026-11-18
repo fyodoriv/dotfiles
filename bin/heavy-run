@@ -95,6 +95,7 @@
 #                       or $HEAVY_RUN_DIR/waits.log when HEAVY_RUN_DIR is set)
 
 set -euo pipefail
+command_umask=$(umask)
 umask 077
 
 dir="${HEAVY_RUN_DIR:-$HOME/.local/state/heavy-run}"
@@ -339,7 +340,7 @@ case "$level" in
 esac
 
 priority_code='
-  my ($level, @cmd) = @ARGV;
+  my ($level, $command_umask, @cmd) = @ARGV;
   my $current = getpriority(0, 0);
   if (!defined $current || $current > $level) {
     print STDERR "heavy-run: cannot raise priority to nice $level\n";
@@ -349,6 +350,7 @@ priority_code='
     print STDERR "heavy-run: cannot set absolute nice level $level\n";
     exit 2;
   }
+  umask(oct($command_umask));
   exec {$cmd[0]} @cmd;
   print STDERR "heavy-run: cannot run $cmd[0]: $!\n";
   exit 127;
@@ -358,7 +360,7 @@ priority_code='
 # A leftover daemon keeps HEAVY_RUN_HELD after the run ends, so check the flock.
 if [ -n "${HEAVY_RUN_HELD:-}" ] && [ -e "$HEAVY_RUN_HELD" ] &&
   ! perl -e 'use Fcntl qw(:flock); open(my $f, "<", $ARGV[0]) or exit 0; exit(flock($f, LOCK_SH | LOCK_NB) ? 0 : 1)' "$HEAVY_RUN_HELD"; then
-  exec perl -e "$priority_code" "$level" "$@"
+  exec perl -e "$priority_code" "$level" "$command_umask" "$@"
 fi
 
 # The project is the repo (all its worktrees share one git common dir), else the folder.
@@ -379,7 +381,7 @@ mkdir -p "$(dirname "$waitlog")" 2>/dev/null || true
 exec perl -e "$common_code"'
   use POSIX ();
   use Time::HiRes ();
-  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $exclusive, @cmd) = @ARGV;
+  my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $exclusive, $command_umask, @cmd) = @ARGV;
   my $t0 = time;
   my $wait_started = $exclusive ? Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) : 0;
   my $slotdir = "$dir/slots";
@@ -723,7 +725,7 @@ exec perl -e "$common_code"'
   my $pid = fork() // die "heavy-run: cannot fork: $!\n";
   if ($pid == 0) {
     POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
-    exec("perl", "-e", $priority_code, $level, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
+    exec("perl", "-e", $priority_code, $level, $command_umask, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
   }
   my $stopped = 0;
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid; kill "CONT", tree($pid) if $stopped; }; }
@@ -750,4 +752,4 @@ exec perl -e "$common_code"'
   unlink $mark;
   ungate() if $ticket;
   exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));
-' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$dir" "$exclusive" "$@"
+' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$dir" "$exclusive" "$command_umask" "$@"

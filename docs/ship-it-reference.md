@@ -647,7 +647,25 @@ Open or update a PR with:
 - vision/user-story/competitor trace when the repo requires it
 - required agent attribution/footer from repo rules
 
-Do not create a draft PR if the goal is immediate merge, unless repo rules require draft-first.
+### Review recipients before opening or marking ready
+
+Request reviews only from named GitHub users. Do not request a team review
+or add a review request when the user has not authorized it.
+
+Before opening a non-draft PR or running `gh pr ready`, check the affected
+paths against the effective base branch `CODEOWNERS`. Check any repository
+or team review assignment rules that apply to those matches. A team match
+can trigger a notification when the PR opens or leaves draft. Verify whether
+GitHub will request review from named people only before publishing as ready.
+
+Keep the PR in draft when an automatic team request could be sent or the
+applicable rules are unknown. Say which match or rule prevents marking it
+ready. Otherwise, follow the normal ready workflow, including immediate
+merge when approved and verified.
+
+Leave GitHub-assigned reviewers and review requirements in place. Removing
+an existing request cannot undo a notification. Report an existing team
+request and leave review settings unchanged.
 
 ### Jira delivery lifecycle
 

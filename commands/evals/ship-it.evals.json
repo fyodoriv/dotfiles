@@ -255,6 +255,18 @@
         "Uses fully qualified review/base source refs with git fetch --no-prune and verifies the default tracking ref remains present after the fetch",
         "Does not change the user global fetch.prune setting; treats tracking refs as repository-scoped state shared across worktrees"
       ]
+    },
+    {
+      "id": 23,
+      "prompt": "/ship-it for four PRs. A has an approved named reviewer and no automatic team. B changes a path matched by a CODEOWNERS team and GitHub may request that team when the draft is marked ready. C has unknown effective review rules. D already has a GitHub-assigned team review request. Handle review recipients and PR readiness.",
+      "expected_output": "Continue the normal ready workflow for A and request the authorized individual. Leave B and C in draft and name the reason. Leave D's existing automatic reviews and branch requirements in place and report the team request.",
+      "expectations": [
+        "A proceeds using an authorized named GitHub user after verifying the base-branch rules and changed paths",
+        "B stays in draft until the effective rules establish that no automatic team request will be sent",
+        "Unknown rules keep C in draft with the missing evidence stated",
+        "Reports D's existing team request and leaves it and any required review in place",
+        "Sends no manual team review request and edits no repository or team settings"
+      ]
     }
   ]
 }

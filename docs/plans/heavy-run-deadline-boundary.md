@@ -93,11 +93,11 @@ correctly while paused, and retains ownership through a launcher failure.
   slot lifetime in `bin/heavy-run`.
 
 The [hosted admission control](https://github.com/fyodoriv/dotfiles/actions/runs/44356622795)
-observed 1.663 seconds in the Linux queue, followed by 1.000 seconds of
-run time before TERM. The next job acquired the same slot after all
-owned workers had stopped. The three jobs exited 0, 137 and 0. This
-qualifies admission timing and successor handoff for the prototype on
-Linux. The run also contains the Mac replay.
+observed 1.663 seconds in the Linux queue and 1.803 seconds in the Mac
+queue. TERM followed 1.000 and 1.062 seconds after the command started,
+respectively. On both hosts, the next job acquired the same slot after
+all owned workers had stopped. The three jobs exited 0, 137 and 0.
+
 
 ## Check the prototype while the scheduler pauses its group
 
@@ -118,3 +118,10 @@ Linux. The run also contains the Mac replay.
   clock deadline.
 - **Anchor**: Temporal admission control above and the process-tree
   pause logic in `bin/heavy-run`.
+
+The [hosted Linux pause control](https://github.com/fyodoriv/dotfiles/actions/runs/44358081478)
+stopped the controller at 1.631 seconds. It sent its first TERM at
+3.619 seconds, after the probe process exited and the scheduler resumed
+the group. All owned workers stopped. A controller inside the stopped
+tree cannot enforce a wall clock deadline. The scheduler or another
+process outside that tree must own the timer.

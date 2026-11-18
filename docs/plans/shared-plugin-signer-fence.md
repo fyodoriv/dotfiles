@@ -32,3 +32,10 @@ revocation. Keep trust reads outside this change.
   installed writer versions cannot establish one commit boundary.
 - **Anchor**: `lib/plugin-signers.sh`, the existing Bats signer fixtures,
   and the [Agentbrew descriptor experiment](https://github.com/fyodoriv/agentbrew/actions/runs/44243184248).
+
+The [baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44243713834)
+failed all three scratch cases. The first
+[candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44243959123)
+passed them. Independent review added explicit cache inputs, ordinary
+exit status preservation, and direct inode and permission assertions.
+The cross-tool publication and revocation decision is still open.

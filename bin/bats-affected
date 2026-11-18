@@ -287,6 +287,12 @@ for file in "${changed_files[@]}"; do
     continue
   fi
 
+  # The signer worker is reached through two source levels.
+  if [[ "$file" == lib/plugin-signer-write.pl || "$file" == lib/plugin-signers.sh ]]; then
+    affected+=("$TESTS_DIR/plugin-v2.bats" "$TESTS_DIR/plugin-update.bats")
+    continue
+  fi
+
   # ── lib/ files ───────────────────────────────────────────────────
   if [[ "$file" == lib/* ]]; then
     local_name="$(basename "$file" .sh)"

@@ -189,6 +189,12 @@ each plugin's full output, without any `user:token@` part of a URL.
   under a new name) is refused too.
 - Key rotation: `plugin trust <name> --signer <new key>`, release a new tag,
   then `--revoke` the old key. A revoked signer disables the plugin.
+- Trust and revoke hold an adjacent commit lock during the registry update.
+  The mode-0600 lock file stays in place between runs. Exit 75 means a
+  cooperating process is finishing a write. Retry the same command when
+  that process finishes. Registry and lock files must be owned regular
+  files. Agentbrew's native publication must use the same protocol before
+  it can coordinate with these writes.
 
 ## Capabilities
 

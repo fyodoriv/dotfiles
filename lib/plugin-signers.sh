@@ -36,10 +36,14 @@ plugin_signers_for() {
 }
 
 _plugin_write_signer() {
-  local action="$1" name="$2" key helper
+  local action="$1" name="$2" key helper rc=0
   key="$(plugin_normalize_key "$3")" || { echo "not an SSH public key" >&2; return 1; }
   helper="$(dirname "${BASH_SOURCE[0]}")/plugin-signer-write.pl"
-  perl "$helper" "$action" "$(plugin_signers_file)" "$name" "$key"
+  perl "$helper" "$action" "$(plugin_signers_file)" "$name" "$key" || rc=$?
+  case "$rc" in
+    0 | 75) return "$rc" ;;
+    *) return 1 ;;
+  esac
 }
 
 # Trust this key for the plugin. Repeated trust keeps the existing entry.

@@ -292,6 +292,9 @@ release_shared_signer_fence() {
   printf 'acme namespaces="git" %s\nneighbor namespaces="git" %s\n' "${KEY% *}" "${OTHER% *}" > "$SIGNERS"
   cp "$SIGNERS" "$TEST_DIR/before"
   hold_shared_signer_fence "$SIGNERS"
+  local lock_identity registry_policy
+  lock_identity="$(perl -e '@s = stat $ARGV[0]; print join(":", @s[0, 1, 2, 4])' "$SIGNERS.agentbrew-signer-v1.lock")"
+  registry_policy="$(perl -e '@s = stat $ARGV[0]; print join(":", @s[2, 4])' "$SIGNERS")"
 
   run bash "$CLI" trust acme --signer "$OTHER" --yes
   [ "$status" -eq 75 ]
@@ -307,7 +310,8 @@ release_shared_signer_fence() {
   [ "$status" -eq 0 ]
   printf 'neighbor namespaces="git" %s\nacme namespaces="git" %s\n' "${OTHER% *}" "${OTHER% *}" > "$TEST_DIR/after"
   cmp -s "$SIGNERS" "$TEST_DIR/after"
-  [ -f "$SIGNERS.agentbrew-signer-v1.lock" ]
+  [ "$registry_policy" = "$(perl -e '@s = stat $ARGV[0]; print join(":", @s[2, 4])' "$SIGNERS")" ]
+  [ "$lock_identity" = "$(perl -e '@s = stat $ARGV[0]; print join(":", @s[0, 1, 2, 4])' "$SIGNERS.agentbrew-signer-v1.lock")" ]
 }
 
 @test "shared signer fence follows the configured registry path" {
@@ -328,7 +332,7 @@ release_shared_signer_fence() {
   printf 'neighbor namespaces="git" %s\n' "${OTHER% *}" > "$SIGNERS"
   cp "$SIGNERS" "$TEST_DIR/before"
   run bash "$CLI" trust acme --signer "$KEY" --yes
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
   cmp -s "$SIGNERS" "$TEST_DIR/before"
   [ -d "$SIGNERS.agentbrew-signer-v1.lock" ]
 }

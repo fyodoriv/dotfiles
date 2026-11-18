@@ -125,3 +125,26 @@ stopped the controller at 1.631 seconds. It sent its first TERM at
 the group. All owned workers stopped. A controller inside the stopped
 tree cannot enforce a wall clock deadline. The scheduler or another
 process outside that tree must own the timer.
+
+## Test loss of the slot launcher
+
+- **Hypothesis**: Killing the exact foreground heavy-run controller releases
+  its slot even when the process it started is still active. An ordinary
+  control retains the slot until its worker exits.
+- **Measurement**: Use the real script in a hosted private temporary queue
+  with one slot. A Python worker records its parent identity and stays
+  active until a separate fixture release. A queued successor reports
+  admission and the worker confirms activity after that report.
+  Kill only the fixture controller after checking its identity.
+- **Success**: Both hosts admit a successor into the same slot before
+  the worker exits after controller loss, and neither host admits it
+  early in the ordinary control. All fixture workers stop after release.
+- **Pivot**: Refuse any result with uncertain identity, a worker that
+  did not acknowledge admission while alive, a missing ordinary control,
+  or an unknown cleanup outcome. If the slot remains held in both
+  cases, investigate the existing retained lease before changing it.
+- **Anchor**: The current heavy-run parent and child fork and wait, and
+  the hosted admission and pause results above.
+
+This measures an existing limitation. It installs no watchdog and sends
+no signal to a process outside the scratch queue.

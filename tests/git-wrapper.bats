@@ -46,6 +46,72 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
+@test "agent commit refuses the long hook-skipping flag before Git runs" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" commit --no-verify -m 'fixture'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Rule 9"* ]]
+  [ ! -e "$GIT_ARGS" ]
+}
+
+@test "agent commit refuses the short hook-skipping flag before Git runs" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" -C /tmp commit -m 'fixture' -n
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Rule 9"* ]]
+  [ ! -e "$GIT_ARGS" ]
+}
+
+@test "agent commit refuses the command-local disabled hooks path" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" -c core.hooksPath=/dev/null commit
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Rule 9"* ]]
+  [ ! -e "$GIT_ARGS" ]
+}
+
+@test "agent commit refuses the short flag in a group of commit options" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" commit -an
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Rule 9"* ]]
+  [ ! -e "$GIT_ARGS" ]
+}
+
+@test "managed git-safe routes commit through the same rule" {
+  local bin
+  bin="$(dirname "$GIT_WRAPPER")"
+  run env PATH="$bin:$PATH" AGENT_PUBLIC_WRITE_GUARD=1 GIT_SAFE_BYPASS=0 \
+    "$bin/git-safe" commit -n
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Rule 9"* ]]
+  [ ! -e "$GIT_ARGS" ]
+}
+
+@test "agent commits retain normal flags, message text, and explicit paths" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" commit --allow-empty -m fixture
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = 'commit --allow-empty -m fixture' ]
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" commit -m --no-verify
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = 'commit -m --no-verify' ]
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" commit -- --no-verify
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = 'commit -- --no-verify' ]
+}
+
+@test "human commit remains a pass-through" {
+  run env AGENT_PUBLIC_WRITE_GUARD= CODEX_AGENT= CLAUDE_CODE_SSE_PORT= \
+    DEVIN_SESSION_ID= CURSOR_AGENT= WINDSURF_AGENT= "$GIT_WRAPPER" commit -n
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = 'commit -n' ]
+}
+
+@test "the last option wins when an agent restores commit hooks" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" \
+    -c core.hooksPath=/dev/null -c CORE.HOOKSPATH=.git/hooks commit --no-verify --verify
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = '-c core.hooksPath=/dev/null -c CORE.HOOKSPATH=.git/hooks commit --no-verify --verify' ]
+}
+
 @test "agent git push --no-verify is blocked without current-session approval" {
   run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" push --no-verify origin feature
 

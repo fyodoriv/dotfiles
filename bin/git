@@ -4,6 +4,7 @@
 # Public GitHub pushes are limited to exact user-owned tooling repos from
 # config/public-push-remotes.txt. Enterprise GitHub pushes pass through.
 # `git push --no-verify` still requires a separate current-session approval.
+# Agent commits must run their hooks.
 # Human and read-only invocations pass through unchanged.
 
 set -euo pipefail
@@ -107,6 +108,37 @@ _git_wrapper_is_agent_context() {
     [ -n "${CURSOR_AGENT:-}" ] ||
     [ -n "${WINDSURF_AGENT:-}" ] ||
     [ -n "${CODEX_AGENT:-}" ]
+}
+
+_git_commit_skips_hooks() {
+  local options skips=false
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --) break ;;
+      --no-verify) skips=true ;;
+      --verify) skips=false ;;
+      --author|--cleanup|--date|--file|--fixup|--message|--pathspec-from-file|--reedit-message|--reuse-message|--squash|--template|--trailer)
+        [ "$#" -gt 1 ] && shift
+        ;;
+      --*) ;;
+      -?*)
+        options="${1#-}"
+        while [ -n "$options" ]; do
+          case "$options" in
+            n*) skips=true; options="${options#?}" ;;
+            [cCFmt]*)
+              if [ "${#options}" -eq 1 ] && [ "$#" -gt 1 ]; then shift; fi
+              break
+              ;;
+            [aeiopqsv]*) options="${options#?}" ;;
+            *) break ;;
+          esac
+        done
+        ;;
+    esac
+    shift
+  done
+  $skips
 }
 
 _git_remote_host() {
@@ -269,6 +301,7 @@ git_command_index=-1
 git_cwd=""
 git_dir=""
 git_work_tree=""
+commit_hooks_disabled=false
 idx=0
 while [ "$idx" -lt "${#args[@]}" ]; do
   arg="${args[$idx]}"
@@ -288,7 +321,18 @@ while [ "$idx" -lt "${#args[@]}" ]; do
       idx=$((idx+2))
       continue
       ;;
-    -c|--namespace)
+    -c)
+      setting="${args[$((idx + 1))]:-}"
+      case "$setting" in
+        [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]=*)
+          commit_hooks_disabled=false
+          [ "${setting#*=}" != /dev/null ] || commit_hooks_disabled=true
+          ;;
+      esac
+      idx=$((idx+2))
+      continue
+      ;;
+    --namespace)
       idx=$((idx+2))
       continue
       ;;
@@ -322,6 +366,13 @@ git_prefix=()
 [ -n "$git_dir" ] && git_prefix+=(--git-dir="$git_dir")
 [ -n "$git_work_tree" ] && git_prefix+=(--work-tree="$git_work_tree")
 [ -n "$git_cwd" ] && git_prefix+=(-C "$git_cwd")
+
+if [ "$git_command" = commit ] && _git_wrapper_is_agent_context; then
+  if $commit_hooks_disabled || _git_commit_skips_hooks "${args[@]:$((git_command_index + 1))}"; then
+    echo "git wrapper: Rule 9 requires hooks for agent commits. Fix the hook or the commit input." >&2
+    exit 1
+  fi
+fi
 
 if _git_wrapper_is_agent_context && [ "$git_command" = "push" ]; then
   _check_agent_public_push_target

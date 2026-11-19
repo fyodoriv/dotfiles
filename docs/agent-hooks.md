@@ -50,6 +50,11 @@ See `agentbrew/hooks/manifest.yaml` for the canonical hook source and
 `agentbrew/docs/research/deterministic-rules-via-hooks.md` for the
 migration architecture.
 
+The managed `git` wrapper also enforces Rule 9 on direct agent commits.
+It refuses `--no-verify`, `-n`, and a command-local `core.hooksPath` of
+`/dev/null` before Git runs. `git-safe` uses the same check when it delegates
+to the managed wrapper. Push approval does not waive the commit rule.
+
 ## block-dangerous-git (dotfiles hook)
 
 The guard blocks missing, empty, or malformed command input. It reports a clear

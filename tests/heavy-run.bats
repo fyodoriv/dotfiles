@@ -652,6 +652,7 @@ release_all() {
   mkdir -p "$HEAVY_RUN_DIR"
   local holder
   perl -MFcntl=:flock -e '
+    $SIG{ALRM} = "DEFAULT";
     alarm 15;
     open(my $seq, ">", $ARGV[0]) or die $!;
     flock($seq, LOCK_EX) or die $!;

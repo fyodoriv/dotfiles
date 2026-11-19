@@ -116,6 +116,9 @@ jobs:
           echo "$RUNNER_TEMP/timing-tools" >> "$GITHUB_PATH"
       - name: Verify timing queue is available
         run: test "$(command -v heavy-run)" = "$RUNNER_TEMP/timing-tools/heavy-run"
+      - name: Check literal Perl alarms
+        if: github.event_name == 'pull_request'
+        run: bats tests/perl-alarm.bats
       - name: Gate (make check)
         # Pull requests only: the affected tests. Every other run starts the
         # full suite below, which covers them.

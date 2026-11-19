@@ -105,6 +105,41 @@ load test_helper
   [[ "$output" != *"/usr/bin/curl"* ]]
 }
 
+assert_explicit_python_unchanged() {
+  local host="$1" command="$2" payload
+  mkdir -p "$TEST_DOTFILES/bin"
+  payload=$(jq -nc --arg host "$host" --arg command "$command" '
+    {tool_name:"Bash",tool_input:{command:$command}}
+    + (if $host == "codex" then {turn_id:"turn-example"}
+       elif $host == "claude" then {permission_mode:"default",hook_event_name:"PreToolUse",transcript_path:"/tmp/fixture.jsonl"}
+       else {} end)')
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e --arg command "$command" --arg prefix "$TEST_DOTFILES/bin" '
+    (.hookSpecificOutput.updatedInput.command // .updated_input.command)
+    | startswith("PATH=") and contains($prefix) and endswith("; " + $command)'
+}
+
+@test "prepend-endpoint-path: preserves an explicit Apple python3 command" {
+  assert_explicit_python_unchanged legacy '/usr/bin/python3 -I -S -V'
+}
+
+@test "prepend-endpoint-path: preserves an explicit Apple python3.13 command" {
+  assert_explicit_python_unchanged codex '/usr/bin/python3.13 -I -S -V'
+}
+
+@test "prepend-endpoint-path: preserves Python paths in an agent draft" {
+  local command
+  command=$(cat <<'COMMAND'
+cat <<'DRAFT'
+The reported paths are /usr/bin/python3 and "/usr/bin/python3.13".
+DRAFT
+COMMAND
+)
+  assert_explicit_python_unchanged claude "$command"
+}
+
 @test "prepend-endpoint-path: parses hook JSON without Python" {
   grep -q '/usr/bin/plutil' agent-hooks/prepend-endpoint-path.sh
   ! grep -vE '^[[:space:]]*#' agent-hooks/prepend-endpoint-path.sh \

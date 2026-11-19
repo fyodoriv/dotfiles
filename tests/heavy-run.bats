@@ -1016,6 +1016,42 @@ make_fake_app() {
   release_all
 }
 
+@test "heavy-run: --no-pause: under pressure a newer no-pause run goes on beside the oldest" {
+  export HEAVY_RUN_SLOTS=4 HEAVY_RUN_PROBE="test -e '$BATS_TEST_TMPDIR/pressure' && echo memory pressure warn"
+  start_holder
+  wait_held 1
+  local new="$BATS_TEST_TMPDIR/new"
+  "$SCRIPT" --no-pause sh -c "for i in \$(seq 16); do echo \$i >> '$new'; sleep 0.25; done" 2>"$BATS_TEST_TMPDIR/err" &
+  local new_pid=$! i
+  for i in $(seq 50); do [ -s "$new" ] && break; sleep 0.1; done
+  : >"$BATS_TEST_TMPDIR/pressure"
+  sleep 2.5
+  local n1 n2
+  n1=$(wc -l < "$new"); sleep 0.8; n2=$(wc -l < "$new")
+  [ "$n2" -gt "$n1" ]
+  wait "$new_pid"
+  ! grep -q "heavy-run: paused" "$BATS_TEST_TMPDIR/err"
+  release_all
+}
+
+@test "heavy-run: heavy_run_exclusive_shared=1: an exclusive run starts beside a running run" {
+  export HEAVY_RUN_SLOTS=2 HEAVY_RUN_RAMP=0 HEAVY_RUN_EXCLUSIVE_SHARED=1
+  start_holder
+  wait_held 1
+  run timeout 20 "$SCRIPT" --exclusive sh -c 'echo "slot=$HEAVY_RUN_SLOT"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "slot=2" ]
+  release_all
+}
+
+@test "heavy-run: --no-pause: runs in a shared slot and hides its internal flag" {
+  run "$SCRIPT" --no-pause sh -c 'echo "slot=$HEAVY_RUN_SLOT flag=${HEAVY_RUN_NOPAUSE_RUN-unset}"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "slot=1 flag=unset" ]
+  run "$SCRIPT" --no-pause
+  [ "$status" -eq 2 ]
+}
+
 @test "heavy-run: project: rejects a bad HEAVY_RUN_PROJECT_SLOTS or HEAVY_RUN_MEMORY_GUARD" {
   HEAVY_RUN_PROJECT_SLOTS=0 run "$SCRIPT" true
   [ "$status" -eq 2 ] && [[ "$output" == *"HEAVY_RUN_PROJECT_SLOTS must be 1-64"* ]]

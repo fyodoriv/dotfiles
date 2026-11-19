@@ -72,6 +72,8 @@
 #   HEAVY_RUN_RAMP      seconds between run starts while others run, 0-3600
 #                       (setting heavy_run_ramp_seconds; default 15)
 #   HEAVY_RUN_EXCLUSIVE_WAIT  exclusive wait limit in seconds (default 900).
+#   HEAVY_RUN_EXCLUSIVE_SHARED  1 = an exclusive run takes a shared slot that is
+#                       never memory-paused (setting heavy_run_exclusive_shared; default 0)
 #   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
 #                       (setting heavy_run_max_load; default 0)
 #   HEAVY_RUN_PROJECT_SLOTS  most slots one project (a repo and its worktrees,
@@ -109,7 +111,7 @@ level="${HEAVY_RUN_NICE:-15}"
 export HEAVY_RUN_PAUSE_APPS="${HEAVY_RUN_PAUSE_APPS-GeForceNOW}"
 
 usage() {
-  echo "Usage: heavy-run [--exclusive] <command...> | heavy-run status (or --status)"
+  echo "Usage: heavy-run [--exclusive | --no-pause] <command...> | heavy-run status (or --status)"
 }
 
 # Settings: env first, then the chezmoi data, then the default. A trailing
@@ -338,6 +340,16 @@ if [ "${1:-}" = --exclusive ]; then
   shift
   [ $# -gt 0 ] || { usage >&2; exit 2; }
 fi
+# --no-pause: a normal shared slot that memory pressure never pauses (a
+# real-time app still does). For gates whose tests time out on wall clock.
+# Unlike --exclusive, other runs keep going beside it.
+nopause=0
+if [ "${1:-}" = --no-pause ] && [ "$exclusive" = 0 ]; then
+  nopause=1
+  shift
+  [ $# -gt 0 ] || { usage >&2; exit 2; }
+fi
+export HEAVY_RUN_NOPAUSE_RUN=$nopause
 
 case "$level" in
   '' | *[!0-9]* | 2[1-9] | [3-9][0-9] | [0-9][0-9][0-9]*) echo "heavy-run: HEAVY_RUN_NICE must be 0-20, got '$level'" >&2; exit 2 ;;
@@ -386,6 +398,8 @@ exec perl -e "$common_code"'
   use POSIX ();
   use Time::HiRes ();
   my ($lock, $owner, $level, $queue, $seqfile, $waitlog, $priority_code, $dir, $exclusive, $command_umask, @cmd) = @ARGV;
+  my $nopause_run = ($ENV{HEAVY_RUN_NOPAUSE_RUN} // "") eq "1" ? 1 : 0;
+  delete $ENV{HEAVY_RUN_NOPAUSE_RUN};
   my $t0 = time;
   my $wait_started = $exclusive ? Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) : 0;
   my $slotdir = "$dir/slots";
@@ -420,7 +434,8 @@ exec perl -e "$common_code"'
             setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, $is_num),
             setting("HEAVY_RUN_PROJECT_SLOTS", "heavy_run_project_slots", 3, $is_slots),
             setting("HEAVY_RUN_MEMORY_GUARD", "heavy_run_memory_guard", 1, $is_bit),
-            setting("HEAVY_RUN_MIN_FREE_PCT", "heavy_run_min_free_pct", 25, $is_pct));
+            setting("HEAVY_RUN_MIN_FREE_PCT", "heavy_run_min_free_pct", 25, $is_pct),
+            setting("HEAVY_RUN_EXCLUSIVE_SHARED", "heavy_run_exclusive_shared", 0, $is_bit));
   }
   # Machine checks asked at most once a second: each one is a fork.
   my %memo;
@@ -449,7 +464,7 @@ exec perl -e "$common_code"'
       my $id = project_identity(\%f);
       if (defined $id) { $s{proj}{$id}++; }
       else { $s{invalid_project} = 1; }
-      push @{$s{runs}}, { id => "s$k", start => $f{start} // 9e9, mark => "$slotdir/s$k.paused" };
+      push @{$s{runs}}, { id => "s$k", start => $f{start} // 9e9, mark => "$slotdir/s$k.paused", nopause => ($f{nopause} // 0) };
     }
     for my $k (slot_files($slotdir)) {
       next unless held("$slotdir/$k");
@@ -470,11 +485,13 @@ exec perl -e "$common_code"'
   # tickets behind it too, or ("skip", why) that lets later tickets go first.
   sub decide {
     my ($s, $t, $set) = @_;
-    my ($n, $ramp, $maxload, $pcap, undef, $minfree) = @$set;
+    my ($n, $ramp, $maxload, $pcap, undef, $minfree, $xshared) = @$set;
     if ((my $r = realtime()) ne "") { return ("wait", $r); }
     return ("wait", "queue project metadata unavailable") if $s->{invalid_project};
     return ("wait", "an exclusive run is active") if $s->{excl};
-    if ($t->{exclusive}) {
+    # heavy_run_exclusive_shared=1: an exclusive ticket takes a shared slot
+    # (and is never memory-paused), so one run no longer holds the whole Mac.
+    if ($t->{exclusive} && !$xshared) {
       return ("grant", "exclusive") if !$s->{active} && !$s->{busy};
       return ("wait", $s->{busy} ? "exclusive: waiting for $s->{busy} running run(s) to end" : "exclusive: waiting for an older heavy-run");
     }
@@ -585,7 +602,7 @@ exec perl -e "$common_code"'
     my %pause;
     if ((my $r = realtime()) ne "") { $pause{$_->{mark}} = $r for grep { $_->{mark} } @runs; }
     elsif ($guard) {
-      my @mem = sort { $a->{start} <=> $b->{start} || $a->{id} cmp $b->{id} } grep { !$_->{excl} } @runs;
+      my @mem = sort { $a->{start} <=> $b->{start} || $a->{id} cmp $b->{id} } grep { !$_->{excl} && !$_->{nopause} } @runs;
       if (@mem > 1 && (my $pr = memo("pressure", \&pressure)) ne "") {
         $pause{$_->{mark}} = "$pr (older runs go first)" for grep { $_->{mark} } @mem[1 .. $#mem];
       }
@@ -713,6 +730,7 @@ exec perl -e "$common_code"'
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = "DEFAULT"; }
   if ($ticket) { unlink "$ticket.grant", "$ticket.why", $ticket; close $tfh; }
   if (open(my $ls, ">", $last_start)) { close $ls; }
+  $nopause_run = 1 if $exclusive && $slot ne "exclusive";
   my $slotfile = $slot eq "exclusive" ? $lock : "$slotdir/s$slot";
   my $ownerfile = $slot eq "exclusive" ? $owner : "$slotdir/s$slot.owner";
   my $mark = $slot eq "exclusive" ? "$dir/exclusive.paused" : "$slotdir/s$slot.paused";
@@ -736,7 +754,7 @@ exec perl -e "$common_code"'
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
   my @t = localtime;
   if (open(my $o, ">", $ownerfile)) {
-    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\nproject=%s\nstart=%.3f\nreader=project-id-v1\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $proj, Time::HiRes::time();
+    printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\nproject=%s\nstart=%.3f\nreader=project-id-v1\nnopause=%d\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $proj, Time::HiRes::time(), $nopause_run;
     close $o;
   }
   # The run keeps the scheduler going while it leads, and stops (SIGSTOP) its

@@ -123,7 +123,7 @@ them. -->
 - [ ] Make the git wrapper refuse `--no-verify` on commit, not only on push
   - **ID**: git-wrapper-refuse-no-verify-commit
   - **Tags**: git, hooks, security
-  - **Details**: Rule 9 says never `--no-verify`. `bin/git` already blocks an agent `git push --no-verify` without current-session approval. A `git commit --no-verify` (or `-n`) and a hook-skipping `core.hooksPath=/dev/null` override are not covered. Add the refusal to the `bin/git` wrapper (and `bin/git-safe` where it applies) with an approval path that matches the push one. Source to adapt: https://github.com/fyodoriv/minsky/blob/main/scripts/check-no-no-verify-bypass.mjs (a scan for the bypass pattern).
+  - **Details**: Rule 9 says never `--no-verify`. `bin/git` already blocks an agent `git push --no-verify` without current-session approval. A `git commit --no-verify` (or `-n`) and a hook-skipping `core.hooksPath=/dev/null` override are not covered. Add the refusal to the `bin/git` wrapper. Verify the managed `git-safe` route uses the same rule. Rule 9 and the existing Agentbrew commit hook allow no commit exception. Keep the separate push approval behavior. Source to adapt: https://github.com/fyodoriv/minsky/blob/main/scripts/check-no-no-verify-bypass.mjs (a scan for the bypass pattern).
   - **Files**: `bin/git`, `bin/git-safe`, `docs/agent-hooks.md`, `tests/git-wrapper*.bats` (the file that covers the push case).
   - **Output**: code
   - **Acceptance**: an agent-authored `git commit --no-verify`, `git commit -n` and `git -c core.hooksPath=/dev/null commit` exit non-zero with a message naming the rule; a human terminal is unchanged; `git commit` without the flag is unchanged.
@@ -132,6 +132,7 @@ them. -->
   - **Success**: 3 of 3 forms refused, 0 of 3 normal commit forms refused, CI green.
   - **Pivot**: a false block on a normal workflow twice in a week -> narrow the refusal to the flag only and drop the `hooksPath` case.
   - **Anchor**: dotfiles Rule 9 (docs/constitution.md); Basili, Caldiera, Rombach 1994 (GQM).
+  - **Setup gate**: Hosted RED must show all three documented switches reaching the harmless Git test double on the old wrapper. GREEN must show all three refusals before Git, the managed git-safe refusal, and zero false refusals in three normal agent cases and one human case. Reject an unobserved refusal or a changed push or normal commit route.
   - **Competitive-goal**: none — git safety for agents (docs/metrics.md), not a scorecard metric.
 
 - [ ] Check launchd-safe paths in dotfiles-launchagent-drift

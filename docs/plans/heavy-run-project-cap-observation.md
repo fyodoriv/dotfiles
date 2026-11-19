@@ -4,7 +4,7 @@
 
 Goal: protect the project cap with a repeatable queue test. Question: can the fixture observe the final project-cap reason after a short safety hold? Metric: failed observations and commands that start before their project releases a slot.
 
-Hypothesis: poll for the exact project-cap reason within the existing five-second observation budget. This reduces early observations from one to zero in a control that briefly holds a slot without project metadata. The eligible project still runs and the capped project starts only after release.
+Hypothesis: use the existing 50 polls at 100 ms to observe the exact project-cap reason. This reduces early observations from one to zero in a control that briefly holds a slot without project metadata. The eligible project still runs and the capped project starts only after release.
 
 Measurement: run the scratch control with one capped ticket, one short-lived owner without metadata, and one eligible project. Record the old single status read during the hold and the bounded exact match after release. Compare both named project-cap cases in the hosted Dotfiles suite.
 

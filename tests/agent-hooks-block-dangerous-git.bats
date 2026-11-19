@@ -75,6 +75,16 @@ _check_command_text() {
   [ "$status" -eq 2 ]
 }
 
+@test "a dynamic or nonleading branch comparison keeps conservative matching" {
+  local status_check literal
+  status_check='test -z "$(git status --porcelain)"'
+  literal='test "$(git branch --show-current)" = docs/topic'
+  _check_command_text "$(printf '%s\n' 'test "$(git branch --show-current)" = "$branch"' "$status_check")"
+  [ "$status" -eq 2 ]
+  _check_command_text "$(printf '%s\n' 'set -u' "$literal" "$status_check")"
+  [ "$status" -eq 2 ]
+}
+
 @test "ignores inert quoted heredoc prose" {
   local text
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")

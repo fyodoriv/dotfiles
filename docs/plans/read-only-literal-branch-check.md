@@ -19,3 +19,11 @@ The tool had received the shell source and had not run it.
   becomes an admission outside the proved leading condition, reject the fix.
 - **Anchor:** The earlier [read-only branch preflight](read-only-branch-preflight.md)
   and the false refusal observed in this session.
+
+## Direct command-text evidence
+
+The tracked and installed baseline guards both returned exit 2 for the
+original text. A separate status substitution after the branch comparison
+was enough to reproduce it. The tracked candidate returned exit 0 for both
+forms, including the plain leading `set -e` case. It retained exit 2
+for six later destructive, dynamic, or nonleading controls.

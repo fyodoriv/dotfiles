@@ -11,3 +11,17 @@ Use the monotonic clock for the wait deadline. Report elapsed run time from the 
 Check the exclusive deadline before and after admission. A busy sequence lock
 has the same limit. The hosted test keeps both the original holder and a later
 waiter in the same isolated queue while the exclusive request expires.
+
+## Sequence-lock fixture alarm
+
+The default-branch full suite returned status 1 in the literal Perl alarm
+check. It expected status 0. The sequence-lock test arms its holder alarm
+without first resetting the inherited handler. The guard reports the holder
+in `tests/heavy-run.bats`.
+
+Reset the holder's `SIGALRM` to its default before arming it. Predict one
+violation before the edit and zero after. Run the alarm guard and the exact
+sequence-lock fixture. Success is zero new violations and the existing
+exclusive deadline and cleanup assertions still passing. Reject any change
+to the scheduler, fixture time limit or guard coverage. Anchor: hosted
+default-branch run 44425352422 and the literal alarm reset guard.

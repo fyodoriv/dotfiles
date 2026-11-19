@@ -249,7 +249,7 @@ LOAD_HOURS = 7 * 24
 AGENT_DAYS = 14
 # Agent projects shown by name; every other project becomes "other", so the
 # dashboard never names private repos.
-TOOLING_PROJECTS = ("agentbrew", "dotfiles", "minsky", "taskgrind", "tasks.md", "tooling")
+TOOLING_PROJECTS = ("agentbrew", "dotfiles", "minsky", "tasks.md", "tooling")
 
 
 def load_rows(path: Path, now: float) -> list:

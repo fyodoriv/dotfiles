@@ -17,3 +17,7 @@ Anchor: Basili, Caldiera and Rombach (1994), Goal Question Metric. The observed 
 ## Fixture contract
 
 A queue status snapshot can reflect a held slot before its owner metadata is available. A short command can also release its owner metadata before the lock closes. Tests for project caps must wait for their specific reason, alongside their separate checks that one project can proceed and another stays queued. The fixture owns its scratch queue and releases only its own holders. This changes test observation only.
+
+## Scratch control
+
+Prediction commit `293d3012` preceded the control. One read during the simulated metadata gap showed the safety hold. After the gap closed, the exact cap reason returned in 0.29 seconds. Beta completed before alpha's slot was released. Alpha started only after release. This shows how a single read can miss the cap reason. The CI log does not identify which file lacked metadata in the original run.

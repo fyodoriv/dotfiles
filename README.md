@@ -1464,7 +1464,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `dotfiles-chrome-dock-guard` | Hand a Chrome Dock click from a hidden agent Chrome to your own Chrome (`--classify ARGV`, `--decide WINDOWS ARGV`, and `--stale PO CO PF CF EVENTS`, `--stale-run s|h ...` for tests; restarts itself when its event stream goes dead; a headed agent Chrome keeps focus) | Always running (LaunchAgent) |
 | `dotfiles-pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
 | `dotfiles-updates-landed` | Say once a day that background updates landed (tooling-sync, dotfiles-upgrade record them) and the checkup should run; `--ack` marks them seen (#301) | An agent session-start hook; the checkup runs `--ack` |
-| `dotfiles-launchagent-drift` | Check loaded arguments, KeepAlive jobs, rendered log paths, and the [sync job's required tool](docs/module-reference.md#workflow-dynamic). `--fix` repairs jobs after the safety checks pass. | After `dotfiles apply` (update-tooling) |
+| `dotfiles-launchagent-drift` | Check loaded arguments, KeepAlive jobs, rendered log paths, and [required tools for sync and sampling](docs/module-reference.md#workflow-dynamic). `--fix` repairs jobs after the safety checks pass. | After `dotfiles apply` (update-tooling) |
 | `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then the apply-time sync script in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 

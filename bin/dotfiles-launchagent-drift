@@ -9,7 +9,7 @@
 #     ok <label>
 #     drift <label>: the loaded job runs other arguments than its plist
 #     log-path <label>: a log path still contains an unexpanded HOME placeholder
-#     tool-path <label>: the registered sync job cannot find chezmoi
+#     tool-path <label>: the registered job cannot find a required tool
 #     stopped <label>: KeepAlive job is not running
 #     unloaded <label>: the plist is not loaded
 #   --fix reloads a drifted job (bootout, then bootstrap), kickstarts a
@@ -19,7 +19,7 @@
 #   --fix only reports, like the other reload scripts. Only KeepAlive <true/>
 #   counts as "must run": a KeepAlive dictionary (SuccessfulExit) may exit.
 #   Render log paths before repairing a job with a HOME placeholder.
-#   A missing tool or unverified tool check also stops repair for the sync job.
+#   A missing tool or unverified tool check also stops repair for a registered job.
 #
 # Exit: 0 when every job is ok (or was fixed); 1 when a problem is left.
 
@@ -48,16 +48,18 @@ is_disabled() {
 repo_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 source "$repo_root/lib/launchagent-args.sh"
 
-# The sync job uses chezmoi by name. Inspect its registered entry point and
-# search the plist PATH as data. Never run a script or executable from it.
-sync_job_has_chezmoi() {
-  local file="$1" args launcher script script_dir env_type job_path directory
+# Check the registered entry point and search the plist PATH as data.
+# Empty output means all tools were found. Return 1 and name the first
+# missing tool, or return 2 if this plist does not match the contract.
+registered_job_tools() {
+  local file="$1" script_name="$2" args launcher script script_dir env_type job_path directory tool
   local -a search_dirs
+  shift 2
   args="$(/usr/bin/plutil -extract ProgramArguments raw -expect array -o - "$file" 2>/dev/null)" || return 2
   [ "$args" = 2 ] || return 2
   launcher="$(/usr/bin/plutil -extract ProgramArguments.0 raw -expect string -o - "$file" 2>/dev/null)" || return 2
   script="$(/usr/bin/plutil -extract ProgramArguments.1 raw -expect string -o - "$file" 2>/dev/null)" || return 2
-  [ "$launcher" = /bin/bash ] && [[ "$script" == /*/dotfiles-sync ]] || return 2
+  [ "$launcher" = /bin/bash ] && [[ "$script" == /*/"$script_name" ]] || return 2
   [ -f "$script" ] && [ ! -L "$script" ] || return 2
   script_dir="$(cd -P -- "${script%/*}" 2>/dev/null && pwd -P)" || return 2
   [ "$script_dir" = "$repo_root/bin" ] || return 2
@@ -78,10 +80,16 @@ sync_job_has_chezmoi() {
   for directory in "${search_dirs[@]}"; do
     [[ "$directory" == /* ]] || return 2
   done
-  for directory in "${search_dirs[@]}"; do
-    [ -f "$directory/chezmoi" ] && [ -x "$directory/chezmoi" ] && return 0
+  for tool in "$@"; do
+    for directory in "${search_dirs[@]}"; do
+      if [ -f "$directory/$tool" ] && [ -x "$directory/$tool" ]; then
+        continue 2
+      fi
+    done
+    printf '%s\n' "$tool"
+    return 1
   done
-  return 1
+  return 0
 }
 
 # reload <label> <plist>: bootout, wait until launchd lets the job go (a
@@ -131,11 +139,20 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     problems=$((problems + 1))
     continue
   fi
-  if [ "$label" = com.dotfiles.dotfiles-sync ] && ! is_disabled "$label"; then
-    sync_job_has_chezmoi "$plist"
+  case "$label" in
+    com.dotfiles.dotfiles-sync)
+      registered_script=dotfiles-sync
+      required_tools=(chezmoi) ;;
+    com.dotfiles.load-sampler)
+      registered_script=dotfiles-load-sampler
+      required_tools=(sysctl ps) ;;
+    *) required_tools=() ;;
+  esac
+  if [ "${#required_tools[@]}" -gt 0 ] && ! is_disabled "$label"; then
+    missing_tool="$(registered_job_tools "$plist" "$registered_script" "${required_tools[@]}")"
     case "$?" in
       1)
-        printf 'tool-path %s: chezmoi is missing from the planned job PATH. Fix it before loading or restarting the job.\n' "$label"
+        printf 'tool-path %s: %s is missing from the planned job PATH. Fix it before loading or restarting the job.\n' "$label" "$missing_tool"
         problems=$((problems + 1))
         continue ;;
       2)

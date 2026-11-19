@@ -77,7 +77,7 @@ teardown() {
 @test "managed git-safe routes commit through the same rule" {
   local bin
   bin="$(dirname "$GIT_WRAPPER")"
-  run env PATH="$bin:$PATH" AGENT_PUBLIC_WRITE_GUARD=1 GIT_SAFE_BYPASS=1 \
+  run env PATH="$bin:$PATH" AGENT_PUBLIC_WRITE_GUARD=1 GIT_SAFE_BYPASS=0 \
     "$bin/git-safe" commit -n
   [ "$status" -eq 1 ]
   [[ "$output" == *"Rule 9"* ]]
@@ -103,6 +103,13 @@ teardown() {
     DEVIN_SESSION_ID= CURSOR_AGENT= WINDSURF_AGENT= "$GIT_WRAPPER" commit -n
   [ "$status" -eq 0 ]
   [ "$(cat "$GIT_ARGS")" = 'commit -n' ]
+}
+
+@test "the last option wins when an agent restores commit hooks" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" \
+    -c core.hooksPath=/dev/null -c CORE.HOOKSPATH=.git/hooks commit --no-verify --verify
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = '-c core.hooksPath=/dev/null -c CORE.HOOKSPATH=.git/hooks commit --no-verify --verify' ]
 }
 
 @test "agent git push --no-verify is blocked without current-session approval" {

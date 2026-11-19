@@ -111,11 +111,12 @@ _git_wrapper_is_agent_context() {
 }
 
 _git_commit_skips_hooks() {
-  local options
+  local options skips=false
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --) return 1 ;;
-      --no-verify) return 0 ;;
+      --) break ;;
+      --no-verify) skips=true ;;
+      --verify) skips=false ;;
       --author|--cleanup|--date|--file|--fixup|--message|--pathspec-from-file|--reedit-message|--reuse-message|--squash|--template|--trailer)
         [ "$#" -gt 1 ] && shift
         ;;
@@ -124,7 +125,7 @@ _git_commit_skips_hooks() {
         options="${1#-}"
         while [ -n "$options" ]; do
           case "$options" in
-            n*) return 0 ;;
+            n*) skips=true; options="${options#?}" ;;
             [cCFmt]*)
               if [ "${#options}" -eq 1 ] && [ "$#" -gt 1 ]; then shift; fi
               break
@@ -137,7 +138,7 @@ _git_commit_skips_hooks() {
     esac
     shift
   done
-  return 1
+  $skips
 }
 
 _git_remote_host() {
@@ -321,15 +322,17 @@ while [ "$idx" -lt "${#args[@]}" ]; do
       continue
       ;;
     -c)
-      case "${args[$((idx + 1))]:-}" in
-        [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]=/dev/null)
-          commit_hooks_disabled=true
+      setting="${args[$((idx + 1))]:-}"
+      case "$setting" in
+        [Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]=*)
+          commit_hooks_disabled=false
+          [ "${setting#*=}" != /dev/null ] || commit_hooks_disabled=true
           ;;
       esac
       idx=$((idx+2))
       continue
       ;;
-    --namespace|--config-env)
+    --namespace)
       idx=$((idx+2))
       continue
       ;;

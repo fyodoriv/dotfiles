@@ -12,7 +12,7 @@
 #   DOTFILES_SOURCE            dotfiles source checkout (default: `chezmoi source-path`)
 #
 # Owners: apple, dotfiles, dotfiles-plugin (a label a dotfiles plugin
-# installed), agentbrew, minsky, taskgrind (change these in their source
+# installed), agentbrew, minsky (change these in their source
 # repo), third-party.
 # Verdicts:
 #   remove     the job's program does not exist (dangling job)
@@ -46,7 +46,6 @@ owner_of() {
     com.dotfiles.*) echo dotfiles; return ;;
     com.agentbrew.*) echo agentbrew; return ;;
     com.minsky.*) echo minsky; return ;;
-    com.taskgrind.*) echo taskgrind; return ;;
   esac
   # A job a dotfiles plugin installed (#309): dotfiles records each plugin's
   # labels in <state>/dotfiles/plugins/<name>.launchagents. Fix it in the plugin.

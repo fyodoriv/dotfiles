@@ -3,7 +3,6 @@
 github.com/fyodoriv/agentbrew
 github.com/fyodoriv/dotfiles
 github.com/fyodoriv/minsky
-github.com/fyodoriv/taskgrind
 github.com/fyodoriv/homebrew-tap
 github.com/tasksmd/tasks.md
 github.com/fyodoriv/careerbrew

@@ -443,6 +443,50 @@ YML
   cd "$(make_checkout origin git@code.widgetco-sso.net:team/app.git)"
   run "$GH_WRAPPER" pr comment https://github.com/octo/tool/pull/8 --body "zzwidgetcorp notes"
   assert_blocked "body: private-pattern match"
+  [[ "$output" != *"different origin host"* ]]
+}
+
+@test "an unqualified public repo from an enterprise checkout gets a host hint" {
+  cd "$(make_checkout origin git@code.widgetco-sso.net:team/app.git)"
+  run "$GH_WRAPPER" pr edit 8 --repo octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
+  [[ "$output" == *"public github.com/octo/tool"* ]]
+  [[ "$output" == *"different origin host"* && "$output" == *"--repo HOST/OWNER/REPO"* ]]
+  [[ "$output" != *"code.widgetco-sso.net"* ]]
+}
+
+@test "an explicit public repo from an enterprise checkout gets no host hint" {
+  cd "$(make_checkout origin git@code.widgetco-sso.net:team/app.git)"
+  run "$GH_WRAPPER" pr edit 8 --repo github.com/octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
+  [[ "$output" != *"different origin host"* ]]
+  GH_HOST=github.com run "$GH_WRAPPER" pr edit 8 --repo octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
+  [[ "$output" != *"different origin host"* ]]
+}
+
+@test "an unqualified public repo from a public checkout gets no host hint" {
+  cd "$(make_checkout origin git@github.com:octo/tool.git)"
+  run "$GH_WRAPPER" pr edit 8 --repo octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
+  [[ "$output" != *"different origin host"* ]]
+}
+
+@test "a local origin or an unknown SSH alias gets no origin host hint" {
+  cd "$(make_checkout origin relative/path/tool.git)"
+  run "$GH_WRAPPER" pr edit 8 --repo octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
+  [[ "$output" != *"different origin host"* ]]
+
+  mkdir "$TEST_DIR/bin"
+  printf '#!/bin/bash\ntouch "$SSH_CALLED"\n' > "$TEST_DIR/bin/ssh"
+  chmod +x "$TEST_DIR/bin/ssh"
+  export PATH="$TEST_DIR/bin:$PATH" SSH_CALLED="$TEST_DIR/ssh-called"
+  git remote set-url origin git@unknown-test-alias:team/app.git
+  run "$GH_WRAPPER" pr edit 8 --repo octo/tool --body "zzwidgetcorp notes"
+  assert_blocked "body: private-pattern match"
+  [[ "$output" != *"different origin host"* ]]
+  [ ! -f "$SSH_CALLED" ]
 }
 
 # ── Enterprise and private targets stay untouched ────────────────────

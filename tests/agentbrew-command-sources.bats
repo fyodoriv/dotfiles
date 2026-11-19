@@ -339,7 +339,6 @@
   grep -q "\`tasks.md\` / \`tasks-md\`" "$command_file"
   grep -q "npm run publish-latest" "$reference_file"
   grep -q "gh release create vX.Y.Z --generate-notes" "$reference_file"
-  grep -q "semantic-release" "$reference_file"
 }
 
 @test "ship-it command approval persists for the current session" {

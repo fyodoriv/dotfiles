@@ -42,6 +42,8 @@ Run this before you push any change to a LaunchAgent script or plist. Real integ
 
 ```bash
 # 1. The script under a launchd-like env: no shell rc, minimal PATH.
+
+Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
 env -i HOME="$HOME" PATH=/usr/bin:/bin bash <script> <short-run-args>
 ```
 

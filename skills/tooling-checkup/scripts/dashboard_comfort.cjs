@@ -48,7 +48,7 @@ const data = {
   doctor: { status: 'ok', data: [...Array.from({ length: 14 }, (_, i) => ({ day: day(i), fail: i % 4 })), { day: '2026-02-30', fail: 9 }] },
   // The real export: one row per hour for 7 days, 'YYYY-MM-DDTHH:00' in local time.
   load: { status: 'ok', data: Array.from({ length: 168 }, (_, i) => ({ hour: day(Math.floor(i / 24)) + 'T' + String(i % 24).padStart(2, '0') + ':00', samples: 12, peak_load1: Math.round((2 + 3 * Math.abs(Math.sin(i / 9)) + (i % 24 > 9 && i % 24 < 18 ? 2 : 0)) * 10) / 10 })) },
-  agent_time: { status: 'ok', data: ['agentbrew', 'dotfiles', 'taskgrind', 'tooling-checkup-dashboard-fixture-repo-name'].flatMap(p => Array.from({ length: 14 }, (_, i) => ({ day: day(i), project: p, tool_hours: 0.5 + i / 10, calls: 100 + i, failed_calls: i % 3 }))) },
+  agent_time: { status: 'ok', data: ['agentbrew', 'dotfiles', 'tasks.md', 'tooling-checkup-dashboard-fixture-repo-name'].flatMap(p => Array.from({ length: 14 }, (_, i) => ({ day: day(i), project: p, tool_hours: 0.5 + i / 10, calls: 100 + i, failed_calls: i % 3 }))) },
 };
 if (DROP) delete data[DROP];
 const themes = {

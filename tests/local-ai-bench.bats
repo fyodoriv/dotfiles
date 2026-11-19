@@ -93,7 +93,9 @@ idle_memory_fixture() {
 #!/bin/sh
 case "$1" in
   -axo) printf '%s' "$BENCH_PROCESS_LIST" ;;
-  -ww) printf '%s' "$BENCH_PROCESS_DETAILS" ;;
+  -ww)
+    [ -z "${BENCH_EXPECT_PIDS:-}" ] || [ "$3" = "$BENCH_EXPECT_PIDS" ] || exit 2
+    printf '%s' "$BENCH_PROCESS_DETAILS" ;;
   *) exit 2 ;;
 esac
 SH
@@ -128,8 +130,8 @@ SH
 
 @test "idle memory reports an empty running server and ignores unrelated executables" {
   idle_memory_fixture
-  BENCH_PROCESS_LIST=$'42 /opt/Ollama App/bin/ollama\n43 /usr/bin/unrelated'
-  BENCH_PROCESS_DETAILS='42 24576 /opt/Ollama App/bin/ollama serve'
+  BENCH_PROCESS_LIST=$'42 1 /opt/Ollama App/bin/ollama\n43 1 /usr/bin/unrelated'
+  BENCH_PROCESS_DETAILS='42 1 24576 /opt/Ollama App/bin/ollama serve'
   run bin/local-ai-bench --idle-memory
   [ "$status" -eq 0 ]
   jq -e '.ollama_runner_rss_mb == 0 and .ollama_serve_rss_mb == 24 and
@@ -138,13 +140,13 @@ SH
 
 @test "idle memory classifies both exact thresholds and one KiB above" {
   idle_memory_fixture
-  BENCH_PROCESS_LIST=$'42 /usr/bin/ollama\n43 /usr/bin/ollama'
+  BENCH_PROCESS_LIST=$'42 1 /usr/bin/ollama\n43 42 /usr/bin/ollama'
   BENCH_MODELS='{"models":[{"name":"sample:fixture"}]}'
   local input kib expected
   for input in 512000:UNDER_THRESHOLD 512001:AT_THRESHOLD 5120000:AT_THRESHOLD 5120001:OVER_THRESHOLD; do
     kib="${input%:*}"
     expected="${input#*:}"
-    BENCH_PROCESS_DETAILS="$(printf '42 24576 /usr/bin/ollama serve\n43 %s /usr/bin/ollama runner --model /example' "$kib")"
+    BENCH_PROCESS_DETAILS="$(printf '42 1 24576 /usr/bin/ollama serve\n43 42 %s /usr/bin/ollama runner --model /example' "$kib")"
     run bin/local-ai-bench --idle-memory
     [ "$status" -eq 0 ]
     jq -e --arg verdict "$expected" --argjson kib "$kib" '.verdict == $verdict and
@@ -166,21 +168,41 @@ SH
 
 @test "idle memory refuses to infer zero RSS from missing or ambiguous process rows" {
   idle_memory_fixture
-  BENCH_PROCESS_LIST=$'42 /usr/bin/ollama\n43 /usr/bin/ollama'
-  BENCH_PROCESS_DETAILS='42 24576 /usr/bin/ollama serve'
+  BENCH_PROCESS_LIST=$'42 1 /usr/bin/ollama\n43 42 /usr/bin/ollama'
+  BENCH_PROCESS_DETAILS='42 1 24576 /usr/bin/ollama serve'
   run bin/local-ai-bench --idle-memory
   [ "$status" -eq 0 ]
   jq -e '.ollama_runner_rss_mb == null and .verdict == "UNKNOWN"' <<< "$output"
 
   BENCH_CURL_STATUS=7
-  BENCH_PROCESS_DETAILS=$'42 24576 /usr/bin/ollama serve\n43 614400 /usr/bin/ollama'
+  BENCH_PROCESS_DETAILS=$'42 1 24576 /usr/bin/ollama serve\n43 42 614400 /usr/bin/ollama'
   run bin/local-ai-bench --idle-memory
   [ "$status" -eq 0 ]
   jq -e '.ollama_runner_rss_mb == null and .verdict == "UNKNOWN"' <<< "$output"
 
-  BENCH_PROCESS_DETAILS=$'42 24576 /usr/bin/ollama serve\n43 614400 /usr/bin/ollama list'
+  BENCH_PROCESS_DETAILS=$'42 1 24576 /usr/bin/ollama serve\n43 42 614400 /usr/bin/ollama list'
   run bin/local-ai-bench --idle-memory
   [ "$status" -eq 0 ]
   jq -e '.ollama_runner_rss_mb == 0 and .loaded_models == null and
     .verdict == "UNDER_THRESHOLD"' <<< "$output"
+}
+
+@test "idle memory includes Ollama-owned llama-server and excludes unrelated workers" {
+  idle_memory_fixture
+  export BENCH_EXPECT_PIDS=42,43,44
+  BENCH_PROCESS_LIST=$'42 1 /usr/bin/ollama\n43 42 /usr/bin/ollama\n44 42 /opt/ollama/llama-server\n45 99 /usr/bin/llama-server'
+  BENCH_PROCESS_DETAILS=$'42 1 24576 /usr/bin/ollama start\n43 42 32768 /usr/bin/ollama runner\n44 42 665600 /opt/ollama/llama-server --port 9000'
+  BENCH_MODELS='{"models":[{"name":"sample:fixture"}]}'
+  run bin/local-ai-bench --idle-memory
+  [ "$status" -eq 0 ]
+  jq -e '.ollama_runner_rss_mb == 682 and .ollama_serve_rss_mb == 24 and
+    .loaded_models == ["sample:fixture"] and .verdict == "AT_THRESHOLD"' <<< "$output"
+
+  BENCH_EXPECT_PIDS=42
+  BENCH_PROCESS_LIST=$'42 1 /usr/bin/ollama\n45 99 /usr/bin/llama-server'
+  BENCH_PROCESS_DETAILS='42 1 24576 /usr/bin/ollama serve'
+  run bin/local-ai-bench --idle-memory
+  [ "$status" -eq 0 ]
+  jq -e '.ollama_runner_rss_mb == null and .ollama_serve_rss_mb == 24 and
+    .verdict == "UNKNOWN"' <<< "$output"
 }

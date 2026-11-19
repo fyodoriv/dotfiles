@@ -71,7 +71,8 @@ Call #1's `prompt_eval_ms` is cold prefix processing. Calls #2+ stay at ~40 ms â
 
 Run `local-ai-bench --idle-memory` at least ten minutes after the last model
 request. It prints one JSON line with the timestamp, runner and server RSS in
-MiB, loaded model names from the local Ollama endpoint, and a verdict. RSS
+MiB, loaded model names from the local Ollama endpoint, and a verdict. Runner
+RSS includes `llama-server` children owned by a local Ollama server. RSS
 measures resident process memory.
 
 Runner RSS up to 500 MiB is under the threshold. More than 500 MiB and up to

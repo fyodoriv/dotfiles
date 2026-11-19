@@ -59,45 +59,69 @@ def read_probe(args):
 
 
 def local_process_memory():
-    listing = read_probe(["ps", "-axo", "pid=,comm="])
+    listing = read_probe(["ps", "-axo", "pid=,ppid=,comm="])
     if listing is None or listing.returncode != 0:
         return None
     executables = {}
+    workers = {}
     for line in listing.stdout.splitlines():
-        fields = line.split(maxsplit=1)
-        if len(fields) != 2:
+        fields = line.split(maxsplit=2)
+        if len(fields) != 3:
             continue
-        pid, command = fields
-        if PurePath(command).name == "ollama":
-            executables[pid] = command
+        pid, parent, command = fields
+        name = PurePath(command).name
+        if name == "ollama":
+            executables[pid] = (parent, command)
+        elif name == "llama-server":
+            workers[pid] = (parent, command)
     if not executables:
         return {}
+    executables.update(
+        {pid: entry for pid, entry in workers.items() if entry[0] in executables}
+    )
 
     details = read_probe(
-        ["ps", "-ww", "-p", ",".join(executables), "-o", "pid=,rss=,args="]
+        ["ps", "-ww", "-p", ",".join(executables), "-o", "pid=,ppid=,rss=,args="]
     )
     if details is None or details.returncode != 0:
         return None
     totals = {}
+    servers = set()
+    child_memory = []
     for line in details.stdout.splitlines():
-        fields = line.split(maxsplit=2)
-        if len(fields) != 3 or not fields[1].isdigit():
+        fields = line.split(maxsplit=3)
+        if len(fields) != 4 or not fields[2].isdigit():
             return None
-        pid, kib, args = fields
-        command = executables.pop(pid, None)
-        if command is None:
+        pid, parent, kib, args = fields
+        entry = executables.pop(pid, None)
+        if entry is None or entry[0] != parent:
             return None
+        command = entry[1]
+        name = PurePath(command).name
         if args.startswith(command + " "):
-            args = "ollama " + args[len(command) + 1:]
+            args = name + " " + args[len(command) + 1:]
+        if name == "llama-server":
+            if re.match(r"^(?:\S*/)?llama-server(?:\s|$)", args) is None:
+                return None
+            child_memory.append((parent, int(kib)))
+            continue
         match = re.match(r"^(?:\S*/)?ollama\s+(\S+)", args)
         if match is None:
             return None
         role = match[1]
+        if role in ("serve", "start"):
+            role = "serve"
+            servers.add(pid)
         if role in ("serve", "runner"):
             totals[role] = totals.get(role, 0) + int(kib)
         elif role not in ("list", "ps", "show", "--version", "--help"):
             return None
-    return None if executables else totals
+    if executables:
+        return None
+    for parent, kib in child_memory:
+        if parent in servers:
+            totals["runner"] = totals.get("runner", 0) + kib
+    return totals
 
 
 def local_models():
@@ -127,14 +151,16 @@ def memory_verdict(runner_kib):
 memory = local_process_memory()
 models, refused = local_models()
 runner_kib = serve_kib = None
-if memory or (memory == {} and refused):
-    runner_kib = memory.get("runner", 0)
+verdict = "UNKNOWN"
+if memory:
     serve_kib = memory.get("serve", 0)
-    verdict = memory_verdict(runner_kib) if memory else "NO_OLLAMA"
-    if verdict == "NO_OLLAMA":
-        models = []
-else:
-    verdict = "UNKNOWN"
+    if "runner" in memory or not models:
+        runner_kib = memory.get("runner", 0)
+        verdict = memory_verdict(runner_kib)
+elif memory == {} and refused:
+    runner_kib = serve_kib = 0
+    verdict = "NO_OLLAMA"
+    models = []
 print(json.dumps({
     "ts": datetime.now(timezone.utc).isoformat(),
     "ollama_runner_rss_mb": None if runner_kib is None else runner_kib / 1024,

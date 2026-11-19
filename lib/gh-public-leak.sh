@@ -791,6 +791,40 @@ _ghpl_cleanup() {
   _ghpl_tmp=""
 }
 
+_ghpl_hint_repo_host() {
+  local origin host
+  [ -z "${GH_HOST:-}" ] && [ -z "$_ghpl_url_ref" ] && [ -n "$_ghpl_repo_flag" ] || return 0
+  case "$_ghpl_repo_flag" in *:*|*/*/*) return 0 ;; esac
+  _ghpl_parse_ref "$_ghpl_repo_flag"
+  [ -n "$_ghpl_rs" ] || return 0
+  origin="$(git remote get-url origin 2>/dev/null)" || return 0
+  case "$origin" in
+    http://*|https://*|git://*)
+      _ghpl_parse_ref "$origin"
+      host="$_ghpl_rh"
+      ;;
+    git@*:*)
+      host="${origin#git@}"
+      host="${host%%:*}"
+      _ghpl_norm_host "$host"
+      # Do not evaluate SSH configuration just to print a hint.
+      _ghpl_auth_has "$_ghpl_nh" || return 0
+      host="$_ghpl_nh"
+      ;;
+    ssh://*)
+      host="${origin#ssh://}"
+      host="${host%%/*}"
+      _ghpl_norm_host "${host#*@}"
+      _ghpl_auth_has "$_ghpl_nh" || return 0
+      host="$_ghpl_nh"
+      ;;
+    *) return 0 ;;
+  esac
+  if [ -n "$host" ] && [ "$host" != github.com ]; then
+    echo "This checkout uses a different origin host. If you meant that host, pass --repo HOST/OWNER/REPO."
+  fi
+}
+
 gh_public_leak_guard() {
   local hits f class idx line report=""
   _ghpl_load_hosts
@@ -848,6 +882,7 @@ gh_public_leak_guard() {
     echo "gh wrapper: blocked a write to public $_ghpl_target. The text has a private reference:"
     printf '%s' "$report"
     [ "$_ghpl_unconfirmed" = 0 ] || echo "  (could not confirm the target's visibility, so it counts as public)"
+    _ghpl_hint_repo_host
     echo "Replace each one with a generic placeholder: ~ for the home dir, github.example.com for a host, PROJ-123 for a ticket."
     echo "If a person checked the text and wants it public, they run 'dotfiles leak allow --once' in a terminal, then rerun."
   } >&2

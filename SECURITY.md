@@ -133,6 +133,11 @@ Nothing rewrites history after a push. A private email that passes L1 and
 L2 lands on github.com as-is. That is why L2 blocks instead of warning, and
 why L0 below guards the hook files themselves.
 
+If the public leak guard blocks a write with an unqualified `--repo OWNER/REPO`
+and can identify a different checkout origin host, it points out the mismatch.
+If you meant the origin host, confirm it and use
+`--repo HOST/OWNER/REPO`. The message keeps the origin name private.
+
 ### Hook integrity (L0 — protects L1 + L2 from silent overwrite)
 
 L1 and L2 only work if the hook files themselves are the canonical ones we

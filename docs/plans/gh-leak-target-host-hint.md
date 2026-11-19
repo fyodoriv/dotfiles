@@ -18,3 +18,15 @@ selects public GitHub from a checkout with a different origin host.
   exposes one private value, or adds a hint to either public control.
 - **Anchor:** Issue #781 and existing target resolution in
   `lib/gh-public-leak.sh`.
+
+## Scratch evidence
+
+The baseline blocked the unqualified public write with exit 1 and no hint.
+The candidate still blocked it and showed one hint. Both explicit enterprise
+controls reached the fake command. Explicit public host, explicit public
+repository and public origin all blocked with no hint. The output did not
+contain the fake private hostname or body text.
+
+Both signed-in SSH origin forms also showed a hint. A relative local origin
+and an unknown SSH alias added no hint. The alias control recorded zero
+calls to the fake SSH command.

@@ -67,6 +67,20 @@ local-ai-agent --model ollama/qwen3:0.6b "What is 2+2? Call done."
 
 Call #1's `prompt_eval_ms` is cold prefix processing. Calls #2+ stay at ~40 ms — KV cache reuse confirmed. `local-ai-bench --cold` force-unloads the model first to surface true cold-load regressions.
 
+### Measure idle Ollama memory
+
+Run `local-ai-bench --idle-memory` at least ten minutes after the last model
+request. It prints one JSON line with the timestamp, runner and server RSS in
+MiB, loaded model names from the local Ollama endpoint, and a verdict. RSS
+measures resident process memory.
+
+Runner RSS up to 500 MiB is under the threshold. More than 500 MiB and up to
+5,000 MiB is at the threshold. Higher values are over it. A stopped Ollama
+reports `NO_OLLAMA`. Missing host memory data reports `UNKNOWN`. When the
+model list is unavailable, `loaded_models` is `null`. The command reads
+process data and the local endpoint on port 11434. It sends no generation or
+unload request.
+
 ## Pitfalls
 
 - **opencode silently 404s every tool call** unless each Ollama model entry in `~/.config/opencode/opencode.json` declares `"tools": true`. The `local-ai.opencode_tools_enabled` doctor check guards against drift.

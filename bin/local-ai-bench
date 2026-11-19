@@ -8,12 +8,14 @@
 #
 # Usage:
 #   local-ai-bench [--model MODEL] [--cold] [--backend=ollama|llamacpp]
+#   local-ai-bench --idle-memory
 #
 # Flags:
 #   --model MODEL   model to bench (default qwen3-coder:30b)
 #   --cold          force-unload the model first so the first call measures
 #                   true cold-load time
 #   --backend       backend to use (default ollama, or llamacpp)
+#   --idle-memory   report local Ollama process memory and loaded models as JSON
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,15 +26,124 @@ PYTHON="$(dotfiles_resolve_python "$SCRIPT_DIR/.." "${HOME:-}")"
 MODEL="qwen3-coder:30b"
 COLD=false
 BACKEND="ollama"
+IDLE_MEMORY=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --model) MODEL="$2"; shift 2 ;;
     --cold) COLD=true; shift ;;
     --backend) BACKEND="$2"; shift 2 ;;
-    --help|-h) sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | head -20; exit 0 ;;
+    --idle-memory) IDLE_MEMORY=true; shift ;;
+    --help|-h) sed -n '2,/^set -euo/{ /^set -euo/d; p; }' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
+
+if $IDLE_MEMORY; then
+  if $COLD || [ "$BACKEND" != ollama ]; then
+    echo "--idle-memory needs the Ollama backend and cannot be used with --cold" >&2
+    exit 1
+  fi
+  exec "$PYTHON" - <<'PY'
+from datetime import datetime, timezone
+import json
+from pathlib import PurePath
+import re
+import subprocess
+
+
+def read_probe(args):
+    try:
+        return subprocess.run(args, capture_output=True, errors="replace", timeout=4)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def local_process_memory():
+    listing = read_probe(["ps", "-axo", "pid=,comm="])
+    if listing is None or listing.returncode != 0:
+        return None
+    executables = {}
+    for line in listing.stdout.splitlines():
+        fields = line.split(maxsplit=1)
+        if len(fields) != 2:
+            continue
+        pid, command = fields
+        if PurePath(command).name == "ollama":
+            executables[pid] = command
+    if not executables:
+        return {}
+
+    details = read_probe(
+        ["ps", "-ww", "-p", ",".join(executables), "-o", "pid=,rss=,args="]
+    )
+    if details is None or details.returncode != 0:
+        return None
+    totals = {}
+    for line in details.stdout.splitlines():
+        fields = line.split(maxsplit=2)
+        if len(fields) != 3 or not fields[1].isdigit():
+            return None
+        pid, kib, args = fields
+        command = executables.pop(pid, None)
+        if command is None:
+            return None
+        if args.startswith(command + " "):
+            args = "ollama " + args[len(command) + 1:]
+        match = re.match(r"^(?:\S*/)?ollama\s+(\S+)", args)
+        if match is None:
+            return None
+        role = match[1]
+        if role in ("serve", "runner"):
+            totals[role] = totals.get(role, 0) + int(kib)
+        elif role not in ("list", "ps", "show", "--version", "--help"):
+            return None
+    return None if executables else totals
+
+
+def local_models():
+    result = read_probe(
+        ["curl", "--disable", "--noproxy", "*", "--silent", "--fail",
+         "--max-time", "2", "http://127.0.0.1:11434/api/ps"]
+    )
+    if result is None:
+        return None, False
+    if result.returncode != 0:
+        return None, result.returncode == 7
+    try:
+        names = [model["name"] for model in json.loads(result.stdout)["models"]]
+        return names if all(isinstance(name, str) for name in names) else None, False
+    except (KeyError, TypeError, ValueError):
+        return None, False
+
+
+def memory_verdict(runner_kib):
+    if runner_kib <= 500 * 1024:
+        return "UNDER_THRESHOLD"
+    if runner_kib <= 5000 * 1024:
+        return "AT_THRESHOLD"
+    return "OVER_THRESHOLD"
+
+
+memory = local_process_memory()
+models, refused = local_models()
+runner_kib = serve_kib = None
+if memory or (memory == {} and refused):
+    runner_kib = memory.get("runner", 0)
+    serve_kib = memory.get("serve", 0)
+    verdict = memory_verdict(runner_kib) if memory else "NO_OLLAMA"
+    if verdict == "NO_OLLAMA":
+        models = []
+else:
+    verdict = "UNKNOWN"
+print(json.dumps({
+    "ts": datetime.now(timezone.utc).isoformat(),
+    "ollama_runner_rss_mb": None if runner_kib is None else runner_kib / 1024,
+    "ollama_serve_rss_mb": None if serve_kib is None else serve_kib / 1024,
+    "loaded_models": models,
+    "verdict": verdict,
+}))
+PY
+fi
 
 if [ "$BACKEND" = "llamacpp" ]; then
   # Probe for llama-server binary

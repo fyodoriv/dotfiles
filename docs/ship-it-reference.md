@@ -262,6 +262,10 @@ export GH_HOST=<your-github-host>   # match remote host — required for gh api/
 OWNER=$(gh repo view --json owner -q .owner.login)
 REPO=$(gh repo view --json name -q .name)
 PR=<number>
+MERGE_BRANCH_OPTION=--delete-branch
+if [ "${GH_HOST:-github.com}" = github.com ] && [ "$OWNER/$REPO" = fyodoriv/agentbrew ]; then
+  MERGE_BRANCH_OPTION=
+fi
 ```
 
 **Cascade** — run in order; stop only when `gh pr view <n> --json state -q .state` is `MERGED`:
@@ -272,16 +276,16 @@ PR=<number>
 gh pr update-branch "$PR" --rebase 2>/dev/null || true
 
 # 1. Normal squash merge
-gh pr merge "$PR" --squash --delete-branch 2>&1 || true
+gh pr merge "$PR" --squash ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"} 2>&1 || true
 
 # 2. Admin merge (GitHub uses GraphQL mergePullRequest internally)
-gh pr merge "$PR" --squash --delete-branch --admin 2>&1 || true
+gh pr merge "$PR" --squash ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"} --admin 2>&1 || true
 
 # 3. Auto-merge when supported (queues merge after requirements)
-gh pr merge "$PR" --auto --squash --delete-branch 2>&1 || true
+gh pr merge "$PR" --auto --squash ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"} 2>&1 || true
 
 # 4. Self-approve then merge — try even when policy likely forbids it
-gh pr review "$PR" --approve 2>&1 && gh pr merge "$PR" --squash --delete-branch 2>&1 || true
+gh pr review "$PR" --approve 2>&1 && gh pr merge "$PR" --squash ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"} 2>&1 || true
 
 # 5. GraphQL mergePullRequest (explicit — same review gate as step 2)
 PR_ID=$(gh pr view "$PR" --json id -q .id)
@@ -826,7 +830,41 @@ Merge details:
 - **Strict branch protection** (branch must be up to date): after each merge, rebase every other open PR of this session with `gh pr update-branch <n> --rebase` before its watcher merges it. Otherwise the next merge fails with "required status checks are expected".
 - **Serial merge watchers:** a watcher that times out while it waits for its predecessor must not merge out of order without a trace. It logs the timeout and the order it used, and the final report names it.
 
-After `gh pr merge --delete-branch` from the live checkout, the PR's worktree is unregistered but its folder stays. Remove the folder by its real path (`~/apps/tooling/wt.noindex/<name>`; `git worktree remove` on the `wt` symlink path says "is not a working tree"), then run `git worktree prune`.
+### Agentbrew squash file coverage before cleanup
+
+For `github.com/fyodoriv/agentbrew`, merge without `--delete-branch`. After
+GitHub reports `MERGED`, run the verifier from the Agentbrew checkout. Read
+the verifier from the reported merge commit so the first delivery can run it.
+
+```bash
+verify_squash_files() (
+  set -o pipefail
+  receipt=$(gh pr view "$PR" --json state,mergeCommit,baseRefName --jq 'select(.state == "MERGED") | [.mergeCommit.oid, .baseRefName] | @tsv') || exit 2
+  IFS=$'\t' read -r merged_sha merge_base <<<"$receipt" || exit 2
+  [[ "$merged_sha" =~ ^[0-9a-f]{40}$ ]] || exit 2
+  git check-ref-format "refs/heads/$merge_base" || exit 2
+  git fetch --no-prune origin "refs/heads/$merge_base:refs/remotes/origin/$merge_base" || exit 2
+  git merge-base --is-ancestor "$merged_sha" "refs/remotes/origin/$merge_base" || exit 2
+  verifier=$(git --no-replace-objects show "$merged_sha:scripts/verify-squash-merge-completeness.mjs") || exit 2
+  [[ -n "${verifier//[[:space:]]/}" ]] || exit 2
+  result=0
+  output=$(printf '%s\n' "$verifier" | node --input-type=module - --pr "$PR" 2>&1) || result=$?
+  printf '%s\n' "$output"
+  case "$result" in
+    0) [[ "$output" == "PR #$PR: "*" present in merge $merged_sha." ]] && exit 0 ;;
+    1) [[ "$output" == "PR #$PR: "*" file paths absent from merge $merged_sha."* ]] && exit 1 ;;
+  esac
+  exit 2
+)
+verify_squash_files
+```
+
+Exit 0 permits cleanup after the pushed-change check. Exit 1 lists paths to
+investigate before preparing a repair. Exit 2 leaves file coverage unverified.
+Keep the local branch and worktree for either exit 1 or 2 and state the result
+in the delivery report.
+
+In other repos, `gh pr merge --delete-branch` from the live checkout unregisters the PR's worktree. Remove the folder by its real path (`~/apps/tooling/wt.noindex/<name>`; `git worktree remove` on the `wt` symlink path says "is not a working tree"), then run `git worktree prune`.
 
 ## 8. Reconcile local default branch
 
@@ -843,8 +881,14 @@ This reconciliation is local-only cleanup after successful delivery. It does not
 ## 9. Clean up shipped/redundant worktrees, branches, and stashes
 
 After PR merge and local default-branch reconciliation, run the worktree
-inventory again. For every current-repo or approved-family worktree classified
-as **already represented** or whose useful work you just shipped:
+inventory again. For an Agentbrew squash, require both the Step 7 file
+coverage result and the pushed-change check to pass for the corresponding
+PR before removing its local branch or worktree. Keep both when either
+check is unverified or found missing work. Apply this rule to branch cleanup
+below as well.
+
+For every current-repo or approved-family worktree classified as **already
+represented** or whose useful work you just shipped:
 
 1. Verify it is clean or only contains ignored/generated trash you created in
    this session; if not clean, return to the worktree-salvage classification.

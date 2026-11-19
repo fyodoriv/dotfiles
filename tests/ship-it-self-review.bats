@@ -25,6 +25,32 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   grep -q 'CI → review (6a) → merge' "$CMD"
 }
 
+@test "ship-it verifies an Agentbrew squash before branch and worktree cleanup" {
+  local flag_fixture step verify cleanup eval_file
+  flag_fixture=$(sed -n '/^MERGE_BRANCH_OPTION=/,/^fi$/p' "$REF")
+  run env GH_HOST=github.com OWNER=fyodoriv REPO=agentbrew bash -c "$flag_fixture"$'\nprintf "<%s>" ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"}'
+  [ "$status" -eq 0 ]
+  [ "$output" = '<>' ]
+  run env -u GH_HOST OWNER=fyodoriv REPO=agentbrew bash -c "$flag_fixture"$'\nprintf "<%s>" ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"}'
+  [ "$status" -eq 0 ]
+  [ "$output" = '<>' ]
+  run env GH_HOST=github.com OWNER=fyodoriv REPO=dotfiles bash -c "$flag_fixture"$'\nprintf "<%s>" ${MERGE_BRANCH_OPTION:+"$MERGE_BRANCH_OPTION"}'
+  [ "$status" -eq 0 ]
+  [ "$output" = '<--delete-branch>' ]
+  step=$(sed -n '/^## 7\. Merge$/,/^## 8\. /p' "$REF")
+  verify=$(grep -nF 'node --input-type=module - --pr "$PR"' <<<"$step" | cut -d: -f1)
+  cleanup=$(grep -nF 'Remove the folder by its real path' <<<"$step" | cut -d: -f1)
+  [ "$verify" -lt "$cleanup" ]
+  grep -Fq 'select(.state == "MERGED") | [.mergeCommit.oid, .baseRefName]' <<<"$step"
+  grep -Fq 'git fetch --no-prune origin' <<<"$step"
+  grep -Fq 'Exit 1 lists paths' <<<"$step"
+  grep -Fq 'Exit 2 leaves file coverage unverified' <<<"$step"
+  grep -Fq 'Keep the local branch and' <<<"$step"
+  grep -Fq 'require both the Step 7 file' "$REF"
+  eval_file="$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json"
+  jq -e '.evals | any((.prompt | contains("resulting squash")) and (.expectations | length >= 3))' "$eval_file" >/dev/null
+}
+
 @test "ship-it reference applies lessons from past PR reviews before verify (#258)" {
   grep -q '^## 2a\. Apply lessons from past PR reviews' "$REF"
   grep -q -- '--author @me --state all --limit 20 --json number,comments,reviews' "$REF"

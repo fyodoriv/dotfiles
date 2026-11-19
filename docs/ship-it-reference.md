@@ -827,6 +827,7 @@ Wait for every check before you merge, required or not: `gh pr checks <n> --watc
 Merge details:
 
 - `gh pr merge --match-head-commit` takes the full 40-character SHA (`git rev-parse HEAD`). Some hosts reject a short SHA.
+- **Green at the reviewed head:** a green run counts only for the head it ran on. After a review fix, watch the new head again and merge with that head's full SHA in `--match-head-commit`, so a later push cannot slip in unreviewed.
 - **Strict branch protection** (branch must be up to date): after each merge, rebase every other open PR of this session with `gh pr update-branch <n> --rebase` before its watcher merges it. Otherwise the next merge fails with "required status checks are expected".
 - **Serial merge watchers:** a watcher that times out while it waits for its predecessor must not merge out of order without a trace. It logs the timeout and the order it used, and the final report names it.
 

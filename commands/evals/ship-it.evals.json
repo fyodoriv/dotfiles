@@ -278,6 +278,17 @@
         "Runs the file check before branch or worktree cleanup",
         "Reports exit 1 as missing paths and an incomplete check as unverified, keeping the local branch and worktree in both cases"
       ]
+    },
+    {
+      "id": 25,
+      "prompt": "/ship-it for two agentbrew PRs. Hosted checks went green on both, then a fresh-context reviewer found real defects in each. The repo has auto-merge disabled.",
+      "expected_output": "The agent fixes each defect with a regression test and pushes. It treats the earlier green runs as stale, waits for the new heads in one background gh pr checks --watch job, and merges each PR with --match-head-commit set to the full SHA of its reviewed head.",
+      "expectations": [
+        "Does not merge on the green run from the head before the review fixes",
+        "Waits for the new heads with gh pr checks --watch in the background, not a sleep loop and not auto-merge",
+        "Passes the full 40-character SHA from git rev-parse HEAD to --match-head-commit",
+        "Runs the squash-merge file check after each merge, before cleanup"
+      ]
     }
   ]
 }

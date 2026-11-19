@@ -72,6 +72,8 @@
 #   HEAVY_RUN_RAMP      seconds between run starts while others run, 0-3600
 #                       (setting heavy_run_ramp_seconds; default 15)
 #   HEAVY_RUN_EXCLUSIVE_WAIT  exclusive wait limit in seconds (default 900).
+#   HEAVY_RUN_EXCLUSIVE_SHARED  1 = an exclusive run takes a shared slot that is
+#                       never memory-paused (setting heavy_run_exclusive_shared; default 0)
 #   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
 #                       (setting heavy_run_max_load; default 0)
 #   HEAVY_RUN_PROJECT_SLOTS  most slots one project (a repo and its worktrees,
@@ -432,7 +434,8 @@ exec perl -e "$common_code"'
             setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, $is_num),
             setting("HEAVY_RUN_PROJECT_SLOTS", "heavy_run_project_slots", 3, $is_slots),
             setting("HEAVY_RUN_MEMORY_GUARD", "heavy_run_memory_guard", 1, $is_bit),
-            setting("HEAVY_RUN_MIN_FREE_PCT", "heavy_run_min_free_pct", 25, $is_pct));
+            setting("HEAVY_RUN_MIN_FREE_PCT", "heavy_run_min_free_pct", 25, $is_pct),
+            setting("HEAVY_RUN_EXCLUSIVE_SHARED", "heavy_run_exclusive_shared", 0, $is_bit));
   }
   # Machine checks asked at most once a second: each one is a fork.
   my %memo;
@@ -482,11 +485,13 @@ exec perl -e "$common_code"'
   # tickets behind it too, or ("skip", why) that lets later tickets go first.
   sub decide {
     my ($s, $t, $set) = @_;
-    my ($n, $ramp, $maxload, $pcap, undef, $minfree) = @$set;
+    my ($n, $ramp, $maxload, $pcap, undef, $minfree, $xshared) = @$set;
     if ((my $r = realtime()) ne "") { return ("wait", $r); }
     return ("wait", "queue project metadata unavailable") if $s->{invalid_project};
     return ("wait", "an exclusive run is active") if $s->{excl};
-    if ($t->{exclusive}) {
+    # heavy_run_exclusive_shared=1: an exclusive ticket takes a shared slot
+    # (and is never memory-paused), so one run no longer holds the whole Mac.
+    if ($t->{exclusive} && !$xshared) {
       return ("grant", "exclusive") if !$s->{active} && !$s->{busy};
       return ("wait", $s->{busy} ? "exclusive: waiting for $s->{busy} running run(s) to end" : "exclusive: waiting for an older heavy-run");
     }
@@ -725,6 +730,7 @@ exec perl -e "$common_code"'
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = "DEFAULT"; }
   if ($ticket) { unlink "$ticket.grant", "$ticket.why", $ticket; close $tfh; }
   if (open(my $ls, ">", $last_start)) { close $ls; }
+  $nopause_run = 1 if $exclusive && $slot ne "exclusive";
   my $slotfile = $slot eq "exclusive" ? $lock : "$slotdir/s$slot";
   my $ownerfile = $slot eq "exclusive" ? $owner : "$slotdir/s$slot.owner";
   my $mark = $slot eq "exclusive" ? "$dir/exclusive.paused" : "$slotdir/s$slot.paused";

@@ -1034,6 +1034,16 @@ make_fake_app() {
   release_all
 }
 
+@test "heavy-run: heavy_run_exclusive_shared=1: an exclusive run starts beside a running run" {
+  export HEAVY_RUN_SLOTS=2 HEAVY_RUN_RAMP=0 HEAVY_RUN_EXCLUSIVE_SHARED=1
+  start_holder
+  wait_held 1
+  run timeout 20 "$SCRIPT" --exclusive sh -c 'echo "slot=$HEAVY_RUN_SLOT"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "slot=2" ]
+  release_all
+}
+
 @test "heavy-run: --no-pause: runs in a shared slot and hides its internal flag" {
   run "$SCRIPT" --no-pause sh -c 'echo "slot=$HEAVY_RUN_SLOT flag=${HEAVY_RUN_NOPAUSE_RUN-unset}"'
   [ "$status" -eq 0 ]

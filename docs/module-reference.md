@@ -129,6 +129,13 @@ unverifiable scans are always repeated.
 
 Spotlight check count varies based on which directories exist on your machine.
 
+Run `dotfiles-launchagent-drift` to compare loaded jobs with their plists.
+If it reports `log-path`, render `StandardOutPath` and `StandardErrorPath`
+in the plist source before repair. The check names the affected fields.
+If the report says `loaded`, launchd still holds an older copy with the
+literal path. Confirm the rendered plist before you reload the job.
+Repair mode leaves jobs with either kind of log path error alone.
+
 ---
 
 ## Important

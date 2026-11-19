@@ -63,6 +63,55 @@ loaded() {
   [[ "$output" == *"ok com.dotfiles.a"* ]]
 }
 
+@test "a plist with unexpanded log paths is reported without restarting it" {
+  local label=com.dotfiles.bad-logs
+  plist "$label" true /bin/bash /x/a.sh
+  loaded "$label" running /bin/bash /x/old.sh
+  /usr/bin/plutil -insert StandardOutPath -string '${HOME}/logs/out' "$AGENTS/$label.plist"
+  /usr/bin/plutil -insert StandardErrorPath -string '${HOME}/logs/err' "$AGENTS/$label.plist"
+  local before
+  before="$(shasum "$AGENTS/$label.plist")"
+
+  run "$SCRIPT"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"log-path $label: unexpanded HOME in StandardOutPath, StandardErrorPath."* ]]
+  [[ "$output" != *"/logs/"* ]]
+  run "$SCRIPT" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"log-path $label:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ "$(shasum "$AGENTS/$label.plist")" = "$before" ]
+}
+
+@test "a bad log path prevents bootstrap and a rendered log path can bootstrap" {
+  local label=com.dotfiles.new
+  plist "$label" true /bin/bash /x/c.sh
+  /usr/bin/plutil -insert StandardErrorPath -string '${HOME}/logs/err' "$AGENTS/$label.plist"
+  run "$SCRIPT" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"log-path $label: unexpanded HOME in StandardErrorPath."* ]]
+  [ -z "$(grep '^bootstrap ' "$TEST_DIR/calls")" ]
+
+  /usr/bin/plutil -replace StandardErrorPath -string "$HOME/logs/err" "$AGENTS/$label.plist"
+  run "$SCRIPT" --fix
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bootstrapped $label"* ]]
+  grep -q '^bootstrap ' "$TEST_DIR/calls"
+}
+
+@test "a stopped job with a stale loaded log path does not kickstart" {
+  local label=com.dotfiles.stale-log
+  plist "$label" true /bin/bash /x/a.sh
+  /usr/bin/plutil -insert StandardOutPath -string "$HOME/logs/out" "$AGENTS/$label.plist"
+  printf 'gui/501/%s = {\n\tstate = not running\n\targuments = {\n\t\t/bin/bash\n\t\t/x/a.sh\n\t}\n\tstdout path = %s\n}\n' \
+    "$label" '${HOME}/logs/old' > "$TEST_DIR/print/$label"
+
+  run "$SCRIPT" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"log-path $label: unexpanded HOME in loaded StandardOutPath."* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+}
+
 @test "a job whose loaded arguments differ from its plist is drift, and --fix reloads it" {
   plist com.dotfiles.chrome false /bin/bash /x/relay "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9223
   loaded com.dotfiles.chrome running "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9223

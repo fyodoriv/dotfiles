@@ -114,7 +114,7 @@ def local_process_memory():
             servers.add(pid)
         if role in ("serve", "runner"):
             totals[role] = totals.get(role, 0) + int(kib)
-        elif role not in ("list", "ps", "show", "--version", "--help"):
+        elif role not in ("list", "ps", "run", "show", "--version", "--help"):
             return None
     if executables:
         return None

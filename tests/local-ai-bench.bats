@@ -180,7 +180,7 @@ SH
   [ "$status" -eq 0 ]
   jq -e '.ollama_runner_rss_mb == null and .verdict == "UNKNOWN"' <<< "$output"
 
-  BENCH_PROCESS_DETAILS=$'42 1 24576 /usr/bin/ollama serve\n43 42 614400 /usr/bin/ollama list'
+  BENCH_PROCESS_DETAILS=$'42 1 24576 /usr/bin/ollama serve\n43 42 614400 /usr/bin/ollama run sample:fixture'
   run bin/local-ai-bench --idle-memory
   [ "$status" -eq 0 ]
   jq -e '.ollama_runner_rss_mb == 0 and .loaded_models == null and

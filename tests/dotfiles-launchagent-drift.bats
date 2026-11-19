@@ -54,13 +54,17 @@ loaded() {
   } > "$TEST_DIR/print/$label"
 }
 
+tool_checkout() {
+  TOOL_CHECKOUT="$TEST_DIR/checkout"
+  mkdir -p "$TOOL_CHECKOUT/bin" "$TOOL_CHECKOUT/lib" "$TEST_DIR/job-bin"
+  cp "$SCRIPT" "$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  cp "$BATS_TEST_DIRNAME/../lib/launchagent-args.sh" "$TOOL_CHECKOUT/lib/"
+}
+
 sync_fixture() {
-  local checkout="$TEST_DIR/checkout"
-  mkdir -p "$checkout/bin" "$checkout/lib" "$TEST_DIR/job-bin"
-  cp "$SCRIPT" "$checkout/bin/dotfiles-launchagent-drift"
-  cp "$BATS_TEST_DIRNAME/../lib/launchagent-args.sh" "$checkout/lib/"
-  SYNC_PROBE="$checkout/bin/dotfiles-launchagent-drift"
-  SYNC_SCRIPT="$checkout/bin/dotfiles-sync"
+  tool_checkout
+  SYNC_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  SYNC_SCRIPT="$TOOL_CHECKOUT/bin/dotfiles-sync"
   SYNC_LABEL=com.dotfiles.dotfiles-sync
   SYNC_PLIST="$AGENTS/$SYNC_LABEL.plist"
   printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/script-ran" > "$SYNC_SCRIPT"
@@ -143,6 +147,55 @@ sync_job_path() {
   [ -z "$output" ]
   [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
   [ ! -e "$TEST_DIR/script-ran" ] && [ ! -e "$TEST_DIR/tool-ran" ]
+}
+
+@test "the load sampler needs both declared tools before repair" {
+  tool_checkout
+  local label=com.dotfiles.load-sampler
+  local sampler="$TOOL_CHECKOUT/bin/dotfiles-load-sampler"
+  local probe="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  local file="$AGENTS/$label.plist" tool other
+  for tool in "$sampler" "$TEST_DIR/bin/sysctl" "$TEST_DIR/bin/ps"; do
+    printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/executed" > "$tool"
+    chmod +x "$tool"
+  done
+  plist "$label" true /bin/bash "$sampler"
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$file"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$TEST_DIR/job-bin" "$file"
+  loaded "$label" waiting /bin/bash "$sampler"
+
+  for tool in sysctl ps; do
+    other=ps
+    [ "$tool" = ps ] && other=sysctl
+    cp "$TEST_DIR/bin/$other" "$TEST_DIR/job-bin/$other"
+    run "$probe"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"tool-path $label: $tool is missing"* ]]
+    [[ "$output" != *"$TEST_DIR"* ]]
+    run "$probe" --fix
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"tool-path $label: $tool is missing"* ]]
+    rm "$TEST_DIR/job-bin/$other"
+  done
+
+  cp "$TEST_DIR/bin/sysctl" "$TEST_DIR/bin/ps" "$TEST_DIR/job-bin/"
+  loaded "$label" running /bin/bash "$sampler"
+  run "$probe"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $label" ]
+
+  plist "$label" true /bin/bash "$sampler" --report
+  rm "$TEST_DIR/print/$label"
+  run "$probe" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $label:"* ]]
+
+  printf '    "%s" => disabled\n' "$label" > "$TEST_DIR/disabled"
+  run "$probe" --fix
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
 }
 
 @test "a job whose loaded arguments match its plist and that runs is ok" {

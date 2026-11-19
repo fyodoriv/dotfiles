@@ -143,6 +143,12 @@ flag after it is a match too. A rewritten word that could expand to a flag
 `git branch --list ${x}` passes. A plain `$var` or `$(...)` in an ordinary
 `git branch` command is not a match.
 
+The branch scanner can set aside an exact leading comparison of
+`$(git branch --show-current)` with a literal branch name. It also accepts
+that comparison immediately after a plain `set -e` line. The shell parser
+must confirm the complete condition. The scanner still checks the remaining
+command, and the guard keeps the conservative result for uncertain forms.
+
 Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
 quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as
 `refs/heads/<name>` (checked with `git show-ref --verify`). The default branch

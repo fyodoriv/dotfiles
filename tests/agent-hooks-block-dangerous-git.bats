@@ -52,6 +52,39 @@ _check_command_text() {
   [ "$status" -eq 0 ]
 }
 
+@test "a leading literal branch comparison can precede a status check" {
+  local text
+  text=$(printf '%s\n' 'test "$(git branch --show-current)" = docs/topic' 'test -z "$(git status --porcelain)"')
+  _check_command_text "$text"
+  [ "$status" -eq 0 ]
+}
+
+@test "a literal branch comparison can follow a leading set -e" {
+  local text
+  text=$(printf '%s\n' 'set -e' 'test "$(git branch --show-current)" = docs/topic' 'test -z "$(git status --porcelain)"')
+  _check_command_text "$text"
+  [ "$status" -eq 0 ]
+}
+
+@test "a literal branch comparison keeps later branch and reset refusals" {
+  local preflight
+  preflight='test "$(git branch --show-current)" = docs/topic'
+  _check_command_text "$(printf '%s\n' "$preflight" 'git branch --delete --force topic')"
+  [ "$status" -eq 2 ]
+  _check_command_text "$(printf '%s\n' "$preflight" 'git reset --hard')"
+  [ "$status" -eq 2 ]
+}
+
+@test "a dynamic or nonleading branch comparison keeps conservative matching" {
+  local status_check literal
+  status_check='test -z "$(git status --porcelain)"'
+  literal='test "$(git branch --show-current)" = docs/topic'
+  _check_command_text "$(printf '%s\n' 'test "$(git branch --show-current)" = "$branch"' "$status_check")"
+  [ "$status" -eq 2 ]
+  _check_command_text "$(printf '%s\n' 'set -u' "$literal" "$status_check")"
+  [ "$status" -eq 2 ]
+}
+
 @test "ignores inert quoted heredoc prose" {
   local text
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")

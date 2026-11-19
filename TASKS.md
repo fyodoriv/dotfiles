@@ -146,7 +146,7 @@ them. -->
   - **Success**: 0 "command not found" lines per week for 4 weeks and the drift command exits 0 on the owner's Mac.
   - **Pivot**: the check reports false drift on 2 or more healthy jobs -> keep only the `${HOME}` log-path check and drop the stripped-env run.
   - **Anchor**: launchd.plist(5) man page (EnvironmentVariables, StandardOutPath); Basili, Caldiera, Rombach 1994 (GQM).
-  - **Log path gate**: The hosted fixture must report both unexpanded log fields in one message, leave valid or missing optional paths unchanged, and make zero reload, kickoff or bootstrap calls for invalid paths even in repair mode. A read-only scan must count existing rendered paths without printing them. Pivot on any false drift or repair for an unsafe path.
+  - **Log path gate**: The hosted fixture must report both unexpanded log fields in one message, leave valid or missing optional paths unchanged, and make zero reload, kickoff or bootstrap calls for invalid paths even in repair mode. A read-only scan must count existing rendered paths without printing them. A stopped loaded copy with a stale log path must also report drift while its rendered disk plist is valid. Pivot on any false drift or repair for an unsafe path.
   - **Tool resolution gate**: Qualify a read-only probe contract for each script before any live tool check. Do not run configured jobs from the drift check. The dynamic tool check and four-week measurement remain open.
   - **Competitive-goal**: none — background job reliability (docs/metrics.md), not a scorecard metric.
 

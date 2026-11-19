@@ -46,6 +46,7 @@ setup() {
 
   is_overridden() { grep -qx "$1" "$OVERRIDES_FILE" 2>/dev/null; }
 
+  check_advisory() { :; }
   check() {
     local id="$1" desc="$2" test_cmd="$3" fix_cmd="$4"
     if $LIST_MODE; then return; fi

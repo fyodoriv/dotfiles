@@ -486,6 +486,13 @@
   jq -e '.evals | any(.id == 13)' "$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json" >/dev/null
 }
 
+@test "ship-it merges only the head that went green after review fixes" {
+  local reference="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
+  grep -F -q 'a green run counts only for the head it ran on' "$reference"
+  grep -F -q "that head's full SHA in \`--match-head-commit\`" "$reference"
+  jq -e '.evals | any(.id == 25 and (.prompt | contains("fresh-context reviewer")))' "$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json" >/dev/null
+}
+
 @test "UI visual proof asks for labeled before/after pairs from the real app" {
   local command_file="$BATS_TEST_DIRNAME/../commands/ship-it.md"
   local reference_file="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"

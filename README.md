@@ -68,6 +68,10 @@ Other ways in:
 - Give AI coding agents (Claude Code, Codex) one shared, local memory and safe defaults.
 - See how much time the automation saves with `dotfiles stats`.
 
+## Sponsor
+
+If dotfiles saves you time, you can [sponsor its author on GitHub](https://github.com/sponsors/fyodoriv). It keeps the work going.
+
 ## The problem
 
 A new Mac ships with conservative defaults — slow key repeat, Spotlight crawling `node_modules`, NVM adding 300ms to every shell, `git status` doing single-threaded I/O. You fix these manually, then forget what you changed. Six months later you get a new machine and start over.

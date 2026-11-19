@@ -1037,7 +1037,7 @@ make_fake_app() {
 @test "heavy-run: --no-pause: runs in a shared slot and hides its internal flag" {
   run "$SCRIPT" --no-pause sh -c 'echo "slot=$HEAVY_RUN_SLOT flag=${HEAVY_RUN_NOPAUSE_RUN-unset}"'
   [ "$status" -eq 0 ]
-  [ "$output" = "slot=s1 flag=unset" ]
+  [ "$output" = "slot=1 flag=unset" ]
   run "$SCRIPT" --no-pause
   [ "$status" -eq 2 ]
 }

@@ -15,3 +15,10 @@ Pivot: any remaining substitution, lost managed PATH, failed curl control, or re
 Anchor: [Dotfiles issue #784](https://github.com/fyodoriv/dotfiles/issues/784) and Basili, Caldiera and Rombach (1994), Goal Question Metric.
 
 The controls use synthetic command text and never run it. The selected command path is independent of bare-name lookup and endpoint approval on a managed machine.
+
+## Baseline
+
+Prediction commit `1367e325` preceded the controls. The original hook failed
+all three exact command checks in the [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44597738094/job/135820481665)
+at `tests/agent-hooks-prepend-endpoint-path.bats:119`. The direct control
+also observed three changed commands. The curl and bare-name controls passed.

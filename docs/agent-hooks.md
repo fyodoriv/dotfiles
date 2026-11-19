@@ -322,6 +322,10 @@ retains Claude's other tool arguments and leaves the approval decision to
 Claude. Auto mode keeps its command and approval behavior. Inputs with the
 legacy envelope keep the existing response.
 
+The hook preserves explicit `/usr/bin/python3` and `/usr/bin/python3.13`
+paths in commands and literal text. Use an explicit path when the
+interpreter matters. A bare Python command still uses the managed PATH.
+
 The response is based on the [Codex hooks protocol](https://learn.chatgpt.com/docs/hooks).
 Input detection and temporary output files are scoped to one hook process.
 The temporary plist is removed before the response is printed.

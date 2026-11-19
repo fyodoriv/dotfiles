@@ -1,0 +1,33 @@
+# Check a literal branch name before starting a worktree task
+
+The command guard refused a branch-name comparison while preparing
+[Dotfiles #781](https://github.com/fyodoriv/dotfiles/issues/781).
+The tool had received the shell source and had not run it.
+
+- **Hypothesis:** The branch scanner keeps a read-only branch substitution
+  in its candidate text and reads a later argument as if it belonged to
+  that Git command.
+- **Measurement:** Pass the original shell source to the Dotfiles guard
+  as JSON. The fixture never executes the supplied command. Compare with
+  a short leading literal-branch test, one harmless command after it, and
+  later protected command controls.
+- **Success:** The original fails on the baseline. The fix admits both
+  verified read-only cases and keeps every changed, dynamic, nonleading
+  and later destructive control blocked when the original guard blocks it.
+- **Pivot:** If the source guard admits the original command, identify the
+  installed guard before changing anything. If any existing refusal
+  becomes an admission outside the proved leading condition, reject the fix.
+- **Anchor:** The earlier [read-only branch preflight](read-only-branch-preflight.md)
+  and the false refusal observed in this session.
+
+## Direct command-text evidence
+
+The tracked and installed baseline guards both returned exit 2 for the
+original text. A separate status substitution after the branch comparison
+was enough to reproduce it. The tracked candidate returned exit 0 for both
+forms, including the plain leading `set -e` case. It retained exit 2
+for six later destructive, dynamic, or nonleading controls.
+
+The [hosted baseline test](https://github.com/fyodoriv/dotfiles/actions/runs/44571238465/job/135774369273)
+failed both registered read-only cases at lines 59 and 66 of the fixture.
+The later branch and reset control passed in that run.

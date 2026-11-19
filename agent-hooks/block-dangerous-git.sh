@@ -497,14 +497,24 @@ literal_search_only() {
 }
 literal_search_only && exit 0
 
-# Read the first condition of one foreground && chain. Check both the parser
-# boundary and its exact literal text before the branch scanner can omit it.
+# Verify the leading read-only comparison as one complete Bash condition.
+# The branch scanner retains the original suffix.
 read_only_branch_prefix_end() {
-  local shfmt_bin="$1" jq_bin="$2" end prefix
+  local shfmt_bin="$1" jq_bin="$2" end prefix offset=0 kind=literal
   local comparison='^test "\$\(git branch --show-current\)" = "\$\(gh pr view [1-9][0-9]* --json headRefName --jq \.headRefName\)"$'
+  local literal='^test "\$\(git branch --show-current\)" = [A-Za-z0-9][A-Za-z0-9._/-]*$'
+  case "$command" in $'set -e\n'*) offset=7 ;; esac
   # shellcheck disable=SC2016
-  case "$command" in 'test "$(git branch --show-current)" = "$(gh pr view '*) ;; *) return 1 ;; esac
-  end=$(printf '%s' "$command" | "$shfmt_bin" --to-json 2>/dev/null | "$jq_bin" -er '
+  case "${command:offset}" in
+    'test "$(git branch --show-current)" = "$(gh pr view '*)
+      [ "$offset" -eq 0 ] || return 1
+      kind='pr' ;;
+    'test "$(git branch --show-current)" = '*)
+      comparison="$literal" ;;
+    *) return 1 ;;
+  esac
+  end=$(printf '%s' "$command" | "$shfmt_bin" --to-json 2>/dev/null |
+    "$jq_bin" -er --argjson offset "$offset" --arg kind "$kind" '
     def first_condition:
       select(.Background != true and .Coprocess != true and .Negated != true and
         ((.Redirs // []) | length) == 0)
@@ -512,13 +522,13 @@ read_only_branch_prefix_end() {
         then .Cmd.X | first_condition
         else .
         end;
-    select(.Type == "File" and (.Stmts | length) == 1)
-    | .Stmts[0] | first_condition
-    | select(.Cmd.Type == "CallExpr" and .Pos.Offset == 0)
+    select(.Type == "File" and ($kind == "literal" or (.Stmts | length) == 1))
+    | if $offset == 0 then .Stmts[0] else .Stmts[1] end | first_condition
+    | select(.Cmd.Type == "CallExpr" and .Pos.Offset == $offset)
     | .End.Offset
   ' 2>/dev/null) || return 1
   [[ "$end" =~ ^[0-9]+$ ]] || return 1
-  prefix=${command:0:end}
+  prefix=${command:offset:end-offset}
   [[ "$prefix" =~ $comparison ]] || return 1
   printf '%s' "$end"
 }

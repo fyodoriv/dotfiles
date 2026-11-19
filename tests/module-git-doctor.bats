@@ -103,10 +103,16 @@ doctor_env() {
   is_overridden() { grep -qx "$1" "$OVERRIDES_FILE" 2>/dev/null; }
   check() {
     local id="$1" desc="$2" t="$3" f="$4"
+    [ "${MERGIRAF_ONLY:-false}" != true ] || [ "$id" = git.mergiraf ] || return 0
     if is_overridden "$id"; then skipped "$desc"; return; fi
     if eval "$t" >/dev/null 2>&1; then pass "$desc"; return; fi
     if [ "$FIX_MODE" = true ] && [ -n "$f" ] && eval "$f" >/dev/null 2>&1; then fixed "$desc"; return; fi
     fail "$id"
+  }
+  check_advisory() {
+    if [ "$1" = git.mergiraf ] && ! eval "$3"; then
+      mergiraf_hint="$4"
+    fi
   }
   check_managed() { :; }
   check_symlink() { :; }
@@ -133,4 +139,72 @@ doctor_env() {
   source "$REPO/modules/git/doctor.sh"
   [ "$(git config -f "$HOME/.gitconfig.local" user.email)" = "me@example.com" ]
   ! grep -q '^\[user\]' "$HOME/.gitconfig"
+}
+
+mergiraf_doctor_env() {
+  doctor_env
+  MERGIRAF_ONLY=true
+  export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+  printf '[include]\n\tpath = ~/.gitconfig.local\n' > "$GIT_CONFIG_GLOBAL"
+  command() {
+    if [ "$*" = '-v mergiraf' ]; then
+      "$MERGIRAF_AVAILABLE"
+    else
+      builtin command "$@"
+    fi
+  }
+}
+
+@test "doctor registers Mergiraf only on repair and the second repair is a no-op" {
+  MERGIRAF_AVAILABLE=true
+  mergiraf_doctor_env
+  printf '[user]\n\tname = Test User\n' > "$HOME/.gitconfig.local"
+  cp "$HOME/.gitconfig.local" "$TEST_DIR/before"
+  source "$REPO/modules/git/doctor.sh"
+  [ "${fail_messages[*]}" = git.mergiraf ]
+  cmp "$HOME/.gitconfig.local" "$TEST_DIR/before"
+
+  FIX_MODE=true
+  source "$REPO/modules/git/doctor.sh"
+  [ "$fix_count" -eq 1 ]
+  [ "$(git config --global --includes --get merge.mergiraf.name)" = mergiraf ]
+  [ "$(git config --global --includes --get merge.mergiraf.driver)" = 'mergiraf merge --git %O %A %B -s %S -x %X -y %Y -p %P -l %L' ]
+  [ "$(git config --global --includes --get merge.mergiraf.recursive)" = binary ]
+  [ "$(git config --global --includes --get user.name)" = 'Test User' ]
+  [ ! -e "$HOME/.gitattributes" ]
+  [ ! -e "$HOME/.config/git/attributes" ]
+
+  cp "$HOME/.gitconfig.local" "$TEST_DIR/registered"
+  source "$REPO/modules/git/doctor.sh"
+  [ "$fix_count" -eq 1 ]
+  cmp "$HOME/.gitconfig.local" "$TEST_DIR/registered"
+}
+
+@test "doctor gives an install hint without writing config when Mergiraf is missing" {
+  MERGIRAF_AVAILABLE=false
+  mergiraf_doctor_env
+  FIX_MODE=true
+  source "$REPO/modules/git/doctor.sh"
+  [[ "$mergiraf_hint" == *'brew install mergiraf'* ]]
+  [ "$fail_count" -eq 0 ]
+  [ "$fix_count" -eq 0 ]
+  [ ! -e "$HOME/.gitconfig.local" ]
+}
+
+@test "doctor keeps the identity bootstrap and skips inactive Git includes" {
+  MERGIRAF_AVAILABLE=true
+  mergiraf_doctor_env
+  FIX_MODE=true
+  source "$REPO/modules/git/doctor.sh"
+  [[ "$mergiraf_hint" == *'onboarding guide'* ]]
+  [ ! -e "$HOME/.gitconfig.local" ]
+
+  printf '[user]\n\tname = Test User\n' > "$HOME/.gitconfig.local"
+  printf '[pull]\n\trebase = true\n' > "$GIT_CONFIG_GLOBAL"
+  cp "$HOME/.gitconfig.local" "$TEST_DIR/before"
+  mergiraf_hint=
+  source "$REPO/modules/git/doctor.sh"
+  [[ "$mergiraf_hint" == *'onboarding guide'* ]]
+  [ "$fix_count" -eq 0 ]
+  cmp "$HOME/.gitconfig.local" "$TEST_DIR/before"
 }

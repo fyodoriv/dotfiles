@@ -66,6 +66,27 @@ check "git.splitindex_off"  "core.splitIndex not set"     "[ -z \"\$(git config 
 check "git.maintenance_auto" "maintenance.auto = true"    "[ \"\$(git config --global maintenance.auto)\" = 'true' ]"     "git config --global maintenance.auto true"
 check "git.safe_aliases"    "global git aliases avoid add-all staging" "[ -z \"\$(git_unsafe_add_aliases)\" ]"
 
+# Register the driver in the machine-local include. Repositories opt in with attributes.
+if ! $LIST_MODE && ! command -v mergiraf >/dev/null 2>&1; then
+  check_advisory "git.mergiraf" "Mergiraf is an optional Git merge driver" "false" \
+    'On macOS, run brew install mergiraf, then dotfiles doctor --module git --fix.'
+elif ! $LIST_MODE && { [ ! -f "$HOME/.gitconfig.local" ] ||
+  ! git config --global --includes --path --get-all include.path |
+    grep -Fxq -- "$HOME/.gitconfig.local"; }; then
+  check_advisory "git.mergiraf" "Mergiraf needs the machine-local Git config" "false" \
+    'Set up the included ~/.gitconfig.local as described in the onboarding guide, then run dotfiles doctor --module git --fix.'
+else
+  _mergiraf_driver='mergiraf merge --git %O %A %B -s %S -x %X -y %Y -p %P -l %L'
+  check "git.mergiraf" "Mergiraf is registered as a Git merge driver" \
+    "[ \"\$(git config --global --includes --get merge.mergiraf.name)\" = 'mergiraf' ] &&
+     [ \"\$(git config --global --includes --get merge.mergiraf.driver)\" = '$_mergiraf_driver' ] &&
+     [ \"\$(git config --global --includes --get merge.mergiraf.recursive)\" = 'binary' ]" \
+    "git config --file \"\$HOME/.gitconfig.local\" --replace-all merge.mergiraf.name mergiraf &&
+     git config --file \"\$HOME/.gitconfig.local\" --replace-all merge.mergiraf.driver '$_mergiraf_driver' &&
+     git config --file \"\$HOME/.gitconfig.local\" --replace-all merge.mergiraf.recursive binary"
+  unset _mergiraf_driver
+fi
+
 # ── File permissions ─────────────────────────────────────────────────
 check "git.safe_guard" "git-safe is executable" "[ -x \"$DOTFILES_DIR/bin/git-safe\" ]" "chmod +x \"$DOTFILES_DIR/bin/git-safe\""
 

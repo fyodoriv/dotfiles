@@ -49,6 +49,7 @@ setup() {
   chezmoi() { printf 'false\n'; }
   check_managed() { :; }
   check_symlink() { :; }
+  check_advisory() { :; }
   check() {
     local id="$1" test_cmd="$3" result
     $LIST_MODE && return 0

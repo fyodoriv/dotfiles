@@ -27,3 +27,7 @@ original text. A separate status substitution after the branch comparison
 was enough to reproduce it. The tracked candidate returned exit 0 for both
 forms, including the plain leading `set -e` case. It retained exit 2
 for six later destructive, dynamic, or nonleading controls.
+
+The [hosted baseline test](https://github.com/fyodoriv/dotfiles/actions/runs/44571238465/job/135774369273)
+failed both registered read-only cases at lines 59 and 66 of the fixture.
+The later branch and reset control passed in that run.

@@ -118,6 +118,8 @@ them. -->
   - **Success**: the 30-day conflict-fix commit count is at most half of the prior 30 days, and 0 wrong merges are found in review.
   - **Pivot**: 3 or more wrong auto-merges in a week, or no drop in the count after 30 days -> remove the driver config and keep only the doctor hint.
   - **Anchor**: Mergiraf project (https://mergiraf.org), published kernel benchmark of auto-resolved conflicts; Basili, Caldiera, Rombach 1994 (GQM).
+  - **Setup gate**: A disposable home verifies 3 of 3 effective Git settings, zero writes before repair or when the binary is missing, and identical config bytes after a second repair. A disposable repository with explicit attributes must retain both sides of one structural conflict. Pivot if any control fails or any attributes are written by doctor.
+  - **Field baseline**: The 30-day log query found zero matching commits on Nov 19, 2026. Keep the field measurement open until an opted-in repository has a nonzero comparable baseline.
   - **Competitive-goal**: none — agent merge reliability (docs/metrics.md), not a scorecard metric.
 
 - [ ] Make the git wrapper refuse `--no-verify` on commit, not only on push

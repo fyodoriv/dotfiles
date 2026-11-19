@@ -67,6 +67,13 @@ teardown() {
   [ ! -e "$GIT_ARGS" ]
 }
 
+@test "agent commit refuses the short flag in a group of commit options" {
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GIT_WRAPPER" commit -an
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Rule 9"* ]]
+  [ ! -e "$GIT_ARGS" ]
+}
+
 @test "managed git-safe routes commit through the same rule" {
   local bin
   bin="$(dirname "$GIT_WRAPPER")"

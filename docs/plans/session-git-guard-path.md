@@ -36,3 +36,26 @@ the two registered opt-in controls. Shell startup selected the Dotfiles
 wrapper before the managed guard. The fallback searched the guard
 before the expected Git candidate. The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44626058363)
 records both failed expectations.
+
+## Claude command rewrite prediction
+
+The command rewrite hook emits a fixed PATH. A Claude Bash command can
+lose its guard if that rewrite places Dotfiles first after the session
+environment is loaded. The session can carry a marker for the exact
+managed guard independently of PATH. The Dotfiles Git wrapper can ask
+that guard for a decision before it runs the ordinary Git command.
+
+Measurement: use the default Claude PreToolUse envelope and a scratch
+session environment. Run the rewritten command with a Git recorder.
+Exercise the fixed PATH with and without the opted-in session marker.
+
+Success: a supported refused request reaches Git zero times. An ordinary
+request reaches Git once with the original arguments. An unopted shell
+uses its ordinary Git path and does not call the guard.
+
+Pivot: any changed command arguments, duplicate delegate, guard invocation
+outside an opted-in session, or failure of the existing fixed-PATH
+controls rejects this design.
+
+Anchor: `agent-hooks/prepend-endpoint-path.sh`, the managed Git wrapper,
+and the Claude session environment contract above.

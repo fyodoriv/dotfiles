@@ -238,13 +238,19 @@ SH
 
 # Wait up to 5 s until --status lists $1 live queue entries, each past its
 # first start check: a new ticket reads "(waiting: starting)" until then.
+# An optional reason must appear in a queue entry in the same snapshot.
 wait_queued() {
   local i s
   for i in $(seq 50); do
     s=$("$SCRIPT" --status)
-    [ "$(grep -c '^queue ' <<<"$s")" -ge "$1" ] && ! grep -q '(waiting: starting)' <<<"$s" && return 0
+    if [ "$(grep -c '^queue ' <<<"$s")" -ge "$1" ] && ! grep -q '(waiting: starting)' <<<"$s"; then
+      if [ -z "${2:-}" ] || grep '^queue ' <<<"$s" | grep -Fq "(waiting: $2)"; then
+        return 0
+      fi
+    fi
     sleep 0.1
   done
+  printf '%s\n' "$s" >&2
   return 1
 }
 
@@ -947,9 +953,8 @@ make_fake_app() {
   wait_queued 1
   HEAVY_RUN_PROJECT=/p/beta "$SCRIPT" touch "$BATS_TEST_TMPDIR/b1"
   [ -e "$BATS_TEST_TMPDIR/b1" ]
+  wait_queued 1 "project cap: 2/2 runs of alpha"
   [ ! -e "$BATS_TEST_TMPDIR/a3" ]
-  run "$SCRIPT" --status
-  [[ "$output" == *"(waiting: project cap: 2/2 runs of alpha)"* ]]
   release_all
   [ -e "$BATS_TEST_TMPDIR/a3" ]
 }
@@ -966,9 +971,7 @@ make_fake_app() {
   wait_held 1
   cd "$BATS_TEST_TMPDIR/wt"
   "$SCRIPT" touch "$BATS_TEST_TMPDIR/second" &
-  wait_queued 1
-  run "$SCRIPT" --status
-  [[ "$output" == *"(waiting: project cap: 1/1 runs of repo)"* ]]
+  wait_queued 1 "project cap: 1/1 runs of repo"
   [ ! -e "$BATS_TEST_TMPDIR/second" ]
   release_all
   [ -e "$BATS_TEST_TMPDIR/second" ]

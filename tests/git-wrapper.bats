@@ -235,6 +235,88 @@ make_git_candidates() {
   [[ "$output" == "path-git status" ]]
 }
 
+prepare_session_git_path() {
+  SESSION_HOME="$TEST_DIR/session-home"
+  SESSION_GUARD="$SESSION_HOME/.claude/codeassist/hooks-scripts/lib"
+  SESSION_STARTUP="$TEST_DIR/bash-env.sh"
+  mkdir -p "$SESSION_GUARD" "$SESSION_HOME/checkout/bin"
+  printf '#!/bin/bash\nprintf "agentbrew-git %%s\\n" "$*"\n' > "$SESSION_GUARD/git"
+  printf '#!/bin/bash\nexit 0\n' > "$SESSION_HOME/checkout/bin/git"
+  chmod +x "$SESSION_GUARD/git" "$SESSION_HOME/checkout/bin/git"
+  sed -e "s|{{ .chezmoi.homeDir }}|$SESSION_HOME|g" -e 's|{{ .dotfiles_dir }}|checkout|g' \
+    "$BATS_TEST_DIRNAME/../dot_config/dotfiles/bash-env.sh.tmpl" > "$SESSION_STARTUP"
+}
+
+@test "shell startup keeps the opted-in Agentbrew Git guard first" {
+  prepare_session_git_path
+  run env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="$SESSION_GUARD:/usr/bin:/bin" \
+    /bin/bash -c 'source "$1"; command -v git' bash "$SESSION_STARTUP"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "$SESSION_GUARD/git" ]
+}
+
+@test "shell startup keeps the Dotfiles Git wrapper first during regular use" {
+  prepare_session_git_path
+  run env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="/usr/bin:/bin" \
+    /bin/bash -c 'source "$1"; command -v git' bash "$SESSION_STARTUP"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "$SESSION_HOME/checkout/bin/git" ]
+}
+
+@test "fallback Git search skips the opted-in Agentbrew guard" {
+  prepare_session_git_path
+  make_git_candidates
+  export GUARD_CALLS="$TEST_DIR/guard-calls"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "$GUARD_CALLS"\n' > "$SESSION_GUARD/git"
+  run env -u DOTFILES_REAL_GIT -u BASH_ENV -u ENV HOME="$SESSION_HOME" \
+    DOTFILES_SYSTEM_GIT="$BROKEN_SYSTEM_GIT" PATH="$SESSION_GUARD:$PATH_GIT_DIR:/usr/bin:/bin" \
+    "$GIT_WRAPPER" status
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "path-git status" ]
+  [ ! -e "$GUARD_CALLS" ]
+}
+
+@test "Claude Bash rewrite still checks opted-in Git before delegation" {
+  prepare_session_git_path
+  export GUARD_CALLS="$TEST_DIR/guard-calls"
+  cat > "$SESSION_GUARD/git" <<'GUARD'
+#!/bin/bash
+printf '%s\n' "$*" >> "$GUARD_CALLS"
+[[ "$1" == --agentbrew-check-only && "$2" == "$DOTFILES_REAL_GIT" ]] || exit 91
+[[ "$3" != reset ]] || exit 2
+GUARD
+  local source_root input updated rewritten
+  source_root="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  input=$(jq -nc --arg log "$TEST_DIR/session.jsonl" '{
+    hook_event_name:"PreToolUse", permission_mode:"default", tool_name:"Bash",
+    transcript_path:$log, tool_input:{command:"git reset --hard"}
+  }')
+  updated=$(env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="/usr/bin:/bin" \
+    DOTFILES_DIR="$source_root" "$source_root/agent-hooks/prepend-endpoint-path.sh" <<<"$input")
+  rewritten=$(jq -er '.hookSpecificOutput.updatedInput.command' <<<"$updated")
+
+  run env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="$SESSION_GUARD:/usr/bin:/bin" \
+    AGENTBREW_SESSION_GIT_GUARD="$SESSION_GUARD/git" /bin/bash -c "$rewritten"
+  [ "$status" -eq 2 ]
+  [ ! -e "$GIT_ARGS" ]
+  [ "$(wc -l < "$GUARD_CALLS")" -eq 1 ]
+
+  rewritten="${rewritten%;*}; git status --short"
+  run env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="$SESSION_GUARD:/usr/bin:/bin" \
+    AGENTBREW_SESSION_GIT_GUARD="$SESSION_GUARD/git" /bin/bash -c "$rewritten"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = 'status --short' ]
+  [ "$(wc -l < "$GUARD_CALLS")" -eq 2 ]
+
+  run env -u BASH_ENV -u ENV -u AGENTBREW_SESSION_GIT_GUARD HOME="$SESSION_HOME" \
+    PATH="/usr/bin:/bin" /bin/bash -c "$rewritten"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$GUARD_CALLS")" -eq 2 ]
+}
+
 # Probe cache (#483): a passing probe leaves a marker; the marker must not
 # outlive an Xcode or CLT update, which replaces the developer-dir git.
 

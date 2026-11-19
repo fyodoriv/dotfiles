@@ -2,4 +2,16 @@
 # Sourced via BASH_ENV / ENV for non-interactive bash/sh script execution.
 # Note: bash -c does NOT source BASH_ENV on macOS; zsh -c loads ~/.zshenv instead.
 export DOTFILES_DIR="{{ .chezmoi.homeDir }}/{{ .dotfiles_dir }}"
-export PATH="$DOTFILES_DIR/bin:{{ .chezmoi.homeDir }}/.local/bin:${PATH:-}"
+_dotfiles_git_guard="{{ .chezmoi.homeDir }}/.claude/codeassist/hooks-scripts/lib"
+_dotfiles_path_rest="${PATH:-}"
+_dotfiles_path_front=
+case "$_dotfiles_path_rest" in
+  "$_dotfiles_git_guard":*)
+    if [ -x "$_dotfiles_git_guard/git" ]; then
+      _dotfiles_path_front="$_dotfiles_git_guard:"
+      _dotfiles_path_rest="${_dotfiles_path_rest#*:}"
+    fi
+    ;;
+esac
+export PATH="${_dotfiles_path_front}$DOTFILES_DIR/bin:{{ .chezmoi.homeDir }}/.local/bin:${_dotfiles_path_rest}"
+unset _dotfiles_git_guard _dotfiles_path_front _dotfiles_path_rest

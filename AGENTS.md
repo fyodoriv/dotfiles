@@ -70,7 +70,7 @@ Keep the rule numbers; other files cite them. Full text: [docs/constitution.md](
 12. **Proactive healing**: a recurring error becomes a same-session fix or a task with its blocker.
 13. **Default by default**: safe, useful behavior is the default; opt-outs are narrow and documented.
 14. **Performance is a gate**: `make perf-gate` must pass (a tracked command gets at most 10% slower per PR); new hot-path commands join `config/perf-budget.tsv`. [Details](docs/observability.md#performance-gate).
-15. **Heavy jobs start only on the owner's say-so**: a LaunchAgent that holds much RAM or CPU, or calls an LLM between runs, stays off until an owner setting turns it on.
+15. **Heavy LaunchAgents are opt-in.**
 
 **Visual proof for every PR**: a browser screenshot for UI work, a pasted terminal transcript otherwise. Never commit proof images; never drive AppleScript or keystrokes to stage one.
 

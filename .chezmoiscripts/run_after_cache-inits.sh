@@ -27,7 +27,7 @@ if ! mkdir -p "$HOME/.cache/zsh" "$HOME/.cache/node-compile" "$HOME/.notes"; the
   exit 1
 fi
 
-# XDG user-binary dir — shim-style tools (minsky, etc.) install themselves
+# XDG user-binary dir — shim-style tools (tasks.md shims, etc.) install themselves
 # by symlinking here, and zshrc unconditionally puts it on PATH.
 if ! mkdir -p "$HOME/.local/bin"; then
   echo "✗ Could not create $HOME/.local/bin" >&2

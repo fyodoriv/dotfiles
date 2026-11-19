@@ -42,7 +42,6 @@ a Tests line names a missing file, or when an e2e test has no story ID.
 |------|-------|
 | Shell, git, macOS, SSH, editor, terminal config | **dotfiles** |
 | Agent config (CLAUDE.md, MCP, skills, rules) | **agentbrew** |
-| Orchestrator, personas, pipelines | **minsky** |
 
 ## Agent workflow acceptance
 

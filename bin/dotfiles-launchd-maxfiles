@@ -4,7 +4,7 @@ set -euo pipefail
 # Raise the launchd open-file limit, so LaunchAgent jobs get more than 256.
 #
 # Interactive shells get `ulimit -n 65535` from zshrc. Jobs that launchd
-# starts (dotfiles agents, a minsky worker, opencode) get launchd's soft
+# starts (dotfiles agents, a parallel agent worker, opencode) get launchd's soft
 # default of 256 instead. Many parallel node, git, and browser processes
 # run out of file descriptors at 256.
 #

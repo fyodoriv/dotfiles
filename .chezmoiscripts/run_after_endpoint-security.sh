@@ -44,7 +44,7 @@ if [ -z "$_bin_dir" ]; then
 fi
 
 export DOTFILES_ADHOC_SIGN_QUIET=1
-# Fast jq + curl sign + link FIRST — closes post-reboot race with minsky daemon/tick-loop.
+# Fast jq + curl sign + link FIRST — closes post-reboot race with other login jobs.
 "$_bin_dir/dotfiles-adhoc-sign-jq"
 if [ -x "$_bin_dir/dotfiles-adhoc-sign-curl" ]; then
   "$_bin_dir/dotfiles-adhoc-sign-curl"

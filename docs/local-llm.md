@@ -1,6 +1,6 @@
 # Local-LLM Stack
 
-A self-hosted code-LLM fallback so Minsky (and any other agent loop)
+A self-hosted code-LLM fallback so any agent loop
 can keep working when claude-code tokens are exhausted, rate-limited,
 or the operator wants zero cloud-side traffic for a session.
 
@@ -27,7 +27,7 @@ Enable if any of the following apply:
 - You have ≥ 64 GB unified memory and an Apple Silicon Mac.
   mlx-lm requires native arm64 — the chezmoi script skips cleanly on
   x86 Macs and Linux, so opting in there only installs pipx + aider.
-- You want Minsky's auto-bootstrap pre-flight to succeed without
+- You want an agent loop's pre-flight to succeed without
   asking you to install anything mid-session.
 
 Skip if you have none of the above. The stack costs ~30 GB on disk
@@ -126,14 +126,6 @@ openai-api-base: http://127.0.0.1:8080/v1
 openai-api-key: NONE
 model: openai/Qwen/Qwen3-Coder-30B-A3B-Instruct-MLX-4bit
 ```
-
-## Composition with Minsky
-
-Minsky's `--local` mode + `~/.minsky/config.json` `local_agent: aider`
-pointing at this stack is the supported flow. The pre-flight in
-`novel/tick-loop/src/local-llm-bootstrap.ts` defers to dotfiles for
-install and only handles the "is the server running right now" check
-itself. Minsky's bootstrap should stay detect-and-prompt only.
 
 ## Troubleshooting
 

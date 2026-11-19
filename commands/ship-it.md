@@ -85,12 +85,12 @@ Admin/bypass merge and product releases still follow the allowlist and repo-loca
 Broad sibling inventory, auto-merge/bypass, release, cleanup, and machine refresh across approved repo families is limited to:
 
 - tooling repos whose real path is under `~/apps/tooling/**`
-- own repos on `github.com/<owner>/*` (minsky, own tools)
+- own repos on `github.com/<owner>/*` (own tools)
 - extra families the org overlay declares (`SHIP_IT_EXTRA_REPO_FAMILIES`, colon-separated path globs)
 
 Other product repos are eligible only when explicitly named by the active request, for normal delivery plus owned-work rebases. They are not added to the bypass/release allowlist.
 
-Own-tool release automation is explicitly enabled for `agentbrew`, `dotfiles`, `tasks.md` / `tasks-md`, and `minsky`.
+Own-tool release automation is explicitly enabled for `agentbrew`, `dotfiles`, and `tasks.md` / `tasks-md`.
 
 ## Safety and merge boundaries
 

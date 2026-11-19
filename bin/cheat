@@ -108,7 +108,6 @@ show_shell() {
   cmd "new-project <t> <n>"  "Scaffold react/node/lib/python project"
   cmd "cached-run <cmd>"     "Skip command if git tree unchanged (cached)"
   cmd "check-all [--fix]"    "Run doctor across all ~/apps repos"
-  cmd "minsky run [--budget=N]" "Multi-session autonomous task loop"
   cmd "graceful-restart"       "Wait for processes to finish, then restart"
   cmd "network-watchdog"       "Verify + restore network after sleep/wake"
   section "Dotfiles Management (chezmoi)"

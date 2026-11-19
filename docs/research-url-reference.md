@@ -44,11 +44,10 @@ For newsletters, digests, link rolls, and other aggregators:
 
 ## Phase 2 — Repo fit assessment
 
-Assess the three repos in this order:
+Assess the two repos in this order:
 
 1. `dotfiles` — does this improve machine bootstrap, doctor checks, shell/git safety, browser/tool setup, or agent-tool lifecycle?
 2. `agentbrew` — does this belong as a cross-agent sync/catalog/deployment capability, or as a command/skill/source pattern? Prefer "curate/wrap" over "host/absorb".
-3. `minsky` — does this improve autonomous loops, orchestration, agent backend adapters, task selection, supervision, observability, or long-running resilience?
 
 For each repo, produce one verdict:
 
@@ -82,9 +81,9 @@ For each repo with a task edit:
 1. Run `git status --short --branch` and inspect for unrelated work.
 2. If the checkout is dirty with unrelated work, prefer creating an isolated worktree from the repo's default branch. If that is not safe, skip the repo with a clear reason.
 3. Stage only `TASKS.md`.
-4. Commit when repo-local rules permit it. The standing delivery approval above satisfies the "explicit approval" requirement for scoped `TASKS.md` task-filing commits in `dotfiles`, `agentbrew`, and `minsky`. Use the repo's commit format. If no stricter format exists, use:
+4. Commit when repo-local rules permit it. The standing delivery approval above satisfies the "explicit approval" requirement for scoped `TASKS.md` task-filing commits in `dotfiles` and `agentbrew`. Use the repo's commit format. If no stricter format exists, use:
    - `chore: add research task <task-id> PROJ-123`
-5. Push, open a PR, wait for required checks, merge, and run the repo-local deploy/sync step when repo-local rules allow it. For this command, the user has already granted that approval for the three canonical target repos; do not stop at "local diff only" solely because the repo is a sibling checkout or a worktree created during this workflow.
+5. Push, open a PR, wait for required checks, merge, and run the repo-local deploy/sync step when repo-local rules allow it. For this command, the user has already granted that approval for the two canonical target repos; do not stop at "local diff only" solely because the repo is a sibling checkout or a worktree created during this workflow.
 6. If repo-local protection blocks merge/deploy (red checks, missing credentials, branch protection, auth errors, required human review), report the blocker with the PR URL and exact evidence. Do not bypass hooks, force-push, admin-merge, or publish public comments/reviews unless the user separately approves that exact action.
 
 ## Summary format
@@ -97,7 +96,6 @@ Source: <input> — <one-line researched synopsis>
 Per-repo verdicts:
   dotfiles  → <added | local-only | skipped — reason>
   agentbrew → <added | local-only | skipped — reason>
-  minsky    → <added | local-only | skipped — reason>
 
 Tasks filed:
   <repo>: <task-id> — <merged PR URL | open PR URL + blocker | commit hash>
@@ -107,7 +105,7 @@ Verification:
   <repo>: <TASKS.md lint command> — <pass/fail/blocker>
 ```
 
-If zero tasks were filed, include the three skip reasons and stop. Zero tasks is a valid outcome when the research does not clear the evidence bar.
+If zero tasks were filed, include the two skip reasons and stop. Zero tasks is a valid outcome when the research does not clear the evidence bar.
 
 ## Anti-patterns to refuse
 

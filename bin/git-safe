@@ -1,7 +1,7 @@
 #!/bin/bash
 # git-safe — guard against destructive git commands in multi-agent repos.
 #
-# Detects when multiple agents (Claude Code, Codex, minsky pipelines)
+# Detects when multiple agents (Claude Code, Codex, orchestrator pipelines)
 # may be working in the same repo and blocks commands that could wipe their work:
 #   - git reset --hard (wipes uncommitted changes)
 #   - git checkout . / git checkout -- <path> (reverts working tree)
@@ -30,12 +30,12 @@ is_multi_agent_repo() {
   local repo_root
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
 
-  # Check for active worktrees (minsky pipelines use these)
+  # Check for active worktrees (orchestrator pipelines use these)
   local worktree_count
   worktree_count=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
   [ "$worktree_count" -gt 1 ] && return 0
 
-  # Check for .orchestrator dir (minsky pipeline state)
+  # Check for .orchestrator dir (orchestrator pipeline state)
   [ -d "$repo_root/.orchestrator" ] && return 0
 
   # Check for .worktrees dir

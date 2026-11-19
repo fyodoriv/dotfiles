@@ -145,8 +145,8 @@ fi
 
 # ── uv: launchctl-wide only-managed python preference ────────────
 # Propagate UV_PYTHON_PREFERENCE=only-managed to ALL processes spawned by
-# launchd — including LaunchAgents (com.minsky.auto-merge, com.minsky.runany,
-# etc.) that fire periodically and ignore ~/.zshenv. Without this, those
+# launchd — including LaunchAgents
+# that fire periodically and ignore ~/.zshenv. Without this, those
 # agents go through `python3` → dotfiles shim → uv discovery which may
 # probe a Python.framework binary and trigger the endpoint-agent popup.
 #

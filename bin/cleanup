@@ -146,7 +146,7 @@ cleanup_main() {
   clean "Homebrew cache" "$(brew --cache 2>/dev/null)" "brew cleanup --prune=7"
 
   # uv cache — best-effort. A live `uvx` / `uv tool run` (e.g. an MCP server
-  # from a Devin/minsky session) holds the cache lock; UV_LOCK_TIMEOUT=10
+  # from an agent session) holds the cache lock; UV_LOCK_TIMEOUT=10
   # makes prune give up fast instead of blocking the default 300s, and
   # clean() swallows the resulting non-zero exit so a busy cache never fails
   # cleanup. Replaces topgrade's --cleanup uv prune (see bin/dotfiles-upgrade).

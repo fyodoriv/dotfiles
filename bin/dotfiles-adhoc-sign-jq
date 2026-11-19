@@ -2,7 +2,7 @@
 # dotfiles-adhoc-sign-jq — fast ad-hoc sign Homebrew jq only (login bootstrap).
 #
 # Full Cellar sweep (dotfiles-adhoc-sign-bottles) is too slow for RunAtLoad
-# races with minsky tick-loop / daemon. This signs jq alone so endpoint-safe Mach-O
+# races with other login jobs. This signs jq alone so endpoint-safe Mach-O
 # exists before supervised loops spawn jq.
 set -uo pipefail
 

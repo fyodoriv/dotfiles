@@ -153,8 +153,8 @@ Run the full **bypass merge cascade** (§ below) when substantive checks are gre
 
 | Rule | Match |
 |------|--------|
-| **tooling family** | Real path under `~/apps/tooling/**` (`agentbrew`, `dotfiles`, `tasks-md`, `minsky`, …) |
-| **Own repos** | Repo name `agentbrew`, `dotfiles`, `tasks-md`, `tasks.md`, or `minsky`; **or** `origin` matches `github.com:<owner>/*` / `github.com/<owner>/*` for the authenticated owner |
+| **tooling family** | Real path under `~/apps/tooling/**` (`agentbrew`, `dotfiles`, `tasks-md`, …) |
+| **Own repos** | Repo name `agentbrew`, `dotfiles`, `tasks-md`, or `tasks.md`; **or** `origin` matches `github.com:<owner>/*` / `github.com/<owner>/*` for the authenticated owner |
 | **Overlay-declared families** | Extra repo families the org overlay declares, for example through `SHIP_IT_EXTRA_REPO_FAMILIES` (a colon-separated list of path globs). This page only documents the variable. The base repo ships no code that reads it; the overlay's ship-it rules do |
 
 A host's branch protection may still reject the bypass APIs when `required_pull_request_reviews` has no actor allowance. Agents **run the full cascade anyway** on allowlisted repos and report honestly.
@@ -180,7 +180,7 @@ case "$REPO_ROOT" in
   */apps/tooling/*) BYPASS_ALLOWED=true ;;
 esac
 case "$REPO_NAME" in
-  agentbrew|dotfiles|tasks-md|tasks.md|minsky) BYPASS_ALLOWED=true ;;
+  agentbrew|dotfiles|tasks-md|tasks.md) BYPASS_ALLOWED=true ;;
 esac
 [ -n "$OWNER" ] && [[ "$REMOTE_URL" =~ github\.com[:/]${OWNER}/ ]] && BYPASS_ALLOWED=true
 # Overlay-declared families: match $REPO_ROOT against each glob in
@@ -204,7 +204,7 @@ Some hosts enforce `required_pull_request_reviews`. Behavior depends on **§ Rep
 - Admin rights often do not bypass `required_pull_request_reviews` — cascade steps may all fail until a teammate approves
 - Stale head vs base blocks merge APIs until the branch is updated — run cascade step 0 first
 
-**Contrast with own-tool repos:** In `~/apps/tooling/**` (`agentbrew`, `dotfiles`, `tasks-md`, `minsky`), cascade step 2 (`--admin`) or step 5 (GraphQL) is usually the completion path when `reviewDecision: REVIEW_REQUIRED` is the only blocker.
+**Contrast with own-tool repos:** In `~/apps/tooling/**` (`agentbrew`, `dotfiles`, `tasks-md`), cascade step 2 (`--admin`) or step 5 (GraphQL) is usually the completion path when `reviewDecision: REVIEW_REQUIRED` is the only blocker.
 
 ## Setting branch protection
 
@@ -348,11 +348,6 @@ from the base and ship that PR. Never push more commits to a merged PR's branch.
 
 ## Approval scope (detail)
 
-### Minsky full delivery access
-
-`minsky` (`~/apps/tooling/minsky`) has the same **full delivery access** under `/ship-it` as `dotfiles` and `agentbrew`. Minsky is **not push-blocked** for ship-it — agents have full git push, PR, CI watch, and admin/bypass merge access to minsky remotes (any configured remote **and** `fyodoriv/minsky` on github.com). Cross-repo delivery to minsky is pre-approved: push feature branches, open/update PRs, watch CI, admin merge when green checks pass but review/base-branch policy blocks normal merge, reconcile local `main`, run `minsky install-daemon` after merge, and watch semantic-release (Step 11).
-
-
 ## Approval scope
 
 Approved without another prompt for current-task and allowlisted scope:
@@ -387,7 +382,7 @@ Approved without another prompt for current-task and allowlisted scope:
 - in approved repo families, use admin/bypass merge as a required delivery step for a PR authored by the user or owned by this session's agent branch when required checks are green, the PR is otherwise mergeable, and normal merge is blocked solely by review/base-branch policy; do not abandon the reviewed PR, start a fresh task branch, or move to another task because of that policy-only blocker
 - treat generic "no admin/bypass outside approved repos" rules as confirming, not forbidding, this approved-family carve-out; only a more specific repo-local rule that names the exact repo/PR class as non-bypassable can block this step
 - run the repo's documented release step when it is part of the current-repo normal release workflow
-- for own-tool release automation only (`agentbrew`, `dotfiles`, `tasks.md`/`tasks-md`, `minsky`), create GitHub Releases, push release tags, trigger repo release workflows, and publish packages when the repo documents those as the normal release path and the required local/CI gates pass
+- for own-tool release automation only (`agentbrew`, `dotfiles`, `tasks.md`/`tasks-md`), create GitHub Releases, push release tags, trigger repo release workflows, and publish packages when the repo documents those as the normal release path and the required local/CI gates pass
 - after delivery in a tooling-family repo, apply the machine's latest recommended
   updates: reconcile/rebuild the canonical tooling checkout per repo docs, run
   the documented update/sync flow (e.g. `agentbrew sync --pull`, which installs
@@ -590,7 +585,7 @@ Respect the guard. Never retry around it with other permissions, shells, encodin
 **Hook context notes:**
 
 - Enterprise GitHub hosts in your hook allowlist should pass when the remote resolves; fail-closed denials often mean cwd/remote resolution failed — fix with explicit `-C` / `origin` / `GH_HOST`. A denial that names an unresolved `origin` means the hook could not find it from the agent workspace parent — always `cd` into the repo checkout (e.g. `~/apps/tooling/dotfiles`) before push/`gh`.
-- Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, minsky, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the `land` command described above.
+- Pushes of own-tool repos to `github.com` (dotfiles, agentbrew, tasks.md) are expected under `/ship-it`. Push the feature branch to `origin` with a normal `git push -u origin <branch>`. The global `git-hooks/pre-push` privacy gate still runs. A managed push guard can block any shell command containing `git push` to github.com; when it does, hand the operator the `land` command described above.
 - Dry-run first when verifying: `git push --dry-run -u origin <branch>`.
 - **Node-version pre-push rejection:** when a repo's pre-push hook rejects the push because the Node version is not the pinned one, run `eval "$(fnm env)" && fnm use` in the checkout (it reads `.nvmrc`), then retry the push.
 
@@ -917,7 +912,6 @@ After merge, determine whether the delivered repo is one of the own-tool release
 | `agentbrew` | Yes — `/ship-it` means publish the latest merged package when the repo's release gates pass | Prefer the repo's documented auto-release flow: monitor `.github/workflows/auto-publish.yml` after merge until it creates the `release: vX [skip ci]` version/tag commit, reconcile the canonical checkout, then run `npm run publish-latest` (or the repo-documented replacement) to publish the tagged version. Use `npm run release [patch|minor|major]` only when the repo docs say manual local release is the intended path for this change. |
 | `dotfiles` | Yes — `/ship-it` means release the applied dotfiles state | After the PR merges on `github.com/fyodoriv/dotfiles`, run the documented apply path (`dotfiles apply` / `chezmoi apply` through the repo wrapper) and doctor/check command required by the touched files. There is no package publish unless the repo adds one. |
 | `tasks.md` / `tasks-md` | Yes — `/ship-it` means create the GitHub Release that triggers npm publish | Follow README "Releasing": compute the next semver from the change, create a `vX.Y.Z` GitHub Release targeting `main` with generated notes (`gh release create vX.Y.Z --generate-notes` or repo replacement), watch `.github/workflows/publish.yml`, verify all four npm packages publish or report the exact workflow failure. Prefer the workflow over local `scripts/publish-all.sh`; manual local publishing is fallback only when the workflow is unavailable and the repo docs allow it. |
-| `minsky` | Yes — full ship-it delivery + semantic-release when commit types warrant it | **Delivery**: push/PR/merge to any configured minsky remote (or `fyodoriv/minsky`); admin/bypass merge when green. **After merge**: run `minsky install-daemon` from the reconciled canonical checkout to refresh the launchd plist and daemon wiring. **Release**: follow the semantic-release path in `CHANGELOG.md` — after merging to `main`, watch `.github/workflows/release.yml`. A merged `feat:`, `fix:`, `perf:`, or `BREAKING CHANGE:` commit should produce the tag, GitHub Release, changelog update, and npm publish. If the change is `docs:`, `chore:`, `style:`, `refactor:`, `test:`, `build:`, or `ci:`, report that no release is expected unless the user explicitly asks to force one. For the first publish gate or `minsky-npm-publish-v0-1-0`, follow the repo's current TASKS/README instructions exactly. |
 
 Rules for all release work:
 
@@ -990,13 +984,11 @@ agentbrew measure context
 
 dotfiles doctor --module security --module terminal --module agent-browser --module chrome --module resilience --fix
 bin/dotfiles-heal-stuck-agents --fix --quiet
-# When minsky delivered:
-cd ~/apps/tooling/minsky && minsky install-daemon
 ```
 
 Reading the reload output: `⊘ <label> — not applicable for this profile` means `dotfiles apply` skips that agent on purpose (the same `should_skip_agent` rules, for example not enterprise). It is not a failure. `⚠ skip <label> — plist not deployed` means apply should have deployed the agent; run `dotfiles apply`.
 
-Skip conditional lines only when the condition is false (no minsky delivery → skip `minsky install-daemon`; agentbrew not delivered → skip `npm run build` in agentbrew checkout). Never skip apply, reload, CDP verify, agentbrew sync, `agentbrew measure context`, or doctor for dotfiles/tooling delivery.
+Skip conditional lines only when the condition is false (agentbrew not delivered → skip `npm run build` in agentbrew checkout). Never skip apply, reload, CDP verify, agentbrew sync, `agentbrew measure context`, or doctor for dotfiles/tooling delivery.
 
 `--module chrome` reasserts ChromeWork as the system default browser (Slack/Outlook/Mail link routing) via `chromework-install` when LaunchServices has drifted back to raw Chrome.
 
@@ -1049,7 +1041,7 @@ When `bin/dotfiles-reload-launchagents` reports bootstrap failure for CDP Chrome
 
 **Every `/ship-it` run that delivers dotfiles or tooling repos MUST execute the command block in Step 12** — merged plist changes are inert until chezmoi deploys them and launchd reloads the agents.
 
-**Order:** reconcile checkout → enable optional token tools → apply (deploy plists) → reload LaunchAgents → verify CDP ports → agentbrew build (when agentbrew shipped) → agentbrew sync → `agentbrew measure context` → doctor → heal-stuck-agents → conditional minsky.
+**Order:** reconcile checkout → enable optional token tools → apply (deploy plists) → reload LaunchAgents → verify CDP ports → agentbrew build (when agentbrew shipped) → agentbrew sync → `agentbrew measure context` → doctor → heal-stuck-agents.
 
 The reload helper bootouts then bootstraps these labels (in order):
 
@@ -1091,29 +1083,6 @@ curl -sf --max-time 2 http://127.0.0.1:9223/json/version >/dev/null && echo CDP9
 ```
 
 
-### Minsky daemon refresh (minsky delivery)
-
-When minsky (or dotfiles changes that affect minsky launchd wiring) was delivered:
-
-```bash
-cd ~/apps/tooling/minsky && git pull --ff-only origin main
-minsky install-daemon
-launchctl print "gui/$(id -u)/com.minsky.daemon" 2>/dev/null | grep -E 'path|PATH|ProgramArguments' || true
-```
-
-**Minsky-specific verification** (run after `install-daemon`; record output):
-
-```bash
-# Tick loop must NOT use /usr/bin/python3 (endpoint policy)
-grep -r '/usr/bin/python3' ~/.minsky 2>/dev/null && echo FAIL || echo python3-shim=ok
-# launchctl PATH should include dotfiles/bin and ~/.local/bin ahead of /usr/bin
-launchctl getenv PATH
-# Daemon plist should reference merged minsky checkout
-plutil -p ~/Library/LaunchAgents/com.minsky.daemon.plist 2>/dev/null | head -20
-```
-
-Re-run `minsky install-daemon` if PATH or python3 shim drift is detected.
-
 ### Fix-and-re-ship loop
 
 When doctor reports **fixable** dotfiles-owned failures (stale Chrome logs, unsigned
@@ -1135,7 +1104,7 @@ ownership, for example:
 - GPG commit signing not configured when the team does not require it
 - Endpoint-security exceptions still pending for third-party tools that hardcode
   `/usr/bin/curl`
-- Minsky framework-python probe failures — file a `TASKS.md` entry or an
+- Framework-python probe failures in sibling repos — file a `TASKS.md` entry or an
   org-specific overlay note when out of scope for the current PR
 
 Report these separately from owned pass/fail counts so the operator knows what

@@ -32,7 +32,6 @@ Consider exactly these repos unless the user explicitly names more:
 |---|---|---|
 | `dotfiles` | `~/apps/tooling/dotfiles` | macOS/dev-machine config, shell/git wrappers, launchagents, doctor checks, agent-tool bootstrap. |
 | `agentbrew` | `~/apps/tooling/agentbrew` | Cross-agent sync for skills, MCP servers, rules, commands, hooks, agents, instructions, catalogs. |
-| `minsky` | `~/apps/tooling/minsky` | Autonomous loop, supervisor/orchestrator, cross-repo runner, observer, task-picking, agent backends. |
 
 Do not silently expand the target list. If the source appears relevant only to another repo, say so in the summary and skip filing unless the user approves that repo.
 

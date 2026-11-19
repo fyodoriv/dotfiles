@@ -3,7 +3,7 @@
 # overwriting our canonical git-hooks/* during a sister-repo pnpm install.
 #
 # Repro pattern: PR #59 on 2026-05-20 silently replaced pre-{commit,push}
-# with a /tmp/minsky-gate/.../lefthook stub via Minsky's transitive
+# with a /tmp/<gate>/.../lefthook stub via a sister repo's transitive
 # pnpm install. The check compares each tracked hook's working-tree blob
 # SHA against its HEAD tree-entry SHA — mismatch = overwrite.
 
@@ -114,7 +114,7 @@ _run_hook_integrity_check() {
   # Simulate transitive lefthook install overwrite — same pattern PR #59 hit
   cat > "$TEST_DOTFILES/git-hooks/pre-push" <<'EOF'
 #!/usr/bin/env bash
-exec /tmp/minsky-gate-Pn5AqP/node_modules/.pnpm/lefthook-darwin-arm64@2.1.6/lefthook run pre-push "$@"
+exec /tmp/gate-Pn5AqP/node_modules/.pnpm/lefthook-darwin-arm64@2.1.6/lefthook run pre-push "$@"
 EOF
 
   _run_hook_integrity_check

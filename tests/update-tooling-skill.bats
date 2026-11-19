@@ -49,7 +49,6 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   grep -F -q 'env -u DOTFILES_DIR "$APPLIED_AGENTBREW" measure context' "$SKILL"
   grep -F -q 'env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-reload-launchagents"' "$SKILL"
   grep -F -q 'CDP9223=ok' "$SKILL"
-  grep -F -q 'MINSKY_STATE_DIR:-$HOME/.minsky}/autostart-enabled' "$SKILL"
   grep -F -q 'agentbrew_updated=true' "$SKILL"
 }
 

@@ -12,12 +12,12 @@
 #   DOTFILES_SOURCE            dotfiles source checkout (default: `chezmoi source-path`)
 #
 # Owners: apple, dotfiles, dotfiles-plugin (a label a dotfiles plugin
-# installed), agentbrew, minsky (change these in their source
+# installed), agentbrew (change these in their source
 # repo), third-party.
 # Verdicts:
 #   remove     the job's program does not exist (dangling job)
 #   duplicate  another job runs the same program and arguments
-#   off-rule   a minsky job is loaded; minsky must never start on its own
+#   off-rule   a stale minsky job is loaded (project archived)
 #   failing    the job is loaded, not running, and its last exit status is not 0
 #   review     third-party job: keep only if the user still uses the app
 #   keep       owned by Apple or a tooling repo and healthy

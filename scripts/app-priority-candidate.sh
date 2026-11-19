@@ -80,7 +80,7 @@ find_pattern_processes() {
 
 prepare_default_patterns() {
   local row pid command_line status=0 seen=" "
-  APP_PRIORITY_PATTERN_ROWS="$(pgrep -l -f 'mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ' 2>/dev/null)" || status=$?
+  APP_PRIORITY_PATTERN_ROWS="$(pgrep -l -f 'mlx_lm.server|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ' 2>/dev/null)" || status=$?
   [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || return 0
   if [ "$status" -eq 0 ] && [ -z "$APP_PRIORITY_PATTERN_ROWS" ]; then return 0; fi
   if [ "$status" -eq 1 ] && [ -n "$APP_PRIORITY_PATTERN_ROWS" ]; then return 0; fi
@@ -236,7 +236,6 @@ else
   set_agent_priority "codex"
   set_process_background "ollama"
   set_process_background_pattern "mlx_lm.server"
-  set_process_background_pattern "node.*minsky"
 
   # Verification remains available but cannot starve the desktop.
   set_process_background "bats"

@@ -141,11 +141,11 @@ MOCK
   ! grep -q -- "-b -p 777" "$TASKPOLICY_LOG"
 }
 
-@test "app-priority queries minsky processes by pattern" {
+@test "app-priority queries test-runner processes by pattern" {
   rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
   run env PATH="$TEST_BIN:$PATH" "$PRIORITY_CMD"
   [ "$status" -eq 0 ]
-  grep -q "node.*minsky" "$PGREP_LOG"
+  grep -q "node_modules/vitest" "$PGREP_LOG"
 }
 
 # ── Config file support ──────────────────────────────────────────

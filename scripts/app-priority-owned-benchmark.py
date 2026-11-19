@@ -67,7 +67,7 @@ def main():
             candidate_env = env.copy()
             candidate_env["XDG_DATA_HOME"] = str(home / "data")
         cases = [("Slack", "slack"), ("claude", "claude"), ("codex", "codex"),
-                 ("bats", "bats"), ("node", "minsky"), ("node", "node_modules/vitest")]
+                 ("bats", "bats"), ("node", "node_modules/vitest")]
         try:
             for name, marker in cases:
                 child = subprocess.Popen([name, "--child", marker], executable=str(args.child),
@@ -81,9 +81,8 @@ def main():
                 f"taskpolicy -B -t 0 -l 0 -p {ids[0]}\n"
                 f"taskpolicy -b -p {ids[1]}\nrenice 10 -p {ids[1]}\n"
                 f"taskpolicy -b -p {ids[2]}\nrenice 10 -p {ids[2]}\n"
-                f"taskpolicy -b -p {ids[4]}\nrenice 10 -p {ids[4]}\n"
                 f"taskpolicy -b -p {ids[3]}\nrenice 10 -p {ids[3]}\n"
-                f"renice 10 -p {ids[5]}\n").encode()
+                f"renice 10 -p {ids[4]}\n").encode()
             if args.memory:
                 memory = {"base_first": [], "base_second": [], "candidate": []}
                 for label in memory:

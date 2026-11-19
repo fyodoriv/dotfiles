@@ -106,6 +106,62 @@ them. -->
 
 ## P2
 
+- [ ] Set up the Mergiraf merge driver in the git module
+  - **ID**: git-mergiraf-merge-driver-setup
+  - **Tags**: git, conflicts, doctor
+  - **Details**: Two agents that append to TASKS.md or the same CI list get line-level conflicts that are not real conflicts. Mergiraf is a tree-sitter merge driver that resolves such conflicts by structure. Add an idempotent setup to `modules/git` (a doctor check plus fix) that writes `merge.mergiraf.name`, `driver` and `recursive`, and reports the install hint when the binary is missing. Source to adapt: https://github.com/fyodoriv/minsky/blob/main/scripts/setup-mergiraf.mjs and https://github.com/fyodoriv/minsky/blob/main/docs/conflict-auto-resolution.md. GET first: check that `brew install mergiraf` is enough; write no merge logic here.
+  - **Files**: `modules/git/doctor.sh`, `docs/module-reference.md` (git section), a Bats case in the git doctor tests.
+  - **Output**: code
+  - **Acceptance**: with the binary present and the config absent, `dotfiles doctor --module git --fix` writes the three keys and a recheck passes; with the binary missing, the check is advisory and prints the install hint; a second run changes nothing.
+  - **Hypothesis**: auto-resolving structural conflicts cuts hand-resolved rebase conflicts in agent worktrees from the current count (record it first from `git log --grep` on merge-fix commits) to half or less, because Mergiraf resolves same-region appends without a human.
+  - **Measurement**: `git -C ~/apps/tooling/dotfiles log --since=30.days --oneline --grep='resolve.*conflict' | wc -l`, before and 30 days after the driver is on.
+  - **Success**: the 30-day conflict-fix commit count is at most half of the prior 30 days, and 0 wrong merges are found in review.
+  - **Pivot**: 3 or more wrong auto-merges in a week, or no drop in the count after 30 days -> remove the driver config and keep only the doctor hint.
+  - **Anchor**: Mergiraf project (https://mergiraf.org), published kernel benchmark of auto-resolved conflicts; Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — agent merge reliability (docs/metrics.md), not a scorecard metric.
+
+- [ ] Make the git wrapper refuse `--no-verify` on commit, not only on push
+  - **ID**: git-wrapper-refuse-no-verify-commit
+  - **Tags**: git, hooks, security
+  - **Details**: Rule 9 says never `--no-verify`. `bin/git` already blocks an agent `git push --no-verify` without current-session approval. A `git commit --no-verify` (or `-n`) and a hook-skipping `core.hooksPath=/dev/null` override are not covered. Add the refusal to the `bin/git` wrapper (and `bin/git-safe` where it applies) with an approval path that matches the push one. Source to adapt: https://github.com/fyodoriv/minsky/blob/main/scripts/check-no-no-verify-bypass.mjs (a scan for the bypass pattern).
+  - **Files**: `bin/git`, `bin/git-safe`, `docs/agent-hooks.md`, `tests/git-wrapper*.bats` (the file that covers the push case).
+  - **Output**: code
+  - **Acceptance**: an agent-authored `git commit --no-verify`, `git commit -n` and `git -c core.hooksPath=/dev/null commit` exit non-zero with a message naming the rule; a human terminal is unchanged; `git commit` without the flag is unchanged.
+  - **Hypothesis**: the wrapper refuses 3 of 3 hook-skipping commit forms (`--no-verify`, `-n`, `core.hooksPath=/dev/null`), up from 0 of 3 today, because it already sits on every agent git call.
+  - **Measurement**: the new Bats cases in `tests/git-wrapper.bats` on CI (`gh pr checks <n> --repo fyodoriv/dotfiles --watch`); each case runs the wrapper as an agent and checks the exit code.
+  - **Success**: 3 of 3 forms refused, 0 of 3 normal commit forms refused, CI green.
+  - **Pivot**: a false block on a normal workflow twice in a week -> narrow the refusal to the flag only and drop the `hooksPath` case.
+  - **Anchor**: dotfiles Rule 9 (docs/constitution.md); Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — git safety for agents (docs/metrics.md), not a scorecard metric.
+
+- [ ] Check launchd-safe paths in dotfiles-launchagent-drift
+  - **ID**: launchagent-drift-launchd-safe-paths
+  - **Tags**: launchagents, reliability, doctor
+  - **Details**: A LaunchAgent script that calls a bare `node`, `python3`, `gh` or `jq` fails only under launchd's stripped PATH. The new `skills/launchd-safe-paths` skill documents the rules; make `dotfiles-launchagent-drift` enforce two of them: (1) the rendered plist holds no unexpanded `${HOME}` in `StandardOutPath` or `StandardErrorPath`, and (2) a plist-run script resolves its tools under `env -i HOME=$HOME PATH=/usr/bin:/bin`. Report each as a new drift kind. Source of the rules: https://github.com/fyodoriv/minsky/blob/main/.claude/skills/launchd-safe-paths/SKILL.md.
+  - **Files**: `bin/dotfiles-launchagent-drift`, `docs/module-reference.md`, `README.md` (LaunchAgents table row), its Bats file.
+  - **Output**: code
+  - **Acceptance**: a fixture plist with `${HOME}` in a log path reports a drift line; a fixture script that needs a PATH tool absent from the stripped PATH reports a drift line; every current `com.dotfiles.*` plist reports `ok`.
+  - **Hypothesis**: the check finds PATH-only failures before a job runs, so "command not found" exits in LaunchAgent logs (count `command not found` in `~/.local/state/dotfiles/*.log` and `~/Library/Logs/dotfiles*`) fall to 0 per week.
+  - **Measurement**: `rg -c 'command not found' ~/.local/state/dotfiles ~/Library/Logs 2>/dev/null` per week, and `dotfiles-launchagent-drift` exit code.
+  - **Success**: 0 "command not found" lines per week for 4 weeks and the drift command exits 0 on the owner's Mac.
+  - **Pivot**: the check reports false drift on 2 or more healthy jobs -> keep only the `${HOME}` log-path check and drop the stripped-env run.
+  - **Anchor**: launchd.plist(5) man page (EnvironmentVariables, StandardOutPath); Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — background job reliability (docs/metrics.md), not a scorecard metric.
+
+- [ ] Add an Ollama idle-memory measurement to local-ai-bench
+  - **ID**: local-ai-bench-ollama-idle-memory
+  - **Tags**: local-ai, performance, measurement
+  - **Details**: A loaded Ollama model can hold tens of GB of wired memory long after the last call. `bin/local-ai-bench` measures latency only. Add an `--idle-memory` mode that prints one JSON line: runner RSS in MB, serve RSS in MB, loaded models, and a verdict (at most 500 MB under, 500 to 5000 MB at, over 5000 MB over, `NO_OLLAMA` when it is not running). Source to adapt: https://github.com/fyodoriv/minsky/blob/main/scripts/measure-ollama-idle-memory.sh.
+  - **Files**: `bin/local-ai-bench`, `docs/local-llm.md` (or the local-ai doc that lists bench flags), `tests/local-ai-bench*.bats`.
+  - **Output**: code
+  - **Acceptance**: `local-ai-bench --idle-memory` exits 0 and prints valid JSON with the five fields, also when Ollama is down (`NO_OLLAMA`); the Bats case stubs `ollama` and `ps`.
+  - **Hypothesis**: with the number visible, idle Ollama wired memory 10 minutes after the last call falls from the current reading (record it first) to 500 MB or less once `OLLAMA_KEEP_ALIVE` is tuned.
+  - **Measurement**: `local-ai-bench --idle-memory | jq .ollama_runner_rss_mb`, run 10 minutes after the last model call.
+  - **Success**: the reading is at most 500 MB on 5 of 7 consecutive days.
+  - **Pivot**: still over 5000 MB after tuning `OLLAMA_KEEP_ALIVE` for 14 days -> accept the cost of a warm model and document the floor instead.
+  - **Anchor**: Ollama documentation (keep-alive and model unloading); Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — local AI memory cost (docs/metrics.md), not a scorecard metric.
+
 - [ ] Prove agent continuity through a battery lid close with Power Protect
   - **ID**: keepawake-power-protect-physical-validation
   - **Blocked**: physical-validation — needs a person on the test laptop to complete any missing Power Protect installation with administrator authentication, disconnect power, and close the lid for a controlled comparison while actual agent progress is recorded. Check readiness first; do not ask to repeat an installation that is already present.

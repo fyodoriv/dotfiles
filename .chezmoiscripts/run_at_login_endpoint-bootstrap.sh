@@ -1,8 +1,7 @@
 #!/bin/bash
 # Fast login bootstrap: sign uv pythons + jq + curl + ggrep, link shims, publish ready sentinel.
 #
-# Runs at RunAtLoad via com.dotfiles.endpoint-bootstrap BEFORE minsky tick-loop
-# and other high-churn LaunchAgents. Closes post-reboot races where supervised
+# Runs at RunAtLoad via com.dotfiles.endpoint-bootstrap BEFORE other high-churn LaunchAgents. Closes post-reboot races where supervised
 # loops exec jq, curl, or python3.13 before adhoc-sign-bottles / link-*-shim complete.
 set -euo pipefail
 

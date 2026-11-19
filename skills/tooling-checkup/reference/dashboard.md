@@ -43,7 +43,7 @@ redacts token-like strings, and replaces any text that matches the local
 private-pattern file (`~/.config/oss-readiness/oss-readiness.env`) with
 `[redacted]`. Metric keys outside `[a-z0-9_]` and non-numeric values are
 dropped from `latest`. `agent_time` names only the tooling projects
-(agentbrew, dotfiles, minsky, tasks.md, tooling); every other
+(agentbrew, dotfiles, tasks.md, tooling); every other
 project is grouped as `other`, so private repo names never reach the page. Anyone who can open the dashboard can read the files.
 
 ## Design

@@ -383,7 +383,7 @@ backend/devin/. Updates tests that imported the old path.
 #
 # Orchestrator pipelines (minsky etc.) bypass attribution rewriting
 # entirely. The library does NOT inject any orchestrator-specific
-# trailer — minsky deliberately has no bot identity (see minsky
+# trailer — the orchestrator deliberately has no bot identity (see its
 # user-story 012: "no new bot account"). The operator's commit message
 # survives byte-for-byte; the orchestrator can add whatever attribution
 # it wants from its own pipeline driver.

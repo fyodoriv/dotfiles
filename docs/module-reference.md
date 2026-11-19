@@ -67,7 +67,7 @@ Every module declares one of four severity tiers in `modules/<name>/severity`. T
 | **critical** | Security & safety — failures need immediate attention | `security`, `ssh`, `workflow` |
 | **important** | Core developer config — should be correct for daily work | `agent-browser`, `agentbrew`, `chezmoi`, `chrome`, `editor`, `git`, `local-bin`, `memory`, `personal-machine`, `resilience`, `shell`, `sync`, `upgrade` |
 | **performance** | System performance — nice to have, not blocking | `macos`, `tools` |
-| **cosmetic** | Personal preference — ok to skip | `claude`, `codex`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `home-theater`, `local-ai`, `minsky`, `obsidian`, `vscode`, `workspace` |
+| **cosmetic** | Personal preference — ok to skip | `claude`, `codex`, `enterprise`, `extras`, `jetbrains`, `local-llm`, `prompt`, `terminal`; no `severity` file (defaults to cosmetic): `home-theater`, `local-ai`, `obsidian`, `vscode`, `workspace` |
 
 Filter usage:
 
@@ -391,6 +391,17 @@ prove agent work continues with the lid closed. The
 [upstream installer guide](https://github.com/x74353/Amphetamine-Power-Protect)
 explains installation; physical uptime needs a separate controlled test.
 
+#### CPU budget and do not oversubscribe
+
+Parallel agent work needs one CPU budget. Idle hardware wastes money. A gridlocked Mac wastes more.
+
+- **Target: 70% CPU.** Run up to about `floor(cores x 0.70)` heavy jobs at once. On 10 cores, that is 7.
+- **Ceiling: 80%.** Go up to 80% only for a short, deliberate burst. Never above it.
+- **Measure effective work, not the job count.** Count active model subprocesses and finished PRs. A rising job count with falling output means you passed the saturation point.
+- **Gridlock signal:** load average at or above `cores x 4` while active subprocesses fall toward zero. Halve the job count at once.
+- **No autoscaler.** Do not build a controller that ramps jobs. Use a fixed per-host number, measured once. Heavy commands go through `heavy-run`, which already queues them; never raise its slot counts without the owner's yes.
+- **OS throttles make a budget unreachable.** A LaunchAgent with `ProcessType=Background` or `Nice > 0` is QoS-throttled. A launchd soft file limit of 256 starves concurrency (see `resilience.launchd_maxfiles`). Check these before you blame the budget.
+
 ### macos
 
 `check_defaults` checks auto-fix via `defaults write`; special checks cover other system settings.
@@ -560,19 +571,6 @@ Optional local LLM via `mlx-lm` on Apple Silicon. When `use_local_ai` is `false`
 | `local-llm.server.reachable` | advisory — `mlx_lm.server` reachable | — (hint: start `mlx_lm.server`) |
 | `local-llm.bootstrap.sentinel` | advisory — operator opted into the model download (sentinel file) | — |
 | `local-llm.model.weights_cached` | advisory — model weights cached under `~/.cache/huggingface/hub` | — |
-
-### minsky
-
-The minsky orchestrator checkout, its PATH shim, and its CLI. `MINSKY_REPO` overrides the repo path.
-
-| ID | What it checks | Auto-fix |
-|----|---------------|----------|
-| `minsky.repo_exists` | minsky repo present | `git clone` |
-| `minsky.repo_is_git_checkout` | Repo is a valid git checkout (HEAD resolves) | None (hint: re-clone) |
-| `minsky.shim_symlinked` | `~/.local/bin/minsky` links to `<repo>/bin/minsky` | `ln -sf` |
-| `minsky.help_runs` | `minsky --help` exits 0 | None (hint: `pnpm install` in the repo) |
-| `minsky.observer_log_present` | advisory — `<repo>/.minsky/observer.log` present | — (hint: `minsky --once`) |
-| `minsky.iter_log_recent` | advisory — `iter-once.log` present | — (hint: `minsky --once`) |
 
 ### obsidian — full-only, opt-in
 

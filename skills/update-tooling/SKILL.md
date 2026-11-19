@@ -348,7 +348,7 @@ drift for source reconciliation.
 
 Only `$DOTFILES_APPLIED` may mutate or reload Home LaunchAgents. The PATH
 repair records which jobs were loaded before it edits a plist, never starts an
-unloaded job, keeps `com.minsky.*` off without its opt-in marker, and leaves
+unloaded job and leaves
 Node-backed jobs alone while endpoint safe mode is active. The separate
 `dotfiles-reload-launchagents` command is an explicit post-apply reload of its
 declared release whitelist; use it only from `$DOTFILES_APPLIED`, not as a
@@ -429,10 +429,10 @@ env -u DOTFILES_DIR "$DOTFILES_APPLIED/bin/dotfiles-heal-stuck-agents" --fix --q
 curl -sf --max-time 2 http://127.0.0.1:9223/json/version && echo CDP9223=ok
 ```
 
-When Minsky is installed, verify its opt-in autostart state remains off:
+Verify that no stale `com.minsky.*` LaunchAgent is loaded (the project is
+archived; any loaded job is off-rule and gets removed):
 
 ```bash
-test ! -e "${MINSKY_STATE_DIR:-$HOME/.minsky}/autostart-enabled"
 ! launchctl list | rg -qi 'minsky'
 ```
 

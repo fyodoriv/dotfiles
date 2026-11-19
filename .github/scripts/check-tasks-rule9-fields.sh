@@ -4,8 +4,8 @@
 #
 #   **Hypothesis**, **Success**, **Pivot**, **Measurement**, **Anchor**
 #
-# Rule-9 (per `agentbrew/templates/AGENTS.md` § "Stability Is P0" + Minsky
-# `vision.md` § 9 "Pre-registered hypothesis-driven development") makes
+# Rule-9 (per `agentbrew/templates/AGENTS.md` § "Stability Is P0" and the
+# pre-registered hypothesis rule) makes
 # these 5 fields mandatory. Since 2026-11-10 they are mandatory at every
 # priority (ADR 0006): every task carries its measurement.
 #
@@ -29,9 +29,7 @@ fi
 # every `- [ ] ...` task, capture its `**ID**:` line, then check the
 # block (until the next task or section boundary) for each of the 5
 # required rule-9 fields — Hypothesis / Success / Pivot / Measurement /
-# Anchor. Emit a failure per non-compliant task. The Minsky `pickHostTask`
-# parser uses the same line shape, so this lint is structurally identical
-# to the runtime check.
+# Anchor. Emit a failure per non-compliant task.
 failures="$(
 awk '
   function field_has_value(line) {

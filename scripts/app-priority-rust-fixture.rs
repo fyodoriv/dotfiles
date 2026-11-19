@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const PGREP: &str = "#!/bin/bash\ncase \"$*\" in\n  \"-l -x Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel\")\n    printf \"101 claude\\\\n201 codex\\\\n301 Slack\\\\n401 bats\\\\n\" ;;\n  \"-l -f mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome \")\n    printf \"501 node minsky\\n601 node_modules/vitest\\n\" ;;\n  \"-x Slack\") printf \"301\\n\" ;;\n  \"-x claude\") printf \"101\\n\" ;;\n  \"-x codex\") printf \"201\\n\" ;;\n  \"-x bats\") printf \"401\\n\" ;;\n  \"-f node.*minsky\") printf \"501\\n\" ;;\n  \"-f node_modules/vitest\") printf \"601\\n\" ;;\n  *) exit 1 ;;\nesac\n";
+const PGREP: &str = "#!/bin/bash\ncase \"$*\" in\n  \"-l -x Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel\")\n    printf \"101 claude\\\\n201 codex\\\\n301 Slack\\\\n401 bats\\\\n\" ;;\n  \"-l -f mlx_lm.server|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome \")\n    printf \"601 node_modules/vitest\\n\" ;;\n  \"-x Slack\") printf \"301\\n\" ;;\n  \"-x claude\") printf \"101\\n\" ;;\n  \"-x codex\") printf \"201\\n\" ;;\n  \"-x bats\") printf \"401\\n\" ;;\n  \"-f node.*runner\") printf \"501\\n\" ;;\n  \"-f node_modules/vitest\") printf \"601\\n\" ;;\n  *) exit 1 ;;\nesac\n";
 const PS: &str = "#!/bin/bash\ncase \"$*\" in\n  \"-p 101 -o comm=\") printf \"/Applications/Terminal.app/Contents/MacOS/Terminal\\n\" ;;\n  \"-p 201 -o comm=\") printf \"/usr/bin/codex\\n\" ;;\n  \"-p 201 -o ppid=\") printf \"1\\n\" ;;\n  *) exit 1 ;;\nesac\n";
 const TASKPOLICY: &str = "#!/bin/bash\nprintf 'taskpolicy %s\\n' \"$*\" >> \"$ACTION_LOG\"\n";
 const RENICE: &str = "#!/bin/bash\nprintf 'renice %s\\n' \"$*\" >> \"$ACTION_LOG\"\n";
@@ -101,16 +101,12 @@ fn run() -> Result<(), &'static str> {
         return Ok(());
     }
     let exact = rows(&output(&dir, "pgrep", &["-l", "-x", "Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel"])?)?;
-    let patterns = rows(&output(&dir, "pgrep", &["-l", "-f", "mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome "])?)?;
+    let patterns = rows(&output(&dir, "pgrep", &["-l", "-f", "mlx_lm.server|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome "])?)?;
     for (name, kind) in [("Slack", "foreground"), ("Google Chrome", "foreground"), ("Microsoft Outlook", "foreground"), ("ghostty", "foreground"), ("WebStorm", "foreground"), ("claude", "agent"), ("codex", "agent"), ("ollama", "background")] {
         for (pid, value) in &exact { if value == name { apply(&dir, pid, kind)?; } }
     }
-    for (pattern, kind) in [("mlx_lm.server", "background"), ("node.*minsky", "background")] {
-        for (pid, value) in &patterns {
-            let matches = if pattern == "node.*minsky" { value.find("node").is_some_and(|at| value[at + 4..].contains("minsky")) }
-                else { value.as_bytes().windows(13).any(|w| &w[..6] == b"mlx_lm" && &w[7..] == b"server") };
-            if matches { apply(&dir, pid, kind)?; }
-        }
+    for (pid, value) in &patterns {
+        if value.as_bytes().windows(13).any(|w| &w[..6] == b"mlx_lm" && &w[7..] == b"server") { apply(&dir, pid, "background")?; }
     }
     for name in ["bats", "shellcheck", "parallel"] {
         for (pid, value) in &exact { if value == name { apply(&dir, pid, "background")?; } }

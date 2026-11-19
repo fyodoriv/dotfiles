@@ -1,7 +1,7 @@
 #!/bin/bash
 # Doctor checks for ~/.local/bin (XDG user-binary directory)
 #
-# Why: shim-style tools (minsky, future minsky/tasks.md shims) install
+# Why: shim-style tools (tasks.md shims and similar) install
 # themselves by symlinking into ~/.local/bin. If the directory is missing
 # or not on PATH, `command -v <shim>` fails first-try and the operator
 # has to debug a "command not found" before anything else works.

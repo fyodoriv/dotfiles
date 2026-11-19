@@ -99,7 +99,6 @@ _render_home() {
 @test "doctor skips owner-only modules when owner_machine=false" {
   grep -q 'dig "owner_machine" true' "$REPO/bin/dotfiles-doctor"
   grep -q 'OWNER_MACHINE:-true}" = "false"' "$REPO/modules/personal-machine/doctor.sh"
-  grep -q 'OWNER_MACHINE:-true}" = "false"' "$REPO/modules/minsky/doctor.sh"
 }
 
 # Run the real apply-time agentbrew step with a stub agentbrew whose merge

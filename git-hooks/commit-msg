@@ -85,7 +85,7 @@ fi
 # Repos that override core.hooksPath via Husky also enforce the same
 # rule — see ~/.config/husky/init.sh which sources the same library.
 #
-# Orchestrator pipelines (e.g. minsky) bypass this rewrite entirely
+# Orchestrator pipelines bypass this rewrite entirely
 # so the orchestrator stays in control of attribution; set
 # MINSKY_PIPELINE=1 to bypass (the library handles this internally).
 hook_dir="$(cd "$(dirname "$0")" && pwd)"

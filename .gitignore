@@ -29,7 +29,7 @@ coverage/
 __pycache__/
 *.py[cod]
 
-# Minsky per-machine bootstrap sidecar. `minsky-bootstrap` writes
+# Stale per-machine sidecar from the archived orchestrator. It wrote
 # `.minsky/repo.yaml` with the canonical host-fork's GHE org name and
 # ticket prefix so the autonomous run loop can pick & validate tasks
 # from THIS host's TASKS.md. The content is intentionally fork-specific

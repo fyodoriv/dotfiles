@@ -2,7 +2,7 @@
 through bin/local-ai-agent. Loop until the queue is empty or the
 deadline is reached.
 
-This is intentionally narrower than minsky:
+This loop is intentionally narrow:
   - Designed for the local-ai-agent backend only (Ollama / qwen3-coder).
   - Reads TASKS.md per the tasks.md spec used in this repo (P0/P1/P2/P3
     sections, `- [ ] ` checkboxes with indented **ID** / **Tags** /

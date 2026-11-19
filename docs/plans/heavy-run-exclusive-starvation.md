@@ -25,3 +25,18 @@ sequence-lock fixture. Success is zero new violations and the existing
 exclusive deadline and cleanup assertions still passing. Reject any change
 to the scheduler, fixture time limit or guard coverage. Anchor: hosted
 default-branch run 44425352422 and the literal alarm reset guard.
+
+### Check the alarm guard before a merge
+
+The affected-test gate passed the preceding pull request. The default
+suite caught the missing reset on three verified revisions. The guard
+reads all of `bin/`, `lib/` and `tests/`, so a file-only test selection
+cannot cover its inputs.
+
+Run the existing alarm guard directly in the pull request job before
+`make check`. Predict one visible guard step and zero missed failures
+from that guard in the next pull request. Success is all eight alarm
+controls passing and the normal affected gate still green. Keep the
+default full suite. Reject a change that skips a guard case or removes an
+existing check. Anchor: pull request #765 and default runs 44425352422,
+44413519464 and 44403049527.

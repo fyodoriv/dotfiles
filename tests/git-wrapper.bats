@@ -279,6 +279,44 @@ prepare_session_git_path() {
   [ ! -e "$GUARD_CALLS" ]
 }
 
+@test "Claude Bash rewrite still checks opted-in Git before delegation" {
+  prepare_session_git_path
+  export GUARD_CALLS="$TEST_DIR/guard-calls"
+  cat > "$SESSION_GUARD/git" <<'GUARD'
+#!/bin/bash
+printf '%s\n' "$*" >> "$GUARD_CALLS"
+[[ "$1" == --agentbrew-check-only && "$2" == "$DOTFILES_REAL_GIT" ]] || exit 91
+[[ "$3" != reset ]] || exit 2
+GUARD
+  local source_root input updated rewritten
+  source_root="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  input=$(jq -nc --arg log "$TEST_DIR/session.jsonl" '{
+    hook_event_name:"PreToolUse", permission_mode:"default", tool_name:"Bash",
+    transcript_path:$log, tool_input:{command:"git reset --hard"}
+  }')
+  updated=$(env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="/usr/bin:/bin" \
+    DOTFILES_DIR="$source_root" "$source_root/agent-hooks/prepend-endpoint-path.sh" <<<"$input")
+  rewritten=$(jq -er '.hookSpecificOutput.updatedInput.command' <<<"$updated")
+
+  run env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="$SESSION_GUARD:/usr/bin:/bin" \
+    AGENTBREW_SESSION_GIT_GUARD="$SESSION_GUARD/git" /bin/bash -c "$rewritten"
+  [ "$status" -eq 2 ]
+  [ ! -e "$GIT_ARGS" ]
+  [ "$(wc -l < "$GUARD_CALLS")" -eq 1 ]
+
+  rewritten="${rewritten%;*}; git status --short"
+  run env -u BASH_ENV -u ENV HOME="$SESSION_HOME" PATH="$SESSION_GUARD:/usr/bin:/bin" \
+    AGENTBREW_SESSION_GIT_GUARD="$SESSION_GUARD/git" /bin/bash -c "$rewritten"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$GIT_ARGS")" = 'status --short' ]
+  [ "$(wc -l < "$GUARD_CALLS")" -eq 2 ]
+
+  run env -u BASH_ENV -u ENV -u AGENTBREW_SESSION_GIT_GUARD HOME="$SESSION_HOME" \
+    PATH="/usr/bin:/bin" /bin/bash -c "$rewritten"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$GUARD_CALLS")" -eq 2 ]
+}
+
 # Probe cache (#483): a passing probe leaves a marker; the marker must not
 # outlive an Xcode or CLT update, which replaces the developer-dir git.
 

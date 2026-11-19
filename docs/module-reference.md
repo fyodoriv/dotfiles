@@ -146,6 +146,12 @@ Read-only auth and scope checks share one lazy `gh auth status` result for
 that module run. Fix mode probes again after each possible change. The
 temporary output and exit code are cleared after the scope checks.
 
+After [setting up your Git config](onboarding.md#step-3-set-up-personal-git-config),
+install the optional driver with `brew install mergiraf` and run
+`dotfiles doctor --module git --fix`. To use it, add `*.json merge=mergiraf`
+to a repository’s `.gitattributes`. Select other patterns as needed. See
+[Mergiraf usage](https://mergiraf.org/usage.html#registration-as-a-git-merge-driver).
+
 | ID | What it checks | Auto-fix |
 |----|---------------|----------|
 | `symlink.gitconfig` | `~/.gitconfig` symlinked to dotfiles | Create symlink |
@@ -164,6 +170,7 @@ temporary output and exit code are cleared after the scope checks.
 | `git.fsmonitor_off` | `core.fsmonitor = false` | `git config --global` |
 | `git.splitindex_off` | `core.splitIndex` not set | `git config --global --unset` |
 | `git.maintenance_auto` | `maintenance.auto = true` | `git config --global` |
+| `git.mergiraf` | Mergiraf driver, name, and recursive mode are available in global Git config | Registers the driver in `~/.gitconfig.local` when Mergiraf is installed. Shows an install hint when it is missing. |
 | `git.safe_aliases` | Git aliases avoid `git add -A` / `git add .` all-path staging | None |
 | `git.safe_guard` | `git-safe` script is executable | `chmod +x` |
 | `git.hooks_path` | `core.hooksPath` points to dotfiles | `git config --global` |

@@ -118,6 +118,8 @@ them. -->
   - **Success**: the 30-day conflict-fix commit count is at most half of the prior 30 days, and 0 wrong merges are found in review.
   - **Pivot**: 3 or more wrong auto-merges in a week, or no drop in the count after 30 days -> remove the driver config and keep only the doctor hint.
   - **Anchor**: Mergiraf project (https://mergiraf.org), published kernel benchmark of auto-resolved conflicts; Basili, Caldiera, Rombach 1994 (GQM).
+  - **Setup gate**: A disposable home verifies 3 of 3 effective Git settings, zero writes before repair or when the binary is missing, and identical config bytes after a second repair. A disposable repository with explicit attributes must retain both sides of one structural conflict. Pivot if any control fails or any attributes are written by doctor.
+  - **Field baseline**: The 30-day log query found zero matching commits on Nov 19, 2026. Keep the field measurement open until an opted-in repository has a nonzero comparable baseline.
   - **Competitive-goal**: none — agent merge reliability (docs/metrics.md), not a scorecard metric.
 
 - [ ] Check launchd-safe paths in dotfiles-launchagent-drift
@@ -148,6 +150,8 @@ them. -->
   - **Success**: the reading is at most 500 MB on 5 of 7 consecutive days.
   - **Pivot**: still over 5000 MB after tuning `OLLAMA_KEEP_ALIVE` for 14 days -> accept the cost of a warm model and document the floor instead.
   - **Anchor**: Ollama documentation (keep-alive and model unloading); Basili, Caldiera, Rombach 1994 (GQM).
+  - **Setup gate**: CI verifies five JSON fields and exactly one line. Cases cover a stopped server, a running idle server, 500 MiB and 5000 MiB boundaries and one KiB above each, and an available endpoint with unknown host RSS. A mixed-worker case must count the RSS from both an Ollama runner and its server-owned llama-server, with zero RSS from an unrelated llama-server. Loaded models with no accounted runner must produce an unknown runner result. Require zero false stopped or zero-memory verdicts and zero model-changing requests. Check the read-only command against the real local endpoint after.
+  - **Field baseline**: The first local snapshot found one Ollama process and zero loaded models. Its time since the last model call is unknown. Treat the longitudinal result as open. RSS is resident process memory, not wired-memory or VRAM accounting.
   - **Competitive-goal**: none — local AI memory cost (docs/metrics.md), not a scorecard metric.
 
 - [ ] Prove agent continuity through a battery lid close with Power Protect

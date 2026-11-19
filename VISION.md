@@ -79,7 +79,7 @@ User stories under [`docs/user-stories/`](docs/user-stories/) are the contract:
 | 06 | Stay safe from damage (no-leak contract, multi-agent git safety) |
 | 07 | Git workflow helpers (`git-maintain`, `gh-wrapper`, custom hooks) |
 | 08 | Time saved by automation (tracked via `bin/dotfiles-stats`) |
-| 09 | Run local models fast (Ollama + qwen3-coder; warmup; minsky-aware) |
+| 09 | Run local models fast (Ollama + qwen3-coder; warmup) |
 | 10 | Fork for your company (overlay model, secrets architecture) |
 
 New capabilities earn a new user story; new user stories carry a numeric threshold and an SLI source per the constitution.

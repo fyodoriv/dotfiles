@@ -37,7 +37,7 @@ set -uo pipefail
 # tooling repos, never every repo under ~/apps.
 TOOLING_REPOS=""
 if [ -z "${TOOLING_ROOT:-}" ] && [ ! -d "$HOME/apps/tooling" ]; then
-  for name in agentbrew dotfiles minsky tasks.md; do
+  for name in agentbrew dotfiles tasks.md; do
     [ -d "$HOME/apps/$name/.git" ] && TOOLING_REPOS="$TOOLING_REPOS $HOME/apps/$name"
   done
   [ -n "$TOOLING_REPOS" ] && TOOLING_ROOT="$HOME/apps" &&

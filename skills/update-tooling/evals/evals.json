@@ -11,7 +11,7 @@
         "Uses git merge --ff-only rather than git pull --rebase or destructive Git commands",
         "Rebuilds agentbrew after its checkout advances, then runs agentbrew sync --pull outside a project Agentfile",
         "Uses the chezmoi applied checkout's dotfiles-sync path instead of the development checkout",
-        "Reports stability evidence from agentbrew, dotfiles doctor, LaunchAgent, CDP, context, and Minsky hard-off checks",
+        "Reports stability evidence from agentbrew, dotfiles doctor, LaunchAgent, CDP, context, and stale-LaunchAgent checks",
         "Ranks no more than three current AgentBrew and dotfiles tasks without claiming or modifying them"
       ]
     },
@@ -80,7 +80,7 @@
         "Compares the static catalog with ~/.config/agentbrew/Agentfile.yaml without invoking agentbrew or Node, and reports names missing from skills:",
         "Provides env -u DOTFILES_DIR agentbrew sync --only skills as the post-safe-mode reconciliation command",
         "Runs applied AgentBrew and dotfiles commands with DOTFILES_DIR unset",
-        "Keeps LaunchAgent repair and reload actions in the configured applied checkout, with loaded-only, Minsky, and Node-safe-mode guards"
+        "Keeps LaunchAgent repair and reload actions in the configured applied checkout, with loaded-only and Node-safe-mode guards"
       ]
     },
     {

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Prepend dotfiles/bin (and ~/.local/bin) to deployed LaunchAgent PATH keys that
-# omit endpoint shims. Stale com.agentbrew.* / com.minsky.* / com.github.facebook.watchman
+# omit endpoint shims. Stale com.agentbrew.* / com.github.facebook.watchman
 # plists resolve jq or ggrep to /usr/bin/* or bare Homebrew until PATH matches
 # launchagent-path. Also rewrites other checkout bins (legacy ~/apps/dotfiles/bin,
 # a dev ~/apps/tooling/dotfiles/bin, ~/dotfiles/bin) → the applied checkout's bin.
@@ -86,10 +86,6 @@ _blocked_node_job() {
 
 _reload_permitted() {
   local label="$1"
-  if [[ "$label" == com.minsky.* ]] \
-    && [ ! -e "${MINSKY_STATE_DIR:-$HOME/.minsky}/autostart-enabled" ]; then
-    return 1
-  fi
   if [ -e "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ] \
     && _blocked_node_job "$label"; then
     return 1
@@ -105,8 +101,8 @@ _was_loaded_before_repair() {
 _reload_plist() {
   local plist="$1" label="$2" was_loaded="$3"
   [ "$was_loaded" = "1" ] || return 2
-  # Recheck immediately before bootstrap. The endpoint safe-mode sentinel or
-  # Minsky marker can change between the initial loaded-state probe and reload.
+  # Recheck immediately before bootstrap. The endpoint safe-mode sentinel can change
+  # between the initial loaded-state probe and reload.
   _reload_permitted "$label" || return 2
   local domain uid
   uid="$(id -u)"

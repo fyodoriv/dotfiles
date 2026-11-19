@@ -151,24 +151,7 @@ teardown() {
   [[ "$output" != *"[topgrade-stub] would run upgrades"* ]]
 }
 
-# ── Grind safety ─────────────────────────────────────────────────────
-
-@test "skips upgrade when minsky autonomous iteration is in flight" {
-  # Match the REAL signal — `pgrep -f 'minsky run\b'`. Sharpened from
-  # the prior over-eager `pgrep -f minsky` (which matched any process
-  # path containing 'minsky', e.g. vim editing ~/apps/tooling/minsky/...).
-  cat > "$TEST_BIN/pgrep" <<'STUB'
-#!/bin/bash
-# Simulate `minsky run` autonomous iteration running
-[[ "$*" == *"minsky run"* ]] && exit 0
-exit 1
-STUB
-  chmod +x "$TEST_BIN/pgrep"
-
-  run "$SCRIPT"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"minsky autonomous iteration in flight"* ]]
-}
+# ── Interactive sessions ─────────────────────────────────────────────
 
 @test "does NOT skip on an interactive dvb (devin --permission-mode) session" {
   # Operator is at the keyboard with a `dvb` session open. They invoked
@@ -180,7 +163,6 @@ STUB
 # Simulate a legacy `caffeinate -ms devin --permission-mode dangerous --`
 # process from the 2026-05-29 reproducer in the operator's shell.
 [[ "$*" == *"devin"* ]] && exit 0
-[[ "$*" == *"minsky run"* ]] && exit 1
 exit 1
 STUB
   chmod +x "$TEST_BIN/pgrep"
@@ -190,25 +172,6 @@ STUB
   [[ "$output" != *"Skipping upgrade"* ]]
   # Sanity: the wrapper ran topgrade rather than aborting
   [[ "$output" == *"[topgrade-stub] would run upgrades"* ]]
-}
-
-@test "does NOT skip when 'minsky' appears in an unrelated path (e.g. vim editing minsky source)" {
-  # Original `pgrep -f minsky` regex was too broad — it matched an
-  # operator editing files under ~/apps/tooling/minsky in vim/etc.
-  # The new `pgrep -f 'minsky run\b'` regex requires the canonical
-  # autonomous-iteration argv shape.
-  cat > "$TEST_BIN/pgrep" <<'STUB'
-#!/bin/bash
-# Simulate a vim editing a minsky source file
-[[ "$*" == *"minsky run"* ]] && exit 1   # not an autonomous iteration
-[[ "$*" == *"minsky"* ]] && exit 0       # path match, but not the loop
-exit 1
-STUB
-  chmod +x "$TEST_BIN/pgrep"
-
-  run "$SCRIPT" --yes
-  [ "$status" -eq 0 ]
-  [[ "$output" != *"Skipping upgrade"* ]]
 }
 
 # ── topgrade-missing handling ────────────────────────────────────────

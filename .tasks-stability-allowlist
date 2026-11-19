@@ -4,7 +4,7 @@
 # agentbrew's scripts/lint-tasks-stability.mjs. Stability work belongs in
 # P0/P1 (see ~/.config/devin/AGENTS.md § Task queues). Each entry below is a
 # pre-existing stability-tagged task not yet promoted — promote it to P0/P1
-# with the 5 minsky HDD fields (then delete it here), or retag if the
+# with the 5 rule-9 fields (then delete it here), or retag if the
 # stability tag is a false positive. The lint flags dead entries so this list
 # drains over time.
 #

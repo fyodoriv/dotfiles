@@ -59,7 +59,7 @@ probe_target() {
 
 # ── Fast check-only mode ─────────────────────────────────────────────
 # Returns 0/1 with no output, no sudo, no VPN wait, no notifications.
-# Designed for minsky's non-interactive network checks.
+# Designed for non-interactive network checks.
 if [[ "${1:-}" == "--check-only" ]]; then
   # WiFi: any interface has an IP?
   for iface in en0 en1 en2 en3 en4; do

@@ -563,7 +563,7 @@ source ~/.zshrc
 ulimit -n   # should output 65535
 ```
 
-If the error comes from a LaunchAgent job (a dotfiles agent, a minsky worker, opencode), the `.zshrc` limit does not apply. launchd gives its jobs a soft limit of 256. Raise it once in a human terminal:
+If the error comes from a LaunchAgent job (a dotfiles agent, a parallel agent worker, opencode), the `.zshrc` limit does not apply. launchd gives its jobs a soft limit of 256. Raise it once in a human terminal:
 
 ```bash
 launchctl limit maxfiles            # shows the launchd soft and hard limits

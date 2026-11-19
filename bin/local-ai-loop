@@ -2,7 +2,7 @@
 # local-ai-loop — drive bin/local-ai-agent through TASKS.md until empty
 # or a deadline passes.
 #
-# A thin alternative to minsky, narrower in scope:
+# A thin loop, narrow in scope:
 #   - Local-AI backend only (qwen3-coder:30b via Ollama).
 #   - Reads TASKS.md per the tasks.md spec used in this repo.
 #   - Skips tasks tagged secrets / machine / manual / interactive / auth.

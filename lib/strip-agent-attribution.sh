@@ -20,11 +20,10 @@
 #      was agent-authored.
 #      The footer goes before a trailing git trailer block (Task:,
 #      Signed-off-by:) so git still parses those trailers.
-#   3. Orchestrator pipelines (e.g. minsky) are exempt — set
+#   3. Orchestrator pipelines are exempt — set
 #      MINSKY_PIPELINE=1 to bypass entirely. Bypass mode preserves
 #      the caller's commit message as-is so the orchestrator stays
-#      in control of attribution. Minsky deliberately has no bot
-#      identity (see minsky user-story 012); the operator's own
+#      in control of attribution. The operator's own
 #      identity is the correct author for orchestrator-driven runs.
 #
 # Why a shared library: Husky overrides core.hooksPath (it points at
@@ -108,7 +107,7 @@ _strip_agent_attribution_in_file() {
     return 0
   fi
 
-  # Orchestrator pipelines (minsky etc.): pure bypass — leave the
+  # Orchestrator pipelines: pure bypass — leave the
   # message exactly as the orchestrator wrote it. The orchestrator is
   # responsible for any attribution it wants; this library stays out
   # of its way.
@@ -135,7 +134,7 @@ _strip_agent_attribution_in_file() {
     echo ""
     echo "🤖 Stripped tool-specific agent attribution line(s) (agent-attribution-footer rule)."
     echo "   The rule keeps your public authorship identity consistent across agents."
-    echo "   To preserve attribution (e.g., minsky orchestrator pipelines), export MINSKY_PIPELINE=1."
+    echo "   To preserve attribution (e.g., orchestrator pipelines), export MINSKY_PIPELINE=1."
     echo ""
   fi
 

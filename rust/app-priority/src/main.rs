@@ -159,7 +159,7 @@ fn defaults<B: Backend>(backend: &mut B) {
     }
     for name in ["claude", "codex"] { apply(backend, OsStr::new(name), false, Action::Agent); }
     apply(backend, OsStr::new("ollama"), false, Action::Background);
-    for name in ["mlx_lm.server", "node.*minsky"] { apply(backend, OsStr::new(name), true, Action::Background); }
+    for name in ["mlx_lm.server"] { apply(backend, OsStr::new(name), true, Action::Background); }
     for name in ["bats", "shellcheck", "parallel"] { apply(backend, OsStr::new(name), false, Action::Background); }
     for name in ["node_modules/vitest", "node_modules/typescript/bin/tsc", "bats-core", "/biome "] {
         apply(backend, OsStr::new(name), true, Action::Nice);
@@ -226,13 +226,12 @@ mod tests {
         for (name, pid) in [("Slack", 301), ("claude", 101), ("codex", 201), ("bats", 401)] {
             b.ids.insert(key(false, name), vec![pid]);
         }
-        b.ids.insert(key(true, "node.*minsky"), vec![501]);
         b.ids.insert(key(true, "node_modules/vitest"), vec![601]);
         b.info.insert((101, "comm=".into()), b"/Applications/Terminal.app/Contents/MacOS/Terminal\n".to_vec());
         b.info.insert((201, "ppid=".into()), b"1\n".to_vec());
         defaults(&mut b);
         let expected = [(301,"foreground"),(101,"foreground"),(101,"nice:0"),
-            (201,"background"),(201,"nice:10"),(501,"background"),(501,"nice:10"),
+            (201,"background"),(201,"nice:10"),
             (401,"background"),(401,"nice:10"),(601,"nice:10")];
         assert_eq!(b.actions, expected.into_iter().map(|(pid, action)| (pid, action.to_owned())).collect::<Vec<_>>());
     }
@@ -240,8 +239,8 @@ mod tests {
     fn custom_list_keeps_comments_patterns_and_incomplete_line() {
         let mut b = Fake::default();
         b.ids.insert(key(false, "Slack"), vec![1]);
-        b.ids.insert(key(true, "node.*minsky"), vec![2]);
-        custom(&mut b, b" Slack # comment\nnode.*minsky\n# skip\nSlack");
+        b.ids.insert(key(true, "node.*runner"), vec![2]);
+        custom(&mut b, b" Slack # comment\nnode.*runner\n# skip\nSlack");
         assert_eq!(b.actions, vec![(1,"foreground".into()), (2,"foreground".into())]);
     }
 

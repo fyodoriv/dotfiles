@@ -555,22 +555,6 @@ EOF
   printf '%s\n' "${failed_ids[@]:-}" | /usr/bin/grep -qx "security.no_env_shebang.git-hooks_pre-commit"
 }
 
-@test "security: env shebang in minsky/bin is flagged on a managed endpoint" {
-  mkdir -p "$TEST_HOME/apps/tooling/minsky/bin"
-  printf '#!/usr/bin/env bash\necho hi\n' > "$TEST_HOME/apps/tooling/minsky/bin/minsky-init"
-  export DOTFILES_MANAGED_ENDPOINT=1
-  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
-  printf '%s\n' "${failed_ids[@]:-}" | /usr/bin/grep -qx "security.no_env_shebang.minsky_bin_minsky-init"
-}
-
-@test "security: env shebang in minsky/bin is not flagged off a managed endpoint" {
-  mkdir -p "$TEST_HOME/apps/tooling/minsky/bin"
-  printf '#!/usr/bin/env bash\necho hi\n' > "$TEST_HOME/apps/tooling/minsky/bin/minsky-init"
-  unset DOTFILES_MANAGED_ENDPOINT DOTFILES_ENDPOINT_AGENT_APPS
-  source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
-  ! printf '%s\n' "${failed_ids[@]:-}" | /usr/bin/grep -q '^security\.no_env_shebang\.minsky_'
-}
-
 @test "security: LaunchAgent plist with /usr/bin/env is flagged" {
   mkdir -p "$TEST_DOTFILES/launchagents"
   cat > "$TEST_DOTFILES/launchagents/com.dotfiles.bad.plist" <<'EOF'
@@ -732,15 +716,15 @@ EOF
   failed_ids_contains "security.deployed_la_perl.com.agentbrew.competitor-watch"
 }
 
-@test "security: deployed minsky tick-loop without dotfiles/bin fails jq PATH check" {
+@test "security: deployed example worker without dotfiles/bin fails jq PATH check" {
   chmod 700 "$TEST_HOME/.ssh"
   mkdir -p "$TEST_HOME/Library/LaunchAgents"
-  cat > "$TEST_HOME/Library/LaunchAgents/com.minsky.tick-loop.plist" <<EOF
+  cat > "$TEST_HOME/Library/LaunchAgents/com.example.worker.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.minsky.tick-loop</string>
+  <key>Label</key><string>com.example.worker</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
@@ -754,7 +738,7 @@ EOF
     "$TEST_DOTFILES/bin/dotfiles-fix-launchagent-endpoint-path"
   chmod +x "$TEST_DOTFILES/bin/dotfiles-fix-launchagent-endpoint-path"
   source "$BATS_TEST_DIRNAME/../modules/security/doctor.sh"
-  failed_ids_contains "security.deployed_la_jq.com.minsky.tick-loop"
+  failed_ids_contains "security.deployed_la_jq.com.example.worker"
 }
 
 @test "security: deployed watchman LaunchAgent with stale dotfiles path fails jq PATH check" {
@@ -891,29 +875,6 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"Fixed and reloaded PATH"* ]]
   /usr/bin/grep -q '^print gui/' "$TEST_DIR/launchctl.log"
-  /usr/bin/grep -q '^bootout gui/' "$TEST_DIR/launchctl.log"
-  /usr/bin/grep -q '^bootstrap gui/' "$TEST_DIR/launchctl.log"
-}
-
-@test "security: LaunchAgent PATH repair never loads Minsky without its autostart marker" {
-  write_path_repair_plist "com.minsky.tick-loop"
-  install_launchagent_path_repair
-  write_launchctl_reload_stub
-  run_path_repair_with_launchctl_stub 1
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"reload skipped by current safety policy"* ]]
-  /usr/bin/grep -q '^print gui/' "$TEST_DIR/launchctl.log"
-  ! /usr/bin/grep -qE '^(bootout|unload|bootstrap|load)' "$TEST_DIR/launchctl.log"
-}
-
-@test "security: LaunchAgent PATH repair reloads a loaded Minsky job only with its autostart marker" {
-  write_path_repair_plist "com.minsky.tick-loop"
-  install_launchagent_path_repair
-  write_launchctl_reload_stub
-  mkdir -p "$TEST_HOME/.minsky"
-  : > "$TEST_HOME/.minsky/autostart-enabled"
-  run_path_repair_with_launchctl_stub 1
-  [ "$status" -eq 0 ]
   /usr/bin/grep -q '^bootout gui/' "$TEST_DIR/launchctl.log"
   /usr/bin/grep -q '^bootstrap gui/' "$TEST_DIR/launchctl.log"
 }

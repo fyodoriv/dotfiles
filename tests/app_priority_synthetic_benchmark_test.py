@@ -120,7 +120,7 @@ class RustFixtureTests(unittest.TestCase):
     def test_custom_configuration_matches_shell_actions(self):
         config = self.config / "dotfiles/priority-apps.txt"
         config.parent.mkdir()
-        config.write_text("  Slack # foreground\nnode.*minsky\n  # ignored\n\n")
+        config.write_text("  Slack # foreground\nnode.*runner\n  # ignored\n\n")
         base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
                                 self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
@@ -186,7 +186,7 @@ class CandidateFixtureTests(unittest.TestCase):
     def test_malformed_grouped_pattern_output_falls_back(self):
         pgrep = self.mockbin / "pgrep"
         source = pgrep.read_text()
-        expected = 'printf "501 node minsky\\n601 node_modules/vitest\\n"'
+        expected = 'printf "601 node_modules/vitest\\n"'
         self.assertIn(expected, source)
         pgrep.write_text(source.replace(expected, 'printf "invalid\\n"'))
         benchmark.compare(self.observe(self.repo), self.observe(self.candidate))

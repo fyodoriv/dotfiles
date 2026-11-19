@@ -127,7 +127,7 @@ surfaces:
 |--------|------------------------|------------------------------------|
 | `VISION.md` | G1 self-healing, G2 agentbrew ownership, G3 no-leak public repo, G4 overlay forkability | doctor modules, `Agentfile.yaml`, privacy hooks, `tests/no-internal-refs.bats` |
 | agentbrew `templates/AGENTS.md` + `VISION.md` | reuse before implementation, generated-agent-config ownership, task backend shape, git/public-write safety | `Agentfile.yaml`, `bin/gh`, `git-hooks/*`, `agentbrew/hooks/manifest.yaml` backstops |
-| Minsky `vision.md` constitution | rule #1 reuse, #3 doc/test-first, #6 stay alive, #9 HDD metadata, #10 deterministic gates, #16 default-by-default, #17 proactive healing | `make check`, `make lint-tasks`, `make lint-tasks-rule9`, doctor modules, Bats tests |
+| Peer orchestrator constitution (project archived) | rule #1 reuse, #3 doc/test-first, #6 stay alive, #9 HDD metadata, #10 deterministic gates, #16 default-by-default, #17 proactive healing | `make check`, `make lint-tasks`, `make lint-tasks-rule9`, doctor modules, Bats tests |
 
 Each numbered rule in [`docs/constitution.md`](constitution.md#rules-for-editing)
 (summarized in [`AGENTS.md`](../AGENTS.md#rules-for-editing)) names either

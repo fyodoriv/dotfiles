@@ -37,7 +37,6 @@ Also runs automatically via `com.dotfiles.morning` LaunchAgent at 8:30 AM.
 → Pulling latest code...
   ✓ dotfiles
   ✓ agentbrew
-  ✓ minsky
 
 → Health check...
   N passed, 0 failed, N skipped
@@ -65,7 +64,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | LaunchAgent | What | Frequency |
 |-------------|------|-----------|
 | `dotfiles-sync` | Git commit + push + pull (never commits deletions) | Every 30 min |
-| `tooling-sync` | Pull agentbrew and minsky; push agentbrew TASKS.md edits | Every hour |
+| `tooling-sync` | Pull agentbrew; push agentbrew TASKS.md edits | Every hour |
 | `dotfiles-doctor` | Health check + auto-fix | Weekly |
 | `git-maintain` | `git maintenance` on all repos | Daily |
 | `app-priority` | Keep terminal/desktop Claude Code and Codex interactive; background agents without an interactive ancestor | Every 60s |

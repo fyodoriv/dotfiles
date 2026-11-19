@@ -1,7 +1,7 @@
 # Multi-workspace visibility
 
 A **workspace** is a parent folder holding several repo checkouts that are
-worked as a unit — e.g. `~/apps/tooling/` (dotfiles, agentbrew, minsky, …)
+worked as a unit — e.g. `~/apps/tooling/` (dotfiles, agentbrew, tasks.md, …)
 or another folder of related repos. dotfiles gives the host-level picture across all
 of them: which repos are dirty or ahead, and how much TASKS.md work each
 one carries.
@@ -19,7 +19,7 @@ Sample output:
 === Workspace: tooling (~/apps/tooling) ===
   ✓ agentbrew  0 dirty  +0
   agentbrew: 133 tasks (124 unblocked)
-  ✗ minsky  (git status failed — bare or worktree-container checkout?)
+  ✗ example  (git status failed — bare or worktree-container checkout?)
   Total: 11 repos, 416 tasks, 292 unblocked
 === All workspaces: 2 workspaces, 14 repos, 686 tasks ===
 ```
@@ -84,7 +84,3 @@ and runs the real `tasks workspaces add` when the CLI is installed.
   (for example `tasks workspaces list --json`).
 - **Bootstrap flag "declared repos are git checkouts": accepted** as
   `workspace.declared_repos_are_git` (advisory).
-- **Bootstrap flag "minsky-observed repos carry `.minsky/repo.yaml`":
-  rejected.** No config marks a repo as minsky-observed, so the doctor
-  cannot tell which repos need the file. minsky owns that contract; its
-  own tooling should check it.

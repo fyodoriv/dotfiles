@@ -336,7 +336,7 @@ def check_rules(path: pathlib.Path, report: Report):
         report.add("WARN", "R003", where, f"{len(repeats) - 5} more repeated line(s)")
 
 
-TOOLING_REPOS = ("agentbrew", "dotfiles", "minsky", "tasks.md")
+TOOLING_REPOS = ("agentbrew", "dotfiles", "tasks.md")
 
 
 def tooling_repos():

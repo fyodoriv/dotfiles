@@ -56,7 +56,7 @@ STUB
   printf '#!/bin/bash\necho "${TEST_AI_TOOLS:-true}"\n' > "$STUB_DIR/chezmoi"
   chmod +x "$STUB_DIR/fnm" "$STUB_DIR/launchctl" "$STUB_DIR/chezmoi"
 
-  # Current state: v24.21.0 everywhere, plus the pinned minsky Node.
+  # Current state: v24.21.0 everywhere, plus a pinned older Node.
   _make_version v24.21.0
   _make_version v24.14.0
   echo "v24.21.0" > "$TEST_HOME/.node-version"
@@ -106,7 +106,7 @@ teardown() {
   [[ "$output" == *"agentbrew.launchagent_node_pinned: all LaunchAgents"* ]]
 }
 
-@test "old Node versions stay installed (minsky pins one)" {
+@test "old Node versions stay installed (another tool may pin one)" {
   run bash "$SCRIPT" 24.22.0
   [ "$status" -eq 0 ]
   ! grep -q 'fnm uninstall' "$CALL_LOG"

@@ -62,7 +62,7 @@ make_tooling_root() {
   grep -F -q '**critical** dependabot alert' "$SKILL"
   grep -F -q 'Automation branches are not outstanding work.' "$SKILL"
   grep -F -q 'Never delete a plist; move it.' "$SKILL"
-  grep -F -q 'Minsky never starts on its own.' "$SKILL"
+  grep -F -q 'Minsky stays off (the project is archived).' "$SKILL"
   grep -F -q 'lifts the `update-tooling` package' "$SKILL"
   grep -F -q 'disable-model-invocation: true' "$SKILL"
   grep -F -q 'git branch -d`, never `-D`' "$SKILL"

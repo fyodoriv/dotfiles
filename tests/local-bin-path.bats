@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 # Tests for modules/local-bin/doctor.sh and the zshrc PATH export.
 #
-# Why: the Minsky observer plugin (and future shim-style tools) install
+# Why: shim-style tools install
 # themselves by symlinking into ~/.local/bin. If the dir is missing or
-# not on PATH, `command -v minsky` fails first-try. This module locks
+# not on PATH, `command -v <shim>` fails first-try. This module locks
 # the guarantee in place.
 
 load test_helper

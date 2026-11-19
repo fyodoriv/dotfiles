@@ -62,23 +62,23 @@ setup() {
 teardown() { rm -rf "$TEST_DIR"; }
 
 @test "flags a lefthook repo that inherits the global hooksPath (no local override)" {
-  _make_lefthook_repo "$REPOS_DIR/minsky"
+  _make_lefthook_repo "$REPOS_DIR/sister"
   _run_lefthook_check
   [ "$fail_count" -eq 1 ]
-  [[ "${fail_messages[0]}" == *"minsky"* ]]
+  [[ "${fail_messages[0]}" == *"sister"* ]]
 }
 
 @test "--fix sets a local core.hooksPath on the sister repo" {
-  _make_lefthook_repo "$REPOS_DIR/minsky"
+  _make_lefthook_repo "$REPOS_DIR/sister"
   FIX_MODE=true
   _run_lefthook_check
   [ "$fix_count" -eq 1 ]
-  [ "$(git -C "$REPOS_DIR/minsky" config --local --get core.hooksPath)" = ".git/hooks" ]
+  [ "$(git -C "$REPOS_DIR/sister" config --local --get core.hooksPath)" = ".git/hooks" ]
 }
 
 @test "passes when the sister repo already has a local hooksPath" {
-  _make_lefthook_repo "$REPOS_DIR/minsky"
-  git -C "$REPOS_DIR/minsky" config --local core.hooksPath .git/hooks
+  _make_lefthook_repo "$REPOS_DIR/sister"
+  git -C "$REPOS_DIR/sister" config --local core.hooksPath .git/hooks
   _run_lefthook_check
   [ "$fail_count" -eq 0 ]
   [ "$pass_count" -eq 1 ]

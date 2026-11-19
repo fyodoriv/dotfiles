@@ -155,10 +155,10 @@ fn run(measure: bool) -> Result<(), &'static str> {
         }
     }
     let long_name = format!("priorityselection{seed}long");
-    let spaced_marker = format!("priorityprobe{seed} node minsky");
+    let spaced_marker = format!("priorityprobe{seed} node runner");
     let long_child = spawn_child(&long_name, &spaced_marker)?;
     let long_pattern = format!("^{long_name}$");
-    let spaced_pattern = format!("priorityprobe{seed} node.*minsky");
+    let spaced_pattern = format!("priorityprobe{seed} node.*runner");
     require_child("long-name", &long_pattern, true, long_child.0.id())?;
     require_child("spaced-arguments", &spaced_pattern, false, long_child.0.id())?;
     let finished_pid = long_child.0.id();

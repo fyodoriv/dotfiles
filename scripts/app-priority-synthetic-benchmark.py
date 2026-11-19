@@ -15,13 +15,13 @@ MOCKS = {
 case "$*" in
   "-l -x Slack|Google Chrome|Microsoft Outlook|ghostty|WebStorm|claude|codex|ollama|bats|shellcheck|parallel")
     printf "101 claude\\n201 codex\\n301 Slack\\n401 bats\\n" ;;
-  "-l -f mlx_lm.server|node.*minsky|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ")
-    printf "501 node minsky\n601 node_modules/vitest\n" ;;
+  "-l -f mlx_lm.server|node_modules/vitest|node_modules/typescript/bin/tsc|bats-core|/biome ")
+    printf "601 node_modules/vitest\n" ;;
   "-x Slack") printf "301\n" ;;
   "-x claude") printf "101\n" ;;
   "-x codex") printf "201\n" ;;
   "-x bats") printf "401\n" ;;
-  "-f node.*minsky") printf "501\n" ;;
+  "-f node.*runner") printf "501\n" ;;
   "-f node_modules/vitest") printf "601\n" ;;
   *) exit 1 ;;
 esac
@@ -49,8 +49,6 @@ EXPECTED_ACTIONS = (
     b"renice 0 -p 101\n"
     b"taskpolicy -b -p 201\n"
     b"renice 10 -p 201\n"
-    b"taskpolicy -b -p 501\n"
-    b"renice 10 -p 501\n"
     b"taskpolicy -b -p 401\n"
     b"renice 10 -p 401\n"
     b"renice 10 -p 601\n"

@@ -1,12 +1,12 @@
 #!/bin/bash
 # Doctor checks for the local-llm module.
 #
-# Detects the local-LLM stack that Minsky and other agent loops fall
+# Detects the local-LLM stack that agent loops fall
 # back to when claude-code tokens are exhausted: pipx, mlx-lm, aider,
 # huggingface-cli, the mlx-lm.server endpoint, and Apple Silicon arch
 # handling. Install paths live in the brew + local-LLM chezmoi scripts.
 #
-# See: docs/local-llm.md and Minsky README → "auto-bootstrap pre-flight"
+# See: docs/local-llm.md
 #
 # Each check has three terminal states:
 #   ✓  pass — present + working

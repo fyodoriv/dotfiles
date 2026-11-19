@@ -181,7 +181,6 @@ else
   set_agent_priority "codex"
   set_process_background "ollama"
   set_process_background_pattern "mlx_lm.server"
-  set_process_background_pattern "node.*minsky"
 
   # Verification remains available but cannot starve the desktop.
   set_process_background "bats"

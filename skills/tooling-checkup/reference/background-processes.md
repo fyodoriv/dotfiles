@@ -22,13 +22,13 @@ System Settings > General > Login Items. Report them; do not change them.
 | `remove` | any | Program is gone. Ask the user, then disable (below). |
 | `duplicate` | tooling | Two jobs run the same command. Fix in the source repo. The rule is one LaunchAgent per job. |
 | `duplicate` | third-party | Ask the user which one to keep. |
-| `off-rule` | minsky | A minsky job is loaded. Minsky must never start on its own. Unload it now, then check `~/.minsky/autostart-enabled` is absent. |
+| `off-rule` | minsky | A minsky job is loaded. The project is archived, so any job is stale. Unload it now, then check `~/.minsky/autostart-enabled` is absent. |
 | `failing` | tooling | Read its log (`StandardErrorPath` in the plist). Fix the cause in the source repo, or file a task. |
 | `failing` | third-party | Report it. Ask the user if the app is still in use. |
 | `review` | third-party | Updaters and helpers of apps. Ask only about jobs for apps the user may not use. Leave Apple, security, and VPN tools alone unless the user asks. |
 | `keep` | any | Nothing to do. |
 
-Tooling-owned jobs (`com.dotfiles.*`, `com.agentbrew.*`, `com.minsky.*`,
+Tooling-owned jobs (`com.dotfiles.*`, `com.agentbrew.*`, 
 and owner `dotfiles-plugin`: a label a dotfiles plugin
 installed, recorded in `~/.local/state/dotfiles/plugins/<name>.launchagents`)
 come from their source repo (for a plugin job, the plugin's repo). Change the template there and

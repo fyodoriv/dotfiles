@@ -49,7 +49,7 @@ make lint       # the local gate in this repo; tests run on CI (push, then `gh p
 
 ## Prompt And Task Interpretation
 
-Minsky pipeline prompts sometimes include machine-generated labels from
+Orchestrator pipeline prompts sometimes include machine-generated labels from
 previous pipeline state. Treat the files in the active worktree as the source of
 truth, then reconcile labels against `context.md` and `manager.md`.
 
@@ -145,7 +145,6 @@ load test_helper
 |------|-------|
 | Shell, git, macOS, SSH, editor config | **dotfiles** |
 | Agent config (CLAUDE.md, MCP, skills, rules) | **agentbrew** |
-| Orchestrator, personas, pipelines | **minsky** |
 
 ## Rules
 

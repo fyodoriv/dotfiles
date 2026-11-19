@@ -179,7 +179,7 @@ done
 failed=0
 
 # Fast endpoint bootstrap MUST load (and run once) before other RunAtLoad agents
-# so jq/python shims exist before minsky tick-loop / daemon spawn jq.
+# so jq/python shims exist before other login jobs spawn jq.
 _run_endpoint_bootstrap_now() {
   local script="$SOURCE_DIR/.chezmoiscripts/run_at_login_endpoint-bootstrap.sh"
   [ -x "$script" ] || return 0

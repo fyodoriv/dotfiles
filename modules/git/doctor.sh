@@ -36,9 +36,6 @@ if [ "$_git_personal_enabled" = "true" ]; then
   check_managed "managed.gitconfig_personal" "$DOTFILES_DIR/dot_gitconfig.personal.tmpl" "$HOME/.gitconfig.personal"
   check "git.personal_includeif_block" "\$HOME/.gitconfig.local has managed includeIf block for github.com" \
     "grep -qF '# BEGIN git-personal-includeif' \"\$HOME/.gitconfig.local\""
-  # Verify git actually picks up the personal identity in a repo that should trigger it.
-  check "git.personal_resolves_for_minsky" "personal identity resolves for github.com repos" \
-    "[ ! -d \"\$HOME/apps/tooling/minsky/.git\" ] || [ \"\$(git -C \"\$HOME/apps/tooling/minsky\" config user.email 2>/dev/null)\" != \"\$(chezmoi execute-template '{{ .git_work_email }}' 2>/dev/null)\" ]"
 elif [ -f "$HOME/.gitconfig.personal" ]; then
   # Personal is disabled but the file lingers — flag it so the user notices drift.
   check "git.personal_disabled_but_file_exists" "\$HOME/.gitconfig.personal removed when git_personal_enabled=false" \
@@ -90,7 +87,7 @@ check "git.hooks_path_no_local_override" "dotfiles repo has no stale local core.
 # Defends against transitive `lefthook install` overwriting our git-hooks/*
 # from a sister repo's pnpm install (root cause of the 2026-05-20 leak —
 # 8 commits with @company.example authors reached personal/main because PR #59
-# silently swapped pre-{commit,push} for a /tmp/minsky-gate/.../lefthook
+# silently swapped pre-{commit,push} for a /tmp/<gate>/.../lefthook
 # stub during a sister-repo install, no commit involved).
 #
 # Approach: compare each canonical hook's working-tree blob SHA against

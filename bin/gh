@@ -36,7 +36,7 @@
 # zero overhead — `gh auth status`, `gh pr view`, `gh repo clone`, …
 # all behave exactly like upstream `gh`.
 #
-# Bypass: set MINSKY_PIPELINE=1 (set by the minsky orchestrator when it
+# Bypass: set MINSKY_PIPELINE=1 (set by an orchestrator when it
 # spawns unattended pipeline runs) to preserve attribution for
 # pipeline-to-PR linkage. The public leak guard below still runs.
 #
@@ -163,7 +163,7 @@ if _gh_is_write_shaped "$@"; then
   gh_public_leak_guard "$@"
 fi
 
-# Minsky pipelines preserve attribution — exec straight through.
+# Orchestrator pipelines preserve attribution — exec straight through.
 if [ -n "${MINSKY_PIPELINE:-}" ]; then
   exec "$REAL_GH" "$@"
 fi

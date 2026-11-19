@@ -2,7 +2,7 @@
 # Switch this Mac to a new Node version in one step.
 #
 # A Node upgrade has pieces that must move together. This script moves them:
-#   1. fnm install + fnm default (old versions stay installed; minsky pins one)
+#   1. fnm install + fnm default (old versions stay installed)
 #   2. ~/.node-version (com.dotfiles.gui-path and agentbrew read it)
 #   3. ~/.local/bin/{node,npm,npx,codex} symlinks
 #   4. agentbrew plists: `agentbrew auto-sync install` and `agentbrew sync`
@@ -82,7 +82,7 @@ OLD_VERSION="${OLD_VERSION:+v$OLD_VERSION}"
 
 info "Node $VERSION (was ${OLD_VERSION:-unset})"
 
-# 1. Install and make default. Never uninstall: minsky pins an older Node.
+# 1. Install and make default. Never uninstall: another tool may pin an older Node.
 if [ -x "$NEW_BIN/node" ]; then
   ok "fnm: $VERSION already installed"
 else

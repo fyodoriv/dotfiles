@@ -9,7 +9,6 @@
 #
 # This wrapper adds the dotfiles-specific glue topgrade can't do itself:
 #   - Lock acquisition (prevents concurrent runs with auto-sync launchagents)
-#   - Skip-if-grind-active safety (don't fight an in-flight minsky/Devin loop)
 #   - Logging to ~/.local/share/dotfiles/logs/dotfiles-upgrade.log
 #   - macOS notification on completion
 #   - last-upgrade timestamp file for `dotfiles stats`
@@ -95,33 +94,6 @@ UPGRADE_LOG="$LOG_DIR/dotfiles-upgrade.log"
 (umask 077; touch "$UPGRADE_LOG") && chmod 600 "$UPGRADE_LOG" 2>/dev/null || true
 LAST_UPGRADE_FILE="$HOME/.local/share/dotfiles/last-upgrade"
 
-# ── Safety: skip when a real autonomous loop is in flight ───────────
-# Original check was over-eager: it skipped on ANY process matching
-# `minsky` (would have matched a vim editing ~/apps/tooling/minsky/...)
-# AND on any `devin --permission-mode` process (would have matched an
-# interactive `dvb` session where the operator is at the keyboard).
-# Both cases triggered false-positive skips that confused operators.
-#
-# Sharper signal: `pgrep -f 'minsky run\b'` matches the iteration
-# process minsky's autonomous daemon spawns (`minsky run`, `minsky run
-# --hosts-dir <p>`, etc.). That's the actual "don't race brew upgrade
-# against an in-flight Cargo build / npm install" case. The minsky
-# launchd supervisor itself (`com.minsky.daemon`) doesn't match —
-# only an active iteration does.
-#
-# Interactive Devin sessions (including `dvb`) no longer trigger the
-# skip. The operator initiated the upgrade; they know what they're
-# doing. If they're mid-build and want to defer, they Ctrl-C.
-is_minsky_loop_active() {
-  pgrep -f 'minsky run\b' >/dev/null 2>&1
-}
-
-if is_minsky_loop_active; then
-  echo -e "${YELLOW}⚠${NC} Skipping upgrade — minsky autonomous iteration in flight"
-  echo -e "  Run \`minsky daemon status\` for details; retry once the loop completes."
-  exit 0
-fi
-
 # ── Ensure topgrade is installed ────────────────────────────────────
 if ! command -v topgrade >/dev/null 2>&1; then
   echo -e "${RED}✗${NC} topgrade not installed."
@@ -189,7 +161,7 @@ unset _opencode_bin
 # makes each step run its cache-prune phase inline, and the uv step's
 # `uv cache prune` then blocks on (and times out against) the cache lock
 # held by any live `uvx` / `uv tool run` MCP server — common on this machine
-# whenever a Devin/minsky session is up — which fails the whole upgrade
+# whenever an agent session is up — which fails the whole upgrade
 # (the original symptom: "Timeout (300s) when waiting for lock on .../uv").
 # Cache pruning instead runs via the [post_commands] `cleanup` step
 # (bin/cleanup) in dot_config/topgrade.toml.tmpl: it already covers brew / npm /

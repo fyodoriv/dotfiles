@@ -83,7 +83,7 @@ while IFS=$'\t' read -r name root; do
       # One broken checkout must not kill the host-level rollup: bare /
       # worktree-container repos (e.g. a worktree-orchestrated checkout)
       # fail `git status` with "must be run in a work tree" — surface
-      # them instead of crashing (observed: ~/apps/tooling/minsky).
+      # them instead of crashing (observed in a worktree-container checkout).
       if dirty_out="$(git -C "$dir" status --short 2>/dev/null)"; then
         dirty="$(printf '%s\n' "$dirty_out" | grep -c '[^[:space:]]' || true)"
         ahead="-"

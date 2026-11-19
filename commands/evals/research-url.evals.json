@@ -4,10 +4,10 @@
     {
       "id": 1,
       "prompt": "/research-url https://example.com/new-mcp-tool",
-      "expected_output": "The agent researches the URL, checks dotfiles, agentbrew, and minsky, then files only evidence-backed TASKS.md entries and delivers scoped PRs/merges under the standing approval.",
+      "expected_output": "The agent researches the URL, checks dotfiles and agentbrew, then files only evidence-backed TASKS.md entries and delivers scoped PRs/merges under the standing approval.",
       "expectations": [
         "Researches the primary URL rather than making a decision from the URL text alone",
-        "Produces an explicit verdict for dotfiles, agentbrew, and minsky",
+        "Produces an explicit verdict for dotfiles and agentbrew",
         "Requires local repo file:line evidence before filing any task",
         "Lints each modified TASKS.md and reports the exact command/result",
         "Treats scoped TASKS.md-only commits, branch pushes, PR creation, PR merge, and repo-local deploy/sync as pre-approved for canonical target repos"
@@ -41,7 +41,7 @@
       "expected_output": "The agent researches the page, identifies missing reproducible evidence, and reports skip reasons rather than padding task queues.",
       "expectations": [
         "Rejects marketing-only or unverifiable claims as insufficient for TASKS.md entries",
-        "Still gives a per-repo verdict for all three canonical targets",
+        "Still gives a per-repo verdict for both canonical targets",
         "Does not file generic adoption tasks without local file:line evidence",
         "Ends with the required Source, Per-repo verdicts, Tasks filed, and Verification summary"
       ]

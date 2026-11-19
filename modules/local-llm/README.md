@@ -1,6 +1,6 @@
 # `local-llm` doctor module
 
-Detects the local-LLM stack that Minsky and other agent loops fall
+Detects the local-LLM stack that agent loops fall
 back to when claude-code tokens are exhausted. Install paths live in
 the brew + local-LLM chezmoi scripts.
 
@@ -78,16 +78,6 @@ arch -arm64 mlx_lm.server \
 
 Re-run `dotfiles-doctor --module local-llm` after each step to watch
 the state flip.
-
-## Coordination with Minsky
-
-Minsky's local-LLM bootstrap path should detect-and-prompt only — the
-actual install code lives in this dotfiles module. The boundary is
-documented in `AGENTS.md`
-Ownership Boundary table: system-level Python tooling + brew
-packages + `~/Library` agents are dotfiles' concern; Minsky just
-detects whether the stack is healthy and prompts the operator to
-run `dotfiles apply` when it isn't.
 
 ## Tests
 

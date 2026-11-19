@@ -624,40 +624,6 @@ check "security.jq_launchagent_path" "jq under LaunchAgent PATH is dotfiles/bin/
   "PATH=\"\$_la_path\" command -v jq >/dev/null 2>&1 && [ \"\$(PATH=\"\$_la_path\" command -v jq)\" = '$DOTFILES_LINK_BIN/jq' ]" \
   "'$DOTFILES_DIR/bin/dotfiles-link-jq-shim'  # + launchagent-path template; dotfiles-fix-launchagent-endpoint-path"
 
-# Recurring endpoint agent trigger: minsky tick-loop historically test-executed /usr/bin/python3
-# (Apple tool-shim-public, system-signed). Flag drift in sibling repo.
-_minsky_tick="${HOME}/apps/tooling/minsky/distribution/systemd/run-tick-loop.sh"
-_minsky_path_lib="${HOME}/apps/tooling/minsky/distribution/systemd/lib-launchd-path.sh"
-if [ -f "$_minsky_tick" ]; then
-  check_advisory "security.minsky_tick_loop_no_system_python" "minsky tick-loop does not reference /usr/bin/python3" \
-    "! grep -vE '^[[:space:]]*#' '$_minsky_tick' | grep -q '/usr/bin/python3'" \
-    "upgrade minsky: use ~/.local/share/uv/python in lib-launchd-path.sh; remove /usr/bin/python3 from run-tick-loop.sh"
-  check_advisory "security.minsky_tick_loop_sources_launchd_path" "minsky tick-loop sources lib-launchd-path.sh (dotfiles shims before /usr/bin)" \
-    "grep -q 'lib-launchd-path.sh' '$_minsky_tick'" \
-    "upgrade minsky: run-tick-loop.sh must source lib-launchd-path.sh; then minsky install-daemon / launchctl kickstart com.minsky.tick-loop"
-fi
-if [ -f "$_minsky_path_lib" ]; then
-  check_advisory "security.minsky_launchd_path_dotfiles_bin" "minsky lib-launchd-path.sh prepends dotfiles/bin" \
-    "grep -q 'apps/tooling/dotfiles/bin' '$_minsky_path_lib'" \
-    "upgrade minsky lib-launchd-path.sh; reload com.minsky.tick-loop and com.minsky.watchdog"
-  check "security.minsky_launchd_path_no_uv_test_exec" "minsky lib-launchd-path.sh does not test-execute bare uv python3.13 (post-reboot endpoint agent)" \
-    "! grep -qE '\"\\$_uv_py\" -c|\\.local/share/uv/python.*-c' '$_minsky_path_lib'" \
-    "upgrade minsky lib-launchd-path.sh (remove uv python -c '' probe); kickstart -k gui/\$(id -u)/com.minsky.tick-loop"
-  # Historical failure: uv-only PATH still resolved jq to /usr/bin/jq (endpoint agent popup every ~5–10s).
-  _uv_bin=""
-  for _uv_candidate in "${HOME}"/.local/share/uv/python/cpython-3.13*/bin; do
-    [ -d "$_uv_candidate" ] && _uv_bin="$_uv_candidate" && break
-  done
-  if [ -n "$_uv_bin" ]; then
-    _tick_sim_path="${_uv_bin}:/usr/bin:/bin"
-    check_advisory "security.minsky_tick_loop_jq_via_dotfiles" "jq under uv-only launchd PATH is dotfiles/bin/jq when dotfiles/bin is prepended" \
-      "PATH=\"$DOTFILES_LINK_BIN:$_tick_sim_path\" command -v jq >/dev/null 2>&1 && [ \"\$(PATH=\"$DOTFILES_LINK_BIN:$_tick_sim_path\" command -v jq)\" = '$DOTFILES_LINK_BIN/jq' ]" \
-      "chezmoi apply; kickstart com.minsky.tick-loop after minsky lib-launchd-path.sh upgrade"
-  fi
-  unset _uv_bin _uv_candidate _tick_sim_path
-fi
-unset _minsky_tick _minsky_path_lib
-
 if command -v python3.13 >/dev/null 2>&1; then
   check_advisory "security.python3_13_not_framework" "python3.13 path does not contain Python.framework" \
     "! command -v python3.13 | grep -q Python.framework" \
@@ -698,15 +664,12 @@ fi
 case "${ENDPOINT_HARDENING:-true}" in true|1) _endpoint_hardening_on=true ;; *) _endpoint_hardening_on=false ;; esac
 if [ "$_endpoint_hardening_on" = "true" ]; then
   _adhoc_sign_uv_la="$HOME/Library/LaunchAgents/com.dotfiles.endpoint-bootstrap.plist"
-  check "security.endpoint_bootstrap_la" "Login endpoint-bootstrap LaunchAgent installed (jq + uv sign before minsky RunAtLoad)" \
+  check "security.endpoint_bootstrap_la" "Login endpoint-bootstrap LaunchAgent installed (jq + uv sign before other login jobs)" \
     "[ -f '$_adhoc_sign_uv_la' ]" \
     "chezmoi apply  # launchagents/com.dotfiles.endpoint-bootstrap.plist.tmpl"
   check_advisory "security.endpoint_bootstrap_sentinel" "endpoint-bootstrap ready sentinel present after login" \
     "[ -f \"\$HOME/.local/state/dotfiles/endpoint-ready\" ]" \
     "launchctl kickstart -k gui/\$(id -u)/com.dotfiles.endpoint-bootstrap  # or: dotfiles-adhoc-sign-jq && dotfiles-link-jq-shim"
-  check_advisory "security.endpoint_bootstrap_before_minsky" "endpoint-bootstrap label sorts before com.minsky.* (launchd RunAtLoad hint)" \
-    "printf '%s\\n' 'com.dotfiles.endpoint-bootstrap' 'com.minsky.tick-loop' | LC_ALL=C sort | head -1 | grep -qx 'com.dotfiles.endpoint-bootstrap'" \
-    "chezmoi apply  # com.dotfiles.endpoint-bootstrap replaces com.dotfiles.adhoc-sign-uv-pythons"
 fi
 
 # LaunchAgent plists with explicit PATH must prepend dotfiles shims (see .chezmoitemplates/launchagent-path).
@@ -813,7 +776,7 @@ check "security.git_launchagent_not_system" "git under LaunchAgent PATH is not /
   "PATH=\"\$_la_path\" command -v git >/dev/null 2>&1 && [ \"\$(PATH=\"\$_la_path\" command -v git)\" != '/usr/bin/git' ]" \
   "chezmoi apply  # launchagent-path template prepends dotfiles/bin"
 
-# Deployed LaunchAgents (agentbrew, minsky, dotfiles, watchman, …) with stale PATH
+# Deployed LaunchAgents (agentbrew, dotfiles, watchman, …) with stale PATH
 # omit dotfiles/bin and resolve jq/ggrep/python3 to /usr/bin/* or bare Homebrew.
 _la_endpoint_deploy_bad=0
 # Deployed plists point at the applied checkout, even when this doctor runs
@@ -1391,30 +1354,10 @@ if [ "$_env_hook_count" -eq 0 ]; then
   check "security.no_env_shebangs_git_hooks" "No #!/usr/bin/env shebangs in dotfiles/git-hooks" "true"
 fi
 
-# Minsky bin/ scripts are invoked directly by operators and the tick-loop
-# maintenance path; env shebangs pop endpoint agent on every spawn.
-# Minsky is a public cross-platform repo, so only a managed endpoint needs this.
-_minsky_home="${HOME}/apps/tooling/minsky"
-_env_minsky_count=0
-if [ -d "$_minsky_home/bin" ] \
-    && declare -F dotfiles_managed_endpoint >/dev/null \
-    && dotfiles_managed_endpoint; then
-  while IFS= read -r _env_minsky; do
-    [ -n "$_env_minsky" ] || continue
-    _env_minsky_rel="${_env_minsky#"$_minsky_home"/}"
-    check "security.no_env_shebang.minsky_${_env_minsky_rel//\//_}" "minsky/$_env_minsky_rel must not use #!/usr/bin/env (endpoint agents may block env)" \
-      "false" \
-      "sed -i '' '1s|^#!/usr/bin/env bash|#!/opt/homebrew/bin/bash|' '$_env_minsky'"
-    _env_minsky_count=$((_env_minsky_count + 1))
-  done < <(grep -rl '^#!/usr/bin/env' "$_minsky_home/bin" 2>/dev/null || true)
-fi
-if [ "$_env_minsky_count" -eq 0 ]; then
-  check "security.no_env_shebangs_minsky_bin" "No #!/usr/bin/env shebangs in minsky/bin" "true"
-fi
-unset _minsky_home _env_minsky_count _env_minsky _env_minsky_rel _env_hook_count _env_hook _env_hook_rel
+unset _env_hook_count _env_hook _env_hook_rel
 
 # LaunchAgent ProgramArguments must not invoke /usr/bin/env directly — use
-# /bin/bash + run-*.sh wrappers (see minsky distribution/systemd/run-watchdog.sh).
+# /bin/bash + run-*.sh wrappers (a wrapper script that sets PATH, then runs the tool).
 _la_env_bad=0
 _la_env_plist=""
 while IFS= read -r _la_env_plist; do
@@ -1429,8 +1372,7 @@ while IFS= read -r _la_env_plist; do
   fi
 done < <({
   "$_DOTFILES_FIND" "$DOTFILES_DIR/launchagents" -maxdepth 1 \( -name '*.plist.tmpl' -o -name '*.plist' \) 2>/dev/null
-  "$_DOTFILES_FIND" "${HOME}/apps/tooling/minsky/distribution/launchd" -maxdepth 1 -name '*.plist' 2>/dev/null
-  "$_DOTFILES_FIND" "$HOME/Library/LaunchAgents" -maxdepth 1 \( -name 'com.dotfiles.*.plist' -o -name 'com.minsky.*.plist' -o -name 'com.agentbrew.*.plist' \) 2>/dev/null
+  "$_DOTFILES_FIND" "$HOME/Library/LaunchAgents" -maxdepth 1 \( -name 'com.dotfiles.*.plist' -o -name 'com.agentbrew.*.plist' \) 2>/dev/null
 } | sort -u)
 if [ "$_la_env_bad" -eq 0 ]; then
   check "security.launchagent_no_env" "No LaunchAgent plists invoke /usr/bin/env" "true"

@@ -149,7 +149,7 @@ EOF
   run _critique "$TMP/test.bats" \
     "Per AGENTS.md three layers must agree on \`gpt-5-5-xhigh-priority\`: \
 the DEVIN_MODEL env var (in home/zshrc.ai-tools), agent.model in \
-~/.config/devin/config.json, and minsky's per-persona ANTHROPIC_MODEL."
+~/.config/devin/config.json, and an orchestrator's per-persona ANTHROPIC_MODEL."
   [ "$status" -eq 1 ]
   # Should fire all three: placeholder, tautology, missing-literal.
   [[ "$output" == *"placeholder"* ]]

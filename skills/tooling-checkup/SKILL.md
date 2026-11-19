@@ -56,7 +56,7 @@ runs Phase 1, that part, and Phases 10 to 12:
 5. **Source, not output.** Generated agent config (`~/.claude/`,
    installed skills) and installed LaunchAgents of tooling repos change only
    through their source repo, then `agentbrew sync` or `dotfiles apply`.
-6. **Minsky never starts on its own.** Do not start it. Keep
+6. **Minsky stays off (the project is archived).** Do not start it. Keep
    `~/.minsky/autostart-enabled` absent. Leave `.worktrees/` that an
    orchestrator owns alone.
 7. **Public writes.** `/ship-it` delivery in the approved tooling family is

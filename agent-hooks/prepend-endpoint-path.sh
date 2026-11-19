@@ -126,15 +126,13 @@ fi
 [ -n "$_path_prefix" ] \
   || _path_prefix="${_dotfiles_dir}/bin:${_home}/.local/bin"
 
-# Hardcoded Apple paths still fire endpoint policy even when PATH is fixed.
-# Rewrite them to managed shims. Longer names must come first.
+# Some explicit tool paths still need managed shims after PATH is set.
+# Keep explicit Apple Python paths so the hook preserves the interpreter choice.
 _original_cmd="$cmd"
 _shim="${_dotfiles_dir}/bin"
 while IFS='|' read -r old new; do
   cmd="${cmd//$old/$new}"
 done <<EOF
-/usr/bin/python3.13|$_shim/python3.13
-/usr/bin/python3|$_shim/python3
 /usr/bin/curl|$_shim/curl
 /usr/bin/jq|$_shim/jq
 /usr/bin/perl|$_shim/perl

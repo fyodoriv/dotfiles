@@ -34,9 +34,14 @@ Symptoms: `command not found`, `ModuleNotFoundError`, a wrong node version, or a
 
 ## `${HOME}` in plists
 
-launchd expands `${HOME}` in `Program` and `ProgramArguments`, but not in `StandardOutPath` or `StandardErrorPath`. A plist with `${HOME}/x.log` there makes launchd create a directory literally named `${HOME}` in the job's cwd.
+The plist gives launchd the log paths for `StandardOutPath` and
+`StandardErrorPath`. Render both before loading the plist. An unexpanded
+`${HOME}` points to the wrong place and can keep the job from starting.
+Launchd passes `ProgramArguments` as an argument vector. Render any variables
+those arguments need before loading the plist.
 
-Fix: render the plist at install time (chezmoi template, or `envsubst` with `${HOME}` in its allowlist). Do not rely on launchd to expand it.
+Use a chezmoi template at install time or use `envsubst` with `${HOME}` in its
+allowlist. See [Apple’s launchd guide](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html).
 
 ## Smoke: run the script under a stripped env
 

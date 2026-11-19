@@ -8,6 +8,7 @@
 #   One line per job:
 #     ok <label>
 #     drift <label>: the loaded job runs other arguments than its plist
+#     log-path <label>: a log path still contains an unexpanded HOME placeholder
 #     stopped <label>: KeepAlive job is not running
 #     unloaded <label>: the plist is not loaded
 #   --fix reloads a drifted job (bootout, then bootstrap), kickstarts a
@@ -16,6 +17,7 @@
 #   endpoint safe mode (~/.local/state/dotfiles/endpoint-node-publisher-blocked)
 #   --fix only reports, like the other reload scripts. Only KeepAlive <true/>
 #   counts as "must run": a KeepAlive dictionary (SuccessfulExit) may exit.
+#   Render log paths before repairing a job with a HOME placeholder.
 #
 # Exit: 0 when every job is ok (or was fixed); 1 when a problem is left.
 
@@ -57,11 +59,40 @@ reload() {
 }
 
 problems=0
+home_placeholder='${HOME}'
 for plist in "$agents"/com.dotfiles.*.plist; do
   [ -f "$plist" ] || continue
   label="$(/usr/bin/plutil -extract Label raw -o - "$plist" 2>/dev/null || basename "$plist" .plist)"
+  loaded=true
   if ! out="$("$LAUNCHCTL" print "$domain/$label" 2>/dev/null)"; then
     if is_disabled "$label"; then continue; fi
+    loaded=false
+  fi
+  log_fields=""
+  for field in StandardOutPath StandardErrorPath; do
+    path="$(/usr/bin/plutil -extract "$field" raw -o - "$plist" 2>/dev/null)" || continue
+    if [[ "$path" == *"$home_placeholder"* ]]; then
+      log_fields="${log_fields:+$log_fields, }$field"
+    fi
+  done
+  if [ -z "$log_fields" ] && $loaded && [[ "$out" == *"$home_placeholder"* ]]; then
+    log_fields="$(awk -v marker="$home_placeholder" '
+      index($0, marker) {
+        if ($0 ~ /^\tstdout path = /) stdout=1
+        if ($0 ~ /^\tstderr path = /) stderr=1
+      }
+      END {
+        if (stdout) printf "loaded StandardOutPath"
+        if (stderr) printf "%sloaded StandardErrorPath", (stdout ? ", " : "")
+      }
+    ' <<< "$out")"
+  fi
+  if [ -n "$log_fields" ]; then
+    printf 'log-path %s: unexpanded HOME in %s. Check the rendered plist before loading or restarting it.\n' "$label" "$log_fields"
+    problems=$((problems + 1))
+    continue
+  fi
+  if ! $loaded; then
     if $fix && "$LAUNCHCTL" bootstrap "$domain" "$plist" >/dev/null 2>&1; then
       echo "bootstrapped $label"
     else

@@ -54,6 +54,97 @@ loaded() {
   } > "$TEST_DIR/print/$label"
 }
 
+sync_fixture() {
+  local checkout="$TEST_DIR/checkout"
+  mkdir -p "$checkout/bin" "$checkout/lib" "$TEST_DIR/job-bin"
+  cp "$SCRIPT" "$checkout/bin/dotfiles-launchagent-drift"
+  cp "$BATS_TEST_DIRNAME/../lib/launchagent-args.sh" "$checkout/lib/"
+  SYNC_PROBE="$checkout/bin/dotfiles-launchagent-drift"
+  SYNC_SCRIPT="$checkout/bin/dotfiles-sync"
+  SYNC_LABEL=com.dotfiles.dotfiles-sync
+  SYNC_PLIST="$AGENTS/$SYNC_LABEL.plist"
+  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/script-ran" > "$SYNC_SCRIPT"
+  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/tool-ran" > "$TEST_DIR/bin/chezmoi"
+  chmod +x "$SYNC_SCRIPT" "$TEST_DIR/bin/chezmoi"
+  plist "$SYNC_LABEL" true /bin/bash "$SYNC_SCRIPT"
+}
+
+sync_job_path() {
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$SYNC_PLIST"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$1" "$SYNC_PLIST"
+}
+
+@test "the sync job reports a missing tool without using the caller PATH or repairing" {
+  sync_fixture
+  sync_job_path "$TEST_DIR/job-bin"
+  loaded "$SYNC_LABEL" waiting /bin/bash "$SYNC_SCRIPT"
+  run "$SYNC_PROBE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $SYNC_LABEL: chezmoi is missing"* ]]
+  [[ "$output" != *"$TEST_DIR/job-bin"* ]]
+  run "$SYNC_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $SYNC_LABEL:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/script-ran" ] && [ ! -e "$TEST_DIR/tool-ran" ]
+}
+
+@test "the sync job uses the stripped default to stop an unsafe bootstrap" {
+  sync_fixture
+  run "$SYNC_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $SYNC_LABEL: chezmoi is missing"* ]]
+  [ -z "$(grep '^bootstrap ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/script-ran" ] && [ ! -e "$TEST_DIR/tool-ran" ]
+}
+
+@test "the sync job can find an executable on the declared PATH without running it" {
+  sync_fixture
+  cp "$TEST_DIR/bin/chezmoi" "$TEST_DIR/job-bin/chezmoi"
+  sync_job_path "/usr/bin:$TEST_DIR/job-bin"
+  loaded "$SYNC_LABEL" running /bin/bash "$SYNC_SCRIPT"
+  run "$SYNC_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $SYNC_LABEL" ]
+  [ ! -e "$TEST_DIR/script-ran" ] && [ ! -e "$TEST_DIR/tool-ran" ]
+}
+
+@test "the tool check never runs a startup file or an unregistered command form" {
+  sync_fixture
+  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/startup-ran" > "$TEST_DIR/startup"
+  sync_job_path "$TEST_DIR/job-bin"
+  /usr/bin/plutil -insert EnvironmentVariables.BASH_ENV -string "$TEST_DIR/startup" "$SYNC_PLIST"
+  loaded "$SYNC_LABEL" running /bin/bash "$SYNC_SCRIPT"
+  run "$SYNC_PROBE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool-path-unverified $SYNC_LABEL:"* ]]
+  [[ "$output" != *"$TEST_DIR/startup"* ]]
+  [ ! -e "$TEST_DIR/startup-ran" ]
+  rm "$TEST_DIR/print/$SYNC_LABEL"
+  run "$SYNC_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $SYNC_LABEL:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/startup-ran" ]
+  plist "$SYNC_LABEL" true /bin/bash -c "touch $TEST_DIR/inline-ran"
+  loaded "$SYNC_LABEL" running /bin/bash -c "touch $TEST_DIR/inline-ran"
+  run "$SYNC_PROBE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tool-path-unverified $SYNC_LABEL:"* ]]
+  [ ! -e "$TEST_DIR/inline-ran" ]
+  [ ! -e "$TEST_DIR/script-ran" ] && [ ! -e "$TEST_DIR/tool-ran" ]
+}
+
+@test "a disabled sync job stays out of the tool check and repair" {
+  sync_fixture
+  printf '    "%s" => disabled\n' "$SYNC_LABEL" > "$TEST_DIR/disabled"
+  run "$SYNC_PROBE" --fix
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/script-ran" ] && [ ! -e "$TEST_DIR/tool-ran" ]
+}
+
 @test "a job whose loaded arguments match its plist and that runs is ok" {
   plist com.dotfiles.a true /bin/bash /x/a.sh
   loaded com.dotfiles.a running /bin/bash /x/a.sh

@@ -136,6 +136,7 @@ them. -->
   - **Anchor**: launchd.plist(5) man page (EnvironmentVariables, StandardOutPath); Basili, Caldiera, Rombach 1994 (GQM).
   - **Log path gate**: The hosted fixture must report both unexpanded log fields in one message, leave valid or missing optional paths unchanged, and make zero reload, kickoff or bootstrap calls for invalid paths even in repair mode. A read-only scan must count existing rendered paths without printing them. A stopped loaded copy with a stale log path must also report drift while its rendered disk plist is valid. Pivot on any false drift or repair for an unsafe path.
   - **Tool resolution gate**: Qualify a read-only probe contract for each script before any live tool check. Do not run configured jobs from the drift check. The dynamic tool check and four-week measurement remain open.
+  - **Sync tool pilot**: Check the registered no-argument managed Dotfiles sync script for executable chezmoi using the rendered PATH or the stripped default. Require a missing-tool case in read and repair mode, an available-tool case, and unmatched and disabled controls. Expect zero script or tool executions, zero repairs for missing tools, zero private PATH or script values in output, and zero new false drift on this Mac. An unverified contract keeps broader coverage open.
   - **Competitive-goal**: none — background job reliability (docs/metrics.md), not a scorecard metric.
 
 - [ ] Add an Ollama idle-memory measurement to local-ai-bench

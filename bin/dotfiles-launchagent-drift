@@ -9,6 +9,7 @@
 #     ok <label>
 #     drift <label>: the loaded job runs other arguments than its plist
 #     log-path <label>: a log path still contains an unexpanded HOME placeholder
+#     tool-path <label>: the registered sync job cannot find chezmoi
 #     stopped <label>: KeepAlive job is not running
 #     unloaded <label>: the plist is not loaded
 #   --fix reloads a drifted job (bootout, then bootstrap), kickstarts a
@@ -18,6 +19,7 @@
 #   --fix only reports, like the other reload scripts. Only KeepAlive <true/>
 #   counts as "must run": a KeepAlive dictionary (SuccessfulExit) may exit.
 #   Render log paths before repairing a job with a HOME placeholder.
+#   A missing tool or unverified tool check also stops repair for the sync job.
 #
 # Exit: 0 when every job is ok (or was fixed); 1 when a problem is left.
 
@@ -43,7 +45,44 @@ is_disabled() {
 }
 
 # shellcheck source=../lib/launchagent-args.sh
-source "$(cd "$(dirname "$0")/.." && pwd)/lib/launchagent-args.sh"
+repo_root="$(cd "$(dirname "$0")/.." && pwd -P)"
+source "$repo_root/lib/launchagent-args.sh"
+
+# The sync job uses chezmoi by name. Inspect its registered entry point and
+# search the plist PATH as data. Never run a script or executable from it.
+sync_job_has_chezmoi() {
+  local file="$1" args launcher script script_dir env_type job_path directory
+  local -a search_dirs
+  args="$(/usr/bin/plutil -extract ProgramArguments raw -expect array -o - "$file" 2>/dev/null)" || return 2
+  [ "$args" = 2 ] || return 2
+  launcher="$(/usr/bin/plutil -extract ProgramArguments.0 raw -expect string -o - "$file" 2>/dev/null)" || return 2
+  script="$(/usr/bin/plutil -extract ProgramArguments.1 raw -expect string -o - "$file" 2>/dev/null)" || return 2
+  [ "$launcher" = /bin/bash ] && [[ "$script" == /*/dotfiles-sync ]] || return 2
+  [ -f "$script" ] && [ ! -L "$script" ] || return 2
+  script_dir="$(cd -P -- "${script%/*}" 2>/dev/null && pwd -P)" || return 2
+  [ "$script_dir" = "$repo_root/bin" ] || return 2
+  if /usr/bin/plutil -type Program "$file" >/dev/null 2>&1 ||
+    /usr/bin/plutil -type EnvironmentVariables.BASH_ENV "$file" >/dev/null 2>&1; then
+    return 2
+  fi
+  env_type="$(/usr/bin/plutil -type EnvironmentVariables "$file" 2>/dev/null)" || env_type=""
+  [ -z "$env_type" ] || [ "$env_type" = dictionary ] || return 2
+  job_path=/usr/bin:/bin
+  if /usr/bin/plutil -type EnvironmentVariables.PATH "$file" >/dev/null 2>&1; then
+    job_path="$(/usr/bin/plutil -extract EnvironmentVariables.PATH raw -expect string -o - "$file" 2>/dev/null)" || return 2
+  fi
+  case "$job_path" in
+    ""|:*|*:|*::*|*$'\n'*) return 2 ;;
+  esac
+  IFS=: read -r -a search_dirs <<< "$job_path"
+  for directory in "${search_dirs[@]}"; do
+    [[ "$directory" == /* ]] || return 2
+  done
+  for directory in "${search_dirs[@]}"; do
+    [ -f "$directory/chezmoi" ] && [ -x "$directory/chezmoi" ] && return 0
+  done
+  return 1
+}
 
 # reload <label> <plist>: bootout, wait until launchd lets the job go (a
 # Chrome can outlive the bootout for a few seconds), then bootstrap.
@@ -91,6 +130,21 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     printf 'log-path %s: unexpanded HOME in %s. Check the rendered plist before loading or restarting it.\n' "$label" "$log_fields"
     problems=$((problems + 1))
     continue
+  fi
+  if [ "$label" = com.dotfiles.dotfiles-sync ] && ! is_disabled "$label"; then
+    sync_job_has_chezmoi "$plist"
+    case "$?" in
+      1)
+        printf 'tool-path %s: chezmoi is missing from the planned job PATH. Fix it before loading or restarting the job.\n' "$label"
+        problems=$((problems + 1))
+        continue ;;
+      2)
+        printf 'tool-path-unverified %s: the rendered job does not match the registered tool check.\n' "$label" >&2
+        if $fix; then
+          problems=$((problems + 1))
+          continue
+        fi ;;
+    esac
   fi
   if ! $loaded; then
     if $fix && "$LAUNCHCTL" bootstrap "$domain" "$plist" >/dev/null 2>&1; then

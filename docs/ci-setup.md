@@ -302,7 +302,7 @@ runs-on: [self-hosted, macOS]
 1. Isolate: does it fail alone (`bats --filter '<name>' <file>`) on the runner? If yes, it is a real bug, not a flake.
 2. Serial: does it fail only under `bats --jobs`? Look for shared temp paths, ports, or fixtures; give each test its own `BATS_TEST_TMPDIR` path.
 3. Load: does it fail only on slow runners? Raise in-test deadlines to 30 s or more, and replace real tools with fakes that answer at once (a fake backend must answer `--version`).
-Count calls with a counter file in the fixture, not with timing. Never add a retry to hide a flake.
+Count calls with a counter file in the fixture, not with timing; startup probes and preflight calls can bump the counter too, so assert on the calls you mean.
 
 **`doctor` job fails**: The doctor job runs `chezmoi apply` first, then `dotfiles doctor --report`. Failures usually mean a module check assumes something about the environment that CI runners don't have. The `DOTFILES_CI=1` env var is set so modules can skip CI-incompatible checks.
 

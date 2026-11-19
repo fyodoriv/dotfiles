@@ -77,13 +77,13 @@ _git_candidate_runs() {
 
 # DOTFILES_SYSTEM_GIT exists so tests can stand in for /usr/bin/git.
 SYSTEM_GIT="${DOTFILES_SYSTEM_GIT:-/usr/bin/git}"
+agentbrew_guard="${HOME:-}/.claude/codeassist/hooks-scripts/lib/git"
 if [ -n "${DOTFILES_REAL_GIT:-}" ] && [ -x "$DOTFILES_REAL_GIT" ]; then
   REAL_GIT="$DOTFILES_REAL_GIT"
 elif _git_candidate_runs "$SYSTEM_GIT"; then
   REAL_GIT="$SYSTEM_GIT"
 else
   self_realpath=$(readlink -f "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0" 2>/dev/null || printf '%s' "$0")
-  agentbrew_guard="${HOME:-}/.claude/codeassist/hooks-scripts/lib/git"
   REAL_GIT=""
   IFS=':' read -r -a path_parts <<< "$PATH"
   for p in "${path_parts[@]}"; do
@@ -100,6 +100,14 @@ else
     echo "git wrapper: could not locate the real git binary" >&2
     exit 127
   fi
+fi
+
+if [ "${AGENTBREW_SESSION_GIT_GUARD:-}" = "$agentbrew_guard" ]; then
+  if [ ! -x "$agentbrew_guard" ]; then
+    printf '%s\n' 'git wrapper: the opted-in Agentbrew guard is unavailable. Sync the hooks before retrying.' >&2
+    exit 2
+  fi
+  "$agentbrew_guard" --agentbrew-check-only "$REAL_GIT" "$@" || exit "$?"
 fi
 
 _git_wrapper_is_agent_context() {

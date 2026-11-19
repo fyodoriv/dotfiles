@@ -59,6 +59,9 @@ When a Claude Code Bash session opts in to Agentbrew's Git script guard,
 Dotfiles shell startup keeps that managed guard first on PATH. Allowed
 calls still pass through the Dotfiles Git wrapper. If the system Git
 probe fails, the fallback skips the Agentbrew guard and looks for Git.
+If the Claude command hook rewrites PATH, the session marker lets the
+Dotfiles wrapper ask the managed guard for a decision. Dotfiles still
+runs each allowed Git operation once.
 
 ## block-dangerous-git (dotfiles hook)
 

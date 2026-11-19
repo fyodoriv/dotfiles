@@ -59,3 +59,9 @@ controls rejects this design.
 
 Anchor: `agent-hooks/prepend-endpoint-path.sh`, the managed Git wrapper,
 and the Claude session environment contract above.
+
+The [hosted rewrite control](https://github.com/fyodoriv/dotfiles/actions/runs/44629793792)
+passed the repaired startup and fallback cases. It then failed the new
+Claude rewrite control. The composed scratch session observed exit 0
+and a Git recorder call where the expected outcome was exit 2 with zero
+calls.

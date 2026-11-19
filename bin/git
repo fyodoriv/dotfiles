@@ -83,11 +83,12 @@ elif _git_candidate_runs "$SYSTEM_GIT"; then
   REAL_GIT="$SYSTEM_GIT"
 else
   self_realpath=$(readlink -f "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0" 2>/dev/null || printf '%s' "$0")
+  agentbrew_guard="${HOME:-}/.claude/codeassist/hooks-scripts/lib/git"
   REAL_GIT=""
   IFS=':' read -r -a path_parts <<< "$PATH"
   for p in "${path_parts[@]}"; do
     cand="$p/git"
-    if [ -x "$cand" ] && [ "$cand" != "$SYSTEM_GIT" ]; then
+    if [ -x "$cand" ] && [ "$cand" != "$SYSTEM_GIT" ] && ! [ "$cand" -ef "$agentbrew_guard" ]; then
       cand_realpath=$(readlink -f "$cand" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$cand" 2>/dev/null || printf '%s' "$cand")
       if [ "$cand_realpath" != "$self_realpath" ] && _git_candidate_runs "$cand"; then
         REAL_GIT="$cand"

@@ -28,3 +28,11 @@ checks rejects the change.
 
 Anchor: `dot_config/dotfiles/bash-env.sh.tmpl`, `bin/git`, and the
 [Claude Code session environment contract](https://code.claude.com/docs/en/hooks#persist-environment-variables).
+
+## Baseline
+
+The hosted Mac run for `2bcbe8af` passed ordinary startup and failed
+the two registered opt-in controls. Shell startup selected the Dotfiles
+wrapper before the managed guard. The fallback searched the guard
+before the expected Git candidate. The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44626058363)
+records both failed expectations.

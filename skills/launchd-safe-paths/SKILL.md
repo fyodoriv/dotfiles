@@ -11,6 +11,8 @@ description: >
 
 **Agent contract:** Claude Code + ChatGPT Work/Codex; shared memory required when configured; regression: tests/user-stories.bats.
 
+Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
+
 ## The problem
 
 launchd gives a job a minimal PATH: `/usr/bin:/bin:/usr/sbin:/sbin`, plus whatever the plist sets in `EnvironmentVariables`. Tools that your shell finds are missing there.
@@ -43,7 +45,6 @@ Run this before you push any change to a LaunchAgent script or plist. Real integ
 ```bash
 # 1. The script under a launchd-like env: no shell rc, minimal PATH.
 
-Follow the [agent workflow acceptance](../../docs/user-stories/README.md#agent-workflow-acceptance) before context-dependent work.
 env -i HOME="$HOME" PATH=/usr/bin:/bin bash <script> <short-run-args>
 ```
 

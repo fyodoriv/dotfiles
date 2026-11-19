@@ -28,7 +28,7 @@ System Settings > General > Login Items. Report them; do not change them.
 | `review` | third-party | Updaters and helpers of apps. Ask only about jobs for apps the user may not use. Leave Apple, security, and VPN tools alone unless the user asks. |
 | `keep` | any | Nothing to do. |
 
-Tooling-owned jobs (`com.dotfiles.*`, `com.agentbrew.*`, 
+Tooling-owned jobs (`com.dotfiles.*`, `com.agentbrew.*`,
 and owner `dotfiles-plugin`: a label a dotfiles plugin
 installed, recorded in `~/.local/state/dotfiles/plugins/<name>.launchagents`)
 come from their source repo (for a plugin job, the plugin's repo). Change the template there and

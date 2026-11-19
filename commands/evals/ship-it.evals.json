@@ -267,6 +267,17 @@
         "Reports D's existing team request and leaves it and any required review in place",
         "Sends no manual team review request and edits no repository or team settings"
       ]
+    },
+    {
+      "id": 24,
+      "prompt": "/ship-it for an Agentbrew pull request. The merge is ready, but the resulting squash could omit a file. Run the delivery through post-merge verification and cleanup.",
+      "expected_output": "Merge without automatic branch deletion, fetch the target branch, and verify the exact merge before cleanup. Preserve the local review branch and report any missing file or incomplete evidence.",
+      "expectations": [
+        "Omits --delete-branch for the Agentbrew merge",
+        "Confirms the merged state and full commit ID, fetches the target branch, and runs the verifier from that commit",
+        "Runs the file check before branch or worktree cleanup",
+        "Reports exit 1 as missing paths and an incomplete check as unverified, keeping the local branch and worktree in both cases"
+      ]
     }
   ]
 }

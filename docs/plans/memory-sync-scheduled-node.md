@@ -11,3 +11,20 @@ Registration date: 2026-11-20. Target: `c18cb5a3`. Task: #787.
 Keep runtime selection in this scheduled job. Reuse the existing managed
 endpoint and explicit approved Node checks. Probe the feature without loading
 Agentbrew or user Node options. All test binaries and stores are synthetic.
+
+## Scheduled handoff controls
+
+Verify two routing details before enabling the new path. The rendered memory
+job alone declares the scheduled context. The executable chosen for Agentbrew
+stays the same if the selected Node directory also contains an Agentbrew.
+
+Keep the existing operator override and fresh-stamp paths ahead of the probe.
+Reuse the configured fnm resolver. A default fnm alias can supply a fallback
+when the configured runtime is absent or fails the probe. Run the fixed
+feature probe with a clean environment.
+
+Use the existing endpoint safe-mode marker even when the launch environment
+omits endpoint variables. Without the existing exception, require an
+explicit approved compatible Node while that marker is present. A known
+blocked publisher must receive zero probes. A caller that selects its own
+Agentbrew retains that command and its interpreter contract.

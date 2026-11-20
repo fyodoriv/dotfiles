@@ -42,6 +42,99 @@ holdout hash and pre-disclosure ordering intact. A new prediction must define
 how the frozen observations can supply the qualified root before a new model
 is measured. The live observer remains unqualified.
 
+## Qualified root evidence registration
+
+The fixture needs a trusted root reference before it can return an
+`outside` verdict. A walker can stop on a null parent even when the
+rest of the chain is unavailable. `chain_complete` can describe a
+capture, but it cannot make that capture authoritative.
+
+For the next synthetic boundary, give the subject a separate root
+reference from each capture pass. Bind each reference to one host boot,
+one process view, and the designated root's PID and birth identity.
+The capture provider selects the root before the walk under a fixed
+policy for that view. It does not copy the last node returned by the
+walk. The view must cover the observer and every queue lane in the
+admission check. The future live provider must prove this contract.
+The synthetic harness supplies the fields as test assertions.
+
+An outside decision requires the same qualified root in both passes.
+The two walks must reach that exact identity through verified links.
+A missing reference, a broken edge, a changed view or an unqualified
+queue lane prevents an outside decision. Keep the existing stable
+epoch requirement. An owned decision may stop at a verified controller
+under the existing ownership conditions.
+
+A PID has one birth identity within each qualified observation. Compare
+the root references, ancestry nodes and parent endpoints, and the
+controller and payload identities from all captured queue lanes.
+Conflicting birth identities for one PID in a pass make the observation
+unknown. A PID used in both passes must also keep the same birth
+identity. Refuse evidence assembled from different boots or process
+views before comparing PIDs. Repeated references to the same PID and
+birth across records are valid.
+
+The old observations have no independent root references. Preserve the
+version 2 observation file, receipt oracle, harness, epoch test and
+lockfile. Keep the original 24 of 24 and 8 of 8 thresholds and the
+holdout hash and disclosure order. Do not execute the old decision
+measurement with the new subject until independently sealed root
+evidence can be attached to the original inputs. Only the harness may
+match an evidence entry to its original case. The subject receives
+observation data with no case ID, expected verdict or fixture order.
+Do not fill missing evidence from an expected verdict, a case ID or the
+end of a captured chain. If a reviewer cannot verify the independent
+source of each new field, keep the old measurement blocked.
+
+### Registered controls
+
+R01 and R02 are separate valid baselines. Each remaining case changes
+one condition of the named baseline. Keep its other conditions fixed.
+
+| Case | Evidence | Required result |
+| --- | --- | --- |
+| R01 | Both complete walks reach the same qualified root. All lane epochs stay stable and no verified owner matches | Outside |
+| R02 | Both walks reach the verified controller in a held reservation with the verified payload, queue scope and reservation generation. Its birth identity agrees across both walks and the reservation records | Owned |
+| R03 | From R01, remove both root references. Keep the walks' null parents and completeness flags | Unknown |
+| R04 | From R01, remove one root reference | Unknown |
+| R05 | From R01, change the boot or process view of one root reference | Unknown |
+| R06 | From R01, change the root birth identity at the end of the walk while keeping its PID | Unknown |
+| R07 | From R01, stop a walk before it reaches the root | Unknown |
+| R08 | From R02, give a second held reservation record the controller PID with a different birth identity in one pass | Unknown |
+| R09 | From R02, change the matching payload record's birth identity while keeping its PID in the ancestry | Unknown |
+| R10 | From R02, change the birth identity of a PID between passes while preserving each pass's internal agreement | Unknown |
+| R11 | From R01, make one queue lane fall outside the qualified view | Unknown |
+| R12 | From R01, record an intervening admission in the epoch | Unknown |
+
+### Hypothesis and measurement
+
+- **Hypothesis**: Qualified root and PID-generation evidence makes both
+  valid controls classify correctly and all ten ambiguous controls
+  return unknown, with zero private output.
+- **Measurement**: Before subject code, independently review the 12-row
+  matrix and verify unchanged source inputs with the command below. A
+  later registered runner will run these 12 controls with the prior
+  frozen harness tests. No decision result is recorded here.
+- **Success**: This registration changes zero frozen inputs, adds 12
+  unambiguous expected decisions and passes independent review. Later
+  qualification requires 12 of 12 exact outcomes, zero false owned or
+  outside results, zero private-marker bytes and no prior regression.
+- **Pivot**: Stop if a root cannot be bound to an independently
+  qualified view, a root or PID generation conflict can appear valid,
+  or any sealed input must change. Revise the evidence contract before
+  measuring a subject.
+- **Anchor**: The compiler queue evidence protocol and the independent
+  review above. Basili, Caldiera and Rombach (1994), Goal Question Metric.
+
+```sh
+git diff --exit-code 65495b2657312843390ff5b14792643b85d023a5 HEAD -- \
+  tests/fixtures/compiler-queue-observer/ \
+  docs/plans/compiler-queue-holdout.sha256
+```
+
+The protocol defines the decision inputs only. A live capture provider,
+the new fixture runner and the actual decisions still need qualification.
+
 ## Prediction and decision
 
 Goal: determine whether the proposed pure decision boundary handles its

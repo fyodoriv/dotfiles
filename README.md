@@ -940,7 +940,9 @@ It never automatically archives raw transcripts or sends content to a cloud serv
 
 Agent artifact coverage is enforced source-side: every `commands/*.md` file must have either `commands/evals/<command>.evals.json` or a literal Bats assertion, and `tests/agent-artifact-coverage.bats` also checks Agentfile command/rule/skill invariants plus `AGENTS.md`/`CLAUDE.md` delivery-safety mirroring. Add or update that coverage whenever changing command markdown, `Agentfile.yaml`, or global delivery rules.
 
-Agent Shell/Bash/Task commands pass through `agent-hooks/prepend-endpoint-path.sh` so endpoint-safe shims remain first in the sandbox PATH. The hook emits a fully materialized PATH rather than a dynamic `$PATH` expression, allowing downstream enterprise egress guards to classify literal `git push` and `gh` commands without weakening either policy layer.
+Agent shells use the managed PATH to find endpoint-safe shims. Claude Code
+sets that PATH at session start so approved Bash calls can run in headless
+permission modes. See [PATH hook output](docs/agent-hooks.md#path-hook-output).
 
 On managed endpoints, uv Python may remain **Publisher: N/A** because python-build-standalone has no Developer ID authority; ad-hoc signing is not equivalent to publisher approval. Apply-time hook edits and high-frequency pre-tool JSON parsing use Apple-signed `plutil`; the pipx-based mcpm bridge and Python-dependent base/overlay doctors—including local-LLM checks—default to endpoint-policy safe mode. Set `DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=1` only after the machine-scoped exception is approved.
 

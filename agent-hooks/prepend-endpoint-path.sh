@@ -143,6 +143,19 @@ done <<EOF
 /usr/bin/otool|$_shim/otool
 EOF
 
+if $_is_claude && [ "$tool" = "Bash" ]; then
+  case "$_permission_mode" in
+    acceptEdits|dontAsk|bypassPermissions)
+      if [ "$cmd" = "$_original_cmd" ]; then
+        _emit_no_update
+      else
+        _emit_updated_input "$cmd"
+      fi
+      exit 0
+      ;;
+  esac
+fi
+
 if [[ "$cmd" == *dotfiles/bin* ]] \
     && { [[ "$cmd" == *"export PATH="* ]] || [[ "${cmd#"${cmd%%[![:space:]]*}"}" == PATH=* ]]; }; then
   if [ "$cmd" != "$_original_cmd" ]; then

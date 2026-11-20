@@ -11,3 +11,14 @@ Registered on 2026-11-20. Target: `0cc6d828`. Task: `launchagent-drift-launchd-s
 The scope is the managed Bash command with no extra arguments, the rendered
 user HOME and the default checkout. It checks Git executable presence only.
 Git wrapper delegation, other tools and the four-week field result remain open.
+
+## Inherited environment controls
+
+Independent review found that the job can inherit a checkout override from
+launchd. The same user domain can also provide Bash startup code.
+
+- **Hypothesis**: Reading those two named values without running startup code avoids falsely treating a custom user-domain checkout as absent.
+- **Measurement**: Extend the hosted fixture with a user-domain checkout override, an inherited startup path, and a failed read. Keep every returned value in the scratch fixture.
+- **Success**: All 3 unverified cases leave repair off and expose 0 environment values. A read-only report with an inherited startup path still checks the rendered plan.
+- **Pivot**: Any unintended repair, environment disclosure, or startup execution rejects the candidate.
+- **Anchor**: `tooling-sync` reads `TOOLING_ROOT` from its environment. The rendered plan remains separate from shell startup.

@@ -22,3 +22,11 @@ launchd. The same user domain can also provide Bash startup code.
 - **Success**: All 3 unverified cases leave repair off and expose 0 environment values. A read-only report with an inherited startup path still checks the rendered plan.
 - **Pivot**: Any unintended repair, environment disclosure, or startup execution rejects the candidate.
 - **Anchor**: `tooling-sync` reads `TOOLING_ROOT` from its environment. The rendered plan remains separate from shell startup.
+
+## Detect an inherited value made of line endings
+
+- **Hypothesis**: Counting the query's output bytes preserves a value made entirely of line endings.
+- **Measurement**: Reuse the inherited-setting fixture with a one-line-ending value and check its repair trace. Confirm the native launchd query returns zero bytes for an unset key.
+- **Success**: The fixture reports 1 unverified job, makes 0 repair calls and prints 0 private values. The unset native query returns status 0 and zero bytes.
+- **Pivot**: A missed nonempty value or a native unset key with output rejects this check.
+- **Anchor**: Bash removes trailing newlines from command substitution.

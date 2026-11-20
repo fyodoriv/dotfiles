@@ -24,6 +24,13 @@ case "\$1" in
     [ -f "\$f" ] || exit 113
     cat "\$f" ;;
   print-disabled) cat "$TEST_DIR/disabled" 2>/dev/null ;;
+  asuser)
+    [ "\$3" = /bin/launchctl ] && [ "\$4" = getenv ] || exit 2
+    [ ! -e "$TEST_DIR/domain-env-offline" ] || exit 2
+    case "\$5" in
+      TOOLING_ROOT|BASH_ENV) cat "$TEST_DIR/inherited-\$5" 2>/dev/null || true ;;
+      *) exit 2 ;;
+    esac ;;
   bootout) rm -f "$TEST_DIR/print/\${2##*/}" ;;
 esac
 exit 0
@@ -237,6 +244,148 @@ sync_job_path() {
 
   printf '    "%s" => disabled\n' "$label" > "$TEST_DIR/disabled"
   run "$probe" --fix
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+tooling_sync_fixture() {
+  tool_checkout
+  TOOLING_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  TOOLING_SCRIPT="$TOOL_CHECKOUT/bin/tooling-sync"
+  TOOLING_LABEL=com.dotfiles.tooling-sync
+  TOOLING_PLIST="$AGENTS/$TOOLING_LABEL.plist"
+  TOOLING_REPO="$HOME/apps/tooling/agentbrew"
+  local executable
+  for executable in "$TOOLING_SCRIPT" "$TEST_DIR/bin/git"; do
+    printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/executed" > "$executable"
+    chmod +x "$executable"
+  done
+  plist "$TOOLING_LABEL" false /bin/bash "$TOOLING_SCRIPT"
+  tooling_sync_env
+}
+
+tooling_sync_env() {
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$TOOLING_PLIST"
+  /usr/bin/plutil -insert EnvironmentVariables.HOME -string "$HOME" "$TOOLING_PLIST"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$TEST_DIR/job-bin" "$TOOLING_PLIST"
+}
+
+@test "the hourly tooling sync reports missing Git for an eligible checkout" {
+  tooling_sync_fixture
+  mkdir -p "$TOOLING_REPO/.git"
+  loaded "$TOOLING_LABEL" waiting /bin/bash "$TOOLING_SCRIPT"
+  run "$TOOLING_PROBE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $TOOLING_LABEL: git is missing"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "the hourly tooling sync with missing Git cannot be bootstrapped" {
+  tooling_sync_fixture
+  mkdir -p "$TOOLING_REPO/.git"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $TOOLING_LABEL: git is missing"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync tool lookup matches the default checkout condition" {
+  tooling_sync_fixture
+  loaded "$TOOLING_LABEL" waiting /bin/bash "$TOOLING_SCRIPT"
+  run "$TOOLING_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $TOOLING_LABEL" ]
+
+  mkdir -p "$TOOLING_REPO"
+  printf '%s\n' 'gitdir: synthetic-worktree' > "$TOOLING_REPO/.git"
+  run "$TOOLING_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $TOOLING_LABEL" ]
+
+  rm "$TOOLING_REPO/.git"
+  mkdir "$TOOLING_REPO/.git"
+  cp "$TEST_DIR/bin/git" "$TEST_DIR/job-bin/git"
+  run "$TOOLING_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $TOOLING_LABEL" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync keeps repair off with unsupported inputs" {
+  tooling_sync_fixture
+  /usr/bin/plutil -replace EnvironmentVariables.HOME -string "$TEST_DIR/other" "$TOOLING_PLIST"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+
+  /usr/bin/plutil -replace EnvironmentVariables.HOME -string "$HOME" "$TOOLING_PLIST"
+  /usr/bin/plutil -insert EnvironmentVariables.TOOLING_ROOT -string "$TEST_DIR/other" "$TOOLING_PLIST"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+
+  plist "$TOOLING_LABEL" false /bin/bash "$TOOLING_SCRIPT" --dry-run
+  tooling_sync_env
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync leaves repair off with an inherited checkout override" {
+  tooling_sync_fixture
+  printf '%s\n' "$TEST_DIR/custom" > "$TEST_DIR/inherited-TOOLING_ROOT"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  printf '\n' > "$TEST_DIR/inherited-TOOLING_ROOT"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync reports the plan but keeps repair off with inherited startup" {
+  tooling_sync_fixture
+  mkdir -p "$TOOLING_REPO/.git"
+  cp "$TEST_DIR/bin/git" "$TEST_DIR/job-bin/git"
+  printf '%s\n' "$TOOLING_SCRIPT" > "$TEST_DIR/inherited-BASH_ENV"
+  loaded "$TOOLING_LABEL" waiting /bin/bash "$TOOLING_SCRIPT"
+  run "$TOOLING_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $TOOLING_LABEL" ]
+  rm "$TEST_DIR/print/$TOOLING_LABEL"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync leaves repair off when the user-domain check fails" {
+  tooling_sync_fixture
+  touch "$TEST_DIR/domain-env-offline"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "an intentionally disabled hourly tooling sync job remains off" {
+  tooling_sync_fixture
+  mkdir -p "$TOOLING_REPO/.git"
+  printf '    "%s" => disabled\n' "$TOOLING_LABEL" > "$TEST_DIR/disabled"
+  run "$TOOLING_PROBE" --fix
   [ "$status" -eq 0 ]
   [ -z "$output" ]
   [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]

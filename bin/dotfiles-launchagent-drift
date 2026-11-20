@@ -52,7 +52,7 @@ source "$repo_root/lib/launchagent-args.sh"
 # Empty output means all tools were found. Return 1 and name the first
 # missing tool, or return 2 if this plist does not match the contract.
 registered_job_tools() {
-  local file="$1" script_name="$2" args launcher script script_dir env_type job_path directory tool
+  local file="$1" script_name="$2" args launcher script script_dir env_type job_home job_path directory tool inherited
   local -a search_dirs
   shift 2
   args="$(/usr/bin/plutil -extract ProgramArguments raw -expect array -o - "$file" 2>/dev/null)" || return 2
@@ -69,6 +69,18 @@ registered_job_tools() {
   fi
   env_type="$(/usr/bin/plutil -type EnvironmentVariables "$file" 2>/dev/null)" || env_type=""
   [ -z "$env_type" ] || [ "$env_type" = dictionary ] || return 2
+  if [ "$script_name" = tooling-sync ]; then
+    /usr/bin/plutil -type EnvironmentVariables.TOOLING_ROOT "$file" >/dev/null 2>&1 && return 2
+    job_home="$(/usr/bin/plutil -extract EnvironmentVariables.HOME raw -expect string -o - "$file" 2>/dev/null)" || return 2
+    [[ "$job_home" == /* && "$job_home" == "$HOME" ]] || return 2
+    inherited="$("$LAUNCHCTL" asuser "${domain#gui/}" /bin/launchctl getenv TOOLING_ROOT 2>/dev/null)" || return 2
+    [ -z "$inherited" ] || return 2
+    if $fix; then
+      inherited="$("$LAUNCHCTL" asuser "${domain#gui/}" /bin/launchctl getenv BASH_ENV 2>/dev/null)" || return 2
+      [ -z "$inherited" ] || return 2
+    fi
+    [ -d "$job_home/apps/tooling/agentbrew/.git" ] || return 0
+  fi
   job_path=/usr/bin:/bin
   if /usr/bin/plutil -type EnvironmentVariables.PATH "$file" >/dev/null 2>&1; then
     job_path="$(/usr/bin/plutil -extract EnvironmentVariables.PATH raw -expect string -o - "$file" 2>/dev/null)" || return 2
@@ -145,6 +157,9 @@ for plist in "$agents"/com.dotfiles.*.plist; do
       required_tools=(chezmoi) ;;
     com.dotfiles.git-maintain)
       registered_script=git-maintain
+      required_tools=(git) ;;
+    com.dotfiles.tooling-sync)
+      registered_script=tooling-sync
       required_tools=(git) ;;
     com.dotfiles.load-sampler)
       registered_script=dotfiles-load-sampler

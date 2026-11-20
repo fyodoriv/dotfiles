@@ -152,10 +152,11 @@ flag after it is a match too. A rewritten word that could expand to a flag
 `git branch` command is not a match.
 
 The branch scanner can set aside an exact leading comparison of
-`$(git branch --show-current)` with a literal branch name. It also accepts
-that comparison immediately after a plain `set -e` line. The shell parser
-must confirm the complete condition. The scanner still checks the remaining
-command, and the guard keeps the conservative result for uncertain forms.
+`$(git branch --show-current)` with a literal branch name, plain or in single
+quotes. It also accepts that comparison immediately after a plain `set -e`
+line. The shell parser must confirm the complete condition. The scanner still
+checks the remaining command and keeps the conservative result for uncertain
+forms.
 
 For a literal branch list or containment query, the shell parser can prove
 where that invocation ends. The guard reads the other commands separately

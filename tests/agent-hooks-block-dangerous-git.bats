@@ -107,6 +107,31 @@ _check_command_text() {
   [ "$status" -eq 0 ]
 }
 
+@test "a single-quoted branch name can precede a status check" {
+  local preflight="test \"\$(git branch --show-current)\" = 'docs/topic'"
+  _check_command_text "$(printf '%s\n' "$preflight" 'test -z "$(git status --porcelain)"')"
+  [ "$status" -eq 0 ]
+}
+
+@test "a single-quoted branch name can follow set -e" {
+  local preflight="test \"\$(git branch --show-current)\" = 'fix/run-2'"
+  _check_command_text "$(printf '%s\n' 'set -e' "$preflight" 'test -z "$(git status --porcelain)"')"
+  [ "$status" -eq 0 ]
+}
+
+@test "a quoted branch comparison keeps unsupported operands and later changes blocked" {
+  local preflight="test \"\$(git branch --show-current)\" = 'docs/topic'"
+  local status_check='test -z "$(git status --porcelain)"'
+  _check_command_text "$(printf '%s\n' "$preflight" 'git branch --delete --force topic')"
+  [ "$status" -eq 2 ]
+  _check_command_text "$(printf '%s\n' "$preflight" 'git reset --hard')"
+  [ "$status" -eq 2 ]
+  _check_command_text "$(printf '%s\n' "test \"\$(git branch --show-current)\" = 'docs topic'" "$status_check")"
+  [ "$status" -eq 2 ]
+  _check_command_text "$(printf '%s\n' 'test "$(git branch --show-current)" = "$(printf docs/topic)"' "$status_check")"
+  [ "$status" -eq 2 ]
+}
+
 @test "a literal branch comparison keeps later branch and reset refusals" {
   local preflight
   preflight='test "$(git branch --show-current)" = docs/topic'

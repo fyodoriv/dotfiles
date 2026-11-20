@@ -120,6 +120,20 @@ them. -->
 
 ## P2
 
+- [ ] Read-only `git branch` commands pass the git safety hook when a later command has `-f`
+  - **ID**: git-hook-later-force-flag-false-block
+  - **Tags**: hooks, git, false-positive
+  - **Details**: `agent-hooks/block-dangerous-git.sh` blocks a read-only `git branch` query when a later command in the same line has a `-f` token, and reports "'git branch -D' is not permitted". Reproduced on 2026-11-19 by feeding the hook PreToolUse JSON. Blocked: `git branch --list; ls -f`, `git branch --list | cut -f1`, `git branch --list && rm -f /nonexistent-x`, and `git branch --contains X; echo x | cut -f1`. Allowed: `ls -f; git branch --list`, `git branch --list`, and `git branch --contains X; cmp - file`. A goal grader agent hit it with `git branch --contains <sha>; … | cut -f1 …` and had to switch to `git merge-base --is-ancestor`. A flag should count only inside the `git branch` invocation it belongs to.
+  - **Files**: `agent-hooks/block-dangerous-git.sh`, its tests.
+  - **Output**: code
+  - **Acceptance**: every blocked example above is allowed; `git branch -D x`, `git branch -f x HEAD`, `git branch --delete --force x` and a force flag hidden in a variable stay blocked.
+  - **Hypothesis**: false blocks of read-only `git branch` queries followed by an unrelated `-f` drop from every such line to none, with no loss of real delete or force blocks.
+  - **Measurement**: the hook's test file on CI, with the examples above as new cases.
+  - **Success**: every listed allow case passes and every existing block case still blocks.
+  - **Pivot**: if splitting at `;`, `|`, `&&` and `||` lets any real delete or force through, keep the block and change the message to name the matched token.
+  - **Anchor**: Reason 1990 (Human Error, defenses in depth); Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — correctness of an existing guard, not a scorecard metric.
+
 - [ ] Set up the Mergiraf merge driver in the git module
   - **ID**: git-mergiraf-merge-driver-setup
   - **Tags**: git, conflicts, doctor

@@ -47,13 +47,13 @@ refusal labels without quoting input or decoded payloads.
 
 ## Intake controls
 
-Each invalid control changes one input from a passing synthetic pair.
+The invalid controls start from a passing synthetic pair.
 The expected result for each is a refusal before a result can be handed off.
 
 | Control | Input change |
 | --- | --- |
-| J01 | Original bytes differ from the registered hash |
-| J02 | Companion bytes differ from the registered hash |
+| J01 | Malformed original bytes differ from the registered hash |
+| J02 | Malformed companion bytes differ from the registered hash. The original digest matches malformed bytes, to check that both digests precede either parse |
 | J03 | The sealed companion names the wrong original hash |
 | J04 | The original packet has a repeated case ID |
 | J05 | The companion has a repeated case ID |

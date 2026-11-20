@@ -505,3 +505,44 @@ synced_stores() {
   [ "$status" -eq 0 ]
   [ "$(sync_calls)" -eq 1 ]
 }
+
+@test "scheduled memory sync uses a compatible Node when the job path starts with an old one" {
+  unset DOTFILES_MEMORY_AGENTBREW_BIN
+  export DOTFILES_MEMORY_SYNC_LAUNCHAGENT=1
+  export RUNTIME_LOG="$BATS_TEST_TMPDIR/runtime.log"
+  export PATH="$STUB_BIN:/usr/bin:/bin"
+  fnm_bin="$HOME/.local/share/fnm/aliases/default/bin"
+  mkdir -p "$fnm_bin"
+
+  cat > "$STUB_BIN/agentbrew" <<'STUB'
+#!/bin/bash
+exec node "$@"
+STUB
+  cat > "$STUB_BIN/node" <<'STUB'
+#!/bin/bash
+if [ "${1:-}" = "-e" ]; then
+  printf 'old:probe\n' >> "$RUNTIME_LOG"
+  exit 1
+fi
+printf 'old:dispatch\n' >> "$RUNTIME_LOG"
+exit 18
+STUB
+  cat > "$fnm_bin/node" <<'STUB'
+#!/bin/bash
+if [ "${1:-}" = "-e" ]; then
+  printf 'compatible:probe\n' >> "$RUNTIME_LOG"
+  exit 0
+fi
+printf 'compatible:dispatch\n' >> "$RUNTIME_LOG"
+STUB
+  chmod +x "$STUB_BIN/agentbrew" "$STUB_BIN/node" "$fnm_bin/node"
+
+  run "$SCRIPT" --check
+  if [ "$status" -ne 0 ]; then
+    printf 'scheduled status: %s\n' "$status"
+    cat "$RUNTIME_LOG"
+    return 1
+  fi
+  [ "$(grep -c '^compatible:dispatch$' "$RUNTIME_LOG")" -eq 1 ]
+  ! grep -q '^old:dispatch$' "$RUNTIME_LOG"
+}

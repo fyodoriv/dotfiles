@@ -534,6 +534,11 @@ client instead of a second raw HTTP implementation. A plain run first checks
 each store's newest change time against a stamp from the last full sync and
 returns in milliseconds, without AgentBrew or the daemon, when nothing
 changed.
+The daily job checks that its Node provides `util.styleText`. If the job
+path selects an older Node, it can use a compatible configured fnm
+runtime or the fnm default. Endpoint safe mode requires an approved
+runtime. For a Node-based Agentbrew launcher, the shim starts the verified
+Node directly. Other launchers keep their own interpreter.
 
 `--background` runs the AgentBrew part detached. AgentBrew's Claude Code
 `SessionEnd` hook adds a debounced, non-blocking fast path. The daily job

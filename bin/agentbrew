@@ -23,8 +23,92 @@ source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
 # shellcheck source=../lib/dotfiles-agent-node.sh
 source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
 
+resolve_compatible_memory_node() {
+  local candidate="$1" restricted="$2"
+  case "$candidate" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  [ -f "$candidate" ] && [ -x "$candidate" ] || return 1
+  candidate="$(_agentbrew_resolve_path "$candidate")" || return 1
+  [ -f "$candidate" ] && [ -x "$candidate" ] || return 1
+  if "$restricted" && dotfiles_node_publisher_blocked "$candidate"; then
+    return 1
+  fi
+  /usr/bin/env -i PATH=/usr/bin:/bin "$candidate" -e \
+    'process.exit(typeof require("node:util").styleText === "function" ? 0 : 1)' \
+    >/dev/null 2>&1 || return 1
+  printf '%s\n' "$candidate"
+}
+
+select_scheduled_memory_node() {
+  # shellcheck source=../lib/dotfiles-endpoint-paths.sh
+  source "$DOTFILES_DIR/lib/dotfiles-endpoint-paths.sh" || return 1
+
+  local current fnm_bin node approved_only=false restricted=false
+  if [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
+    if [ -f "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ]; then
+      approved_only=true
+      restricted=true
+    elif dotfiles_managed_endpoint; then
+      restricted=true
+    fi
+  fi
+
+  if "$approved_only" || [ -n "${DOTFILES_AGENT_NODE_BIN:-}" ]; then
+    if node="$(dotfiles_agent_node_bin)" && node="$(resolve_compatible_memory_node "$node" "$restricted")"; then
+      printf '%s\n' "$node"
+      return 0
+    fi
+    if "$approved_only"; then
+      echo "memory sync skipped: endpoint-policy safe mode requires a compatible approved Node" >&2
+    else
+      echo "memory sync skipped: the configured agent Node is unavailable or incompatible" >&2
+    fi
+    return 1
+  fi
+
+  current="$(type -P node || true)"
+  if node="$(resolve_compatible_memory_node "$current" "$restricted")"; then
+    printf '%s\n' "$node"
+    return 0
+  fi
+  fnm_bin="$(dotfiles_resolve_fnm_node_bin "$HOME" || true)"
+  for node in "${fnm_bin:+$fnm_bin/node}" "$HOME/.local/share/fnm/aliases/default/bin/node"; do
+    if node="$(resolve_compatible_memory_node "$node" "$restricted")"; then
+      printf '%s\n' "$node"
+      return 0
+    fi
+  done
+  if "$restricted"; then
+    echo "memory sync skipped: no compatible Node is allowed by endpoint policy" >&2
+  else
+    echo "memory sync skipped: Agentbrew needs a compatible Node" >&2
+  fi
+  return 1
+}
+
+exec_scheduled_node_cli() {
+  "$scheduled_memory" || return 0
+  local cli="$1" first_line node
+  shift
+  [ -f "$cli" ] || return 0
+  IFS= read -r -n 64 first_line < "$cli" || return 0
+  [ "$first_line" = '#!/usr/bin/env node' ] || return 0
+  node="$(select_scheduled_memory_node)" || exit 1
+  exec "$node" "$cli" "$@"
+}
+
+scheduled_memory=false
+if [ "${DOTFILES_MEMORY_SYNC_LAUNCHAGENT:-0}" = "1" ] \
+    && [ -z "${DOTFILES_MEMORY_AGENTBREW_BIN:-}" ] \
+    && [ "${1:-}" = "memory" ] && [ "${2:-}" = "sync-projects" ]; then
+  scheduled_memory=true
+fi
+
 if agentbrew_dir="$(agentbrew_locate)"; then
   if [ -x "$agentbrew_dir/dist/cli.js" ] && ! grep -Fq "exec $agentbrew_dir/dist/cli.js" "$agentbrew_dir/dist/cli.js"; then
+    exec_scheduled_node_cli "$agentbrew_dir/dist/cli.js" "$@"
     # The CLI's shebang runs the first `node` on PATH. With an approved agent
     # Node (DOTFILES_AGENT_NODE_BIN), run that Node, so the LaunchAgents that
     # `auto-sync install` writes run it too.
@@ -34,6 +118,7 @@ if agentbrew_dir="$(agentbrew_locate)"; then
     exec "$agentbrew_dir/dist/cli.js" "$@"
   fi
   if [ -x "$agentbrew_dir/node_modules/.bin/tsx" ]; then
+    exec_scheduled_node_cli "$agentbrew_dir/node_modules/.bin/tsx" "$agentbrew_dir/src/cli.ts" "$@"
     exec "$agentbrew_dir/node_modules/.bin/tsx" "$agentbrew_dir/src/cli.ts" "$@"
   fi
   echo "agentbrew shim: found $agentbrew_dir, but no runnable CLI (dist/cli.js or node_modules/.bin/tsx)" >&2
@@ -48,6 +133,7 @@ for path_dir in "${path_parts[@]}"; do
   [ -x "$candidate" ] || continue
   candidate_path="$(_agentbrew_resolve_path "$candidate")"
   [ "$candidate_path" = "$SELF_PATH" ] && continue
+  exec_scheduled_node_cli "$candidate" "$@"
   exec "$candidate" "$@"
 done
 

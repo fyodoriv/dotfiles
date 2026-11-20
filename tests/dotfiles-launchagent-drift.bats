@@ -198,6 +198,51 @@ sync_job_path() {
   [ ! -e "$TEST_DIR/executed" ]
 }
 
+@test "the Git maintenance job needs Git on its declared PATH before repair" {
+  tool_checkout
+  local label=com.dotfiles.git-maintain
+  local job="$TOOL_CHECKOUT/bin/git-maintain"
+  local probe="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  local file="$AGENTS/$label.plist" executable
+  for executable in "$job" "$TEST_DIR/bin/git"; do
+    printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/executed" > "$executable"
+    chmod +x "$executable"
+  done
+  plist "$label" false /bin/bash "$job"
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$file"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$TEST_DIR/job-bin" "$file"
+  loaded "$label" running /bin/bash "$job"
+
+  run "$probe"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $label: git is missing"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+
+  rm "$TEST_DIR/print/$label"
+  run "$probe" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $label: git is missing"* ]]
+
+  cp "$TEST_DIR/bin/git" "$TEST_DIR/job-bin/git"
+  loaded "$label" running /bin/bash "$job"
+  run "$probe"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $label" ]
+
+  plist "$label" false /bin/bash "$job" --quick
+  rm "$TEST_DIR/print/$label"
+  run "$probe" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $label:"* ]]
+
+  printf '    "%s" => disabled\n' "$label" > "$TEST_DIR/disabled"
+  run "$probe" --fix
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
 @test "a job whose loaded arguments match its plist and that runs is ok" {
   plist com.dotfiles.a true /bin/bash /x/a.sh
   loaded com.dotfiles.a running /bin/bash /x/a.sh

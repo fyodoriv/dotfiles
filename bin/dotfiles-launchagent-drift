@@ -143,6 +143,9 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     com.dotfiles.dotfiles-sync)
       registered_script=dotfiles-sync
       required_tools=(chezmoi) ;;
+    com.dotfiles.git-maintain)
+      registered_script=git-maintain
+      required_tools=(git) ;;
     com.dotfiles.load-sampler)
       registered_script=dotfiles-load-sampler
       required_tools=(sysctl ps) ;;

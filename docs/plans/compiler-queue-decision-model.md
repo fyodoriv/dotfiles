@@ -132,8 +132,9 @@ git diff --exit-code 65495b2657312843390ff5b14792643b85d023a5 HEAD -- \
   docs/plans/compiler-queue-holdout.sha256
 ```
 
-The protocol defines the decision inputs only. A live capture provider,
-the new fixture runner and the actual decisions still need qualification.
+The [synthetic companion join](compiler-root-companion.md) checks attachment
+without measuring a decision. A live capture provider, a decision runner
+and the actual decisions still need qualification.
 
 ## Prediction and decision
 

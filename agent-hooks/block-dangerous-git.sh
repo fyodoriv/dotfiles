@@ -502,7 +502,8 @@ literal_search_only && exit 0
 read_only_branch_prefix_end() {
   local shfmt_bin="$1" jq_bin="$2" end prefix offset=0 kind=literal
   local comparison='^test "\$\(git branch --show-current\)" = "\$\(gh pr view [1-9][0-9]* --json headRefName --jq \.headRefName\)"$'
-  local literal='^test "\$\(git branch --show-current\)" = [A-Za-z0-9][A-Za-z0-9._/-]*$'
+  local literal='^test "\$\(git branch --show-current\)" = '
+  local branch_name='[A-Za-z0-9][A-Za-z0-9._/-]*'
   case "$command" in $'set -e\n'*) offset=7 ;; esac
   # shellcheck disable=SC2016
   case "${command:offset}" in
@@ -510,7 +511,7 @@ read_only_branch_prefix_end() {
       [ "$offset" -eq 0 ] || return 1
       kind='pr' ;;
     'test "$(git branch --show-current)" = '*)
-      comparison="$literal" ;;
+      comparison="$literal($branch_name|'$branch_name')$" ;;
     *) return 1 ;;
   esac
   end=$(printf '%s' "$command" | "$shfmt_bin" --to-json 2>/dev/null |

@@ -533,6 +533,38 @@ read_only_branch_prefix_end() {
   printf '%s' "$end"
 }
 
+# Mask proven branch queries for the branch scan. Keep the surrounding shell
+# syntax and every other command so the existing safeguards still see them.
+without_read_only_branch_queries() {
+  local LC_ALL=C shfmt_bin="$1" jq_bin="$2" spans start end stripped="$command"
+  case "$command" in *--list*|*--contains*) ;; *) return 1 ;; esac
+  spans=$(printf '%s' "$command" | "$shfmt_bin" --to-json 2>/dev/null |
+    "$jq_bin" -er '
+      def direct_call:
+        select(.Background != true and .Coprocess != true and .Negated != true and
+          ((.Redirs // []) | length) == 0)
+        | if .Cmd.Type == "BinaryCmd" and (.Cmd.Op | IN("&&", "||", "|", "|&"))
+          then (.Cmd.X, .Cmd.Y) | direct_call
+          else .Cmd | select(.Type == "CallExpr" and ((.Assigns // []) | length) == 0)
+          end;
+      select(.Type == "File")
+      | [.Stmts[] | direct_call
+        | select(all(.Args[]; (.Parts | length) == 1 and .Parts[0].Type == "Lit"))
+        | [.Args[].Parts[0].Value] as $args
+        | select($args == ["git", "branch", "--list"] or
+          ($args[0:3] == ["git", "branch", "--contains"] and ($args | length) == 4 and
+           ($args[3] | test("^[A-Za-z0-9][A-Za-z0-9._/~^@-]*$"))))
+        | [.Pos.Offset, .End.Offset]]
+      | sort_by(.[0]) | reverse | .[] | @tsv
+    ' 2>/dev/null) || return 1
+  while IFS=$'\t' read -r start end; do
+    [[ "$start" =~ ^[0-9]+$ && "$end" =~ ^[0-9]+$ ]] || return 1
+    [ "$start" -lt "$end" ] && [ "$end" -le "${#command}" ] || return 1
+    stripped="${stripped:0:start}:${stripped:end}"
+  done <<< "$spans"
+  printf '%s' "$stripped"
+}
+
 case "$command" in
   *"git reset --hard"*)   block "git reset --hard" ;;
   *"git clean -f"*)       block "git clean -f" ;;
@@ -557,6 +589,13 @@ if looks_like_branch_delete; then
     _prefix_end=$(read_only_branch_prefix_end "$_boundary_shfmt" "$_boundary_jq"); then
     _original_command="$command"
     command="test 1 = 1${command:_prefix_end}"
+    if ! looks_like_branch_delete; then exit 0; fi
+    command="$_original_command"
+  fi
+  if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
+    _without_queries=$(without_read_only_branch_queries "$_boundary_shfmt" "$_boundary_jq"); then
+    _original_command="$command"
+    command="$_without_queries"
     if ! looks_like_branch_delete; then exit 0; fi
     command="$_original_command"
   fi

@@ -157,6 +157,11 @@ that comparison immediately after a plain `set -e` line. The shell parser
 must confirm the complete condition. The scanner still checks the remaining
 command, and the guard keeps the conservative result for uncertain forms.
 
+For a literal branch list or containment query, the shell parser can prove
+where that invocation ends. The guard reads the other commands separately
+from that query. It keeps the conservative result when the parser cannot
+prove a boundary.
+
 Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
 quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as
 `refs/heads/<name>` (checked with `git show-ref --verify`). The default branch

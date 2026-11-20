@@ -28,7 +28,7 @@ root fields is either null or an object with these fields:
 
 - `boot` and `view`: nonempty synthetic identity strings.
 - `pid`: positive integer.
-- `birth`: nonempty synthetic birth identity string.
+- `birth`: positive integer, matching the frozen process tuple.
 - `covers_queue`: Boolean claim that the process view covers its queue lanes.
 
 The join verifies both SHA-256 values before parsing. It requires exactly
@@ -41,7 +41,8 @@ future subject so the decision controls can verify an unknown result.
 The case ID remains only in the harness lookup. A future runner must provide
 observations to the subject in a separate, independently chosen order.
 The join does not call the subject. Projected observations carry neither
-the ID nor the expected verdict. This fixture reports counts and fixed
+the ID nor the expected verdict. The trusted frozen observation is the source
+of nested evidence. This fixture reports counts and fixed
 refusal labels without quoting input or decoded payloads.
 
 ## Intake controls

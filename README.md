@@ -1038,7 +1038,7 @@ After `dotfiles apply`, these agents run in the background. All are per-user (`~
 | `com.dotfiles.tooling-sync` | `tooling-sync` | Every hour | Pull agentbrew; push agentbrew TASKS.md edits |
 | `com.dotfiles.network-resilience` | `network-watchdog` | Every 5 min + after wake | Restore DNS/connectivity after sleep |
 | `com.dotfiles.agent-keepawake` | `dotfiles-agent-keepawake` | Every 5s | Process-scoped `caffeinate -ims` + verified owned Amphetamine Closed-Display session while Claude Code (CLI or desktop app) runs on AC or battery ≥20% (see [Power Protect and closed-display limits](docs/troubleshooting.md#claude-code-stops-when-the-laptop-sleeps-or-the-lid-closes) for Apple Silicon power changes); releases when both exit, and quarantines rejected scripting commands |
-| `com.dotfiles.git-maintain` | `git-maintain` | Daily 4:00 AM | git gc, prune branches in `~/apps` repos |
+| `com.dotfiles.git-maintain` | `git-maintain` | Daily 4:00 AM | git gc, prune branches in `~/apps` repos. The LaunchAgent drift check verifies Git before repair. |
 | `com.dotfiles.morning` | `morning` | Daily 8:30 AM | Pull repos, health check, system summary |
 | `com.dotfiles.dotfiles-doctor` | `dotfiles-doctor --fix` | Monday 9:00 AM | Auto-repair config drift and warn about stale Amphetamine Single-Use sleep blockers |
 | `com.dotfiles.cleanup` | `cleanup` | Sunday 3:00 AM | Clear caches, logs, build artifacts |

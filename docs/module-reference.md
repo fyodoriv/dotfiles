@@ -136,10 +136,10 @@ If the report says `loaded`, launchd still holds an older copy with the
 literal path. Confirm the rendered plist before you reload the job.
 Repair mode leaves jobs with either kind of log path error alone.
 
-The tool check looks for `chezmoi` in the managed Dotfiles sync job and
-`sysctl` and `ps` in the load sampler. It reads the rendered plist and checks
-file permissions in its PATH without running the job or any tool. Without a
-PATH in the plist, it uses `/usr/bin:/bin`. A `tool-path` finding names the first
+The tool check looks for `chezmoi` in the managed Dotfiles sync job,
+`sysctl` and `ps` in the load sampler, and `git` in the Git maintenance job.
+It reads the rendered plist and checks file permissions in its PATH without
+running the job or any tool. Without a PATH in the plist, it uses `/usr/bin:/bin`. A `tool-path` finding names the first
 missing tool. `tool-path-unverified` means the plist uses an unsupported
 script, environment, or argument form. Both findings stop repair for that job.
 

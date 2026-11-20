@@ -89,6 +89,7 @@ exec_scheduled_node_cli() {
   "$scheduled_memory" || return 0
   local cli="$1" first_line node
   shift
+  [ -f "$cli" ] || return 0
   IFS= read -r -n 64 first_line < "$cli" || return 0
   [ "$first_line" = '#!/usr/bin/env node' ] || return 0
   node="$(select_scheduled_memory_node)" || exit 1

@@ -48,3 +48,7 @@ the old Node first. Require 1 compatible dispatch and 0 alternate Agentbrew
 dispatches. Require the approved path with a different basename to work.
 A known Node launcher with no compatible candidate exits 1 before dispatch.
 A standalone launcher dispatches once with 0 probes.
+
+Resolve a runtime symlink to its version path before probing it. Add one
+scratch control that moves the default alias after the probe. Require one
+dispatch on the probed version and zero dispatches on the changed alias.

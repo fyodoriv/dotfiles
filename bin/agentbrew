@@ -23,19 +23,22 @@ source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
 # shellcheck source=../lib/dotfiles-agent-node.sh
 source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
 
-memory_node_supports_style_text() {
+resolve_compatible_memory_node() {
   local candidate="$1" restricted="$2"
   case "$candidate" in
     /*) ;;
     *) return 1 ;;
   esac
   [ -f "$candidate" ] && [ -x "$candidate" ] || return 1
+  candidate="$(_agentbrew_resolve_path "$candidate")" || return 1
+  [ -f "$candidate" ] && [ -x "$candidate" ] || return 1
   if "$restricted" && dotfiles_node_publisher_blocked "$candidate"; then
     return 1
   fi
   /usr/bin/env -i PATH=/usr/bin:/bin "$candidate" -e \
     'process.exit(typeof require("node:util").styleText === "function" ? 0 : 1)' \
-    >/dev/null 2>&1
+    >/dev/null 2>&1 || return 1
+  printf '%s\n' "$candidate"
 }
 
 select_scheduled_memory_node() {
@@ -53,7 +56,7 @@ select_scheduled_memory_node() {
   fi
 
   if "$approved_only" || [ -n "${DOTFILES_AGENT_NODE_BIN:-}" ]; then
-    if node="$(dotfiles_agent_node_bin)" && memory_node_supports_style_text "$node" "$restricted"; then
+    if node="$(dotfiles_agent_node_bin)" && node="$(resolve_compatible_memory_node "$node" "$restricted")"; then
       printf '%s\n' "$node"
       return 0
     fi
@@ -66,13 +69,13 @@ select_scheduled_memory_node() {
   fi
 
   current="$(type -P node || true)"
-  if memory_node_supports_style_text "$current" "$restricted"; then
-    printf '%s\n' "$current"
+  if node="$(resolve_compatible_memory_node "$current" "$restricted")"; then
+    printf '%s\n' "$node"
     return 0
   fi
   fnm_bin="$(dotfiles_resolve_fnm_node_bin "$HOME" || true)"
   for node in "${fnm_bin:+$fnm_bin/node}" "$HOME/.local/share/fnm/aliases/default/bin/node"; do
-    if memory_node_supports_style_text "$node" "$restricted"; then
+    if node="$(resolve_compatible_memory_node "$node" "$restricted")"; then
       printf '%s\n' "$node"
       return 0
     fi

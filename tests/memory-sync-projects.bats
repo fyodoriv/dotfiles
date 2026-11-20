@@ -566,6 +566,35 @@ STUB
   [ ! -e "$NODE_V8_COVERAGE" ]
 }
 
+@test "scheduled memory sync keeps the verified Node when the default alias changes" {
+  scheduled_node_fixture
+  alias="${FNM_BIN%/bin}"
+  preferred="$BATS_TEST_TMPDIR/preferred"
+  alternate="$BATS_TEST_TMPDIR/alternate"
+  mv "$alias" "$preferred"
+  mkdir -p "$alternate/bin"
+  ln -s "$preferred" "$alias"
+  scheduled_node "$alternate/bin/node" alternate 1
+  {
+    printf '#!/bin/bash\nalias_path=%q\nalternate=%q\n' "$alias" "$alternate"
+    cat <<'STUB'
+if [ "${1:-}" = "-e" ]; then
+  rm "$alias_path"
+  ln -s "$alternate" "$alias_path"
+  exit 0
+fi
+printf 'verified:dispatch\n' >> "$RUNTIME_LOG"
+STUB
+  } > "$preferred/bin/node"
+  chmod +x "$preferred/bin/node"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$alias")" = "$alternate" ]
+  [ "$(cat "$RUNTIME_LOG")" = "verified:dispatch" ]
+}
+
 @test "scheduled memory sync keeps an already-compatible job path" {
   scheduled_node_fixture
   scheduled_node "$STUB_BIN/node" current 0

@@ -24,6 +24,13 @@ case "\$1" in
     [ -f "\$f" ] || exit 113
     cat "\$f" ;;
   print-disabled) cat "$TEST_DIR/disabled" 2>/dev/null ;;
+  asuser)
+    [ "\$3" = /bin/launchctl ] && [ "\$4" = getenv ] || exit 2
+    [ ! -e "$TEST_DIR/domain-env-offline" ] || exit 2
+    case "\$5" in
+      TOOLING_ROOT|BASH_ENV) cat "$TEST_DIR/inherited-\$5" 2>/dev/null || true ;;
+      *) exit 2 ;;
+    esac ;;
   bootout) rm -f "$TEST_DIR/print/\${2##*/}" ;;
 esac
 exit 0
@@ -324,6 +331,45 @@ tooling_sync_env() {
 
   plist "$TOOLING_LABEL" false /bin/bash "$TOOLING_SCRIPT" --dry-run
   tooling_sync_env
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync leaves repair off with an inherited checkout override" {
+  tooling_sync_fixture
+  printf '%s\n' "$TEST_DIR/custom" > "$TEST_DIR/inherited-TOOLING_ROOT"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync reports the plan but keeps repair off with inherited startup" {
+  tooling_sync_fixture
+  mkdir -p "$TOOLING_REPO/.git"
+  cp "$TEST_DIR/bin/git" "$TEST_DIR/job-bin/git"
+  printf '%s\n' "$TOOLING_SCRIPT" > "$TEST_DIR/inherited-BASH_ENV"
+  loaded "$TOOLING_LABEL" waiting /bin/bash "$TOOLING_SCRIPT"
+  run "$TOOLING_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $TOOLING_LABEL" ]
+  rm "$TEST_DIR/print/$TOOLING_LABEL"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/executed" ]
+}
+
+@test "hourly tooling sync leaves repair off when the user-domain check fails" {
+  tooling_sync_fixture
+  touch "$TEST_DIR/domain-env-offline"
   run "$TOOLING_PROBE" --fix
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]

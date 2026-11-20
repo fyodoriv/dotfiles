@@ -265,3 +265,11 @@ _program_resolves() {
     }
   done
 }
+
+@test "only the scheduled memory job declares the Node handoff context" {
+  local marker=DOTFILES_MEMORY_SYNC_LAUNCHAGENT rendered
+  rendered="$(_render_plist "$REPO_ROOT/launchagents/com.dotfiles.memory-sync-projects.plist.tmpl")"
+  [ "$(_plist_string_for_key "$rendered" "$marker")" = "1" ]
+  rm -f "$rendered"
+  [ "$(grep -l "$marker" "$REPO_ROOT"/launchagents/*.plist.tmpl | wc -l | tr -d ' ')" -eq 1 ]
+}

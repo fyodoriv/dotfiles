@@ -74,6 +74,75 @@ agentbrew_available() {
   return 1
 }
 
+memory_node_supports_style_text() {
+  local candidate="$1" restricted="$2"
+  case "$candidate" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  [ -f "$candidate" ] && [ -x "$candidate" ] || return 1
+  if "$restricted" && dotfiles_node_publisher_blocked "$candidate"; then
+    return 1
+  fi
+  /usr/bin/env -i PATH=/usr/bin:/bin "$candidate" -e \
+    'process.exit(typeof require("node:util").styleText === "function" ? 0 : 1)' \
+    >/dev/null 2>&1
+}
+
+prepare_scheduled_memory_node() {
+  [ "${DOTFILES_MEMORY_SYNC_LAUNCHAGENT:-0}" = "1" ] || return 0
+  [ -z "${DOTFILES_MEMORY_AGENTBREW_BIN:-}" ] || return 0
+
+  local dotfiles_dir current fnm_bin node approved_only=false restricted=false
+  dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || return 1
+  # shellcheck source=../lib/dotfiles-endpoint-paths.sh
+  source "$dotfiles_dir/lib/dotfiles-endpoint-paths.sh" || return 1
+  # shellcheck source=../lib/dotfiles-agent-node.sh
+  source "$dotfiles_dir/lib/dotfiles-agent-node.sh" || return 1
+
+  # Keep the command that the job had selected before adding a Node directory.
+  agentbrew_bin="$(type -P "$agentbrew_bin")" || return 1
+  if [ "${DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER:-0}" != "1" ]; then
+    if [ -f "$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked" ]; then
+      approved_only=true
+      restricted=true
+    elif dotfiles_managed_endpoint; then
+      restricted=true
+    fi
+  fi
+
+  if "$approved_only" || [ -n "${DOTFILES_AGENT_NODE_BIN:-}" ]; then
+    if node="$(dotfiles_agent_node_bin)" && [ "$node" -ef "${node%/*}/node" ] \
+        && memory_node_supports_style_text "$node" "$restricted"; then
+      export PATH="${node%/*}:$PATH"
+      return 0
+    fi
+    if "$approved_only"; then
+      echo "memory sync skipped: endpoint-policy safe mode requires a compatible approved Node" >&2
+    else
+      echo "memory sync skipped: the configured agent Node is unavailable or incompatible" >&2
+    fi
+    return 1
+  fi
+
+  current="$(type -P node || true)"
+  if memory_node_supports_style_text "$current" "$restricted"; then
+    return 0
+  fi
+  fnm_bin="$(dotfiles_resolve_fnm_node_bin "$HOME" || true)"
+  for node in "${fnm_bin:+$fnm_bin/node}" "$HOME/.local/share/fnm/aliases/default/bin/node"; do
+    if memory_node_supports_style_text "$node" "$restricted"; then
+      export PATH="${node%/*}:$PATH"
+      return 0
+    fi
+  done
+  if "$restricted"; then
+    echo "memory sync skipped: no compatible Node is allowed by endpoint policy" >&2
+    return 1
+  fi
+  return 0
+}
+
 now_ms() {
   perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000' 2>/dev/null \
     || printf '%s000\n' "$(date +%s)"
@@ -334,19 +403,16 @@ if $help; then
   usage
 fi
 
-if ! $fast_path; then
-  agentbrew_available || exit 0
-  if $background; then
-    start_background
-    exit 0
-  fi
-  exec "$agentbrew_bin" memory sync-projects "${forward[@]}"
+if $fast_path && store_scan check "$stamp" "$agentbrew_ledger" "$stamp_max_age" "$quiet"; then
+  exit 0
 fi
-
-store_scan check "$stamp" "$agentbrew_ledger" "$stamp_max_age" "$quiet" && exit 0
 agentbrew_available || exit 0
+prepare_scheduled_memory_node || exit 1
 if $background; then
   start_background
   exit 0
+fi
+if ! $fast_path; then
+  exec "$agentbrew_bin" memory sync-projects "${forward[@]}"
 fi
 sync_and_stamp

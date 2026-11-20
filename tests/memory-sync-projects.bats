@@ -506,43 +506,142 @@ synced_stores() {
   [ "$(sync_calls)" -eq 1 ]
 }
 
-@test "scheduled memory sync uses a compatible Node when the job path starts with an old one" {
-  unset DOTFILES_MEMORY_AGENTBREW_BIN
+scheduled_node() {
+  local path="$1" kind="$2" probe_status="$3"
+  {
+    printf '#!/bin/bash\nkind=%s\nprobe_status=%s\n' "$kind" "$probe_status"
+    cat <<'STUB'
+if [ "${1:-}" = "-e" ]; then
+  printf '%s:probe\n' "$kind" >> "${0%/*}/probe.log"
+  [ -z "${NODE_OPTIONS:-}${NODE_V8_COVERAGE:-}" ] || exit 42
+  exit "$probe_status"
+fi
+printf '%s:dispatch\n' "$kind" >> "$RUNTIME_LOG"
+[ "$probe_status" -eq 0 ] || exit 18
+STUB
+  } > "$path"
+  chmod +x "$path"
+}
+
+scheduled_node_fixture() {
+  unset DOTFILES_MEMORY_AGENTBREW_BIN DOTFILES_AGENT_NODE_BIN \
+    DOTFILES_MANAGED_ENDPOINT DOTFILES_ENDPOINT_AGENT_APPS DOTFILES_ALLOW_BLOCKED_NODE_PUBLISHER BASH_ENV ENV
   export DOTFILES_MEMORY_SYNC_LAUNCHAGENT=1
   export RUNTIME_LOG="$BATS_TEST_TMPDIR/runtime.log"
   export PATH="$STUB_BIN:/usr/bin:/bin"
-  fnm_bin="$HOME/.local/share/fnm/aliases/default/bin"
-  mkdir -p "$fnm_bin"
-
+  FNM_BIN="$HOME/.local/share/fnm/aliases/default/bin"
+  mkdir -p "$FNM_BIN"
   cat > "$STUB_BIN/agentbrew" <<'STUB'
 #!/bin/bash
 exec node "$@"
 STUB
-  cat > "$STUB_BIN/node" <<'STUB'
+  cat > "$FNM_BIN/agentbrew" <<'STUB'
 #!/bin/bash
-if [ "${1:-}" = "-e" ]; then
-  printf 'old:probe\n' >> "$RUNTIME_LOG"
-  exit 1
-fi
-printf 'old:dispatch\n' >> "$RUNTIME_LOG"
-exit 18
+printf 'unexpected:agentbrew\n' >> "$RUNTIME_LOG"
+exit 43
 STUB
-  cat > "$fnm_bin/node" <<'STUB'
-#!/bin/bash
-if [ "${1:-}" = "-e" ]; then
-  printf 'compatible:probe\n' >> "$RUNTIME_LOG"
-  exit 0
-fi
-printf 'compatible:dispatch\n' >> "$RUNTIME_LOG"
-STUB
-  chmod +x "$STUB_BIN/agentbrew" "$STUB_BIN/node" "$fnm_bin/node"
+  chmod +x "$STUB_BIN/agentbrew" "$FNM_BIN/agentbrew"
+  scheduled_node "$STUB_BIN/node" old 1
+  scheduled_node "$FNM_BIN/node" compatible 0
+}
+
+@test "scheduled memory sync uses a compatible Node when the job path starts with an old one" {
+  scheduled_node_fixture
+  export NODE_OPTIONS=--trace-warnings
+  export NODE_V8_COVERAGE="$BATS_TEST_TMPDIR/coverage"
 
   run "$SCRIPT" --check
   if [ "$status" -ne 0 ]; then
     printf 'scheduled status: %s\n' "$status"
-    cat "$RUNTIME_LOG"
+    [ ! -f "$RUNTIME_LOG" ] || cat "$RUNTIME_LOG"
     return 1
   fi
-  [ "$(grep -c '^compatible:dispatch$' "$RUNTIME_LOG")" -eq 1 ]
-  ! grep -q '^old:dispatch$' "$RUNTIME_LOG"
+  [ "$(cat "$RUNTIME_LOG")" = "compatible:dispatch" ]
+  [ "$(cat "$FNM_BIN/probe.log")" = "compatible:probe" ]
+  [ ! -e "$NODE_V8_COVERAGE" ]
+}
+
+@test "scheduled memory sync keeps an already-compatible job path" {
+  scheduled_node_fixture
+  scheduled_node "$STUB_BIN/node" current 0
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$RUNTIME_LOG")" = "current:dispatch" ]
+  [ "$(cat "$STUB_BIN/probe.log")" = "current:probe" ]
+  [ ! -e "$FNM_BIN/probe.log" ]
+}
+
+@test "scheduled memory sync honors the endpoint marker before probing Node" {
+  scheduled_node_fixture
+  mark="$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked"
+  mkdir -p "${mark%/*}"
+  : > "$mark"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"endpoint-policy safe mode"* ]]
+  [ ! -e "$STUB_BIN/probe.log" ]
+  [ ! -e "$FNM_BIN/probe.log" ]
+  [ ! -e "$RUNTIME_LOG" ]
+}
+
+@test "scheduled memory sync uses the approved Node when endpoint safe mode is active" {
+  scheduled_node_fixture
+  mark="$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked"
+  mkdir -p "${mark%/*}"
+  : > "$mark"
+  export DOTFILES_AGENT_NODE_BIN="$FNM_BIN/node"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$RUNTIME_LOG")" = "compatible:dispatch" ]
+  [ ! -e "$STUB_BIN/probe.log" ]
+}
+
+@test "scheduled memory sync does not probe a blocked publisher on a managed endpoint" {
+  scheduled_node_fixture
+  export DOTFILES_MANAGED_ENDPOINT=1
+  cat > "$STUB_BIN/codesign" <<'STUB'
+#!/bin/bash
+case "$2" in
+  */fnm/*) printf 'TeamIdentifier=HX7739G8FX\n' >&2 ;;
+esac
+STUB
+  chmod +x "$STUB_BIN/codesign"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -ne 0 ]
+  [ ! -e "$FNM_BIN/probe.log" ]
+  [ ! -e "$RUNTIME_LOG" ]
+}
+
+@test "scheduled memory sync preserves the explicit Agentbrew override" {
+  override="$BATS_TEST_TMPDIR/explicit-agentbrew"
+  cp "$DOTFILES_MEMORY_AGENTBREW_BIN" "$override"
+  scheduled_node_fixture
+  export DOTFILES_MEMORY_AGENTBREW_BIN="$override"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$AGENTBREW_LOG")" = "memory sync-projects --check|||" ]
+  [ ! -e "$STUB_BIN/probe.log" ]
+  [ ! -e "$FNM_BIN/probe.log" ]
+}
+
+@test "scheduled memory sync returns from a fresh stamp before any Node probe" {
+  synced_stores
+  scheduled_node_fixture
+
+  run "$SCRIPT" --quiet
+
+  [ "$status" -eq 0 ]
+  [ ! -e "$STUB_BIN/probe.log" ]
+  [ ! -e "$FNM_BIN/probe.log" ]
+  [ ! -e "$RUNTIME_LOG" ]
 }

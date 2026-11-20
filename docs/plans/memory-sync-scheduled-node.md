@@ -28,3 +28,9 @@ omits endpoint variables. Without the existing exception, require an
 explicit approved compatible Node while that marker is present. A known
 blocked publisher must receive zero probes. A caller that selects its own
 Agentbrew retains that command and its interpreter contract.
+
+## Baseline
+
+The [unchanged macOS job](https://github.com/fyodoriv/dotfiles/actions/runs/44784727640/job/136456429681)
+used the old Node in the scratch setup. The case returned exit 18 and
+one `old:dispatch` marker. The other 34 memory-sync cases passed.

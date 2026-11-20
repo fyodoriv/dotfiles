@@ -34,3 +34,17 @@ Agentbrew retains that command and its interpreter contract.
 The [unchanged macOS job](https://github.com/fyodoriv/dotfiles/actions/runs/44784727640/job/136456429681)
 used the old Node in the scratch setup. The case returned exit 18 and
 one `old:dispatch` marker. The other 34 memory-sync cases passed.
+
+## Managed launcher handoff
+
+The scheduled marker reaches the existing Agentbrew shim. The shim selects
+the same CLI path it normally would. For a launcher with the standard
+`#!/usr/bin/env node` line, it starts the qualified Node directly. A shell
+startup can still reorder PATH before the check, but cannot change that
+direct handoff. A launcher that selects its own interpreter keeps using it.
+
+Cover the real shim with a scratch checkout and a shell startup that moves
+the old Node first. Require 1 compatible dispatch and 0 alternate Agentbrew
+dispatches. Require the approved path with a different basename to work.
+A known Node launcher with no compatible candidate exits 1 before dispatch.
+A standalone launcher dispatches once with 0 probes.

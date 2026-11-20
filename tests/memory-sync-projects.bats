@@ -531,22 +531,27 @@ scheduled_node_fixture() {
   export PATH="$STUB_BIN:/usr/bin:/bin"
   FNM_BIN="$HOME/.local/share/fnm/aliases/default/bin"
   mkdir -p "$FNM_BIN"
-  cat > "$STUB_BIN/agentbrew" <<'STUB'
-#!/bin/bash
-exec node "$@"
-STUB
+  export DOTFILES_REPOS_DIR="$BATS_TEST_TMPDIR/repos"
+  scratch_cli="$DOTFILES_REPOS_DIR/agentbrew/dist/cli.js"
+  mkdir -p "${scratch_cli%/*}"
+  printf '#!/usr/bin/env node\n// Synthetic Agentbrew entry point.\n' > "$scratch_cli"
+  chmod +x "$scratch_cli"
+  ln -sf "$REPO_ROOT/bin/agentbrew" "$STUB_BIN/agentbrew"
   cat > "$FNM_BIN/agentbrew" <<'STUB'
 #!/bin/bash
 printf 'unexpected:agentbrew\n' >> "$RUNTIME_LOG"
 exit 43
 STUB
-  chmod +x "$STUB_BIN/agentbrew" "$FNM_BIN/agentbrew"
+  chmod +x "$FNM_BIN/agentbrew"
   scheduled_node "$STUB_BIN/node" old 1
   scheduled_node "$FNM_BIN/node" compatible 0
 }
 
 @test "scheduled memory sync uses a compatible Node when the job path starts with an old one" {
   scheduled_node_fixture
+  export BASH_ENV="$BATS_TEST_TMPDIR/startup.sh"
+  printf '%s\n' 'export PATH="$STUB_BIN:$PATH"' > "$BASH_ENV"
+  export STUB_BIN
   export NODE_OPTIONS=--trace-warnings
   export NODE_V8_COVERAGE="$BATS_TEST_TMPDIR/coverage"
 
@@ -593,7 +598,8 @@ STUB
   mark="$HOME/.local/state/dotfiles/endpoint-node-publisher-blocked"
   mkdir -p "${mark%/*}"
   : > "$mark"
-  export DOTFILES_AGENT_NODE_BIN="$FNM_BIN/node"
+  mv "$FNM_BIN/node" "$FNM_BIN/approved-node"
+  export DOTFILES_AGENT_NODE_BIN="$FNM_BIN/approved-node"
 
   run "$SCRIPT" --check
 
@@ -618,6 +624,37 @@ STUB
   [ "$status" -ne 0 ]
   [ ! -e "$FNM_BIN/probe.log" ]
   [ ! -e "$RUNTIME_LOG" ]
+}
+
+@test "scheduled memory sync refuses an env-node launcher when no compatible Node is available" {
+  scheduled_node_fixture
+  rm "$FNM_BIN/node"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"needs a compatible Node"* ]]
+  [ ! -e "$RUNTIME_LOG" ]
+}
+
+@test "scheduled memory sync keeps a standalone launcher that owns its interpreter" {
+  scheduled_node_fixture
+  export DOTFILES_REPOS_DIR="$BATS_TEST_TMPDIR/no-checkout"
+  standalone_bin="$BATS_TEST_TMPDIR/standalone"
+  mkdir -p "$standalone_bin"
+  cat > "$standalone_bin/agentbrew" <<'STUB'
+#!/bin/bash
+printf 'standalone dispatch\n'
+STUB
+  chmod +x "$standalone_bin/agentbrew"
+  export PATH="$STUB_BIN:$standalone_bin:/usr/bin:/bin"
+
+  run "$SCRIPT" --check
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "standalone dispatch" ]
+  [ ! -e "$STUB_BIN/probe.log" ]
+  [ ! -e "$FNM_BIN/probe.log" ]
 }
 
 @test "scheduled memory sync preserves the explicit Agentbrew override" {

@@ -29,6 +29,20 @@ them. -->
 
 ## P1
 
+- [ ] Claude sessions that check permissions can run their allowed Bash commands
+  - **ID**: path-hook-permission-mode-denials
+  - **Tags**: hooks, claude, headless, reliability
+  - **Details**: Since #763 (apply the native Claude path hook response without approval), `agent-hooks/prepend-endpoint-path.sh` rewrites each Claude Bash command to `PATH=<prefix>; <cmd>` and leaves the approval to Claude. On 2026-11-19, Claude Code 2.1.312 ran `claude -p --permission-mode acceptEdits --allowedTools "Bash(git:*) Bash(make:*) …"` in a scratch repo. It refused every Bash call, `pwd` included. Each refusal was a `permission_denied` event with the reason "PATH assignment alters command lookup/execution for subsequent commands". A re-run in bypass mode ran most of them, but Claude still denied one `PATH=`-prefixed call, so bypass is not fully safe either. Auto mode skips the rewrite. So default, acceptEdits, dontAsk and allowlisted headless sessions (scheduled workers, unattended goals) cannot run Bash without a prompt. The SessionStart hook `session-endpoint-path.sh` already returns `env.PATH`. Check whether Claude applies it to the Bash tool, so the rewrite can be skipped for Claude in those modes.
+  - **Files**: `agent-hooks/prepend-endpoint-path.sh`, `agent-hooks/session-endpoint-path.sh`, their tests, `docs/plans/guard-order-benign-control.md`.
+  - **Output**: code
+  - **Acceptance**: in a scratch config, a headless acceptEdits session allowed only `Bash(pwd:*)` and `Bash(echo:*)` runs `pwd` and `echo $PATH`, with `dotfiles/bin` first on PATH. A headless bypass session gets no `PATH=` denial either. Auto and interactive default sessions keep their current behavior.
+  - **Hypothesis**: allowed Bash calls refused for a PATH assignment in permission-checked Claude sessions drop from every call to none, and the Bash tool still finds `dotfiles/bin` first.
+  - **Measurement**: in a scratch dir, `claude -p --permission-mode acceptEdits --allowedTools "Bash(pwd:*) Bash(echo:*)" --output-format stream-json --verbose 'Run pwd, then echo $PATH.' | jq -c 'select(.subtype=="permission_denied")' | wc -l`, plus the hook's existing tests on CI.
+  - **Success**: 0 denials, and the echoed PATH starts with `dotfiles/bin`.
+  - **Pivot**: if Claude ignores SessionStart env for the Bash tool and refuses every non-assignment rewrite, stop rewriting for Claude in permission-checked modes and document the PATH gap instead.
+  - **Anchor**: Claude Code hook reference at https://code.claude.com/docs/en/hooks; Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — keeps unattended agent runs working, not a scorecard metric.
+
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability
@@ -105,6 +119,20 @@ them. -->
   - **Competitive-goal**: none — machine stability for agent work (docs/metrics.md), not a scorecard metric.
 
 ## P2
+
+- [ ] Read-only `git branch` commands pass the git safety hook when a later command has `-f`
+  - **ID**: git-hook-later-force-flag-false-block
+  - **Tags**: hooks, git, false-positive
+  - **Details**: `agent-hooks/block-dangerous-git.sh` blocks a read-only `git branch` query when a later command in the same line has a `-f` token, and reports "'git branch -D' is not permitted". Reproduced on 2026-11-19 by feeding the hook PreToolUse JSON. Blocked: `git branch --list; ls -f`, `git branch --list | cut -f1`, `git branch --list && rm -f /nonexistent-x`, and `git branch --contains X; echo x | cut -f1`. Allowed: `ls -f; git branch --list`, `git branch --list`, and `git branch --contains X; cmp - file`. A goal grader agent hit it with `git branch --contains <sha>; … | cut -f1 …` and had to switch to `git merge-base --is-ancestor`. A flag should count only inside the `git branch` invocation it belongs to.
+  - **Files**: `agent-hooks/block-dangerous-git.sh`, its tests.
+  - **Output**: code
+  - **Acceptance**: every blocked example above is allowed; `git branch -D x`, `git branch -f x HEAD`, `git branch --delete --force x` and a force flag hidden in a variable stay blocked.
+  - **Hypothesis**: false blocks of read-only `git branch` queries followed by an unrelated `-f` drop from every such line to none, with no loss of real delete or force blocks.
+  - **Measurement**: the hook's test file on CI, with the examples above as new cases.
+  - **Success**: every listed allow case passes and every existing block case still blocks.
+  - **Pivot**: if splitting at `;`, `|`, `&&` and `||` lets any real delete or force through, keep the block and change the message to name the matched token.
+  - **Anchor**: Reason 1990 (Human Error, defenses in depth); Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none — correctness of an existing guard, not a scorecard metric.
 
 - [ ] Set up the Mergiraf merge driver in the git module
   - **ID**: git-mergiraf-merge-driver-setup

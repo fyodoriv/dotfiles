@@ -52,6 +52,47 @@ _check_command_text() {
   [ "$status" -eq 0 ]
 }
 
+@test "a later listing flag belongs to its own command" {
+  _check_command_text 'git branch --list; ls -f'
+  [ "$status" -eq 0 ]
+}
+
+@test "a filter flag after a branch listing belongs to the pipeline stage" {
+  _check_command_text 'git branch --list | cut -f1'
+  [ "$status" -eq 0 ]
+}
+
+@test "a later command keeps its own flag after a branch query" {
+  _check_command_text 'git branch --list && rm -f /nonexistent-x'
+  [ "$status" -eq 0 ]
+}
+
+@test "a filter after a containment query keeps its own flag" {
+  _check_command_text 'git branch --contains X; echo x | cut -f1'
+  [ "$status" -eq 0 ]
+}
+
+@test "a branch query inside a list still leaves later flags with their commands" {
+  _check_command_text 'git status; git branch --list || cut -f1'
+  [ "$status" -eq 0 ]
+}
+
+@test "byte offsets preserve the commands around multiple branch queries" {
+  _check_command_text 'printf "%s" "café"; git branch --list; git branch --contains X | cut -f1'
+  [ "$status" -eq 0 ]
+  _check_command_text 'printf "%s" "café"; git branch --list; git branch --contains X | git branch -f topic HEAD'
+  [ "$status" -eq 2 ]
+}
+
+@test "a branch listing leaves subsequent force and dynamic branch guards active" {
+  _check_command_text 'git branch --list; git branch --delete --force topic'
+  [ "$status" -eq 2 ]
+  _check_command_text 'git branch --list | git branch -f topic HEAD'
+  [ "$status" -eq 2 ]
+  _check_command_text 'git branch --list && git branch "${force_flag}" topic'
+  [ "$status" -eq 2 ]
+}
+
 @test "a leading literal branch comparison can precede a status check" {
   local text
   text=$(printf '%s\n' 'test "$(git branch --show-current)" = docs/topic' 'test -z "$(git status --porcelain)"')

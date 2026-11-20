@@ -338,8 +338,12 @@ Unchanged Codex input gets native allow without an input update. Claude
 Code uses its native `updatedInput` response when the envelope includes
 the PreToolUse event, permission mode, and a transcript path. The hook
 retains Claude's other tool arguments and leaves the approval decision to
-Claude. Auto mode keeps its command and approval behavior. Inputs with the
-legacy envelope keep the existing response.
+Claude. SessionStart writes the managed PATH to the Claude-provided
+`CLAUDE_ENV_FILE` for the Mac shell. The write preserves an active
+Agentbrew Git guard at the front of PATH. In accept-edits, don't-ask,
+and bypass-permissions modes, Bash keeps its original command unless it names a tool with an
+explicit shim rewrite. Those rewrites still use the managed shim. Default,
+auto, Codex, and legacy PreToolUse replies follow their existing routes.
 
 The hook preserves explicit `/usr/bin/python3` and `/usr/bin/python3.13`
 paths in commands and literal text. Use an explicit path when the

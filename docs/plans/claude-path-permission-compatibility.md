@@ -22,3 +22,16 @@ the private fixture path came first.
   document the remaining lookup gap before making a source change.
 - **Anchor**: [Claude Code SessionStart environment](https://code.claude.com/docs/en/hooks#persist-environment-variables)
   and the [registered harmless hook control](guard-order-benign-control.md).
+
+## Proof adjustment
+
+Claude refused the variable expansion in `echo $PATH` under two modes
+even when the PATH hook left the command alone. The scratch fixture used
+the same `pwd` call and replaced the path read with exactly allowed
+`printenv PATH`. On Claude Code 2.1.312, the original hook caused two
+denials. The session environment file let both calls run and put Dotfiles
+first in each of the three modes.
+
+Also verify the opt-in Agentbrew Git guard at the front of the existing
+PATH. The Dotfiles session file must leave it first and still add Dotfiles
+immediately after it. A declined write must keep the legacy JSON response.

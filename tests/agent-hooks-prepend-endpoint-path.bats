@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 load test_helper
+bats_require_minimum_version 1.5.0
 
 @test "prepend-endpoint-path: allows non-shell tools unchanged" {
   run bash -c 'echo "{\"tool_name\": \"Read\", \"tool_input\": {}}" | ./agent-hooks/prepend-endpoint-path.sh'
@@ -53,6 +54,73 @@ load test_helper
   [[ "$output" == *'"env"'* ]]
   [[ "$output" == *"$TEST_DOTFILES/bin"* ]]
   [[ "$output" == *'"DOTFILES_DIR"'* ]]
+}
+
+@test "session-endpoint-path: appends quoted PATH to Claude's environment file" {
+  local quoted_dotfiles="$TEST_HOME/dotfiles with a 'quote"
+  local env_file="$TEST_HOME/claude-session.env"
+  mkdir -p "$quoted_dotfiles/bin"
+  printf '%s\n' 'export KEEP=fixture' >"$env_file"
+
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$quoted_dotfiles" HOME="$TEST_HOME" \
+    CLAUDE_ENV_FILE="$env_file" /bin/bash -c \
+    'printf "%s\n" '"'"'{"hook_event_name":"SessionStart"}'"'"' | ./agent-hooks/session-endpoint-path.sh'
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e --arg path "$quoted_dotfiles/bin" '.env.PATH | startswith($path + ":")'
+
+  run env -u BASH_ENV -u ENV PATH="/usr/bin:/bin" /bin/bash -c \
+    'source "$1"; printf "%s\n%s\n" "$KEEP" "$PATH"' bash "$env_file"
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = fixture ]
+  [[ "${lines[1]}" == "$quoted_dotfiles/bin:"* ]]
+  [[ "${lines[1]}" == *":/usr/bin:/bin" ]]
+}
+
+@test "session-endpoint-path: leaves the environment file alone for legacy events" {
+  local env_file="$TEST_HOME/claude-session.env"
+  mkdir -p "$TEST_DOTFILES/bin"
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    CLAUDE_ENV_FILE="$env_file" /bin/bash -c 'printf "%s\n" "{}" | ./agent-hooks/session-endpoint-path.sh'
+  [ "$status" -eq 0 ]
+  [ ! -e "$env_file" ]
+}
+
+@test "session-endpoint-path: retains an active Agentbrew Git guard while adding shims" {
+  local env_file="$TEST_HOME/claude-session.env"
+  local guard="$TEST_HOME/.claude/codeassist/hooks-scripts/lib"
+  mkdir -p "$TEST_DOTFILES/bin" "$guard"
+  printf '#!/bin/bash\n' >"$guard/git"
+  chmod +x "$guard/git"
+
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    CLAUDE_ENV_FILE="$env_file" /bin/bash -c \
+    'printf "%s\n" '"'"'{"hook_event_name":"SessionStart"}'"'"' | ./agent-hooks/session-endpoint-path.sh'
+  [ "$status" -eq 0 ]
+
+  run env -u BASH_ENV -u ENV PATH="$guard:/usr/bin:/bin" /bin/bash -c \
+    'source "$1"; command -v git; printf "%s\n" "$PATH"' bash "$env_file"
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "$guard/git" ]
+  [[ "${lines[1]}" == "$guard:$TEST_DOTFILES/bin:"* ]]
+
+  run env -u BASH_ENV -u ENV PATH="/usr/bin:/bin" /bin/bash -c \
+    'source "$1"; printf "%s\n" "$PATH"' bash "$env_file"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "$TEST_DOTFILES/bin:"* ]]
+}
+
+@test "session-endpoint-path: rejects a symlink and still replies with legacy JSON" {
+  local env_file="$TEST_HOME/claude-session.env"
+  local sentinel="$TEST_HOME/sentinel"
+  mkdir -p "$TEST_DOTFILES/bin"
+  printf '%s\n' unchanged >"$sentinel"
+  ln -s "$sentinel" "$env_file"
+  run --separate-stderr env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    CLAUDE_ENV_FILE="$env_file" /bin/bash -c \
+    'printf "%s\n" '"'"'{"hook_event_name":"SessionStart"}'"'"' | ./agent-hooks/session-endpoint-path.sh'
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '.env.PATH | length > 0'
+  [ "$(cat "$sentinel")" = unchanged ]
 }
 
 @test "session-endpoint-path: prepends fnm node bin when .node-version present" {
@@ -199,4 +267,33 @@ COMMAND
     bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
   [ "$status" -eq 0 ]
   printf '%s' "$output" | jq -e '. == {}'
+}
+
+@test "prepend-endpoint-path: preserves approved Bash input in Claude permission modes" {
+  mkdir -p "$TEST_DOTFILES/bin"
+  local mode payload
+  for mode in acceptEdits dontAsk bypassPermissions; do
+    payload="$(jq -cn --arg mode "$mode" '{
+      hook_event_name: "PreToolUse",
+      permission_mode: $mode,
+      transcript_path: "/tmp/fixture.jsonl",
+      tool_name: "Bash",
+      tool_input: {command: "pwd", description: "Read fixture root"}
+    }')"
+    run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+      bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+    [ "$status" -eq 0 ]
+    printf '%s' "$output" | jq -e '. == {}'
+  done
+}
+
+@test "prepend-endpoint-path: keeps explicit shim rewrites in Claude permission modes" {
+  mkdir -p "$TEST_DOTFILES/bin"
+  local payload='{"hook_event_name":"PreToolUse","permission_mode":"dontAsk","transcript_path":"/tmp/fixture.jsonl","tool_name":"Bash","tool_input":{"command":"/usr/bin/curl --version","description":"Read fixture version"}}'
+  run env -u BASH_ENV -u ENV DOTFILES_DIR="$TEST_DOTFILES" HOME="$TEST_HOME" \
+    bash -c 'printf "%s\n" "$1" | ./agent-hooks/prepend-endpoint-path.sh' bash "$payload"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e --arg command "$TEST_DOTFILES/bin/curl --version" \
+    '.hookSpecificOutput | (.updatedInput.command == $command) and
+     (.updatedInput.description == "Read fixture version") and (has("permissionDecision") | not)'
 }

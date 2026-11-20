@@ -1,6 +1,5 @@
 #!/bin/bash
-# sessionStart: inject dotfiles/bin into agent session env (belt-and-suspenders).
-# Shell tool PATH is primarily fixed by prepend-endpoint-path.sh preToolUse hook.
+# Set the managed PATH at session start and keep the legacy JSON response.
 
 set -euo pipefail
 
@@ -70,4 +69,5 @@ if [ -x "$_dotfiles_dir/bin/dotfiles-adhoc-sign-uv-pythons" ]; then
 fi
 
 _py_cmd="$(dotfiles_resolve_python "$_dotfiles_dir" "$_home" python3 2>/dev/null || echo python3)"
-"$_py_cmd" "$_lib_root/lib/dotfiles-agent-session-env.py" "$_dotfiles_dir" "$_home" "$_path_prefix"
+printf '%s\n' "$input" |
+  "$_py_cmd" "$_lib_root/lib/dotfiles-agent-session-env.py" "$_dotfiles_dir" "$_home" "$_path_prefix"

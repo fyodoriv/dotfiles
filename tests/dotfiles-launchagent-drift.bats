@@ -345,6 +345,10 @@ tooling_sync_env() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
   [[ "$output" != *"$TEST_DIR"* ]]
+  printf '\n' > "$TEST_DIR/inherited-TOOLING_ROOT"
+  run "$TOOLING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path-unverified $TOOLING_LABEL:"* ]]
   [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
   [ ! -e "$TEST_DIR/executed" ]
 }

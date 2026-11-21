@@ -24,3 +24,8 @@ probe so the drift check can find a missing executable before repair.
 This step covers only the startup dependency. Tools for conditional
 worktree, disk scan and model cleanup need separate path checks.
 The four-week LaunchAgent field measurement remains open.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44888157657/job/136797889165)
+failed both expected exit-1 checks. The healthy PATH passed.
+The drift check did not recognize the scratch cleanup job label,
+so it skipped the required tool check in both modes.

@@ -172,6 +172,9 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     com.dotfiles.morning)
       registered_script=morning
       required_tools=(dirname mktemp rm tail date df awk) ;;
+    com.dotfiles.agent-scratch-prune)
+      registered_script=agent-scratch-prune
+      required_tools=(dirname) ;;
     *) required_tools=() ;;
   esac
   if [ "${#required_tools[@]}" -gt 0 ] && ! is_disabled "$label"; then

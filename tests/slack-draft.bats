@@ -343,6 +343,7 @@ left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
 
 @test "count retries once within the command limit after the first readiness read stalls" {
   drafts '[{"to":"Bob","body":"hello"}]'
+  cp "$DRAFTS_JSON" "$TEST_DIR/original-drafts"
   SECONDS=0
   SLOW_FIRST_READINESS=1 SLACK_DRAFT_TIMEOUT_SECONDS=8 run "$SCRIPT" count T1 hello --to Bob
   local attempts
@@ -354,7 +355,7 @@ left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
   [ "$status" -eq 0 ]
   [ "$output" = 1 ]
   [ "$SECONDS" -lt 10 ]
-  [ "$(left)" = Bob ]
+  cmp -s "$DRAFTS_JSON" "$TEST_DIR/original-drafts"
   [ ! -e "$DELCOUNT" ]
 }
 

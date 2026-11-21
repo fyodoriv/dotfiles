@@ -29,7 +29,10 @@ sub await {
     }
 }
 
-my ($source, $state, $fixture) = @ARGV;
+my ($source, $state, $fixture, $scenario) = @ARGV;
+$scenario //= "handoff";
+die "Unknown legacy fixture scenario\n" unless $scenario =~ /^(?:handoff|exclusive-select|exclusive-open)$/;
+my $exclusive = $scenario ne "handoff";
 die "Expected a disposable queue\n" unless $state eq $ENV{HEAVY_RUN_DIR}
     && $state eq "$ENV{BATS_TEST_TMPDIR}/hr" && $fixture eq "$ENV{BATS_TEST_TMPDIR}/handoff";
 umask 077;
@@ -40,8 +43,8 @@ my $scan = index($code, '    opendir(my $qd, $queue) or return;', $begin);
 die "Scheduler scan changed\n" unless $begin >= 0 && $scan > $begin;
 substr($code, $scan, 0) = <<'PERL';
     my $handoff_fixture = $ENV{HEAVY_RUN_HANDOFF_FIXTURE};
-    my $handoff_tick = !-e "$handoff_fixture/before-scan";
-    if ($handoff_tick) {
+    my $handoff_tick = !-e "$handoff_fixture/decision";
+    if ($handoff_tick && $ENV{HEAVY_RUN_HANDOFF_SCENARIO} eq "handoff") {
       put("$handoff_fixture/before-scan", "ready\n") or die "Could not mark scheduler scan\n";
       my $deadline = Time::HiRes::time() + 15;
       until (-e "$handoff_fixture/legacy-held") {
@@ -67,33 +70,43 @@ my $name = sprintf("%010d-%d", 1, $$);
 my $ticket = "$state/queue/$name";
 open(my $waiting, ">", $ticket) or die $!;
 flock($waiting, LOCK_EX | LOCK_NB) or die $!;
-print $waiting "pid=$$ cwd=fixture cmd=legacy\nwait=waiting\nproject=fixture-old\n";
+my $command = $exclusive ? "legacy [exclusive]" : "legacy";
+print $waiting "pid=$$ cwd=fixture cmd=$command\nwait=waiting\nproject=fixture-old\n";
 $waiting->flush or die $!;
-write_file("$state/gate-open", "$name\n");
+write_file("$state/gate-open", "$name\n") if $scenario ne "exclusive-select";
 
 my $child = fork();
 die "Could not start scratch scheduler: $!\n" unless defined $child;
 if ($child == 0) {
     close($waiting);
     $ENV{HEAVY_RUN_HANDOFF_FIXTURE} = $fixture;
+    $ENV{HEAVY_RUN_HANDOFF_SCENARIO} = $scenario;
     $ENV{HEAVY_RUN_WAIT_LOG} = "$state/waits.log";
     exec($scheduler, "/bin/sh", "-c", 'printf "young\n" >> "$1"', "fixture", "$fixture/ran") or die $!;
 }
 
 my ($domain, $slot, $decision, $early);
 eval {
-    await(sub { -e "$fixture/before-scan" }, "scheduler scan");
-    open($domain, ">>", "$state/lock") or die $!;
-    flock($domain, LOCK_SH | LOCK_NB) or die $!;
-    open($slot, ">>", "$state/slots/1") or die $!;
-    flock($slot, LOCK_EX | LOCK_NB) or die $!;
-    write_file("$state/slots/1.owner", "00:00:00 pid=$$ cwd=fixture cmd=legacy\nproject=fixture-old\nstart=1\n");
-    unlink($ticket) or die $!;
-    close($waiting) or die $!;
-    write_file("$fixture/legacy-held", "held\n");
+    if (!$exclusive) {
+        await(sub { -e "$fixture/before-scan" }, "scheduler scan");
+        open($domain, ">>", "$state/lock") or die $!;
+        flock($domain, LOCK_SH | LOCK_NB) or die $!;
+        open($slot, ">>", "$state/slots/1") or die $!;
+        flock($slot, LOCK_EX | LOCK_NB) or die $!;
+        write_file("$state/slots/1.owner", "00:00:00 pid=$$ cwd=fixture cmd=legacy\nproject=fixture-old\nstart=1\n");
+        unlink($ticket) or die $!;
+        close($waiting) or die $!;
+        write_file("$fixture/legacy-held", "held\n");
+    }
     await(sub { -e "$fixture/decision" }, "scheduler decision");
     $decision = read_file("$fixture/decision");
     $early = -e "$fixture/ran";
+    if ($exclusive) {
+        die "Expected the gate to select the older exclusive ticket\n"
+            unless read_file("$state/gate-open") eq "$name\n";
+        unlink($ticket) or die $!;
+        close($waiting) or die $!;
+    }
 };
 my $fixture_error = $@;
 close($slot) if defined $slot;
@@ -120,6 +133,8 @@ if ($@) {
 die "Younger command failed after slot release\n" unless $status == 0;
 die "Expected one younger command\n" unless read_file("$fixture/ran") eq "young\n";
 my ($reason, $grant) = split(/\n/, $decision, -1);
-die "Expected busy reason and no grant while the legacy slot was held; received reason '$reason', grant '$grant'\n"
-    unless $reason eq "no free slot (1/1 busy)" && $grant eq "" && !$early;
-print "Observed the legacy slot before grant; younger command ran once after release.\n";
+my $expected = $exclusive ? "an exclusive run is active" : "no free slot (1/1 busy)";
+die "Expected '$expected' and no grant before release; received reason '$reason', grant '$grant'\n"
+    unless $reason eq $expected && $grant eq "" && !$early;
+print $exclusive ? "Observed the exclusive reservation; younger command ran once after release.\n"
+                 : "Observed the legacy slot before grant; younger command ran once after release.\n";

@@ -520,7 +520,10 @@ exec perl -e "$common_code"'
     my ($s, $t, $slot) = @_;
     $s->{busy}++;
     $s->{proj}{$t->{project_id}}++ if defined $t->{project_id};
-    if ($slot eq "exclusive") { $s->{excl} = $s->{active} = 1; }
+    # A selected older exclusive waiter takes the domain lock itself.
+    if ($slot eq "exclusive" || ($slot eq "old" && $t->{exclusive})) {
+      $s->{excl} = $s->{active} = 1;
+    }
     elsif ($slot =~ /^s(\d+)$/) { $s->{used}{$1} = 1; $s->{active} = 1; }
   }
 

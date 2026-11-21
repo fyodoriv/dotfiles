@@ -1166,6 +1166,25 @@ caller_mask_file() {
   [ "$output" = "Observed the legacy slot before grant; younger command ran once after release." ]
 }
 
+check_legacy_exclusive_reservation() {
+  HEAVY_RUN_SLOTS=2 HEAVY_RUN_EXCLUSIVE_SHARED=0 run --separate-stderr \
+    perl "$BATS_TEST_DIRNAME/helpers/heavy-run-legacy-handoff.pl" \
+    "$SCRIPT" "$HEAVY_RUN_DIR" "$BATS_TEST_TMPDIR/handoff" "$1"
+  if [ "$status" -ne 0 ]; then
+    printf '%s\n' "$stderr" >&2
+    return 1
+  fi
+  [ "$output" = "Observed the exclusive reservation; younger command ran once after release." ]
+}
+
+@test "heavy-run: selecting an older exclusive waiter reserves later grants" {
+  check_legacy_exclusive_reservation exclusive-select
+}
+
+@test "heavy-run: an open gate keeps the older exclusive reservation" {
+  check_legacy_exclusive_reservation exclusive-open
+}
+
 # Start a waiter from a shell that exits at once, so the waiter is orphaned.
 # The shell lives 0.5 s, so the waiter starts with it as parent (a waiter
 # that starts under pid 1 is exempt). $1 is the output redirect; the rest is env.

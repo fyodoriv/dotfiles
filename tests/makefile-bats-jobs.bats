@@ -105,6 +105,9 @@ _scheduler_fixture() {
   cat > "$SCHED_REPO/bin/bats-affected" <<'STUB'
 #!/bin/bash
 repo="$(cd "$(dirname "$0")/.." && pwd)"
+printf '%s\n' "${BATS_AFFECTED_BASE:-unset}" > "$SCHEDULER_STATE/base"
+printf '%s\n' "${BATS_AFFECTED_REQUIRE_BASE:-unset}" > "$SCHEDULER_STATE/base-required"
+printf '%s\n' "${BATS_AFFECTED_INFER_NAMES:-unset}" > "$SCHEDULER_STATE/infer-names"
 while IFS= read -r file; do
   if [ "${SCHEDULER_RELATIVE:-false}" = true ]; then
     printf '%s\tMakefile\n' "$file"
@@ -183,11 +186,13 @@ STUB
 }
 
 _scheduler_make() {
+  local target="$1"
+  shift
   env -u BASH_ENV -u ENV HOME="$SCHED_STATE/home" GIT_CONFIG_GLOBAL=/dev/null \
     PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" CACHED_RUN_DIR="$SCHED_STATE/cache" \
     SCHEDULER_RELATIVE="${SCHEDULER_RELATIVE:-false}" \
     SCHEDULER_STATE="$SCHED_STATE" SCHEDULER_REPO="$SCHED_REPO" SCHEDULER_FAIL_FILE="${SCHEDULER_FAIL_FILE:-}" \
-    make -C "$SCHED_REPO" --no-print-directory "$1" JOBS="${SCHEDULER_JOBS:-2}" FULLPOWER=
+    make -C "$SCHED_REPO" --no-print-directory "$target" JOBS="${SCHEDULER_JOBS:-2}" FULLPOWER= "$@"
 }
 
 _scheduler_exact_coverage() {
@@ -314,4 +319,25 @@ _scheduler_exact_coverage() {
   printf 'end tests/unselected.bats\n' >> "$SCHED_STATE/events"
   run _scheduler_exact_coverage
   [ "$status" -ne 0 ]
+}
+
+@test "make test-changed passes default and selected bases to the affected runner" {
+  local base path
+  local -a args
+  for base in origin/feat/chezmoi fixture-base; do
+    path="${base##*/}"
+    _scheduler_fixture "test-changed-$path" peers
+    args=(test-changed)
+    [ "$base" = origin/feat/chezmoi ] || args+=("BASE=$base")
+    SCHEDULER_JOBS=1 run _scheduler_make "${args[@]}"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$SCHED_STATE/base")" = "$base" ]
+    [ "$(cat "$SCHED_STATE/infer-names")" = 1 ]
+    if [ "$base" = origin/feat/chezmoi ]; then
+      [ "$(cat "$SCHED_STATE/base-required")" = 0 ]
+    else
+      [ "$(cat "$SCHED_STATE/base-required")" = 1 ]
+    fi
+    _scheduler_exact_coverage
+  done
 }

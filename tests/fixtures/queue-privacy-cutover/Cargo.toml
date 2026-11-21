@@ -15,3 +15,7 @@ path = "activation.rs"
 [[test]]
 name = "route_inventory"
 path = "route_inventory.rs"
+
+[[test]]
+name = "route_staging"
+path = "route_staging.rs"

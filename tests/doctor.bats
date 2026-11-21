@@ -539,9 +539,9 @@ if [ "$1" = init ]; then
   exit 66
 fi
 if [ "$1" = apply ]; then
+  printf 'apply\n' >> "$MANAGED_APPLY_LOG"
   [ "$#" -eq 4 ] && [ "$2" = "$HOME/.editorconfig" ] &&
     [ "$3" = --source ] && [ "$4" = "$MANAGED_CHECKOUT" ] || exit 64
-  printf 'apply\n' >> "$MANAGED_APPLY_LOG"
   [ "${MANAGED_COMPARE_FAILURE:-}" != true ] || exit 65
   cp "$MANAGED_CHECKOUT/dot_editorconfig" "$HOME/.editorconfig"
   exit $?
@@ -701,7 +701,9 @@ prompt starship dot_config/starship.toml .config/starship.toml
 terminal ghostty dot_config/ghostty/config .config/ghostty/config
 ROWS
   local module name source target
+  local -a comparison_targets=()
   while read -r module name source target; do
+    comparison_targets+=("$HOME/$target")
     mkdir -p "$TEST_DOTFILES/modules/$module" "$TEST_DOTFILES/$(dirname "$source")" "$HOME/$(dirname "$target")"
     awk -v id="managed.$name" '
       index($0, "check_managed \"" id "\"") {
@@ -742,8 +744,16 @@ ROWS
 
   run --separate-stderr /bin/sh -c 'umask 077; exec "$@"' fixture "${audit[@]}"
   [ "$status" -eq 1 ]
+  [[ "$output" != *"chezmoi diff failed"* ]]
   managed_audit_results <<< "$output" | LC_ALL=C sort > "$TEST_DIR/actual"
   diff -u "$expected_fail" "$TEST_DIR/actual"
+
+  run --separate-stderr /bin/sh -c 'umask 077; exec "$@"' fixture \
+    "$TEST_DOTFILES/bin/chezmoi" diff "${comparison_targets[@]}"
+  [ "$status" -eq 0 ]
+  [ "$(grep -Fxc 'old mode 100644' <<< "$output")" -eq 10 ]
+  [ "$(grep -Fxc 'new mode 100600' <<< "$output")" -eq 10 ]
+  ! grep -q '^@@ ' <<< "$output"
 
   [ ! -e "$MANAGED_APPLY_LOG" ]
   while read -r module name source target; do

@@ -103,10 +103,22 @@ The 27 LaunchAgent consumers share one PATH template.
 - **Pivot**: Stop after 1 missing or extra source row, 1 changed blob accepted, or 1 inference that source evidence proves live route closure.
 - **Anchor**: The source route scope and admission requirements below, the current Dotfiles Git tree, and the existing queue privacy decision fixture.
 
-The inventory records tracked definitions as they existed at the frozen
+The [source manifest](heavy-run-managed-routes.tsv) records tracked definitions at the frozen
 revision. A deployed target, untracked PATH candidate, or outside-repo
 caller remains unknown until the installed observer checks it. This
 qualification cannot satisfy the production activation decision.
+
+#### Extend the reviewed inventory after the route audit
+
+The initial 48 Git pins were valid. They omitted the separate GUI publisher,
+noninteractive shell startup, agent PATH hooks, and the tracked scratch timing
+command. Include their 15 source definitions and wiring files.
+
+- **Hypothesis**: The additional pins cover the reviewed missing route families, and independent checks reject a missing shared-template consumer or GUI publisher.
+- **Measurement**: Use the same hosted Rust fixture. Discover the shared-template consumers and the separate GUI PATH publisher from the frozen Git tree. Check the core shell, agent and direct route anchors separately from the file pins.
+- **Success**: Verify 63 reviewed pins, all 27 shared-template consumers and exactly 1 separately discovered GUI publisher. Retain the 4 refusal controls and 0 live actions.
+- **Pivot**: Stop after 1 omitted discovered route, 1 wrong core identity, 1 accepted changed observation, or 1 claim of complete installed coverage.
+- **Anchor**: The GUI LaunchAgent, the zshenv and Bash startup templates, the Agentfile PATH hooks, and `config/perf-budget.tsv` in revision `911d1416`.
 
 Before code, freeze the actual managed source executable, installed PATH routes,
 declared direct callers and symlink aliases in one installation manifest. Use

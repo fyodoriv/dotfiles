@@ -225,9 +225,10 @@ if [[ -o interactive ]] \
       else
         mlx_model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
       fi
+      mlx_model="$(dotfiles_shell_mlx_local_model "$mlx_model")" || exit 0
       # Direct background + disown -h (nohup-equivalent, no blocked binary).
       # See "endpoint-agent popup history" comment above.
-      "$_mlx_launcher" \
+      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MLXLM_USE_MODELSCOPE=false "$_mlx_launcher" \
         --model "$mlx_model" \
         --port 8080 --host 127.0.0.1 \
         --max-tokens 32768 \

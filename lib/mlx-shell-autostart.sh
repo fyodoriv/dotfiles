@@ -1,7 +1,7 @@
 #!/bin/bash
 
 dotfiles_shell_mlx_autostart_allowed() {
-  [ "${DOTFILES_SHELL_MLX_AUTOSTART:-1}" = 1 ] || return 1
+  [ "${DOTFILES_SHELL_MLX_AUTOSTART:-0}" = 1 ] || return 1
   [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" = 1 ] && return 0
   case "${DOTFILES_ENDPOINT_HARDENING:-0}" in
     0|false) ;;
@@ -17,7 +17,7 @@ dotfiles_shell_mlx_autostart_allowed() {
 }
 
 dotfiles_shell_mlx_launcher() {
-  local launcher package_file
+  local launcher launcher_dir shebang interpreter python_version
   launcher="$(command -v mlx_lm.server)" || return 1
   case "$launcher" in
     /*) ;;
@@ -25,10 +25,53 @@ dotfiles_shell_mlx_launcher() {
   esac
   launcher="$(realpath "$launcher" 2>/dev/null)" || return 1
   [ -f "$launcher" ] && [ -x "$launcher" ] || return 1
+  launcher_dir="${launcher%/*}"
+  IFS= read -r shebang < "$launcher" || return 1
+  case "$shebang" in
+    '#!'/*) interpreter="${shebang#\#!}" ;;
+    *) return 1 ;;
+  esac
+  [ -f "$interpreter" ] && [ -x "$interpreter" ] || return 1
+  [ "$(realpath "${interpreter%/*}" 2>/dev/null)" = "$launcher_dir" ] || return 1
+  python_version="$(awk -F'[[:space:]=.]+' '
+    ($1 == "version" || $1 == "version_info") && $2 == 3 && $3 ~ /^[0-9]+$/ {
+      print $2 "." $3
+      exit
+    }
+  ' "$launcher_dir/../pyvenv.cfg" 2>/dev/null)" || return 1
+  [ -n "$python_version" ] || return 1
+  case "${interpreter##*/}" in
+    python|python3|"python$python_version") ;;
+    *) return 1 ;;
+  esac
+  [ -r "$launcher_dir/../lib/python$python_version/site-packages/mlx_lm/server.py" ] || return 1
+  printf '%s\n' "$launcher"
+}
+
+dotfiles_shell_mlx_local_model() {
+  local model="$1" cache revision weights
+  if [ ! -d "$model" ]; then
+    case "$model" in
+      *[!a-zA-Z0-9._/-]*|/*|*/*/*|*/) return 1 ;;
+      */*) ;;
+      *) return 1 ;;
+    esac
+    cache="${HF_HUB_CACHE:-${HF_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/huggingface}/hub}/models--${model%/*}--${model#*/}"
+    [ -r "$cache/refs/main" ] || return 1
+    IFS= read -r revision < "$cache/refs/main" || [ -n "$revision" ] || return 1
+    case "$revision" in *[!a-f0-9]*) return 1 ;; esac
+    [ "${#revision}" -eq 40 ] || return 1
+    model="$cache/snapshots/$revision"
+  fi
+  [ -s "$model/config.json" ] || return 1
+  case "$model" in
+    /*) ;;
+    *) model="$(realpath "$model" 2>/dev/null)" || return 1 ;;
+  esac
   if [ -n "${ZSH_VERSION:-}" ]; then setopt local_options nonomatch; fi
-  for package_file in "${launcher%/*}"/../lib/python*/site-packages/mlx_lm/server.py; do
-    if [ -r "$package_file" ]; then
-      printf '%s\n' "$launcher"
+  for weights in "$model"/model*.safetensors; do
+    if [ -s "$weights" ]; then
+      printf '%s\n' "$model"
       return 0
     fi
   done

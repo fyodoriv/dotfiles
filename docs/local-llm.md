@@ -19,11 +19,14 @@ every piece; this doc covers when and how to install them.
 
 ## Shell startup
 
-On an eligible interactive shell, Dotfiles starts the installed
-`mlx_lm.server` on loopback when the service is down. Startup checks
+With local AI enabled, Dotfiles can start `mlx_lm.server` on loopback
+from an eligible interactive shell when the service is down. Startup checks
 the endpoint policy before looking up the package or probing the service.
-The launcher and its matching package files must both be present. Doctor
-reports an advisory if shell startup is enabled and those files are missing.
+It needs the installed launcher, its interpreter and matching package files
+in the same virtual environment. Doctor reports an advisory for an eligible
+startup with an incomplete installation.
+Automatic startup uses a local model directory or the cached main revision.
+If the model files are missing, use the separate bootstrap described below.
 If a previous install has no saved shell endpoint policy, apply the current
 configuration before relying on automatic startup.
 

@@ -52,3 +52,9 @@ also failed. The already-ready service case passed.
 The upstream server can load the default model during startup. Keep
 the separately approved bootstrap as the path that downloads weights.
 Respect `use_local_ai` in the shell as Doctor already does.
+
+The [follow-up baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44881741060/job/136778385380)
+accepted a missing interpreter and a package for another Python
+version. It attempted a launch with no cached model and passed a
+remote model ID for a cached revision. The generated shell setting
+also allowed startup with local AI off. The other eight controls passed.

@@ -76,3 +76,30 @@ On macOS, the activation suite went from 17 of 19 passing with the empty
 reader to 19 of 19 passing with the bounded native read. Both reads matched
 the system utility, and the five malformed inputs returned no identity.
 The test compares the value in memory and does not print it.
+
+## Stage route replacement before a reboot
+
+- **Hypothesis**: A staging receipt can identify an intact pair of
+  replaced routes before later activation. A partial replacement,
+  changed route or artifact, and replaced dispatch lock prevent handoff.
+- **Measurement**: Run `heavy-run cargo test --offline --locked --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_staging`.
+  Use two inert launcher files, one inert artifact, a real lock and
+  synthetic boot identities below a disposable directory. Replace the
+  route files by rename. Validate both before publishing a receipt by
+  rename. Compare the receipt to the current identities and fixed
+  content while the dispatch lock is held.
+- **Success**: One complete replacement publishes one matching receipt.
+  Same-boot handoff refuses, and the staged receipt is recognized after
+  one synthetic boot change. Partial replacement leaves zero receipts.
+  A changed route, changed artifact, replaced dispatch lock or busy
+  dispatch lock yields zero handoffs and no retained-state changes.
+- **Pivot**: One receipt for partial state, one handoff after drift or
+  on the same boot, or one state change during a refusal rejects the
+  staging design.
+- **Anchor**: The existing cutover admission fixture and the
+  [managed route inventory](heavy-run-private-metadata.md#reviewed-managed-launch-routes).
+  See Basili, Caldiera and Rombach (1994), Goal Question Metric.
+
+The fixture checks a transaction in scratch space. Native reboot
+provenance, actual installed route closure and fresh verified cohort
+evidence remain separate activation prerequisites.

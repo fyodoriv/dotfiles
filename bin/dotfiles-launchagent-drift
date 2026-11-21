@@ -169,6 +169,9 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     com.dotfiles.pmset-drift-watch)
       registered_script=dotfiles-pmset-drift-watch
       required_tools=(mkdir dirname cat date head diff ps awk cut pgrep) ;;
+    com.dotfiles.morning)
+      registered_script=morning
+      required_tools=(dirname mktemp rm tail date df awk) ;;
     *) required_tools=() ;;
   esac
   if [ "${#required_tools[@]}" -gt 0 ] && ! is_disabled "$label"; then

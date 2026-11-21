@@ -119,6 +119,10 @@ settings:
     type: bool
     default: "@use_local_ai|owner_machine"
     description: Load the local-AI LaunchAgents (Ollama, model warmup, and the OpenCode 1 server).
+  shell_mlx_autostart:
+    type: bool
+    default: true
+    description: Start the installed MLX server from an eligible interactive shell.
   gh_admin_scopes:
     type: bool
     default: false

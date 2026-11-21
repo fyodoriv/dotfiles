@@ -67,6 +67,16 @@
         "Waits for explicit permission before running dotfiles apply --if-changed",
         "Runs dotfiles doctor --module security after apply"
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "/dotfiles then: stop new terminals from starting MLX and tell me how to check its installation.",
+      "expected_output": "Use the shell startup setting, ask before applying, and point to the local LLM Doctor check.",
+      "expectations": [
+        "Runs dotfiles config set shell_mlx_autostart false",
+        "Waits for explicit permission before running dotfiles apply --if-changed",
+        "Uses dotfiles doctor --module local-llm to check the installed package"
+      ]
     }
   ]
 }

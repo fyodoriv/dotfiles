@@ -33,6 +33,8 @@ To change a setting the user asks for, run `dotfiles config` (every setting, its
 
 To stop unattended uv Python downloads, run `dotfiles config set uv_python_downloads_never true`. Follow the apply step above, then verify with `dotfiles doctor --module security`.
 
+To stop new shells from starting MLX, run `dotfiles config set shell_mlx_autostart false` and follow the apply step above. To check the installed launcher and package, run `dotfiles doctor --module local-llm`.
+
 Every other command: run `dotfiles actions --json`. It lists every top-level `dotfiles` command, generated from `bin/dotfiles`: its usage `forms` and arguments, what it does, `subforms` (the sub-commands from the command's own usage header, for example `dotfiles config get <key>`), and four notes. `terminal_only`: why an agent cannot run it; give the user the command to run in their own terminal. `confirm`: what it changes that is hard to undo; say that in plain words and run it only after the user says yes. Each form with `needs_yes: true` takes `--yes`; pass it after the yes (without a terminal such a form refuses without `--yes`). `unattended`: why a confirm command takes no `--yes` (`apply`, `sync`); still ask first. `agent_note`: what to do differently. `dotfiles actions <name>` shows one command with its sub-forms; `dotfiles <name> --help` shows the rest.
 
 If dotfiles fails, surprises you, or could clearly work better, offer once to report it (CONTRIBUTING.md "Report problems and ideas"). Show the user the exact text, and post only after they say yes.

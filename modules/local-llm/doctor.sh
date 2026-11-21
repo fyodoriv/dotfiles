@@ -107,10 +107,27 @@ if _ll_is_apple_silicon_machine; then
     # exposes the `mlx_lm.server` console script on PATH.
     return 1
   }
-  _ll_check "local-llm.mlx_lm" \
-    "mlx-lm installed (mlx_lm.server on PATH)" \
-    "_ll_check_mlx_lm" \
-    "brew install mlx-lm"
+  if [ -r "$DOTFILES_DIR/lib/mlx-shell-autostart.sh" ] &&
+    declare -F dotfiles_managed_endpoint >/dev/null; then
+    # shellcheck source=../../lib/mlx-shell-autostart.sh
+    source "$DOTFILES_DIR/lib/mlx-shell-autostart.sh"
+  fi
+  _ll_shell_mlx_autostart="${DOTFILES_SHELL_MLX_AUTOSTART:-$(chezmoi execute-template '{{ if dig "shell_mlx_autostart" true . }}1{{ else }}0{{ end }}' 2>/dev/null || echo 1)}"
+  if declare -F dotfiles_shell_mlx_autostart_allowed >/dev/null &&
+    DOTFILES_SHELL_MLX_AUTOSTART="$_ll_shell_mlx_autostart" \
+    DOTFILES_ENDPOINT_HARDENING="${DOTFILES_ENDPOINT_HARDENING:-${ENDPOINT_HARDENING:-1}}" \
+    dotfiles_shell_mlx_autostart_allowed; then
+    check_advisory "local-llm.mlx_lm" \
+      "Shell MLX startup has an installed server and package" \
+      "dotfiles_shell_mlx_launcher >/dev/null" \
+      "brew install mlx-lm"
+  else
+    _ll_check "local-llm.mlx_lm" \
+      "mlx-lm installed (mlx_lm.server on PATH)" \
+      "_ll_check_mlx_lm" \
+      "brew install mlx-lm"
+  fi
+  unset _ll_shell_mlx_autostart
 
   # mlx-lm.server reachability — advisory because the server isn't
   # expected to always be running; the bootstrap script starts it

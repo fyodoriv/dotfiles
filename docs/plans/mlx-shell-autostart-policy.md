@@ -26,3 +26,8 @@ first check endpoint policy or the selected Python installation.
 Use the existing endpoint configuration and operator policy. A shell
 startup override for CPU architecture must not override endpoint policy.
 The fixtures start no real inference server and download no weights.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44881105374/job/136776356487)
+recorded curl, uv and Python calls in the hardened case. The managed,
+disabled, missing-package and installed-package entry point controls
+also failed. The already-ready service case passed.

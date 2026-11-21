@@ -20,3 +20,30 @@ file when the caller uses the old queue mask.
   the issue on that result.
 - **Anchor**: Issue #731, [runner permission fix](https://github.com/fyodoriv/dotfiles/pull/756),
   and the Doctor managed-file check's invocation of chezmoi diff.
+
+## Isolated chezmoi result
+
+Both calls returned 0. With mask 022, standard output was empty.
+With mask 077, the diff changed mode 100644 to 100600 and contained
+no content hunk. The fixture file still matched the source at 0644.
+
+## Check the result through Doctor and heavy-run
+
+- **Hypothesis**: The equivalent restrictive caller produces the
+  original managed-file failure through Doctor. The current queue
+  wrapper restores the usual caller mode and the same Doctor check
+  passes.
+- **Measurement**: Run hosted `bats tests/doctor.bats` for a disposable
+  `managed.editorconfig` check. Use the actual Doctor and chezmoi
+  with a fixed 0644 destination. Run the check directly under 022
+  and 077, then put the 022 Doctor behind the current heavy-run
+  controller with a fixture-owned queue. Compare its JSON result
+  and the file's bytes and mode.
+- **Success**: The two usual-mask checks each report one managed
+  pass. The restrictive control reports exactly one managed
+  failure. All three leave the fixture file unchanged.
+- **Pivot**: One incorrect managed status, an unavailable fixture
+  tool, or one file mutation leaves the reported symptom unqualified.
+- **Anchor**: The isolated result above, the
+  [chezmoi mask reference](https://www.chezmoi.io/reference/configuration-file/umask/),
+  and the shipped caller-mask fix in #756.

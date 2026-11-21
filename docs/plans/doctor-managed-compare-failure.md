@@ -57,3 +57,10 @@ repaired the confirmed difference, then attempted to apply an
 existing file after the comparator failed. The repair branch ran
 before the exit-code check. Report the comparison failure before
 considering repair.
+
+The [first candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44892310701/job/136810576321)
+passed the real chezmoi comparison and repair controls. An older
+verification fixture returned plain `diff`'s exit 1 for a normal
+difference. A disposable built-in `chezmoi diff` returned exit 0
+and the difference while leaving its target untouched. Align the
+fixture with that contract and keep the separate unreadable case.

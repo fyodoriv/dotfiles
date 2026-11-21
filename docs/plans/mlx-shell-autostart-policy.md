@@ -31,3 +31,24 @@ The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44881105
 recorded curl, uv and Python calls in the hardened case. The managed,
 disabled, missing-package and installed-package entry point controls
 also failed. The already-ready service case passed.
+
+## Check the launcher interpreter and keep startup offline
+
+- **Hypothesis**: A stale interpreter or a package for a different
+  Python version leaves the startup idle. With no usable local
+  model, an eligible cold shell also leaves the server alone.
+- **Measurement**: Run the hosted shell controls with an installed
+  entry point and each missing or mismatched file. Use a recognized
+  virtual environment, a local model, and a cached revision fixture
+  with an inert launcher. Record the model argument and offline value.
+- **Success**: 0 service probes for the two broken launchers.
+  An eligible cold shell without weights makes 0 launch calls. Each
+  offline positive case starts once with a local model path.
+- **Pivot**: Any startup with a broken launcher or missing weights,
+  any direct remote model argument, or a missed valid start rejects.
+- **Anchor**: The [Homebrew MLX formula](https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/m/mlx-lm.rb)
+  and [upstream model loading](https://github.com/ml-explore/mlx-lm/blob/v0.32.2/mlx_lm/utils.py).
+
+The upstream server can load the default model during startup. Keep
+the separately approved bootstrap as the path that downloads weights.
+Respect `use_local_ai` in the shell as Doctor already does.

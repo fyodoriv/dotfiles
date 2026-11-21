@@ -171,6 +171,12 @@ _check_command_text() {
   [ "$status" -eq 2 ]
   _check_command_text "gh issue create --title 'Synthetic' --body 'A note'; git branch -D synthetic-topic"
   [ "$status" -eq 2 ]
+  _check_command_text 'gh issue create --title "$(git branch -D synthetic-topic)" --body "A note"'
+  [ "$status" -eq 2 ]
+  _check_command_text 'gh issue create -- --body "A note about git branch -D synthetic-topic"'
+  [ "$status" -eq 2 ]
+  _check_command_text 'gh issue create --body $"A note about git branch -D synthetic-topic"'
+  [ "$status" -eq 2 ]
 }
 
 @test "ignores inert quoted heredoc prose" {
@@ -245,6 +251,10 @@ _check_command_text() {
   [ -L "$scratch/.config/dotfiles/hooks/plain-document-write.jq" ]
   [ -L "$scratch/.config/dotfiles/hooks/python-document-boundaries.py" ]
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
+  payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
+  run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
+  [ "$status" -eq 0 ]
+  text="gh issue create --title 'Résumé' --body 'A note about git branch -D topic'"
   payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
   run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
   [ "$status" -eq 0 ]

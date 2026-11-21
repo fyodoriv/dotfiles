@@ -7,6 +7,7 @@ on:
       - tests/agent-hooks-block-dangerous-git.bats
       - tests/fixtures/guard-*.sh.txt
       - agent-hooks/block-dangerous-git.sh
+      - agent-hooks/plain-document-write.jq
       - agent-hooks/python-document-boundaries.py
       - .github/workflows/guard-standalone.yml
 
@@ -25,7 +26,9 @@ jobs:
         run: brew install bats-core jq shfmt
       - name: Run all standalone guard tests
         run: |
-          ./bin/heavy-run bats --tap tests/agent-hooks-block-dangerous-git.bats > "$RUNNER_TEMP/guard-standalone.tap"
+          status=0
+          ./bin/heavy-run bats --tap tests/agent-hooks-block-dangerous-git.bats > "$RUNNER_TEMP/guard-standalone.tap" || status=$?
           cat "$RUNNER_TEMP/guard-standalone.tap"
+          test "$status" -eq 0
           expected="$(grep -c '^@test ' tests/agent-hooks-block-dangerous-git.bats)"
           grep -qx "1\\.\\.$expected" "$RUNNER_TEMP/guard-standalone.tap"

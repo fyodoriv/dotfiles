@@ -103,3 +103,28 @@ The test compares the value in memory and does not print it.
 The fixture checks a transaction in scratch space. Native reboot
 provenance, actual installed route closure and fresh verified cohort
 evidence remain separate activation prerequisites.
+
+## Restore one interrupted scratch route before the reboot
+
+- **Hypothesis**: A scratch restart can restore the first replaced route
+  when a private record still identifies its original bytes, its staged
+  replacement, the untouched route, the artifact and the dispatch lock.
+- **Measurement**: Run `heavy-run cargo test --offline --locked --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_staging`.
+  Save the first route and record identities before the rename. Interrupt
+  after that rename, reopen the dispatch lock and try recovery on the
+  same synthetic boot. Compare the restored file and all retained state.
+  Repeat with a changed route, archive, untouched route, lock, or journal,
+  after a synthetic boot change, and after a final receipt appears.
+- **Success**: One exact scratch restoration with no changed neighboring
+  route or artifact. Recovery consumes its archive and journal. A repeat
+  makes zero changes. Each of seven invalid recovery attempts changes
+  zero files and retains its evidence.
+- **Pivot**: One unrecorded replacement, one lost archive on refusal,
+  one restoration on the wrong boot, or one changed unrelated file
+  rejects the recovery design.
+- **Anchor**: The existing staged-route fixture and the retained-state
+  contract above. See Basili, Caldiera and Rombach (1994), Goal Question Metric.
+
+This case stops the first staging attempt after a known rename. It does
+not prove recovery from a power loss, native installation or another
+interruption while restoring. The live queue stays outside the fixture.

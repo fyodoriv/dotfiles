@@ -21,3 +21,7 @@ Reserve part of that time for another read.
 Use the existing absolute deadline for navigation and later actions.
 Only reduce the first readiness read's allowance when more than
 three seconds remain. The fixture uses no browser or workspace.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44874919833/job/136757407009)
+made one readiness read and exited 1. The existing outside-Slack,
+closed-budget and stalled-view checks passed.

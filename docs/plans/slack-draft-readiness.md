@@ -36,3 +36,6 @@ A review fixture delays child process-group setup past the deadline. The
 group-only adapter failed its under-three-second threshold. Cleanup now
 kills both the call-owned group and its unreaped direct child before wait,
 so that startup scheduling race also remains bounded.
+
+The first readiness read gives up part of a longer budget to leave
+time for a retry. See [the retry checks](slack-draft-readiness-retry.md).

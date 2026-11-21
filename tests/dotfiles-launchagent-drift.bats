@@ -363,7 +363,7 @@ scratch_prune_fixture() {
   PRUNE_LABEL=com.dotfiles.agent-scratch-prune
   PRUNE_SCRIPT="$TOOL_CHECKOUT/bin/agent-scratch-prune"
   PRUNE_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
-  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/prune-executed" > "$PRUNE_SCRIPT"
+  printf '#!/bin/bash\n: > "%s"\n' "$TEST_DIR/prune-executed" > "$PRUNE_SCRIPT"
   chmod +x "$PRUNE_SCRIPT"
   plist "$PRUNE_LABEL" false /bin/bash "$PRUNE_SCRIPT"
   local file="$AGENTS/$PRUNE_LABEL.plist"
@@ -394,7 +394,7 @@ scratch_prune_fixture() {
 
 @test "the scratch cleanup job PATH passes without executing files" {
   scratch_prune_fixture
-  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/tool-executed" > "$TEST_DIR/job-bin/dirname"
+  printf '#!/bin/bash\n: > "%s"\n' "$TEST_DIR/tool-executed" > "$TEST_DIR/job-bin/dirname"
   chmod +x "$TEST_DIR/job-bin/dirname"
   loaded "$PRUNE_LABEL" running /bin/bash "$PRUNE_SCRIPT"
   run "$PRUNE_PROBE"

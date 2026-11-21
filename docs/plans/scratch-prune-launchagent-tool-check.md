@@ -11,7 +11,8 @@ probe so the drift check can find a missing executable before repair.
   and an inert executable at the registered script path. Check a
   loaded job with an empty PATH directory, an unloaded job in repair
   mode with the same PATH, and a loaded job with an executable
-  `dirname` stub. Set canaries on both executable fixtures.
+`dirname` stub. Both canaries use a shell built-in so they can record
+unexpected execution even when the PATH is empty.
 - **Success**: Both missing-tool cases exit 1 and report `dirname`.
   The complete PATH reports one healthy job. The missing-tool cases
   make 0 repair calls, and all 3 cases make 0 job or tool calls and

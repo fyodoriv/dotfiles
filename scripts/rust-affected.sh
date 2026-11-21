@@ -2,6 +2,10 @@
 # Build and test Rust when its source differs from the current base.
 set -euo pipefail
 base="$(git merge-base HEAD "${BATS_AFFECTED_BASE:-origin/feat/chezmoi}" 2>/dev/null || true)"
+route_paths=(docs/plans/heavy-run-managed-routes.tsv scripts/rust-affected.sh tests/fixtures/queue-privacy-cutover)
+if [ -z "$base" ] || [ -n "$(git diff --name-only "$base" -- "${route_paths[@]}"; git ls-files --others --exclude-standard -- "${route_paths[@]}")" ]; then
+  ./bin/heavy-run cargo test --locked --offline --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_inventory
+fi
 changed=""
 if [ -n "$base" ]; then
   changed="$(git diff --name-only "$base" -- rust/; git ls-files --others --exclude-standard -- rust/)"

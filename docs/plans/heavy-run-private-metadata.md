@@ -89,6 +89,37 @@ record the dependency; add no shell or Python control-plane fallback.
 
 ### Supported entrypoints and closure
 
+#### Source inventory qualification
+
+Freeze the reviewed Dotfiles revision `911d141646aeff642ddefbb165e9b362a42942d9`
+in a source manifest. Record one logical ID, class, Git blob and mode per
+tracked definition. Include the controller, shell and LaunchAgent routes,
+the declared direct callers, and hosted and scratch paths as separate classes.
+The 27 LaunchAgent consumers share one PATH template.
+
+- **Hypothesis**: The exact route inventory can admit the reviewed source snapshot and refuse a missing, changed, extra or duplicate route.
+- **Measurement**: On hosted CI, run `cargo test --locked --offline --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_inventory` through `heavy-run`. Compare the recorded files to the frozen Git tree without launching any entrypoint. Use scratch observations for the refusal cases.
+- **Success**: All 48 tracked source rows match the exact tree, including all 27 LaunchAgent consumers. The exact and reordered observations qualify. All 4 invalid observations refuse. The tests make 0 changes to a live queue or installation.
+- **Pivot**: Stop after 1 missing or extra source row, 1 changed blob accepted, or 1 inference that source evidence proves live route closure.
+- **Anchor**: The source route scope and admission requirements below, the current Dotfiles Git tree, and the existing queue privacy decision fixture.
+
+The [source manifest](heavy-run-managed-routes.tsv) records tracked definitions at the frozen
+revision. A deployed target, untracked PATH candidate, or outside-repo
+caller remains unknown until the installed observer checks it. This
+qualification cannot satisfy the production activation decision.
+
+#### Extend the reviewed inventory after the route audit
+
+The initial 48 Git pins were valid. They omitted the separate GUI publisher,
+noninteractive shell startup, agent PATH hooks, and the tracked scratch timing
+command. Include their 15 source definitions and wiring files.
+
+- **Hypothesis**: The additional pins cover the reviewed missing route families, and independent checks reject a missing shared-template consumer or GUI publisher.
+- **Measurement**: Use the same hosted Rust fixture. Discover the shared-template consumers and the separate GUI PATH publisher from the frozen Git tree. Check the core shell, agent and direct route anchors separately from the file pins.
+- **Success**: Verify 63 reviewed pins, all 27 shared-template consumers and exactly 1 separately discovered GUI publisher. Retain the 4 refusal controls and 0 live actions.
+- **Pivot**: Stop after 1 omitted discovered route, 1 wrong core identity, 1 accepted changed observation, or 1 claim of complete installed coverage.
+- **Anchor**: The GUI LaunchAgent, the zshenv and Bash startup templates, the Agentfile PATH hooks, and `config/perf-budget.tsv` in revision `911d1416`.
+
 Before code, freeze the actual managed source executable, installed PATH routes,
 declared direct callers and symlink aliases in one installation manifest. Use
 logical entrypoint IDs and hashes in receipts, not private absolute paths.

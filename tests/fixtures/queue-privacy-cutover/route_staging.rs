@@ -344,3 +344,51 @@ fn retains_the_archive_on_wrong_boot_or_file_drift() {
         assert_eq!(scratch.snapshot(), before, "{name}");
     }
 }
+
+fn restore_without_cleanup(scratch: &Scratch) {
+    let dispatch = Dispatch::acquire(&scratch.0).unwrap();
+    dispatch.stage_first_replacement().unwrap();
+    fs::rename(scratch.0.join(ARCHIVE), scratch.0.join(ROUTES[0])).unwrap();
+}
+
+#[test]
+fn finishes_cleanup_when_the_exact_archive_is_already_restored() {
+    let scratch = Scratch::new();
+    restore_without_cleanup(&scratch);
+    let before = scratch.snapshot();
+    let pending = before.iter().filter(|file| file.0 == PENDING).count();
+    assert_eq!(pending, 1);
+    let expected: Vec<_> = before
+        .into_iter()
+        .filter(|file| file.0 != PENDING)
+        .collect();
+
+    let restarted = Dispatch::acquire(&scratch.0).unwrap();
+    restarted
+        .restore_first_replacement(BEFORE_BOOT)
+        .expect("the exact restored route should allow journal cleanup");
+    assert_eq!(scratch.snapshot(), expected);
+    assert!(restarted.restore_first_replacement(BEFORE_BOOT).is_err());
+    assert_eq!(scratch.snapshot(), expected);
+}
+
+#[test]
+fn retains_the_cleanup_journal_when_the_route_or_context_changes() {
+    for (name, contents, boot) in [
+        (ROUTES[0], OLD, BEFORE_BOOT),
+        (PENDING, b"Changed journal".as_slice(), BEFORE_BOOT),
+        ("", b"".as_slice(), AFTER_BOOT),
+    ] {
+        let scratch = Scratch::new();
+        restore_without_cleanup(&scratch);
+        if !name.is_empty() {
+            let changed = scratch.0.join("replacement");
+            write_new(&changed, contents).unwrap();
+            fs::rename(changed, scratch.0.join(name)).unwrap();
+        }
+        let before = scratch.snapshot();
+        let restarted = Dispatch::acquire(&scratch.0).unwrap();
+        assert!(restarted.restore_first_replacement(boot).is_err(), "{name}");
+        assert_eq!(scratch.snapshot(), before, "{name}");
+    }
+}

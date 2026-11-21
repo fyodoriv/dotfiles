@@ -300,6 +300,38 @@ fn partial_replacement_cannot_publish_after_restart() {
 }
 
 #[test]
+fn unresolved_recovery_prevents_a_staging_receipt() {
+    let scratch = Scratch::new();
+    let dispatch = Dispatch::acquire(&scratch.0).unwrap();
+    dispatch.stage_first_replacement().unwrap();
+    dispatch.replace_route(ROUTES[1]).unwrap();
+    drop(dispatch);
+
+    let before = scratch.snapshot();
+    let restarted = Dispatch::acquire(&scratch.0).unwrap();
+    assert!(restarted.publish_receipt().is_err());
+    assert!(!scratch.0.join(RECEIPT).exists());
+    assert_eq!(scratch.snapshot(), before);
+}
+
+#[test]
+fn unresolved_recovery_prevents_handoff_after_the_boot_change() {
+    let scratch = Scratch::new();
+    let dispatch = scratch.staged();
+    write_new(
+        &scratch.0.join(PENDING),
+        b"Conflicting fixture recovery record",
+    )
+    .unwrap();
+    drop(dispatch);
+
+    let before = scratch.snapshot();
+    let restarted = Dispatch::acquire(&scratch.0).unwrap();
+    assert!(restarted.recognize_staged_routes(AFTER_BOOT).is_err());
+    assert_eq!(scratch.snapshot(), before);
+}
+
+#[test]
 fn refuses_a_drifted_route_artifact_or_dispatch_lock() {
     for (name, bytes) in [
         (ROUTES[0], ROUTE_BODY),

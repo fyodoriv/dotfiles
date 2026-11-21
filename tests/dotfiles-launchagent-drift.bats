@@ -250,6 +250,59 @@ sync_job_path() {
   [ ! -e "$TEST_DIR/executed" ]
 }
 
+pmset_watch_fixture() {
+  tool_checkout
+  PMSET_LABEL=com.dotfiles.pmset-drift-watch
+  PMSET_SCRIPT="$TOOL_CHECKOUT/bin/dotfiles-pmset-drift-watch"
+  PMSET_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  PMSET_TOOLS=(mkdir dirname cat date head diff ps awk cut pgrep)
+  local executable file="$AGENTS/$PMSET_LABEL.plist" tool
+  for tool in "${PMSET_TOOLS[@]}"; do
+    executable="$TEST_DIR/job-bin/$tool"
+    printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/pmset-watch-executed" > "$executable"
+    chmod +x "$executable"
+  done
+  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/pmset-watch-executed" > "$PMSET_SCRIPT"
+  chmod +x "$PMSET_SCRIPT"
+  plist "$PMSET_LABEL" false /bin/bash "$PMSET_SCRIPT"
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$file"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$TEST_DIR/job-bin" "$file"
+}
+
+@test "the power-settings watcher reports each missing job PATH utility" {
+  pmset_watch_fixture
+  loaded "$PMSET_LABEL" running /bin/bash "$PMSET_SCRIPT"
+  local tool
+  for tool in "${PMSET_TOOLS[@]}"; do
+    mv "$TEST_DIR/job-bin/$tool" "$TEST_DIR/absent"
+    run "$PMSET_PROBE"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"tool-path $PMSET_LABEL: $tool is missing"* ]]
+    [[ "$output" != *"$TEST_DIR"* ]]
+    mv "$TEST_DIR/absent" "$TEST_DIR/job-bin/$tool"
+  done
+  [ ! -e "$TEST_DIR/pmset-watch-executed" ]
+}
+
+@test "the power-settings watcher cannot bootstrap without its process tool" {
+  pmset_watch_fixture
+  rm "$TEST_DIR/job-bin/ps"
+  run "$PMSET_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $PMSET_LABEL: ps is missing"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/pmset-watch-executed" ]
+}
+
+@test "the complete power-settings watcher PATH passes without executing files" {
+  pmset_watch_fixture
+  loaded "$PMSET_LABEL" running /bin/bash "$PMSET_SCRIPT"
+  run "$PMSET_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $PMSET_LABEL" ]
+  [ ! -e "$TEST_DIR/pmset-watch-executed" ]
+}
+
 tooling_sync_fixture() {
   tool_checkout
   TOOLING_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"

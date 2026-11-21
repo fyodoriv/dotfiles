@@ -176,3 +176,9 @@ the fixture and covers a known rename boundary.
 
 The fixture keeps the record for review. This does not authorize
 cleanup or activation on an installed route.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44889788643/job/136802919756)
+published a receipt and allowed handoff in the two conflicting
+cases. The receipt check compared both route identities and
+ignored the recovery record. It now requires that record to be
+absent under the dispatch lock before either action.

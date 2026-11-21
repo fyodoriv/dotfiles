@@ -95,8 +95,8 @@ impl<'a> Dispatch<'a> {
         fs::rename(self.stage_route(route)?, self.root.join(route))
     }
 
-    fn require_uncommitted(&self) -> io::Result<()> {
-        match fs::symlink_metadata(self.root.join(RECEIPT)) {
+    fn require_absent(&self, name: &str) -> io::Result<()> {
+        match fs::symlink_metadata(self.root.join(name)) {
             Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
             Err(error) => Err(error),
             Ok(_) => Err(ErrorKind::AlreadyExists.into()),
@@ -150,7 +150,7 @@ impl<'a> Dispatch<'a> {
     }
 
     fn stage_first_replacement(&self) -> io::Result<()> {
-        self.require_uncommitted()?;
+        self.require_absent(RECEIPT)?;
         let replacement = self.stage_route(ROUTES[0])?;
         write_new(&self.root.join(ARCHIVE), OLD)?;
         let record = self.pending_body(&replacement)?;
@@ -163,7 +163,7 @@ impl<'a> Dispatch<'a> {
         if boot != BEFORE_BOOT {
             return Err(ErrorKind::InvalidData.into());
         }
-        self.require_uncommitted()?;
+        self.require_absent(RECEIPT)?;
         let route = self.root.join(ROUTES[0]);
         let archive = self.root.join(ARCHIVE);
         let pending = self.root.join(PENDING);
@@ -185,6 +185,7 @@ impl<'a> Dispatch<'a> {
 
     fn receipt_body(&self) -> io::Result<String> {
         self.check()?;
+        self.require_absent(PENDING)?;
         let (device, inode) = identity(&self.owner.metadata()?)?;
         let (artifact_device, artifact_inode) = observe(&self.root.join(ARTIFACT), ARTIFACT_BODY)?;
         let mut receipt = format!("v1 {BEFORE_BOOT}\nlock {device} {inode}\nartifact {artifact_device} {artifact_inode}\n");
@@ -197,7 +198,7 @@ impl<'a> Dispatch<'a> {
 
     fn publish_receipt(&self) -> io::Result<()> {
         let receipt = self.receipt_body()?;
-        self.require_uncommitted()?;
+        self.require_absent(RECEIPT)?;
         let staged = self.root.join("receipt.next");
         write_new(&staged, receipt.as_bytes())?;
         self.check()?;

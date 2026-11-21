@@ -71,3 +71,7 @@ also allowed startup with local AI off. The other eight controls passed.
 - **Pivot**: Any launch with a missing listed shard, malformed index,
   or empty weight file rejects the check.
 - **Anchor**: [MLX weight loading](https://github.com/ml-explore/mlx-lm/blob/v0.32.2/mlx_lm/utils.py#L409-L419).
+
+The [partial-shard baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44882595650/job/136780935396)
+contacted the startup path after the loopback check. It had only one of
+two indexed files. The thirteen other controls passed.

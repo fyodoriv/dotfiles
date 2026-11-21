@@ -49,7 +49,7 @@ dotfiles_shell_mlx_launcher() {
 }
 
 dotfiles_shell_mlx_local_model() {
-  local model="$1" cache revision weights
+  local model="$1" cache revision index shards shard
   if [ ! -d "$model" ]; then
     case "$model" in
       *[!a-zA-Z0-9._/-]*|/*|*/*/*|*/) return 1 ;;
@@ -63,17 +63,24 @@ dotfiles_shell_mlx_local_model() {
     [ "${#revision}" -eq 40 ] || return 1
     model="$cache/snapshots/$revision"
   fi
-  [ -s "$model/config.json" ] || return 1
+  [ -f "$model/config.json" ] && [ -s "$model/config.json" ] || return 1
   case "$model" in
     /*) ;;
     *) model="$(realpath "$model" 2>/dev/null)" || return 1 ;;
   esac
-  if [ -n "${ZSH_VERSION:-}" ]; then setopt local_options nonomatch; fi
-  for weights in "$model"/model*.safetensors; do
-    if [ -s "$weights" ]; then
-      printf '%s\n' "$model"
-      return 0
-    fi
-  done
-  return 1
+  index="$model/model.safetensors.index.json"
+  shards=model.safetensors
+  if [ -e "$index" ] || [ -L "$index" ]; then
+    [ -f "$index" ] || return 1
+    shards="$(jq -er '
+      .weight_map | select(type == "object" and length > 0)
+      | [.[]] | unique
+      | select(all(.[]; type == "string" and test("^model[A-Za-z0-9._-]*\\.safetensors$")))
+      | .[]
+    ' "$index" 2>/dev/null)" || return 1
+  fi
+  while IFS= read -r shard; do
+    [ -f "$model/$shard" ] && [ -s "$model/$shard" ] || return 1
+  done <<< "$shards"
+  printf '%s\n' "$model"
 }

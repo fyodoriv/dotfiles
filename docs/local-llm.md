@@ -26,7 +26,8 @@ It needs the installed launcher, its interpreter and matching package files
 in the same virtual environment. Doctor reports an advisory for an eligible
 startup with an incomplete installation.
 Automatic startup uses a local model directory or the cached main revision.
-If the model files are missing, use the separate bootstrap described below.
+It requires every listed shard for a sharded model. If model files are
+missing, use the separate bootstrap described below.
 If a previous install has no saved shell endpoint policy, apply the current
 configuration before relying on automatic startup.
 

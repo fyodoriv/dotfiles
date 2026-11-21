@@ -151,6 +151,28 @@ _check_command_text() {
   [ "$status" -eq 2 ]
 }
 
+@test "Git guard allows a literal GitHub issue body with its long flag" {
+  _check_command_text "gh issue create --title 'Synthetic' --body 'A note about git branch -D topic'"
+  [ "$status" -eq 0 ]
+}
+
+@test "Git guard allows a literal GitHub issue body with its short flag" {
+  _check_command_text 'gh issue create --title "Synthetic" -b "A note about git branch -D topic"'
+  [ "$status" -eq 0 ]
+}
+
+@test "Git guard allows a literal GitHub issue body joined to its flag" {
+  _check_command_text 'gh issue create --title "Synthetic" --body="A note about git branch -D topic"'
+  [ "$status" -eq 0 ]
+}
+
+@test "Git guard keeps executable input in and after a GitHub issue body" {
+  _check_command_text 'gh issue create --title "Synthetic" --body "$(git branch -D synthetic-topic)"'
+  [ "$status" -eq 2 ]
+  _check_command_text "gh issue create --title 'Synthetic' --body 'A note'; git branch -D synthetic-topic"
+  [ "$status" -eq 2 ]
+}
+
 @test "ignores inert quoted heredoc prose" {
   local text
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")

@@ -27,3 +27,8 @@ full-audit observation still needs direct evidence.
 The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44874112993/job/136754897956)
 returned the generic managed-file JSON result with exit 65 missing.
 The real 022 and 077 controls completed before the failing assertion.
+
+The [first candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44874467181/job/136755998974)
+passed the real Doctor checks. The existing failure-line check rejected
+its plain-text hint because that line lacked the expected `fix:` label.
+Use the existing label and keep the safe comparison exit code.

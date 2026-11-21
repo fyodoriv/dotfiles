@@ -24,3 +24,22 @@ evidence before the remaining acceptance can proceed.
   [connector prerequisites](github-connector-machine-credentials.md),
   [compiler companion evidence](compiler-root-companion.md), and
   the released priority watcher in Agentbrew #1219.
+
+## Keep the guard task visible
+
+Independent review found a Linux follow-up that needs its own admission
+check. The existing Linux control proves plain and rewritten commands.
+A harmless denial control can check for zero executor receipts if the
+normal trust and launch path can be qualified. Keep the guard task
+visible while verifying that path. The Mac matrix still needs its own proof.
+
+- **Hypothesis**: Record only the connector and compiler waits. Four
+  Dotfiles P1 candidates then become two.
+- **Measurement**: Use the same released watcher and compare the
+  exact Dotfiles P1 IDs. Inspect the guard and private queue entries.
+- **Success**: 0 recommendations for the two waiting IDs, both other
+  Dotfiles P1 entries retained, and 0 changed acceptance lines.
+- **Pivot**: Any lost guard or queue candidate, a waiting ID still
+  recommended, or an altered acceptance rejects the change.
+- **Anchor**: The [Linux guard control](guard-order-benign-control.md#check-the-codex-executor-on-isolated-linux)
+  and this pull request's independent source review.

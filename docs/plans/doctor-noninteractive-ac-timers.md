@@ -23,3 +23,8 @@ doctor module.
   result, or no-credential run at or above 5 seconds rejects the change.
 - **Anchor**: Issue #572 and the `sudo -n pmset` repairs in
   `modules/macos/doctor.sh`.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44868715184/job/136738178289)
+returned promptly with the fake command. It attempted
+`pmset -c sleep 1 disksleep 10` without the required `-n`. The fake
+command recorded the interactive attempt and declined to run it.

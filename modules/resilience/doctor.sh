@@ -330,7 +330,8 @@ _resilience_pmset_custom_value_is() {
 
 check "resilience.ac_idle_timers_normal" "AC idle timers are normal outside tracked agent work" \
   "! command -v pmset >/dev/null || { _resilience_pmset_custom_value_is 'AC Power' sleep 1 && _resilience_pmset_custom_value_is 'AC Power' disksleep 10; }" \
-  "sudo pmset -c sleep 1 disksleep 10"
+  "sudo -n pmset -c sleep 1 disksleep 10" \
+  "AC idle timers need sudo to repair. Run sudo pmset -c sleep 1 disksleep 10 from a terminal."
 
 check_advisory "resilience.pmset_tcpkeepalive" "TCP keepalive enabled (network wake hints)" \
   "! command -v pmset >/dev/null || pmset -g | grep -q 'tcpkeepalive.*1'" \

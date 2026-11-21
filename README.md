@@ -494,6 +494,11 @@ dotfiles doctor --trends     # show pass/fail/fix trend over time
 
 **What `--fix` does (and doesn't do):** creates missing symlinks, loads LaunchAgents, sets git config defaults, and installs missing Homebrew packages. It **never** deletes files, overwrites personal config (`~/.zshrc.local`, `~/.gitconfig.local`), or runs destructive commands. Safe to run repeatedly.
 
+The AC timer repair uses cached sudo credentials when available and returns
+without a password prompt otherwise. If quiet output lists
+`resilience.ac_idle_timers_normal`, use `dotfiles doctor --module resilience
+--json` to see the repair message and terminal command.
+
 The Homebrew bottle signature audit keeps its security coverage while avoiding
 an expensive `codesign` scan on every healthy doctor run. It caches only a
 successful scan for 24 hours. A changed Cellar inventory, a signing repair, or

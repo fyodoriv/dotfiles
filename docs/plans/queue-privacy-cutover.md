@@ -128,3 +128,21 @@ evidence remain separate activation prerequisites.
 This case stops the first staging attempt after a known rename. It does
 not prove recovery from a power loss, native installation or another
 interruption while restoring. The live queue stays outside the fixture.
+
+## Finish scratch cleanup after a second interruption
+
+- **Hypothesis**: A second scratch restart can finish cleanup when the
+  first recovery already moved the exact archive into place.
+- **Measurement**: Run hosted
+  `cargo test --offline --locked --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_staging`.
+  Stage the first route, rename its archive over it, and stop before
+  removing the recovery record. Reacquire the lock and retry on the
+  same synthetic boot. Try the same retry with a byte-identical route
+  at a different inode, a changed journal, and a different boot.
+- **Success**: One retry removes the recorded journal and makes zero
+  other changes. A repeat and all 3 invalid cases make zero changes.
+  All existing route cases still pass.
+- **Pivot**: One removed journal on a refusal, one change to a restored
+  route, or one regression in an existing case rejects cleanup.
+- **Anchor**: The staged-route recovery fixture above and the exact
+  file identity checks in its dispatch lock.

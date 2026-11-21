@@ -35,3 +35,30 @@ held. The earlier slot sample did not include the completed handoff.
 The scheduler now refreshes its slot sample when the gated ticket
 disappears, before applying existing reservations. The scratch run
 does not qualify a new cutover or change any configured slot limit.
+
+## Hold later grants for a selected older exclusive waiter
+
+The older controller takes the domain lock exclusively when it
+starts. Its ticket can still be live after the scheduler opens
+the gate. The scheduler needs to reserve that exclusive admission
+while the older waiter moves to the lock.
+
+- **Hypothesis**: A selected older exclusive ticket prevents
+  later shared grants even when a second slot is free.
+- **Measurement**: Run hosted `bats tests/heavy-run.bats`.
+  Keep one synthetic older exclusive ticket locked in a scratch
+  queue with two slots. Observe the actual scheduler pass when
+  it selects that ticket and when its gate is already open.
+  Withdraw the held ticket after recording the decision.
+- **Success**: Both passes report an exclusive wait, make 0
+  younger grants and launch 0 younger commands before release.
+  Each younger command runs once after the held ticket leaves.
+  Existing shared and mixed-version controls still pass.
+- **Pivot**: At least 1 premature grant, a missing exclusive
+  wait result or a failed ordinary scheduling control rejects it.
+- **Anchor**: The scheduler's `took` reservation and the frozen
+  429 fixture's exclusive domain lock in `try_start`.
+
+The controls use scratch settings only. The staged ticket
+tests pending admission. The running exclusive and multi-slot
+controls stay in the existing suite.

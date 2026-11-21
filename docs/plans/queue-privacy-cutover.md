@@ -138,7 +138,7 @@ interruption while restoring. The live queue stays outside the fixture.
   Stage the first route, rename its archive over it, and stop before
   removing the recovery record. Reacquire the lock and retry on the
   same synthetic boot. Try the same retry with a byte-identical route
-  at a different inode, a changed journal, and a different boot.
+  at a different inode, a malformed journal, and a different boot.
 - **Success**: One retry removes the recorded journal and makes zero
   other changes. A repeat and all 3 invalid cases make zero changes.
   All existing route cases still pass.

@@ -178,9 +178,7 @@ alias tcdx='agent-tmux codex'                             # Codex CLI in tmux
 alias agents='agent-tmux --ls'                            # List active agent-tmux sessions
 
 # ── MLX local LLM server (auto-start, hardware-adaptive) ─────────────
-# Starts from the user's terminal context — some corporate Endpoint Security
-# configurations kill launchd-spawned LLM processes within seconds; shell-
-# spawned children are left alone.
+# Starts the packaged server from an eligible interactive shell.
 #
 # endpoint-agent popup history (2026-05-12 fix):
 # This block previously invoked `/usr/bin/nohup` to make the child immune
@@ -202,12 +200,18 @@ alias agents='agent-tmux --ls'                            # List active agent-tm
 # Skip in that case — opencode falls back to whichever engine the
 # local-ai LaunchAgents brought up (Ollama on :11434 by default; see
 # `~/.config/opencode/opencode.json`). Override with
-# DOTFILES_FORCE_MLX_STARTUP=1 to opt back in. WebStorm's fast terminal path
-# skips local-model startup so Claude Code does not compete with a new MLX server.
+# DOTFILES_FORCE_MLX_STARTUP=1 to override the architecture and terminal checks.
+# Endpoint policy and the installed-package check apply in both modes.
 if [[ -o interactive ]] \
    && { [[ "${DOTFILES_JETBRAINS_FAST_SHELL:-0}" != "1" ]] || [[ -n "${DOTFILES_FORCE_MLX_STARTUP:-}" ]]; } \
    && { [[ "$(uname -m)" == "arm64" ]] || [[ -n "${DOTFILES_FORCE_MLX_STARTUP:-}" ]]; }; then
   (
+    _mlx_lib="${DOTFILES_DIR:-$HOME/apps/tooling/dotfiles}/lib"
+    [[ -r "$_mlx_lib/dotfiles-endpoint-paths.sh" && -r "$_mlx_lib/mlx-shell-autostart.sh" ]] || exit 0
+    source "$_mlx_lib/dotfiles-endpoint-paths.sh"
+    source "$_mlx_lib/mlx-shell-autostart.sh"
+    dotfiles_shell_mlx_autostart_allowed || exit 0
+    _mlx_launcher="$(dotfiles_shell_mlx_launcher)" || exit 0
     if ! curl -sf http://127.0.0.1:8080/v1/models > /dev/null 2>&1; then
       mem_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
       if [[ -n "${MLX_MODEL_OVERRIDE:-}" ]]; then
@@ -221,14 +225,10 @@ if [[ -o interactive ]] \
       else
         mlx_model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
       fi
+      mlx_model="$(dotfiles_shell_mlx_local_model "$mlx_model")" || exit 0
       # Direct background + disown -h (nohup-equivalent, no blocked binary).
       # See "endpoint-agent popup history" comment above.
-      # Use uv-managed python to avoid Python.framework path (endpoint agent
-      # flags any binary whose path contains Python.framework — rule 10).
-      # Dynamic lookup via `uv python find` adapts to any architecture.
-      _mlx_python="$(uv python find 3.13 2>/dev/null || echo "")"
-      [ -z "$_mlx_python" ] && _mlx_python="${HOME}/.local/bin/python3.13"
-      "$_mlx_python" -m mlx_lm server \
+      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MLXLM_USE_MODELSCOPE=false "$_mlx_launcher" \
         --model "$mlx_model" \
         --port 8080 --host 127.0.0.1 \
         --max-tokens 32768 \

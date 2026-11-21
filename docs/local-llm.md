@@ -17,6 +17,23 @@ or the operator wants zero cloud-side traffic for a session.
 `dotfiles-doctor --module local-llm` reports the current state of
 every piece; this doc covers when and how to install them.
 
+## Shell startup
+
+With local AI enabled, Dotfiles can start `mlx_lm.server` on loopback
+from an eligible interactive shell when the service is down. Startup checks
+the endpoint policy before looking up the package or probing the service.
+It needs the installed launcher, its interpreter and matching package files
+in the same virtual environment. Doctor reports an advisory for an eligible
+startup with an incomplete installation.
+Automatic startup uses a local model directory or the cached main revision.
+It requires every listed shard for a sharded model. If model files are
+missing, use the separate bootstrap described below.
+If a previous install has no saved shell endpoint policy, apply the current
+configuration before relying on automatic startup.
+
+To turn off this startup path, run `dotfiles config set shell_mlx_autostart false`
+then `dotfiles apply`. Open a new shell after applying the setting.
+
 ## When to enable
 
 Enable if any of the following apply:

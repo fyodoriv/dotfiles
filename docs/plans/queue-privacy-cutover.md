@@ -97,7 +97,7 @@ The test compares the value in memory and does not print it.
   on the same boot, or one state change during a refusal rejects the
   staging design.
 - **Anchor**: The existing cutover admission fixture and the
-  [managed route inventory](heavy-run-private-metadata.md#reviewed-managed-launch-routes).
+  [managed route inventory](heavy-run-private-metadata.md#source-inventory-qualification).
   See Basili, Caldiera and Rombach (1994), Goal Question Metric.
 
 The fixture checks a transaction in scratch space. Native reboot

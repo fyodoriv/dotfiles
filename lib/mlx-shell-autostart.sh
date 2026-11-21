@@ -72,10 +72,10 @@ dotfiles_shell_mlx_local_model() {
   shards=model.safetensors
   if [ -e "$index" ] || [ -L "$index" ]; then
     [ -f "$index" ] || return 1
-    shards="$(jq -er '
-      .weight_map | select(type == "object" and length > 0)
+    shards="$(jq -ers '
+      select(length == 1) | .[0].weight_map | select(type == "object" and length > 0)
       | [.[]] | unique
-      | select(all(.[]; type == "string" and test("^model[A-Za-z0-9._-]*\\.safetensors$")))
+      | select(all(.[]; type == "string" and test("\\Amodel[A-Za-z0-9._-]*\\.safetensors\\z")))
       | .[]
     ' "$index" 2>/dev/null)" || return 1
   fi

@@ -75,3 +75,7 @@ also allowed startup with local AI off. The other eight controls passed.
 The [partial-shard baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44882595650/job/136780935396)
 contacted the startup path after the loopback check. It had only one of
 two indexed files. The thirteen other controls passed.
+
+A scratch parser check reproduced two malformed inputs accepted as
+valid: a second JSON document and a trailing newline in a filename.
+The hosted check covers both cases with the missing and empty files.

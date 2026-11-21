@@ -213,6 +213,18 @@ source_interactive_startup() {
   run source_interactive_startup
   [ "$status" -eq 0 ]
   [ "$(cat "$MLX_FIXTURE_CALLS")" = curl ]
+
+  printf '{"weight_map":{"first":"%s","second":"%s"}}\n{}\n' "$first" "$second" > "$index"
+  : > "$MLX_FIXTURE_CALLS"
+  run source_interactive_startup
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MLX_FIXTURE_CALLS")" = curl ]
+
+  printf '{"weight_map":{"first":"%s\\n","second":"%s"}}\n' "$first" "$second" > "$index"
+  : > "$MLX_FIXTURE_CALLS"
+  run source_interactive_startup
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MLX_FIXTURE_CALLS")" = curl ]
 }
 
 @test "MLX shell settings render default and explicitly disabled values" {

@@ -66,3 +66,21 @@ The two apply fixtures also failed because their scratch config lacked
 the required profile. After adding the profile to the scratch config,
 a direct chezmoi probe showed that apply created the unused default
 config when the custom config directory was active.
+
+## Defer unattended Poetry migration with the policy on
+
+- **Hypothesis**: Keep the original Poetry paths when downloads are
+  disabled, even if a project interpreter is available. Keep the
+  ordinary automatic repair with the policy off.
+- **Measurement**: Run the hosted repair fixture with an installed
+  interpreter and a simulated tool-install refusal. Run the same
+  helper with the policy off and an available tool install.
+- **Success**: 0 uv calls and 0 moved paths with the policy on.
+  With the policy off, 2 saved paths and 1 ordinary tool install.
+- **Pivot**: Any altered path or uv call with the policy enabled,
+  or a failed ordinary repair, rejects the change.
+- **Anchor**: [uv tool interpreter selection](https://docs.astral.sh/uv/concepts/tools/#python-versions).
+
+A generic Python lookup can accept a project interpreter that tool
+installation ignores. Defer the migration with the policy enabled
+because the existing repair moves both paths before it installs the tool.

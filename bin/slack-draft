@@ -118,7 +118,7 @@ drafts_failure() {
 }
 
 ensure_drafts() {
-  local tab="$1" deadline="$2" target remaining ready rc
+  local tab="$1" deadline="$2" target remaining ready rc probe_deadline
   target="$(tab_eval_until "$deadline" "$tab" '(() => {
     const u = new URL(location.href), team = u.pathname.match(/^\/client\/(T[A-Z0-9]+)(?:\/|$)/);
     return u.hostname === "app.slack.com" && team ? u.origin + "/client/" + team[1] + "/drafts" : "";
@@ -127,9 +127,16 @@ ensure_drafts() {
   remaining=$((deadline - $(date +%s)))
   [ "$remaining" -gt 0 ] || drafts_failure 124
   tab_call_with_timeout "$remaining" "$AGENT_TAB" nav --owner "$OWNER" "$tab" "$target" >/dev/null || drafts_failure "$?"
+  probe_deadline="$deadline"
+  remaining=$((deadline - $(date +%s)))
+  # A stalled first read must leave time for another read and the count.
+  if [ "$remaining" -gt 3 ]; then
+    probe_deadline=$((deadline - 3))
+  fi
   while [ "$(date +%s)" -lt "$deadline" ]; do
     rc=0
-    ready="$(tab_eval_until "$deadline" "$tab" "document.querySelector('$SEL_DRAFT_VIEW') ? 1 : 0")" || rc=$?
+    ready="$(tab_eval_until "$probe_deadline" "$tab" "document.querySelector('$SEL_DRAFT_VIEW') ? 1 : 0")" || rc=$?
+    probe_deadline="$deadline"
     [ "$rc" -ne 3 ] || drafts_failure 3
     [ "$ready" != 1 ] || return 0
     sleep 0.1

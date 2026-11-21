@@ -229,7 +229,7 @@ _framework="/Library/Frameworks/Python.framework"
 if [ -d "$_framework" ]; then
   check_advisory "security.no_framework_python" "No python.org framework install (endpoint agent flags it)" \
     "[ ! -d '$_framework' ]" \
-    "dotfiles-remove-framework-python (needs admin rights)"
+    "In your own terminal run \"$DOTFILES_DIR/bin/dotfiles-remove-framework-python\" --user-only. Ask an administrator to remove the system framework."
 
   # Scan for venvs under ~/apps that resolve to the framework python
   if command -v fd >/dev/null 2>&1; then

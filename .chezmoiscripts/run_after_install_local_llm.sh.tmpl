@@ -29,7 +29,7 @@ _LL_HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 
 _resolve_uv_python() {
   if ! command -v uv &>/dev/null; then
-    echo "⚠ uv not on PATH — skipping local-LLM pipx installs"
+    echo "⚠ uv not on PATH — skipping local-LLM pipx installs" >&2
     return 1
   fi
 
@@ -37,11 +37,11 @@ _resolve_uv_python() {
   uv_python="$(uv python find 3.13 2>/dev/null || echo "")"
   if [ -z "$uv_python" ] || [ ! -x "$uv_python" ]; then
     if [ "${UV_PYTHON_DOWNLOADS:-}" = never ]; then
-      echo "○ uv Python 3.13 is missing. Its automatic Python downloads are disabled."
+      echo "○ uv Python 3.13 is missing. Its automatic Python downloads are disabled." >&2
       return 1
     fi
     uv python install 3.13 >/dev/null 2>&1 || {
-      echo "⚠ uv python 3.13 unavailable — run: uv python install 3.13"
+      echo "⚠ uv python 3.13 unavailable — run: uv python install 3.13" >&2
       return 1
     }
     uv_python="$(uv python find 3.13 2>/dev/null || echo "")"
@@ -67,8 +67,7 @@ _pipx_install_if_missing() {
   echo "✓ pipx ${app} installed"
 }
 
-UV_PYTHON="$(_resolve_uv_python || echo "")"
-if [ -z "$UV_PYTHON" ]; then
+if ! UV_PYTHON="$(_resolve_uv_python)"; then
   exit 0
 fi
 

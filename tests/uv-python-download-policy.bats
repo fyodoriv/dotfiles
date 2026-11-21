@@ -52,7 +52,7 @@ SH
 teardown() { rm -rf "$TEST_DIR"; }
 
 set_policy() {
-  printf 'data:\n  uv_python_downloads_never: %s\n  use_local_ai: true\n  is_enterprise: false\n' "$1" > "$UV_POLICY_CONFIG"
+  printf 'data:\n  profile: full\n  uv_python_downloads_never: %s\n  use_local_ai: true\n  is_enterprise: false\n' "$1" > "$UV_POLICY_CONFIG"
 }
 
 render_topgrade() {
@@ -147,7 +147,7 @@ stage_local_llm() {
   local config="$XDG_CONFIG_HOME/uv/uv.toml"
   set_policy false
   run chezmoi apply
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
   [ ! -e "$config" ]
 
   run "$BATS_TEST_DIRNAME/../bin/dotfiles-config" set uv_python_downloads_never true
@@ -259,7 +259,7 @@ SH
   printf 'python-downloads = "manual"\n' > "$XDG_CONFIG_HOME/uv/uv.toml"
   cp "$XDG_CONFIG_HOME/uv/uv.toml" "$TEST_DIR/original"
   run chezmoi apply
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
   [ ! -e "$HOME/.config/uv/uv.toml" ]
   cmp -s "$XDG_CONFIG_HOME/uv/uv.toml" "$TEST_DIR/original"
 }

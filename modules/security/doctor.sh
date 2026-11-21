@@ -134,7 +134,7 @@ _uv_python_download_policy_matches() {
 if [ "$(chezmoi execute-template '{{ dig "uv_python_downloads_never" false . }}' 2>/dev/null)" = true ]; then
   check "security.uv_python_downloads_never" "uv uses only installed Python by default" \
     "_uv_python_download_policy_matches" "" \
-    'Set python-downloads = "never" in your uv user config. Run dotfiles apply to create a missing config.'
+    'Set python-downloads = "never" in your uv user config.'
 fi
 
 # ── Git Configuration Safety ────────────────────────────────────

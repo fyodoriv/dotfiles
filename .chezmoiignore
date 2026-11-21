@@ -1,5 +1,6 @@
 # Non-dotfile repo files (never deployed to $HOME)
-{{ if not (dig "uv_python_downloads_never" false .) -}}
+{{ $uvConfigRoot := env "XDG_CONFIG_HOME" -}}
+{{ if or (not (dig "uv_python_downloads_never" false .)) (and $uvConfigRoot (ne (clean $uvConfigRoot) (joinPath .chezmoi.homeDir ".config"))) -}}
 .config/uv/uv.toml
 {{ end -}}
 .claude

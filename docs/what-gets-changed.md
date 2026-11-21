@@ -250,10 +250,13 @@ These chezmoi scripts run automatically during `chezmoi apply`:
 Run `dotfiles config set uv_python_downloads_never true` and apply to keep
 unattended Dotfiles operations on installed Python versions. Apply can create
 `~/.config/uv/uv.toml` with `python-downloads = "never"` if the file is missing.
-An existing file stays in place. `dotfiles doctor --module security` checks
-its policy when the option is on.
+An existing file stays in place. If you set a custom `XDG_CONFIG_HOME`,
+set the policy in its `uv/uv.toml` yourself. `dotfiles doctor --module security`
+checks the selected config when the option is on.
 
 Topgrade still upgrades uv tools. The Dotfiles Brew update covers uv itself.
+Scheduled Doctor leaves Poetry in place if uv cannot find an installed
+Python for the repair.
 For an explicit Python install, run `UV_PYTHON_DOWNLOADS=manual uv python install 3.13`.
 Set the Dotfiles option to `false` to restore its default operations. Adjust
 the uv user file separately if you also want to change that persisted policy.

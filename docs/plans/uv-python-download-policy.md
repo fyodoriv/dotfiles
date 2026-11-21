@@ -59,3 +59,10 @@ captures its interpreter result, and the custom user config location.
   backup, one changed user config, or one misleading check rejects.
 - **Anchor**: The scheduled Doctor and Poetry repair call sites,
   the local-LLM caller, and [uv configuration precedence](https://docs.astral.sh/uv/concepts/configuration-files/).
+
+The [second hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44877551957/job/136765582899)
+called pipx with no usable Python and let the Poetry repair return 0.
+The two apply fixtures also failed because their scratch config lacked
+the required profile. After adding the profile to the scratch config,
+a direct chezmoi probe showed that apply created the unused default
+config when the custom config directory was active.

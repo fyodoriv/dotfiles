@@ -1,4 +1,7 @@
 # Non-dotfile repo files (never deployed to $HOME)
+{{ if not (dig "uv_python_downloads_never" false .) -}}
+.config/uv/uv.toml
+{{ end -}}
 .claude
 .github
 .gitignore

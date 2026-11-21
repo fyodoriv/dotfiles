@@ -31,3 +31,8 @@ report its policy if it does not match the opt-in. Automatic Dotfiles
 paths apply the policy for their own subprocesses. Keep ordinary
 standalone project and user overrides under the program's normal
 precedence. Do not download or sign a real interpreter in these tests.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44876768131/job/136763068333)
+passed both default cases. The enabled Topgrade template still had its
+combined uv step. The standalone installer and local-LLM resolver also
+missed the expected enabled-policy behavior.

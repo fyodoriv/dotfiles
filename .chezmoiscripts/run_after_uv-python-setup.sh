@@ -13,6 +13,9 @@ set -euo pipefail
 
 # Ignore python.org / Homebrew framework installs during uv discovery (endpoint-safe).
 export UV_PYTHON_PREFERENCE=only-managed
+if [ "$(chezmoi execute-template '{{ dig "uv_python_downloads_never" false . }}' 2>/dev/null)" = true ]; then
+  export UV_PYTHON_DOWNLOADS=never
+fi
 
 # ── uv python ────────────────────────────────────────────────────
 if command -v uv &>/dev/null; then
@@ -28,9 +31,13 @@ if command -v uv &>/dev/null; then
   if [ -n "$platform" ]; then
     target_dir="$HOME/.local/share/uv/python"
     if ! ls "$target_dir"/cpython-3.13*-"$platform" &>/dev/null; then
-      echo "→ Installing uv python 3.13 ($arch)..."
-      uv python install 3.13
-      echo "✓ uv python 3.13 installed"
+      if [ "${UV_PYTHON_DOWNLOADS:-}" = never ]; then
+        echo "○ uv Python 3.13 is missing. Its automatic Python downloads are disabled."
+      else
+        echo "→ Installing uv python 3.13 ($arch)..."
+        uv python install 3.13
+        echo "✓ uv python 3.13 installed"
+      fi
     else
       echo "✓ uv python 3.13 already installed ($arch)"
     fi

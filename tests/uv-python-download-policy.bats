@@ -8,7 +8,10 @@ setup() {
   TEST_DOTFILES="$TEST_DIR/source"
   mkdir -p "$TEST_HOME" "$TEST_DOTFILES" "$TEST_DIR/bin"
   export HOME="$TEST_HOME"
-  export UV_POLICY_CONFIG="$TEST_DIR/chezmoi.yaml"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_DATA_HOME="$TEST_HOME/.local/share"
+  export XDG_STATE_HOME="$TEST_HOME/.local/state" XDG_CACHE_HOME="$TEST_HOME/.cache"
+  mkdir -p "$XDG_CONFIG_HOME/chezmoi"
+  export UV_POLICY_CONFIG="$XDG_CONFIG_HOME/chezmoi/chezmoi.yaml"
   export UV_POLICY_CHEZMOI="$(command -v chezmoi)"
   export UV_POLICY_SOURCE="$TEST_DOTFILES"
   export UV_POLICY_CALLS="$TEST_DIR/uv-calls"
@@ -22,8 +25,11 @@ exec "$UV_POLICY_CHEZMOI" --config "$UV_POLICY_CONFIG" \
 SH
   cat > "$TEST_DIR/bin/uname" <<'SH'
 #!/bin/sh
-[ "$1" = -m ] || exit 2
-printf '%s\n' arm64
+case "$1" in
+  -m) printf '%s\n' arm64 ;;
+  -s) printf '%s\n' Darwin ;;
+  *) exit 2 ;;
+esac
 SH
   cat > "$TEST_DIR/bin/uv" <<'SH'
 #!/bin/sh
@@ -32,7 +38,9 @@ case "$*" in
   'python find 3.13')
     [ -n "${UV_POLICY_PYTHON:-}" ] || exit 1
     printf '%s\n' "$UV_POLICY_PYTHON" ;;
-  'python install 3.13'|'tool upgrade --all') exit 0 ;;
+  'tool dir --bin') printf '%s\n' "$HOME/.local/bin" ;;
+  'tool dir') printf '%s\n' "$HOME/.local/share/uv/tools" ;;
+  'python install 3.13'|'tool upgrade --all'|'tool list'|'tool install '*) exit 0 ;;
   *) exit 90 ;;
 esac
 SH
@@ -84,7 +92,7 @@ stage_local_llm() {
   yq -p=toml -e '.misc.disable | any_c(. == "uv")' "$TEST_DIR/topgrade.toml"
   local command
   command="$(yq -p=toml -r '.commands["uv tools (installed Python only)"]' "$TEST_DIR/topgrade.toml")"
-  [ "$command" = 'UV_PYTHON_DOWNLOADS=never uv tool upgrade --all' ]
+  [ "$command" = 'command -v uv >/dev/null 2>&1 || exit 0; UV_PYTHON_DOWNLOADS=never uv tool upgrade --all' ]
   run /bin/bash -c "$command"
   [ "$status" -eq 0 ]
   [ "$(cat "$UV_POLICY_CALLS")" = 'tool upgrade --all|never' ]
@@ -122,4 +130,77 @@ stage_local_llm() {
   [ "$status" -eq 0 ]
   [ "$output" = "$UV_POLICY_PYTHON" ]
   [ "$(cat "$UV_POLICY_CALLS")" = 'python find 3.13|never' ]
+}
+
+@test "uv policy constrains the apply-time tool installer" {
+  set_policy true
+  CHEZMOI_SOURCE_DIR="$TEST_DOTFILES" run bash "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_uv-tools.sh"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^tool install .*|never$' "$UV_POLICY_CALLS")" -eq 4 ]
+  ! grep -q '^tool install .*|unset$' "$UV_POLICY_CALLS"
+}
+
+@test "uv policy creates a missing user config and preserves an existing one" {
+  mkdir -p "$TEST_DOTFILES/dot_config/uv"
+  cp "$BATS_TEST_DIRNAME/../dot_config/uv/create_uv.toml" "$TEST_DOTFILES/dot_config/uv/"
+  cp "$BATS_TEST_DIRNAME/../.chezmoiignore" "$TEST_DOTFILES/"
+  local config="$XDG_CONFIG_HOME/uv/uv.toml"
+  set_policy false
+  run chezmoi apply
+  [ "$status" -eq 0 ]
+  [ ! -e "$config" ]
+
+  run "$BATS_TEST_DIRNAME/../bin/dotfiles-config" set uv_python_downloads_never true
+  [ "$status" -eq 0 ]
+  run chezmoi apply
+  [ "$status" -eq 0 ]
+  [ "$(yq -p=toml -r '."python-downloads"' "$config")" = never ]
+
+  printf 'python-downloads = "manual"\n# Existing user preference\n' > "$config"
+  cp "$config" "$TEST_DIR/original-config"
+  run chezmoi apply
+  [ "$status" -eq 0 ]
+  cmp -s "$config" "$TEST_DIR/original-config"
+  run "$BATS_TEST_DIRNAME/../bin/dotfiles-config" set uv_python_downloads_never false
+  [ "$status" -eq 0 ]
+  run chezmoi apply
+  [ "$status" -eq 0 ]
+  cmp -s "$config" "$TEST_DIR/original-config"
+}
+
+@test "uv policy Doctor checks the top-level user configuration only when enabled" {
+  local block="$TEST_DIR/security-policy"
+  awk '
+    /^_uv_python_download_policy_matches\(\)/ { print_block = 1 }
+    /Git Configuration Safety/ { if (print_block) exit }
+    print_block { print }
+  ' "$BATS_TEST_DIRNAME/../modules/security/doctor.sh" > "$block"
+  cat > "$TEST_DIR/doctor" <<'SH'
+#!/bin/bash
+check() {
+  if eval "$3"; then printf 'pass %s\n' "$1"
+  else printf 'fail %s\n' "$1"; fi
+}
+source "$1"
+SH
+  set_policy false
+  run bash "$TEST_DIR/doctor" "$block"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+
+  set_policy true
+  run bash "$TEST_DIR/doctor" "$block"
+  [ "$status" -eq 0 ]
+  [ "$output" = 'fail security.uv_python_downloads_never' ]
+
+  mkdir -p "$XDG_CONFIG_HOME/uv"
+  printf 'python-downloads = "never"\n' > "$XDG_CONFIG_HOME/uv/uv.toml"
+  run bash "$TEST_DIR/doctor" "$block"
+  [ "$status" -eq 0 ]
+  [ "$output" = 'pass security.uv_python_downloads_never' ]
+
+  printf '[tool]\npython-downloads = "never"\n' > "$XDG_CONFIG_HOME/uv/uv.toml"
+  run bash "$TEST_DIR/doctor" "$block"
+  [ "$status" -eq 0 ]
+  [ "$output" = 'fail security.uv_python_downloads_never' ]
 }

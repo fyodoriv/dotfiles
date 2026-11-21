@@ -6,6 +6,8 @@ set -euo pipefail
 #
 # Usage: dotfiles-remove-framework-python
 #   (prompts for sudo password once)
+#        dotfiles-remove-framework-python --user-only
+#   (repairs user-controlled paths without calling sudo)
 #        dotfiles-remove-framework-python --profile-only
 #   (no sudo: only removes the installer's PATH blocks from shell profiles)
 
@@ -51,9 +53,9 @@ if [[ "${1:-}" == "--profile-only" ]]; then
   exit 0
 fi
 
-# Bail early in agent terminals — sudo can't prompt for a password there.
+# Keep full and user-only repair in a terminal the operator controls.
 if [[ "${DOTFILES_IS_AGENT:-0}" == "1" ]]; then
-  echo "❌ This script requires sudo — run it in a human terminal (Ghostty/iTerm), not an agent terminal."
+  echo "❌ Run the framework repair in your own terminal outside the agent."
   exit 1
 fi
 
@@ -72,22 +74,19 @@ for v in "$FRAMEWORK"/Versions/*/; do
 done
 
 echo ""
-echo "Homebrew Python (kept):"
-command -v python3 &>/dev/null && echo "  $(python3 --version) at $(command -v python3)"
-echo ""
 
-# Single sudo prompt — cache for the rest
-if ! sudo -v 2>/dev/null; then
-  echo "❌ No admin rights — running USER-MODE patch instead."
+# The explicit user mode never asks for admin rights.
+if [[ "${1:-}" == --user-only ]] || ! sudo -v 2>/dev/null; then
+  echo "Running USER-MODE patch without administrator access."
   echo ""
   echo "Without admin we can't delete the root-owned framework binary, but we"
   echo "can patch every user-controlled invoker so nothing actually invokes it:"
   echo ""
 
   # ── User-mode patch: rebuild any pipx venvs hardcoded to framework python
-  uv_py="$(uv python find 3.13 2>/dev/null || true)"
+  uv_py="$(uv python find --system --managed-python --no-python-downloads 3.13 2>/dev/null || true)"
   if [[ -z "$uv_py" || ! -x "$uv_py" ]]; then
-    echo "  ⚠ uv python find 3.13 failed — install uv first (brew install uv)."
+    echo "  ⚠ uv could not find an installed, uv-managed Python 3.13."
   elif command -v pipx &>/dev/null && [[ -d "$HOME/.local/pipx/venvs" ]]; then
     echo "  Step 1: rebuild pipx venvs that hardcode framework python"
     rebuilt=0
@@ -125,8 +124,7 @@ if ! sudo -v 2>/dev/null; then
   # ── User-mode patch: scan small targeted dirs for hardcoded framework refs
   # Intentionally narrow: $HOME/.local has pipx + uv installs (huge; covered by step 1)
   # and $HOME/.local/share/devin / .npm / .yarn (multi-GB caches we don't want to walk).
-  # Each candidate dir is checked independently with a short per-dir timeout so a
-  # single slow directory can't hang the whole step.
+  # Logs and saved environments do not identify active settings to repair.
   echo ""
   echo "  Step 3: scan targeted config dirs for files that hardcode the framework path"
   declare -a scan_dirs=(
@@ -138,7 +136,8 @@ if ! sudo -v 2>/dev/null; then
   for d in "${scan_dirs[@]}"; do
     [[ -d "$d" ]] || continue
     # grep exits 1 on no-match — `|| true` keeps the loop alive under set -e
-    h="$( { grep -rln --max-count=1 "Library/Frameworks/Python.framework" "$d" 2>/dev/null || true; } | head -10)"
+    h="$( { grep -rln --max-count=1 --exclude='*.log' --exclude-dir='*-bak' --exclude-dir='*.dotfiles-bak-*' \
+      "Library/Frameworks/Python.framework" "$d" 2>/dev/null || true; } | head -10)"
     [[ -n "$h" ]] && hits_total="$hits_total"$'\n'"$h"
   done
   hits_total="$(printf '%s\n' "$hits_total" | sed '/^$/d')"
@@ -146,8 +145,10 @@ if ! sudo -v 2>/dev/null; then
     echo "    ✓ no residual hardcoded framework refs in scanned dirs"
   else
     echo "    ⚠ files still hardcoding the framework path:"
-    printf '      %s\n' $hits_total
-    echo "    Patch each manually (typically: replace with \$(uv python find 3.13))"
+    while IFS= read -r hit; do
+      printf '      %s\n' "$hit"
+    done <<< "$hits_total"
+    echo "    Review each active config and point it to an approved Python interpreter."
   fi
 
   echo ""

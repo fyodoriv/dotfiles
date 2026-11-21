@@ -24,3 +24,8 @@ which can remain after a successful user repair.
 
 The hosted fixtures use no real sudo, framework executable, or
 LaunchAgent. The system framework still needs a separate admin action.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44878698797/job/136769013126)
+recorded one invocation of the framework-side Python and one sudo call.
+Doctor's advisory also lacked the user-only route. The command ignored
+the new mode and probed the first Python on PATH before checking sudo.

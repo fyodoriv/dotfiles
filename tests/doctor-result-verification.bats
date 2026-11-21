@@ -54,8 +54,15 @@ managed_fixture() {
 #!/bin/sh
 case "$1" in
   source-path) printf '%s\n' "$VERIFY_REPO";;
-  diff) [ -z "${VERIFY_DIFF_ERROR:-}" ] || exit 1; diff "$VERIFY_SOURCE" "$2";;
-  apply) [ -n "${VERIFY_APPLY_NOOP:-}" ] || cp "$VERIFY_SOURCE" "$2";;
+  diff)
+    [ -z "${VERIFY_DIFF_ERROR:-}" ] || exit 1
+    diff "$VERIFY_SOURCE" "$2" || {
+      result=$?
+      [ "$result" -eq 1 ] || exit "$result"
+    };;
+  apply)
+    : > "$VERIFY_MARKER"
+    [ -n "${VERIFY_APPLY_NOOP:-}" ] || cp "$VERIFY_SOURCE" "$2";;
   *) exit 1;;
 esac
 SH
@@ -69,6 +76,7 @@ SH
   run bash "$VERIFY_REPO/bin/dotfiles-doctor" --module probe --fix --json
   [ "$status" -ne 0 ]
   [ "$(printf '%s' "$output" | jq -r '.[] | select(.id == "probe.managed") | .status')" = fail ]
+  [ -e "$VERIFY_MARKER" ]
 }
 
 @test "an effective managed-file repair is fixed" {
@@ -84,6 +92,7 @@ SH
   run bash "$VERIFY_REPO/bin/dotfiles-doctor" --module probe --fix --json
   [ "$status" -ne 0 ]
   [ "$(printf '%s' "$output" | jq -r '.[] | select(.id == "probe.managed") | .status')" = fail ]
+  [ ! -e "$VERIFY_MARKER" ]
 }
 
 @test "repair verification refreshes the module-scoped Amphetamine preference snapshot" {

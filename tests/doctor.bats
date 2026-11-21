@@ -515,8 +515,10 @@ setup_defaults_mock() {
 @test "managed file checks keep the same result under the queue caller mask" {
   bats_require_minimum_version 1.5.0
   export MANAGED_CHEZMOI_BIN="$(command -v chezmoi)"
-  export MANAGED_CHECKOUT="$TEST_DOTFILES" MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
+  MANAGED_CHECKOUT="$(cd "$TEST_DOTFILES" && pwd -P)"
+  export MANAGED_CHECKOUT MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
   export MANAGED_STATE="$TEST_DIR/state.boltdb"
+  export MANAGED_APPLY_LOG="$TEST_DIR/managed-apply.log"
   export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
   export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
   local doctor="$TEST_DOTFILES/bin/dotfiles-doctor"
@@ -533,6 +535,18 @@ setup_defaults_mock() {
   chmod 0644 "$source" "$target"
   cat > "$TEST_DOTFILES/bin/chezmoi" <<'SH'
 #!/bin/sh
+if [ "$1" = source-path ]; then
+  printf '%s\n' "$MANAGED_CHECKOUT"
+  exit 0
+fi
+if [ "$1" = apply ]; then
+  [ "$#" -eq 4 ] && [ "$2" = "$HOME/.editorconfig" ] &&
+    [ "$3" = --source ] && [ "$4" = "$MANAGED_CHECKOUT" ] || exit 64
+  printf 'apply\n' >> "$MANAGED_APPLY_LOG"
+  [ "${MANAGED_COMPARE_FAILURE:-}" != true ] || exit 65
+  cp "$MANAGED_CHECKOUT/dot_editorconfig" "$HOME/.editorconfig"
+  exit $?
+fi
 if [ "${MANAGED_COMPARE_FAILURE:-}" = true ] && [ "$1" = diff ]; then
   printf 'synthetic private comparator marker\n' >&2
   exit 65
@@ -587,6 +601,37 @@ SH
   [[ "$output$stderr" != *"synthetic private comparator marker"* ]]
   cmp -s "$target" "$source"
   [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
+
+  printf '\n# confirmed fixture difference\n' >> "$target"
+  run --separate-stderr /bin/sh -c 'umask 022; exec "$@"' fixture \
+    /bin/bash "$doctor" --module editor --json --fix
+  if [ "$status" -ne 0 ]; then
+    printf 'Expected confirmed-difference repair to exit 0. Received exit %s.\n' "$status" >&2
+    printf '%s\n' "$output" | jq -r '.[] | select(.status == "fail") | .id' >&2
+    if [ -e "$MANAGED_APPLY_LOG" ]; then echo "Fixture apply was called." >&2; fi
+    return 1
+  fi
+  printf '%s\n' "$output" | jq -e '
+    [.[] | select(.id == "managed.editorconfig")] | length == 1 and .[0].status == "fixed"
+  ' >/dev/null
+  [ "$(cat "$MANAGED_APPLY_LOG")" = apply ]
+  cmp -s "$target" "$source"
+  rm "$MANAGED_APPLY_LOG"
+
+  for kind in text json; do
+    local -a report=(/bin/bash "$doctor" --module editor --fix)
+    [ "$kind" = json ] && report+=(--json)
+    MANAGED_COMPARE_FAILURE=true run --separate-stderr "${report[@]}"
+    [ "$status" -eq 1 ]
+    if [ -e "$MANAGED_APPLY_LOG" ]; then
+      printf 'Expected no apply after a failed comparison in %s mode.\n' "$kind" >&2
+      return 1
+    fi
+    [[ "$output" == *"chezmoi diff failed (exit 65)"* ]]
+    [[ "$output$stderr" != *"synthetic private comparator marker"* ]]
+    cmp -s "$target" "$source"
+    [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
+  done
 }
 
 @test "doctor --module security does not run agentbrew aggregate health" {

@@ -38,7 +38,8 @@ Run just these: `dotfiles doctor --module git --module macos --module ssh --modu
 | `check_defaults id desc domain key expected type` | Verifies macOS `defaults` value | `defaults write` with the expected value |
 
 If `chezmoi diff` fails during a managed-file audit, text and JSON
-report its exit code. Run `chezmoi doctor` to inspect the setup.
+report its exit code. Repair mode leaves that file in place. Run
+`chezmoi doctor` to inspect the setup.
 
 `fix_cmd` runs in a new process (`bash -c`), so a fix that calls a function defined in its module needs `export -f <function>` (and `export` for the variables it reads; the doctor exports `DOTFILES_DIR`). `tests/doctor-fix-functions-exported.bats` fails when one is missing.
 

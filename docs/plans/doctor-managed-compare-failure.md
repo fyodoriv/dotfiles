@@ -32,3 +32,35 @@ The [first candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44874467
 passed the real Doctor checks. The existing failure-line check rejected
 its plain-text hint because that line lacked the expected `fix:` label.
 Use the existing label and keep the safe comparison exit code.
+
+## Leave a file in place after a failed comparison
+
+- **Hypothesis**: Doctor can report a failed comparison in repair
+  mode without applying a file it could not inspect. It still repairs
+  a confirmed difference.
+- **Measurement**: Run hosted `bats tests/doctor.bats` with the
+  disposable editor file. Simulate comparison exit 65 with a private
+  stderr marker. Record each apply attempt in a scratch canary.
+  In a separate comparison, change the file and allow its synthetic
+  apply. Check text, JSON, exit code, bytes and mode.
+- **Success**: A failed comparison makes 0 apply attempts in either
+  output mode and preserves the file. Text and JSON report exit 65
+  without the marker. A confirmed difference makes 1 apply attempt
+  and the repair recheck passes.
+- **Pivot**: Stop for 1 apply after failed comparison, disclosure,
+  changed target on refusal or broken repair of a confirmed difference.
+- **Anchor**: Issue #731 and the comparison and repair checks in
+  `bin/dotfiles-doctor`.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44892073205/job/136809877320)
+repaired the confirmed difference, then attempted to apply an
+existing file after the comparator failed. The repair branch ran
+before the exit-code check. Report the comparison failure before
+considering repair.
+
+The [first candidate](https://github.com/fyodoriv/dotfiles/actions/runs/44892310701/job/136810576321)
+passed the real chezmoi comparison and repair controls. An older
+verification fixture returned plain `diff`'s exit 1 for a normal
+difference. A disposable built-in `chezmoi diff` returned exit 0
+and the difference while leaving its target untouched. Align the
+fixture with that contract and keep the separate unreadable case.

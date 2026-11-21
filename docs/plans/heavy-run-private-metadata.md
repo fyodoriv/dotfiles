@@ -89,6 +89,25 @@ record the dependency; add no shell or Python control-plane fallback.
 
 ### Supported entrypoints and closure
 
+#### Source inventory qualification
+
+Freeze the reviewed Dotfiles revision `911d141646aeff642ddefbb165e9b362a42942d9`
+in a source manifest. Record one logical ID, class, Git blob and mode per
+tracked definition. Include the controller, shell and LaunchAgent routes,
+the declared direct callers, and hosted and scratch paths as separate classes.
+The 27 LaunchAgent consumers share one PATH template.
+
+- **Hypothesis**: The exact route inventory can admit the reviewed source snapshot and refuse a missing, changed, extra or duplicate route.
+- **Measurement**: On hosted CI, run `cargo test --locked --offline --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_inventory` through `heavy-run`. Compare the recorded files to the frozen Git tree without launching any entrypoint. Use scratch observations for the refusal cases.
+- **Success**: All 48 tracked source rows match the exact tree, including all 27 LaunchAgent consumers. The exact and reordered observations qualify. All 4 invalid observations refuse. The tests make 0 changes to a live queue or installation.
+- **Pivot**: Stop after 1 missing or extra source row, 1 changed blob accepted, or 1 inference that source evidence proves live route closure.
+- **Anchor**: The source route scope and admission requirements below, the current Dotfiles Git tree, and the existing queue privacy decision fixture.
+
+The inventory records tracked definitions as they existed at the frozen
+revision. A deployed target, untracked PATH candidate, or outside-repo
+caller remains unknown until the installed observer checks it. This
+qualification cannot satisfy the production activation decision.
+
 Before code, freeze the actual managed source executable, installed PATH routes,
 declared direct callers and symlink aliases in one installation manifest. Use
 logical entrypoint IDs and hashes in receipts, not private absolute paths.

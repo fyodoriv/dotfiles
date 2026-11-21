@@ -9,6 +9,7 @@ PAGE="$BATS_TEST_DIRNAME/fixtures/fake-slack-page.mjs"
 setup() {
   TEST_DIR="$(mktemp -d)"
   export CALLS="$TEST_DIR/calls.log"
+  export FIRST_READY_READ="$TEST_DIR/first-ready-read"
   export DRAFTS_JSON="$TEST_DIR/drafts.json" INPUT_STATE="$TEST_DIR/input"
   export PAGE MARK="$TEST_DIR/injected" DELCOUNT="$TEST_DIR/delcount" PAGE_STATE="$TEST_DIR/page-state"
   echo drafts > "$PAGE_STATE"
@@ -18,7 +19,12 @@ setup() {
 #!/bin/bash
 echo "$*" >> "$CALLS"
 case "$1" in
-  eval) if [[ "$5" == *"  b.click();"* ]]; then
+  eval) if [ "${SLOW_FIRST_READINESS:-0}" = 1 ] && [[ "$5" == *"document.querySelector"*"drafts_page"* ]] &&
+           [ ! -e "$FIRST_READY_READ" ]; then
+          : > "$FIRST_READY_READ"
+          exec /bin/sleep 20
+        fi
+        if [[ "$5" == *"  b.click();"* ]]; then
           dn=$(( $(cat "$DELCOUNT" 2>/dev/null || echo 0) + 1 )); echo "$dn" > "$DELCOUNT"
           if [ "${FAIL_ON_DELETE_CALL:-0}" = "$dn" ]; then echo "agent-tab: cdp Runtime.evaluate: no answer in 10 s" >&2; exit 1; fi
         fi
@@ -331,6 +337,23 @@ left() { jq -r '[.[].to] | join(",")' "$DRAFTS_JSON"; }
   FAKE_DRAFTS_NEVER_READY=1 SLACK_DRAFT_TIMEOUT_SECONDS=0 run "$SCRIPT" delete T1 hello --to Bob --yes
   [ "$status" -eq 1 ]
   [[ "$output" == *"Drafts"*"limit"* ]]
+  [ "$(left)" = Bob ]
+  [ ! -e "$DELCOUNT" ]
+}
+
+@test "count retries once within the command limit after the first readiness read stalls" {
+  drafts '[{"to":"Bob","body":"hello"}]'
+  SECONDS=0
+  SLOW_FIRST_READINESS=1 SLACK_DRAFT_TIMEOUT_SECONDS=8 run "$SCRIPT" count T1 hello --to Bob
+  local attempts
+  attempts="$(grep -c '^eval .*document.querySelector.*drafts_page' "$CALLS" || true)"
+  if [ "$attempts" -ne 2 ]; then
+    printf 'Expected two readiness reads, got %s with status %s\n' "$attempts" "$status" >&2
+    return 1
+  fi
+  [ "$status" -eq 0 ]
+  [ "$output" = 1 ]
+  [ "$SECONDS" -lt 10 ]
   [ "$(left)" = Bob ]
   [ ! -e "$DELCOUNT" ]
 }

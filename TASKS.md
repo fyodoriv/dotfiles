@@ -32,6 +32,7 @@ them. -->
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability
+  - **Blocked**: needs-qualified-codex-executor — the isolated Linux result covers benign rewrite ordering. Mac execution and the harmless denial case still need a qualified normal trust and launch path.
   - **Details**: The Agentfile registers the heavy-run guard and a path hook for Bash. The path hook can return updated command input. The public hook contract documents updated input, but the effect of hook ordering on the final executed command has not been established for the configured agents. This is a verification gap, not a demonstrated bypass. Use only synthetic commands, a scratch agent configuration and canaries; never run a destructive command. The hooks emit different response formats for Claude and Codex; qualify each host and version separately.
   - **Progress**: The [Claude Code 2.1.312 harmless check](docs/plans/guard-order-benign-control.md) observed the original command in the before-tool hooks and the replacement in the executor. The configured path hook now uses the native response in the measured default mode. The same harmless Codex distinction passed on isolated Linux. Mac Codex execution and the full guard matrix remain open.
   - **Files**: `Agentfile.yaml`, `agent-hooks/require-heavy-run.sh`, `agent-hooks/prepend-endpoint-path.sh`, their tests and hook guidance as needed.
@@ -47,6 +48,7 @@ them. -->
 - [ ] Keep selected machine connector credentials fresh without leaks
   - **ID**: github-connector-machine-credentials
   - **Tags**: security, git, machine, rust, preparation
+  - **Blocked**: needs-owned-installed-callback — qualify the actual callback and a secret-safe GUI writer or covered removal policy before native wiring.
   - **Details**: User assigns the GitHub header helper and stale GUI credential doctor to dotfiles; request is agentbrew issue #693. Register C01–C14, then land runnable Rust instrumentation before native wiring. Clear both token variables only for the keyring-backed callback. Preserve ordinary gh and explicit-token users. Plan: [machine credential controls](docs/plans/github-connector-machine-credentials.md).
   - **Files**: `tests/fixtures/connector-credentials/`, `docs/plans/github-connector-machine-credentials.md`; future native adapter and existing doctor check/fix/recheck boundary.
   - **Output**: instrumentation
@@ -63,6 +65,7 @@ them. -->
 - [ ] Prepare private evidence for compiler runs outside queue ownership
   - **ID**: compiler-queue-observation
   - **Tags**: stability, privacy, instrumentation, agents
+  - **Blocked**: needs-original-sealed-cases — the scratch join can preserve a missing root claim. The remaining classification requires the eight original sealed cases and matching root evidence.
   - **Details**: The current doctor observer recognizes headless Chrome ancestry only. Prepare a source-bound compiler observation contract and independent synthetic oracle before adding any observer. Process names, nice levels, working folders and an inherited lease marker do not prove reservation ownership. Keep unsupported or stale evidence explicitly unknown. This is separate from the immediate classifier fix and the future Rust queue port. A pre-measurement source review found that the synthetic observation does not identify its defined root and must reject conflicting PID generations; the [qualified root registration](docs/plans/compiler-queue-decision-model.md#qualified-root-evidence-registration) defines the new evidence contract. Review and qualify a separate fixture before a new decision candidate. No candidate or holdout decision result was measured. See [decision model](docs/plans/compiler-queue-decision-model.md). Scope and registration prerequisites: [Queue caller coverage](docs/plans/queue-caller-coverage.md#rollout-security-and-regression-coverage).
   - **Files**: proposed observer contract and synthetic fixtures; existing `bin/headless-chrome-unlocked` and `tests/headless-chrome-unlocked.bats` are references, not compiler acceptance tests.
   - **Output**: instrumentation

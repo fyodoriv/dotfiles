@@ -56,6 +56,17 @@
         "Keeps OAuth, privacy opt-ins, schedules and business records local",
         "Uses the generated dotfiles actions --json registry for CLI discovery"
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "/dotfiles then: stop unattended uv Python downloads on this Mac and keep my existing uv config.",
+      "expected_output": "The agent uses the opt-in config command, explains the existing file stays in place, applies only with permission, and runs the security Doctor check after apply.",
+      "expectations": [
+        "Runs dotfiles config set uv_python_downloads_never true",
+        "Preserves the existing uv user configuration",
+        "Waits for explicit permission before running dotfiles apply --if-changed",
+        "Runs dotfiles doctor --module security after apply"
+      ]
     }
   ]
 }

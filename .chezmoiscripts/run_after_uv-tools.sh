@@ -15,6 +15,10 @@ if ! command -v uv &>/dev/null; then
   exit 0
 fi
 
+if [ "$(chezmoi execute-template '{{ dig "uv_python_downloads_never" false . }}' 2>/dev/null)" = true ]; then
+  export UV_PYTHON_DOWNLOADS=never
+fi
+
 # httpie ships the `http`/`https` commands; jrnl, poetry, pipx ship eponymous
 # executables. awscli is NOT here — AWS CLI v2 is not on PyPI; it is installed
 # via the AWS user-dir pkg (bin/dotfiles-install-aws-gcloud, run by

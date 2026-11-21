@@ -28,6 +28,9 @@ no_self_update    = false  # let topgrade self-update — pairs with brew's topg
 # (chezmoi), race against in-flight launchagent runs, or fail noisily
 # when an optional daemon isn't running.
 disable = [
+  {{- if dig "uv_python_downloads_never" false . }}
+  "uv",
+  {{- end }}
   # dotfiles auto-sync launchagent runs `chezmoi update --apply` every 30
   # minutes. Letting topgrade ALSO run `chezmoi update` would double-pull
   # and could race the in-flight launchagent run mid-apply.
@@ -121,6 +124,10 @@ poetry_force_self_update = false
 
 # ── Custom steps (run during the main sequence) ─────────────────────
 [commands]
+
+{{- if dig "uv_python_downloads_never" false . }}
+"uv tools (installed Python only)" = "command -v uv >/dev/null 2>&1 || exit 0; UV_PYTHON_DOWNLOADS=never uv tool upgrade --all"
+{{- end }}
 
 # Xcode-tolerant Mac App Store upgrade. Replaces the built-in `mas` step
 # (disabled above): upgrades each outdated app individually and skips Xcode,

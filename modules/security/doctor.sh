@@ -126,6 +126,17 @@ for sf in "${sensitive_files[@]}"; do
   fi
 done
 
+_uv_python_download_policy_matches() {
+  local file="${XDG_CONFIG_HOME:-$HOME/.config}/uv/uv.toml"
+  [ -f "$file" ] && [ "$(yq -p=toml -r '."python-downloads"' "$file" 2>/dev/null)" = never ]
+}
+
+if [ "$(chezmoi execute-template '{{ dig "uv_python_downloads_never" false . }}' 2>/dev/null)" = true ]; then
+  check "security.uv_python_downloads_never" "uv uses only installed Python by default" \
+    "_uv_python_download_policy_matches" "" \
+    'Set python-downloads = "never" in your uv user config.'
+fi
+
 # ── Git Configuration Safety ────────────────────────────────────
 
 check_advisory "security.git_credential" "Git credential helper not plaintext store" \

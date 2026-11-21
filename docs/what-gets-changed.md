@@ -245,6 +245,24 @@ These chezmoi scripts run automatically during `chezmoi apply`:
 | `run_after_agentbrew-sync.sh` | Every apply | Sync agent config from `Agentfile.yaml` (non-fatal) |
 | `run_after_jetbrains-plugins.sh` | Every apply where a JetBrains IDE is in `/Applications` | Install the plugins in `jetbrains/recommended_plugins.txt` with `bin/jetbrains-install-plugins --if-changed` (non-fatal). Each install starts a headless IDE JVM, so a stamp per IDE in `~/.local/state/dotfiles/jetbrains-plugins/` records the IDE build and plugin list. A no-change apply starts no JVM. A list change, an IDE upgrade, or a new IDE re-runs it. Open IDEs are skipped and get no stamp. |
 
+### Python downloads with uv
+
+Run `dotfiles config set uv_python_downloads_never true` and apply to keep
+unattended Dotfiles operations on installed Python versions. Apply can create
+`~/.config/uv/uv.toml` with `python-downloads = "never"` if the file is missing.
+An existing file stays in place. If you set a custom `XDG_CONFIG_HOME`,
+set the policy in its `uv/uv.toml` yourself. `dotfiles doctor --module security`
+checks the selected config when the option is on.
+
+Topgrade still upgrades uv tools. The Dotfiles Brew update covers uv itself.
+Doctor still checks the existing Poetry command. With this policy on,
+it leaves migration to uv for a separate manual repair.
+For an explicit Python install, run `UV_PYTHON_DOWNLOADS=manual uv python install 3.13`.
+Set the Dotfiles option to `false` to restore its default operations. Adjust
+the uv user file separately if you also want to change that persisted policy.
+User and project settings outside the unattended Dotfiles operations follow
+[uv configuration precedence](https://docs.astral.sh/uv/concepts/configuration-files/).
+
 `dotfiles apply --if-changed` skips the whole apply, scripts and doctor pass
 included, when nothing changed. A successful full apply (by `dotfiles apply`
 or `dotfiles-sync`) from a clean source writes

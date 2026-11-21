@@ -515,7 +515,8 @@ setup_defaults_mock() {
 @test "managed file checks keep the same result under the queue caller mask" {
   bats_require_minimum_version 1.5.0
   export MANAGED_CHEZMOI_BIN="$(command -v chezmoi)"
-  export MANAGED_CHECKOUT="$TEST_DOTFILES" MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
+  MANAGED_CHECKOUT="$(cd "$TEST_DOTFILES" && pwd -P)"
+  export MANAGED_CHECKOUT MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
   export MANAGED_STATE="$TEST_DIR/state.boltdb"
   export MANAGED_APPLY_LOG="$TEST_DIR/managed-apply.log"
   export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
@@ -604,7 +605,12 @@ SH
   printf '\n# confirmed fixture difference\n' >> "$target"
   run --separate-stderr /bin/sh -c 'umask 022; exec "$@"' fixture \
     /bin/bash "$doctor" --module editor --json --fix
-  [ "$status" -eq 0 ]
+  if [ "$status" -ne 0 ]; then
+    printf 'Expected confirmed-difference repair to exit 0. Received exit %s.\n' "$status" >&2
+    printf '%s\n' "$output" | jq -r '.[] | select(.status == "fail") | .id' >&2
+    if [ -e "$MANAGED_APPLY_LOG" ]; then echo "Fixture apply was called." >&2; fi
+    return 1
+  fi
   printf '%s\n' "$output" | jq -e '
     [.[] | select(.id == "managed.editorconfig")] | length == 1 and .[0].status == "fixed"
   ' >/dev/null

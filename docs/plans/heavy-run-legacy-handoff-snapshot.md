@@ -28,3 +28,10 @@ The order log alone does not show which scheduling pass did that.
 The fixture uses a complete synthetic owner record and real scratch
 locks. The frozen 429 source and installed queue are outside this run.
 Keep the ordinary mixed-version control as a separate check.
+
+The [hosted reproduction](https://github.com/fyodoriv/dotfiles/actions/runs/44892003832/job/136809660974)
+recorded an empty wait reason and grant `s1` while the old slot was
+held. The earlier slot sample did not include the completed handoff.
+The scheduler now refreshes its slot sample when the gated ticket
+disappears, before applying existing reservations. The scratch run
+does not qualify a new cutover or change any configured slot limit.

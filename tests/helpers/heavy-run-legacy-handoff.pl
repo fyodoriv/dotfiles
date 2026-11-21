@@ -76,6 +76,7 @@ die "Could not start scratch scheduler: $!\n" unless defined $child;
 if ($child == 0) {
     close($waiting);
     $ENV{HEAVY_RUN_HANDOFF_FIXTURE} = $fixture;
+    $ENV{HEAVY_RUN_WAIT_LOG} = "$state/waits.log";
     exec($scheduler, "/bin/sh", "-c", 'printf "young\n" >> "$1"', "fixture", "$fixture/ran") or die $!;
 }
 

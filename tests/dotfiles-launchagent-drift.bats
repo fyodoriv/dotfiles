@@ -303,6 +303,61 @@ pmset_watch_fixture() {
   [ ! -e "$TEST_DIR/pmset-watch-executed" ]
 }
 
+morning_fixture() {
+  tool_checkout
+  MORNING_LABEL=com.dotfiles.morning
+  MORNING_SCRIPT="$TOOL_CHECKOUT/bin/morning"
+  MORNING_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  MORNING_TOOLS=(dirname mktemp rm tail date df awk)
+  local tool file="$AGENTS/$MORNING_LABEL.plist"
+  for tool in "${MORNING_TOOLS[@]}"; do
+    printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/morning-executed" > "$TEST_DIR/job-bin/$tool"
+    chmod +x "$TEST_DIR/job-bin/$tool"
+  done
+  printf '#!/bin/bash\ntouch "%s"\n' "$TEST_DIR/morning-executed" > "$MORNING_SCRIPT"
+  chmod +x "$MORNING_SCRIPT"
+  plist "$MORNING_LABEL" false /bin/bash "$MORNING_SCRIPT"
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$file"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$TEST_DIR/job-bin" "$file"
+}
+
+@test "the morning job reports each missing required PATH utility" {
+  morning_fixture
+  loaded "$MORNING_LABEL" running /bin/bash "$MORNING_SCRIPT"
+  local tool missed=0
+  for tool in "${MORNING_TOOLS[@]}"; do
+    mv "$TEST_DIR/job-bin/$tool" "$TEST_DIR/absent"
+    run "$MORNING_PROBE"
+    if [ "$status" -ne 1 ] || [[ "$output" != *"tool-path $MORNING_LABEL: $tool is missing"* ]]; then
+      printf 'Expected missing %s with exit 1. Received exit %s.\n' "$tool" "$status" >&2
+      missed=$((missed + 1))
+    fi
+    [[ "$output" != *"$TEST_DIR"* ]]
+    mv "$TEST_DIR/absent" "$TEST_DIR/job-bin/$tool"
+  done
+  [ "$missed" -eq 0 ]
+  [ ! -e "$TEST_DIR/morning-executed" ]
+}
+
+@test "the morning job cannot bootstrap without its temporary-file tool" {
+  morning_fixture
+  rm "$TEST_DIR/job-bin/mktemp"
+  run "$MORNING_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $MORNING_LABEL: mktemp is missing"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/morning-executed" ]
+}
+
+@test "the complete morning job PATH passes without executing files" {
+  morning_fixture
+  loaded "$MORNING_LABEL" running /bin/bash "$MORNING_SCRIPT"
+  run "$MORNING_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $MORNING_LABEL" ]
+  [ ! -e "$TEST_DIR/morning-executed" ]
+}
+
 tooling_sync_fixture() {
   tool_checkout
   TOOLING_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"

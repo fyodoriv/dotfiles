@@ -539,6 +539,10 @@ if [ "$1" = source-path ]; then
   printf '%s\n' "$MANAGED_CHECKOUT"
   exit 0
 fi
+if [ "$1" = init ]; then
+  printf 'init\n' >> "$MANAGED_APPLY_LOG"
+  exit 66
+fi
 if [ "$1" = apply ]; then
   [ "$#" -eq 4 ] && [ "$2" = "$HOME/.editorconfig" ] &&
     [ "$3" = --source ] && [ "$4" = "$MANAGED_CHECKOUT" ] || exit 64
@@ -550,6 +554,14 @@ fi
 if [ "${MANAGED_COMPARE_FAILURE:-}" = true ] && [ "$1" = diff ]; then
   printf 'synthetic private comparator marker\n' >&2
   exit 65
+fi
+if [ "$1" = diff ]; then
+  case "${MANAGED_COMPARE_WARNING:-}" in
+    stale)
+      printf 'chezmoi: config file template has changed, run chezmoi init to regenerate config file\n' >&2
+      printf 'synthetic private warning marker\n' >&2 ;;
+    unrelated) printf 'synthetic private warning marker\n' >&2 ;;
+  esac
 fi
 exec "$MANAGED_CHEZMOI_BIN" --no-tty --no-pager --dry-run --config "$MANAGED_CONFIG" \
   --destination "$HOME" --source "$MANAGED_CHECKOUT" --persistent-state "$MANAGED_STATE" "$@"
@@ -632,6 +644,32 @@ SH
     cmp -s "$target" "$source"
     [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
   done
+
+  printf '%s\n' 'check_managed "managed.warning_repeat" "$DOTFILES_DIR/dot_editorconfig" "$HOME/.editorconfig"' \
+    >> "$TEST_DOTFILES/modules/editor/doctor.sh"
+  local -a warning_cmd=(/bin/sh -c 'umask 022; exec "$@"' fixture /bin/bash "$doctor" --module editor)
+  MANAGED_COMPARE_WARNING=unrelated run --separate-stderr "${warning_cmd[@]}" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"chezmoi.config_template_stale"* ]]
+  [[ "$output$stderr" != *"synthetic private warning marker"* ]]
+
+  MANAGED_COMPARE_WARNING=stale run --separate-stderr "${warning_cmd[@]}" --json --fix
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq -e '
+    ([.[] | select(.id == "chezmoi.config_template_stale")] |
+      length == 1 and .[0].status == "warn" and .[0].fix == "chezmoi init") and
+    ([.[] | select(.id == "managed.editorconfig" or .id == "managed.warning_repeat")] |
+      length == 2 and all(.[]; .status == "pass"))
+  ' >/dev/null
+  [[ "$output$stderr" != *"synthetic private warning marker"* ]]
+
+  MANAGED_COMPARE_WARNING=stale run --separate-stderr "${warning_cmd[@]}"
+  [ "$status" -eq 0 ]
+  [ "$(grep -Fc 'chezmoi config template has changed' <<< "$output")" -eq 1 ]
+  [[ "$output$stderr" != *"synthetic private warning marker"* ]]
+  [ ! -e "$MANAGED_APPLY_LOG" ]
+  cmp -s "$target" "$source"
+  [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
 }
 
 @test "doctor --module security does not run agentbrew aggregate health" {

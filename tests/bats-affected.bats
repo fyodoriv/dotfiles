@@ -63,6 +63,16 @@ setup_file() {
   echo '# tooling-checkup' > "$TEST_REPO/skills/tooling-checkup/SKILL.md"
   echo 'lint-tasks: ; @true' > "$TEST_REPO/Makefile"
 
+  # Distinct sources for the inferred-name and literal path controls.
+  mkdir -p "$TEST_REPO/tools"
+  for name in survey-sample-extras signal-export-revision side-record; do
+    printf '# fixed fixture source\n' > "$TEST_REPO/tools/$name.sh"
+  done
+  for name in tools-survey-sample-extras-fast survey-sample-extras signal-export-fast tools-newly-created; do
+    printf '# fixed fixture test\n' > "$TEST_REPO/tests/$name.bats"
+  done
+  printf 'command="$REPO_ROOT/tools/side-record.sh"\n' > "$TEST_REPO/tests/direct-reference.bats"
+
   # Initial commit (--no-verify to skip pre-commit hooks in test repos)
   git -C "$TEST_REPO" add -A
   git -C "$TEST_REPO" commit -q --no-verify -m "chore: init"
@@ -814,4 +824,24 @@ BATS
   run bash "$TEST_REPO/bin/bats-affected"
   [ "$status" -eq 0 ]
   [[ "$output" != *'/user-stories.bats'* ]]
+}
+
+@test "inferred names prefer a folder-prefixed test" {
+  result="$(affected_for tools/survey-sample-extras.sh | basenames)"
+  [ "$result" = tools-survey-sample-extras-fast ]
+}
+
+@test "inferred names shorten a source stem at its last dash" {
+  result="$(affected_for tools/signal-export-revision.sh | basenames)"
+  [ "$result" = signal-export-fast ]
+}
+
+@test "inferred names include untracked source files" {
+  result="$(affected_for tools/newly-created.sh | basenames)"
+  [ "$result" = tools-newly-created ]
+}
+
+@test "a literal path can select a test with an unrelated name" {
+  result="$(affected_for tools/side-record.sh | basenames)"
+  [ "$result" = direct-reference ]
 }

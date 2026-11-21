@@ -23,3 +23,7 @@ failed before returning a usable result.
 
 The comparison error helps explain a future run. The exact old
 full-audit observation still needs direct evidence.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44874112993/job/136754897956)
+returned the generic managed-file JSON result with exit 65 missing.
+The real 022 and 077 controls completed before the failing assertion.

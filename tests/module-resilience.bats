@@ -133,6 +133,71 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -e "$TEST_DIR/sleepwatcher-launched" ]
 }
 
+@test "AC timer repair runs without a terminal or an interactive sudo attempt" {
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$TEST_DOTFILES/bin/"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '
+    /^_resilience_pmset_custom_value_is\(\) \{/ { helper = 1 }
+    /^check "resilience\.ac_idle_timers_normal"/ { check = 1 }
+    helper || check { print }
+    helper && /^}$/ { helper = 0 }
+    check && $0 !~ /\\$/ { exit }
+  ' "$BATS_TEST_DIRNAME/../modules/resilience/doctor.sh" > "$TEST_DOTFILES/modules/resilience/doctor.sh"
+  printf '#!/bin/sh\n[ "$1" = source-path ] && printf "%%s\\n" "%s"\nexit 0\n' "$TEST_DOTFILES" > "$TEST_DOTFILES/bin/chezmoi"
+  cat > "$TEST_DOTFILES/bin/sudo" <<'SH'
+#!/bin/sh
+[ ! -t 0 ] || exit 90
+printf '%s\n' "$*" >> "$AC_TIMER_FIXTURE/attempts"
+[ "$1" = -n ] || exit 91
+[ -e "$AC_TIMER_FIXTURE/allow" ] || exit 1
+shift
+[ "$1" = pmset ] || exit 92
+shift
+exec "$AC_TIMER_FIXTURE/dotfiles/bin/pmset" "$@"
+SH
+  cat > "$TEST_DOTFILES/bin/pmset" <<'SH'
+#!/bin/sh
+case "$*" in
+  '-g custom')
+    if [ -e "$AC_TIMER_FIXTURE/wrote" ]; then
+      printf 'AC Power:\n sleep 1\n disksleep 10\n'
+    else
+      printf 'AC Power:\n sleep 0\n disksleep 0\n'
+    fi
+    ;;
+  '-c sleep 1 disksleep 10') printf 'write\n' >> "$AC_TIMER_FIXTURE/wrote" ;;
+  *) exit 92 ;;
+esac
+SH
+  chmod +x "$TEST_DOTFILES/bin/"{chezmoi,sudo,pmset}
+  ln -s "$(command -v jq)" "$TEST_DOTFILES/bin/jq"
+  export AC_TIMER_FIXTURE="$TEST_DIR"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
+  export PATH="$TEST_DOTFILES/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  [ "$(command -v sudo)" = "$TEST_DOTFILES/bin/sudo" ]
+  [ "$(command -v pmset)" = "$TEST_DOTFILES/bin/pmset" ]
+
+  local started=$SECONDS
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience </dev/null
+  [ "$status" -eq 1 ]
+  [ "$((SECONDS - started))" -lt 5 ]
+  [ ! -e "$TEST_DIR/wrote" ]
+  if [ "$(cat "$TEST_DIR/attempts")" != '-n pmset -c sleep 1 disksleep 10' ]; then
+    printf 'Expected one non-interactive sudo attempt, got: %s\n' "$(cat "$TEST_DIR/attempts")" >&2
+    return 1
+  fi
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.ac_idle_timers_normal")] | length == 1 and .[0].status == "fail" and (.[0].message | contains("need sudo"))' >/dev/null
+
+  : > "$TEST_DIR/attempts"
+  touch "$TEST_DIR/allow"
+  run bash "$TEST_DOTFILES/bin/dotfiles-doctor" --fix --json --module resilience </dev/null
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/attempts")" = '-n pmset -c sleep 1 disksleep 10' ]
+  [ "$(cat "$TEST_DIR/wrote")" = write ]
+  printf '%s\n' "$output" | jq -e '[.[] | select(.id == "resilience.ac_idle_timers_normal")] | length == 1 and .[0].status == "fixed"' >/dev/null
+}
+
 @test "mas missing is advisory with owner guidance" {
   FIX_MODE=true
   KEEP_AWAKE_TOOLS=false

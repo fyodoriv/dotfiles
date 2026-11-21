@@ -30,3 +30,15 @@ test and a test referring to the same source must both appear with its
 exact path in `--pairs`. A new bin script with an inferred test must also
 keep smoke coverage. Any missing test or changed dependency pair
 invalidates the candidate.
+
+The first candidate passed the new selection cases. Two existing checks
+found compatibility gaps. The selector benchmark got a different list
+in its default mode. The cache test looked for the Make recipe at its
+old source location even though the expanded command kept its inputs.
+
+Keep filename inference behind the new entry point. Require exact
+default output parity and retain the existing benchmark threshold.
+Check the expanded recipes for both affected-test targets. Require two
+recipes with the selector's exact pairs, the HEAD cache key, and the
+peer and doctor invocations. No additional file should match by name
+in the selector's default mode.

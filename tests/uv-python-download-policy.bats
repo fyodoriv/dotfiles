@@ -35,7 +35,7 @@ SH
 #!/bin/sh
 printf '%s|%s\n' "$*" "${UV_PYTHON_DOWNLOADS:-unset}" >> "$UV_POLICY_CALLS"
 case "$*" in
-  'python find 3.13')
+  'python find'|'python find 3.13')
     [ -n "${UV_POLICY_PYTHON:-}" ] || exit 1
     printf '%s\n' "$UV_POLICY_PYTHON" ;;
   'tool dir --bin') printf '%s\n' "$HOME/.local/bin" ;;
@@ -203,4 +203,63 @@ SH
   run bash "$TEST_DIR/doctor" "$block"
   [ "$status" -eq 0 ]
   [ "$output" = 'fail security.uv_python_downloads_never' ]
+}
+
+@test "uv policy stops the full local-LLM installer before dependent work without Python" {
+  set_policy true
+  local script="$TEST_DIR/local-llm-full" name
+  for name in pipx hf huggingface-cli; do
+    printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s"\n' "$TEST_DIR/downstream-calls" > "$TEST_DIR/bin/$name"
+    chmod +x "$TEST_DIR/bin/$name"
+  done
+  export LOCAL_LLM_SENTINEL="$TEST_DIR/model-sentinel" HF_HOME="$TEST_DIR/model-cache"
+  export LOCAL_LLM_MODEL_REPO="fixture/model"
+  touch "$LOCAL_LLM_SENTINEL"
+  chezmoi execute-template < "$BATS_TEST_DIRNAME/../.chezmoiscripts/run_after_install_local_llm.sh.tmpl" > "$script"
+  run bash "$script"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"automatic Python downloads are disabled"* ]]
+  if [ -s "$TEST_DIR/downstream-calls" ]; then
+    echo "Expected no pipx or model command without an installed interpreter."
+    return 1
+  fi
+}
+
+@test "uv policy leaves Poetry in place without an installed interpreter" {
+  set_policy true
+  local lib="$BATS_TEST_DIRNAME/../lib/poetry-repair.sh"
+  local poetry="$HOME/.local/bin/poetry" venv="$HOME/Library/Application Support/pypoetry/venv"
+  mkdir -p "$(dirname "$poetry")" "$venv"
+  printf 'fixture poetry\n' > "$poetry"
+
+  run bash -c 'source "$1"; poetry_repair_to_uv "$2"' policy "$lib" "$poetry"
+  if [ "$status" -ne 1 ]; then
+    printf 'Expected missing-Python refusal, got exit %s.\n' "$status"
+    return 1
+  fi
+  [ -f "$poetry" ] && [ -d "$venv" ]
+  [ ! -e "$poetry.bak" ] && [ ! -e "$venv.bak" ]
+  [ "$(cat "$UV_POLICY_CALLS")" = 'python find|never' ]
+
+  export UV_POLICY_PYTHON="$TEST_DIR/python-available"
+  cp /bin/echo "$UV_POLICY_PYTHON"
+  : > "$UV_POLICY_CALLS"
+  run bash -c 'source "$1"; poetry_repair_to_uv "$2"' policy "$lib" "$poetry"
+  [ "$status" -eq 0 ]
+  [ -f "$poetry.bak" ] && [ -d "$venv.bak" ]
+  grep -Fxq 'tool install poetry|never' "$UV_POLICY_CALLS"
+}
+
+@test "uv policy leaves the unused default config absent with custom XDG config" {
+  set_policy true
+  export XDG_CONFIG_HOME="$TEST_HOME/custom-config"
+  mkdir -p "$TEST_DOTFILES/dot_config/uv" "$XDG_CONFIG_HOME/uv"
+  cp "$BATS_TEST_DIRNAME/../dot_config/uv/create_uv.toml" "$TEST_DOTFILES/dot_config/uv/"
+  cp "$BATS_TEST_DIRNAME/../.chezmoiignore" "$TEST_DOTFILES/"
+  printf 'python-downloads = "manual"\n' > "$XDG_CONFIG_HOME/uv/uv.toml"
+  cp "$XDG_CONFIG_HOME/uv/uv.toml" "$TEST_DIR/original"
+  run chezmoi apply
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.config/uv/uv.toml" ]
+  cmp -s "$XDG_CONFIG_HOME/uv/uv.toml" "$TEST_DIR/original"
 }

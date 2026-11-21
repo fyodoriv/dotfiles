@@ -512,6 +512,59 @@ setup_defaults_mock() {
   echo "$output" | jq -e '.[] | select(.id == "security.sensitive_perms..netrc" and .status == "warn" and .fix == "chmod 600 ~/.netrc")' >/dev/null
 }
 
+@test "managed file checks keep the same result under the queue caller mask" {
+  export MANAGED_CHEZMOI_BIN="$(command -v chezmoi)"
+  export MANAGED_CHECKOUT="$TEST_DOTFILES" MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
+  export MANAGED_STATE="$TEST_DIR/state.boltdb"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
+  export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
+  local doctor="$TEST_DOTFILES/bin/dotfiles-doctor"
+  local target="$TEST_HOME/.editorconfig" source="$TEST_DOTFILES/dot_editorconfig"
+  mkdir -p "$TEST_DOTFILES/bin" "$TEST_DOTFILES/lib" "$TEST_DOTFILES/modules/editor"
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$doctor"
+  cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
+  awk '/^check_managed "managed\.editorconfig"/ {print; exit}' \
+    "$BATS_TEST_DIRNAME/../modules/editor/doctor.sh" > "$TEST_DOTFILES/modules/editor/doctor.sh"
+  [ -s "$TEST_DOTFILES/modules/editor/doctor.sh" ]
+  : > "$MANAGED_CONFIG"
+  printf 'root = true\n\n[*]\nindent_style = space\n' > "$source"
+  cp "$source" "$target"
+  chmod 0644 "$source" "$target"
+  cat > "$TEST_DOTFILES/bin/chezmoi" <<'SH'
+#!/bin/sh
+exec "$MANAGED_CHEZMOI_BIN" --no-tty --no-pager --dry-run --config "$MANAGED_CONFIG" \
+  --destination "$HOME" --source "$MANAGED_CHECKOUT" --persistent-state "$MANAGED_STATE" "$@"
+SH
+  chmod +x "$TEST_DOTFILES/bin/chezmoi"
+  ln -s "$(command -v jq)" "$TEST_DOTFILES/bin/jq"
+  export PATH="$TEST_DOTFILES/bin:$PATH"
+  export HEAVY_RUN_DIR="$TEST_DIR/queue" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
+  export HEAVY_RUN_PAUSE_APPS="" HEAVY_RUN_MAX_LOAD=0 HEAVY_RUN_WAIT_LOG="$TEST_DIR/waits.log"
+  unset HEAVY_RUN_HELD
+
+  local mask expected_status expected mode kind
+  for kind in direct permissive-queue restrictive; do
+    mask=022
+    expected=pass
+    expected_status=0
+    local -a cmd=(/bin/bash "$doctor" --json --module editor)
+    case "$kind" in
+      permissive-queue) cmd=("$BATS_TEST_DIRNAME/../bin/heavy-run" "${cmd[@]}") ;;
+      restrictive) mask=077; expected=fail; expected_status=1 ;;
+    esac
+    run --separate-stderr /bin/sh -c 'umask "$1"; shift; exec "$@"' mask "$mask" "${cmd[@]}"
+    if [ "$status" -ne "$expected_status" ]; then
+      printf 'Expected %s exit %s. Received %s.\n' "$kind" "$expected_status" "$status" >&2
+      return 1
+    fi
+    printf '%s\n' "$output" | jq -e --arg expected "$expected" \
+      '[.[] | select(.id == "managed.editorconfig")] | length == 1 and .[0].status == $expected' >/dev/null
+    cmp -s "$target" "$source"
+    mode="$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")"
+    [ "$mode" = 644 ]
+  done
+}
+
 @test "doctor --module security does not run agentbrew aggregate health" {
   mkdir -p "$TEST_DIR/bin"
   cat > "$TEST_DIR/bin/agentbrew" <<'EOF'

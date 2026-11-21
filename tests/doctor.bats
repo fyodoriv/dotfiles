@@ -602,7 +602,8 @@ SH
   [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
 
   printf '\n# confirmed fixture difference\n' >> "$target"
-  run --separate-stderr /bin/bash "$doctor" --module editor --json --fix
+  run --separate-stderr /bin/sh -c 'umask 022; exec "$@"' fixture \
+    /bin/bash "$doctor" --module editor --json --fix
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq -e '
     [.[] | select(.id == "managed.editorconfig")] | length == 1 and .[0].status == "fixed"

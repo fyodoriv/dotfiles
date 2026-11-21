@@ -167,6 +167,61 @@ create_test_repo() {
   [ "$status" -eq 0 ]
   # The repo should now have the upstream file
   [ -f "$TEST_REPOS/alpha/UPSTREAM.md" ]
+  [ "$(git -C "$TEST_REPOS/alpha" rev-parse HEAD)" = "$(git -C "$clone" rev-parse HEAD)" ]
+}
+
+@test "morning leaves the local branch on its original root after an upstream rewrite" {
+  create_test_repo "rewritten"
+  local repo="$TEST_REPOS/rewritten" replacement="$TEST_DIR/replacement" old_head new_head
+  old_head="$(git -C "$repo" rev-parse HEAD)"
+  git init --bare --quiet "$TEST_DIR/replacement.git"
+  git init --quiet "$replacement"
+  printf 'new upstream root\n' > "$replacement/NEW.md"
+  git -C "$replacement" add NEW.md
+  git -C "$replacement" commit --quiet -m "new root"
+  git -C "$replacement" push --quiet "$TEST_DIR/replacement.git" main
+  new_head="$(git -C "$replacement" rev-parse HEAD)"
+  git -C "$repo" remote set-url origin "$TEST_DIR/replacement.git"
+  git -C "$repo" fetch --quiet
+  ! git -C "$repo" merge-base "$old_head" "$new_head"
+  git -C "$repo" config pull.rebase true
+
+  run bash "$MORNING_CMD"
+  [ "$status" -eq 0 ]
+  if [ "$(git -C "$repo" rev-parse HEAD)" != "$old_head" ]; then
+    echo "Expected the original local HEAD after an upstream rewrite" >&2
+    return 1
+  fi
+  [ -z "$(git -C "$repo" status --porcelain)" ]
+  [ "$(cat "$repo/README.md")" = content ]
+  [ ! -e "$repo/NEW.md" ]
+  [[ "$output" == *"rewritten: refresh skipped"* ]]
+  [[ "$output" == *"status --short --branch"* ]]
+}
+
+@test "morning leaves a diverged local branch unchanged" {
+  create_test_repo "diverged"
+  local repo="$TEST_REPOS/diverged" upstream="$TEST_DIR/upstream" old_head
+  git clone --quiet "$TEST_DIR/bare-diverged.git" "$upstream"
+  printf 'incoming change\n' > "$upstream/UPSTREAM.md"
+  git -C "$upstream" add UPSTREAM.md
+  git -C "$upstream" commit --quiet -m "upstream work"
+  git -C "$upstream" push --quiet
+  printf 'local edit\n' > "$repo/LOCAL.md"
+  git -C "$repo" add LOCAL.md
+  git -C "$repo" commit --quiet -m "local work"
+  old_head="$(git -C "$repo" rev-parse HEAD)"
+
+  run bash "$MORNING_CMD"
+  [ "$status" -eq 0 ]
+  if [ "$(git -C "$repo" rev-parse HEAD)" != "$old_head" ]; then
+    echo "Expected the original local HEAD after branch divergence" >&2
+    return 1
+  fi
+  [ -z "$(git -C "$repo" status --porcelain)" ]
+  [ "$(cat "$repo/LOCAL.md")" = 'local edit' ]
+  [ ! -e "$repo/UPSTREAM.md" ]
+  [[ "$output" == *"diverged: refresh skipped"* ]]
 }
 
 @test "morning skips repos on non-main branches" {

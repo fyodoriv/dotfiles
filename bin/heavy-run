@@ -650,11 +650,20 @@ exec perl -e "$common_code"'
     exit 75;
   }
 
+  sub ensure_queue_directory {
+    my ($path) = @_;
+    return 1 if -d $path || mkdir $path;
+    my $error = 0 + $!;
+    return 1 if $!{EEXIST} && -d $path;
+    $! = $error;
+    return 0;
+  }
+
   # Take the next ticket number. The ticket is written and locked under a
   # temporary name, then renamed, so no sweeper sees it before it is locked.
   my $info = sprintf("pid=%d cwd=%s cmd=%s%s", $$, $ENV{PWD} // "", join(" ", @cmd), $exclusive ? " [exclusive]" : "");
   my $queued = eval {
-    -d $queue or mkdir $queue or die "cannot create $queue: $!\n";
+    ensure_queue_directory($queue) or die "cannot create $queue: $!\n";
     sysopen(my $sf, $seqfile, O_RDWR | O_CREAT, 0600) or die "cannot open $seqfile: $!\n";
     if ($exclusive) {
       while (!flock($sf, LOCK_EX | LOCK_NB)) {
@@ -686,7 +695,7 @@ exec perl -e "$common_code"'
     1;
   };
   if (!$queued) { my $e = $@; chomp $e; print STDERR "heavy-run: queue unavailable ($e); waiting without arrival order\n"; }
-  -d $slotdir or mkdir $slotdir or die "heavy-run: cannot create $slotdir: $!\n";
+  ensure_queue_directory($slotdir) or die "heavy-run: cannot create $slotdir: $!\n";
   open(my $lfh, ">>", $lock) or do { unlink $ticket if $ticket; die "heavy-run: cannot open $lock: $!\n"; };
   chmod 0600, $lock;
 

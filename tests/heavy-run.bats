@@ -944,6 +944,80 @@ make_fake_app() {
   wait "$BATS_RT_PROBE_PID"
 }
 
+queue_directory_creation_fixture() {
+  local fixture="$BATS_TEST_TMPDIR/queue-directory-creation"
+  mkdir -p "$fixture"
+  cat > "$fixture/HeavyQueueDirectoryFixture.pm" <<'PERL'
+package HeavyQueueDirectoryFixture;
+use Errno qw(EACCES EEXIST);
+
+BEGIN {
+  *CORE::GLOBAL::mkdir = sub {
+    my ($path, $mode) = @_;
+    $mode //= 0777;
+    return CORE::mkdir($path, $mode) unless $path eq $ENV{FIXTURE_DIRECTORY};
+    my $case = $ENV{FIXTURE_DIRECTORY_CASE};
+    if ($case eq "directory") {
+      CORE::mkdir($path, $mode) or die "fixture mkdir failed: $!\n";
+    } elsif ($case eq "file") {
+      open(my $file, ">", $path) or die "fixture file creation failed: $!\n";
+      close($file) or die "fixture file close failed: $!\n";
+    }
+    open(my $receipt, ">", $ENV{FIXTURE_DIRECTORY_RECEIPT}) or die "fixture receipt failed: $!\n";
+    print $receipt "$case\n";
+    close($receipt) or die "fixture receipt close failed: $!\n";
+    $! = $case eq "denied" ? EACCES : EEXIST;
+    return 0;
+  };
+}
+1;
+PERL
+  export PERL5LIB="$fixture" PERL5OPT=-MHeavyQueueDirectoryFixture LC_ALL=C
+  export FIXTURE_DIRECTORY="$HEAVY_RUN_DIR/$1" FIXTURE_DIRECTORY_CASE="$2"
+  export FIXTURE_DIRECTORY_RECEIPT="$fixture/injected"
+}
+
+assert_adopts_concurrent_queue_directory() {
+  queue_directory_creation_fixture "$1" directory
+  run --separate-stderr "$SCRIPT" sh -c 'printf "%s\n" "$HEAVY_RUN_HELD"'
+  [ "$(cat "$FIXTURE_DIRECTORY_RECEIPT")" = directory ]
+  [ -d "$FIXTURE_DIRECTORY" ]
+  if [ "$status" -ne 0 ] || [ -n "$stderr" ]; then
+    printf 'Expected a normal slot without diagnostics. Exit: %s\n%s\n' "$status" "$stderr" >&2
+    return 1
+  fi
+  [ "$output" = "$HEAVY_RUN_DIR/slots/s1" ]
+  [ "$(cat "$HEAVY_RUN_DIR/seq")" = 1 ]
+}
+
+@test "heavy-run: adopts an arrival directory another starter creates" {
+  assert_adopts_concurrent_queue_directory queue
+}
+
+@test "heavy-run: adopts a slots directory another starter creates" {
+  assert_adopts_concurrent_queue_directory slots
+}
+
+@test "heavy-run: refuses to use a non-directory slots path" {
+  queue_directory_creation_fixture slots file
+  run --separate-stderr "$SCRIPT" sh -c ': > "$1"' fixture "$BATS_TEST_TMPDIR/launched"
+  [ "$(cat "$FIXTURE_DIRECTORY_RECEIPT")" = file ]
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"cannot create"* && "$stderr" == *"File exists"* ]]
+  [ -f "$FIXTURE_DIRECTORY" ]
+  [ ! -e "$BATS_TEST_TMPDIR/launched" ]
+}
+
+@test "heavy-run: a slots directory permission failure stays fatal" {
+  queue_directory_creation_fixture slots denied
+  run --separate-stderr "$SCRIPT" sh -c ': > "$1"' fixture "$BATS_TEST_TMPDIR/launched"
+  [ "$(cat "$FIXTURE_DIRECTORY_RECEIPT")" = denied ]
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"cannot create"* && "$stderr" == *"Permission denied"* ]]
+  [ ! -e "$FIXTURE_DIRECTORY" ]
+  [ ! -e "$BATS_TEST_TMPDIR/launched" ]
+}
+
 @test "heavy-run: project: a run waits at its project cap while another project's run starts" {
   export HEAVY_RUN_SLOTS=10 HEAVY_RUN_PROJECT_SLOTS=2
   HEAVY_RUN_PROJECT=/p/alpha start_holder

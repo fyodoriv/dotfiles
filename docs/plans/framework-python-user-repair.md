@@ -29,3 +29,18 @@ The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44878698
 recorded one invocation of the framework-side Python and one sudo call.
 Doctor's advisory also lacked the user-only route. The command ignored
 the new mode and probed the first Python on PATH before checking sudo.
+
+## Reject unknown options and report incomplete pipx repair
+
+- **Hypothesis**: A misspelled option leaves the profile and repair
+  commands untouched. A failed reinstall reports the affected pipx
+  environment and a nonzero status.
+- **Measurement**: Run the hosted mixed-path fixture with a misspelled
+  option. Run a separate fixture with one framework-based pipx
+  environment and a failing reinstall.
+- **Success**: The invalid option exits 2 with zero repair calls and
+  no profile changes. The failed reinstall exits 1, makes one
+  reinstall attempt, and names the retained environment.
+- **Pivot**: Any invalid-option write or false-success message
+  rejects the candidate.
+- **Anchor**: The command entry point and existing pipx repair loop.

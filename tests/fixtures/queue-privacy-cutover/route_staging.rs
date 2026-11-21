@@ -35,17 +35,23 @@ fn identity(meta: &Metadata) -> io::Result<(u64, u64)> {
     Ok((meta.dev(), meta.ino()))
 }
 
-fn observe(path: &Path, expected: &[u8]) -> io::Result<(u64, u64)> {
+fn read_private(path: &Path, limit: usize) -> io::Result<((u64, u64), Vec<u8>)> {
     let named = identity(&fs::symlink_metadata(path)?)?;
     let opened = File::open(path)?;
     if identity(&opened.metadata()?)? != named {
         return Err(ErrorKind::InvalidData.into());
     }
     let mut contents = Vec::new();
-    opened
-        .take(expected.len() as u64 + 1)
-        .read_to_end(&mut contents)?;
-    if contents != expected || identity(&fs::symlink_metadata(path)?)? != named {
+    opened.take(limit as u64 + 1).read_to_end(&mut contents)?;
+    if contents.len() > limit || identity(&fs::symlink_metadata(path)?)? != named {
+        return Err(ErrorKind::InvalidData.into());
+    }
+    Ok((named, contents))
+}
+
+fn observe(path: &Path, expected: &[u8]) -> io::Result<(u64, u64)> {
+    let (named, contents) = read_private(path, expected.len())?;
+    if contents != expected {
         return Err(ErrorKind::InvalidData.into());
     }
     Ok(named)
@@ -97,20 +103,50 @@ impl<'a> Dispatch<'a> {
         }
     }
 
-    fn pending_body(&self, replacement: &Path) -> io::Result<String> {
+    fn pending_context(&self, archived: &Path) -> io::Result<String> {
         self.check()?;
         let (device, inode) = identity(&self.owner.metadata()?)?;
         let mut record = format!("v1 {BEFORE_BOOT}\nlock {device} {inode}\n");
         for (name, path, contents) in [
             (ARTIFACT, self.root.join(ARTIFACT), ARTIFACT_BODY),
             (ROUTES[1], self.root.join(ROUTES[1]), OLD),
-            (ARCHIVE, self.root.join(ARCHIVE), OLD),
-            (ROUTES[0], replacement.to_path_buf(), ROUTE_BODY),
+            (ARCHIVE, archived.to_path_buf(), OLD),
         ] {
             let (device, inode) = observe(&path, contents)?;
             record.push_str(&format!("{name} {device} {inode}\n"));
         }
         Ok(record)
+    }
+
+    fn pending_body(&self, replacement: &Path) -> io::Result<String> {
+        let context = self.pending_context(&self.root.join(ARCHIVE))?;
+        let (device, inode) = observe(replacement, ROUTE_BODY)?;
+        Ok(format!("{context}{} {device} {inode}\n", ROUTES[0]))
+    }
+
+    fn verify_restored_route(&self, route: &Path, pending: &Path) -> io::Result<()> {
+        let context = self.pending_context(route)?;
+        let (_, record) = read_private(pending, 512)?;
+        let suffix = std::str::from_utf8(&record)
+            .ok()
+            .and_then(|record| record.strip_prefix(&context))
+            .and_then(|line| line.strip_prefix("shell-route "))
+            .and_then(|line| line.strip_suffix('\n'))
+            .ok_or(ErrorKind::InvalidData)?;
+        let (device, inode) = suffix.split_once(' ').ok_or(ErrorKind::InvalidData)?;
+        let device: u64 = device.parse().map_err(|_| ErrorKind::InvalidData)?;
+        let inode: u64 = inode.parse().map_err(|_| ErrorKind::InvalidData)?;
+        let restored = observe(route, OLD)?;
+        // The replaced entry no longer exists. Its record must describe a
+        // different file on the same device and use the original format.
+        if inode == 0
+            || (device, inode) == restored
+            || device != restored.0
+            || suffix != format!("{device} {inode}")
+        {
+            return Err(ErrorKind::InvalidData.into());
+        }
+        Ok(())
     }
 
     fn stage_first_replacement(&self) -> io::Result<()> {
@@ -129,11 +165,22 @@ impl<'a> Dispatch<'a> {
         }
         self.require_uncommitted()?;
         let route = self.root.join(ROUTES[0]);
-        let record = self.pending_body(&route)?;
-        observe(&self.root.join(PENDING), record.as_bytes())?;
+        let archive = self.root.join(ARCHIVE);
+        let pending = self.root.join(PENDING);
+        match fs::symlink_metadata(&archive) {
+            Ok(_) => {
+                let record = self.pending_body(&route)?;
+                observe(&pending, record.as_bytes())?;
+                self.check()?;
+                fs::rename(archive, &route)?;
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                self.verify_restored_route(&route, &pending)?;
+            }
+            Err(error) => return Err(error),
+        }
         self.check()?;
-        fs::rename(self.root.join(ARCHIVE), route)?;
-        fs::remove_file(self.root.join(PENDING))
+        fs::remove_file(pending)
     }
 
     fn receipt_body(&self) -> io::Result<String> {
@@ -341,6 +388,54 @@ fn retains_the_archive_on_wrong_boot_or_file_drift() {
         let restarted = Dispatch::acquire(&scratch.0).unwrap();
         assert!(restarted.restore_first_replacement(boot).is_err(), "{name}");
         assert!(scratch.0.join(ARCHIVE).is_file(), "{name}");
+        assert_eq!(scratch.snapshot(), before, "{name}");
+    }
+}
+
+fn restore_without_cleanup(scratch: &Scratch) {
+    let dispatch = Dispatch::acquire(&scratch.0).unwrap();
+    dispatch.stage_first_replacement().unwrap();
+    fs::rename(scratch.0.join(ARCHIVE), scratch.0.join(ROUTES[0])).unwrap();
+}
+
+#[test]
+fn finishes_cleanup_when_the_exact_archive_is_already_restored() {
+    let scratch = Scratch::new();
+    restore_without_cleanup(&scratch);
+    let before = scratch.snapshot();
+    let pending = before.iter().filter(|file| file.0 == PENDING).count();
+    assert_eq!(pending, 1);
+    let expected: Vec<_> = before
+        .into_iter()
+        .filter(|file| file.0 != PENDING)
+        .collect();
+
+    let restarted = Dispatch::acquire(&scratch.0).unwrap();
+    restarted
+        .restore_first_replacement(BEFORE_BOOT)
+        .expect("the exact restored route should allow journal cleanup");
+    assert_eq!(scratch.snapshot(), expected);
+    assert!(restarted.restore_first_replacement(BEFORE_BOOT).is_err());
+    assert_eq!(scratch.snapshot(), expected);
+}
+
+#[test]
+fn retains_the_cleanup_journal_when_the_route_or_context_changes() {
+    for (name, contents, boot) in [
+        (ROUTES[0], OLD, BEFORE_BOOT),
+        (PENDING, b"Changed journal".as_slice(), BEFORE_BOOT),
+        ("", b"".as_slice(), AFTER_BOOT),
+    ] {
+        let scratch = Scratch::new();
+        restore_without_cleanup(&scratch);
+        if !name.is_empty() {
+            let changed = scratch.0.join("replacement");
+            write_new(&changed, contents).unwrap();
+            fs::rename(changed, scratch.0.join(name)).unwrap();
+        }
+        let before = scratch.snapshot();
+        let restarted = Dispatch::acquire(&scratch.0).unwrap();
+        assert!(restarted.restore_first_replacement(boot).is_err(), "{name}");
         assert_eq!(scratch.snapshot(), before, "{name}");
     }
 }

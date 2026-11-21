@@ -11,3 +11,7 @@ autotests = false
 [[test]]
 name = "activation"
 path = "activation.rs"
+
+[[test]]
+name = "route_inventory"
+path = "route_inventory.rs"

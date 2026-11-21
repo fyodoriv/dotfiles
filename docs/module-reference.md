@@ -95,6 +95,8 @@ If Doctor reports the python.org framework, run
 `dotfiles-remove-framework-python --user-only` in your own terminal.
 It uses an installed uv-managed Python for pipx repair when available
 and lists active config references that still need your review.
+The command exits 1 when a pipx repair or the LaunchAgent environment
+update fails.
 An administrator can remove the system framework. Doctor keeps the
 framework's presence advisory and still flags active dependent environments.
 

@@ -48,10 +48,21 @@ _strip_profile_paths() {
   return 0
 }
 
-if [[ "${1:-}" == "--profile-only" ]]; then
-  _strip_profile_paths
-  exit 0
-fi
+case "$#:${1:-}" in
+  0:|1:--user-only) ;;
+  1:--profile-only)
+    _strip_profile_paths
+    exit 0
+    ;;
+  1:-h|1:--help)
+    echo "Usage: dotfiles-remove-framework-python [--user-only | --profile-only]"
+    exit 0
+    ;;
+  *)
+    echo "Usage: dotfiles-remove-framework-python [--user-only | --profile-only]" >&2
+    exit 2
+    ;;
+esac
 
 # Keep full and user-only repair in a terminal the operator controls.
 if [[ "${DOTFILES_IS_AGENT:-0}" == "1" ]]; then
@@ -79,31 +90,35 @@ echo ""
 if [[ "${1:-}" == --user-only ]] || ! sudo -v 2>/dev/null; then
   echo "Running USER-MODE patch without administrator access."
   echo ""
-  echo "Without admin we can't delete the root-owned framework binary, but we"
-  echo "can patch every user-controlled invoker so nothing actually invokes it:"
+  echo "Repair user-controlled paths where possible. The system framework stays installed."
   echo ""
 
+  incomplete=false
   # ── User-mode patch: rebuild any pipx venvs hardcoded to framework python
-  uv_py="$(uv python find --system --managed-python --no-python-downloads 3.13 2>/dev/null || true)"
-  if [[ -z "$uv_py" || ! -x "$uv_py" ]]; then
-    echo "  ⚠ uv could not find an installed, uv-managed Python 3.13."
-  elif command -v pipx &>/dev/null && [[ -d "$HOME/.local/pipx/venvs" ]]; then
+  if [[ -d "$HOME/.local/pipx/venvs" ]]; then
+    uv_py="$(uv python find --system --managed-python --no-python-downloads 3.13 2>/dev/null || true)"
     echo "  Step 1: rebuild pipx venvs that hardcode framework python"
-    rebuilt=0
+    detected=0 rebuilt=0
     for cfg in "$HOME"/.local/pipx/venvs/*/pyvenv.cfg; do
       [[ -f "$cfg" ]] || continue
       if grep -q "Python.framework" "$cfg" 2>/dev/null; then
+        detected=$((detected + 1))
         pkg="$(basename "$(dirname "$cfg")")"
-        echo "    → rebuilding $pkg with $uv_py..."
-        if pipx reinstall --python "$uv_py" "$pkg" 2>&1 | tail -1; then
+        if [[ ! -x "$uv_py" ]] || ! command -v pipx >/dev/null 2>&1; then
+          echo "    ⚠ Could not rebuild $pkg. Install pipx and an approved uv-managed Python 3.13."
+          incomplete=true
+        elif pipx reinstall --python "$uv_py" "$pkg" 2>&1 | tail -1; then
           rebuilt=$((rebuilt + 1))
+        else
+          echo "    ⚠ Could not rebuild $pkg. Check the pipx error above."
+          incomplete=true
         fi
       fi
     done
-    if [[ "$rebuilt" -eq 0 ]]; then
+    if [[ "$detected" -eq 0 ]]; then
       echo "    ✓ no framework-using pipx venvs found"
     else
-      echo "    ✓ rebuilt $rebuilt pipx venv(s)"
+      echo "    Rebuilt $rebuilt of $detected framework-using pipx venv(s)."
     fi
   fi
 
@@ -118,6 +133,7 @@ if [[ "${1:-}" == --user-only ]] || ! sudo -v 2>/dev/null; then
       echo "    ✓ launchctl: UV_PYTHON_PREFERENCE=only-managed (now set)"
     else
       echo "    ⚠ launchctl setenv failed"
+      incomplete=true
     fi
   fi
 
@@ -153,10 +169,8 @@ if [[ "${1:-}" == --user-only ]] || ! sudo -v 2>/dev/null; then
 
   echo ""
   echo "──────────────────────────────────────────────────────────────────"
-  echo "User-mode patch done. The framework binary at $FRAMEWORK"
-  echo "still exists (we can't delete it without admin), but with the patches"
-  echo "above + UV_PYTHON_PREFERENCE=only-managed, nothing under our control"
-  echo "should invoke it. If policy popups still fire, run:"
+  echo "The framework binary at $FRAMEWORK remains installed."
+  echo "Review any active config references above. If policy popups still fire, run:"
   echo ""
   echo "  ps -ef | grep Python.framework | grep -v grep"
   echo ""
@@ -171,6 +185,10 @@ if [[ "${1:-}" == --user-only ]] || ! sudo -v 2>/dev/null; then
   echo "Keep Homebrew and uv-managed Python (under /opt/homebrew, /usr/local/Cellar,"
   echo "and ~/.local/share/uv)."
   echo ""
+  if $incomplete; then
+    echo "The user-mode repair did not finish. Review the failed steps above." >&2
+    exit 1
+  fi
   exit 0
 fi
 

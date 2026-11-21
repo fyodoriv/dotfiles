@@ -98,3 +98,24 @@ The comparison opens a private empty file and unlinks it before
 running chezmoi. Doctor recognizes only the known warning line.
 If sample setup fails, Doctor uses the ordinary comparison. A
 separate canary catches attempts to regenerate config in repair mode.
+
+## Compare every affected managed check in a full audit
+
+- **Hypothesis**: The queue preserves all ten managed-file results
+  reported in issue #731 when Doctor checks every module.
+- **Measurement**: Run hosted `bats tests/doctor.bats` on macOS.
+  Use the actual managed-check declarations with matching disposable
+  files and real chezmoi comparisons. Compare one full Doctor audit
+  through heavy-run with each individual module. Run the full audit
+  separately with the old restrictive caller mask as a negative control.
+- **Success**: The ten named results all pass in both routes under caller mask
+  `022`, all 10 fail in the restrictive control, and no fixture
+  comparison runs a repair or changes a target.
+- **Pivot**: At least 1 missing, mismatched or unexamined result,
+  unexpected repair or changed target rejects issue closure.
+- **Anchor**: [Issue #731 and its root-cause report](https://github.com/fyodoriv/dotfiles/issues/731)
+  and the [heavy-run caller mask fix](https://github.com/fyodoriv/dotfiles/pull/756).
+
+The fixture covers the managed checks named in the report. It runs the
+real Doctor module selection and chezmoi comparison in a disposable home.
+Unrelated local application checks and settings are outside the fixture.

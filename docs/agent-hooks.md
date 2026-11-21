@@ -389,8 +389,9 @@ leader lock `sched.lock`; the holder reads the settings live and writes a grant 
 reason per ticket, and the pause marks. So `dotfiles config set heavy_run_slots N` reaches
 every waiter within about a second. Waiters from an older `heavy-run` keep their place in
 line: new processes hold the gate ticket `queue/0000000000-0`, and the scheduler opens it
-for one older waiter at a time when its turn comes. Never kill waiters to make them pick up
-new code or settings: their callers get exit 143.
+for one older waiter at a time when its turn comes. When that ticket disappears, the
+scheduler checks the held slots again before granting another ticket. Never kill waiters
+to make them pick up new code or settings: their callers get exit 143.
 
 Project identity readers accept existing raw project fields and typed
 `project_id=sha256:...` fields. Each controller keeps its selected raw project

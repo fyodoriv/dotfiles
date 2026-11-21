@@ -546,7 +546,7 @@ exec perl -e "$common_code"'
       next if time - (stat $xf)[9] < 5;
       unlink "$queue/$t" if flock($xf, LOCK_EX | LOCK_NB);
     }
-    my (@tickets, %live);
+    my (@tickets, %live, $invalid_ticket_project);
     for my $t (sort grep { /^\d+-\d+$/ && $_ ne $GATE } @all) {
       open(my $xf, "<", "$queue/$t") or next;
       if (flock($xf, LOCK_EX | LOCK_NB)) { unlink "$queue/$t", "$queue/$t.grant", "$queue/$t.why"; next; }
@@ -554,18 +554,24 @@ exec perl -e "$common_code"'
       $live{$t} = 1;
       my $kind = ($f{kind} // "") eq "v2" ? "v2" : exists $f{wait} ? "old" : "unknown";
       my $id = project_identity(\%f);
-      $s->{invalid_project} = 1 unless defined $id;
+      $invalid_ticket_project = 1 unless defined $id;
       push @tickets, { name => $t, kind => $kind, project => $f{project}, project_id => $id,
         exclusive => $kind eq "v2" ? ($f{exclusive} // 0) : ($f{line} =~ /\[exclusive\]$/ ? 1 : 0) };
     }
     for my $f (@all) { unlink "$queue/$f" if $f =~ /^(\d+-\d+)\.(grant|why)$/ && !$live{$1}; }
+    my $gate = read1($gate_open);
+    if ($gate ne "" && !$live{$gate}) {
+      unlink $gate_open;
+      $gate = "";
+      # An older waiter takes its slot before removing its ticket.
+      $s = snapshot();
+    }
+    $s->{invalid_project} = 1 if $invalid_ticket_project;
     # A grant not yet taken holds its slot.
     for my $t (@tickets) {
       my $g = read1("$queue/$t->{name}.grant");
       took($s, $t, $g) if $g ne "";
     }
-    my $gate = read1($gate_open);
-    if ($gate ne "" && !$live{$gate}) { unlink $gate_open; $gate = ""; }
     my ($blocked, %why) = (0);
     for my $t (@tickets) {
       next if -e "$queue/$t->{name}.grant";

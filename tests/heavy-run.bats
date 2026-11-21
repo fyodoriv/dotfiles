@@ -1156,6 +1156,16 @@ caller_mask_file() {
   [ ! -e "$HEAVY_RUN_DIR/gate-open" ]
 }
 
+@test "heavy-run: scheduler counts a gated legacy slot taken during a pass" {
+  run --separate-stderr perl "$BATS_TEST_DIRNAME/helpers/heavy-run-legacy-handoff.pl" \
+    "$SCRIPT" "$HEAVY_RUN_DIR" "$BATS_TEST_TMPDIR/handoff"
+  if [ "$status" -ne 0 ]; then
+    printf '%s\n' "$stderr" >&2
+    return 1
+  fi
+  [ "$output" = "Observed the legacy slot before grant; younger command ran once after release." ]
+}
+
 # Start a waiter from a shell that exits at once, so the waiter is orphaned.
 # The shell lives 0.5 s, so the waiter starts with it as parent (a waiter
 # that starts under pid 1 is exempt). $1 is the output redirect; the rest is env.

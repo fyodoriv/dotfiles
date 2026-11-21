@@ -2,8 +2,9 @@
 
 Issue [#636](https://github.com/fyodoriv/dotfiles/issues/636) asks
 for a quick way to run the tests selected by changed files. Reuse the
-current cached affected-test runner. Keep its exact test and path
-mappings, and infer names only when those mappings have no result.
+current cached affected-test runner. Keep existing targeted mappings.
+Infer names when no targeted mapping applies and include literal
+references in either case.
 
 - **Hypothesis**: The new command selects tests for changed and
   untracked source files without sending unrelated tests to Bats.
@@ -18,3 +19,14 @@ mappings, and infer names only when those mappings have no result.
 - **Pivot**: Reject after 1 missed test, 1 extra test in a fixed control,
   1 incorrect base or 1 regression in the full-suite target.
 - **Anchor**: Issue #636 and the existing `bin/bats-affected` selector.
+
+The [hosted selector baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44866545758/job/136731382137)
+failed all three inferred name checks. The literal path reference passed.
+A Make dry run reported that the requested target did not exist.
+
+Before measuring the candidate, add three controls from independent review.
+An explicit unknown base must return 2 before selection. An inferred
+test and a test referring to the same source must both appear with its
+exact path in `--pairs`. A new bin script with an inferred test must also
+keep smoke coverage. Any missing test or changed dependency pair
+invalidates the candidate.

@@ -183,6 +183,38 @@ source_interactive_startup() {
   grep -Fq "mlx offline=1 --model $snapshot --port 8080 --host 127.0.0.1" "$MLX_FIXTURE_CALLS"
 }
 
+@test "MLX shell startup requires every indexed weight shard to be present" {
+  install_mlx_entry_point complete
+  export MLX_MODEL_OVERRIDE="$BATS_TEST_TMPDIR/sharded"
+  mkdir -p "$MLX_MODEL_OVERRIDE"
+  local index="$MLX_MODEL_OVERRIDE/model.safetensors.index.json"
+  local first=model-00001-of-00002.safetensors second=model-00002-of-00002.safetensors
+  printf '{}\n' > "$MLX_MODEL_OVERRIDE/config.json"
+  printf 'fixture weights 1\n' > "$MLX_MODEL_OVERRIDE/$first"
+  printf '{"weight_map":{"first":"%s","second":"%s"}}\n' "$first" "$second" > "$index"
+  run source_interactive_startup
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MLX_FIXTURE_CALLS")" = curl ]
+
+  : > "$MLX_MODEL_OVERRIDE/$second"
+  : > "$MLX_FIXTURE_CALLS"
+  run source_interactive_startup
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MLX_FIXTURE_CALLS")" = curl ]
+
+  printf 'fixture weights 2\n' > "$MLX_MODEL_OVERRIDE/$second"
+  : > "$MLX_FIXTURE_CALLS"
+  run source_interactive_startup
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^mlx offline=1 ' "$MLX_FIXTURE_CALLS")" -eq 1 ]
+
+  printf 'invalid index\n' > "$index"
+  : > "$MLX_FIXTURE_CALLS"
+  run source_interactive_startup
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MLX_FIXTURE_CALLS")" = curl ]
+}
+
 @test "MLX shell settings render default and explicitly disabled values" {
   local config="$BATS_TEST_TMPDIR/chezmoi.yaml"
   printf 'data:\n  repos_dir: apps\n  dotfiles_dir: apps/tooling/dotfiles\n' > "$config"

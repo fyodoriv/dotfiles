@@ -533,6 +533,10 @@ setup_defaults_mock() {
   chmod 0644 "$source" "$target"
   cat > "$TEST_DOTFILES/bin/chezmoi" <<'SH'
 #!/bin/sh
+if [ "${MANAGED_COMPARE_FAILURE:-}" = true ] && [ "$1" = diff ]; then
+  printf 'synthetic private comparator marker\n' >&2
+  exit 65
+fi
 exec "$MANAGED_CHEZMOI_BIN" --no-tty --no-pager --dry-run --config "$MANAGED_CONFIG" \
   --destination "$HOME" --source "$MANAGED_CHECKOUT" --persistent-state "$MANAGED_STATE" "$@"
 SH
@@ -541,7 +545,7 @@ SH
   export PATH="$TEST_DOTFILES/bin:$PATH"
   export HEAVY_RUN_DIR="$TEST_DIR/queue" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
   export HEAVY_RUN_PAUSE_APPS="" HEAVY_RUN_MAX_LOAD=0 HEAVY_RUN_WAIT_LOG="$TEST_DIR/waits.log"
-  unset HEAVY_RUN_HELD
+  unset HEAVY_RUN_HELD MANAGED_COMPARE_FAILURE
 
   local mask expected_status expected mode kind
   for kind in direct permissive-queue restrictive; do
@@ -563,7 +567,26 @@ SH
     cmp -s "$target" "$source"
     mode="$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")"
     [ "$mode" = 644 ]
+    [[ "$output" != *"chezmoi diff failed"* ]]
   done
+
+  MANAGED_COMPARE_FAILURE=true run --separate-stderr /bin/bash "$doctor" --json --module editor
+  [ "$status" -eq 1 ]
+  if ! printf '%s\n' "$output" | jq -e '
+    [.[] | select(.id == "managed.editorconfig")]
+    | length == 1 and .[0].status == "fail" and (.[0].message | contains("chezmoi diff failed (exit 65)"))
+  ' >/dev/null; then
+    echo "Expected the managed-file JSON result to name the comparison failure and exit 65."
+    return 1
+  fi
+  [[ "$output$stderr" != *"synthetic private comparator marker"* ]]
+
+  MANAGED_COMPARE_FAILURE=true run --separate-stderr /bin/bash "$doctor" --module editor
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"chezmoi diff failed (exit 65)"* ]]
+  [[ "$output$stderr" != *"synthetic private comparator marker"* ]]
+  cmp -s "$target" "$source"
+  [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
 }
 
 @test "doctor --module security does not run agentbrew aggregate health" {

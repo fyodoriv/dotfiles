@@ -84,3 +84,8 @@ config when the custom config directory was active.
 A generic Python lookup can accept a project interpreter that tool
 installation ignores. Defer the migration with the policy enabled
 because the existing repair moves both paths before it installs the tool.
+
+The [hosted mismatch baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44878373835/job/136768101762)
+returned the simulated tool refusal (42) instead of deferring the
+migration (1). All ten other uv policy controls passed, including both
+configuration locations and the full local-model installer.

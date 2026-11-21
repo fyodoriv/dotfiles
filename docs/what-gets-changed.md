@@ -255,8 +255,8 @@ set the policy in its `uv/uv.toml` yourself. `dotfiles doctor --module security`
 checks the selected config when the option is on.
 
 Topgrade still upgrades uv tools. The Dotfiles Brew update covers uv itself.
-Scheduled Doctor leaves Poetry in place if uv cannot find an installed
-Python for the repair.
+Doctor still checks the existing Poetry command. With this policy on,
+it leaves migration to uv for a separate manual repair.
 For an explicit Python install, run `UV_PYTHON_DOWNLOADS=manual uv python install 3.13`.
 Set the Dotfiles option to `false` to restore its default operations. Adjust
 the uv user file separately if you also want to change that persisted policy.

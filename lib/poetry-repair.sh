@@ -6,8 +6,12 @@
 #   aside to *.bak (never deletes; an existing *.bak gets a time suffix),
 #   then runs `uv tool install poetry`. Returns non-zero when uv is
 #   missing, the binary is outside $HOME (not the official installer's
-#   location), the download policy requires an installed Python and
-#   none is available, or the install fails.
+#   location), the download policy defers migration, or the install fails.
+
+poetry_repair_deferred() {
+  [ "${UV_PYTHON_DOWNLOADS:-}" = never ] ||
+    [ "$(chezmoi execute-template '{{ dig "uv_python_downloads_never" false . }}' 2>/dev/null)" = true ]
+}
 
 _poetry_repair_move_aside() {
   local path="$1" dest="$1.bak"
@@ -24,14 +28,9 @@ poetry_repair_to_uv() {
     "$HOME"/*) ;;
     *) return 1 ;;
   esac
-  if [ "${UV_PYTHON_DOWNLOADS:-}" = never ] ||
-    [ "$(chezmoi execute-template '{{ dig "uv_python_downloads_never" false . }}' 2>/dev/null)" = true ]; then
-    local UV_PYTHON_DOWNLOADS=never installed_python
-    export UV_PYTHON_DOWNLOADS
-    if ! installed_python="$(uv python find 2>/dev/null)" || [ ! -x "$installed_python" ]; then
-      echo "uv did not find an installed Python. Poetry remains in place." >&2
-      return 1
-    fi
+  if poetry_repair_deferred; then
+    echo "Automatic Python downloads are disabled. Poetry remains in place." >&2
+    return 1
   fi
   _poetry_repair_move_aside "$bin" || return 1
   _poetry_repair_move_aside "$venv" || return 1

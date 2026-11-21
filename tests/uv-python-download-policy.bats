@@ -231,7 +231,8 @@ SH
   local lib="$BATS_TEST_DIRNAME/../lib/poetry-repair.sh"
   local poetry="$HOME/.local/bin/poetry" venv="$HOME/Library/Application Support/pypoetry/venv"
   mkdir -p "$(dirname "$poetry")" "$venv"
-  printf 'fixture poetry\n' > "$poetry"
+  printf '#!/bin/sh\nexit 1\n' > "$poetry"
+  chmod +x "$poetry"
   export UV_POLICY_PYTHON="$TEST_DIR/project-python" UV_POLICY_POETRY_EXIT=42
   cp /bin/echo "$UV_POLICY_PYTHON"
 
@@ -244,6 +245,15 @@ SH
   [ -f "$poetry" ] && [ -d "$venv" ]
   [ ! -e "$poetry.bak" ] && [ ! -e "$venv.bak" ]
   [ ! -s "$UV_POLICY_CALLS" ]
+
+  run env PATH="$(dirname "$poetry"):$PATH" DOTFILES_DIR="$BATS_TEST_DIRNAME/.." bash -c '
+    check() { if [ "$1" = upgrade.poetry_runs ]; then printf "%s\nfix=%s\n" "$2" "$4"; fi; }
+    source "$DOTFILES_DIR/modules/upgrade/doctor.sh"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"automatic migration is off"* && "$output" == *$'\nfix=' ]]
+  [ "$(cat "$UV_POLICY_CALLS")" = 'tool dir|unset' ]
+  : > "$UV_POLICY_CALLS"
 
   set_policy false
   unset UV_POLICY_POETRY_EXIT

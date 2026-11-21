@@ -566,6 +566,36 @@ without_read_only_branch_queries() {
   printf '%s' "$stripped"
 }
 
+find_boundary_parser() {
+  local tool
+  _boundary_shfmt="" _boundary_jq=""
+  for tool in /opt/homebrew/bin/shfmt /usr/local/bin/shfmt; do
+    if [ -x "$tool" ]; then _boundary_shfmt="$tool"; break; fi
+  done
+  for tool in /opt/homebrew/bin/jq /usr/local/bin/jq; do
+    if [ -x "$tool" ]; then _boundary_jq="$tool"; break; fi
+  done
+  [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ]
+}
+
+without_literal_issue_body() {
+  local LC_ALL=C span start end
+  span=$(printf '%s' "$command" | "$_boundary_shfmt" --to-json 2>/dev/null |
+    "$_boundary_jq" -er --arg mode issue-body -f "$_hook_dir/plain-document-write.jq" 2>/dev/null) || return 1
+  IFS=$'\t' read -r start end <<< "$span"
+  [[ "$start" =~ ^[0-9]+$ && "$end" =~ ^[0-9]+$ ]] || return 1
+  [ "$start" -lt "$end" ] && [ "$end" -le "${#command}" ] || return 1
+  printf "%s''%s" "${command:0:start}" "${command:end}"
+}
+
+case "$command" in
+  *gh*issue*create*)
+    if find_boundary_parser && _without_issue_body=$(without_literal_issue_body); then
+      command="$_without_issue_body"
+    fi
+    ;;
+esac
+
 case "$command" in
   *"git reset --hard"*)   block "git reset --hard" ;;
   *"git clean -f"*)       block "git clean -f" ;;
@@ -579,13 +609,7 @@ esac
 if looks_like_branch_delete; then
   # Keep every segment, including the Python body, in the branch detector.
   _segments=""
-  _boundary_shfmt="" _boundary_jq=""
-  for _tool in /opt/homebrew/bin/shfmt /usr/local/bin/shfmt; do
-    if [ -x "$_tool" ]; then _boundary_shfmt="$_tool"; break; fi
-  done
-  for _tool in /opt/homebrew/bin/jq /usr/local/bin/jq; do
-    if [ -x "$_tool" ]; then _boundary_jq="$_tool"; break; fi
-  done
+  find_boundary_parser || true
   if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
     _prefix_end=$(read_only_branch_prefix_end "$_boundary_shfmt" "$_boundary_jq"); then
     _original_command="$command"

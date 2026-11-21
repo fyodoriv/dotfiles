@@ -76,6 +76,11 @@ deployment script links the syntax filter beside the hook. A missing parser
 or failed proof also keeps the original command. Homebrew installs `shfmt`
 on both profiles.
 
+For a direct `gh issue create` call, the parser can identify one ordinary
+quoted body passed with `--body` or `-b`. The guard omits that body
+from its Git command scan. It keeps the full command for shell
+substitutions, translated quotes and unrecognized flag layouts.
+
 For one fixed branch, literal Python document, add, and commit sequence, the
 guard checks each proven command boundary separately. It still checks the
 Python body and commit message. Unknown syntax or a missing checker keeps the

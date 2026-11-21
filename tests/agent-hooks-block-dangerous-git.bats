@@ -151,6 +151,34 @@ _check_command_text() {
   [ "$status" -eq 2 ]
 }
 
+@test "Git guard allows a literal GitHub issue body with its long flag" {
+  _check_command_text "gh issue create --title 'Synthetic' --body 'A note about git branch -D topic'"
+  [ "$status" -eq 0 ]
+}
+
+@test "Git guard allows a literal GitHub issue body with its short flag" {
+  _check_command_text 'gh issue create --title "Synthetic" -b "A note about git branch -D topic"'
+  [ "$status" -eq 0 ]
+}
+
+@test "Git guard allows a literal GitHub issue body joined to its flag" {
+  _check_command_text 'gh issue create --title "Synthetic" --body="A note about git branch -D topic"'
+  [ "$status" -eq 0 ]
+}
+
+@test "Git guard keeps executable input in and after a GitHub issue body" {
+  _check_command_text 'gh issue create --title "Synthetic" --body "$(git branch -D synthetic-topic)"'
+  [ "$status" -eq 2 ]
+  _check_command_text "gh issue create --title 'Synthetic' --body 'A note'; git branch -D synthetic-topic"
+  [ "$status" -eq 2 ]
+  _check_command_text 'gh issue create --title "$(git branch -D synthetic-topic)" --body "A note"'
+  [ "$status" -eq 2 ]
+  _check_command_text 'gh issue create -- --body "A note about git branch -D synthetic-topic"'
+  [ "$status" -eq 2 ]
+  _check_command_text 'gh issue create --body $"A note about git branch -D synthetic-topic"'
+  [ "$status" -eq 2 ]
+}
+
 @test "ignores inert quoted heredoc prose" {
   local text
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
@@ -223,6 +251,10 @@ _check_command_text() {
   [ -L "$scratch/.config/dotfiles/hooks/plain-document-write.jq" ]
   [ -L "$scratch/.config/dotfiles/hooks/python-document-boundaries.py" ]
   text=$(printf "cat <<'NOTE'\ngit branch -D topic\nNOTE\n")
+  payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
+  run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
+  [ "$status" -eq 0 ]
+  text="gh issue create --title 'Résumé' --body 'A note about git branch -D topic'"
   payload=$(jq -n --arg command "$text" '{tool_input: {command: $command}}')
   run bash -c 'printf "%s" "$1" | "$2"' _ "$payload" "$scratch/.config/dotfiles/hooks/block-dangerous-git.sh"
   [ "$status" -eq 0 ]

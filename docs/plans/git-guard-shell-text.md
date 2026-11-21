@@ -24,3 +24,31 @@ fixtures cover comments, here-strings, nested quotes, unquoted substitutions,
 multiple heredocs, and executable code after the terminator. Existing
 branch-proof tests must remain green. Test commands are strings sent to the
 guard, never executed as destructive git operations.
+
+## Preserve a quoted GitHub issue body
+
+- **Hypothesis**: The Git guard can ignore destructive-command words
+  in a quoted body passed to one direct GitHub issue create operation.
+- **Measurement**: Run hosted `bats tests/agent-hooks-block-dangerous-git.bats`.
+  Submit separate short and long body flags and an inline long flag.
+  Verify that command substitution and an additional destructive Git
+  statement still refuse. The fixture never runs the supplied input.
+- The deployed helper exercises a Unicode title before the body.
+  Extra controls preserve substitutions in other arguments and treat
+  text after the option terminator and locale-translated quotes conservatively.
+- **Success**: Allow the 3 literal body forms and retain both refusals
+  and the existing quoted heredoc and branch controls. Run 0 supplied
+  invocations.
+- **Pivot**: At least 1 ignored executable segment, 1 refused literal
+  case, or 1 existing guard regression rejects the change.
+- **Anchor**: [Dotfiles issue #761](https://github.com/fyodoriv/dotfiles/issues/761)
+  and the existing typed shell proof above.
+
+Qualify literal body text only when the parser identifies one direct
+call. Preserve the original guard for missing parsers, unsupported
+structures and any executable part of a body argument.
+
+The [hosted macOS baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44901508839/job/136838202714)
+refused each literal case. The executable controls and quoted heredoc
+passed. The guard now uses the typed parser to mask just the literal
+body span for the analysis. The broader quoted-text report stays open.

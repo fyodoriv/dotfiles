@@ -58,3 +58,16 @@ accepted a missing interpreter and a package for another Python
 version. It attempted a launch with no cached model and passed a
 remote model ID for a cached revision. The generated shell setting
 also allowed startup with local AI off. The other eight controls passed.
+
+## Require all indexed weight shards
+
+- **Hypothesis**: A partial sharded snapshot leaves the shell idle
+  after its loopback check. A complete indexed snapshot starts once.
+- **Measurement**: Give the local model fixture an index with two
+  shard names. Run startup with one file and then with both files.
+- **Success**: 0 launch calls for the partial snapshot and 1 offline
+  launch for the complete snapshot. A nonempty unsharded model
+  continues to pass the original control.
+- **Pivot**: Any launch with a missing listed shard, malformed index,
+  or empty weight file rejects the check.
+- **Anchor**: [MLX weight loading](https://github.com/ml-explore/mlx-lm/blob/v0.32.2/mlx_lm/utils.py#L409-L419).

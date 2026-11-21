@@ -18,7 +18,7 @@ morning
 
 Runs these steps in sequence:
 
-1. **Pull latest on all repos** — `git pull --rebase` on every repo in `~/apps/` on `main`/`master`
+1. **Pull latest on active repos** — fast-forward each `main` or `master` branch in `~/apps/`. If a refresh fails, show the command to review that checkout.
 2. **Health check** — `dotfiles doctor` (report only, no fixes)
 3. **Today's notes** — shows today's entries from `~/.notes/` (written via `note` command)
 4. **Calendar** — today's meetings via `icalBuddy` (or just the date)

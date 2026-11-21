@@ -62,3 +62,9 @@ while the older waiter moves to the lock.
 The controls use scratch settings only. The staged ticket
 tests pending admission. The running exclusive and multi-slot
 controls stay in the existing suite.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44894743197/job/136817883052)
+recorded grant `s1` and no wait reason in both passes. The old
+reservation counted a busy slot without reserving exclusive
+admission. It now holds later grants for the selected older
+exclusive ticket. The shared-ticket accounting stays the same.

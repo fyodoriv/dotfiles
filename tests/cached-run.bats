@@ -654,13 +654,15 @@ calls() {
 }
 
 @test "both affected test recipes retain pairs and the HEAD cache key" {
-  local target
+  local target commands
   for target in test test-changed; do
     run make -C "$BATS_TEST_DIRNAME/.." -n --no-print-directory "$target" JOBS=1 FULLPOWER=
     [ "$status" -eq 0 ]
-    [[ "$output" == *'./bin/bats-affected --pairs > "$pairs"'* ]]
-    [[ "$output" == *'./bin/cached-run --per-file'*'--deps "$pairs"'*'--key "head=$(git rev-parse HEAD)" bats'*'-- $peers'* ]]
-    [[ "$output" == *'./bin/cached-run --per-file --deps "$pairs"'*'--key "head=$(git rev-parse HEAD)" bats -- $doctor'* ]]
+    commands="$(printf '%s\n' "$output" | tr ';' '\n' | sed -E 's/[[:blank:]]+/ /g')"
+    grep -qF './bin/bats-affected --pairs > "$pairs"' <<< "$commands"
+    grep -qF './bin/cached-run --per-file --deps "$pairs" --key "head=$(git rev-parse HEAD)" bats -- $peers' <<< "$commands"
+    grep -qF './bin/cached-run --per-file --deps "$pairs" --key "head=$(git rev-parse HEAD)" bats -- $queue_test' <<< "$commands"
+    grep -qF './bin/cached-run --per-file --deps "$pairs" --key "head=$(git rev-parse HEAD)" bats -- $doctor' <<< "$commands"
   done
 }
 

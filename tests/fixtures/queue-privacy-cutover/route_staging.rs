@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 const LOCK: &str = "dispatch-lock";
 const RECEIPT: &str = "staging-receipt";
 const ARTIFACT: &str = "fixture-controller";
+const ARCHIVE: &str = "shell-route.previous";
+const PENDING: &str = "route-restore";
 const OLD: &[u8] = b"Old fixture route";
 const ARTIFACT_BODY: &[u8] = b"Inert fixture controller";
 const ROUTE_BODY: &[u8] = b"Guarded fixture route";
@@ -75,12 +77,63 @@ impl<'a> Dispatch<'a> {
         Ok(())
     }
 
-    fn replace_route(&self, route: &str) -> io::Result<()> {
+    fn stage_route(&self, route: &str) -> io::Result<PathBuf> {
         self.check()?;
         observe(&self.root.join(route), OLD)?;
         let sibling = self.root.join(format!("{route}.next"));
         write_new(&sibling, ROUTE_BODY)?;
-        fs::rename(&sibling, self.root.join(route))
+        Ok(sibling)
+    }
+
+    fn replace_route(&self, route: &str) -> io::Result<()> {
+        fs::rename(self.stage_route(route)?, self.root.join(route))
+    }
+
+    fn require_uncommitted(&self) -> io::Result<()> {
+        match fs::symlink_metadata(self.root.join(RECEIPT)) {
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error),
+            Ok(_) => Err(ErrorKind::AlreadyExists.into()),
+        }
+    }
+
+    fn pending_body(&self, replacement: &Path) -> io::Result<String> {
+        self.check()?;
+        let (device, inode) = identity(&self.owner.metadata()?)?;
+        let mut record = format!("v1 {BEFORE_BOOT}\nlock {device} {inode}\n");
+        for (name, path, contents) in [
+            (ARTIFACT, self.root.join(ARTIFACT), ARTIFACT_BODY),
+            (ROUTES[1], self.root.join(ROUTES[1]), OLD),
+            (ARCHIVE, self.root.join(ARCHIVE), OLD),
+            (ROUTES[0], replacement.to_path_buf(), ROUTE_BODY),
+        ] {
+            let (device, inode) = observe(&path, contents)?;
+            record.push_str(&format!("{name} {device} {inode}\n"));
+        }
+        Ok(record)
+    }
+
+    fn stage_first_replacement(&self) -> io::Result<()> {
+        self.require_uncommitted()?;
+        let replacement = self.stage_route(ROUTES[0])?;
+        write_new(&self.root.join(ARCHIVE), OLD)?;
+        let record = self.pending_body(&replacement)?;
+        write_new(&self.root.join(PENDING), record.as_bytes())?;
+        self.check()?;
+        fs::rename(replacement, self.root.join(ROUTES[0]))
+    }
+
+    fn restore_first_replacement(&self, boot: &str) -> io::Result<()> {
+        if boot != BEFORE_BOOT {
+            return Err(ErrorKind::InvalidData.into());
+        }
+        self.require_uncommitted()?;
+        let route = self.root.join(ROUTES[0]);
+        let record = self.pending_body(&route)?;
+        observe(&self.root.join(PENDING), record.as_bytes())?;
+        self.check()?;
+        fs::rename(self.root.join(ARCHIVE), route)?;
+        fs::remove_file(self.root.join(PENDING))
     }
 
     fn receipt_body(&self) -> io::Result<String> {
@@ -97,9 +150,7 @@ impl<'a> Dispatch<'a> {
 
     fn publish_receipt(&self) -> io::Result<()> {
         let receipt = self.receipt_body()?;
-        if self.root.join(RECEIPT).symlink_metadata().is_ok() {
-            return Err(ErrorKind::AlreadyExists.into());
-        }
+        self.require_uncommitted()?;
         let staged = self.root.join("receipt.next");
         write_new(&staged, receipt.as_bytes())?;
         self.check()?;
@@ -233,4 +284,63 @@ fn refuses_a_busy_dispatch_lock_before_handoff() {
     let restarted = Dispatch::acquire(&scratch.0).unwrap();
     restarted.recognize_staged_routes(AFTER_BOOT).unwrap();
     assert_eq!(scratch.snapshot(), before);
+}
+
+#[test]
+fn restores_only_the_recorded_partial_replacement_after_restart() {
+    let scratch = Scratch::new();
+    let dispatch = Dispatch::acquire(&scratch.0).unwrap();
+    let second_route = observe(&scratch.0.join(ROUTES[1]), OLD).unwrap();
+    let artifact = observe(&scratch.0.join(ARTIFACT), ARTIFACT_BODY).unwrap();
+    dispatch.stage_first_replacement().unwrap();
+    let archive = observe(&scratch.0.join(ARCHIVE), OLD).unwrap();
+    observe(&scratch.0.join(ROUTES[0]), ROUTE_BODY).unwrap();
+    drop(dispatch);
+
+    let restarted = Dispatch::acquire(&scratch.0).unwrap();
+    restarted.restore_first_replacement(BEFORE_BOOT).unwrap();
+    assert_eq!(observe(&scratch.0.join(ROUTES[0]), OLD).unwrap(), archive);
+    assert_eq!(
+        observe(&scratch.0.join(ROUTES[1]), OLD).unwrap(),
+        second_route
+    );
+    assert_eq!(
+        observe(&scratch.0.join(ARTIFACT), ARTIFACT_BODY).unwrap(),
+        artifact
+    );
+    for file in [ARCHIVE, PENDING, RECEIPT] {
+        assert!(!scratch.0.join(file).exists());
+    }
+    let recovered = scratch.snapshot();
+    assert!(restarted.restore_first_replacement(BEFORE_BOOT).is_err());
+    assert_eq!(scratch.snapshot(), recovered);
+}
+
+#[test]
+fn retains_the_archive_on_wrong_boot_or_file_drift() {
+    for (name, contents, boot) in [
+        (ROUTES[0], ROUTE_BODY, BEFORE_BOOT),
+        (ARCHIVE, b"Changed archive".as_slice(), BEFORE_BOOT),
+        (ROUTES[1], OLD, BEFORE_BOOT),
+        (LOCK, b"".as_slice(), BEFORE_BOOT),
+        (PENDING, b"Changed journal".as_slice(), BEFORE_BOOT),
+        (RECEIPT, b"Final receipt present".as_slice(), BEFORE_BOOT),
+        ("", b"".as_slice(), AFTER_BOOT),
+    ] {
+        let scratch = Scratch::new();
+        let dispatch = Dispatch::acquire(&scratch.0).unwrap();
+        dispatch.stage_first_replacement().unwrap();
+        drop(dispatch);
+        if !name.is_empty() {
+            let changed = scratch.0.join("replacement");
+            write_new(&changed, contents).unwrap();
+            fs::rename(changed, scratch.0.join(name)).unwrap();
+        }
+
+        let before = scratch.snapshot();
+        let restarted = Dispatch::acquire(&scratch.0).unwrap();
+        assert!(restarted.restore_first_replacement(boot).is_err(), "{name}");
+        assert!(scratch.0.join(ARCHIVE).is_file(), "{name}");
+        assert_eq!(scratch.snapshot(), before, "{name}");
+    }
 }

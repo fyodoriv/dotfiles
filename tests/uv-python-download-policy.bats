@@ -40,6 +40,7 @@ case "$*" in
     printf '%s\n' "$UV_POLICY_PYTHON" ;;
   'tool dir --bin') printf '%s\n' "$HOME/.local/bin" ;;
   'tool dir') printf '%s\n' "$HOME/.local/share/uv/tools" ;;
+  'tool install poetry') exit "${UV_POLICY_POETRY_EXIT:-0}" ;;
   'python install 3.13'|'tool upgrade --all'|'tool list'|'tool install '*) exit 0 ;;
   *) exit 90 ;;
 esac
@@ -225,29 +226,31 @@ SH
   fi
 }
 
-@test "uv policy leaves Poetry in place without an installed interpreter" {
+@test "uv policy leaves Poetry in place even if the project has an interpreter" {
   set_policy true
   local lib="$BATS_TEST_DIRNAME/../lib/poetry-repair.sh"
   local poetry="$HOME/.local/bin/poetry" venv="$HOME/Library/Application Support/pypoetry/venv"
   mkdir -p "$(dirname "$poetry")" "$venv"
   printf 'fixture poetry\n' > "$poetry"
+  export UV_POLICY_PYTHON="$TEST_DIR/project-python" UV_POLICY_POETRY_EXIT=42
+  cp /bin/echo "$UV_POLICY_PYTHON"
 
   run bash -c 'source "$1"; poetry_repair_to_uv "$2"' policy "$lib" "$poetry"
   if [ "$status" -ne 1 ]; then
-    printf 'Expected missing-Python refusal, got exit %s.\n' "$status"
+    printf 'Expected migration to defer before tool installation, got exit %s.\n' "$status"
     return 1
   fi
+  [[ "$output" == *"Poetry remains in place"* ]]
   [ -f "$poetry" ] && [ -d "$venv" ]
   [ ! -e "$poetry.bak" ] && [ ! -e "$venv.bak" ]
-  [ "$(cat "$UV_POLICY_CALLS")" = 'python find|never' ]
+  [ ! -s "$UV_POLICY_CALLS" ]
 
-  export UV_POLICY_PYTHON="$TEST_DIR/python-available"
-  cp /bin/echo "$UV_POLICY_PYTHON"
-  : > "$UV_POLICY_CALLS"
+  set_policy false
+  unset UV_POLICY_POETRY_EXIT
   run bash -c 'source "$1"; poetry_repair_to_uv "$2"' policy "$lib" "$poetry"
   [ "$status" -eq 0 ]
   [ -f "$poetry.bak" ] && [ -d "$venv.bak" ]
-  grep -Fxq 'tool install poetry|never' "$UV_POLICY_CALLS"
+  [ "$(cat "$UV_POLICY_CALLS")" = 'tool install poetry|unset' ]
 }
 
 @test "uv policy leaves the unused default config absent with custom XDG config" {

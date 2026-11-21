@@ -512,8 +512,7 @@ setup_defaults_mock() {
   echo "$output" | jq -e '.[] | select(.id == "security.sensitive_perms..netrc" and .status == "warn" and .fix == "chmod 600 ~/.netrc")' >/dev/null
 }
 
-@test "managed file checks keep the same result under the queue caller mask" {
-  bats_require_minimum_version 1.5.0
+setup_managed_comparison_doctor() {
   export MANAGED_CHEZMOI_BIN="$(command -v chezmoi)"
   MANAGED_CHECKOUT="$(cd "$TEST_DOTFILES" && pwd -P)"
   export MANAGED_CHECKOUT MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
@@ -521,22 +520,18 @@ setup_defaults_mock() {
   export MANAGED_APPLY_LOG="$TEST_DIR/managed-apply.log"
   export XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" XDG_STATE_HOME="$TEST_HOME/.local/state"
   export DOTFILES_BREW_PREFIX="$TEST_DIR/no-brew" DOTFILES_DOCTOR_NOTIFY=0
-  local doctor="$TEST_DOTFILES/bin/dotfiles-doctor"
-  local target="$TEST_HOME/.editorconfig" source="$TEST_DOTFILES/dot_editorconfig"
-  mkdir -p "$TEST_DOTFILES/bin" "$TEST_DOTFILES/lib" "$TEST_DOTFILES/modules/editor"
-  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$doctor"
+  MANAGED_DOCTOR="$TEST_DOTFILES/bin/dotfiles-doctor"
+  mkdir -p "$TEST_DOTFILES/bin" "$TEST_DOTFILES/lib" "$TEST_DOTFILES/modules"
+  cp "$BATS_TEST_DIRNAME/../bin/dotfiles-doctor" "$MANAGED_DOCTOR"
   cp -R "$BATS_TEST_DIRNAME/../lib/." "$TEST_DOTFILES/lib/"
-  awk '/^check_managed "managed\.editorconfig"/ {print; exit}' \
-    "$BATS_TEST_DIRNAME/../modules/editor/doctor.sh" > "$TEST_DOTFILES/modules/editor/doctor.sh"
-  [ -s "$TEST_DOTFILES/modules/editor/doctor.sh" ]
   : > "$MANAGED_CONFIG"
-  printf 'root = true\n\n[*]\nindent_style = space\n' > "$source"
-  cp "$source" "$target"
-  chmod 0644 "$source" "$target"
   cat > "$TEST_DOTFILES/bin/chezmoi" <<'SH'
 #!/bin/sh
 if [ "$1" = source-path ]; then
   printf '%s\n' "$MANAGED_CHECKOUT"
+  exit 0
+fi
+if [ "$1" = doctor ] && [ "${MANAGED_SKIP_STOCK_DOCTOR:-}" = true ]; then
   exit 0
 fi
 if [ "$1" = init ]; then
@@ -544,9 +539,9 @@ if [ "$1" = init ]; then
   exit 66
 fi
 if [ "$1" = apply ]; then
+  printf 'apply\n' >> "$MANAGED_APPLY_LOG"
   [ "$#" -eq 4 ] && [ "$2" = "$HOME/.editorconfig" ] &&
     [ "$3" = --source ] && [ "$4" = "$MANAGED_CHECKOUT" ] || exit 64
-  printf 'apply\n' >> "$MANAGED_APPLY_LOG"
   [ "${MANAGED_COMPARE_FAILURE:-}" != true ] || exit 65
   cp "$MANAGED_CHECKOUT/dot_editorconfig" "$HOME/.editorconfig"
   exit $?
@@ -571,7 +566,21 @@ SH
   export PATH="$TEST_DOTFILES/bin:$PATH"
   export HEAVY_RUN_DIR="$TEST_DIR/queue" HEAVY_RUN_SLOTS=1 HEAVY_RUN_RAMP=0 HEAVY_RUN_PROBE=true
   export HEAVY_RUN_PAUSE_APPS="" HEAVY_RUN_MAX_LOAD=0 HEAVY_RUN_WAIT_LOG="$TEST_DIR/waits.log"
-  unset HEAVY_RUN_HELD MANAGED_COMPARE_FAILURE
+  unset HEAVY_RUN_HELD MANAGED_COMPARE_FAILURE MANAGED_COMPARE_WARNING MANAGED_SKIP_STOCK_DOCTOR
+}
+
+@test "managed file checks keep the same result under the queue caller mask" {
+  bats_require_minimum_version 1.5.0
+  setup_managed_comparison_doctor
+  local doctor="$MANAGED_DOCTOR"
+  local target="$TEST_HOME/.editorconfig" source="$TEST_DOTFILES/dot_editorconfig"
+  mkdir -p "$TEST_DOTFILES/modules/editor"
+  awk '/^check_managed "managed\.editorconfig"/ {print; exit}' \
+    "$BATS_TEST_DIRNAME/../modules/editor/doctor.sh" > "$TEST_DOTFILES/modules/editor/doctor.sh"
+  [ -s "$TEST_DOTFILES/modules/editor/doctor.sh" ]
+  printf 'root = true\n\n[*]\nindent_style = space\n' > "$source"
+  cp "$source" "$target"
+  chmod 0644 "$source" "$target"
 
   local mask expected_status expected mode kind
   for kind in direct permissive-queue restrictive; do
@@ -670,6 +679,87 @@ SH
   [ ! -e "$MANAGED_APPLY_LOG" ]
   cmp -s "$target" "$source"
   [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$target")" = 644 ]
+}
+
+@test "all reported managed files agree in full and individual Doctor audits" {
+  bats_require_minimum_version 1.5.0
+  setup_managed_comparison_doctor
+  export MANAGED_SKIP_STOCK_DOCTOR=true
+
+  local inventory="$TEST_DIR/managed-inventory" expected_pass="$TEST_DIR/expected-pass"
+  local expected_fail="$TEST_DIR/expected-fail" individual="$TEST_DIR/individual"
+  cat > "$inventory" <<'ROWS'
+editor editorconfig dot_editorconfig .editorconfig
+git gitconfig dot_gitconfig.tmpl .gitconfig
+git gitconfig_personal dot_gitconfig.personal.tmpl .gitconfig.personal
+shell hushlogin dot_hushlogin .hushlogin
+tools topgrade dot_config/topgrade.toml.tmpl .config/topgrade.toml
+extras gradle dot_gradle/gradle.properties .gradle/gradle.properties
+extras lazygit dot_config/lazygit/config.yml .config/lazygit/config.yml
+extras tigrc dot_tigrc .tigrc
+prompt starship dot_config/starship.toml .config/starship.toml
+terminal ghostty dot_config/ghostty/config .config/ghostty/config
+ROWS
+  local module name source target
+  local -a comparison_targets=()
+  while read -r module name source target; do
+    comparison_targets+=("$HOME/$target")
+    mkdir -p "$TEST_DOTFILES/modules/$module" "$TEST_DOTFILES/$(dirname "$source")" "$HOME/$(dirname "$target")"
+    awk -v id="managed.$name" '
+      index($0, "check_managed \"" id "\"") {
+        print
+        while ($0 ~ /\\$/ && getline) print
+        found = 1
+        exit
+      }
+      END { if (!found) exit 1 }
+    ' "$BATS_TEST_DIRNAME/../modules/$module/doctor.sh" >> "$TEST_DOTFILES/modules/$module/doctor.sh"
+    printf 'synthetic %s\n' "$name" > "$TEST_DOTFILES/$source"
+    cp "$TEST_DOTFILES/$source" "$HOME/$target"
+    chmod 0644 "$TEST_DOTFILES/$source" "$HOME/$target"
+    printf 'managed.%s\tpass\n' "$name" >> "$expected_pass"
+    printf 'managed.%s\tfail\n' "$name" >> "$expected_fail"
+  done < "$inventory"
+  LC_ALL=C sort -o "$expected_pass" "$expected_pass"
+  LC_ALL=C sort -o "$expected_fail" "$expected_fail"
+
+  managed_audit_results() {
+    jq -er '.[] | select(.id | startswith("managed.")) | [.id, .status] | @tsv'
+  }
+
+  local -a audit=(/bin/bash "$MANAGED_DOCTOR" --json)
+  run --separate-stderr /bin/sh -c 'umask 022; exec "$@"' fixture \
+    "$BATS_TEST_DIRNAME/../bin/heavy-run" "${audit[@]}"
+  [ "$status" -eq 0 ]
+  managed_audit_results <<< "$output" | LC_ALL=C sort > "$TEST_DIR/actual"
+  diff -u "$expected_pass" "$TEST_DIR/actual"
+
+  for module in editor git shell tools extras prompt terminal; do
+    run --separate-stderr /bin/sh -c 'umask 022; exec "$@"' fixture "${audit[@]}" --module "$module"
+    [ "$status" -eq 0 ]
+    managed_audit_results <<< "$output" >> "$individual"
+  done
+  LC_ALL=C sort -o "$individual" "$individual"
+  diff -u "$expected_pass" "$individual"
+
+  run --separate-stderr /bin/sh -c 'umask 077; exec "$@"' fixture "${audit[@]}"
+  [ "$status" -eq 1 ]
+  [[ "$output" != *"chezmoi diff failed"* ]]
+  managed_audit_results <<< "$output" | LC_ALL=C sort > "$TEST_DIR/actual"
+  diff -u "$expected_fail" "$TEST_DIR/actual"
+
+  run --separate-stderr /bin/sh -c 'umask 077; exec "$@"' fixture \
+    "$TEST_DOTFILES/bin/chezmoi" diff "${comparison_targets[@]}"
+  [ "$status" -eq 0 ]
+  [ "$(grep -Fxc 'old mode 100644' <<< "$output")" -eq 10 ]
+  [ "$(grep -Fxc 'new mode 100600' <<< "$output")" -eq 10 ]
+  ! grep -q '^@@ ' <<< "$output"
+
+  [ ! -e "$MANAGED_APPLY_LOG" ]
+  while read -r module name source target; do
+    cmp -s "$TEST_DOTFILES/$source" "$HOME/$target"
+    [ "$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$HOME/$target")" = 644 ]
+  done < "$inventory"
 }
 
 @test "doctor --module security does not run agentbrew aggregate health" {

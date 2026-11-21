@@ -90,3 +90,92 @@ PROFILE
   [[ "$output" == *"no python.org PATH"* ]]
   ! ls "$home"/.zprofile.dotfiles-bak-* >/dev/null 2>&1
 }
+
+@test "remove-framework-python: user-only repair leaves sudo, framework Python and dormant files alone" {
+  local root="$BATS_TEST_TMPDIR/root"
+  local home="$root/home" stubs="$root/stub-bin"
+  local framework_bin="$root/Library/Frameworks/Python.framework/Versions/3.14/bin"
+  mkdir -p "$home/.config/venv.framework-bak" "$stubs" "$framework_bin"
+  export FRAMEWORK_REPAIR_CALLS="$root/calls"
+  : > "$FRAMEWORK_REPAIR_CALLS"
+  printf '#!/bin/bash\nprintf "sudo\\n" >> "$FRAMEWORK_REPAIR_CALLS"\nexit 1\n' > "$stubs/sudo"
+  printf '#!/bin/bash\nprintf "python3\\n" >> "$FRAMEWORK_REPAIR_CALLS"\n' > "$framework_bin/python3"
+  printf '#!/bin/bash\nexit 1\n' > "$stubs/uv"
+  printf '#!/bin/bash\nexit 0\n' > "$stubs/launchctl"
+  chmod +x "$stubs/"{sudo,uv,launchctl} "$framework_bin/python3"
+  local reference='/Library/Frameworks/Python.framework/Versions/3.14/bin/python3'
+  printf '%s\n' "$reference" > "$home/.config/active.conf"
+  printf '%s\n' "$reference" > "$home/.config/tool.log"
+  printf '%s\n' "$reference" > "$home/.config/venv.framework-bak/pyvenv.cfg"
+
+  run env -u DOTFILES_IS_AGENT HOME="$home" PATH="$framework_bin:$stubs:$PATH" \
+    DOTFILES_PYTHON_ROOT="$root" bash "$BATS_TEST_DIRNAME/../bin/dotfiles-remove-framework-python" --user-only
+  [ "$status" -eq 0 ]
+  if [ -s "$FRAMEWORK_REPAIR_CALLS" ]; then
+    printf 'Unexpected commands in user-only repair:\n'
+    cat "$FRAMEWORK_REPAIR_CALLS"
+    return 1
+  fi
+  [[ "$output" == *"$home/.config/active.conf"* ]]
+  [[ "$output" != *tool.log* && "$output" != *venv.framework-bak* ]]
+  [[ "$output" == *"ask an administrator"* ]]
+  [ -d "$framework_bin" ]
+
+  printf '# Setting PATH for Python 3.14\nPATH="%s:\${PATH}"\nexport PATH\n' "$framework_bin" > "$home/.zprofile"
+  cp "$home/.zprofile" "$root/original-profile"
+  run env -u DOTFILES_IS_AGENT HOME="$home" PATH="$framework_bin:$stubs:$PATH" \
+    DOTFILES_PYTHON_ROOT="$root" bash "$BATS_TEST_DIRNAME/../bin/dotfiles-remove-framework-python" --user-onyl
+  if [ "$status" -ne 2 ]; then
+    printf 'Expected invalid option to exit 2, got %s.\n' "$status"
+    return 1
+  fi
+  [ ! -s "$FRAMEWORK_REPAIR_CALLS" ]
+  cmp -s "$home/.zprofile" "$root/original-profile"
+}
+
+@test "remove-framework-python: a failed pipx reinstall reports incomplete repair" {
+  local root="$BATS_TEST_TMPDIR/root"
+  local home="$root/home" stubs="$root/stub-bin"
+  local pipx_venv="$home/.local/pipx/venvs/tool-example"
+  mkdir -p "$pipx_venv" "$stubs" "$root/Library/Frameworks/Python.framework"
+  printf 'home = /Library/Frameworks/Python.framework/Versions/3.14/bin\n' > "$pipx_venv/pyvenv.cfg"
+  export FRAMEWORK_REPAIR_CALLS="$root/calls"
+  export FRAMEWORK_REPAIR_PYTHON="$stubs/python-fixture"
+  : > "$FRAMEWORK_REPAIR_CALLS"
+  cp /bin/echo "$FRAMEWORK_REPAIR_PYTHON"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$FRAMEWORK_REPAIR_PYTHON"\n' > "$stubs/uv"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "$FRAMEWORK_REPAIR_CALLS"\nexit 1\n' > "$stubs/pipx"
+  printf '#!/bin/bash\nprintf "unexpected sudo\\n" >> "$FRAMEWORK_REPAIR_CALLS"\nexit 1\n' > "$stubs/sudo"
+  printf '#!/bin/bash\nexit 0\n' > "$stubs/launchctl"
+  chmod +x "$stubs/"{uv,pipx,sudo,launchctl}
+
+  run env -u DOTFILES_IS_AGENT HOME="$home" PATH="$stubs:$PATH" \
+    DOTFILES_PYTHON_ROOT="$root" bash "$BATS_TEST_DIRNAME/../bin/dotfiles-remove-framework-python" --user-only
+  if [ "$status" -ne 1 ]; then
+    printf 'Expected incomplete repair to exit 1, got %s.\n' "$status"
+    return 1
+  fi
+  [[ "$output" == *"Could not rebuild tool-example"* && "$output" != *"no framework-using pipx venvs"* ]]
+  [ "$(cat "$FRAMEWORK_REPAIR_CALLS")" = "reinstall --python $FRAMEWORK_REPAIR_PYTHON tool-example" ]
+}
+
+@test "remove-framework-python: Doctor gives a non-admin repair with the advisory" {
+  local fixture_root="$BATS_TEST_TMPDIR/root"
+  mkdir -p "$fixture_root/Library/Frameworks/Python.framework"
+  local block="$BATS_TEST_TMPDIR/doctor-framework"
+  printf '_framework=%q\n' "$fixture_root/Library/Frameworks/Python.framework" > "$block"
+  awk '
+    /^_framework=/ { copy = 1; next }
+    /pipx venv architecture drift/ { exit }
+    copy { print }
+  ' "$BATS_TEST_DIRNAME/../modules/security/doctor.sh" >> "$block"
+
+  run env HOME="$fixture_root" DOTFILES_DIR="$BATS_TEST_DIRNAME/.." bash -c '
+    check_advisory() { printf "%s\n" "$1" "$4"; }
+    check() { printf "unexpected required check %s\n" "$1"; return 1; }
+    source "$1"
+  ' doctor "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *security.no_framework_python* && "$output" == *"--user-only"* && "$output" == *"administrator"* ]]
+  [[ "$output" != *"unexpected required check"* ]]
+}

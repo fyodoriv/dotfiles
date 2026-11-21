@@ -64,3 +64,28 @@ verification fixture returned plain `diff`'s exit 1 for a normal
 difference. A disposable built-in `chezmoi diff` returned exit 0
 and the difference while leaving its target untouched. Align the
 fixture with that contract and keep the separate unreadable case.
+
+## Report a stale chezmoi config template once
+
+A disposable chezmoi setup compared one unchanged target before
+and after changing its config template. Both comparisons exited
+zero. Only the stale comparison wrote the template warning.
+The built-in doctor and source-path commands omitted the warning.
+
+- **Hypothesis**: Dotfiles Doctor can report the known stale-template
+  warning once per invocation without changing its managed-file results.
+- **Measurement**: Run hosted `bats tests/doctor.bats`. Use two
+  comparisons in a disposable module. Add the stale-template warning
+  and an unrelated synthetic private marker to comparator stderr.
+  Check text, JSON and a separate control with only the unrelated marker.
+- **Success**: 1 fixed advisory in each stale run, 0 advisories in the
+  unrelated control, 0 private markers printed and 0 apply attempts.
+  Both managed-file results stay healthy and exit status stays zero.
+- **Pivot**: At least 1 duplicate, missed or false advisory, printed
+  marker, file change or failed ordinary comparison rejects it.
+- **Anchor**: Issue #731, the ordinary zero-exit comparison result,
+  and the existing Doctor advisory output.
+
+Sample the first successful comparison of an existing file. The
+applied source and config stay common across the checks within one
+invocation. Keep the comparison and warning results separate.

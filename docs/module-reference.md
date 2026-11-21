@@ -154,6 +154,7 @@ hourly tooling sync jobs. It also checks the power-settings watcher's
 file and process utilities, including `ps` and `pgrep`.
 For the morning job it checks `dirname`, `mktemp`, `rm`, `tail`,
 `date`, `df` and `awk` before repair.
+For the scratch cleanup job it checks `dirname`, which is needed at startup.
 The hourly check applies when the rendered HOME
 matches this user and the default Agentbrew checkout has a `.git` directory.
 An explicit or inherited checkout override needs a separate check. Repair also

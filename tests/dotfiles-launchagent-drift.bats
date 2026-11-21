@@ -358,6 +358,51 @@ morning_fixture() {
   [ ! -e "$TEST_DIR/morning-executed" ]
 }
 
+scratch_prune_fixture() {
+  tool_checkout
+  PRUNE_LABEL=com.dotfiles.agent-scratch-prune
+  PRUNE_SCRIPT="$TOOL_CHECKOUT/bin/agent-scratch-prune"
+  PRUNE_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"
+  printf '#!/bin/bash\n: > "%s"\n' "$TEST_DIR/prune-executed" > "$PRUNE_SCRIPT"
+  chmod +x "$PRUNE_SCRIPT"
+  plist "$PRUNE_LABEL" false /bin/bash "$PRUNE_SCRIPT"
+  local file="$AGENTS/$PRUNE_LABEL.plist"
+  /usr/bin/plutil -insert EnvironmentVariables -xml '<dict/>' "$file"
+  /usr/bin/plutil -insert EnvironmentVariables.PATH -string "$TEST_DIR/job-bin" "$file"
+}
+
+@test "the scratch cleanup job reports its missing startup tool" {
+  scratch_prune_fixture
+  loaded "$PRUNE_LABEL" running /bin/bash "$PRUNE_SCRIPT"
+  run "$PRUNE_PROBE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $PRUNE_LABEL: dirname is missing"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/prune-executed" ]
+}
+
+@test "the scratch cleanup job cannot start without its startup tool" {
+  scratch_prune_fixture
+  run "$PRUNE_PROBE" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"tool-path $PRUNE_LABEL: dirname is missing"* ]]
+  [[ "$output" != *"$TEST_DIR"* ]]
+  [ -z "$(grep -E '^(bootout|bootstrap|kickstart) ' "$TEST_DIR/calls")" ]
+  [ ! -e "$TEST_DIR/prune-executed" ]
+}
+
+@test "the scratch cleanup job PATH passes without executing files" {
+  scratch_prune_fixture
+  printf '#!/bin/bash\n: > "%s"\n' "$TEST_DIR/tool-executed" > "$TEST_DIR/job-bin/dirname"
+  chmod +x "$TEST_DIR/job-bin/dirname"
+  loaded "$PRUNE_LABEL" running /bin/bash "$PRUNE_SCRIPT"
+  run "$PRUNE_PROBE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok $PRUNE_LABEL" ]
+  [ ! -e "$TEST_DIR/prune-executed" ] && [ ! -e "$TEST_DIR/tool-executed" ]
+}
+
 tooling_sync_fixture() {
   tool_checkout
   TOOLING_PROBE="$TOOL_CHECKOUT/bin/dotfiles-launchagent-drift"

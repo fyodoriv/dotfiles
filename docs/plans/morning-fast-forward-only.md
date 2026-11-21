@@ -18,3 +18,7 @@ The refresh should advance a branch only when it can do so directly.
   fast-forward, or one regression in the morning suite rejects the fix.
 - **Anchor**: Issue #644 and the matching fast-forward-only tooling
   refresh contract.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44870754407/job/136744504287)
+failed both original-HEAD assertions. The old rebase replayed local
+commits in both fixtures. The ordinary fast-forward control passed.

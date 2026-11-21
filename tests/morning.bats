@@ -117,8 +117,8 @@ create_test_repo() {
   grep -q 'branch.*main.*master' "$MORNING_CMD"
   # Verify it skips non-main branches
   grep -q 'continue' "$MORNING_CMD"
-  # Verify it uses git pull --rebase
-  grep -q 'git pull --rebase' "$MORNING_CMD"
+  # Verify it allows only a fast-forward, even with a configured rebase.
+  grep -q 'git pull --ff-only --no-rebase' "$MORNING_CMD"
 }
 
 @test "morning script runs doctor" {

@@ -1469,7 +1469,7 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `hook-status-native` | Build or roll back the [native status guard](docs/agent-hooks.md) | On demand |
 
 | `git-maintain` | git gc, fetch, prune branches and fix worktrees in `~/apps` repos | Daily |
-| `morning` | Pull repos, health check, notes, disk and CPU summary | Daily (8:30 AM) |
+| `morning` | Fast-forward active repos, check health, and summarize notes, disk and CPU | Daily (8:30 AM) |
 | `network-watchdog` | Verify and restore connectivity with signed native TCP probes | Every 5 min + after wake |
 | `rancher-desktop` | Start Rancher Desktop and wait until the Docker API answers | At login |
 | `dotfiles-quit-relay` | Run a LaunchAgent Chrome so a restart, shut down, or log out can quit it: a small accessory app (`lib/quit-watcher.swift`) gets the quit request that Chrome ignores, and the relay sends Chrome SIGTERM (issue #298) | Inside the agent Chrome LaunchAgent |

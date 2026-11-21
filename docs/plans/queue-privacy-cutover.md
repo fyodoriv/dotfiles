@@ -154,3 +154,25 @@ scratch directory. Recheck the lock, untouched route, and artifact in
 the same bounded journal. The old replacement no longer exists, so only
 its recorded shape and device can be checked. This step changes only
 the fixture and covers a known rename boundary.
+
+## Refuse staging when a recovery record remains
+
+- **Hypothesis**: A recovery record in scratch space prevents
+  receipt publication and later handoff even when both replaced
+  routes match their expected files.
+- **Measurement**: Run hosted
+  `cargo test --offline --locked --manifest-path tests/fixtures/queue-privacy-cutover/Cargo.toml --test route_staging`.
+  Prepare both fixture routes and keep a recovery record. Check
+  receipt publication with a record from the partial replacement.
+  Separately present a record after a valid receipt and check
+  handoff after the synthetic boot change.
+- **Success**: Both ambiguous cases refuse and change 0 files.
+  The publication case creates 0 receipts. The original complete
+  staging, handoff and recovery controls still pass.
+- **Pivot**: One receipt or handoff with a recovery record,
+  changed evidence on refusal, or a failed clean case rejects the check.
+- **Anchor**: The existing recovery check refuses when a final
+  receipt exists. Both operations must exclude the other's record.
+
+The fixture keeps the record for review. This does not authorize
+cleanup or activation on an installed route.

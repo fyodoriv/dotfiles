@@ -53,13 +53,13 @@ if [ -n "$_poetry_bin" ]; then
   _poetry_target="$(readlink "$_poetry_bin" 2>/dev/null || echo "$_poetry_bin")"
   if [ -z "$_poetry_uv_dir" ] || [[ "$_poetry_target" != "$_poetry_uv_dir"/* ]]; then
     _poetry_fix=""
-    _poetry_desc="non-uv poetry at $_poetry_bin runs"
-    if command -v uv >/dev/null 2>&1 && [ -r "$DOTFILES_DIR/lib/poetry-repair.sh" ]; then
+    _poetry_desc="non-uv poetry at $_poetry_bin runs (fix: mv '$_poetry_bin' '$_poetry_bin.bak' && mv ~/Library/Application\\ Support/pypoetry/venv ~/Library/Application\\ Support/pypoetry/venv.bak && uv tool install poetry)"
+    if [ -r "$DOTFILES_DIR/lib/poetry-repair.sh" ]; then
       # shellcheck source=../../lib/poetry-repair.sh
       source "$DOTFILES_DIR/lib/poetry-repair.sh"
       if poetry_repair_deferred; then
-        _poetry_desc+=" (automatic migration is off while Python downloads are disabled)"
-      else
+        _poetry_desc="non-uv poetry at $_poetry_bin runs (automatic migration is off while Python downloads are disabled)"
+      elif command -v uv >/dev/null 2>&1; then
         _poetry_fix="source '$DOTFILES_DIR/lib/poetry-repair.sh' && poetry_repair_to_uv '$_poetry_bin'"
       fi
     fi

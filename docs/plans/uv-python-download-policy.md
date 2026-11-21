@@ -89,3 +89,7 @@ The [hosted mismatch baseline](https://github.com/fyodoriv/dotfiles/actions/runs
 returned the simulated tool refusal (42) instead of deferring the
 migration (1). All ten other uv policy controls passed, including both
 configuration locations and the full local-model installer.
+
+All eleven new controls then passed in the [first corrected run](https://github.com/fyodoriv/dotfiles/actions/runs/44879095568/job/136770224142).
+The existing upgrade Doctor test still expected the original repair
+hint when the option was off. Keep that hint in ordinary mode.

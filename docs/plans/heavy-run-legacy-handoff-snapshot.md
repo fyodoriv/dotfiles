@@ -88,7 +88,13 @@ before that process tried to create it. Perl returned `EEXIST`.
 - **Pivot**: At least 1 lost admission, improper fallback, accepted
   non-directory or existing scheduling regression rejects the change.
 - **Anchor**: The default-branch queue failure and
-  [the POSIX mkdir contract](https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdir.html).
+  [the Perl mkdir contract](https://perldoc.perl.org/functions/mkdir).
 
 The fixture changes only the point where each disposable directory
 becomes visible. No queue setting or installed path is involved.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44899184216/job/136831265333)
+fell back without arrival order at the queue path and exited with
+status 17 at the slots path. Both negative controls passed. The
+launcher now checks whether a directory exists after mkdir reports
+`EEXIST`. If it cannot use that directory, it keeps the original error.

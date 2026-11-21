@@ -89,3 +89,12 @@ The built-in doctor and source-path commands omitted the warning.
 Sample the first successful comparison of an existing file. The
 applied source and config stay common across the checks within one
 invocation. Keep the comparison and warning results separate.
+
+Hosted [baseline run](https://github.com/fyodoriv/dotfiles/actions/runs/44896501565/job/136823187645)
+fails at the stale JSON assertion. The unrelated warning control
+passes. The missing advisory is the first stale-run failure.
+
+The comparison opens a private empty file and unlinks it before
+running chezmoi. Doctor recognizes only the known warning line.
+If sample setup fails, Doctor uses the ordinary comparison. A
+separate canary catches attempts to regenerate config in repair mode.

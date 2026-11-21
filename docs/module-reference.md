@@ -41,6 +41,11 @@ If `chezmoi diff` fails during a managed-file audit, text and JSON
 report its exit code. Repair mode leaves that file in place. Run
 `chezmoi doctor` to inspect the setup.
 
+When the first successful managed-file comparison reports a stale chezmoi
+config template, Doctor shows one `chezmoi.config_template_stale` warning.
+Run `chezmoi init` when you are ready to regenerate the config. Doctor
+leaves regeneration to you, including in repair mode.
+
 `fix_cmd` runs in a new process (`bash -c`), so a fix that calls a function defined in its module needs `export -f <function>` (and `export` for the variables it reads; the doctor exports `DOTFILES_DIR`). `tests/doctor-fix-functions-exported.bats` fails when one is missing.
 
 After a repair command succeeds, doctor runs the check again. It reports

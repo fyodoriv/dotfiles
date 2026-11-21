@@ -539,6 +539,10 @@ if [ "$1" = source-path ]; then
   printf '%s\n' "$MANAGED_CHECKOUT"
   exit 0
 fi
+if [ "$1" = init ]; then
+  printf 'init\n' >> "$MANAGED_APPLY_LOG"
+  exit 66
+fi
 if [ "$1" = apply ]; then
   [ "$#" -eq 4 ] && [ "$2" = "$HOME/.editorconfig" ] &&
     [ "$3" = --source ] && [ "$4" = "$MANAGED_CHECKOUT" ] || exit 64

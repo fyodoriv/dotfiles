@@ -236,6 +236,10 @@ PLUGIN_FILTER_ROOT=""
 failed_check_ids=()
 fixed_check_ids=()
 
+# One successful stderr sample per doctor invocation.
+doctor_config_sampled=false
+doctor_config_template_stale=false
+
 # Parse args (loop so multiple flags work, e.g. `--module shell --quiet`)
 TRENDS_MODE=false
 # Full-check selection lasts for this doctor process only.
@@ -673,9 +677,28 @@ check_managed() {
     return
   fi
 
-  local comparison_exit=0
+  local comparison_exit=0 comparison_stderr=""
   if [ -f "$dst" ]; then
-    managed_diff=$(chezmoi diff "$dst" --source "$link_dir" 2>/dev/null) || comparison_exit=$?
+    if ! $doctor_config_sampled; then
+      comparison_stderr=$(mktemp "${TMPDIR:-/tmp}/dotfiles-doctor.XXXXXXXX" 2>/dev/null) || comparison_stderr=""
+    fi
+    if [ -n "$comparison_stderr" ] && {
+      # Unlink the empty file before chezmoi can write diagnostics.
+      rm -f -- "$comparison_stderr" && {
+        managed_diff=$(chezmoi diff "$dst" --source "$link_dir" 2>&9 8<&- 9>&-) || comparison_exit=$?
+        if [ "$comparison_exit" -eq 0 ]; then
+          doctor_config_sampled=true
+          if grep -Fxq 'chezmoi: config file template has changed, run chezmoi init to regenerate config file' <&8; then
+            doctor_config_template_stale=true
+          fi
+        fi
+      }
+    } 2>/dev/null 8<"$comparison_stderr" 9>"$comparison_stderr"; then
+      :
+    else
+      [ -z "$comparison_stderr" ] || rm -f -- "$comparison_stderr" 2>/dev/null
+      managed_diff=$(chezmoi diff "$dst" --source "$link_dir" 2>/dev/null) || comparison_exit=$?
+    fi
     if [ "$comparison_exit" -eq 0 ] && [ -z "$managed_diff" ]; then
       $JSON_MODE && _json_add "$id" "pass" "$desc (managed)"
       pass "$desc (managed)"
@@ -985,6 +1008,10 @@ if command -v chezmoi &>/dev/null && ! $LIST_MODE; then
   if $QUIET_MODE; then :
   elif $REPORT_MODE; then echo ""; echo "### 🔧 Chezmoi"
   else echo ""; echo -e "${BLUE}═══ Chezmoi ═══${NC}"; fi
+
+  if $doctor_config_template_stale; then
+    check_advisory "chezmoi.config_template_stale" "chezmoi config template has changed" "false" "chezmoi init"
+  fi
 
   chezmoi_output=$(chezmoi doctor --source "$DOTFILES_DIR" 2>&1 || true)
   while IFS= read -r line; do

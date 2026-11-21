@@ -23,3 +23,8 @@ This step covers the unconditional tools for startup, temporary-file
 cleanup, the date, and the disk report. Calendar and update programs
 have their own availability checks. Git is used only when a checkout
 is present and is outside this fixture's oracle.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44872291729/job/136749287269)
+returned 0 for all seven missing tools and processed the fake repair
+when `mktemp` was absent. The complete PATH passed. The registered
+probe previously did not recognize the morning job label.

@@ -140,6 +140,8 @@ The tool check looks for `chezmoi` in the managed Dotfiles sync job,
 `sysctl` and `ps` in the load sampler, and `git` in the Git maintenance and
 hourly tooling sync jobs. It also checks the power-settings watcher's
 file and process utilities, including `ps` and `pgrep`.
+For the morning job it checks `dirname`, `mktemp`, `rm`, `tail`,
+`date`, `df` and `awk` before repair.
 The hourly check applies when the rendered HOME
 matches this user and the default Agentbrew checkout has a `.git` directory.
 An explicit or inherited checkout override needs a separate check. Repair also

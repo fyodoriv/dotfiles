@@ -79,6 +79,10 @@ settings:
     type: bool
     default: "@owner_machine"
     description: Ad-hoc sign Homebrew bottles and link shims for an endpoint-security agent (writes outside your home folder). Run chezmoi init before dotfiles apply.
+  uv_python_downloads_never:
+    type: bool
+    default: false
+    description: Use installed Python interpreters for unattended uv operations. Keep uv tool upgrades enabled.
   capslock_control:
     type: bool
     default: "@owner_machine"

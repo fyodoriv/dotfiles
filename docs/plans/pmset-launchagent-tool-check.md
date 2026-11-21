@@ -23,3 +23,7 @@ The watcher chooses its power-setting reader by an absolute path.
 The PATH check covers its ten bare utilities and uses the existing
 behavior for an unsupported job form. The four-week live result stays
 part of the broader LaunchAgent task.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44861475146/job/136715625345)
+failed both missing-tool checks at the expected exit-status assertion.
+The complete scratch job passed.

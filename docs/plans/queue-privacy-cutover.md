@@ -146,3 +146,11 @@ interruption while restoring. The live queue stays outside the fixture.
   route, or one regression in an existing case rejects cleanup.
 - **Anchor**: The staged-route recovery fixture above and the exact
   file identity checks in its dispatch lock.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44869078709/job/136739284408)
+failed with a missing archive. Recovery always looked at its old path.
+After the rename, compare the archive identity at the live route in the
+scratch directory. Recheck the lock, untouched route, and artifact in
+the same bounded journal. The old replacement no longer exists, so only
+its recorded shape and device can be checked. This step changes only
+the fixture and covers a known rename boundary.

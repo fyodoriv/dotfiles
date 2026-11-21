@@ -513,6 +513,7 @@ setup_defaults_mock() {
 }
 
 @test "managed file checks keep the same result under the queue caller mask" {
+  bats_require_minimum_version 1.5.0
   export MANAGED_CHEZMOI_BIN="$(command -v chezmoi)"
   export MANAGED_CHECKOUT="$TEST_DOTFILES" MANAGED_CONFIG="$TEST_DIR/chezmoi.toml"
   export MANAGED_STATE="$TEST_DIR/state.boltdb"

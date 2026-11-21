@@ -47,3 +47,9 @@ no content hunk. The fixture file still matched the source at 0644.
 - **Anchor**: The isolated result above, the
   [chezmoi mask reference](https://www.chezmoi.io/reference/configuration-file/umask/),
   and the shipped caller-mask fix in #756.
+
+The [hosted check](https://github.com/fyodoriv/dotfiles/actions/runs/44873277053/job/136752331650)
+matched all three expected statuses and preserved the fixture file.
+This covers the queue permission mechanism through Doctor. The
+original ten-check difference between a full audit and a module audit,
+and the stale-configuration warning, still need direct evidence.

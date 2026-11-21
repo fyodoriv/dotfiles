@@ -108,7 +108,7 @@ separate canary catches attempts to regenerate config in repair mode.
   files and real chezmoi comparisons. Compare one full Doctor audit
   through heavy-run with each individual module. Run the full audit
   separately with the old restrictive caller mask as a negative control.
-- **Success**: All 10 checks pass in both routes under caller mask
+- **Success**: The ten named results all pass in both routes under caller mask
   `022`, all 10 fail in the restrictive control, and no fixture
   comparison runs a repair or changes a target.
 - **Pivot**: At least 1 missing, mismatched or unexamined result,

@@ -68,3 +68,27 @@ recorded grant `s1` and no wait reason in both passes. The old
 reservation counted a busy slot without reserving exclusive
 admission. It now holds later grants for the selected older
 exclusive ticket. The shared-ticket accounting stays the same.
+
+## Adopt a queue directory created by another starter
+
+The [default-branch run](https://github.com/fyodoriv/dotfiles/actions/runs/44896078650/job/136827105036)
+failed while waiting for two held slots. A concurrent starter created
+the slots directory after the failing process checked for it and
+before that process tried to create it. Perl returned `EEXIST`.
+
+- **Hypothesis**: A starter can use the queue directory or slots
+  directory that a concurrent process just created.
+- **Measurement**: Run hosted `bats tests/heavy-run.bats`. Use
+  disposable queues and inject directory creation between the initial
+  directory check and the matching mkdir call. Separately inject a
+  regular-file collision and a permission failure at the slots path.
+- **Success**: Both directory-race controls admit a normal numbered slot,
+  with 0 startup diagnostics and 0 loss of arrival ordering. Both
+  negative cases refuse with 0 command executions.
+- **Pivot**: At least 1 lost admission, improper fallback, accepted
+  non-directory or existing scheduling regression rejects the change.
+- **Anchor**: The default-branch queue failure and
+  [the POSIX mkdir contract](https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdir.html).
+
+The fixture changes only the point where each disposable directory
+becomes visible. No queue setting or installed path is involved.

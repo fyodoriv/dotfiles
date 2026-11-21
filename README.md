@@ -1071,7 +1071,7 @@ a managed agent's name (`launchagents.no_same_name_twins`).
 | `com.dotfiles.atuin-daemon` | Shell history sync daemon |
 | `com.dotfiles.sleepwatcher` | Run scripts on sleep/wake events |
 | `com.dotfiles.chrome-dock-guard` | Event-driven: when a hidden agent Chrome takes the front (Dock click, Cmd-Tab), raise or start your own Chrome (`logs/chrome-dock-guard.log`). Off with core option `chrome.dock_guard: false` and a headed purpose Chrome |
-| `com.dotfiles.pmset-drift-watch` | Read-only: log each power-settings change with the processes alive at that moment (`logs/pmset-drift.log`) |
+| `com.dotfiles.pmset-drift-watch` | Records power-settings changes and running processes in `logs/pmset-drift.log`. The drift check verifies its tools before repair. |
 | `com.dotfiles.load-sampler` | Read-only: append load, memory, swap, and top CPU processes every 30s (`~/.local/state/dotfiles/load-samples.tsv`) |
 
 **Login-time (run once at login)**

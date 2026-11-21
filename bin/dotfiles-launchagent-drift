@@ -166,6 +166,9 @@ for plist in "$agents"/com.dotfiles.*.plist; do
     com.dotfiles.load-sampler)
       registered_script=dotfiles-load-sampler
       required_tools=(sysctl ps) ;;
+    com.dotfiles.pmset-drift-watch)
+      registered_script=dotfiles-pmset-drift-watch
+      required_tools=(mkdir dirname cat date head diff ps awk cut pgrep) ;;
     *) required_tools=() ;;
   esac
   if [ "${#required_tools[@]}" -gt 0 ] && ! is_disabled "$label"; then

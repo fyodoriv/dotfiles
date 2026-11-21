@@ -166,7 +166,7 @@ the fixture and covers a known rename boundary.
   receipt publication with a record from the partial replacement.
   Separately present a record after a valid receipt and check
   handoff after the synthetic boot change.
-- **Success**: Both ambiguous cases refuse and change 0 files.
+- **Success**: Both ambiguous cases refuse with 0 changed paths.
   The publication case creates 0 receipts. The original complete
   staging, handoff and recovery controls still pass.
 - **Pivot**: One receipt or handoff with a recovery record,

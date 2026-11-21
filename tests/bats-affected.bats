@@ -65,13 +65,16 @@ setup_file() {
 
   # Distinct sources for the inferred-name and literal path controls.
   mkdir -p "$TEST_REPO/tools"
-  for name in survey-sample-extras signal-export-revision side-record; do
+  for name in survey-sample-extras signal-export-revision side-record mixed-export; do
     printf '# fixed fixture source\n' > "$TEST_REPO/tools/$name.sh"
   done
-  for name in tools-survey-sample-extras-fast survey-sample-extras signal-export-fast tools-newly-created; do
+  for name in tools-survey-sample-extras-fast survey-sample-extras signal-export-fast tools-newly-created \
+              tools-mixed-export-run bin-archive-worker-run; do
     printf '# fixed fixture test\n' > "$TEST_REPO/tests/$name.bats"
   done
   printf 'command="$REPO_ROOT/tools/side-record.sh"\n' > "$TEST_REPO/tests/direct-reference.bats"
+  printf '# fixed fixture binary\n' > "$TEST_REPO/bin/archive-worker"
+  printf 'command="$REPO_ROOT/tools/mixed-export.sh"\n' > "$TEST_REPO/tests/mixed-path-reference.bats"
 
   # Initial commit (--no-verify to skip pre-commit hooks in test repos)
   git -C "$TEST_REPO" add -A
@@ -844,4 +847,23 @@ BATS
 @test "a literal path can select a test with an unrelated name" {
   result="$(affected_for tools/side-record.sh | basenames)"
   [ "$result" = direct-reference ]
+}
+
+@test "a selected missing base fails before producing test pairs" {
+  printf '# change\n' >> "$TEST_REPO/tools/side-record.sh"
+  BATS_AFFECTED_BASE=missing-fixture-base BATS_AFFECTED_REQUIRE_BASE=1 run "$TEST_REPO/bin/bats-affected" --pairs
+  [ "$status" -eq 2 ]
+  [ "$output" = "Cannot resolve the selected affected-test base." ]
+}
+
+@test "an inferred test and a literal path reference retain the same source pair" {
+  printf '# change\n' >> "$TEST_REPO/tools/mixed-export.sh"
+  run pairs_now
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf 'mixed-path-reference\ttools/mixed-export.sh\ntools-mixed-export-run\ttools/mixed-export.sh')" ]
+}
+
+@test "an inferred bin test keeps the generic smoke test" {
+  result="$(affected_for bin/archive-worker | basenames)"
+  [ "$result" = "$(printf 'bin-archive-worker-run\nsmoke')" ]
 }

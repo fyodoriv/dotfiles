@@ -1,4 +1,4 @@
-.PHONY: changelog check-steps e2e e2e-if-needed test-plugins-bash32 help lint lint-full lint-tasks lint-tasks-freshness lint-tasks-rule9 perf-gate test test-all test-force check audit install-deps count clean fmt coverage
+.PHONY: changelog check-steps e2e e2e-if-needed test-plugins-bash32 help lint lint-full lint-tasks lint-tasks-freshness lint-tasks-rule9 perf-gate test test-changed test-all test-force check audit install-deps count clean fmt coverage
 
 .DEFAULT_GOAL := help
 
@@ -134,8 +134,8 @@ endef
 # A fix to one file re-runs only the tests that file selects.
 # TEST_SKIP_FILE=<path> leaves one affected file out and says so (a debugging
 # aid: hosted CI skips no file).
-test: ## Run affected tests only (skips tests that passed with the same inputs)
-	@pairs=$$(mktemp "$${TMPDIR:-/tmp}/bats-pairs.XXXXXX") || exit 1; \
+define BATS_AFFECTED_RUN
+pairs=$$(mktemp "$${TMPDIR:-/tmp}/bats-pairs.XXXXXX") || exit 1; \
 	trap 'rm -f "$$pairs"' EXIT; \
 	./bin/bats-affected --pairs > "$$pairs" || exit 1; \
 	affected=$$(cut -f1 "$$pairs" | LC_ALL=C sort -u); \
@@ -168,6 +168,17 @@ test: ## Run affected tests only (skips tests that passed with the same inputs)
 	  fi; \
 	  exit "$$result"; \
 	fi
+
+endef
+
+test: ## Run affected tests only (skips tests that passed with the same inputs)
+	@$(BATS_AFFECTED_RUN)
+
+BASE ?= origin/feat/chezmoi
+test-changed: export BATS_AFFECTED_BASE = $(BASE)
+test-changed: export BATS_AFFECTED_REQUIRE_BASE = $(if $(filter file,$(origin BASE)),0,1)
+test-changed: ## Run affected tests against BASE
+	@$(BATS_AFFECTED_RUN)
 
 test-all: ## Run full test suite (cached)
 	@$(FULLPOWER) ./bin/cached-run /bin/sh -c '$(BATS_FULL_RUN)'

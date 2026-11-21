@@ -368,13 +368,21 @@ Agents run `make lint` only.
 
 ```bash
 make test                     # affected tests only (fast, git-aware)
+make test-changed BASE=HEAD~1 # use another base for affected tests
 make test-all                 # full suite (cached)
 make test-force               # full suite (no cache)
 bats tests/doctor.bats        # run a single test file
 bats tests/doctor.bats -f "check passes"   # run tests matching a filter
 ```
 
-`make test` uses `bats-affected` to detect which test files cover your changed files. If you change shared infrastructure (`test_helper.bash`, `Makefile`, `lib/`), all tests run. It skips a test file that already passed on the same commit with the same content of the changed files that select it, so after a fix only the tests that the fixed file selects run again. The install e2e in `make check` works the same way: it reruns only when a file that `tests/e2e/needs-e2e.sh` counts changed since its last pass. Hosted CI runs `make check` on the pull request.
+`make test` uses `bats-affected` to detect which test files cover your changed files.
+`make test-changed` uses the same runner and defaults to `origin/feat/chezmoi`.
+It reports an error if an explicitly chosen `BASE` cannot be resolved.
+The selector checks existing test mappings and literal path references.
+For sources without a targeted mapping, it also tries folder prefixes
+and shortens the source name at its last dash.
+Changing `tests/test_helper.bash` runs every Bats file. Makefile and library
+changes select their linked checks. The runner skips a test file that already passed on the same commit with the same content of the changed files that select it, so after a fix only the tests that the fixed file selects run again. The install e2e in `make check` works the same way: it reruns only when a file that `tests/e2e/needs-e2e.sh` counts changed since its last pass. Hosted CI runs `make check` on the pull request.
 
 ### Writing tests
 

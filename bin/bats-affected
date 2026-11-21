@@ -46,9 +46,15 @@ case "${1:-}" in
     # origin/feat/chezmoi), so `make check` after a commit still tests it.
     diff_args=(HEAD)
     include_untracked=1
-    if base=$(git -C "$DOTFILES_DIR" merge-base HEAD "${BATS_AFFECTED_BASE:-origin/feat/chezmoi}" 2>/dev/null) &&
-      [ "$base" != "$(git -C "$DOTFILES_DIR" rev-parse HEAD)" ]; then
+    base_ref="${BATS_AFFECTED_BASE:-origin/feat/chezmoi}"
+    if [ "${BATS_AFFECTED_REQUIRE_BASE:-0}" = 1 ]; then
+      base_ref="${BATS_AFFECTED_BASE-}"
+    fi
+    if base=$(git -C "$DOTFILES_DIR" merge-base -- HEAD "$base_ref" 2>/dev/null); then
       diff_args=("$base")
+    elif [ "${BATS_AFFECTED_REQUIRE_BASE:-0}" = 1 ]; then
+      printf '%s\n' 'Cannot resolve the selected affected-test base.' >&2
+      exit 2
     fi
     ;;
   *)
@@ -135,8 +141,34 @@ command_sources_valid=true
 command_source_entries=()
 skill_source_entries=()
 
+append_name_fallback() {
+  local path="$1" before="$2" name stem folder prefix candidate matched
+  [ "${#affected[@]}" -eq "$before" ] || return 0
+  name="${path##*/}"
+  stem="${name%.*}"
+  local -a prefixes=("")
+  if [[ "$path" == */* ]]; then
+    folder="${path%/*}"
+    prefixes=("${folder##*/}-" "")
+  fi
+  while [ -n "$stem" ]; do
+    for prefix in "${prefixes[@]}"; do
+      matched=0
+      for candidate in "$TESTS_DIR/$prefix$stem"*.bats; do
+        [ -f "$candidate" ] || continue
+        affected+=("$candidate")
+        matched=1
+      done
+      [ "$matched" -eq 0 ] || return 0
+    done
+    [[ "$stem" == *-* ]] || break
+    stem="${stem%-*}"
+  done
+}
+
 for file in "${changed_files[@]}"; do
   pairs_note "$file"
+  mapped_before="${#affected[@]}"
   # ── Run-all triggers ─────────────────────────────────────────────
   run_all=0
   for pattern in "${run_all_patterns[@]}"; do
@@ -282,6 +314,7 @@ for file in "${changed_files[@]}"; do
         ;;
     esac
 
+    append_name_fallback "$file" "$mapped_before"
     # Every bin/ change also triggers smoke tests
     affected+=("$TESTS_DIR/smoke.bats")
     continue
@@ -327,6 +360,7 @@ for file in "${changed_files[@]}"; do
           ;;
       esac
     done < <(grep -rl "$(basename "$file")" "$DOTFILES_DIR/bin/" 2>/dev/null || true)
+    append_name_fallback "$file" "$mapped_before"
     continue
   fi
 
@@ -381,6 +415,8 @@ for file in "${changed_files[@]}"; do
       continue
       ;;
   esac
+
+  append_name_fallback "$file" "$mapped_before"
 
   # ── Smoke-test triggers (modules, macos, templates, home/) ───────
   for pattern in "${smoke_patterns[@]}"; do

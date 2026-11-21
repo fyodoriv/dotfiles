@@ -107,6 +107,7 @@ _scheduler_fixture() {
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 printf '%s\n' "${BATS_AFFECTED_BASE:-unset}" > "$SCHEDULER_STATE/base"
 printf '%s\n' "${BATS_AFFECTED_REQUIRE_BASE:-unset}" > "$SCHEDULER_STATE/base-required"
+printf '%s\n' "${BATS_AFFECTED_INFER_NAMES:-unset}" > "$SCHEDULER_STATE/infer-names"
 while IFS= read -r file; do
   if [ "${SCHEDULER_RELATIVE:-false}" = true ]; then
     printf '%s\tMakefile\n' "$file"
@@ -331,6 +332,7 @@ _scheduler_exact_coverage() {
     SCHEDULER_JOBS=1 run _scheduler_make "${args[@]}"
     [ "$status" -eq 0 ]
     [ "$(cat "$SCHED_STATE/base")" = "$base" ]
+    [ "$(cat "$SCHED_STATE/infer-names")" = 1 ]
     if [ "$base" = origin/feat/chezmoi ]; then
       [ "$(cat "$SCHED_STATE/base-required")" = 0 ]
     else

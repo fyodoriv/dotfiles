@@ -653,14 +653,15 @@ calls() {
   [ -z "$bad" ] || { echo "$bad"; return 1; }
 }
 
-@test "make test skips a test whose selecting files did not change since it passed on HEAD" {
-  local mk="$BATS_TEST_DIRNAME/../Makefile"
-  grep -qF './bin/bats-affected --pairs > "$$pairs"' "$mk"
-  grep -qF './bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs"' "$mk"
-  local recipe
-  recipe="$(awk '/^test:/{copy=1} copy{print} copy && /^test-all:/{exit}' "$mk" | tr '\n' ' ')"
-  [[ "$recipe" == *'./bin/cached-run --per-file $(TEST_FILE_JOBS) --deps "$$pairs"'*'--key "head=$$(git rev-parse HEAD)" bats $(BATS_JOBS) -- $$peers'* ]]
-  [[ "$recipe" == *'./bin/cached-run --per-file --deps "$$pairs"'*'--key "head=$$(git rev-parse HEAD)" bats -- $$doctor'* ]]
+@test "both affected test recipes retain pairs and the HEAD cache key" {
+  local target
+  for target in test test-changed; do
+    run make -C "$BATS_TEST_DIRNAME/.." -n --no-print-directory "$target" JOBS=1 FULLPOWER=
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'./bin/bats-affected --pairs > "$pairs"'* ]]
+    [[ "$output" == *'./bin/cached-run --per-file'*'--deps "$pairs"'*'--key "head=$(git rev-parse HEAD)" bats'*'-- $peers'* ]]
+    [[ "$output" == *'./bin/cached-run --per-file --deps "$pairs"'*'--key "head=$(git rev-parse HEAD)" bats -- $doctor'* ]]
+  done
 }
 
 @test "make e2e-if-needed reruns the e2e only when an input needs-e2e counts changed" {

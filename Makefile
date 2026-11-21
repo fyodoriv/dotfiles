@@ -176,6 +176,7 @@ test: ## Run affected tests only (skips tests that passed with the same inputs)
 
 BASE ?= origin/feat/chezmoi
 test-changed: export BATS_AFFECTED_BASE = $(BASE)
+test-changed: export BATS_AFFECTED_INFER_NAMES = 1
 test-changed: export BATS_AFFECTED_REQUIRE_BASE = $(if $(filter file,$(origin BASE)),0,1)
 test-changed: ## Run affected tests against BASE
 	@$(BATS_AFFECTED_RUN)

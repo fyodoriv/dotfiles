@@ -830,17 +830,17 @@ BATS
 }
 
 @test "inferred names prefer a folder-prefixed test" {
-  result="$(affected_for tools/survey-sample-extras.sh | basenames)"
+  result="$(BATS_AFFECTED_INFER_NAMES=1 affected_for tools/survey-sample-extras.sh | basenames)"
   [ "$result" = tools-survey-sample-extras-fast ]
 }
 
 @test "inferred names shorten a source stem at its last dash" {
-  result="$(affected_for tools/signal-export-revision.sh | basenames)"
+  result="$(BATS_AFFECTED_INFER_NAMES=1 affected_for tools/signal-export-revision.sh | basenames)"
   [ "$result" = signal-export-fast ]
 }
 
 @test "inferred names include untracked source files" {
-  result="$(affected_for tools/newly-created.sh | basenames)"
+  result="$(BATS_AFFECTED_INFER_NAMES=1 affected_for tools/newly-created.sh | basenames)"
   [ "$result" = tools-newly-created ]
 }
 
@@ -858,12 +858,17 @@ BATS
 
 @test "an inferred test and a literal path reference retain the same source pair" {
   printf '# change\n' >> "$TEST_REPO/tools/mixed-export.sh"
-  run pairs_now
+  BATS_AFFECTED_INFER_NAMES=1 run pairs_now
   [ "$status" -eq 0 ]
   [ "$output" = "$(printf 'mixed-path-reference\ttools/mixed-export.sh\ntools-mixed-export-run\ttools/mixed-export.sh')" ]
 }
 
 @test "an inferred bin test keeps the generic smoke test" {
-  result="$(affected_for bin/archive-worker | basenames)"
+  result="$(BATS_AFFECTED_INFER_NAMES=1 affected_for bin/archive-worker | basenames)"
   [ "$result" = "$(printf 'bin-archive-worker-run\nsmoke')" ]
+}
+
+@test "default selector output does not add inferred name matches" {
+  result="$(affected_for tools/survey-sample-extras.sh | basenames)"
+  [ -z "$result" ]
 }

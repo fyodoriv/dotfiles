@@ -143,7 +143,7 @@ skill_source_entries=()
 
 append_name_fallback() {
   local path="$1" before="$2" name stem folder prefix candidate matched
-  [ "${#affected[@]}" -eq "$before" ] || return 0
+  [ "${BATS_AFFECTED_INFER_NAMES:-0}" = 1 ] && [ "${#affected[@]}" -eq "$before" ] || return 0
   name="${path##*/}"
   stem="${name%.*}"
   local -a prefixes=("")

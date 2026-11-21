@@ -683,7 +683,12 @@ check_managed() {
     fi
   fi
 
-  if $FIX_MODE; then
+  if [ "$comparison_exit" -ne 0 ]; then
+    local comparison_failure="$desc. chezmoi diff failed (exit $comparison_exit)"
+    $JSON_MODE && _json_add "$id" "fail" "$comparison_failure"
+    fail "$comparison_failure — fix: run chezmoi doctor for details"
+    failed_check_ids+=("$id")
+  elif $FIX_MODE; then
     local _f0=$fix_count _x0=$fail_count
     _fix "$desc" "chezmoi apply '$dst' --source '$link_dir'" \
       "{ [ -L '$dst' ] && [ \"\$(readlink '$dst')\" = '$src' ]; } || { [ -f '$dst' ] && managed_diff=\$(chezmoi diff '$dst' --source '$link_dir' 2>/dev/null) && [ -z \"\$managed_diff\" ]; }"
@@ -695,14 +700,8 @@ check_managed() {
       failed_check_ids+=("$id")
     fi
   else
-    if [ "$comparison_exit" -ne 0 ]; then
-      local comparison_failure="$desc. chezmoi diff failed (exit $comparison_exit)"
-      $JSON_MODE && _json_add "$id" "fail" "$comparison_failure"
-      fail "$comparison_failure — fix: run chezmoi doctor for details"
-    else
-      $JSON_MODE && _json_add "$id" "fail" "$desc"
-      fail "$desc ${DIM}(not managed)${NC} — fix: chezmoi apply '$dst'"
-    fi
+    $JSON_MODE && _json_add "$id" "fail" "$desc"
+    fail "$desc ${DIM}(not managed)${NC} — fix: chezmoi apply '$dst'"
     failed_check_ids+=("$id")
   fi
 }

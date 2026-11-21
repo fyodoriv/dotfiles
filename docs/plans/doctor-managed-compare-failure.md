@@ -51,3 +51,9 @@ Use the existing label and keep the safe comparison exit code.
   changed target on refusal or broken repair of a confirmed difference.
 - **Anchor**: Issue #731 and the comparison and repair checks in
   `bin/dotfiles-doctor`.
+
+The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44892073205/job/136809877320)
+repaired the confirmed difference, then attempted to apply an
+existing file after the comparator failed. The repair branch ran
+before the exit-code check. Report the comparison failure before
+considering repair.

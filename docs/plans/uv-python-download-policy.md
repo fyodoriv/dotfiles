@@ -36,3 +36,26 @@ The [hosted baseline](https://github.com/fyodoriv/dotfiles/actions/runs/44876768
 passed both default cases. The enabled Topgrade template still had its
 combined uv step. The standalone installer and local-LLM resolver also
 missed the expected enabled-policy behavior.
+
+## Check the rest of each unattended entry point
+
+Review found a Poetry repair behind scheduled Doctor, a caller that
+captures its interpreter result, and the custom user config location.
+
+- **Hypothesis**: With the policy on and no installed interpreter,
+  Poetry repair leaves both original paths intact. The full rendered
+  local-LLM installer stops before pipx or model operations. A
+  custom configuration directory stays owner-managed.
+- **Measurement**: Extend the hosted policy fixtures with an absent
+  interpreter and inert executables. Call the existing Poetry repair
+  helper, and run the complete rendered local-LLM script with its
+  sentinel present. Run real chezmoi against a disposable home whose
+  XDG config directory differs from the default.
+- **Success**: 0 moved paths or tool installs without Python, 0 pipx
+  or model requests, and 0 user files created at the unused default
+  location. The installed-interpreter Poetry control runs 1 tool
+  install with downloads disabled. Doctor checks the selected config.
+- **Pivot**: One tool call without a usable interpreter, an unexpected
+  backup, one changed user config, or one misleading check rejects.
+- **Anchor**: The scheduled Doctor and Poetry repair call sites,
+  the local-LLM caller, and [uv configuration precedence](https://docs.astral.sh/uv/concepts/configuration-files/).

@@ -187,9 +187,19 @@ EOF
 @test "pending footer C8 preserves the existing ask judge and other owner rules" {
   local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml" tail_hash
   grep -Fq 'Before the Needed-from-you line asks for anything, an independent judge' "$owner_rules"
-  # Preserve the existing rule suffix from registered base 893097f5 verbatim.
+  # Preserve the rule suffix verbatim. It last changed on purpose when the
+  # ask judge gained its full-context check (2026-11-22).
   tail_hash="$(awk '/^  End every message with one last line/ { capture=1 } capture' "$owner_rules" | shasum -a 256 | awk '{print $1}')"
-  [ "$tail_hash" = "aa01a531f65f66640bf1cf1aa1750015a495f9530067ca9c3551216a7845aa82" ]
+  [ "$tail_hash" = "a980bfd533c13b066f4c110909b51107d430ae3f8bf753d5d0ddc3a1287f0261" ]
+}
+
+@test "ask judge rejects an ask that lacks full context" {
+  local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml"
+  grep -Fq 'The judge also checks full context.' "$owner_rules"
+  grep -Fq 'It rejects an ask that names' "$owner_rules"
+  grep -Fq 'a term, file, flag, hook, step, or internal name without explaining it in' "$owner_rules"
+  grep -Fq 'plain words: what it is, why it needs me, each option and what it changes' "$owner_rules"
+  grep -Fq 'for me, and where to do it.' "$owner_rules"
 }
 
 @test "Agentfile inline rules do not repeat the agentbrew bootstrap" {

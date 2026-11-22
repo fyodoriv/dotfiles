@@ -1,5 +1,12 @@
 # Owner message pending line
 
+> **Update 2026-11-22:** the owner split the Pending line in two. A
+> `**Follow-ups:**` line lists suggested work nobody has started; a
+> `**Waiting on:**` line lists only work still running or queued, each with
+> what it waits for. Mixing the two made finished work read as "still
+> waiting". The judge now checks both lines. Source:
+> `config/agentfile-owner-rules.yaml`.
+
 ## Overall goal and vision
 
 [Issue 439](https://github.com/fyodoriv/dotfiles/issues/439) asks owner-machine

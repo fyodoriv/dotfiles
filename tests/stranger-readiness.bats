@@ -139,7 +139,8 @@ _pending_footer_export() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"lifecycle scope"* ]]
   [[ "$output" == *"Right before the Needed-from-you line"* ]]
-  [[ "$output" == *"**Pending:**"* ]]
+  [[ "$output" == *"**Follow-ups:**"* ]]
+  [[ "$output" == *"**Waiting on:**"* ]]
   [[ "$output" == *"**Needed from you:**"* ]]
 }
 
@@ -149,7 +150,7 @@ _pending_footer_export() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"lifecycle scope"* ]]
   merged="$output"
-  run grep -E '\*\*(Pending|Needed from you):\*\*' <<<"$merged"
+  run grep -E '\*\*(Pending|Waiting on|Follow-ups|Needed from you):\*\*' <<<"$merged"
   [ "$status" -eq 1 ]
 }
 
@@ -158,7 +159,7 @@ _pending_footer_export() {
   run _pending_footer_export fyodor@sent.com
   [ "$status" -eq 0 ]
   merged="$output"
-  [[ "$merged" == *"**Pending:**"* ]]
+  [[ "$merged" == *"**Waiting on:**"* ]]
   for category in 'CI' 'background jobs' 'linked (chats|sessions)' 'unfinished steps' 'cleanup' 'follow-ups'; do
     grep -Ei "$category" <<<"$merged" >/dev/null
   done
@@ -169,7 +170,7 @@ _pending_footer_export() {
   run _pending_footer_export fyodor@sent.com
   [ "$status" -eq 0 ]
   merged="$output"
-  [[ "$merged" == *"**Pending:**"* ]]
+  [[ "$merged" == *"**Waiting on:**"* ]]
   grep -Ei 'each (item|one)' <<<"$merged" >/dev/null
   grep -Ei 'check.*live|live.*check' <<<"$merged" >/dev/null
   grep -Ei 'never.*memory|not.*memory' <<<"$merged" >/dev/null
@@ -179,9 +180,21 @@ _pending_footer_export() {
 @test "pending footer C7 owner export permits independent nothing forms" {
   run _pending_footer_export fyodor@sent.com
   [ "$status" -eq 0 ]
-  [[ "$output" == *"**Pending:** nothing"* ]]
+  [[ "$output" == *"**Follow-ups:** nothing"* ]]
+  [[ "$output" == *"**Waiting on:** nothing"* ]]
   [[ "$output" == *"**Needed from you:** nothing"* ]]
   grep -Ei '(lines|forms).*independent|independent.*(lines|forms)' <<<"$output" >/dev/null
+}
+
+@test "pending footer C9 owner export keeps follow-ups out of Waiting on and judges both" {
+  local merged
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  merged="$output"
+  grep -Fq 'Never list a follow-up here.' <<<"$merged"
+  grep -Ei 'running or queued' <<<"$merged" >/dev/null
+  grep -Ei 'merged PR.*idle session|idle session' <<<"$merged" >/dev/null
+  grep -Fq 'When Waiting on lists anything, the same judge also checks' <<<"$merged"
 }
 
 @test "base Agentfile.yaml rules carry no owner-only lines" {

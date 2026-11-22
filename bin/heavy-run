@@ -74,8 +74,11 @@
 #   HEAVY_RUN_EXCLUSIVE_WAIT  exclusive wait limit in seconds (default 900).
 #   HEAVY_RUN_EXCLUSIVE_SHARED  1 = an exclusive run takes a shared slot that is
 #                       never memory-paused (setting heavy_run_exclusive_shared; default 0)
-#   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off
-#                       (setting heavy_run_max_load; default 0)
+#   HEAVY_RUN_MAX_LOAD  1-minute load above which no extra run starts; 0 = off;
+#                       auto = heavy-run sets it from the cores and tunes it from
+#                       run outcomes (setting heavy_run_max_load; default 0)
+#   HEAVY_RUN_CORES     core count for the auto cap (default: hw.ncpu)
+#   HEAVY_RUN_LOAD_PROBE  a command that prints the 1-minute load (tests)
 #   HEAVY_RUN_PROJECT_SLOTS  most slots one project (a repo and its worktrees,
 #                       by git common dir) holds at once; its next run lets later
 #                       projects go first (setting heavy_run_project_slots; default 3)
@@ -120,6 +123,9 @@ setting() {
   local env="$1" key="$2" def="$3" cfg="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.yaml" v
   if [ -n "${!env:-}" ]; then printf '%s\n' "${!env}"; return; fi
   v=$(sed -n "s/^  $key: *\"\{0,1\}\([0-9.]*\)\"\{0,1\} *\(#.*\)\{0,1\}$/\1/p" "$cfg" 2>/dev/null | head -n 1) || v=""
+  if [ -z "$v" ] && [ "$key" = heavy_run_max_load ]; then
+    v=$(sed -n "s/^  $key: *\"\{0,1\}auto\"\{0,1\} *\(#.*\)\{0,1\}$/auto/p" "$cfg" 2>/dev/null | head -n 1) || v=""
+  fi
   printf '%s\n' "${v:-$def}"
 }
 slots_set=$(setting HEAVY_RUN_SLOTS heavy_run_slots 1)
@@ -147,7 +153,7 @@ case "$memguard" in
   *) echo "heavy-run: HEAVY_RUN_MEMORY_GUARD must be 0 or 1, got '$memguard'" >&2; exit 2 ;;
 esac
 check_num HEAVY_RUN_RAMP "$ramp"
-check_num HEAVY_RUN_MAX_LOAD "$maxload"
+[ "$maxload" = auto ] || check_num HEAVY_RUN_MAX_LOAD "$maxload"
 case "${HEAVY_RUN_KEEP_ORPHAN:-0}" in
   0 | 1) ;;
   *) echo "heavy-run: HEAVY_RUN_KEEP_ORPHAN must be 0 or 1, got '$HEAVY_RUN_KEEP_ORPHAN'" >&2; exit 2 ;;
@@ -161,6 +167,9 @@ common_code='
   sub cmd_out { my $o = `$_[0] 2>/dev/null`; $o //= ""; chomp $o; return $o; }
   sub slot_count { my ($set) = @_; return $set ne "" ? $set : 1; }
   sub load1 {
+    if (defined $ENV{HEAVY_RUN_LOAD_PROBE} && $ENV{HEAVY_RUN_LOAD_PROBE} ne "") {
+      my $r = cmd_out($ENV{HEAVY_RUN_LOAD_PROBE}); return $r =~ /^\s*(\d+(?:\.\d+)?)\s*$/ ? $1 : 0;
+    }
     my $l = cmd_out("sysctl -n vm.loadavg");
     return $1 if $l =~ /([\d.]+)/;
     if (open(my $f, "<", "/proc/loadavg")) { my $x = <$f> // ""; return $1 if $x =~ /^([\d.]+)/; }
@@ -268,6 +277,28 @@ common_code='
     return defined $f->{project} ? "sha256:" . sha256_hex($f->{project}) : undef;
   }
   sub read1 { my ($p) = @_; open(my $f, "<", $p) or return ""; my $l = <$f> // ""; chomp $l; return $l; }
+  # --- Auto load cap (heavy_run_max_load: auto). It starts at 8 x cores and
+  # stays within 2-16 x cores. A failed run at high load lowers it by 20%; a
+  # passed run while others waited on load raises it by 5% (AIMD).
+  sub cores {
+    for my $c ($ENV{HEAVY_RUN_CORES} // "", cmd_out("sysctl -n hw.ncpu"), cmd_out("getconf _NPROCESSORS_ONLN")) {
+      return $c if $c =~ /^[1-9]\d*$/;
+    }
+    return 4;
+  }
+  sub auto_bounds { my $c = cores(); return (8 * $c, 2 * $c, 16 * $c, $c); }
+  # (cap, why) from $dir/load-cap ("cap<TAB>why"), clamped to the bounds.
+  sub auto_cap {
+    my ($d) = @_;
+    my ($start, $lo, $hi, $c) = auto_bounds();
+    if (read1("$d/load-cap") =~ /^(\d+(?:\.\d+)?)\t(.*)$/) {
+      my ($v, $why) = ($1, $2);
+      return ($lo, "$why; floor 2 x $c cores") if $v < $lo;
+      return ($hi, "$why; ceiling 16 x $c cores") if $v > $hi;
+      return ($v, $why);
+    }
+    return ($start, "start: 8 x $c cores");
+  }
   our $GATE = "0000000000-0";
 '
 
@@ -288,7 +319,8 @@ case "${1:-}" in
         return "" unless defined $start && $start =~ /^\d+(?:\.\d+)?$/ && int($start) <= time;
         return sprintf(" (running: %ds)", time - int($start));
       }
-      my ($dir, $lock, $owner, $queue, $set) = @ARGV;
+      our ($dir, $lock, $owner, $queue, $set, $maxload) = @ARGV;
+      $maxload //= "";
       my $n = slot_count($set);
       my @busy;
       for my $s (new_slots("$dir/slots")) {
@@ -330,7 +362,15 @@ case "${1:-}" in
         if ($w eq "behind") { $w = "behind queue " . ($head || 1); }
         elsif ($w !~ /^(project cap|starting)/) { $head = $i; }
         printf "queue %d: %s (waiting: %s)\n", $i, $f{line}, $w;
-      }' "$dir" "$lock" "$owner" "$queue" "$slots_set"
+      }
+      END {
+        if ($maxload eq "auto") {
+          my ($cap, $why) = auto_cap($dir);
+          printf "load cap: %g auto, load now %s (%s)\n", $cap, load1(), $why;
+        } elsif ($maxload ne "" && $maxload > 0) {
+          printf "load cap: %s (setting heavy_run_max_load), load now %s\n", $maxload, load1();
+        }
+      }' "$dir" "$lock" "$owner" "$queue" "$slots_set" "$maxload"
     ;;
 esac
 
@@ -422,7 +462,7 @@ exec perl -e "$common_code"'
       $cfg_at = time; %cfg = ();
       my $file = ($ENV{XDG_CONFIG_HOME} || "$ENV{HOME}/.config") . "/chezmoi/chezmoi.yaml";
       if (open(my $c, "<", $file)) {
-        while (<$c>) { $cfg{$1} //= $2 if /^  (heavy_run_\w+): *"?([0-9.]*)"? *(#.*)?$/; }
+        while (<$c>) { $cfg{$1} //= $2 if /^  (heavy_run_\w+): *"?([0-9.]*|auto)"? *(#.*)?$/; }
       }
     }
     for my $v ($ENV{$env}, $cfg{$key}) { return $v if defined $v && $v ne "" && $ok->($v); }
@@ -431,7 +471,7 @@ exec perl -e "$common_code"'
   sub settings {
     return (setting("HEAVY_RUN_SLOTS", "heavy_run_slots", 1, $is_slots),
             setting("HEAVY_RUN_RAMP", "heavy_run_ramp_seconds", 15, $is_num),
-            setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, $is_num),
+            setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, sub { $_[0] eq "auto" || $is_num->($_[0]) }),
             setting("HEAVY_RUN_PROJECT_SLOTS", "heavy_run_project_slots", 3, $is_slots),
             setting("HEAVY_RUN_MEMORY_GUARD", "heavy_run_memory_guard", 1, $is_bit),
             setting("HEAVY_RUN_MIN_FREE_PCT", "heavy_run_min_free_pct", 25, $is_pct),
@@ -506,7 +546,12 @@ exec perl -e "$common_code"'
       my $m = (stat $last_start)[9];
       my $age = defined $m ? time - $m : 1e9;
       return ("wait", sprintf("ramp: last run started %ds ago, next after %ds", $age, $ramp)) if $age < $ramp;
-      if ($maxload > 0 && (my $l = memo("load", \&load1)) > $maxload) { return ("wait", "load $l above $maxload"); }
+      ($maxload) = auto_cap($dir) if $maxload eq "auto";
+      if ($maxload > 0 && (my $l = memo("load", \&load1)) > $maxload) {
+        # The auto cap rises only while runs wait on load.
+        if (open(my $lw, ">", "$dir/load-waited")) { close $lw; }
+        return ("wait", "load $l above $maxload");
+      }
       if ((my $pr = memo("pressure", \&pressure)) ne "") { return ("wait", $pr); }
       if ($minfree) {
         my $fp = memo("free", \&free_pct);
@@ -536,6 +581,31 @@ exec perl -e "$common_code"'
     $lead = $f; %marked = ();
     return 1;
   }
+  # Monitor: the leader appends one line a minute to $dir/monitor.tsv
+  # (time, load1, busy, queued, free memory %, cap); kept under 1 MB.
+  my $mon_at = 0;
+  sub monitor {
+    my ($s, $all, $maxload) = @_;
+    return if time - $mon_at < 5;
+    $mon_at = time;
+    # The file time keeps one line a minute across leaders.
+    return if time - ((stat "$dir/monitor.tsv")[9] // 0) < 60;
+    my $queued = grep { /^\d+-\d+$/ && $_ ne $GATE } @$all;
+    my ($cap) = $maxload eq "auto" ? auto_cap($dir) : ($maxload);
+    tsv("monitor.tsv", "time\tload1\tbusy\tqueued\tmemfree\tcap",
+      join("\t", stamp(), memo("load", \&load1), $s->{busy}, $queued, memo("free", \&free_pct), $cap));
+  }
+  sub stamp { my @lt = localtime; return sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $lt[5] + 1900, $lt[4] + 1, @lt[3,2,1,0]); }
+  sub tsv {
+    my ($name, $head, $line) = @_;
+    my $p = "$dir/$name";
+    rename($p, "$p.1") if (-s $p // 0) > 1_000_000;
+    my $new = !-e $p;
+    open(my $f, ">>", $p) or return;
+    print $f "$head\n" if $new;
+    print $f "$line\n";
+    close $f;
+  }
   sub tick {
     my @set = settings();
     my $guard = $set[4];
@@ -543,6 +613,7 @@ exec perl -e "$common_code"'
     opendir(my $qd, $queue) or return;
     my @all = readdir $qd;
     closedir $qd;
+    monitor($s, \@all, $set[2]);
     # A temp ticket nobody holds (and older than 5 s) is a leftover.
     for my $t (grep { /^\.new-\d+$/ } @all) {
       next unless open(my $xf, "<", "$queue/$t");
@@ -638,6 +709,37 @@ exec perl -e "$common_code"'
     if ($gfh) { close $gfh; undef $gfh; }
     my $p = "$queue/$GATE";
     if (open(my $f, "<", $p)) { unlink $p if flock($f, LOCK_EX | LOCK_NB); }
+  }
+
+  # Log the end of each run to $dir/runs.tsv, then tune the auto cap from it.
+  sub outcome {
+    my ($code, $secs, $load0, $peak, $busy0) = @_;
+    (my $pn = $proj) =~ s{.*/}{};
+    my $ml = setting("HEAVY_RUN_MAX_LOAD", "heavy_run_max_load", 0, sub { $_[0] eq "auto" || $is_num->($_[0]) });
+    my ($cap) = $ml eq "auto" ? auto_cap($dir) : ($ml);
+    tsv("runs.tsv", "time\texit\tseconds\tload_start\tload_peak\tbusy_start\tcap\tproject",
+      join("\t", stamp(), $code, $secs, $load0, $peak, $busy0, $cap, $pn));
+    return unless $ml eq "auto";
+    sysopen(my $lk, "$dir/load-cap.lock", O_RDWR | O_CREAT, 0600) or return;
+    flock($lk, LOCK_EX) or return;
+    my ($now, $why) = auto_cap($dir);
+    my (undef, $lo, $hi) = auto_bounds();
+    my $age = time - ((stat "$dir/load-cap")[9] // 0);
+    my $waited = time - ((stat "$dir/load-waited")[9] // 0) < 600;
+    # 129, 130, 143: the caller hung up or stopped the run; not an overload.
+    my $failed = $code != 0 && $code != 129 && $code != 130 && $code != 143;
+    my $new;
+    if ($failed && $peak >= 0.75 * $now && $age >= 60) {
+      $new = $now * 0.8; $new = $lo if $new < $lo;
+      $why = sprintf("lowered from %g: a %s run failed (exit %d) at load %s", $now, $pn || "heavy", $code, $peak);
+    } elsif ($code == 0 && $waited && $age >= 300) {
+      $new = $now * 1.05; $new = $hi if $new > $hi;
+      $why = sprintf("raised from %g: a %s run passed at load %s while runs waited on load", $now, $pn || "heavy", $peak);
+    }
+    return unless defined $new;
+    $new = int($new + 0.5);
+    return if $new == $now;
+    put("$dir/load-cap", "$new\t$why\n");
   }
 
   my $exclusive_wait = $exclusive
@@ -767,9 +869,12 @@ exec perl -e "$common_code"'
     POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
     exec("perl", "-e", $priority_code, $level, $command_umask, @cmd) or die "heavy-run: cannot run $cmd[0]: $!\n";
   }
+  my ($load0, $peak, $peak_at, $busy0) = (load1(), 0, 0, snapshot()->{busy});
+  $peak = $load0;
   my $stopped = 0;
   for my $sig (qw(TERM INT HUP)) { $SIG{$sig} = sub { kill $sig, $pid; kill "CONT", tree($pid) if $stopped; }; }
   POSIX::sigprocmask(POSIX::SIG_UNBLOCK(), $set_sig);
+  my $t_run = time;
   my @t = localtime;
   if (open(my $o, ">", $ownerfile)) {
     printf $o "%02d:%02d:%02d pid=%d cwd=%s cmd=%s\nproject=%s\nstart=%.3f\nreader=project-id-v1\nnopause=%d\n", @t[2,1,0], $pid, $ENV{PWD} // "", join(" ", @cmd), $proj, Time::HiRes::time(), $nopause_run;
@@ -782,14 +887,17 @@ exec perl -e "$common_code"'
     last if $r == $pid;
     if ($r == -1) { next if $!{EINTR}; last; }
     step() if $ticket;
+    if (time - $peak_at >= 5) { $peak_at = time; my $l = load1(); $peak = $l if $l > $peak; }
     my $why = $ticket ? read1($mark) : "";
     if ($why ne "" && !$stopped) { kill "STOP", tree($pid); $stopped = 1; print STDERR "heavy-run: paused: $why\n"; }
     elsif ($why eq "" && $stopped) { kill "CONT", tree($pid); $stopped = 0; print STDERR "heavy-run: resumed\n"; }
     select(undef, undef, undef, 0.2);
   }
   my $st = $?;
+  my $code = POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st);
   truncate($ownerfile, 0);
   unlink $mark;
+  outcome($code, time - $t_run, $load0, $peak, $busy0);
   ungate() if $ticket;
-  exit(POSIX::WIFSIGNALED($st) ? 128 + POSIX::WTERMSIG($st) : POSIX::WEXITSTATUS($st));
+  exit($code);
 ' "$lock" "$owner" "$level" "$queue" "$dir/seq" "$waitlog" "$priority_code" "$dir" "$exclusive" "$command_umask" "$@"

@@ -214,10 +214,10 @@ settings:
     optional: true
     description: Seconds an exclusive run waits before exiting with retry status 75. Empty = 900. HEAVY_RUN_EXCLUSIVE_WAIT wins.
   heavy_run_max_load:
-    type: int:0-1000
+    type: intauto:0-1000
     default: ""
     optional: true
-    description: 1-minute load average above which heavy-run starts no extra run. Empty or 0 = off (memory pressure still applies). HEAVY_RUN_MAX_LOAD wins.
+    description: 1-minute load average above which heavy-run starts no extra run. Empty or 0 = off (memory pressure still applies). auto = start at 8 x cores, lower 20% after a run fails at high load, raise 5% when runs pass while others wait on load; heavy-run --status shows the cap and why. HEAVY_RUN_MAX_LOAD wins.
   heavy_run_min_free_pct:
     type: int:0-90
     default: ""

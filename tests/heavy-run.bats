@@ -765,7 +765,7 @@ release_all() {
   run "$SCRIPT" --status
   release_all
   # An idle CI box can show load 0.00; then no wait is a pass too.
-  [[ "${lines[2]}" == *"(waiting: load "*" above 0.0001)" ]] || [ "${#lines[@]}" -le 2 ]
+  [[ "${lines[2]}" == *"(waiting: load "*" above 0.0001)" ]] || [ "${#lines[@]}" -le 3 ]
 }
 
 @test "heavy-run: slots: the heavy_run_slots setting sets the count; env wins" {
@@ -1315,4 +1315,78 @@ start_orphan() {
   run env HEAVY_RUN_KEEP_ORPHAN=yes "$SCRIPT" true
   [ "$status" -eq 2 ]
   [[ "$output" == *"HEAVY_RUN_KEEP_ORPHAN must be 0 or 1"* ]]
+}
+
+# --- Auto load cap (heavy_run_max_load: auto).
+auto_env() {
+  export HEAVY_RUN_SLOTS=2 HEAVY_RUN_MAX_LOAD=auto HEAVY_RUN_CORES=10
+  printf '%s\n' "${1:-95}" >"$BATS_TEST_TMPDIR/load"
+  export HEAVY_RUN_LOAD_PROBE="cat $BATS_TEST_TMPDIR/load"
+}
+
+@test "heavy-run: auto load cap starts at 8 x cores and --status says why" {
+  auto_env 3
+  run "$SCRIPT" --status
+  [ "${lines[1]}" = "load cap: 80 auto, load now 3 (start: 8 x 10 cores)" ]
+}
+
+@test "heavy-run: auto load cap reads 'auto' from the setting" {
+  unset HEAVY_RUN_MAX_LOAD
+  auto_env 3
+  unset HEAVY_RUN_MAX_LOAD
+  mkdir -p "$HOME/.config/chezmoi"
+  printf 'data:\n  heavy_run_max_load: auto  # tuned\n' >"$HOME/.config/chezmoi/chezmoi.yaml"
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 80 auto"* ]]
+}
+
+@test "heavy-run: auto load cap drops 20% after a failed run at high load" {
+  auto_env 95
+  run "$SCRIPT" false
+  [ "$status" -eq 1 ]
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 64 auto"*"lowered from 80: a "*" run failed (exit 1) at load 95)" ]]
+  # One overload counts once: a second failure within a minute keeps 64.
+  run "$SCRIPT" false
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 64 auto"* ]]
+}
+
+@test "heavy-run: auto load cap keeps its value after a failure at low load" {
+  auto_env 5
+  run "$SCRIPT" false
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 80 auto"* ]]
+}
+
+@test "heavy-run: auto load cap rises 5% when a run passes while runs waited on load" {
+  auto_env 95
+  mkdir -p "$HEAVY_RUN_DIR"
+  printf '64\told\n' >"$HEAVY_RUN_DIR/load-cap"
+  touch -t 202601010000 "$HEAVY_RUN_DIR/load-cap"
+  touch "$HEAVY_RUN_DIR/load-waited"
+  run "$SCRIPT" true
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 67 auto"*"raised from 64"* ]]
+}
+
+@test "heavy-run: auto load cap stays within 2-16 x cores" {
+  auto_env 3
+  mkdir -p "$HEAVY_RUN_DIR"
+  printf '1\tx\n' >"$HEAVY_RUN_DIR/load-cap"
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 20 auto"*"floor 2 x 10 cores)" ]]
+  printf '9999\tx\n' >"$HEAVY_RUN_DIR/load-cap"
+  run "$SCRIPT" --status
+  [[ "${lines[1]}" == "load cap: 160 auto"*"ceiling 16 x 10 cores)" ]]
+}
+
+@test "heavy-run: monitor logs each run's exit and load, and a sample line" {
+  auto_env 42
+  run "$SCRIPT" sh -c 'exit 3'
+  [ "$status" -eq 3 ]
+  [ "$(head -1 "$HEAVY_RUN_DIR/runs.tsv")" = "$(printf 'time\texit\tseconds\tload_start\tload_peak\tbusy_start\tcap\tproject')" ]
+  [ "$(tail -1 "$HEAVY_RUN_DIR/runs.tsv" | cut -f2,4,5,7)" = "$(printf '3\t42\t42\t80')" ]
+  [ "$(tail -1 "$HEAVY_RUN_DIR/monitor.tsv" | cut -f2,6)" = "$(printf '42\t80')" ]
+  [ "$(stat -f %Lp "$HEAVY_RUN_DIR/runs.tsv" 2>/dev/null || stat -c %a "$HEAVY_RUN_DIR/runs.tsv")" = 600 ]
 }

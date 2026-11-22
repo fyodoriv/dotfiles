@@ -11,11 +11,18 @@ rules: |
   (with why they wait). Give each a few words and why it matters.
   If there are none, write "**Follow-ups:** nothing".
   Second, what is in flight right now:
-  "**Waiting on:** <item> (<what it waits for and why>); <item>". List only
+  "**Waiting on:** <item> (<what it waits for>; check: <which check>;
+  next: <HH:MM TZ>); <item>". List only
   work that is running or queued now and will change state without a new
   request from me: running CI, background jobs, queued heavy-run checks,
   linked chats or sessions that are still working, and unfinished steps of
   this task that are blocked on one of those. Never list a follow-up here.
+  Each item names the exact check that watches it (for example background
+  job bzdl5bv87 running `gh pr checks 1256 --watch --interval 60`, a
+  ScheduleWakeup id, a Monitor, or a CI check name) and when that check
+  next runs, as a local clock time (for example "next: 23:41 EST" or
+  "re-checks every 60 s; next: 23:41 EST"). An item with no watching check
+  is not allowed: start a watcher, or move the item out of Waiting on.
   Check each item live before listing it. Never list one from memory.
   If a live check is unavailable, state that verification is pending and the
   current status is unknown. Do not infer "nothing" from an unavailable check.
@@ -38,7 +45,9 @@ rules: |
   When Waiting on lists anything, the same judge also checks both lines against live
   evidence: each Waiting-on item is still running or queued (a finished job,
   a merged PR or an idle session is not), and no follow-up sits under
-  Waiting on. Fix the lines before you send.
+  Waiting on. It rejects a Waiting-on item that lacks its check or its next
+  time, or whose next time is already in the past. Fix the lines before you
+  send.
   At session start, when the memory MCP is available, call get_bootstrap_profile with this agent's ID and current task_summary, then search ranked memory and mistake notes before consequential decisions.
   Before answering questions about local repositories, architecture, configuration, operations, or domain workflows, automatically search memory with the task and relevant repo/topic tags. Prefer current-revision repo-procedure and pattern memories over generic repo-docs dossiers; if grounded memory is missing or stale, read the current source docs, answer from them, and store the reusable correction with source paths and revision.
   Before the final response after substantive work, when the memory MCP is available, call commit_session_legacy once; encode decisions as {what, why}, errors as {error, tool, resolution}, and user corrections as {original, corrected_to}.

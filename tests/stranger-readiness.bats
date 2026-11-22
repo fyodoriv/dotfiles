@@ -197,6 +197,21 @@ _pending_footer_export() {
   grep -Fq 'When Waiting on lists anything, the same judge also checks' <<<"$merged"
 }
 
+@test "pending footer C10 owner export makes every Waiting-on item name its check and next time" {
+  local merged
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  merged="$output"
+  grep -Fq 'check: <which check>;' <<<"$merged"
+  grep -Fq 'next: <HH:MM TZ>' <<<"$merged"
+  grep -Fq 'names the exact check that watches it' <<<"$merged"
+  grep -Fq 'as a local clock time' <<<"$merged"
+  grep -Fq 'An item with no watching check' <<<"$merged"
+  grep -Fq 'start a watcher, or move the item out of Waiting on.' <<<"$merged"
+  grep -Fq 'lacks its check or its next' <<<"$merged"
+  grep -Fq 'already in the past' <<<"$merged"
+}
+
 @test "base Agentfile.yaml rules carry no owner-only lines" {
   run grep -nE "$OWNER_RULE_PATTERN" "$REPO/Agentfile.yaml"
   [ "$status" -ne 0 ] || { echo "owner-only rule in Agentfile.yaml: $output"; return 1; }

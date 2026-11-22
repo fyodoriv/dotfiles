@@ -6,6 +6,15 @@
 > what it waits for. Mixing the two made finished work read as "still
 > waiting". The judge now checks both lines. Source:
 > `config/agentfile-owner-rules.yaml`.
+>
+> **Update 2026-11-22 (later):** each Waiting-on item now has the form
+> `<item> (<what it waits for>; check: <which check>; next: <HH:MM TZ>)`.
+> The check is the exact watcher (a background job and its command, a
+> ScheduleWakeup id, a Monitor, a CI check name). The next time is when that
+> watcher runs again, in local clock time. An item with no watcher is not
+> allowed: start one or move the item out. The judge rejects an item with no
+> check, no next time, or a next time in the past, so a stalled wait shows.
+> Pinned by `tests/stranger-readiness.bats` case C10.
 
 ## Overall goal and vision
 

@@ -195,9 +195,10 @@ EOF
   local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml" tail_hash
   grep -Fq 'Before the Needed-from-you line asks for anything, an independent judge' "$owner_rules"
   # Preserve the rule suffix verbatim. It last changed on purpose when the
-  # judge started checking the Waiting-on and Follow-ups lines (2026-11-22).
+  # judge started rejecting Waiting-on items with no check or next time
+  # (2026-11-22).
   tail_hash="$(awk '/^  End every message with one last line/ { capture=1 } capture' "$owner_rules" | shasum -a 256 | awk '{print $1}')"
-  [ "$tail_hash" = "7bac658d37f4a4b1210e35810120cccb44642431e370092c52b0f11831a04c7f" ]
+  [ "$tail_hash" = "bb039096303519eb64928b314e37e72b00c80c208c175b7bfc7fe31dc78fdc13" ]
 }
 
 @test "ask judge rejects an ask that lacks full context" {

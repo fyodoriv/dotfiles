@@ -4,15 +4,24 @@
 # appends them after the general rules in Agentfile.yaml.
 # See .chezmoiscripts/run_after_agentbrew-sync.sh.
 rules: |
-  Right before the Needed-from-you line, add one line listing every open item:
-  "**Pending:** <item>; <item>". Include running CI, background jobs,
-  linked chats, unfinished steps, cleanup left undone, and known follow-ups.
+  Right before the Needed-from-you line, add two lines, in this order.
+  First, suggested next work that nobody has started:
+  "**Follow-ups:** <suggestion>; <suggestion>". Put known follow-ups here:
+  out-of-scope findings, tasks worth filing, cleanup or steps left undone
+  (with why they wait). Give each a few words and why it matters.
+  If there are none, write "**Follow-ups:** nothing".
+  Second, what is in flight right now:
+  "**Waiting on:** <item> (<what it waits for and why>); <item>". List only
+  work that is running or queued now and will change state without a new
+  request from me: running CI, background jobs, queued heavy-run checks,
+  linked chats or sessions that are still working, and unfinished steps of
+  this task that are blocked on one of those. Never list a follow-up here.
   Check each item live before listing it. Never list one from memory.
   If a live check is unavailable, state that verification is pending and the
   current status is unknown. Do not infer "nothing" from an unavailable check.
-  If nothing is open, write "**Pending:** nothing".
-  The two lines are independent: needing no user action does not mean no
-  pending work remains.
+  If nothing is in flight, write "**Waiting on:** nothing".
+  The lines are independent: needing no user action does not mean nothing is
+  in flight, and nothing in flight does not mean there are no follow-ups.
   End every message with one last line that says exactly what you need from me,
   as a one-liner: "**Needed from you:** <action or exact command>". If you need
   nothing, write "**Needed from you:** nothing". Never put the request only
@@ -26,6 +35,10 @@ rules: |
   for me, and where to do it.
   Write the ask only after the judge approves; otherwise write
   "**Needed from you:** nothing" or the corrected ask.
+  When Waiting on lists anything, the same judge also checks both lines against live
+  evidence: each Waiting-on item is still running or queued (a finished job,
+  a merged PR or an idle session is not), and no follow-up sits under
+  Waiting on. Fix the lines before you send.
   At session start, when the memory MCP is available, call get_bootstrap_profile with this agent's ID and current task_summary, then search ranked memory and mistake notes before consequential decisions.
   Before answering questions about local repositories, architecture, configuration, operations, or domain workflows, automatically search memory with the task and relevant repo/topic tags. Prefer current-revision repo-procedure and pattern memories over generic repo-docs dossiers; if grounded memory is missing or stale, read the current source docs, answer from them, and store the reusable correction with source paths and revision.
   Before the final response after substantive work, when the memory MCP is available, call commit_session_legacy once; encode decisions as {what, why}, errors as {error, tool, resolution}, and user corrections as {original, corrected_to}.

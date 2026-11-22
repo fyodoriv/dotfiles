@@ -173,14 +173,21 @@ EOF
   grep -q 'not bypass the queue, required gates' "$agentfile"
 }
 
-@test "pending footer C1 canonical owner contract puts Pending before Needed" {
+@test "pending footer C1 canonical owner contract puts Follow-ups and Waiting on before Needed" {
   local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml"
   grep -Fq 'Right before the Needed-from-you line' "$owner_rules"
-  grep -Fq '**Pending:**' "$owner_rules"
+  grep -Fq '**Follow-ups:**' "$owner_rules"
+  grep -Fq '**Waiting on:**' "$owner_rules"
+  # Follow-ups comes first, then Waiting on, then Needed from you.
+  [ "$(grep -nF '"**Follow-ups:** <' "$owner_rules" | cut -d: -f1)" -lt "$(grep -nF '"**Waiting on:** <' "$owner_rules" | cut -d: -f1)" ]
+  [ "$(grep -nF '"**Waiting on:** <' "$owner_rules" | cut -d: -f1)" -lt "$(grep -nF '"**Needed from you:** <' "$owner_rules" | cut -d: -f1)" ]
+  # The old mixed Pending line is gone.
+  run grep -F '**Pending:**' "$owner_rules"
+  [ "$status" -eq 1 ]
 }
 
 @test "pending footer C4 base Agentfile excludes both personal footer rules" {
-  run grep -E '\*\*(Pending|Needed from you):\*\*' "$(repo_root)/Agentfile.yaml"
+  run grep -E '\*\*(Pending|Waiting on|Follow-ups|Needed from you):\*\*' "$(repo_root)/Agentfile.yaml"
   [ "$status" -eq 1 ]
 }
 
@@ -188,9 +195,9 @@ EOF
   local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml" tail_hash
   grep -Fq 'Before the Needed-from-you line asks for anything, an independent judge' "$owner_rules"
   # Preserve the rule suffix verbatim. It last changed on purpose when the
-  # ask judge gained its full-context check (2026-11-22).
+  # judge started checking the Waiting-on and Follow-ups lines (2026-11-22).
   tail_hash="$(awk '/^  End every message with one last line/ { capture=1 } capture' "$owner_rules" | shasum -a 256 | awk '{print $1}')"
-  [ "$tail_hash" = "a980bfd533c13b066f4c110909b51107d430ae3f8bf753d5d0ddc3a1287f0261" ]
+  [ "$tail_hash" = "7bac658d37f4a4b1210e35810120cccb44642431e370092c52b0f11831a04c7f" ]
 }
 
 @test "ask judge rejects an ask that lacks full context" {

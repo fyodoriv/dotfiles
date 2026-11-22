@@ -99,7 +99,7 @@ run_hook() {
   unset STUB_GH_OUT
   run_hook "git branch -D feat/unmerged"
   [ "$status" -eq 2 ]
-  [ "$output" = "BLOCKED: 'git branch -D' is not permitted. Ask the user to run it manually." ]
+  [[ "$output" == "BLOCKED: 'git branch -D' is allowed only for a branch whose PR is merged"* ]]
 }
 
 @test "blocks when a merged PR head differs from the branch tip" {
@@ -650,4 +650,11 @@ run_hook_in() {
     run_hook "$c"
     [ "$status" -eq 0 ]
   done
+}
+
+@test "a cd before a merged-branch delete blocks with the plain-form hint" {
+  make_feature_branch feat/merged-cd
+  run_hook "cd $REPO && git branch -D feat/merged-cd"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"git -C <absolute repo path> branch -D <branch>"* ]]
 }

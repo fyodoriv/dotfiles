@@ -50,6 +50,13 @@ block() {
   exit 2
 }
 
+# The merged-branch allowance needs one plain git call. Say so, so an agent
+# retries in that form instead of handing a safe delete to the user.
+block_branch_delete() {
+  echo "BLOCKED: 'git branch -D' is allowed only for a branch whose PR is merged, as one plain command with nothing before git and no chain: git -C <absolute repo path> branch -D <branch>. Retry in that form; if it still blocks, the branch is not proven merged, so ask the user." >&2
+  exit 2
+}
+
 # A squash merge leaves the branch commits off the default branch, so the safe
 # lowercase delete refuses the branch. Treat a branch as merged only when:
 #   1. its tip is already in the default branch, or
@@ -644,7 +651,7 @@ if looks_like_branch_delete; then
   fi
   command="$_original_command"
   if [ "$_segment_match" -eq 1 ]; then
-    branch_delete_allowed || block "git branch -D"
+    branch_delete_allowed || block_branch_delete
   fi
 fi
 

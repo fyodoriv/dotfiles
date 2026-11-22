@@ -15,7 +15,7 @@
 @test "blocks git branch -D" {
   run bash -c "echo '{\"tool_input\": {\"command\": \"git branch -D\"}}' | ./agent-hooks/block-dangerous-git.sh"
   [ "$status" -eq 2 ]
-  [ "$output" = "BLOCKED: 'git branch -D' is not permitted. Ask the user to run it manually." ]
+  [[ "$output" == "BLOCKED: 'git branch -D' is allowed only for a branch whose PR is merged"* ]]
 }
 
 @test "blocks git checkout ." {

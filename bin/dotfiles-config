@@ -125,6 +125,7 @@ _allowed() {
   case "$t" in
     bool) ALLOWED="true|false" ;;
     int:*) ALLOWED="${t#int:}" ;;
+    intauto:*) ALLOWED="${t#intauto:}|auto" ;;
     enum:*) ALLOWED="${t#enum:}"; ALLOWED="${ALLOWED//,/|}" ;;
     text) ALLOWED="one line" ;;
     email) ALLOWED="email or empty" ;;
@@ -153,12 +154,15 @@ _validate() {
         *) WHY="use true or false" ;;
       esac
       ;;
-    int:*)
-      lo="${t#int:}"; hi="${lo#*-}"; lo="${lo%-*}"
-      if [[ "$v" =~ ^[0-9]{1,6}$ ]] && [ "$((10#$v))" -ge "$lo" ] && [ "$((10#$v))" -le "$hi" ]; then
+    intauto:* | int:*)
+      lo="${t#*:}"; hi="${lo#*-}"; lo="${lo%-*}"
+      if [[ "$t" = intauto:* && "$v" = auto ]]; then
+        :
+      elif [[ "$v" =~ ^[0-9]{1,6}$ ]] && [ "$((10#$v))" -ge "$lo" ] && [ "$((10#$v))" -le "$hi" ]; then
         v="$((10#$v))"
       else
         WHY="use a whole number from $lo to $hi"
+        if [[ "$t" = intauto:* ]]; then WHY="$WHY, or auto"; fi
       fi
       ;;
     enum:*)
@@ -286,6 +290,9 @@ cmd_set() {
     case "${TYPES[$I]}" in
       bool) expr='.data[strenv(DOTFILES_CONFIG_KEY)] = (strenv(DOTFILES_CONFIG_VALUE) == "true")' ;;
       int:*) expr='.data[strenv(DOTFILES_CONFIG_KEY)] = (strenv(DOTFILES_CONFIG_VALUE) | to_number)' ;;
+      intauto:*)
+        if [ "$NEW" = auto ]; then expr='.data[strenv(DOTFILES_CONFIG_KEY)] = strenv(DOTFILES_CONFIG_VALUE)'
+        else expr='.data[strenv(DOTFILES_CONFIG_KEY)] = (strenv(DOTFILES_CONFIG_VALUE) | to_number)'; fi ;;
       list)
         if [ -z "$NEW" ]; then
           expr='.data[strenv(DOTFILES_CONFIG_KEY)] = []'

@@ -389,6 +389,27 @@ It also keeps existing real-time pause marks until a valid check reports no
 matching app. This applies to the first run, exclusive runs and added parallel
 runs. It does not change the configured slot limits.
 
+### Auto load cap
+
+`heavy_run_max_load: auto` lets heavy-run own the load cap. Goal: run as much
+as possible in parallel, but stop before gates fail on wall-clock timeouts.
+
+- **Start:** 8 x cores (80 on a 10-core Mac). The cap stays within 2-16 x cores.
+- **Lower 20%:** a run fails (exit not 0, 129, 130 or 143) and the load peaked
+  at 75% of the cap or more. At most once a minute, so one overload counts once.
+- **Raise 5%:** a run passes while other runs waited on load in the last
+  10 minutes. At most once every 5 minutes.
+- **Where:** the cap and its reason are in `~/.local/state/heavy-run/load-cap`.
+  `heavy-run --status` prints `load cap: <n> auto, load now <l> (<reason>)`.
+- **Monitor:** the scheduler appends a line a minute to `monitor.tsv` (time,
+  load, busy slots, queued, free memory %, cap). Each run's end goes to
+  `runs.tsv` (exit, seconds, load at start and peak, busy slots, cap, project).
+  Both files are private (0600) and roll over at 1 MB.
+
+Asymmetric steps (big cut, small rise) follow additive-increase /
+multiplicative-decrease (Chiu and Jain 1989). Tests set `HEAVY_RUN_CORES` and
+`HEAVY_RUN_LOAD_PROBE`.
+
 One scheduler decides for the whole queue. Every `heavy-run` process tries for the
 leader lock `sched.lock`; the holder reads the settings live and writes a grant or a wait
 reason per ticket, and the pause marks. So `dotfiles config set heavy_run_slots N` reaches

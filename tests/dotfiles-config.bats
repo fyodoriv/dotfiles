@@ -126,6 +126,18 @@ cfg_hash() { shasum -a 256 "$CFG" | awk '{ print $1 }'; }
   [[ "$output" == *"already full. Nothing changed."* ]]
 }
 
+@test "config set takes auto or a whole number for heavy_run_max_load" {
+  cfg set heavy_run_max_load auto
+  [ "$status" -eq 0 ]
+  [ "$(yq '.data.heavy_run_max_load' "$CFG")" = "auto" ]
+  cfg set heavy_run_max_load 70
+  [ "$status" -eq 0 ]
+  [ "$(yq '.data.heavy_run_max_load | tag' "$CFG")" = '!!int' ]
+  cfg set heavy_run_max_load xyz
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"or auto"* ]]
+}
+
 @test "config set refuses a bad value with the reason and leaves the file unchanged" {
   local before key value
   before="$(cfg_hash)"

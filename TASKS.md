@@ -11,6 +11,62 @@ them. -->
 
 ## P0
 
+- [ ] Rewrite heavy commands to heavy-run instead of refusing them
+  - **ID**: heavy-run-rewrite-not-block
+  - **Tags**: hooks, heavy-run, reliability
+  - **Details**: From the 2026-11-22 rules-to-hooks audit. Over two months the perf log shows about 200 tool calls refused by `require-heavy-run` and `block-local-tests` (cargo test 56, bats 42, cargo build 40, cargo fmt 36, vitest 27). Each refusal costs the agent a round trip and a retry. Claude Code PreToolUse hooks can return `updatedInput`, so the hook can rewrite `cargo test` to `heavy-run cargo test` and allow it, like an eslint `--fix` rule. **Parallel changes first**: this depends on the P1 task `guard-final-command-hook-order` (does a later guard see the rewritten command?). Read its latest progress and any merged result before you start; do not ship a rewrite until it proves guards check the final command. Never rewrite where `block-local-tests` forbids local runs (agentbrew checkouts use hosted CI). A queued heavy-run can outlast the Bash timeout, so the rewrite also sets `run_in_background`.
+  - **Files**: `agent-hooks/require-heavy-run.sh`, its tests, `docs/heavy-run.md` or the hook guidance.
+  - **Output**: code
+  - **Acceptance**: fixtures: plain `cargo test` in a repo that allows local runs is rewritten and allowed; the same in an agentbrew checkout stays blocked; a command already wrapped stays unchanged; `HEAVY_RUN_HOOK=off` in the hook's own environment still turns it off.
+  - **Hypothesis**: refused heavy commands drop from about 100 per month to 10 or fewer, with 0 heavy runs that bypass the queue.
+  - **Measurement**: perf log attempts with no result row for keys `cargo test|cargo build|cargo fmt|bats|npx vitest`: `jq -r 'select(.ev=="attempt")|[.id,.key]|@tsv'` joined against result ids, per month; and `heavy-run --status` history for unqueued heavy commands.
+  - **Success**: 10 or fewer refused per month and 0 unqueued heavy runs.
+  - **Pivot**: if `guard-final-command-hook-order` shows a later guard can miss the rewritten command, keep the block and improve the block message to give the exact rewritten command instead.
+  - **Anchor**: Claude Code hooks reference (`updatedInput`), https://code.claude.com/docs/en/hooks; Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — agent iteration speed, not a scorecard metric.
+
+- [ ] Refresh the owner hook overlay: enable ready hooks, fix the stale judge note
+  - **ID**: owner-hook-overlay-refresh
+  - **Tags**: hooks, owner-machine, agentbrew
+  - **Details**: From the 2026-11-22 audit. Seven agentbrew catalog hooks exist, cover owner rules, and are off: `no-commit-no-verify`, `no-git-add-all`, `gh-pr-agent-artifacts-require-tests`, `gh-pr-skill-requires-evals`, `no-binary-screenshots`, `gh-pr-body-no-review-response`, `gh-pr-body-related-prs-not-first`. Add them to `HOOKS=` in `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl`. Leave off `git-commit-conventional`, `git-strip-agent-attribution`, and `no-force-push-protected` (git hooks and `block-dangerous-git` already do this) and `no-cross-workspace-publish` (conflicts with standing PR approvals). The overlay comment says the 10 judge hooks are off because `claude --print` never returns; on 2026-11-22 it answered in 9 s. Update the comment to the measured fact and point to the agentbrew task `hook-judge-tier-local-model`; keep the judges off until that lands. Remove the "escape hatch: `git commit --no-verify`" line from the `git-hooks/pre-commit` header, because owner rules forbid it. **Parallel changes first**: the overlay already enables `detached-start-needs-watch` and `start-refused-caught`, which exist only in open agentbrew PR #1248; check whether it merged, and do not report them as broken until then. Fetch `origin/feat/chezmoi` and the agentbrew catalog for new or renamed hook ids.
+  - **Files**: `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl`, `git-hooks/pre-commit`, the overlay test.
+  - **Output**: config
+  - **Acceptance**: after `dotfiles apply` and `agentbrew sync`, each of the 7 ids appears in `~/.claude/settings.json`; one sample stdin per hook blocks its bad case and allows a normal case; the pre-commit header no longer advertises `--no-verify`.
+  - **Hypothesis**: owner rules covered by an enabled hook rise by 7 (from 20 of 55 hookable rules to 27 of 55), with 0 false blocks on normal commits and PRs over 14 days.
+  - **Measurement**: `for id in <7 ids>; do grep -c "/$id.sh" ~/.claude/settings.json; done`, plus perf-log blocked rows for those hook ids over 14 days reviewed for false blocks.
+  - **Success**: all 7 wired, 0 false blocks in 14 days.
+  - **Pivot**: if any hook false-blocks twice in 14 days, remove it from the overlay and file the defect in agentbrew.
+  - **Anchor**: agentbrew `hooks/manifest.yaml` (`defaultEnabled`); Claude Code hooks reference.
+  - **Competitive-goal**: none — owner-machine policy coverage, not a scorecard metric.
+
+- [ ] Reconcile the gh wrapper PR body check with the owner PR opener rule
+  - **ID**: gh-pr-body-shape-reconcile
+  - **Tags**: gh, delivery, pr-body, owner-rules
+  - **Details**: From the 2026-11-22 audit. Owner rules say a PR body opens with `## Summary` (2-3 sentences of why), then `## Details`, plus `## Docs`, a pre-registration block or an `Exempt:` line, no `Status:` lines, and `## Vision trace` only when the repo has that CI gate. `bin/gh` `_validate_pr_create_body` (around line 465) accepts two other shapes (Requirements/Previous state/Validation steps, or Summary/Delivery plan/Test plan). Agents learn the shape only from a refusal. Pick one documented shape set in one place (this wrapper), check the opener order and the extra rules there, and make the block message show the exact template. Do not add a second PR-body hook in agentbrew. **Parallel changes first**: fetch `origin/feat/chezmoi`, read the current `bin/gh` and the agentbrew `check-preregistration.mjs` CI check (it needs a line starting `Exempt: <gate>`), and list open PRs touching `bin/gh` or `config/agentfile-owner-rules.yaml`.
+  - **Files**: `bin/gh`, its tests, the owner-rules text if the shape changes.
+  - **Output**: code
+  - **Acceptance**: fixtures: a body that opens with `## Summary` then `## Details` plus `## Docs` and `Exempt:` passes; a body that leads with `## Details` is blocked with the template shown; a `Status:` line is blocked; `## Vision trace` in a repo without the gate is blocked; both existing accepted shapes keep working or are migrated with a documented reason.
+  - **Hypothesis**: PR creates refused by the wrapper or by the hosted prediction check drop from the current count to 1 or fewer per 30 days.
+  - **Measurement**: perf log refused `gh pr` attempts per 30 days, plus `gh run list --workflow "PR pre-registration" --status failure` per 30 days in agentbrew and dotfiles.
+  - **Success**: 1 or fewer refusals per 30 days.
+  - **Pivot**: if the stricter shape refuses more than 1 in 5 owner PRs in the first week, keep the opener check and make the other rules warn-only.
+  - **Anchor**: owner rule "PR bodies must open with `## Summary`"; Basili, Caldiera, Rombach 1994 (GQM).
+  - **Competitive-goal**: none — delivery consistency, not a scorecard metric.
+
+- [ ] Make block-dangerous-git match commands, not text, and close its gaps
+  - **ID**: git-guard-parsed-words-and-gaps
+  - **Tags**: hooks, git, security, reliability
+  - **Details**: From the 2026-11-22 audit. `block-dangerous-git.sh` blocked a harmless command because the words for deleting a branch appeared inside a quoted `jq --arg` value; a skills-scan agent hit the same with a heredoc. Match parsed command words only (the hook already has a shfmt-based parser), with a regression test for quoted data. Close gaps that skill text assumes are covered: `git stash` (bare) and `git stash drop`; plain `--force` push on any branch (skills require `--force-with-lease=<ref>:<oid>`); pull, merge, or push when `git merge-base HEAD origin/<default>` is empty (replaced history); `git commit --allow-empty` used to re-trigger CI; in the tooling repos only, `git worktree add` outside `~/apps/tooling/wt`. Align `skills/tooling-checkup/SKILL.md` (it says only the owner deletes branches, but the guard and ship-it allow agents to delete proven-merged ones). **Parallel changes first**: fetch `origin/feat/chezmoi`, read the latest guard and its bats tests, and check the P1 task `guard-final-command-hook-order` for overlapping parser changes.
+  - **Files**: `agent-hooks/block-dangerous-git.sh`, `tests/*block-dangerous-git*.bats`, `skills/tooling-checkup/SKILL.md`.
+  - **Output**: code
+  - **Acceptance**: failing tests first: quoted data and heredoc text with the dangerous words are allowed; bare `git stash`, `stash drop`, plain `--force`, empty merge-base pull, and `--allow-empty` re-trigger are blocked with a fix hint; every existing guard test still passes.
+  - **Hypothesis**: false blocks on non-command text drop from at least 2 known cases to 0, and the 5 listed gaps go from unguarded to guarded.
+  - **Measurement**: `heavy-run bats tests/<guard test file>` with the new fixtures; perf-log blocked rows for the guard over 14 days, reviewed for false blocks.
+  - **Success**: all new and old fixtures pass; 0 false blocks in 14 days.
+  - **Pivot**: if parsing makes the guard slower than 100 ms per Bash call, fall back to the text match plus an allowlist for quoted and heredoc spans.
+  - **Anchor**: shared-rules "Git hygiene (salvage-first)" and "Replaced history"; Claude Code hooks reference.
+  - **Competitive-goal**: none — guard correctness, not a scorecard metric.
+
 - [ ] Company plugins adopt the 2026-11 core (CI, telemetry sink, Rust, docs)
   - **ID**: org-plugin-adopt-core-2026-11
   - **Tags**: plugins, telemetry, org-sink, ci, org-overlay

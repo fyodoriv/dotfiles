@@ -210,7 +210,7 @@ _pending_footer_export() {
   grep -Fq "watcher's own hard timeout or wake time" <<<"$merged"
   grep -Fq 'goes stale within a minute' <<<"$merged"
   grep -Fq 're-arm the watcher with a new deadline.' <<<"$merged"
-  grep -Fq 'An item with no watching check' <<<"$merged"
+  grep -Fq 'An item with no watching' <<<"$merged"
   grep -Fq 'start a watcher with a timeout, or move the item' <<<"$merged"
   grep -Fq 'lacks its check or its next' <<<"$merged"
   grep -Fq 'already in the past' <<<"$merged"

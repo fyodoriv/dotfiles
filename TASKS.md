@@ -309,6 +309,19 @@ them. -->
   - **Competitive-goal**: `noop_reapply_ms` (docs/competition/scorecard.md).
   - **Blocked**: needs-time — 2026-10-22: shipped `dotfiles apply --if-changed` and switched update-tooling and tooling-checkup to it (PR #253). Baseline `dotfiles_apply_secs`: 191 s and 214 s on the last two checkups. The skip check took 0.74 to 1.09 s on this Mac at load1 114. Measure on the next two checkups, on or after 2026-10-29, with `python3 ~/.claude/skills/tooling-checkup/scripts/checkup_state.py diff` (`dotfiles_apply_secs`), then close or pivot.
 
+- [ ] Rule examples that use `timeout` work on a Mac without coreutils
+  - **ID**: rule-examples-timeout-portable
+  - **Tags**: owner-rules, portability, ci-watch
+  - **Details**: dotfiles#831-#833 and agentbrew#1262 teach `timeout 1800 gh run watch <run-id>` in the owner rules, hook hints and PR template. macOS has no `timeout` unless coreutils is installed (this Mac has `/opt/homebrew/bin/timeout`); on a fresh Mac the example fails with "command not found" and the watcher never runs. A fresh-context review of those PRs found it. Either make `dotfiles doctor` require coreutils (and the installer add it), or change the examples to a portable deadline (a `while` loop on `date +%s`).
+  - **Files**: `config/agentfile-owner-rules.yaml`, `docs/agentbrew-setup.md`, the doctor module that checks Homebrew packages
+  - **Output**: code
+  - **Acceptance**: on a PATH without coreutils, the documented watch command either works or the doctor names the missing package with its fix.
+  - **Hypothesis**: watch examples that fail on a stock Mac drop from 1 command form to 0.
+  - **Measurement**: `env PATH=/usr/bin:/bin bash -c '<the documented watch command> --help'` exits 0, or `dotfiles doctor` shows a coreutils line.
+  - **Success**: 0 failing example forms on a stock-PATH run.
+  - **Pivot**: if a doctor check is refused as scope creep, switch every example to the portable loop.
+  - **Anchor**: Nielsen 1994, heuristic 5 (error prevention).
+
 ## P3
 
 - [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback

@@ -197,6 +197,29 @@ _pending_footer_export() {
   grep -Fq 'When Waiting on lists anything, the same judge also checks' <<<"$merged"
 }
 
+@test "pending footer C10 owner export makes every Waiting-on item name its check and next time" {
+  local merged
+  run _pending_footer_export fyodor@sent.com
+  [ "$status" -eq 0 ]
+  merged="$output"
+  grep -Fq 'check: <which check>;' <<<"$merged"
+  grep -Fq 'next: <HH:MM TZ>' <<<"$merged"
+  grep -Fq 'names the exact check that watches it' <<<"$merged"
+  grep -Fq 'the deadline by' <<<"$merged"
+  grep -Fq 'which that check reports back to this session, as a local clock time' <<<"$merged"
+  grep -Fq "watcher's own hard timeout or wake time" <<<"$merged"
+  grep -Fq 'goes stale within a minute' <<<"$merged"
+  grep -Fq 're-arm the watcher with a new deadline.' <<<"$merged"
+  grep -Fq 'Explain the watcher in plain words, not only its command: what it' <<<"$merged"
+  grep -Fq 'checks, how often, what makes it report early, and what happens at the' <<<"$merged"
+  grep -Fq 'wakes me as soon as all checks' <<<"$merged"
+  grep -Fq 'when it gives up and wakes me even' <<<"$merged"
+  grep -Fq 'An item with no watching' <<<"$merged"
+  grep -Fq 'start a watcher with a timeout, or move the item' <<<"$merged"
+  grep -Fq 'lacks its check or its next' <<<"$merged"
+  grep -Fq 'already in the past' <<<"$merged"
+}
+
 @test "base Agentfile.yaml rules carry no owner-only lines" {
   run grep -nE "$OWNER_RULE_PATTERN" "$REPO/Agentfile.yaml"
   [ "$status" -ne 0 ] || { echo "owner-only rule in Agentfile.yaml: $output"; return 1; }

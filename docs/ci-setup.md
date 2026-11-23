@@ -14,9 +14,19 @@ inside a dotfiles checkout and tells the agent to push and read CI
 human sets `DOTFILES_ALLOW_LOCAL_TESTS=1` in a terminal to run tests by hand.
 The hook runs only in an agent session, so CI is not affected.
 
-The loop for an agent: `make lint`, push the branch, then
-`gh pr checks <n> --repo fyodoriv/dotfiles --watch` and, on red,
-`gh run view <id> --log-failed`. To prove a bug, push the failing test first (a
+The loop for an agent: `make lint`, push the branch, then watch the CI run
+by its ID. `gh run list --repo fyodoriv/dotfiles --workflow CI --commit "$(git rev-parse HEAD)"`
+gives the ID of the `CI` run for your head commit. `--commit` needs the full
+40-character SHA; a short one lists nothing. The `OSS Readiness`
+workflow runs too and goes green in seconds, so never take the first run of
+the branch. If the list is empty, the run does not exist yet: wait and list
+again. Then run
+`timeout 1800 gh run watch <id> --repo fyodoriv/dotfiles --exit-status`
+and, on red, `gh run view <id> --log-failed`. Do not start
+`gh pr checks <n> --watch` right after a push: GitHub can list only the fast
+leak check before the main CI run exists, and the watch then exits green
+while `lint` and `test` have not started (seen on 2026-11-22, PR #831).
+`gh pr checks <n>` without `--watch` is fine for a one-time look. To prove a bug, push the failing test first (a
 red run is the proof), then push the fix. This also retires the task
 `speed-up-make-check`: agents no longer run `make check` locally, so its
 local-gate speed has no consumer.

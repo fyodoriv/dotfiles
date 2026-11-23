@@ -15,7 +15,7 @@ Always loaded: open only the doc the routing table names.
 | Task | Command (from the repo root) |
 |---|---|
 | Local gate (the only one) | `make lint` |
-| Tests | Push the branch, then `gh pr checks <n> --repo fyodoriv/dotfiles --watch` and `gh run view <id> --log-failed`. CI runs `make check` (affected tests) per PR and `make test-all` on each push to `feat/chezmoi` and nightly |
+| Tests | Push, then `gh run watch <id> --exit-status` ([by ID](docs/ci-setup.md)) and `gh run view <id> --log-failed`. CI runs `make check` (affected) per PR and `make test-all` on push to `feat/chezmoi` and nightly |
 | TASKS.md only | `make lint-tasks` |
 | Review the task queue | `/review-tasks` |
 | Apply to this Mac | `dotfiles apply` (after `Agentfile.yaml` edits) |
@@ -102,7 +102,7 @@ Claude Code runs `claude-opus-5-5` at `xhigh`, pinned by dotfiles and agentbrew;
 - **Local tests are blocked on purpose**: the hook refuses Bats and `make check`/`test*`/`e2e` in a dotfiles checkout. A human sets `DOTFILES_ALLOW_LOCAL_TESTS=1` in a terminal; an agent never does. Prove a bug with a red CI run, then push the fix.
 - **npm in the sandbox** prints `failed to copy trust settings`: harmless; use `env -u NODE_USE_SYSTEM_CA`.
 - FIFO tests hold through observations; teardown releases/waits; keep the queue guard.
-- Tests: [Bash, PATH, serial Bats](docs/constitution.md#test-command-shims).
+- Tests: [Bash, PATH, serial Bats, line greps](docs/constitution.md#test-command-shims).
 - Hooks: [execute access](docs/plugins.md#migrating-from-the-v1-overlay).
 - Pin Claude fixture IDs.
 - **`sed -i`**: GNU sed may be first. Use `sed -i.bak … && rm -f "$f.bak"`.

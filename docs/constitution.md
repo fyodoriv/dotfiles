@@ -201,6 +201,13 @@ than appending them after `/bin`. The explicit plugin target still selects
 syntax errors as product failures. Use a fresh cache after an interpreter
 correction when prior cache provenance is uncertain.
 
+Rule-text tests (`grep -Fq '<phrase>'` on a rules file or merged
+Agentfile) match one line at a time. Rewrapping a rule moves words to the
+next line and breaks the test, though the rule still says the same thing.
+Pin a phrase that sits inside one line, and after you edit the rule, check
+each pinned phrase against the file before you push. On 2026-11-22 a
+rewrapped owner rule cost one red CI run (PR #831).
+
 Bats 1.14 rejects `--jobs 1` with its file-parallel flags. `JOBS=1 make check`
 selects plain serial Bats and retains every gate step (the Makefile omits the
 parallel flags at one job). This invocation does not raise the

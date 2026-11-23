@@ -480,7 +480,9 @@
 
 @test "ship-it waits for every check and cleans worktree folders after merge" {
   local reference="$BATS_TEST_DIRNAME/../docs/ship-it-reference.md"
-  grep -F -q 'gh pr checks <n> --watch' "$reference"
+  grep -F -q 'watch the CI run by ID (`gh run watch <id> --exit-status`)' "$reference"
+  grep -F -q 'no check is pending' "$reference"
+  grep -F -q 'can exit green before the main CI run exists' "$reference"
   grep -F -q 'non-required checks are still pending' "$reference"
   grep -F -q 'git worktree prune' "$reference"
   jq -e '.evals | any(.id == 13)' "$BATS_TEST_DIRNAME/../commands/evals/ship-it.evals.json" >/dev/null

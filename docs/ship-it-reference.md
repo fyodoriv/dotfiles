@@ -768,7 +768,7 @@ unready.
 
 ## 6. Watch CI and fix
 
-Run `gh pr checks --watch` or the repo's documented CI watcher. If any check fails, inspect the failing log, fix root cause, verify locally, commit, push, and watch again. Repeat until checks pass or a hard external blocker remains.
+Run the repo's documented CI watcher, or `gh run watch <id> --exit-status` on the CI run for the head commit. A `gh pr checks --watch` started right after a push can exit green before the main CI run exists. If any check fails, inspect the failing log, fix root cause, verify locally, commit, push, and watch again. Repeat until checks pass or a hard external blocker remains.
 
 **PR-body gates after a body edit:** a body edit starts a new run (the `edited` event). Read that run. Do not re-run the old failed run: it reuses the old body and hides the passing run. If the old failed run stays on the head commit and keeps the PR red after the new run passes, get a new head by rebasing onto the base. Do not push an empty commit to re-trigger checks.
 
@@ -822,7 +822,7 @@ Run **§ Repo bypass allowlist** detection first. When required checks are green
 6. Process **every** session PR in the family inventory before final report — never stop after the first review-gate failure on one PR.
 7. If any condition other than an unbypassable review gate is false, report the exact blocker and what was already merged.
 
-Wait for every check before you merge, required or not: `gh pr checks <n> --watch`. Do not poll with a foreground `sleep` loop (agent shells block it). `gh pr merge` accepts a PR while non-required checks are still pending, so a green required set is not enough.
+Wait for every check before you merge, required or not: watch the CI run by ID (`gh run watch <id> --exit-status`), then confirm with one `gh pr checks <n>` that no check is pending. Do not poll with a foreground `sleep` loop (agent shells block it). `gh pr merge` accepts a PR while non-required checks are still pending, so a green required set is not enough.
 
 Merge details:
 

@@ -44,7 +44,7 @@ dotfiles/
 ## Verification Commands
 
 ```bash
-make lint       # the local gate in this repo; tests run on CI (push, then `gh pr checks <n> --watch`)
+make lint       # the local gate in this repo; tests run on CI (push, then `gh run watch <id> --exit-status` on the CI run)
 ```
 
 ## Prompt And Task Interpretation

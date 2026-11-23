@@ -31,6 +31,8 @@ run_hook() {
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
     [[ "$output" == *"tests run on CI only"* ]] || { echo "no message: $c"; return 1; }
     [[ "$output" == *"gh pr checks"* ]] || { echo "no CI hint: $c"; return 1; }
+    [[ "$output" == *"gh run watch <run-id>"* ]] || { echo "no run-ID watch hint: $c"; return 1; }
+    [[ "$output" == *"--workflow CI --commit"* ]] || { echo "no CI run lookup hint: $c"; return 1; }
   done
 }
 

@@ -42,7 +42,7 @@ TASK_MIN_MS_PER_DAY = 60_000
 # Known safe fix patterns, matched on the redacted step key.
 FIX_PATTERNS = [
     (re.compile(r"^(until|while|sleep|watch)\b"),
-     "polling loop: wait on the event instead (`gh pr checks --watch`, `wait <pid>`, "
+     "polling loop: wait on the event instead (`gh run watch <run-id> --exit-status`, `wait <pid>`, "
      "a Monitor until-condition), or raise the poll interval"),
     (re.compile(r"^(npm (ci|install)|pnpm install|yarn install|bun install|pip install|uv sync)\b"),
      "repeated full install: skip it when the lockfile is unchanged, "

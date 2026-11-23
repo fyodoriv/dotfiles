@@ -2,11 +2,11 @@
   "scope": "Embedded programs the static shell scanner confirmed in tracked shell sources, outside the five earlier boundary reviews. Not complete discovery: dynamic arguments and unparsed files stay unresolved.",
   "generator": "scripts/inventory-ledger.py",
   "unparsed_shell_files": 377,
-  "unresolved_findings": 15237,
+  "unresolved_findings": 15245,
   "entries": [
     {
       "path": "agent-hooks/block-dangerous-git.sh",
-      "source_object": "c640eac8f81544a187ba07a154bdfe53a272ce29",
+      "source_object": "d71c507de87b3d7c9477816c71d1045812600e80",
       "language": "jq",
       "start": 1386,
       "end": 1400,
@@ -17,7 +17,7 @@
     },
     {
       "path": "agent-hooks/block-dangerous-git.sh",
-      "source_object": "c640eac8f81544a187ba07a154bdfe53a272ce29",
+      "source_object": "d71c507de87b3d7c9477816c71d1045812600e80",
       "language": "jq",
       "start": 2022,
       "end": 2029,
@@ -28,7 +28,7 @@
     },
     {
       "path": "agent-hooks/block-local-tests.sh",
-      "source_object": "4a8e32794401572fcb07a538d42deadf55dc9caa",
+      "source_object": "6f77efb0d933c02cd9862da34e65b097d9ef144a",
       "language": "perl",
       "start": 1944,
       "end": 2937,
@@ -39,7 +39,7 @@
     },
     {
       "path": "agent-hooks/block-local-tests.sh",
-      "source_object": "4a8e32794401572fcb07a538d42deadf55dc9caa",
+      "source_object": "6f77efb0d933c02cd9862da34e65b097d9ef144a",
       "language": "perl",
       "start": 3871,
       "end": 3973,
@@ -1271,10 +1271,10 @@
     },
     {
       "path": "bin/heavy-run",
-      "source_object": "fedb27e506d91c8cec9672905b0da3b0cb1327ab",
+      "source_object": "1d21f355ac78fd69f22d78b5a5bbe1163d0171e5",
       "language": "perl",
-      "start": 17954,
-      "end": 18058,
+      "start": 19906,
+      "end": 20010,
       "owner": "dotfiles",
       "caller": "cli",
       "state": "exception",

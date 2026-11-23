@@ -11,7 +11,7 @@
 ```bash
 make lint                      # shellcheck (the only local gate for agents)
 make lint-tasks                # TASKS.md only
-# Tests run on hosted CI: push, then gh pr checks <n> --watch
+# Tests run on hosted CI: push, then gh run watch <run-id> --exit-status (docs/ci-setup.md)
 ~/apps/tooling/dotfiles/bin/dotfiles-doctor   # doctor checks
 ```
 

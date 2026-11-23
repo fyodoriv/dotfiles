@@ -28,6 +28,12 @@ rules: |
   check is not allowed: start a watcher with a timeout, or move the item
   out of Waiting on. When the deadline passes, report the item's state and
   re-arm the watcher with a new deadline.
+  Explain the watcher in plain words, not only its command: what it
+  checks, how often, what makes it report early, and what happens at the
+  deadline. Example: "PR 831 CI (re-run on 52712981; check: background
+  job b95ko4144 asks GitHub every 60 s and wakes me as soon as all checks
+  pass or one fails; next: 19:29 EST, when it gives up and wakes me even
+  if CI is still running, and I report and re-arm)".
   Check each item live before listing it. Never list one from memory.
   If a live check is unavailable, state that verification is pending and the
   current status is unknown. Do not infer "nothing" from an unavailable check.

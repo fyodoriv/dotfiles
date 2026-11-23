@@ -15,7 +15,9 @@
 > when it reports back to the session even if nothing changed. One poll's
 > time is not allowed, because it goes stale within a minute. An item with
 > no watcher is not allowed: start one with a timeout or move the item out.
-> When the deadline passes, report the state and re-arm. The judge rejects an item with no
+> When the deadline passes, report the state and re-arm. Each item also
+> explains the watcher in plain words: what it checks, how often, what makes
+> it report early, and what happens at the deadline. The judge rejects an item with no
 > check, no next time, or a next time in the past, so a stalled wait shows.
 > Pinned by `tests/stranger-readiness.bats` case C10.
 

@@ -44,7 +44,7 @@ dotfiles/
 ## Verification Commands
 
 ```bash
-make lint       # the local gate in this repo; tests run on CI (push, then `gh run watch <id> --exit-status` on the `CI` run from `gh run list --workflow CI --commit <sha>`)
+make lint       # the local gate in this repo; tests run on CI (push, then `gh run watch <id> --exit-status` on the `CI` run from `gh run list --workflow CI --commit "$(git rev-parse HEAD)"`)
 ```
 
 ## Prompt And Task Interpretation

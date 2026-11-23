@@ -214,7 +214,7 @@ a dotfiles checkout or worktree it refuses `bats`, `bin/bats-affected`,
 `make check`, `make test`, `make test-*` and `make e2e` (also behind `heavy-run`,
 `time`, `nice`, `env`, `bash -c`, `cd <checkout> &&` and `make -C <checkout>`). It
 exits 2 and tells the agent to run `make lint`, push, and read CI
-(`gh run list --workflow CI --commit <sha>`, `gh run watch <id> --exit-status`,
+(`gh run list --workflow CI --commit "$(git rev-parse HEAD)"`, `gh run watch <id> --exit-status`,
 `gh run view <id> --log-failed`).
 
 - A checkout is a folder, or a parent of the session folder, that holds both

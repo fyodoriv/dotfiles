@@ -175,7 +175,7 @@ for d in "${dirs[@]}"; do
     cat >&2 <<'MSG'
 BLOCKED: dotfiles tests run on CI only, not on this Mac.
 Run `make lint` (or `shellcheck <file>`) locally. Then push the branch and read CI:
-  gh run list --repo fyodoriv/dotfiles --workflow CI --commit <head-sha>
+  gh run list --repo fyodoriv/dotfiles --workflow CI --commit "$(git rev-parse HEAD)"
   gh run watch <run-id> --repo fyodoriv/dotfiles --exit-status
   gh run view <run-id> --log-failed
   gh pr checks <number> --repo fyodoriv/dotfiles   (one look, before merge)

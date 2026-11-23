@@ -18,7 +18,7 @@ rules: |
   linked chats or sessions that are still working, and unfinished steps of
   this task that are blocked on one of those. Never list a follow-up here.
   Each item names the exact check that watches it (for example background
-  job bzdl5bv87 running `timeout 1500 gh pr checks 1256 --watch`, a
+  job bzdl5bv87 running `timeout 1500 gh run watch <run-id>`, a
   ScheduleWakeup id, a Monitor, or a CI check name) and the deadline by
   which that check reports back to this session, as a local clock time
   (for example "next: 23:41 EST" or "polls every 60 s; next: 23:41 EST").

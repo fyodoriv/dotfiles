@@ -236,11 +236,11 @@ review	commands/evals/kimi-usage.evals.json	70d04401dbba4d15466995a9068cb2b920d9
 review	commands/evals/learn-repos.evals.json	2dc280067de0b09bc774a580ad3346eca4fb1900	rule-classification	docs/plans/rust-source-classification.md
 review	commands/evals/learn-repos.golden.json	aac1b3ee111f1a1b4ee022699ebb2cccf35aa9e4	rule-classification	docs/plans/rust-source-classification.md
 review	commands/evals/research-url.evals.json	f54b5ea38bafc883719dce77c44ddaafc9851a8a	rule-classification	docs/plans/rust-source-classification.md
-review	commands/evals/ship-it.evals.json	815d3373e3c06c6847bb5d7fd43e4004ac74f0d0	rule-classification	docs/plans/rust-source-classification.md
+review	commands/evals/ship-it.evals.json	9fc49ce7ee6aaae113f13e4a6539bfe6b1479fdf	rule-classification	docs/plans/rust-source-classification.md
 review	commands/kimi-usage.md	41f6cc00b0c664c71d3d0bcd1dbe983cbfae2f24	rule-classification	docs/plans/rust-source-classification.md
 review	commands/learn-repos.md	34f9c86835db8a52aea803b1dd8af72e9ec9e0a7	rule-classification	docs/plans/rust-source-classification.md
 review	commands/research-url.md	259c5fd31bc6b9fc0921efaea6a6a6ab9a3a0085	rule-classification	docs/plans/rust-source-classification.md
-review	commands/ship-it.md	a4b14db31ad57137347e40b0bf0fb31ee268b69b	rule-classification	docs/plans/rust-source-classification.md
+review	commands/ship-it.md	6b87c1840a0b8d7ad3444a152eb441a9ebd44a24	rule-classification	docs/plans/rust-source-classification.md
 review	config/agentfile-owner-rules.yaml	cfbf8ab5671ee8dc72a3120045a62c32eec77ba7	rule-classification	docs/plans/rust-source-classification.md
 review	config/dotfiles-plugin.schema.json	b347cfcf6422a07fa57d2d18237c72aa7ca83482	rule-classification	docs/plans/rust-source-classification.md
 review	config/glove80/LICENSE	c34a03df0989321e426a4a27df73e271f503fd94	rule-classification	docs/plans/rust-source-classification.md
@@ -2225,7 +2225,7 @@ review	tests/setup-chrome.bats	98638e2933866cabcef8b66bedfcfeff2e577023	rule-cla
 review	tests/setup-dock.bats	185c9b0ae3b9edc54560b40ffe03651798bfcbe7	rule-classification	docs/plans/rust-source-classification.md
 review	tests/setup_suite.bash	5ddb7bc9c7cd54a7e951829fea6d3f1f3c31e7da	rule-classification	docs/plans/rust-source-classification.md
 review	tests/shell-start-sample.bats	e0189b5333f7f52e1cdf1d2dc4b59cc91cd99765	rule-classification	docs/plans/rust-source-classification.md
-review	tests/ship-it-self-review.bats	3c8431b0fb4ad6b8eaa0a2113102c44d7b53b9c1	rule-classification	docs/plans/rust-source-classification.md
+review	tests/ship-it-self-review.bats	fab6bd86584d95a153bf0b1036f4ddba47b23727	rule-classification	docs/plans/rust-source-classification.md
 review	tests/slack-draft.bats	e7517c04e9940793209e563ef02d231f894898e1	rule-classification	docs/plans/rust-source-classification.md
 review	tests/sleepwatcher-doctor-guidance.bats	622b4ddac5726ec183aa4447bb3f9a96961d03d4	rule-classification	docs/plans/rust-source-classification.md
 review	tests/sleepwatcher.bats	5f8cc7a1695231c11f451c81aff503083dde3b85	rule-classification	docs/plans/rust-source-classification.md

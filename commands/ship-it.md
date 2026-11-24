@@ -11,6 +11,8 @@ Follow the loaded memory lifecycle. Read `$(dotfiles cd)/docs/user-stories/READM
 
 # Ship It
 
+Prefer `/goal deliver`: it runs these steps, then judges and live proof. Keep steps here only.
+
 ## Session activation
 
 If the user has invoked `/ship-it` earlier in this conversation/session, approval remains active for the rest of the conversation/session until the user explicitly disables ship-it mode with **stop ship-it**, **no push**, **plan only**, **read only**, **no commit**, or a narrower scoped limit. Subagents inherit it.

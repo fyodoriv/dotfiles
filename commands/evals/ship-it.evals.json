@@ -289,6 +289,16 @@
         "Passes the full 40-character SHA from git rev-parse HEAD to --match-head-commit",
         "Runs the squash-merge file check after each merge, before cleanup"
       ]
+    },
+    {
+      "id": 26,
+      "prompt": "Which should I use to ship this session's work: /ship-it or /goal deliver?",
+      "expected_output": "The agent recommends /goal deliver, because its Stop hook and judges keep the run going until the work is merged, live, and proved. It explains that /goal deliver runs the /ship-it steps and does not restate them.",
+      "expectations": [
+        "Recommends /goal deliver as the preferred entry",
+        "Says /goal deliver runs the /ship-it step list (docs/ship-it-reference.md) rather than a second copy",
+        "Names what the goal adds: contract, judges, baseline, live proof"
+      ]
     }
   ]
 }

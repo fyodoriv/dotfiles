@@ -11,14 +11,7 @@ Follow the loaded memory lifecycle. Read `$(dotfiles cd)/docs/user-stories/READM
 
 # Ship It
 
-## Prefer `/goal deliver`
-
-`/goal deliver` is the preferred way to ship. It runs these same steps, and
-its Stop hook keeps the run going until judges confirm the goal contract:
-merged, live, and proved against a baseline. This command and
-`docs/ship-it-reference.md` are the one step list; the run-goal skill
-(`references/goal-intake.md#shorthand-goals` in agentbrew) only adds the
-contract, judges, and proof. Do not copy steps between them.
+Prefer `/goal deliver`: it runs these steps, then judges and live proof. Keep steps here only.
 
 ## Session activation
 

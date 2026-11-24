@@ -139,7 +139,6 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
 }
 
 @test "ship-it points to /goal deliver as the preferred entry and stays the one step list" {
-  grep -q '^## Prefer `/goal deliver`' "$CMD"
-  grep -q 'This command and' "$CMD"
-  grep -q 'Do not copy steps between them' "$CMD"
+  grep -q '^Prefer `/goal deliver`: it runs these steps' "$CMD"
+  grep -q 'Keep steps here only' "$CMD"
 }

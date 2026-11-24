@@ -137,3 +137,9 @@ CMD="$BATS_TEST_DIRNAME/../commands/ship-it.md"
     and (.expectations | any(contains("Unknown rules")))
     and (.expectations | any(contains("existing team request"))))' "$eval_file" >/dev/null
 }
+
+@test "ship-it points to /goal deliver as the preferred entry and stays the one step list" {
+  grep -q '^## Prefer `/goal deliver`' "$CMD"
+  grep -q 'This command and' "$CMD"
+  grep -q 'Do not copy steps between them' "$CMD"
+}

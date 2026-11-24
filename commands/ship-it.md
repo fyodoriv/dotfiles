@@ -11,6 +11,15 @@ Follow the loaded memory lifecycle. Read `$(dotfiles cd)/docs/user-stories/READM
 
 # Ship It
 
+## Prefer `/goal deliver`
+
+`/goal deliver` is the preferred way to ship. It runs these same steps, and
+its Stop hook keeps the run going until judges confirm the goal contract:
+merged, live, and proved against a baseline. This command and
+`docs/ship-it-reference.md` are the one step list; the run-goal skill
+(`references/goal-intake.md#shorthand-goals` in agentbrew) only adds the
+contract, judges, and proof. Do not copy steps between them.
+
 ## Session activation
 
 If the user has invoked `/ship-it` earlier in this conversation/session, approval remains active for the rest of the conversation/session until the user explicitly disables ship-it mode with **stop ship-it**, **no push**, **plan only**, **read only**, **no commit**, or a narrower scoped limit. Subagents inherit it.

@@ -90,6 +90,29 @@ render_all() {
   done
 }
 
+@test "hooks overlay: all seven owner workflow guards are registered" {
+  run render_all ""
+  [ "$status" -eq 0 ]
+  local hook missing=()
+  for hook in no-commit-no-verify no-git-add-all gh-pr-agent-artifacts-require-tests \
+    gh-pr-skill-requires-evals no-binary-screenshots gh-pr-body-no-review-response \
+    gh-pr-body-related-prs-not-first; do
+    if ! grep -Fxq "  - $hook" <<<"$output"; then
+      missing+=("$hook")
+    fi
+  done
+  if [ "${#missing[@]}" -ne 0 ]; then
+    printf 'Missing owner hook: %s\n' "${missing[@]}" >&2
+    return 1
+  fi
+}
+
+@test "pre-commit header does not recommend bypassing validation" {
+  local header
+  header="$(awk '/^set -o/{exit} {print}' "$BATS_TEST_DIRNAME/../git-hooks/pre-commit")"
+  [[ "$header" != *'--no-verify'* ]]
+}
+
 render_retirement() {
   printf '%s' "$1" | DOTFILES_OVERLAY_HOOKS='' sh "$SCRIPT"
 }

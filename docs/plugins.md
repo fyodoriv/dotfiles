@@ -302,6 +302,10 @@ last plugin in lock order wins. Lists: union.
 | `mas.skip_ids` | `dotfiles-mas-upgrade` never upgrades these App Store ids. |
 | `brew.skip` | Removed from the core Brewfile; the doctor skips their `tool.<name>` checks. |
 
+On the core profile, the workflow doctor also skips the Dock guard when
+launchd explicitly marks that job disabled for the current user. An enabled
+job or a job whose state is unavailable keeps the usual check.
+
 Rule of thumb: if a fresh external user could use it without company
 identity, network, or entitlement, it belongs in the core as an option. The
 plugin passes data only. For example, an endpoint-agent dialog healer reads

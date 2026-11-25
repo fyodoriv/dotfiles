@@ -118,6 +118,15 @@ render_retirement() {
   [ "$output" = $'version: 1\nenabled: [keep-hook]' ]
 }
 
+@test "retired IDs with mismatched inline quotes refuse without output" {
+  for hook in usage-tip async-human-comms-blocks; do
+    run render_retirement "version: 1
+enabled: [\"$hook', keep-hook]"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+  done
+}
+
 @test "custom override cannot restore the retired communication hook" {
   run bash -c 'printf "%s" "$1" | DOTFILES_OVERLAY_HOOKS="async-human-comms-blocks keep-custom" sh "$2"' test '' "$SCRIPT"
   [ "$status" -eq 0 ]

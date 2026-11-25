@@ -1,7 +1,7 @@
 #!/bin/bash
 # temp-browser: one disposable, locked browser for agents.
 #
-# Each acquire starts a headless Chrome with a fresh profile. Release stops
+# Acquire starts headless Chrome by default, with a fresh profile. Release stops
 # it and deletes the profile, like an incognito window. Only one agent can
 # hold it. The lock is a directory (mkdir is atomic). It records the owner,
 # the reason, the browser pid, the port, the profile, and the lease expiry.
@@ -11,7 +11,7 @@
 # per user account. Release or takeover deletes it.
 #
 # Usage:
-#   temp-browser acquire --owner <id> --reason <text> [--wait [--timeout <s>]]
+#   temp-browser acquire --owner <id> --reason <text> [--headed] [--wait [--timeout <s>]]
 #   temp-browser status
 #   temp-browser release --owner <id>
 #
@@ -36,11 +36,12 @@ OPEN_BIN="${TEMP_BROWSER_OPEN:-open}"
 
 usage() {
   cat <<'EOF'
-Usage: temp-browser acquire --owner <id> --reason <text> [--wait [--timeout <seconds>]]
+Usage: temp-browser acquire --owner <id> --reason <text> [--headed] [--wait [--timeout <seconds>]]
        temp-browser status
        temp-browser release --owner <id>
 
-Env: TEMP_BROWSER_HEADED=1 opens a headed window in the background.
+--headed opens a visible window in the background for a person to sign in.
+Env: TEMP_BROWSER_HEADED=1 selects the same mode.
      TEMP_BROWSER_LAUNCH=<cmd> launches the browser: it gets <profile> <port>
      and prints the browser pid on its last stdout line.
 Exit 0 ok, 1 error, 2 usage, Exit 3 busy: another owner holds the lock
@@ -49,6 +50,13 @@ EOF
 }
 
 field() { cat "$LOCK/$1" 2>/dev/null || true; }
+
+print_port() {
+  if [ "$(field headed)" != 1 ]; then
+    echo 'temp-browser: headless: no window; use --headed if a person must sign in' >&2
+  fi
+  field port
+}
 
 pid_alive() {
   [ -n "$1" ] && kill -0 "$1" 2>/dev/null || return 1
@@ -176,7 +184,7 @@ launch_browser() {
     --no-first-run --no-default-browser-check
     --use-mock-keychain --password-store=basic)
   if [ -n "$LAUNCH_HOOK" ]; then
-    out="$("$LAUNCH_HOOK" "$profile" "$PORT" </dev/null)" || return 1
+    out="$(TEMP_BROWSER_HEADED="$HEADED" "$LAUNCH_HOOK" "$profile" "$PORT" </dev/null)" || return 1
     pid="$(printf '%s\n' "$out" | tail -n 1 | tr -d '[:space:]')"
     case "$pid" in ''|*[!0-9]*) return 1 ;; esac
     echo "$pid"
@@ -206,6 +214,7 @@ cmd_acquire() {
   local args=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
+      --headed) HEADED=1; shift ;;
       --wait) wait=1; shift ;;
       --timeout) wait_timeout="${2:-}"; shift 2 || shift ;;
       *) args+=("$1"); shift ;;
@@ -221,8 +230,12 @@ cmd_acquire() {
   local deadline=$(( $(date +%s) + wait_timeout )) reported=0
   while ! mkdir "$LOCK" 2>/dev/null; do
     if [ "$(field owner)" = "$OWNER" ] && ! lock_stale; then
+      if [ "$HEADED" = 1 ] && [ "$(field headed)" != 1 ]; then
+        echo "temp-browser: existing browser has no verified window; release --owner $OWNER, then acquire --headed" >&2
+        exit 1
+      fi
       echo $(($(date +%s) + LEASE)) > "$LOCK/expires"
-      field port
+      print_port
       return 0
     fi
     if lock_stale; then
@@ -266,6 +279,7 @@ cmd_acquire() {
   printf '%s\n' "$OWNER" > "$LOCK/owner"
   printf '%s\n' "$REASON" > "$LOCK/reason"
   printf '%s\n' "$PORT" > "$LOCK/port"
+  printf '%s\n' "$HEADED" > "$LOCK/headed"
   printf '%s\n' "$profile" > "$LOCK/profile"
   echo $(($(date +%s) + LEASE)) > "$LOCK/expires"
   local pid
@@ -280,7 +294,7 @@ cmd_acquire() {
     discard_lock
     exit 1
   fi
-  echo "$PORT"
+  print_port
 }
 
 cmd_status() {

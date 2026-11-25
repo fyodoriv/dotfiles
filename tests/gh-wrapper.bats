@@ -842,3 +842,43 @@ JSON
   [ "$(cat "$GH_BODY")" = "Short body." ]
   [[ "$(cat "$GH_ARGS")" == *"--repo fyodoriv/dotfiles"* ]]
 }
+
+@test "agent PR create accepts the canonical owner template" {
+  cd "$(make_origin_checkout https://github.example.com/your-org/example-repo.git)"
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create     --title "fix: canonical body" --base main     --body $'## Summary\nA stale preview hid the current owner. This change refreshes it.\n\n## Details\n- Refresh the preview.\n\n## Docs\nUpdate the workflow guide.\n\nExempt: existing preview fixture'
+
+  [ "$status" -eq 0 ]
+  grep -q '^## Summary$' "$GH_BODY"
+}
+
+@test "agent PR create reports an out-of-order opener and shows the template" {
+  cd "$(make_origin_checkout https://github.example.com/your-org/example-repo.git)"
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create     --title "fix: wrong opener" --base main     --body $'## Details\n- Fix the case.\n\n## Summary\nThe preview goes stale. This patch refreshes it.\n\n## Docs\nUpdate the guide.\n\nExempt: existing preview fixture\n\n## Delivery plan\nUpdate the skill.\n\n## Test plan\nRun the fixture.'
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'open with ## Summary'* ]]
+  [[ "$output" == *'## Details'* && "$output" == *'## Docs'* && "$output" == *'Exempt:'* ]]
+  [ ! -f "$GH_BODY" ]
+}
+
+@test "agent PR create refuses a Status line before calling GitHub" {
+  cd "$(make_origin_checkout https://github.example.com/your-org/example-repo.git)"
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create     --title "fix: status line" --base main     --body $'## Summary\nThe preview goes stale. This patch refreshes it.\n\n## Details\n- Fix the case.\n\n## Docs\nUpdate the guide.\n\nStatus: pending\n\nExempt: existing preview fixture\n\n## Delivery plan\nUpdate the skill.\n\n## Test plan\nRun the fixture.'
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Status:'* ]]
+  [ ! -f "$GH_BODY" ]
+}
+
+@test "agent PR create refuses Vision trace when the checkout has no gate" {
+  cd "$(make_origin_checkout https://github.example.com/your-org/example-repo.git)"
+
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create     --title "fix: unneeded trace" --base main     --body $'## Summary\nThe preview goes stale. This patch refreshes it.\n\n## Details\n- Fix the case.\n\n## Docs\nUpdate the guide.\n\nExempt: existing preview fixture\n\n## Vision trace\nOutdated template.\n\n## Delivery plan\nUpdate the skill.\n\n## Test plan\nRun the fixture.'
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Vision trace'* ]]
+  [ ! -f "$GH_BODY" ]
+}

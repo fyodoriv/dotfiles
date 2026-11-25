@@ -53,3 +53,46 @@ EOF
   grep -q 'security.recurring_automation_no_publisher_na_python' modules/security/doctor.sh
   ! grep -q 'uv python3.*endpoint-safe' modules/security/doctor.sh
 }
+
+_resolve_fixture_python() {
+  local hardening="$1" exception="$2" apple_python="$3"
+  local fixture="$BATS_TEST_TMPDIR/dotfiles"
+  mkdir -p "$fixture/bin"
+  ln -sf /bin/bash "$fixture/bin/python3"
+  run env -u BASH_ENV -u ENV HOME="$BATS_TEST_TMPDIR/home" \
+    DOTFILES_ENDPOINT_HARDENING="$hardening" DOTFILES_MANAGED_ENDPOINT=0 \
+    DOTFILES_ENDPOINT_AGENT_APPS= DOTFILES_ALLOW_PUBLISHER_NA_PYTHON="$exception" \
+    /bin/bash -c '
+      source lib/dotfiles-endpoint-paths.sh
+      apple_python="$2"
+      dotfiles_apple_python() {
+        [ "$1" = python3 ] && [ -n "$apple_python" ] || return 1
+        printf "%s\n" "$apple_python"
+      }
+      dotfiles_resolve_python "$1" "$HOME" python3
+    ' bash "$fixture" "$apple_python"
+}
+
+@test "hardened Python resolution prefers Apple developer tools over the local shim" {
+  _resolve_fixture_python 1 0 /usr/bin/python3
+  [ "$status" -eq 0 ]
+  [ "$output" = /usr/bin/python3 ]
+}
+
+@test "hardened Python resolution fails when no Apple interpreter is available" {
+  _resolve_fixture_python 1 0 ""
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "the Python publisher exception keeps the configured local shim" {
+  _resolve_fixture_python 1 1 /usr/bin/python3
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BATS_TEST_TMPDIR/dotfiles/bin/python3" ]
+}
+
+@test "disabled endpoint hardening keeps the configured local shim" {
+  _resolve_fixture_python 0 0 /usr/bin/python3
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BATS_TEST_TMPDIR/dotfiles/bin/python3" ]
+}

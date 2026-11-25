@@ -17,8 +17,10 @@ set -eu
 # rules, comment and naming style, Jira/Google Docs habits, time reviews).
 # agentbrew ships them off by default; only the owner's Macs
 # (owner_machine) turn them on. A new user gets none of them.
+# The Nov 22 verifier test returned in 9 seconds. Keep those hooks off
+# while Agentbrew tracks hook-judge-tier-local-model.
 # DOTFILES_OVERLAY_HOOKS replaces the list (tests use it).
-HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint no-home-crawl{{ end }}}"
+HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint no-home-crawl no-commit-no-verify no-git-add-all gh-pr-agent-artifacts-require-tests gh-pr-skill-requires-evals no-binary-screenshots gh-pr-body-no-review-response gh-pr-body-related-prs-not-first{{ end }}}"
 
 input=$(cat)
 

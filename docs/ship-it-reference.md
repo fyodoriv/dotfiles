@@ -624,10 +624,25 @@ Default PR body skeleton (add repo-required sections after it):
 
 - <doc updated>, or: Docs: none — <reason>
 
+## Pre-registration
+
+Hypothesis: <expected outcome>
+Measurement: <runnable check>
+Success: <keep threshold>
+Pivot: <change threshold>
+Anchor: <source for the measurement>
+
 ## Visual proof
 
 <pasted terminal transcript or screenshot, with the case and the result>
 ```
+
+For an exempt change, replace the pre-registration block with
+`Exempt: <existing gate>`. Put each pre-registration value on the same
+line as its field. Use `## Vision trace` when the target checkout
+has the vision-trace check. The owner wrapper checks this common opening
+for agent-authored PRs. If the old validation headings came first, move
+them after `## Docs` so the reason opens the PR.
 
 Open or update a PR with:
 - **PR validation block (IRON LAW)** — three required sections in every PR body:
@@ -636,9 +651,9 @@ Open or update a PR with:
   - `## Validation steps` — manual verification for **this PR** with exact commands
   **Forbidden in PR bodies:** `Status:` lines (use GitHub draft/ready). Unchecked epic/sibling requirements (use Jira).
   **Forbidden in Jira descriptions (mirror):** lane tables with live statuses, deferral snapshots, "open work by lane (refreshed DATE)" — use status transitions + issue links + dated **comments** instead (`jira` skill § Epic hygiene; `shared-rules.md` § Jira descriptions are durable charter).
-  **Stacked skill carve-out:** greenfield skill PR chains may use `## Summary`, `## Delivery plan`, and `## Test plan` instead (see `shared-rules.md` § Stacked skill PR body shape). Hook + `bin/gh` accept either shape.
+  **Stacked skill carve-out:** greenfield skill PR chains may add `## Delivery plan` and `## Test plan` to the common opening instead (see `shared-rules.md` § Stacked skill PR body shape).
   **Draft rule:** chain PRs stay draft until merge blockers are merged; only the unblocked head may be `gh pr ready`.
-  Template: `agentbrew/skill-plugins/dev/task-command-center/SKILL.md` § PR validation block. Enforced by `gh-pr-body-requires-validation` hook (blocks) + dotfiles `bin/gh` on agent `pr create`.
+  Template: `agentbrew/skill-plugins/dev/task-command-center/SKILL.md` § PR validation block. The `gh-pr-body-requires-validation` hook enforces the validation block where enabled. Dotfiles `bin/gh` checks the common opening on agent `pr create`.
 - why this change is needed (rationale — separate hook + gh wrapper)
 - summary bullets
 - `## Docs` — the docs this PR updated, or `Docs: none — <reason>`. Enforced by the agentbrew hook `gh-pr-body-requires-docs`.
@@ -823,6 +838,11 @@ Run **§ Repo bypass allowlist** detection first. When required checks are green
 7. If any condition other than an unbypassable review gate is false, report the exact blocker and what was already merged.
 
 Wait for every check before you merge, required or not: watch the CI run by ID (`gh run watch <id> --exit-status`), then confirm with one `gh pr checks <n>` that no check is pending. Do not poll with a foreground `sleep` loop (agent shells block it). `gh pr merge` accepts a PR while non-required checks are still pending, so a green required set is not enough.
+
+On a fresh Mac, run `dotfiles doctor --module tools` if the watcher cannot
+find `timeout`. The `tool.gtimeout` check gives the Homebrew fix,
+`brew install coreutils`. Use `gtimeout` in the watch command when that is
+the executable on PATH.
 
 Merge details:
 

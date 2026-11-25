@@ -58,6 +58,39 @@ teardown() {
   grep -qx -- "--user-data-dir=$profile" "$TEMP_BROWSER_STATE_DIR/launch-args"
 }
 
+@test "acquire --headed sends visible mode to the launch hook" {
+  cat > "$TEST_DIR/hook" <<'STUB'
+#!/bin/bash
+printf '%s' "$TEMP_BROWSER_HEADED" > "$TEMP_BROWSER_STATE_DIR/headed-mode"
+nohup sleep 300 >/dev/null 2>&1 </dev/null &
+echo "$!"
+STUB
+  chmod +x "$TEST_DIR/hook"
+  export TEMP_BROWSER_LAUNCH="$TEST_DIR/hook"
+  export TEMP_BROWSER_HEADED=0
+  run "$SCRIPT" acquire --headed --owner a --reason signin
+  [ "$status" -eq 0 ]
+  [ "$output" = "9399" ]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/headed-mode")" = 1 ]
+}
+
+@test "headless acquire keeps stdout port-only and warns on stderr" {
+  "$SCRIPT" acquire --owner a --reason r > "$TEST_DIR/stdout" 2> "$TEST_DIR/stderr"
+  [ "$(cat "$TEST_DIR/stdout")" = 9399 ]
+  grep -qF 'headless: no window; use --headed if a person must sign in' "$TEST_DIR/stderr"
+}
+
+@test "headed acquire cannot silently reuse the owner's headless browser" {
+  "$SCRIPT" acquire --owner a --reason r >/dev/null
+  original_pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
+  run "$SCRIPT" acquire --headed --owner a --reason signin
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'release'* ]]
+  [[ "$output" == *'--headed'* ]]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")" = "$original_pid" ]
+  kill -0 "$original_pid"
+}
+
 @test "acquire seeds a magenta theme so the temp browser stands out" {
   "$SCRIPT" acquire --owner a --reason r >/dev/null
   profile="$(cat "$TEMP_BROWSER_STATE_DIR/lock/profile")"

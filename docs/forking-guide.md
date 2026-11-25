@@ -225,7 +225,8 @@ If your team doesn't use AI coding agents, the simplest approach:
 2. Remove these modules entirely:
    ```bash
    git rm -r modules/{claude,agentbrew,agent-browser}
-   git commit --no-verify -m "chore: remove AI tooling modules"
+   DOTFILES_INTENDED_DELETIONS="modules/claude/ modules/agentbrew/ modules/agent-browser/" \
+     git commit -m "chore: remove AI tooling modules"
    ```
 3. Remove the agentbrew lifecycle script:
    ```bash

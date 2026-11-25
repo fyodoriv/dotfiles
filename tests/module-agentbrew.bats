@@ -90,6 +90,7 @@ agentbrew.hooks_enforcing
 agentbrew.memory_service_singleton
 agentbrew.memory_launchagent_identity
 agentbrew.launchagent_node_pinned
+agentbrew.path_hook_coverage
 agentbrew.installed_agents_synced
 EOF
 }
@@ -971,7 +972,27 @@ YAML
   [[ "$output" == *'path hook coverage: warn'* ]]
   [[ "$output" == *'/bin/agentbrew'*'sync'* ]]
 
+  # The doctor adds its checkout shims to PATH before sourcing the module.
+  _doctor_json() {
+    bash "$BATS_TEST_DIRNAME/../bin/dotfiles" doctor --module agentbrew --json 2>/dev/null
+  }
+  run _doctor_json
+  jq -e 'any(.[]; .id == "agentbrew.path_hook_coverage" and .status == "warn")' <<< "$output"
+
   cp "$checkout/hooks/manifest.yaml" "$installed/hooks/manifest.yaml"
+  run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [[ "$output" == *'path hook coverage: pass'* ]]
+
+
+  printf '  - id: installed-extra-hook\n' >> "$installed/hooks/manifest.yaml"
+  run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [[ "$output" == *'path hook coverage: pass'* ]]
+
+  printf 'hooks: []\n' > "$installed/hooks/manifest.yaml"
+  run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [[ "$output" == *'path hook coverage: warn'* ]]
+
+  printf 'hooks: unknown\n' > "$installed/hooks/manifest.yaml"
   run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
   [[ "$output" == *'path hook coverage: pass'* ]]
 

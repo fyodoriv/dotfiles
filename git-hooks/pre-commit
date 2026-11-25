@@ -16,10 +16,6 @@
 # `git.pre_commit_hook_works` self-test catches the same regression class
 # going forward.
 #
-# Escape hatch: `git commit --no-verify` skips this hook. Use it only
-# for emergency fixups; the pre-push hook still blocks a private
-# committer email from reaching GitHub.com.
-#
 # Performance budget: <500ms on a typical 5-file commit. We only scan
 # staged files, never the whole tree.
 

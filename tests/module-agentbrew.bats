@@ -945,3 +945,36 @@ YAML
   [[ "$FAILED" != *"not synced"* ]]
   [[ "$PASSED" == *"every installed agent is synced or excluded on purpose"* ]]
 }
+
+@test "doctor identifies an Agentbrew PATH copy missing checkout hooks and gives a repair" {
+  cp "$BATS_TEST_DIRNAME/../lib/agentbrew-locate.sh" "$TEST_DOTFILES/lib/"
+  local checkout="$HOME/apps/agentbrew" installed="$TEST_DIR/runtime"
+  mkdir -p "$checkout/dist" "$checkout/hooks" "$installed/dist" "$installed/hooks"
+  mkdir -p "$TEST_DOTFILES/bin"
+  touch "$checkout/dist/cli.js" "$installed/dist/cli.js" "$TEST_DOTFILES/bin/agentbrew"
+  chmod +x "$checkout/dist/cli.js" "$installed/dist/cli.js" "$TEST_DOTFILES/bin/agentbrew"
+  printf 'hooks:\n  - id: existing-hook\n  - id: checkout-only-hook\n' > "$checkout/hooks/manifest.yaml"
+  printf 'hooks:\n  - id: existing-hook\n' > "$installed/hooks/manifest.yaml"
+  rm "$TEST_DIR/bin/agentbrew"
+  ln -s "$installed/dist/cli.js" "$TEST_DIR/bin/agentbrew"
+
+  check() { return 0; }
+  check_advisory() {
+    [ "$1" = agentbrew.path_hook_coverage ] || return 0
+    if eval "$3"; then
+      echo 'path hook coverage: pass'
+    else
+      printf 'path hook coverage: warn\n%s\n' "$4"
+    fi
+  }
+  run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [[ "$output" == *'path hook coverage: warn'* ]]
+  [[ "$output" == *'/bin/agentbrew'*'sync'* ]]
+
+  cp "$checkout/hooks/manifest.yaml" "$installed/hooks/manifest.yaml"
+  run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [[ "$output" == *'path hook coverage: pass'* ]]
+
+  PATH="$TEST_DOTFILES/bin:$PATH" run source "$BATS_TEST_DIRNAME/../modules/agentbrew/doctor.sh"
+  [[ "$output" == *'path hook coverage: pass'* ]]
+}

@@ -62,8 +62,11 @@ _dotfiles_bootstrap_endpoint_hook_env() {
   jq_path="$(dotfiles_resolve_jq "$dotfiles_dir" "$home" 2>/dev/null || true)"
   find_path="$(dotfiles_resolve_find "${dotfiles_dir:+$dotfiles_dir/bin}" 2>/dev/null || true)"
   fnm_bin="$(dotfiles_resolve_fnm_node_bin "$home" 2>/dev/null || true)"
-  py_path="$(dotfiles_resolve_python "$dotfiles_dir" "$home" python3 2>/dev/null || true)"
-  py13_path="$(dotfiles_resolve_python "$dotfiles_dir" "$home" python3.13 2>/dev/null || true)"
+  if dotfiles_python_requires_apple; then
+    unset DOTFILES_PYTHON3 DOTFILES_PYTHON3_13
+  fi
+  py_path="$(dotfiles_resolve_python "$dotfiles_dir" "$home" python3 hook 2>/dev/null || true)"
+  py13_path="$(dotfiles_resolve_python "$dotfiles_dir" "$home" python3.13 hook 2>/dev/null || true)"
 
   [ -n "$jq_path" ] && export DOTFILES_JQ="$jq_path"
   [ -n "$find_path" ] && export DOTFILES_FIND="$find_path"

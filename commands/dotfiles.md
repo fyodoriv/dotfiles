@@ -29,6 +29,8 @@ Then, answer first:
 
 For a fresh health check, run `dotfiles --health` (1 to 2 minutes).
 
+When a person must sign in to a disposable browser, run `temp-browser acquire --headed --owner "$AGENT_BROWSER_SESSION" --reason "sign-in"`. It opens a visible window in the background and prints the CDP port. Follow the [browser policy](../docs/agent-browser-policy.md#the-temporary-browser) for release and lease reuse.
+
 To change a setting the user asks for, run `dotfiles config` (every setting, its value, its source, and the allowed values) or `dotfiles config <key>` (what one setting does). Then run `dotfiles config set <key> <value>`: it checks the value and saves it. Apply it with `dotfiles apply --if-changed` after the user says yes. Never hand-edit `~/.config/chezmoi/chezmoi.yaml` or generated agent config under `~/.claude/`.
 
 To stop unattended uv Python downloads, run `dotfiles config set uv_python_downloads_never true`. Follow the apply step above, then verify with `dotfiles doctor --module security`.

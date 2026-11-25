@@ -234,6 +234,18 @@
         "Preserves the current build when the check reports no drift",
         "Reports unavailable freshness and respects endpoint safe mode"
       ]
+    },
+    {
+      "id": 22,
+      "prompt": "Update my tooling. The prior sync owner and its related Git processes are gone, but the source lease remains. The applied build also says its installed dependencies are out of sync and requests npm ci.",
+      "expected_output": "Verify the stale source lease, move it aside reversibly, retry sync and report its observed result. Install locked dependencies through heavy-run in the applied checkout. Retry the queued build only after the install succeeds, and report both outcomes.",
+      "expectations": [
+        "Verifies the lease owner and related Git processes before moving the lease",
+        "Preserves active or ambiguous leases, and moves a verified stale lease aside reversibly",
+        "Reports the sync retry exit status",
+        "Runs heavy-run npm ci before retrying heavy-run npm run build and retries only after the install succeeds",
+        "Reports the dependency install outcome and the build outcome if the build was attempted"
+      ]
     }
   ]
 }

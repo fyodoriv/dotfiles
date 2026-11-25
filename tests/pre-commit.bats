@@ -209,6 +209,8 @@ MAKE
   [ "$status" -ne 0 ]
   [[ "$output" == *"TASKS.md lint failed"* ]]
   [[ "$output" == *"TASKS.md must start with # Tasks"* ]]
+  [[ "$output" != *"--no-verify"* ]]
+  [[ "$output" == *"git add -- TASKS.md"* ]]
 }
 
 # ── Multiple deletions ───────────────────────────────────────────
@@ -233,6 +235,9 @@ MAKE
   run git commit -m "chore: remove docs"
   [ "$status" -ne 0 ]
   [[ "$output" == *"51 file deletions staged (limit: 50)"* ]]
+  [[ "$output" != *"--no-verify"* ]]
+  [[ "$output" == *"git diff --cached --name-only --diff-filter=D"* ]]
+  [[ "$output" == *"git restore --staged -- <paths>"* ]]
 }
 
 @test "pre-commit allows deletions up to MAX_DELETES outside protected dirs" {
@@ -330,4 +335,26 @@ SCRIPT
   git add README.md
   run env -u OSS_READINESS_INTERNAL_PATTERN -u OSS_READINESS_PRIVATE_EMAIL_PATTERN git commit --no-gpg-sign -m "chore: safe change"
   [ "$status" -eq 0 ]
+}
+
+@test "pre-commit leak gate blocks and gives a repair step" {
+  cd "$TEST_REPO"
+  mkdir -p .git/lib
+  touch lib/oss-readiness.sh
+  cat > .git/lib/oss-readiness.sh <<'STUB'
+oss_readiness_load_private_env() { return 0; }
+oss_readiness_check_overlay_patterns() { return 0; }
+oss_readiness_email_is_safe() { return 0; }
+oss_readiness_scan_secrets() { echo "Synthetic scan match in README.md"; }
+STUB
+  echo "synthetic scan fixture" >> README.md
+  git add README.md
+
+  run git commit -m "chore: exercise leak message"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Synthetic scan match in README.md"* ]]
+  [[ "$output" == *"commit blocked by dotfiles pre-commit hook"* ]]
+  [[ "$output" != *"--no-verify"* ]]
+  [[ "$output" == *"Fix the reported issue, stage the corrected files, and retry the commit."* ]]
 }

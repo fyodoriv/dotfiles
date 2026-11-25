@@ -41,6 +41,18 @@ for plist in "$HOME"/Library/LaunchAgents/com.dotfiles.*.plist; do
       continue
     fi
   fi
+  if [ "$short" = "chrome-dock-guard" ] && [ "${DOTFILES_PROFILE:-full}" = core ] &&
+    [ -z "${_known_ids+x}" ] && ! $LIST_MODE &&
+    [ -f "$DOTFILES_DIR/lib/dotfiles-agent-node.sh" ]; then
+    # shellcheck source=../../lib/dotfiles-agent-node.sh
+    source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
+    if dotfiles_launchagent_disabled "$name"; then
+      reason="chrome-dock-guard agent disabled in launchd on the core profile"
+      ${JSON_MODE:-false} && _json_add "$agent_id" "skip" "$reason"
+      skipped "$reason"
+      continue
+    fi
+  fi
 
   # Endpoint policy intentionally unloads this Node-backed job while the
   # Node.js Foundation publisher remains blocked. Report that safe mode as a

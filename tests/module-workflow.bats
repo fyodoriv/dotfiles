@@ -282,3 +282,25 @@ fake_df() {
     grep -qx 'agent.test-agent' "$CHECKED"
   done
 }
+
+@test "workflow keeps the Dock guard check unless the exact core job is disabled" {
+  cp "$BATS_TEST_DIRNAME/../lib/chrome-purpose-options.sh" "$TEST_DOTFILES/lib/"
+  cp "$BATS_TEST_DIRNAME/../lib/dotfiles-agent-node.sh" "$TEST_DOTFILES/lib/"
+  touch "$TEST_HOME/Library/LaunchAgents/com.dotfiles.chrome-dock-guard.plist"
+  CHECKED="$TEST_DIR/checked"
+  check() { printf '%s\n' "$1" >> "$CHECKED"; }
+  launchctl() {
+    [ "$1" = print-disabled ] || return 1
+    [ -n "$entry" ] || return 1
+    printf '%s\n' "$entry"
+  }
+  for entry in '"com.dotfiles.chrome-dock-guard" => enabled' '"com.dotfiles.different-job" => disabled' ''; do
+    : > "$CHECKED"
+    DOTFILES_PROFILE=core source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+    grep -qx 'agent.chrome-dock-guard' "$CHECKED"
+  done
+  : > "$CHECKED"
+  entry='"com.dotfiles.chrome-dock-guard" => disabled'
+  DOTFILES_PROFILE=full source "$BATS_TEST_DIRNAME/../modules/workflow/doctor.sh"
+  grep -qx 'agent.chrome-dock-guard' "$CHECKED"
+}

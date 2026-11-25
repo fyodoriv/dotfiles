@@ -25,8 +25,8 @@ short version every contributor needs:
 2. **The pre-commit hook (`git-hooks/pre-commit`) blocks** any staged
    file mentioning configured private identifiers (`lib/oss-readiness.sh` regex),
    any hardcoded secret pattern (GitHub PAT, AWS key, PEM, …), and any
-   @company.example committer email. Bypass with `--no-verify` only as a
-   last-resort emergency fix; later gates still fire. In the dotfiles repo
+   @company.example committer email. Follow the repair step in the rejection
+   message, stage the corrected files, and retry the commit. In the dotfiles repo
    it also blocks a staged line in `home/` that adds a literal
    `/Users/<name>` path. `~/.zshrc` links to `home/zshrc`, so installers
    that append a `PATH` line edit a tracked file. `dotfiles-sync` and the

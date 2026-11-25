@@ -47,8 +47,8 @@ them. -->
   - **Output**: code
   - **Acceptance**: Staged validation failures state the reason and the repair command. All existing leak and commit guards keep their decisions.
   - **Hypothesis**: Runtime bypass suggestions drop from 3 to 0 while all existing failure decisions stay the same.
-  - **Measurement**: `rg -n -- '--no-verify' git-hooks/pre-commit` and the affected hosted Bats controls.
-  - **Success**: 0 runtime bypass suggestions and all required CI checks pass.
+  - **Measurement**: `rg -n -- '--no-verify' git-hooks/pre-commit` and `bats tests/pre-commit.bats` in hosted CI. Baseline on 5555a44c has 3 suggestions.
+  - **Success**: 0 runtime bypass suggestions, all 3 failure paths still refuse the commit and name the repair, and all required CI checks pass.
   - **Pivot**: If 1 existing validation decision or required repair instruction changes, restore that case and revise the wording.
   - **Anchor**: [Pre-commit implementation on the recorded baseline](https://github.com/fyodoriv/dotfiles/blob/f6884dd2ac3ec3bb842ab505018054a48ea88caa/git-hooks/pre-commit#L140).
 

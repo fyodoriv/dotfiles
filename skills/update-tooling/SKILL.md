@@ -210,6 +210,11 @@ prebuilt pair when that release supports one. For older releases without that
 verifier, Cargo must be on PATH. If the check fails, preserve the old `dist/`,
 report the build as blocked, and continue independent checks. Do not install
 Rust implicitly or claim the preserved build matches the advanced source.
+If the build guard reports that installed dependencies are out of sync, run
+`heavy-run npm ci` in the applied checkout. Retry `heavy-run npm run build`
+only after the install succeeds. Report the install result and the build result
+if you reached the build.
+
 Endpoint safe mode skips both the Node probe and the build. Other hosts keep
 their existing build path.
 
@@ -264,6 +269,14 @@ directory without a project Agentfile:
 ```bash
 cd "$HOME" && env -u DOTFILES_DIR "$APPLIED_AGENTBREW" sync --pull --no-recommended --agentfile "$HOME/.config/agentbrew/Agentfile.yaml"
 ```
+
+If sync reports a busy or unverified source checkout, follow the applied
+AgentBrew checkout's `docs/source-lease-recovery.md`. Resolve the checkout ID
+to one lease and verify its owner and related Git operations. A missing PID
+alone is insufficient. Only after establishing that neither the owner nor
+related work remains active, move the verified stale lease aside reversibly
+and retry the same sync command. Record its actual exit status. Leave an
+active or ambiguous lease in place.
 
 Always pass `--no-recommended --agentfile`, as the dotfiles lifecycle does. A
 bare `agentbrew sync` also installs every catalog skill marked `recommended`,

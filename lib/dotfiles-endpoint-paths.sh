@@ -212,11 +212,39 @@ dotfiles_resolve_jq() {
   command -v jq 2>/dev/null || true
 }
 
-# Resolve python3 / python3.13 for hook subprocesses (sessionStart, audit hooks).
-# Prefer dotfiles/bin symlinks to adhoc-signed uv Mach-O.
+dotfiles_python_requires_apple() {
+  [ "${DOTFILES_ALLOW_PUBLISHER_NA_PYTHON:-0}" != 1 ] || return 1
+  case "${DOTFILES_ENDPOINT_HARDENING:-${DOTFILES_AGENT_ENDPOINT_HARDENING:-0}}" in
+    1|true) return 0 ;;
+  esac
+  dotfiles_managed_endpoint
+}
+
+dotfiles_apple_python() {
+  local name="$1" developer candidate
+  case "$name" in
+    python3|python3.13) ;;
+    *) return 1 ;;
+  esac
+
+  developer="$(/usr/bin/xcode-select -p 2>/dev/null)" || return 1
+  [ -n "$developer" ] || return 1
+  candidate="$developer/usr/bin/$name"
+  [ -x "$candidate" ] || return 1
+  /usr/bin/codesign --verify '-R=anchor apple' "$candidate" >/dev/null 2>&1 || return 1
+  printf '%s\n' "$candidate"
+}
+
+# Resolve Python from the configured shim or PATH. The optional fourth
+# argument "hook" uses Apple developer-tools Python under endpoint hardening.
 dotfiles_resolve_python() {
   local dotfiles_dir="${1:-${DOTFILES_DIR:-}}" home="${2:-${HOME:-}}" name="${3:-python3}"
   local candidate
+
+  if [ "${4:-}" = hook ] && dotfiles_python_requires_apple; then
+    dotfiles_apple_python "$name"
+    return $?
+  fi
 
   if [ -n "$dotfiles_dir" ] && [ -x "${dotfiles_dir}/bin/${name}" ]; then
     candidate="${dotfiles_dir}/bin/${name}"

@@ -68,6 +68,10 @@ if [ -x "$_dotfiles_dir/bin/dotfiles-adhoc-sign-uv-pythons" ]; then
     "$_dotfiles_dir/bin/dotfiles-link-python-shim" 2>/dev/null || true
 fi
 
-_py_cmd="$(dotfiles_resolve_python "$_dotfiles_dir" "$_home" python3 2>/dev/null || echo python3)"
+_py_cmd="$(dotfiles_resolve_python "$_dotfiles_dir" "$_home" python3 hook 2>/dev/null || true)"
+if [ -z "$_py_cmd" ]; then
+  printf '%s\n' '{}'
+  exit 0
+fi
 printf '%s\n' "$input" |
   "$_py_cmd" "$_lib_root/lib/dotfiles-agent-session-env.py" "$_dotfiles_dir" "$_home" "$_path_prefix"

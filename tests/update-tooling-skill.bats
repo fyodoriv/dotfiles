@@ -151,3 +151,19 @@ AGENTFILE="$ROOT/Agentfile.yaml"
   run jq -e '[.evals[] | select(.expectations | any(contains("heavy-run")))] | length >= 1' "$EVALS"
   [ "$status" -eq 0 ]
 }
+
+@test "update-tooling verifies the sync lease and keeps recovery reversible" {
+  grep -F -q 'docs/source-lease-recovery.md' "$SKILL"
+  grep -F -q 'related Git operations' "$SKILL"
+  grep -F -q 'stale lease aside reversibly' "$SKILL"
+  grep -F -q 'Record its actual exit status' "$SKILL"
+  run jq -e '.evals | any(.expectations | any(contains("active or ambiguous leases")))' "$EVALS"
+  [ "$status" -eq 0 ]
+}
+
+@test "update-tooling installs locked dependencies before retrying the queued build" {
+  grep -F -q '`heavy-run npm ci` in the applied checkout' "$SKILL"
+  grep -F -q 'only after the install succeeds' "$SKILL"
+  run jq -e '.evals | any(.expectations | any(contains("heavy-run npm ci before retrying heavy-run npm run build")))' "$EVALS"
+  [ "$status" -eq 0 ]
+}

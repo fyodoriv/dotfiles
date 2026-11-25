@@ -480,7 +480,7 @@ review	docs/plans/rust-cold-profile-fixture-audit.md	3d3a75acad0c58ee32302e02d3b
 review	docs/plans/rust-current-bin-receipt.md	9517fe075640714245759a09b40b013bbcb7b78c	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-current-bin-source-receipt.json	416959ef7c582caf346bb0b8cc09a6f7b5da1f30	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-document-ledger-prediction.md	58c2799cd78db29e5226fd7557eab2756be598ef	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
-review	docs/plans/rust-embedded-discovery-review.json	65ea3459c563e3bfb9e20e5fb11e9043eb33fff0	rule-classification	docs/plans/rust-source-classification.md
+review	docs/plans/rust-embedded-discovery-review.json	2a0d1aacabe7613854df89455a6724be99d5f947	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-git-hook-receipt.md	86ae0ea9d4d3fbb7fa2b73358251a9aea9c2a720	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md
 review	docs/plans/rust-git-hook-source-receipt.json	0ec90fac2d5cffea39f1e7e7660ba4cfee890298	rule-classification	docs/plans/rust-source-classification.md
 review	docs/plans/rust-hook-baseline-2026-11-11.md	75eb068fd8337981b9492fe5642c06f1f37c72e7	documentation-scope-review	docs/plans/rust-document-ledger-prediction.md

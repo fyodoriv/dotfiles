@@ -60,6 +60,28 @@ render_all() {
   [[ "$output" != *"[]"* ]]
 }
 
+@test "hooks overlay: adds one entry to a nonempty inline enabled list" {
+  input=$'version: 1\nenabled: [keep-first, "keep-second"  ] # keep this note\ndisabled:\n  - keep-disabled\n'
+  expected=$'version: 1\nenabled: [keep-first, "keep-second", '"$HOOK"$'  ] # keep this note\ndisabled:\n  - keep-disabled'
+  run render "$input"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^enabled:' <<<"$output")" -eq 1 ]
+  [ "$output" = "$expected" ]
+
+  run render "$output"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+}
+
+@test "hooks overlay: keeps quoted inline hook IDs already enabled" {
+  for quote in "'" '"'; do
+    input="version: 1"$'\nenabled: ['"$quote$HOOK$quote"$', keep-hook] # machine note'
+    run render "$input"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$input" ]
+  done
+}
+
 @test "hooks overlay: a machine that disabled the hook keeps it disabled" {
   input=$'version: 1\ndisabled:\n  - '"$HOOK"$'\n'
   run render "$input"

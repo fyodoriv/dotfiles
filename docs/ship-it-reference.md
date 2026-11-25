@@ -839,6 +839,11 @@ Run **§ Repo bypass allowlist** detection first. When required checks are green
 
 Wait for every check before you merge, required or not: watch the CI run by ID (`gh run watch <id> --exit-status`), then confirm with one `gh pr checks <n>` that no check is pending. Do not poll with a foreground `sleep` loop (agent shells block it). `gh pr merge` accepts a PR while non-required checks are still pending, so a green required set is not enough.
 
+On a fresh Mac, run `dotfiles doctor --module tools` if the watcher cannot
+find `timeout`. The `tool.gtimeout` check gives the Homebrew fix,
+`brew install coreutils`. Use `gtimeout` in the watch command when that is
+the executable on PATH.
+
 Merge details:
 
 - `gh pr merge --match-head-commit` takes the full 40-character SHA (`git rev-parse HEAD`). Some hosts reject a short SHA.

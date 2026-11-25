@@ -84,14 +84,14 @@ agent_pr_approval() {
 
 @test "agent PR create appends canonical footer when body had no vendor footer" {
   local expected_body approval
-  expected_body=$'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes an unsafe public write path.\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  expected_body=$'## Summary\nFixes an unsafe public write path.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
   approval="$(agent_pr_approval "your-org/example-cli" "master" "fix: guard" "$expected_body")"
 
   run env AGENT_PUBLIC_WRITE_GUARD=1 AGENT_PUBLIC_WRITE_APPROVAL="$approval" "$GH_WRAPPER" pr create \
     --repo your-org/example-cli \
     --title "fix: guard" \
     --base master \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes an unsafe public write path.'
+    --body $'## Summary\nFixes an unsafe public write path.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
   grep -q "Written by an agent, not Fyodor" "$GH_BODY"
@@ -99,8 +99,8 @@ agent_pr_approval() {
 
 @test "agent PR create with --body-file - still appends footer and validates approval" {
   local input_body expected_body approval
-  input_body=$'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes the stdin body path from the incident.'
-  expected_body=$'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes the stdin body path from the incident.\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  input_body=$'## Summary\nFixes the stdin body path from the incident.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
+  expected_body=$'## Summary\nFixes the stdin body path from the incident.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
   approval="$(agent_pr_approval "your-org/example-cli" "master" "fix: guard stdin" "$expected_body")"
 
   run env AGENT_PUBLIC_WRITE_GUARD=1 \
@@ -113,37 +113,36 @@ agent_pr_approval() {
   grep -q "Written by an agent, not Fyodor" "$GH_BODY"
 }
 
-@test "agent PR create blocks bodies without rationale" {
+@test "agent PR create blocks bodies without the Summary opener" {
   run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
     --title "fix: guard" \
     --base main \
     --body "Fixes an unsafe public write path."
 
   [ "$status" -eq 1 ]
-  [[ "$output" == *"Why this is needed"* ]]
+  [[ "$output" == *"open with ## Summary"* ]]
 }
 
-@test "agent PR create blocks bodies without validation sections" {
+@test "agent PR create blocks bodies without Docs" {
   run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
     --title "fix: guard" \
     --base main \
-    --body $'## Why this is needed\nFixes foo because bar broke.\n\n## Summary\nShip it.'
+    --body $'## Summary\nThe guard refused a normal PR. This fixes the guard.\n\n## Details\n- Update the check.'
 
   [ "$status" -eq 1 ]
-  [[ "$output" == *"Requirements checklist"* ]]
-  [[ "$output" == *"Validation steps"* ]]
+  [[ "$output" == *"include ## Docs"* ]]
 }
 
 @test "agent PR create allows bodies with rationale and validation sections" {
   local expected_body approval
-  expected_body=$'## Requirements checklist\n- [x] fix bug\n\n## Previous state\n1. repro\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes foo because bar broke.\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  expected_body=$'## Summary\nFixes foo because bar broke.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] fix bug\n\n## Previous state\n1. repro\n\n## Validation steps\n1. verify\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
   approval="$(agent_pr_approval "your-org/example-cli" "master" "fix: guard" "$expected_body")"
 
   run env AGENT_PUBLIC_WRITE_GUARD=1 AGENT_PUBLIC_WRITE_APPROVAL="$approval" "$GH_WRAPPER" pr create \
     --repo your-org/example-cli \
     --title "fix: guard" \
     --base master \
-    --body $'## Requirements checklist\n- [x] fix bug\n\n## Previous state\n1. repro\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes foo because bar broke.'
+    --body $'## Summary\nFixes foo because bar broke.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] fix bug\n\n## Previous state\n1. repro\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
   grep -q "Requirements checklist" "$GH_BODY"
@@ -152,14 +151,14 @@ agent_pr_approval() {
 
 @test "agent PR create normalizes hard-wrapped prose paragraphs" {
   local expected_body approval
-  expected_body=$'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nThis paragraph was hard wrapped by an agent into several short lines.\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  expected_body=$'## Summary\nThis paragraph was hard wrapped by an agent into several short lines.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
   approval="$(agent_pr_approval "your-org/example-cli" "master" "fix: guard" "$expected_body")"
 
   run env AGENT_PUBLIC_WRITE_GUARD=1 AGENT_PUBLIC_WRITE_APPROVAL="$approval" "$GH_WRAPPER" pr create \
     --repo your-org/example-cli \
     --title "fix: guard" \
     --base master \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nThis paragraph was hard wrapped\nby an agent into several\nshort lines.'
+    --body $'## Summary\nThis paragraph was hard wrapped\nby an agent into several\nshort lines.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
   grep -q "This paragraph was hard wrapped by an agent into several short lines." "$GH_BODY"
@@ -167,14 +166,14 @@ agent_pr_approval() {
 
 @test "agent PR create keeps consecutive numbered list items on their own lines" {
   local expected_body approval
-  expected_body=$'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. build\n2. test\n10. ship\n\n## Why this is needed\nFixes list rendering.\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  expected_body=$'## Summary\nFixes list rendering.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. build\n2. test\n10. ship\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
   approval="$(agent_pr_approval "your-org/example-cli" "master" "fix: guard" "$expected_body")"
 
   run env AGENT_PUBLIC_WRITE_GUARD=1 AGENT_PUBLIC_WRITE_APPROVAL="$approval" "$GH_WRAPPER" pr create \
     --repo your-org/example-cli \
     --title "fix: guard" \
     --base master \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. build\n2. test\n10. ship\n\n## Why this is needed\nFixes list rendering.'
+    --body $'## Summary\nFixes list rendering.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. build\n2. test\n10. ship'
 
   [ "$status" -eq 0 ]
   [[ "$output" != *"regexp escape sequence"* ]]
@@ -187,7 +186,7 @@ agent_pr_approval() {
     --repo your-org/example-cli \
     --title "fix: guard" \
     --base master \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nFixes an unsafe public write path.'
+    --body $'## Summary\nFixes an unsafe public write path.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"blocked agent-authored PR create"* ]]
@@ -199,7 +198,7 @@ agent_pr_approval() {
     --repo github.example.com/your-org/example-repo \
     --title "fix: trusted delivery" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why needed\nKeeps routine trusted-repo delivery explicit.'
+    --body $'## Summary\nKeeps routine trusted-repo delivery explicit.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"blocked agent-authored PR create"* ]]
@@ -221,7 +220,7 @@ make_origin_checkout() {
     --repo github.example.com/your-org/example-repo \
     --title "fix: same repo" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nSame repo, host-qualified.'
+    --body $'## Summary\nSame repo, host-qualified.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
   [ -f "$GH_BODY" ]
@@ -234,7 +233,7 @@ make_origin_checkout() {
     --repo github.com/your-org/example-repo \
     --title "fix: other host" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nA public mirror is a different repo.'
+    --body $'## Summary\nA public mirror is a different repo.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"blocked agent-authored PR create"* ]]
@@ -250,7 +249,7 @@ make_origin_checkout() {
     --repo github.com/your-org/example-repo \
     --title "fix: public host" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nThe allowlist names the enterprise repo only.'
+    --body $'## Summary\nThe allowlist names the enterprise repo only.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"blocked agent-authored PR create"* ]]
@@ -263,7 +262,7 @@ make_origin_checkout() {
   run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
     --title "fix: ship-it body" \
     --base main \
-    --body $'## Summary\nThe preview went stale after a 409. Now it refreshes.\n\n## Details\n- apply refreshes the preview\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
+    --body $'## Summary\nThe preview went stale after a 409. Now it refreshes.\n\n## Details\n- apply refreshes the preview\n\n## Docs\nUpdate the guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
   grep -q "^## Summary" "$GH_BODY"
@@ -286,7 +285,7 @@ ALLOW
     --repo your-org/example-repo \
     --title "feat: covered by allowlist" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nRepo lives in the per-machine allowlist.'
+    --body $'## Summary\nRepo lives in the per-machine allowlist.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
   [ -f "$GH_BODY" ]
@@ -309,7 +308,7 @@ ALLOW
     --repo your-org/whitespace-ok \
     --title "feat: pad" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nWhitespace-padded entries should still match.'
+    --body $'## Summary\nWhitespace-padded entries should still match.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 0 ]
 }
@@ -322,7 +321,7 @@ ALLOW
     --repo your-org/example-repo \
     --title "fix: missing allowlist file" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nNo allowlist file means strict approval.'
+    --body $'## Summary\nNo allowlist file means strict approval.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"blocked agent-authored PR create"* ]]
@@ -342,7 +341,7 @@ ALLOW
     --repo your-org/example-repo \
     --title "fix: not on the list" \
     --base main \
-    --body $'## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify\n\n## Why this is needed\nTarget repo is not in the allowlist.'
+    --body $'## Summary\nTarget repo is not in the allowlist.\n\n## Details\n- Keep the guard behavior.\n\n## Docs\nUpdate the wrapper guide.\n\nExempt: existing wrapper fixture\n\n## Requirements checklist\n- [x] test requirement\n\n## Previous state\n1. before state\n\n## Validation steps\n1. verify'
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"blocked agent-authored PR create"* ]]
@@ -881,4 +880,30 @@ JSON
   [ "$status" -eq 1 ]
   [[ "$output" == *'Vision trace'* ]]
   [ ! -f "$GH_BODY" ]
+}
+
+@test "agent PR create preserves prediction fields and ignores status inside a longer fence" {
+  cd "$(make_origin_checkout https://github.example.com/your-org/example-repo.git)"
+  local body
+  body=$'## Summary\r\nThe preview could go stale. This refreshes it.\r\n\r\n## Details\r\n- Refresh preview.\r\n\r\n## Docs\r\nUpdate the guide.\r\n\r\n## Pre-registration\r\nHypothesis: fewer stale previews\r\n__Measurement__: run the fixture\r\nSuccess: 0 stale previews\r\nPivot: 1 stale preview\r\nAnchor: preview guide\r\n\r\n````text\r\n```\r\nStatus: sample output\r\n```\r\n````'
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
+    --title "fix: predicted preview" --base main --body "$body"
+
+  [ "$status" -eq 0 ]
+  grep -qx '__Measurement__: run the fixture' "$GH_BODY"
+  grep -qx 'Status: sample output' "$GH_BODY"
+}
+
+@test "agent PR create accepts a tracked Vision trace gate in the target checkout" {
+  cd "$(make_origin_checkout https://github.example.com/your-org/example-repo.git)"
+  mkdir -p .github/workflows
+  printf '%s\n' 'name: PR vision trace' > .github/workflows/pr-vision-trace.yml
+  git add .github/workflows/pr-vision-trace.yml
+  local body
+  body=$'## Summary\nThe preview could go stale. This refreshes it.\n\n## Details\n- Refresh preview.\n\n## Docs\nUpdate the guide.\n\nExempt: existing preview fixture\n\n## Vision trace\nKeep previews current.'
+  run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
+    --title "fix: traced preview" --base main --body "$body"
+
+  [ "$status" -eq 0 ]
+  grep -qx '## Vision trace' "$GH_BODY"
 }

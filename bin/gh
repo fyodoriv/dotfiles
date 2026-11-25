@@ -257,55 +257,86 @@ _gh_wrapper_is_agent_context() {
     [ -n "${CODEX_AGENT:-}" ]
 }
 
-_body_has_rationale() {
-  local body_file
-  body_file="$1"
-  # `/ship-it` opens every PR with `## Summary`, which must say why the PR is needed.
-  grep -qiE '^##[[:space:]]+Summary[[:space:]]*$' "$body_file" ||
-    grep -qiE '(^|[[:space:]#*_>-])(why this is needed|why needed|rationale|motivation|context)[[:space:]:#*_>-]*' "$body_file"
+PR_BODY_FIELDS='^[[:blank:]]*([-*+][[:blank:]]+)?([*][*]|__)?(status|exempt|hypothesis|measurement|success|pivot|anchor)([*][*]|__)?[[:blank:]]*:'
+
+PR_BODY_FENCE_AWK='
+  function fence_line(line,    marker, width) {
+    if (line ~ /^(    |\t)/) return 0
+    sub(/^ */, "", line)
+    if (!match(line, /^(`+|~+)/) || RLENGTH < 3) return 0
+    marker = substr(line, 1, 1)
+    width = RLENGTH
+    if (!fence) {
+      fence = marker
+      fence_width = width
+    } else if (marker == fence && width >= fence_width && substr(line, width + 1) ~ /^[[:blank:]]*$/) {
+      fence = ""
+    }
+    return 1
+  }
+'
+
+_pr_body_structure() {
+  awk -v fields="$PR_BODY_FIELDS" "$PR_BODY_FENCE_AWK"'
+    /^[[:blank:]]*$/ { next }
+    {
+      line = tolower($0)
+      sub(/[[:blank:]]+$/, "", line)
+      if (!first++) opener = line
+      if (fence_line(line) || fence || line ~ /^(    |\t)/) next
+      if (line ~ /^##[[:blank:]]+/) {
+        sub(/^##[[:blank:]]+/, "", line)
+        if (++headings == 2) second = line
+        if (line == "docs") docs = 1
+        if (line == "vision trace") vision = 1
+        next
+      }
+      if (headings == 1 && line !~ /^[[:blank:]]*(#|>|[-*+][[:blank:]])/ && line !~ fields) summary = 1
+      if (line ~ fields) {
+        sub(/^[[:blank:]]*([-*+][[:blank:]]+)?/, "", line)
+        gsub(/([*][*]|__)/, "", line)
+        split(line, parts, ":")
+        key = parts[1]
+        sub(/[[:blank:]]+$/, "", key)
+        if (key == "status") status = 1
+        if (line ~ /:[[:blank:]]*[^[:blank:]]/) present[key] = 1
+      }
+    }
+    END {
+      if (opener !~ /^##[[:blank:]]+summary$/) print "open with ## Summary"
+      else if (!summary) print "explain why the change is needed under ## Summary"
+      else if (second != "details") print "put ## Details after ## Summary"
+      else if (!docs) print "include ## Docs"
+      else if (status) print "remove the Status: line and use GitHub draft or ready"
+      else if (!present["exempt"] && !(present["hypothesis"] && present["measurement"] && present["success"] && present["pivot"] && present["anchor"])) {
+        print "include a pre-registration block or an Exempt: line with the gate"
+      } else if (vision) print "vision trace"
+    }
+  ' "$1"
 }
 
-_body_has_validation_sections() {
-  local body_file missing=0
-  body_file="$1"
-  grep -qiE '^##[[:space:]]+(Requirements checklist|What this change is about)[[:space:]]*$' "$body_file" || missing=1
-  grep -qiE '^##[[:space:]]+(Previous state|How to see previous state)[[:space:]]*$' "$body_file" || missing=1
-  grep -qiE '^##[[:space:]]+(Validation steps|How to validate)' "$body_file" || missing=1
-  [ "$missing" -eq 0 ]
-}
-
-_body_has_stacked_skill_sections() {
-  local body_file missing=0
-  body_file="$1"
-  grep -qiE '^##[[:space:]]+Summary[[:space:]]*$' "$body_file" || missing=1
-  grep -qiE '^##[[:space:]]+Delivery plan[[:space:]]*$' "$body_file" || missing=1
-  grep -qiE '^##[[:space:]]+Test plan[[:space:]]*$' "$body_file" || missing=1
-  [ "$missing" -eq 0 ]
-}
-
-_body_has_pr_validation() {
-  local body_file="$1"
-  _body_has_validation_sections "$body_file" || _body_has_stacked_skill_sections "$body_file"
+_block_pr_body() {
+  printf 'gh wrapper: blocked agent-authored PR create: %s.\n' "$1" >&2
+  printf '\n%s\n' '## Summary' 'Explain why this is needed and what changes in two or three sentences.' \
+    '' '## Details' '- List the changes.' '' '## Docs' '- Name the updated docs, or explain why none changed.' \
+    '' '## Pre-registration' 'Hypothesis: ...' 'Measurement: ...' 'Success: ...' 'Pivot: ...' 'Anchor: ...' \
+    '' 'For an exempt change, replace the prediction with Exempt: <gate>.' >&2
+  exit 1
 }
 
 _normalize_markdown_body() {
-  awk '
+  awk -v fields="$PR_BODY_FIELDS" "$PR_BODY_FENCE_AWK"'
     function flush_para() {
       if (para == "") return
       print para
       para = ""
     }
     function is_special(line) {
-      return line ~ /^([[:space:]]*$|[[:space:]]*(```|~~~)|[[:space:]]{0,3}#{1,6}[[:space:]]|[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]|[[:space:]]*>|[[:space:]]*\||[[:space:]]*---[[:space:]]*$)/
+      return tolower(line) ~ fields || line ~ /^([[:space:]]*$|[[:space:]]*(```|~~~)|[[:space:]]{0,3}#{1,6}[[:space:]]|[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]|[[:space:]]*>|[[:space:]]*\||[[:space:]]*---[[:space:]]*$)/
     }
     {
-      if ($0 ~ /^[[:space:]]*(```|~~~)/) {
-        flush_para()
-        print
-        in_code = !in_code
-        next
-      }
-      if (in_code || is_special($0)) {
+      sub(/\r$/, "", $0)
+      if (fence_line($0) || fence || $0 ~ /^(    |\t)/ || is_special($0)) {
         flush_para()
         print
         next
@@ -463,29 +494,36 @@ _arg_value() {
 }
 
 _validate_pr_create_body() {
-  local body_file repo_arg repo_norm current_repo_norm repo_host current_host allow_host base_arg title_arg body_sha title_sha required approval allowlist_file allow_line
+  local body_file shape repo_arg repo_norm current_repo_norm repo_host current_host allow_host base_arg title_arg body_sha title_sha required approval allowlist_file allow_line
   body_file="$1"
-  if ! _body_has_rationale "$body_file"; then
-    echo "gh wrapper: blocked agent-authored PR create — body must include a clear 'Why this is needed' / rationale section." >&2
-    exit 1
-  fi
-  if ! _body_has_pr_validation "$body_file"; then
-    echo "gh wrapper: blocked agent-authored PR create — body must include either (1) ## Requirements checklist, ## Previous state, and ## Validation steps, or (2) stacked-skill trio: ## Summary, ## Delivery plan, and ## Test plan (task-command-center IRON LAW)." >&2
-    exit 1
-  fi
+  shape="$(_pr_body_structure "$body_file")"
+  case "$shape" in
+    ''|'vision trace') ;;
+    *) _block_pr_body "$shape" ;;
+  esac
 
   repo_arg="$(_arg_value --repo || true)"
   if [ -z "$repo_arg" ]; then
     repo_arg="$(_arg_value -R || true)"
   fi
   if [ -z "$repo_arg" ]; then
-    repo_arg="$(_current_repo_slug)"
+    repo_arg="${GH_REPO:-$(_current_repo_slug)}"
   fi
   if [ -n "$repo_arg" ]; then
     repo_norm="$(_normalize_repo_slug "$repo_arg")"
     current_repo_norm="$(_normalize_repo_slug "$(_current_repo_slug)")"
     repo_host="$(_repo_host "$repo_arg")"
     current_host="$(_repo_host "$(git config --get remote.origin.url 2>/dev/null || true)")"
+    if [ "$shape" = 'vision trace' ]; then
+      if [ "$repo_norm" != "$current_repo_norm" ] ||
+         { [ -n "${repo_host:-${GH_HOST:-}}" ] && [ "${repo_host:-${GH_HOST:-}}" != "$current_host" ]; }; then
+        _block_pr_body 'omit ## Vision trace or run from the target checkout to verify its gate'
+      fi
+      if ! git ls-files --full-name -- ':(top).github/workflows/pr-vision-trace.y*ml' \
+          ':(top)scripts/check-pr-vision-trace.mjs' ':(top)scripts/verify-vision-trace.sh' | grep -q .; then
+        _block_pr_body 'omit ## Vision trace when the target repository has no check'
+      fi
+    fi
     if [ "$repo_norm" = "$current_repo_norm" ] &&
        { [ -z "$repo_host" ] || [ "$repo_host" = "$current_host" ]; }; then
       return 0
@@ -543,9 +581,7 @@ _prepare_body_tmp() {
     return 0
   fi
   # PR create: full treatment — markdown normalisation, footer, and
-  # rationale validation. PR-create remains the strictest gate because
-  # a missing rationale on a fresh PR means the agent shipped without
-  # explaining why.
+  # owner template validation.
   if [ "${argv[0]} ${argv[1]}" = "pr create" ]; then
     normalized=$(mktemp -t gh-wrapper-normalized.XXXXXX)
     _normalize_markdown_body "$tmp" > "$normalized"

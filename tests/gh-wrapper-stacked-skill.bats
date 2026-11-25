@@ -49,28 +49,28 @@ agent_pr_approval() {
   printf 'repo=%s base=%s title=%s body_sha256=%s' "$repo" "$base" "$title" "$body_sha"
 }
 
-@test "agent PR create allows stacked skill trio (Summary + Delivery plan + Test plan)" {
+@test "agent PR create allows stacked validation after the owner template" {
   local expected_body approval
-  expected_body=$'## Why this is needed\nWizard phase B ships data intake.\n\n## Summary\nAdds phase B skill docs.\n\n## Delivery plan\n| Step | PR | Status |\n\n## Test plan\n- [x] bash scripts/run-tests.sh\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
+  expected_body=$'## Summary\nThe wizard needs data intake. This adds the phase B skill docs.\n\n## Details\n- Document data intake.\n\n## Docs\nUpdate the wizard guide.\n\nExempt: existing stacked fixture\n\n## Delivery plan\n| Step | PR | Status |\n\n## Test plan\n- [x] bash scripts/run-tests.sh\n\n---\n_🤖 Written by an agent, not Fyodor. Ping me if this looks off._\n'
   approval="$(agent_pr_approval "your-org/example-cli" "master" "feat: phase b" "$expected_body")"
 
   run env AGENT_PUBLIC_WRITE_GUARD=1 AGENT_PUBLIC_WRITE_APPROVAL="$approval" "$GH_WRAPPER" pr create \
     --repo your-org/example-cli \
     --title "feat: phase b" \
     --base master \
-    --body $'## Why this is needed\nWizard phase B ships data intake.\n\n## Summary\nAdds phase B skill docs.\n\n## Delivery plan\n| Step | PR | Status |\n\n## Test plan\n- [x] bash scripts/run-tests.sh'
+    --body $'## Summary\nThe wizard needs data intake. This adds the phase B skill docs.\n\n## Details\n- Document data intake.\n\n## Docs\nUpdate the wizard guide.\n\nExempt: existing stacked fixture\n\n## Delivery plan\n| Step | PR | Status |\n\n## Test plan\n- [x] bash scripts/run-tests.sh'
 
   [ "$status" -eq 0 ]
   grep -q "Delivery plan" "$GH_BODY"
   grep -q "Test plan" "$GH_BODY"
 }
 
-@test "agent PR create blocks Summary-only without full or stacked validation" {
+@test "agent PR create blocks a stacked body without the canonical opener" {
   run env AGENT_PUBLIC_WRITE_GUARD=1 "$GH_WRAPPER" pr create \
     --title "feat: phase b" \
     --base main \
     --body $'## Why this is needed\nShip phase B.\n\n## Summary\nAdds docs only.'
 
   [ "$status" -eq 1 ]
-  [[ "$output" == *"Delivery plan"* ]] || [[ "$output" == *"Requirements checklist"* ]]
+  [[ "$output" == *"open with ## Summary"* ]]
 }

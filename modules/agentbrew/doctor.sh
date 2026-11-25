@@ -11,6 +11,44 @@ _agentbrew_cli_available() {
 check "agentbrew.cli_available" "agentbrew CLI available" \
   "_agentbrew_cli_available" ""
 
+_agentbrew_hook_ids() {
+  local hooks
+  hooks="$(yq -o=json '.hooks' "$1")" || return 1
+  jq -er '
+    select(type == "array" and all(.[];
+      type == "object" and (.id | type == "string" and test("^[A-Za-z0-9._-]+$"))
+    ))
+    | map(.id) | unique | join("\n")
+  ' <<< "$hooks"
+}
+
+_agentbrew_path_has_checkout_hooks() {
+  local path_cli checkout checkout_ids path_ids
+  command -v yq >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 0
+  [ -r "$DOTFILES_DIR/lib/agentbrew-locate.sh" ] || return 0
+  # shellcheck source=../../lib/agentbrew-locate.sh
+  source "$DOTFILES_DIR/lib/agentbrew-locate.sh"
+  checkout="$(agentbrew_locate)" || return 0
+  [ -x "$checkout/dist/cli.js" ] || return 0
+
+  path_cli="${_dotfiles_doctor_agentbrew_on_path-$(type -P agentbrew)}" || return 0
+  [ -x "$path_cli" ] || return 0
+  path_cli="$(realpath "$path_cli")" || return 0
+  case "$path_cli" in */dist/cli.js) ;; *) return 0 ;; esac
+  [ "$path_cli" -ef "$checkout/dist/cli.js" ] && return 0
+
+  # A warning requires two readable manifests with valid hook IDs.
+  checkout_ids="$(_agentbrew_hook_ids "$checkout/hooks/manifest.yaml")" || return 0
+  path_ids="$(_agentbrew_hook_ids "${path_cli%/dist/cli.js}/hooks/manifest.yaml")" || return 0
+  [ -z "$(LC_ALL=C comm -23 <(printf '%s\n' "$checkout_ids") <(printf '%s\n' "$path_ids"))" ]
+}
+
+printf -v _agentbrew_repair_cli '%q' "$DOTFILES_DIR/bin/agentbrew"
+check_advisory "agentbrew.path_hook_coverage" "Agentbrew PATH hook coverage" \
+  "_agentbrew_path_has_checkout_hooks" \
+  "Use the checkout shim. Run: cd \"\$HOME\" && $_agentbrew_repair_cli sync --no-recommended --agentfile \"\$HOME/.config/agentbrew/Agentfile.yaml\" && $_agentbrew_repair_cli hooks verify --agent claude-code --json"
+unset _agentbrew_repair_cli
+
 check "agentbrew.agentfile_exists" "Agentfile.yaml in dotfiles" \
   "[ -f '$AGENTFILE' ]" ""
 

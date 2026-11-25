@@ -56,6 +56,9 @@ _doctor_agent_node_bin() {
   source "$DOTFILES_DIR/lib/dotfiles-agent-node.sh"
   dotfiles_agent_node_bin
 }
+# The Agentbrew advisory checks the executable the caller would use.
+# shellcheck disable=SC2034 # read by the sourced Agentbrew module
+_dotfiles_doctor_agentbrew_on_path="$(type -P agentbrew || true)"
 dotfiles_prepend_endpoint_tool_paths "$DOTFILES_LINK_DIR/bin"
 
 # Trim log to last 500 lines (prevents unbounded growth from LaunchAgent)

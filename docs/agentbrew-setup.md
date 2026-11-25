@@ -230,6 +230,12 @@ agentbrew status
 If there is no local checkout, install the packaged CLI with
 `npm install -g agentbrew`.
 
+When the doctor warns that the PATH runtime lacks checkout hooks, follow
+its command to run sync through the Dotfiles checkout shim. The command
+then verifies Claude Code hook drift. A `driftCount` of `0` confirms the
+sync. To use that same runtime for later shell commands, put the Dotfiles
+`bin/` directory before the packaged CLI on PATH.
+
 After fixing the CLI or manifest error, rerun `dotfiles apply` so chezmoi and
 agentbrew agree about the generated state.
 

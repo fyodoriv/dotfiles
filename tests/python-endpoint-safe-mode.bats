@@ -55,7 +55,7 @@ EOF
 }
 
 _resolve_fixture_python() {
-  local hardening="$1" exception="$2" apple_python="$3"
+  local hardening="$1" exception="$2" apple_python="$3" purpose="${4-hook}"
   local fixture="$BATS_TEST_TMPDIR/dotfiles"
   mkdir -p "$fixture/bin"
   ln -sf /bin/bash "$fixture/bin/python3"
@@ -69,8 +69,8 @@ _resolve_fixture_python() {
         [ "$1" = python3 ] && [ -n "$apple_python" ] || return 1
         printf "%s\n" "$apple_python"
       }
-      dotfiles_resolve_python "$1" "$HOME" python3
-    ' bash "$fixture" "$apple_python"
+      dotfiles_resolve_python "$1" "$HOME" python3 "$3"
+    ' bash "$fixture" "$apple_python" "$purpose"
 }
 
 @test "hardened Python resolution prefers Apple developer tools over the local shim" {
@@ -95,4 +95,62 @@ _resolve_fixture_python() {
   _resolve_fixture_python 0 0 /usr/bin/python3
   [ "$status" -eq 0 ]
   [ "$output" = "$BATS_TEST_TMPDIR/dotfiles/bin/python3" ]
+}
+
+@test "Apple Python resolution verifies the selected developer-tools binary" {
+  [ "$(uname -s)" = Darwin ] || skip "requires Apple developer tools"
+  developer="$(/usr/bin/xcode-select -p)" || skip "no selected developer tools"
+  [ -x "$developer/usr/bin/python3" ] || skip "no Apple developer-tools Python"
+
+  run env -u BASH_ENV -u ENV /bin/bash -c '
+    source lib/dotfiles-endpoint-paths.sh
+    dotfiles_apple_python python3
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "$developer/usr/bin/python3" ]
+  /usr/bin/codesign --verify '-R=anchor apple' "$output"
+}
+
+@test "ordinary Python consumers keep the configured interpreter under owner hardening" {
+  _resolve_fixture_python 1 0 /usr/bin/python3 ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BATS_TEST_TMPDIR/dotfiles/bin/python3" ]
+}
+
+_make_unsigned_hook_python_fixture() {
+  local fixture="$BATS_TEST_TMPDIR/dotfiles"
+  mkdir -p "$fixture/bin" "$fixture/lib"
+  cp lib/dotfiles-endpoint-paths.sh "$fixture/lib/"
+  printf '\ndotfiles_apple_python() { return 1; }\n' >>"$fixture/lib/dotfiles-endpoint-paths.sh"
+  cat >"$fixture/bin/python3" <<'PYTHON'
+#!/bin/bash
+printf '%s\n' 'unsigned interpreter ran'
+exit 99
+PYTHON
+  chmod +x "$fixture/bin/python3"
+}
+
+@test "session hook leaves the environment alone when signed Python is unavailable" {
+  _make_unsigned_hook_python_fixture
+  run env -u BASH_ENV -u ENV HOME="$BATS_TEST_TMPDIR/home" \
+    DOTFILES_DIR="$BATS_TEST_TMPDIR/dotfiles" DOTFILES_ENDPOINT_HARDENING= \
+    DOTFILES_AGENT_ENDPOINT_HARDENING=1 DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=0 \
+    /bin/bash -c 'printf "%s\n" "{}" | ./agent-hooks/session-endpoint-path.sh'
+  [ "$status" -eq 0 ]
+  [ "$output" = '{}' ]
+}
+
+@test "hook bootstrap clears inherited Python paths when signed Python is unavailable" {
+  _make_unsigned_hook_python_fixture
+  run env -u BASH_ENV -u ENV HOME="$BATS_TEST_TMPDIR/home" \
+    DOTFILES_DIR="$BATS_TEST_TMPDIR/dotfiles" DOTFILES_ENDPOINT_HARDENING= \
+    DOTFILES_AGENT_ENDPOINT_HARDENING=1 DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=0 \
+    DOTFILES_PYTHON3=/inherited/python3 DOTFILES_PYTHON3_13=/inherited/python3.13 \
+    /bin/bash -c '
+      source agent-hooks/bootstrap-endpoint-path.sh
+      printf "%s|%s\n" "${DOTFILES_PYTHON3-unset}" "${DOTFILES_PYTHON3_13-unset}"
+    '
+  [ "$status" -eq 0 ]
+  [ "$output" = 'unset|unset' ]
 }

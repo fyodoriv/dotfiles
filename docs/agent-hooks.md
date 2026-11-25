@@ -355,6 +355,10 @@ auto, Codex, and legacy PreToolUse replies follow their existing routes.
 The hook preserves explicit `/usr/bin/python3` and `/usr/bin/python3.13`
 paths in commands and literal text. Use an explicit path when the
 interpreter matters. A bare Python command still uses the managed PATH.
+Under endpoint hardening, hook helpers resolve Python from the selected
+Apple developer tools and verify its signature. If no matching interpreter
+exists, the session hook leaves the prior environment in place. The
+`DOTFILES_ALLOW_PUBLISHER_NA_PYTHON=1` exception restores local shim selection.
 
 The response is based on the [Codex hooks protocol](https://learn.chatgpt.com/docs/hooks).
 Input detection and temporary output files are scoped to one hook process.

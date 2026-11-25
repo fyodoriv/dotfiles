@@ -132,8 +132,9 @@ deleted_count=$(git diff --cached --diff-filter=D --name-only 2>/dev/null | wc -
 if [ "$deleted_count" -gt "$MAX_DELETES" ]; then
   printf '%s✗ %d file deletions staged (limit: %d).%s\n' "$RED" "$deleted_count" "$MAX_DELETES" "$RST" >&2
   printf '%sThis usually means git add picked up changes from another worktree.%s\n' "$YEL" "$RST" >&2
-  printf '  Fix: git reset HEAD && git add <specific-files>\n' >&2
-  printf '  Bypass: git commit --no-verify\n\n' >&2
+  printf '  Inspect the staged deletions with `git diff --cached --name-only --diff-filter=D`.\n' >&2
+  printf '  Unstage unintended deletions with `git restore --staged -- <paths>`.\n' >&2
+  printf '  Split intended deletions into commits of %d files or fewer.\n\n' "$MAX_DELETES" >&2
   exit 1
 fi
 
@@ -222,7 +223,7 @@ fi
 
 if [ "$violations" -ne 0 ]; then
   printf '%scommit blocked by dotfiles pre-commit hook%s\n' "$RED" "$RST" >&2
-  printf '%s(override with `git commit --no-verify` — but the pre-push gate will still fire)%s\n' "$DIM" "$RST" >&2
+  printf '%sFix the reported issue, stage the corrected files, and retry the commit.%s\n' "$YEL" "$RST" >&2
   exit 1
 fi
 
@@ -328,7 +329,7 @@ if [ "$is_dotfiles_repo" -eq 1 ]; then
     if [ "$lint_status" -ne 0 ]; then
       printf '%s✗ TASKS.md lint failed:%s\n' "$RED" "$RST" >&2
       printf '%s\n' "$lint_output" | sed 's/^/  /' >&2
-      printf '\n%sFix the format and re-stage, or %sgit commit --no-verify%s for emergencies.%s\n' "$YEL" "$DIM" "$YEL" "$RST" >&2
+      printf '\n%sFix TASKS.md, run `git add -- TASKS.md`, and retry the commit.%s\n' "$YEL" "$RST" >&2
       exit 1
     fi
     fi

@@ -74,8 +74,8 @@ git rm -r modules/<name>
 # 3. Verify nothing broke
 dotfiles doctor
 
-# 4. Commit (--no-verify bypasses the pre-commit hook that protects module deletion)
-git commit --no-verify -m "chore: remove <name> module"
+# 4. Commit with the intended deletion path. All other checks still run.
+DOTFILES_INTENDED_DELETIONS="modules/<name>/" git commit -m "chore: remove <name> module"
 ```
 
 **Cross-module dependencies:**
@@ -225,7 +225,8 @@ If your team doesn't use AI coding agents, the simplest approach:
 2. Remove these modules entirely:
    ```bash
    git rm -r modules/{claude,agentbrew,agent-browser}
-   git commit --no-verify -m "chore: remove AI tooling modules"
+   DOTFILES_INTENDED_DELETIONS="modules/claude/ modules/agentbrew/ modules/agent-browser/" \
+     git commit -m "chore: remove AI tooling modules"
    ```
 3. Remove the agentbrew lifecycle script:
    ```bash

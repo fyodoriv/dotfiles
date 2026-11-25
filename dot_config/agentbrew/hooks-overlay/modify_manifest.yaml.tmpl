@@ -10,7 +10,7 @@
 # removed, and missing supported hook IDs are added under `enabled:`.
 #
 # A supported ID already present is left alone, so a machine can still opt
-# out under `disabled:`. The retired usage-tip ID cannot be re-enabled.
+# out under `disabled:`. Retired IDs cannot be re-enabled.
 set -eu
 
 # Owner-only hooks: they hold agents to the repo owner's workflow (PR body
@@ -18,15 +18,19 @@ set -eu
 # agentbrew ships them off by default; only the owner's Macs
 # (owner_machine) turn them on. A new user gets none of them.
 # DOTFILES_OVERLAY_HOOKS replaces the list (tests use it).
-HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs async-human-comms-blocks jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint no-home-crawl{{ end }}}"
+HOOKS="${DOTFILES_OVERLAY_HOOKS-{{ if dig "owner_machine" true . }}gh-pr-body-requires-docs code-no-timestamps selectors-pure tests-adapt-to-production skill-names-user-facing-verbs jira-no-grandchildren gdoc-comment-preservation gdoc-surgical-edit-only perf-task-review poll-loop-hint no-home-crawl{{ end }}}"
 
 input=$(cat)
 
-# Retire only this enabled scalar. Buffer output so ambiguous YAML cannot
+# Retire only exact enabled scalars. Buffer output so ambiguous YAML cannot
 # produce a partial replacement. Disabled choices and unrelated lines stay.
 input=$(printf '%s\n' "$input" | awk '
   function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-  function retired(s) { return s == "usage-tip" || s == "\"usage-tip\"" || s == "\047usage-tip\047" }
+  function retired(s) {
+    sub(/^"/, "", s); sub(/"$/, "", s)
+    sub(/^\047/, "", s); sub(/\047$/, "", s)
+    return s == "usage-tip" || s == "async-human-comms-blocks"
+  }
   function literal(s) { return s ~ /^[A-Za-z0-9_.:-]+$/ || s ~ /^"[A-Za-z0-9_.:-]+"$/ || s ~ /^\047[A-Za-z0-9_.:-]+\047$/ }
   !root_seen && $0 !~ /^[[:space:]]*(#|$)/ {
     root_seen = 1
@@ -77,7 +81,7 @@ input=$(printf '%s\n' "$input" | awk '
 ')
 
 for hook in $HOOKS; do
-  [ "$hook" = usage-tip ] && continue
+  case "$hook" in usage-tip|async-human-comms-blocks) continue ;; esac
   if [ -z "$(printf '%s' "$input" | tr -d '[:space:]')" ]; then
     input=$(printf 'version: 1\n\n# Opt-in agentbrew hooks that dotfiles turns on for every machine.\nenabled:\n  - %s' "$hook")
     continue

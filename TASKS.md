@@ -85,6 +85,20 @@ them. -->
 
 ## P1
 
+- [ ] Detect when ChatGPT Work commands lose network
+  - **ID**: codex-work-network-probe
+  - **Tags**: codex, chatgpt, doctor, reliability
+  - **Details**: Since the 2026-11-24 ChatGPT app update (bundled codex-cli 0.171.0-alpha.13.2), Work chats run commands through a local `codex exec-server --remote` process. OpenAI's cloud side sends each command's sandbox policy. With Settings > Configuration > Work > Network access "On", commands still get `CODEX_SANDBOX_NETWORK_DISABLED=1` and DNS fails. Local config cannot fix it: `default_permissions`, a `[permissions.managed]` profile and a settings resave were each tested in a real Work chat on 2026-11-25 and failed. Local Codex threads and `codex exec` keep network. The doctor checks `codex.agent_access` and `codex.network_proxy` only read config text, so they stayed green while Work was broken.
+  - **Files**: `modules/codex/doctor.sh`, `tests/codex-doctor.bats`, `docs/module-reference.md`.
+  - **Output**: code
+  - **Acceptance**: The doctor says plainly that its config checks do not cover Work commands, and points to a one-line in-chat probe (print `CODEX_SANDBOX_NETWORK_DISABLED`, curl github.com). If a reliable local signal exists (for example the app log line `recorded sandbox violation` for a recent Work turn), an advisory check reports it; otherwise no fake check is added.
+  - **Hypothesis**: Saying what the doctor cannot see, plus a probe, cuts time-to-diagnosis of the next Work network break from about an hour to under 5 minutes.
+  - **Measurement**: Time from first failed Work command to a correct cause in the next incident's chat log; bats tests for the new doctor text.
+  - **Success**: Next incident diagnosed in 5 minutes or less; bats pass; gate green.
+  - **Pivot**: If no local signal separates Work-policy breaks from other failures, ship only the doc and probe and drop the check.
+  - **Anchor**: Basili, Caldiera and Rombach (1994), Goal Question Metric.
+  - **Competitive-goal**: none - reliability of an existing check.
+
 - [ ] Verify guard decisions against later hook rewrites
   - **ID**: guard-final-command-hook-order
   - **Tags**: hooks, security, reliability

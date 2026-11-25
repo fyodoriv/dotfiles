@@ -39,7 +39,7 @@ teardown() {
 @test "acquire prints the CDP port and records the lock" {
   run "$SCRIPT" acquire --owner agent-a --reason "bot sign-in"
   [ "$status" -eq 0 ]
-  [ "$output" = "9399" ]
+  [ "${lines[-1]}" = "9399" ]
   [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/owner")" = "agent-a" ]
   [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/reason")" = "bot sign-in" ]
   pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
@@ -72,6 +72,9 @@ STUB
   [ "$status" -eq 0 ]
   [ "$output" = "9399" ]
   [ "$(cat "$TEMP_BROWSER_STATE_DIR/headed-mode")" = 1 ]
+  run "$SCRIPT" acquire --owner a --reason signin
+  [ "$status" -eq 0 ]
+  [ "$output" = "9399" ]
 }
 
 @test "headless acquire keeps stdout port-only and warns on stderr" {
@@ -89,6 +92,10 @@ STUB
   [[ "$output" == *'--headed'* ]]
   [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")" = "$original_pid" ]
   kill -0 "$original_pid"
+  rm "$TEMP_BROWSER_STATE_DIR/lock/headed"
+  run "$SCRIPT" acquire --headed --owner a --reason signin
+  [ "$status" -eq 1 ]
+  [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")" = "$original_pid" ]
 }
 
 @test "acquire seeds a magenta theme so the temp browser stands out" {
@@ -184,7 +191,7 @@ STUB
   pid="$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")"
   run "$SCRIPT" acquire --owner agent-a --reason r
   [ "$status" -eq 0 ]
-  [ "$output" = "9399" ]
+  [ "${lines[-1]}" = "9399" ]
   [ "$(cat "$TEMP_BROWSER_STATE_DIR/lock/pid")" = "$pid" ]
 }
 

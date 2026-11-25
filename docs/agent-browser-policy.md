@@ -21,7 +21,7 @@ The old `chrome-debug` (9222), `debug-chrome` (9224), and `tooling-chrome` (9225
 ### The temporary browser
 
 ```bash
-port="$(temp-browser acquire --owner "$AGENT_BROWSER_SESSION" --reason "bot sign-in")"
+port="$(temp-browser acquire --headed --owner "$AGENT_BROWSER_SESSION" --reason "bot sign-in")"
 agent-browser --cdp "$port" open https://example.com
 temp-browser status                                  # holder, reason, pid, lease expiry
 temp-browser release --owner "$AGENT_BROWSER_SESSION"  # stops the browser, deletes the profile
@@ -30,11 +30,11 @@ temp-browser release --owner "$AGENT_BROWSER_SESSION"  # stops the browser, dele
 - The lock is a directory under `~/.local/state/temp-browser/lock` (`mkdir` is atomic). It records the owner, the reason, the browser pid, the port, the profile, and the lease expiry (default 1 hour, `TEMP_BROWSER_LEASE_SECONDS`).
 - A second agent is refused (exit 3) with the holder's name and reason. Add `--wait` to poll instead; `--timeout <seconds>` changes the default 30-second limit. It prints the holder once and exits 3 only after that limit.
 - An expired lease or a browser that exited is discarded (browser stopped, profile deleted) and taken over. Cleanup renames the old lock aside atomically so it cannot delete a new owner's lock. Acquirer and cleanup PIDs make interrupted initialization and cleanup recoverable; live owners stay protected.
-- The same owner can acquire again; that renews the lease and prints the port.
-- The browser runs `--headless=new` in the background. It never raises or focuses a window.
-- `TEMP_BROWSER_HEADED=1` starts a headed window, for passkey, hardware-key, or visible sign-ins. It launches with `open -g -n -a`: a new instance, kept in the background. It never activates or raises a window; you bring it forward yourself.
+- The same owner can acquire again; that renews the lease and prints the port. A headed request refuses to reuse a headless or older unrecorded-mode lease. Release your lease, then acquire with `--headed`.
+- By default, the browser runs `--headless=new` in the background. It never raises or focuses a window.
+- `acquire --headed` starts a visible window for passkey, hardware-key, or other sign-ins. `TEMP_BROWSER_HEADED=1` selects the same mode. It launches with `open -g -n -a`: a new instance, kept in the background. It never activates or raises a window; you bring it forward yourself. Headless acquire prints a warning on stderr; stdout stays the CDP port.
 - Built-in headed and headless launches pass `--use-mock-keychain` and `--password-store=basic`. A fresh profile must not open the owner's macOS keychain or show a missing-keychain prompt. Custom launch hooks must supply the same isolation.
-- `TEMP_BROWSER_LAUNCH=<cmd>` replaces the launch. temp-browser runs `<cmd> <profile> <port>`. The command must start a browser with that profile and CDP port and print its pid on the last stdout line. temp-browser records that pid in the lock and stops it on release. The hook must not raise or focus a window.
+- `TEMP_BROWSER_LAUNCH=<cmd>` replaces the launch. temp-browser runs `<cmd> <profile> <port>` with the selected mode in `TEMP_BROWSER_HEADED`. The command must honor that mode, start a browser with that profile and CDP port, and print its pid on the last stdout line. temp-browser records that pid and mode in the per-user on-disk lock and stops it on release. Release or stale-lock cleanup deletes the mode with the lease. The hook must not raise or focus a window.
 - Calls that need isolation (`--session-name`, `--profile`, `--extension`) go to the temporary browser through this lock. The `home/zshrc.ai-tools` wrapper hands them to `bin/agent-browser-temp-route`. It takes the lock and runs `agent-browser --cdp <temp port> ...`.
   - Owner: the `--session-name` value, else `$AGENT_ID`, else `$AGENT_BROWSER_SESSION`. With none, the call fails (exit 2).
   - Reason: `$AGENT_BROWSER_TEMP_REASON`, default `isolated agent-browser session`.

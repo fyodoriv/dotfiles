@@ -195,10 +195,9 @@ EOF
   local owner_rules="$(repo_root)/config/agentfile-owner-rules.yaml" tail_hash
   grep -Fq 'Before the Needed-from-you line asks for anything, an independent judge' "$owner_rules"
   # Preserve the rule suffix verbatim. It last changed on purpose when the
-  # judge started rejecting Waiting-on items with no check or next time
-  # (2026-11-22).
+  # judge started requiring a link and recommended choice for owner asks.
   tail_hash="$(awk '/^  End every message with one last line/ { capture=1 } capture' "$owner_rules" | shasum -a 256 | awk '{print $1}')"
-  [ "$tail_hash" = "bb039096303519eb64928b314e37e72b00c80c208c175b7bfc7fe31dc78fdc13" ]
+  [ "$tail_hash" = "e7ae043b426236ffd417eed0f79364b789b72b9ab92b69b9a08a640da4b2e014" ]
 }
 
 @test "ask judge rejects an ask that lacks full context" {
@@ -208,6 +207,8 @@ EOF
   grep -Fq 'a term, file, flag, hook, step, or internal name without explaining it in' "$owner_rules"
   grep -Fq 'plain words: what it is, why it needs me, each option and what it changes' "$owner_rules"
   grep -Fq 'for me, and where to do it.' "$owner_rules"
+  grep -Fq 'Link the exact item or the place to act. Recommend one option and give' "$owner_rules"
+  grep -Fq 'it pending. The judge rejects an ask that lacks the link or a reason for' "$owner_rules"
 }
 
 @test "Agentfile inline rules do not repeat the agentbrew bootstrap" {

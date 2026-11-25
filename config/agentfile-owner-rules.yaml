@@ -51,6 +51,10 @@ rules: |
   a term, file, flag, hook, step, or internal name without explaining it in
   plain words: what it is, why it needs me, each option and what it changes
   for me, and where to do it.
+  Link the exact item or the place to act. Recommend one option and give
+  the reason. If only one action is possible, say what happens if I leave
+  it pending. The judge rejects an ask that lacks the link or a reason for
+  its recommendation.
   Write the ask only after the judge approves; otherwise write
   "**Needed from you:** nothing" or the corrected ask.
   When Waiting on lists anything, the same judge also checks both lines against live

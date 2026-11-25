@@ -47,8 +47,8 @@ them. -->
   - **Output**: code
   - **Acceptance**: A hosted input with an inline enabled list yields one enabled key containing the old and new hooks. The disabled list stays intact.
   - **Hypothesis**: A supported inline input renders one enabled key instead of two while preserving its existing entries.
-  - **Measurement**: Add the inline fixture and run `bats tests/agentbrew-hooks-overlay.bats` in hosted macOS CI.
-  - **Success**: 1 enabled key, zero dropped entries, and all existing controls pass.
+  - **Measurement**: `bats tests/agentbrew-hooks-overlay.bats` in hosted macOS CI. Check the enabled key count, the exact rendered list and comments, and a repeated render.
+  - **Success**: 1 enabled key, zero dropped entries or opt-outs, byte-stable repeat rendering, and all existing controls pass.
   - **Pivot**: If 1 previously valid input changes its disabled choices or loses an enabled entry, reject the change.
   - **Anchor**: [Default insertion on the recorded baseline](https://github.com/fyodoriv/dotfiles/blob/f6884dd2ac3ec3bb842ab505018054a48ea88caa/dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl#L98).
 

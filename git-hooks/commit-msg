@@ -96,6 +96,11 @@ if [ -f "$strip_lib" ]; then
   _strip_agent_attribution_in_file "$1"
 fi
 
+# The installed overlay uses the same verification and capability check as pre-push.
+# shellcheck source=../lib/oss-readiness.sh
+. "$hook_dir/../lib/oss-readiness.sh"
+oss_readiness_run_overlay_hook commit-msg "$1"
+
 if [ -n "$REPO_DIR" ] && [ -x "$REPO_DIR/hooks/commit-msg" ]; then
   (cd "$REPO_DIR" && "$REPO_DIR/hooks/commit-msg" "$1")
 fi

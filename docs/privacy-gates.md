@@ -50,6 +50,11 @@ short version every contributor needs:
    host like a plain dot before applying the same public host list. See `SECURITY.md` § "Private pattern
    file". The hook then runs the overlay's `hooks/pre-push`, then the
    repo-local `hooks/pre-push`; both get the per-ref payload on stdin.
+   The global `commit-msg` hook also calls the installed overlay's
+   `hooks/commit-msg`, then the repo-local hook. Both receive the message-file
+   path. Overlay execution uses the same verified plugin and declared
+   `capabilities.hooks` boundary. It runs after message validation and
+   attribution cleanup. An overlay error stops the commit before the repo hook.
    No environment variable bypasses the gates. A person who read the text
    runs `dotfiles leak allow --once [<commit sha>]` in a terminal; the grant
    lasts 10 minutes and covers one blocked push (with a sha) or one blocked

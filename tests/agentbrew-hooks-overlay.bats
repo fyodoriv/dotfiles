@@ -85,13 +85,44 @@ render_all() {
 @test "hooks overlay: the owner's Mac turns the owner-only hooks on" {
   run render_all ""
   [ "$status" -eq 0 ]
-  for hook in perf-task-review poll-loop-hint no-home-crawl async-human-comms-blocks gdoc-surgical-edit-only; do
+  for hook in perf-task-review poll-loop-hint no-home-crawl gdoc-surgical-edit-only; do
     [[ "$output" == *"  - $hook"* ]]
   done
 }
 
 render_retirement() {
   printf '%s' "$1" | DOTFILES_OVERLAY_HOOKS='' sh "$SCRIPT"
+}
+
+@test "retired communication hook is absent from fresh owner defaults" {
+  run render_all ""
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'  - async-human-comms-blocks'* ]]
+  [[ "$output" == *'  - perf-task-review'* ]]
+}
+
+@test "retired communication hook migrates block lists and keeps disabled choices" {
+  input=$'version: 1\nenabled:\n  - async-human-comms-blocks # old hook\n  - "async-human-comms-blocks"\n  - \'async-human-comms-blocks\'\n  - async-human-comms-blocks-custom\ndisabled:\n  - async-human-comms-blocks\n'
+  expected=$'version: 1\nenabled:\n  # old hook\n  - async-human-comms-blocks-custom\ndisabled:\n  - async-human-comms-blocks'
+  run render_retirement "$input"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+  run render_retirement "$output"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+}
+
+@test "retired communication hook migrates inline lists" {
+  run render_retirement $'version: 1\nenabled: [async-human-comms-blocks, "async-human-comms-blocks", keep-hook]\n'
+  [ "$status" -eq 0 ]
+  [ "$output" = $'version: 1\nenabled: [keep-hook]' ]
+}
+
+@test "custom override cannot restore the retired communication hook" {
+  run bash -c 'printf "%s" "$1" | DOTFILES_OVERLAY_HOOKS="async-human-comms-blocks keep-custom" sh "$2"' test '' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'  - async-human-comms-blocks'* ]]
+  [[ "$output" == *'  - keep-custom'* ]]
 }
 
 @test "R01 retired usage-tip is absent from fresh owner defaults" {

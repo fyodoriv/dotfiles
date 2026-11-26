@@ -12,6 +12,8 @@ source "$app_priority_root/lib/native-delivery.sh"
 
 lock_install() {
   (umask 077; mkdir -p "$directory")
+  # The sourced lock library reads this installation's lock path.
+  # shellcheck disable=SC2034
   DOTFILES_LOCK="$directory/.install.lock"
   # shellcheck source=../lib/lock.sh
   source "$app_priority_root/lib/lock.sh"

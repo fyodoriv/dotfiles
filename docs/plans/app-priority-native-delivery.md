@@ -153,6 +153,24 @@ task.
   implicitly, or selects an unverified artifact, retain the shell path and
   repair the selection before either rollout or shell removal.
 - **Anchor:** App Priority gate G in [the migration plan](rust-migration.md)
+
+### Rollback after an interrupted first install
+
+- **Hypothesis:** If the first-install launcher exits while its build worker
+  is running, a successful later rollback prevents that build from selecting
+  a native binary afterward.
+- **Measurement:** Run the hosted fixture in `tests/app-priority-native.bats`.
+  Terminate only the fixture launcher after its worker starts. Start rollback
+  before releasing the scratch build and inspect the selection and hold after
+  both operations finish.
+- **Success:** The fixture leaves 0 current links, 1 rollback hold, and 0 live
+  priority changes. The existing first-install and concurrent-rollback cases
+  still pass.
+- **Pivot:** If 1 interrupted worker can select a binary after rollback
+  reports success, keep the shell route and move the installation lock to
+  the process that can select the binary.
+- **Anchor:** [App Priority gate G](rust-migration.md) and the first-install
+  concurrency case in `tests/app-priority-native.bats`.
   and the existing atomic link selection and digest validation.
 
 The default rollback still restores the shell in this phase. Test the

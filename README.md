@@ -1489,7 +1489,9 @@ to install native App Priority. It provisions a pinned Rust compiler in App
 Priority's data directory. A setup failure leaves the shell runtime active.
 Run `dotfiles priority-native install` to build and enable the native runtime
 manually. Run `dotfiles priority-native rollback` to keep using the shell runtime
-until the next manual install. The command checks the installed binary's digest before
+until the next manual install. Run `dotfiles priority-native rollback --native`
+to select the verified prior native binary and pause automatic refresh. A
+successful manual install enables updates again. The command checks the installed binary's digest before
 each use and keeps the normal timing record. A failed native run is not retried
 through the shell.
 

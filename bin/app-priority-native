@@ -2,7 +2,7 @@
 # Install or roll back the native app-priority candidate.
 # Usage:
 #   dotfiles priority-native install   Build offline and enable native dispatch
-#   dotfiles priority-native rollback  Restore the shell dispatch
+#   dotfiles priority-native rollback [--native]  Restore shell or the verified previous binary
 set -euo pipefail
 
 app_priority_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,6 +29,66 @@ verify_native_copy() {
   fi
 }
 
+verify_native_target() {
+  local target="$1" artifact digest
+  [[ "$target" =~ ^app-priority-[0-9a-f]{64}$ ]] || return 1
+  artifact="$directory/$target"
+  [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -x "$artifact" ] || return 1
+  digest="$(shasum -a 256 "$artifact")" || return 1
+  [ "${digest%% *}" = "${target#app-priority-}" ]
+}
+
+record_native_predecessor() (
+  local prior="$1" next="$2" receipt temporary
+  [ "$prior" != "$next" ] || exit 0
+  receipt="$directory/predecessor-$next"
+  if [ -L "$receipt" ] || { [ -e "$receipt" ] && [ ! -f "$receipt" ]; }; then
+    echo 'App Priority: refusing to replace an unowned predecessor receipt.' >&2
+    exit 1
+  fi
+  if ! verify_native_target "$prior"; then
+    rm -f "$receipt"
+    exit $?
+  fi
+  temporary="$(mktemp "$directory/.predecessor.XXXXXXXX")" || exit 1
+  trap 'rm -f "$temporary"' EXIT
+  printf '%s\n' "$prior" > "$temporary" || exit 1
+  mv -f "$temporary" "$receipt"
+)
+
+check_rollback_hold() {
+  if [ -L "$directory/disabled" ] || { [ -e "$directory/disabled" ] && [ ! -f "$directory/disabled" ]; }; then
+    echo 'App Priority: unowned rollback hold.' >&2
+    return 1
+  fi
+}
+
+restore_native_predecessor() {
+  local current prior receipt added_hold=false
+  current="$(readlink "$directory/current" 2>/dev/null)" || current=""
+  if [[ ! "$current" =~ ^app-priority-[0-9a-f]{64}$ ]] || [ -d "$directory/current" ]; then
+    echo 'App Priority: an owned current native selection is required for rollback.' >&2
+    return 1
+  fi
+  receipt="$directory/predecessor-$current"
+  if [ ! -f "$receipt" ] || [ -L "$receipt" ] ||
+    ! IFS= read -r prior < "$receipt" || [ "$prior" = "$current" ] ||
+    ! verify_native_target "$prior" || ! verify_native_copy "$directory/$prior"; then
+    echo 'App Priority: the previous native binary could not be verified.' >&2
+    return 1
+  fi
+  check_rollback_hold || return 1
+  if [ ! -e "$directory/disabled" ]; then
+    (umask 077; touch "$directory/disabled") || return 1
+    added_hold=true
+  fi
+  if ! native_delivery_select "$directory" "$prior"; then
+    if $added_hold; then rm -f "$directory/disabled"; fi
+    return 1
+  fi
+  echo 'Previous native App Priority restored. Automatic refresh is paused.'
+}
+
 prepare_toolchain() {
   # shellcheck source=../lib/app-priority-toolchain.sh
   source "$app_priority_root/lib/app-priority-toolchain.sh"
@@ -37,7 +97,7 @@ prepare_toolchain() {
 
 install_first_native() {
   prepare_toolchain
-  native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native verify_native_copy
+  native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native verify_native_copy record_native_predecessor
   record_source_hash "${1:-}"
 }
 
@@ -47,16 +107,36 @@ record_source_hash() {
   fi
 }
 
+show_usage() {
+  printf '%s\n' 'Usage: dotfiles priority-native install' '       dotfiles priority-native rollback [--native]'
+}
+
 case "${1:-}" in
-  --help|-h) echo 'Usage: dotfiles priority-native install|rollback'; exit 0 ;;
+  --help|-h) show_usage; exit 0 ;;
   install|refresh)
     lock_install "$1"
+    previous_selection=""
+    if [ "$1" = install ]; then
+      check_rollback_hold
+      if [ -f "$directory/disabled" ] && [ -L "$directory/current" ]; then
+        previous_selection="$(readlink "$directory/current")"
+      fi
+    fi
     if [ "$1" = refresh ] && { [ ! -L "$directory/current" ] ||
       [ -e "$directory/disabled" ] || [ -L "$directory/disabled" ]; }; then exit 0; fi
     if [ -d "$directory/toolchain" ]; then prepare_toolchain; fi
-    native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native
+    native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native "" record_native_predecessor
     if [ "$1" = install ]; then
-      rm -f "$directory/disabled"
+      if [ -f "$directory/disabled" ] && ! rm -f "$directory/disabled"; then
+        echo 'App Priority: could not clear the rollback hold.' >&2
+        if [ -n "$previous_selection" ]; then
+          native_delivery_select "$directory" "$previous_selection" ||
+            echo 'App Priority: could not restore the previous selection.' >&2
+        else
+          native_delivery_rollback "$directory" app-priority app-priority-native
+        fi
+        exit 1
+      fi
     else
       record_source_hash "${2:-}"
     fi
@@ -77,10 +157,18 @@ case "${1:-}" in
     echo 'Native app-priority installed.'
     ;;
   rollback)
+    if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != --native ]; }; then
+      show_usage >&2
+      exit 2
+    fi
     lock_install rollback
-    native_delivery_rollback "$directory" app-priority app-priority-native
-    (umask 077; mkdir -p "$directory"; touch "$directory/disabled")
-    echo 'Shell app-priority restored.'
+    if [ "${2:-}" = --native ]; then
+      restore_native_predecessor
+    else
+      native_delivery_rollback "$directory" app-priority app-priority-native
+      (umask 077; touch "$directory/disabled")
+      echo 'Shell app-priority restored.'
+    fi
     ;;
-  *) echo 'Usage: app-priority-native install|rollback' >&2; exit 2 ;;
+  *) show_usage >&2; exit 2 ;;
 esac

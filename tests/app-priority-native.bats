@@ -203,3 +203,138 @@ MOCK
   [ ! -L "$DIRECTORY/current" ]
   [ ! -e "$DIRECTORY/.install.lock" ]
 }
+
+install_priority_variant() {
+  printf '\n# fixture %s\n' "$1" >> "$TEST_ROOT/rust/app-priority/target/release/dotfiles-app-priority"
+  "$INSTALLER" install
+}
+
+@test "native rollback refuses a first generation without a predecessor" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+}
+
+@test "native rollback selects the verified immediate predecessor" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  second="$(readlink "$DIRECTORY/current")"
+  [ "$second" != "$first" ]
+
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  [ -x "$DIRECTORY/$second" ]
+}
+
+@test "native rollback stays selected across an automatic refresh" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+
+  run "$INSTALLER" refresh new-fixture-source
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+}
+
+@test "native rollback preserves the predecessor after a failed build or selection" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  second="$(readlink "$DIRECTORY/current")"
+
+  run env FAIL_BUILD=1 "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+
+  printf '\n# candidate that never became current\n' >> "$TEST_ROOT/rust/app-priority/target/release/dotfiles-app-priority"
+  cat > "$TEST_DIR/mockbin/ln" <<'MOCK'
+#!/bin/bash
+if [[ "$1" == -s && "$3" == */.current.* ]]; then exit 1; fi
+exec /bin/ln "$@"
+MOCK
+  chmod +x "$TEST_DIR/mockbin/ln"
+  run "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+  [ ! -e "$DIRECTORY/disabled" ]
+  touch "$DIRECTORY/disabled"
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -ne 0 ]
+  [ -f "$DIRECTORY/disabled" ]
+  rm "$DIRECTORY/disabled"
+  rm "$TEST_DIR/mockbin/ln"
+
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+}
+
+@test "native rollback refuses a corrupted predecessor and keeps current" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  second="$(readlink "$DIRECTORY/current")"
+  printf 'corrupt\n' >> "$DIRECTORY/$first"
+
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+}
+
+@test "native rollback keeps the predecessor across an identical build" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  second="$(readlink "$DIRECTORY/current")"
+  "$INSTALLER" install
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+}
+
+@test "native rollback hold ends after an explicit native install" {
+  install_priority_variant first
+  install_priority_variant second
+  env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  first="$(readlink "$DIRECTORY/current")"
+  rm "$DIRECTORY/disabled"
+  mkdir "$DIRECTORY/disabled"
+  run "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  rmdir "$DIRECTORY/disabled"
+  touch "$DIRECTORY/disabled"
+
+  cat > "$TEST_DIR/mockbin/rm" <<'SCRIPT'
+#!/bin/bash
+if [[ "$1" == -f && "$2" == */disabled ]]; then exit 1; fi
+exec /bin/rm "$@"
+SCRIPT
+  chmod +x "$TEST_DIR/mockbin/rm"
+  run "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  [ -f "$DIRECTORY/disabled" ]
+  /bin/rm "$TEST_DIR/mockbin/rm"
+
+  install_priority_variant third
+  third="$(readlink "$DIRECTORY/current")"
+  [ "$third" != "$first" ]
+
+  printf '\n# refresh after an explicit install\n' >> "$TEST_ROOT/rust/app-priority/target/release/dotfiles-app-priority"
+  run "$INSTALLER" refresh fresh-fixture-source
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" != "$third" ]
+  [ "$(cat "$DIRECTORY/source-hash")" = fresh-fixture-source ]
+}

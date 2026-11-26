@@ -1,12 +1,12 @@
 {
   "scope": "Embedded programs the static shell scanner confirmed in tracked shell sources, outside the five earlier boundary reviews. Not complete discovery: dynamic arguments and unparsed files stay unresolved.",
   "generator": "scripts/inventory-ledger.py",
-  "unparsed_shell_files": 378,
-  "unresolved_findings": 15268,
+  "unparsed_shell_files": 380,
+  "unresolved_findings": 15413,
   "entries": [
     {
       "path": "agent-hooks/block-dangerous-git.sh",
-      "source_object": "d71c507de87b3d7c9477816c71d1045812600e80",
+      "source_object": "ed45fb585292d15b4136827899c2463eefcd9f96",
       "language": "jq",
       "start": 1386,
       "end": 1400,
@@ -17,7 +17,7 @@
     },
     {
       "path": "agent-hooks/block-dangerous-git.sh",
-      "source_object": "d71c507de87b3d7c9477816c71d1045812600e80",
+      "source_object": "ed45fb585292d15b4136827899c2463eefcd9f96",
       "language": "jq",
       "start": 2022,
       "end": 2029,
@@ -732,10 +732,10 @@
     },
     {
       "path": "bin/dotfiles-doctor",
-      "source_object": "7aaa1776effb798b1fd18415aec7a1333d7f267c",
+      "source_object": "e72ae7b4079c1c44d067fc6db7f1748bdd47b034",
       "language": "jq",
-      "start": 18187,
-      "end": 18362,
+      "start": 18389,
+      "end": 18564,
       "owner": "dotfiles",
       "caller": "doctor",
       "state": "exception",
@@ -743,10 +743,10 @@
     },
     {
       "path": "bin/dotfiles-doctor",
-      "source_object": "7aaa1776effb798b1fd18415aec7a1333d7f267c",
+      "source_object": "e72ae7b4079c1c44d067fc6db7f1748bdd47b034",
       "language": "jq",
-      "start": 18694,
-      "end": 18738,
+      "start": 18896,
+      "end": 18940,
       "owner": "dotfiles",
       "caller": "doctor",
       "state": "exception",
@@ -941,7 +941,7 @@
     },
     {
       "path": "bin/dotfiles-sync",
-      "source_object": "576cb224380b64bf6fdc7ae7b7b0a8f0b677f442",
+      "source_object": "697b51c0a8096b6293108c5e3067f19fa2413753",
       "language": "perl",
       "start": 2581,
       "end": 2610,
@@ -1524,7 +1524,7 @@
     },
     {
       "path": "lib/plugin-extensions.sh",
-      "source_object": "2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380",
+      "source_object": "b4f14016630ddc7138aad15e4bec076560101caf",
       "language": "jq",
       "start": 14113,
       "end": 14160,
@@ -1535,7 +1535,7 @@
     },
     {
       "path": "lib/plugin-extensions.sh",
-      "source_object": "2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380",
+      "source_object": "b4f14016630ddc7138aad15e4bec076560101caf",
       "language": "jq",
       "start": 14459,
       "end": 14508,
@@ -1546,7 +1546,7 @@
     },
     {
       "path": "lib/plugin-extensions.sh",
-      "source_object": "2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380",
+      "source_object": "b4f14016630ddc7138aad15e4bec076560101caf",
       "language": "jq",
       "start": 14692,
       "end": 14856,
@@ -1557,7 +1557,7 @@
     },
     {
       "path": "lib/plugin-extensions.sh",
-      "source_object": "2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380",
+      "source_object": "b4f14016630ddc7138aad15e4bec076560101caf",
       "language": "jq",
       "start": 14966,
       "end": 15257,
@@ -1568,10 +1568,21 @@
     },
     {
       "path": "lib/plugin-extensions.sh",
-      "source_object": "2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380",
+      "source_object": "b4f14016630ddc7138aad15e4bec076560101caf",
       "language": "jq",
       "start": 19912,
       "end": 20282,
+      "owner": "dotfiles",
+      "caller": "plugin command",
+      "state": "exception",
+      "reason": "Recorded plugin-trust exception in rust-migration.md."
+    },
+    {
+      "path": "lib/plugin-extensions.sh",
+      "source_object": "b4f14016630ddc7138aad15e4bec076560101caf",
+      "language": "jq",
+      "start": 25654,
+      "end": 25786,
       "owner": "dotfiles",
       "caller": "plugin command",
       "state": "exception",
@@ -1587,6 +1598,28 @@
       "caller": "cli",
       "state": "exception",
       "reason": "Recorded metrics-checkup exception in rust-migration.md."
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "source_object": "60aa47c50b5a9bc96d09fe690ebb28ac437ecc72",
+      "language": "jq",
+      "start": 517,
+      "end": 688,
+      "owner": "dotfiles",
+      "caller": "doctor",
+      "state": "exception",
+      "reason": "Recorded doctor-core and the doctor module groups exception in rust-migration.md."
+    },
+    {
+      "path": "modules/agentbrew/doctor.sh",
+      "source_object": "60aa47c50b5a9bc96d09fe690ebb28ac437ecc72",
+      "language": "jq",
+      "start": 20756,
+      "end": 20972,
+      "owner": "dotfiles",
+      "caller": "doctor",
+      "state": "exception",
+      "reason": "Recorded doctor-core and the doctor module groups exception in rust-migration.md."
     },
     {
       "path": "modules/codex/doctor.sh",
@@ -1620,6 +1653,28 @@
       "caller": "chezmoi lifecycle",
       "state": "exception",
       "reason": "Recorded apply-install exception in rust-migration.md."
+    },
+    {
+      "path": "tests/fixtures/guard-repo-query-timing.sh",
+      "source_object": "a891fdcf530ed1575d790d84553ad67f4a701f6b",
+      "language": "jq",
+      "start": 156,
+      "end": 193,
+      "owner": "dotfiles",
+      "caller": "test tooling",
+      "state": "exception",
+      "reason": "Recorded test-build-tooling exception in rust-migration.md."
+    },
+    {
+      "path": "tests/fixtures/guard-repo-query-timing.sh",
+      "source_object": "a891fdcf530ed1575d790d84553ad67f4a701f6b",
+      "language": "jq",
+      "start": 251,
+      "end": 686,
+      "owner": "dotfiles",
+      "caller": "test tooling",
+      "state": "exception",
+      "reason": "Recorded test-build-tooling exception in rust-migration.md."
     },
     {
       "path": "tests/fixtures/heavy-run-429",

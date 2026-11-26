@@ -220,7 +220,7 @@ Only verified plugins contribute (`lib/plugin-extensions.sh`).
 | Shell | One generated loader (`~/.local/state/dotfiles/plugin-shell.zsh`), sourced by `home/zshrc` before `~/.zshrc.local`. Needs `shell_fragment: true`. |
 | Telemetry sink | `contributes.telemetry_sink` is the org log sink policy ([observability.md](observability.md#org-log-sink)). Apply installs it at `~/.config/dotfiles/telemetry-sink.json` (mode 600) when: the plugin declares `telemetry_sink: true`; it is the only plugin with a sink; `dotfiles telemetry status` accepts it; a `splunk-hec` URL host is in `network_hosts`; and the file there is missing, was written by this step, or has the same bytes (then it is adopted). Any other policy a person wrote is never replaced. When the plugin leaves `plugins.lock`, the next apply removes its unchanged policy; a plugin that is locked but fails verification keeps it. The hourly sender follows on the next apply. |
 | Git hooks | The core pre-commit and pre-push run the plugin's `hooks/<name>` (declared in `capabilities.hooks`) after the leak gates, then the repo-local hook. `commit-msg` runs the same plugin boundary after message validation and attribution cleanup, passing the message-file path; an error stops the commit. |
-| Agentfile | `contributes.agentbrew/Agentfile.yaml` is merged into `~/.config/agentbrew/Agentfile.yaml` on apply, before `agentbrew sync`. It may add to the shared layer (hooks, MCP servers, skills), never take from it: see [Agentfile rules](#agentfile-rules). |
+| Agentfile | Apply merges the shipped `contributes.agentbrew/Agentfile.yaml` and any [per-user Agentfiles](#per-user-agentfiles) before `agentbrew sync`. The plugin can extend the shared layer under the [Agentfile rules](#agentfile-rules). |
 | Blocked software | `apps`, `casks`, `formulae` lists; the doctor check `plugins.<name>.blocked_software` fails while any is installed. |
 
 ### Agentfile rules
@@ -264,6 +264,33 @@ that is not one map or uses a YAML merge key (`<<`), an entry for a shared
 MCP server that is not written the same way, or a command, agent, or skill
 name as above (folders as agentbrew reads them when it applies the file on
 its own) skips it.
+
+#### Per-user Agentfiles
+
+A verified plugin can list optional Agentfiles in its manifest:
+
+```yaml
+contributes:
+  agentfile_layers: [profile.yaml, integrations/local.yaml]
+```
+
+Store the files under `${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/plugins/<plugin-name>/`.
+Apply and the doctor merge the shipped Agentfile first, if present, followed
+by the optional files in manifest order. Both use the same merge guard.
+The machine's local Agentfile is still later in the merge. The plugin can
+write its per-user files without editing the global Agentfile. Use paths
+relative to the plugin's config directory. Apply skips missing files and
+paths that traverse symbolic links. Adding, editing, or removing a
+registered file triggers the next `dotfiles apply --if-changed`.
+
+During a merge, apply and doctor copy each per-user file to a private
+temporary file beside it. The guard and final merge read the same copy.
+The parent directory must be writable, and relative paths inside the
+Agentfile still resolve from that directory. The invocation removes its
+temporary files on exit. Write updates by replacing the file atomically.
+If apply or the doctor cannot copy a registered file, it keeps the current
+global Agentfile. Check that the file is readable and its directory is
+writable, then retry.
 
 The one exception: `defaultModel`, `defaultEffort`, and `modelOverrides`
 may change, because an overlay sets them on purpose

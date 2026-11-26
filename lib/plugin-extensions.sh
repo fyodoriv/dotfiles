@@ -529,17 +529,82 @@ plugin_lint() {
 
 # ── Agentfile layers ───────────────────────────────────────────────────
 # A plugin's contributes.agentbrew folder may hold Agentfile.yaml (data:
-# MCP servers, skills, rules). plugin_agentfile_pairs prints
-# "name<TAB>file" for each verified plugin, in lock order; dotfiles apply
-# passes them through agentfile_plugin_layers (lib/agentfile-layers.sh),
-# which drops a plugin Agentfile that would take from the shared layer.
+# MCP servers, skills, rules). A plugin can also register optional per-user
+# files with contributes.agentfile_layers. The files use the same merge
+# guard as the shipped Agentfile.
+#
+# plugin_agentfile_pairs [registered|snapshot] [receipt]: print "name<TAB>file" in lock and
+# manifest order. Apply and doctor filter the whole list. The apply skip
+# record only needs the mutable registered files. A writer uses snapshots
+# so the guard and final merge read the same bytes.
 plugin_agentfile_pairs() {
-  local name path dir
+  local mode="${1:-all}" receipt="${2:-}" name path dir
   while IFS=$'\t' read -r name path; do
     [ -n "$name" ] || continue
-    dir="$(plugin_contribution "$path" agentbrew)" || continue
-    [ -f "$dir/Agentfile.yaml" ] && printf '%s\t%s\n' "$name" "$dir/Agentfile.yaml"
+    if [ "$mode" != registered ] && dir="$(plugin_contribution "$path" agentbrew)" && [ -f "$dir/Agentfile.yaml" ]; then
+      printf '%s\t%s\n' "$name" "$dir/Agentfile.yaml"
+    fi
+    _plugin_registered_agentfile_pairs "$name" "$path/dotfiles-plugin.yaml" "$mode" "$receipt" || return 1
   done < <(plugin_verified_list 2>/dev/null)
   return 0
+}
+
+_plugin_registered_agentfile_pairs() {
+  local name="$1" manifest="$2" mode="$3" receipt="$4" rel path segment registered
+  local config="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+  local root="$config/plugins/$name"
+  [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || return 0
+  [ -d "$root" ] && [ ! -L "$config" ] && [ ! -L "$config/plugins" ] && [ ! -L "$root" ] || return 0
+
+  # Filter the YAML values before splitting them into shell lines. This
+  # also guards development manifests that changed since installation.
+  registered="$(set -o pipefail
+    yq -o=json '.contributes.agentfile_layers // []' "$manifest" 2>/dev/null |
+      jq -r 'arrays | .[] | strings | select(test("^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$") and (contains("\n") | not))')" || return 1
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    path="$root"
+    while [[ "$rel" == */* ]]; do
+      segment="${rel%%/*}"
+      path="$path/$segment"
+      [ ! -L "$path" ] || continue 2
+      rel="${rel#*/}"
+    done
+    path="$path/$rel"
+    [ ! -L "$path" ] && [ -f "$path" ] || continue
+    [ -r "$path" ] || return 1
+    if [ "$mode" = snapshot ]; then
+      [ -n "$receipt" ] || return 1
+      path="$(_plugin_snapshot_agentfile "$path" "$receipt")" || return 1
+    fi
+    printf '%s\t%s\n' "$name" "$path"
+  done <<< "$registered"
+}
+
+_plugin_snapshot_agentfile() (
+  local parent="${1%/*}" file="${1##*/}" receipt="$2" snapshot physical_config
+  local config="${XDG_CONFIG_HOME:-$HOME/.config}"
+  physical_config="$(cd -P -- "$config" && pwd -P)" || return 1
+  cd -P -- "$parent" || return 1
+  [ "$(pwd -P)" = "$physical_config/${parent#"$config"/}" ] || return 1
+  [ ! -L "$file" ] && [ -f "$file" ] || return 1
+  # Keep the snapshot beside the source so file-relative inputs resolve
+  # the same way. mktemp creates it with permissions for this user only.
+  snapshot="$(mktemp ".dotfiles-agentfile.XXXXXX")" || return 1
+  if ! cat -- "$file" > "$snapshot" || [ -L "$file" ] || [ ! . -ef "$parent" ] ||
+     ! printf '%s\n' "$PWD/$snapshot" >> "$receipt"; then
+    rm -f -- "$snapshot"
+    return 1
+  fi
+  printf '%s\n' "$PWD/$snapshot"
+)
+
+plugin_agentfile_cleanup() {
+  local receipt="$1" path
+  [ -f "$receipt" ] || return 0
+  while IFS= read -r path; do
+    rm -f -- "$path"
+  done < "$receipt"
+  rm -f -- "$receipt"
 }
 

@@ -90,7 +90,10 @@ _agentbrew_plugin_layers_once() {
     # shellcheck source=/dev/null
     source "$DOTFILES_DIR/lib/$_plib.sh"
   done
-  pairs="$(plugin_agentfile_pairs)"
+  if ! pairs="$(plugin_agentfile_pairs "$@")"; then
+    _agentbrew_plugin_problem="cannot read the registered plugin Agentfiles"
+    return 1
+  fi
   [ -n "$pairs" ] || return 0
   if ! errf="$(mktemp "${TMPDIR:-/tmp}/dotfiles-plugin-agentfiles.XXXXXX" 2>/dev/null)"; then
     _agentbrew_plugin_problem="cannot check plugin Agentfiles (no temp file)"
@@ -108,7 +111,7 @@ _agentbrew_plugin_layers_once() {
 # script (with its endpoint safe mode, mcpm, and hooks guards) then runs in
 # the background, one at a time (logs/agentbrew-sync-fix.log): a full sync
 # can take longer than the doctor's fix timeout.
-_agentbrew_global_agentfile_in_sync() {
+_agentbrew_global_agentfile_in_sync() (
   local write=false
   [ "${1:-}" = --write ] && write=true
   command -v agentbrew >/dev/null 2>&1 || return 0
@@ -122,15 +125,21 @@ _agentbrew_global_agentfile_in_sync() {
   local paths=()
   [ -f "$AGENTFILE" ] && paths+=("$AGENTFILE")
 
-  # Company plugins add Agentfile layers (contributes.agentbrew).
-  if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2>&1; then
-    local _plib _pf
-    for _plib in plugin plugin-capabilities plugin-extensions; do
+  # Company plugins can add shipped and per-user Agentfile layers.
+  if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && [ -f "$DOTFILES_DIR/lib/agentfile-layers.sh" ] &&
+     command -v yq >/dev/null 2>&1; then
+    local _plib _pf plugin_receipt=""
+    for _plib in plugin plugin-capabilities plugin-extensions agentfile-layers; do
       # shellcheck source=/dev/null
       source "$DOTFILES_DIR/lib/$_plib.sh"
     done
-    # Match run_after_agentbrew-sync.sh: the same plugin Agentfile filter.
-    _agentbrew_plugin_layers_once
+    # Keep the same per-user bytes through the filter and the final merge.
+    if [ -f "$(plugin_lock_file)" ]; then
+      plugin_receipt="$(_agentfile_local_tmp)" || plugin_receipt=""
+      trap 'plugin_agentfile_cleanup "$plugin_receipt"' EXIT
+    fi
+    _agentbrew_plugin_layers_done="" _agentbrew_plugin_kept="" _agentbrew_plugin_problem=""
+    _agentbrew_plugin_layers_once snapshot "$plugin_receipt" || return 1
     while IFS= read -r _pf; do
       [ -n "$_pf" ] && paths+=("$_pf")
     done <<< "$_agentbrew_plugin_kept"
@@ -183,7 +192,7 @@ _agentbrew_global_agentfile_in_sync() {
   fi
   rm -f "$expected"
   return "$status"
-}
+)
 
 check "agentbrew.global_agentfile_in_sync" "global Agentfile matches dotfiles/overlay merge" \
   "_agentbrew_global_agentfile_in_sync" \
@@ -216,7 +225,7 @@ check "agentbrew.local_agentfile_valid" \
 # mode or when the check is overridden.
 if [ "${LIST_MODE:-false}" != true ] &&
   ! { declare -F is_overridden >/dev/null && is_overridden "agentbrew.plugin_agentfile_shared"; }; then
-  _agentbrew_plugin_layers_once
+  _agentbrew_plugin_layers_once || true
 fi
 check "agentbrew.plugin_agentfile_shared" \
   "no plugin Agentfile takes from the shared layer (hooks, excludeAgents, MCP servers, recommended, command, agent, and skill names)${_agentbrew_plugin_problem:+ ($_agentbrew_plugin_problem; fix: give a plugin hook its own command, a plugin MCP server its own name, and a plugin command, agent, or skill its own name, drop excludeAgents and recommended, then release a new tag)}" \

@@ -158,7 +158,7 @@ calls() {
   # shellcheck source=../lib/apply-state.sh
   source "$REPO_ROOT/lib/apply-state.sh"
   chezmoi apply --no-tty --source "$src" --destination "$HOME" </dev/null
-  apply_state_record "$src"
+  apply_state_record "$src" "$(apply_state_fingerprint "$src")"
   apply_state_current "$src"
   run apply_state_drift "$src"
   [ "$status" -eq 1 ]

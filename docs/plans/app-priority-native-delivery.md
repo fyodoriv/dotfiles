@@ -76,6 +76,16 @@ The runner supplies a Rust toolchain. The check covers native artifact
 portability and the current installer. Fresh full-profile toolchain
 provisioning and native rollback after shell removal need their own proof.
 
+## Fresh toolchain on both architectures
+
+- **Hypothesis:** The install fixture can build and load App Priority using a pinned Rust toolchain in empty runner directories on both Intel and Apple Silicon.
+- **Measurement:** Run `gh workflow run app-priority-fixture.yml -R fyodoriv/dotfiles --ref test/app-priority-isolated-toolchain -f delivery_check=true -f isolated_toolchain=true`. Read both delivery jobs for the selected compiler, installed artifact, no-apply exit and rollback results.
+- **Success:** 2 of 2 jobs verify the installer hash, select Rust 1.100.0 from runner scratch space, build the locked crate offline, load its verified macOS 13.0 artifact and roll back successfully. Zero live priority actions.
+- **Pivot:** If 1 job cannot provision the pinned toolchain, use it for the build, or verify the result, keep shell fallback and identify the failed prerequisite before changing Mac setup.
+- **Anchor:** [Rustup installation options](https://rust-lang.github.io/rustup/installation/other.html), [Rust macOS targets](https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html), and App Priority gate G in [the migration plan](rust-migration.md).
+
+The current matrix uses the runner's Rust install. The added mode starts with empty Cargo and Rustup directories. It runs on macOS 15 and checks deployment metadata for macOS 13. Actual Ventura execution and apply-time integration need separate evidence.
+
 ## Hosted result and installation
 
 [Pull request 672](https://github.com/fyodoriv/dotfiles/pull/672) merged the

@@ -26,8 +26,8 @@ embedded	.github/scripts/brew-audit-manifest.sh	bytes:4213-4244:jq	1bbb603b3b0b4
 embedded	.github/scripts/brew-audit-manifest.sh	bytes:4292-4322:jq	1bbb603b3b0b4e5dbf8aaa4a1bb7440fc0b21921	dotfiles	hosted workflow	exception	Unmeasured cold path; test-build-tooling exception in rust-migration.md.
 embedded	.github/scripts/check-shell-coverage.sh	bytes:495-522:jq	9afb896f1d4d11498c68b70913ac42f38ea6a538	dotfiles	hosted workflow	exception	Unmeasured cold path; test-build-tooling exception in rust-migration.md.
 embedded	.github/scripts/check-tasks-lint-freshness.sh	bytes:2294-2313:jq	b437a590d236404d315ba8288fc00e8ad69b080c	dotfiles	hosted workflow	exception	Unmeasured cold path; test-build-tooling exception in rust-migration.md.
-embedded	agent-hooks/block-dangerous-git.sh	bytes:1386-1400:jq	d71c507de87b3d7c9477816c71d1045812600e80	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
-embedded	agent-hooks/block-dangerous-git.sh	bytes:2022-2029:jq	d71c507de87b3d7c9477816c71d1045812600e80	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
+embedded	agent-hooks/block-dangerous-git.sh	bytes:1386-1400:jq	ed45fb585292d15b4136827899c2463eefcd9f96	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
+embedded	agent-hooks/block-dangerous-git.sh	bytes:2022-2029:jq	ed45fb585292d15b4136827899c2463eefcd9f96	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 embedded	agent-hooks/block-local-tests.sh	bytes:1944-2937:perl	6f77efb0d933c02cd9862da34e65b097d9ef144a	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 embedded	agent-hooks/block-local-tests.sh	bytes:3871-3973:perl	6f77efb0d933c02cd9862da34e65b097d9ef144a	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 embedded	agent-hooks/require-heavy-run.sh	bytes:11972-14096:perl	b837abdaa8793bd7b4c39257d4378f803c53e37a	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
@@ -92,8 +92,8 @@ embedded	bin/dotfiles-amphetamine-sync	bytes:9919-9951:jq	6303ced88d85ca7d96a9cd
 embedded	bin/dotfiles-amphetamine-sync	bytes:9989-10018:jq	6303ced88d85ca7d96a9cd572fc6fc1b60ff02b6	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
 embedded	bin/dotfiles-defaults-add	bytes:1485-1599:jq	e45adc12095e6e800088ee9215730b4fc18cf044	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 embedded	bin/dotfiles-defaults-preview	bytes:4070-4365:jq	291b47f8254cf2a1d7c2e538d2b94bc959a4c002	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
-embedded	bin/dotfiles-doctor	bytes:18187-18362:jq	7aaa1776effb798b1fd18415aec7a1333d7f267c	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
-embedded	bin/dotfiles-doctor	bytes:18694-18738:jq	7aaa1776effb798b1fd18415aec7a1333d7f267c	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
+embedded	bin/dotfiles-doctor	bytes:18389-18564:jq	e72ae7b4079c1c44d067fc6db7f1748bdd47b034	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
+embedded	bin/dotfiles-doctor	bytes:18896-18940:jq	e72ae7b4079c1c44d067fc6db7f1748bdd47b034	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
 embedded	bin/dotfiles-glove80	bytes:1770-1824:perl	f9cf714306cef9ed6e13071b60e03cf8119afe64	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 embedded	bin/dotfiles-install	bytes:18087-18131:jq	b69633d516c4fee8e25f51712145732d39385282	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 embedded	bin/dotfiles-install	bytes:18696-18704:shell	b69633d516c4fee8e25f51712145732d39385282	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
@@ -111,7 +111,7 @@ embedded	bin/dotfiles-set-persistent-chrome-themes	bytes:3982-4463:jq	a73d3eac5b
 embedded	bin/dotfiles-stats	bytes:1479-1890:jq	3ba0070542e3cc5c2d009a0992c61865f470b73b	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 embedded	bin/dotfiles-stats	bytes:3196-3823:jq	3ba0070542e3cc5c2d009a0992c61865f470b73b	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 embedded	bin/dotfiles-stats	bytes:4054-4179:jq	3ba0070542e3cc5c2d009a0992c61865f470b73b	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
-embedded	bin/dotfiles-sync	bytes:2581-2610:perl	576cb224380b64bf6fdc7ae7b7b0a8f0b677f442	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
+embedded	bin/dotfiles-sync	bytes:2581-2610:perl	697b51c0a8096b6293108c5e3067f19fa2413753	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
 embedded	bin/dotfiles-telemetry	bytes:13454-13990:jq	f1dc152805898f4ec984b0431e9eab16b023b7a4	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 embedded	bin/dotfiles-telemetry	bytes:15531-17193:jq	f1dc152805898f4ec984b0431e9eab16b023b7a4	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 embedded	bin/dotfiles-telemetry	bytes:34838-34850:jq	f1dc152805898f4ec984b0431e9eab16b023b7a4	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
@@ -188,12 +188,13 @@ embedded	lib/mac-baseline.sh	bytes:12031-12068:jq	da99f94ca600f167393e33ac993c57
 embedded	lib/mac-baseline.sh	bytes:12564-12600:jq	da99f94ca600f167393e33ac993c57c0b4cc5956	dotfiles	install and metrics commands	exception	Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md.
 embedded	lib/mac-baseline.sh	bytes:12770-12866:jq	da99f94ca600f167393e33ac993c57c0b4cc5956	dotfiles	install and metrics commands	exception	Unmeasured cold path; apply-install and metrics-checkup exception in rust-migration.md.
 embedded	lib/mlx-shell-autostart.sh	bytes:2679-2903:jq	a89c9c6dee3c0a3754c7e47bb2420d7e2d38df22	dotfiles	cli	exception	Recorded developer-utilities exception in rust-migration.md.
-embedded	lib/plugin-extensions.sh	bytes:14113-14160:jq	2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+embedded	lib/plugin-extensions.sh	bytes:14113-14160:jq	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
 embedded	lib/plugin-extensions.sh	bytes:14318-14688:jq	19ea424fededa49cad6c759f1a3df52b3c4b682a	dotfiles	plugin extension checks and VS Code doctor	exception	Unmeasured cold path; plugin-trust exception in rust-migration.md.
-embedded	lib/plugin-extensions.sh	bytes:14459-14508:jq	2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
-embedded	lib/plugin-extensions.sh	bytes:14692-14856:jq	2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
-embedded	lib/plugin-extensions.sh	bytes:14966-15257:jq	2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
-embedded	lib/plugin-extensions.sh	bytes:19912-20282:jq	2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+embedded	lib/plugin-extensions.sh	bytes:14459-14508:jq	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+embedded	lib/plugin-extensions.sh	bytes:14692-14856:jq	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+embedded	lib/plugin-extensions.sh	bytes:14966-15257:jq	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+embedded	lib/plugin-extensions.sh	bytes:19912-20282:jq	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+embedded	lib/plugin-extensions.sh	bytes:25654-25786:jq	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
 embedded	lib/plugin-extensions.sh	bytes:8519-8566:jq	19ea424fededa49cad6c759f1a3df52b3c4b682a	dotfiles	plugin extension checks and VS Code doctor	exception	Unmeasured cold path; plugin-trust exception in rust-migration.md.
 embedded	lib/plugin-extensions.sh	bytes:8865-8914:jq	19ea424fededa49cad6c759f1a3df52b3c4b682a	dotfiles	plugin extension checks and VS Code doctor	exception	Unmeasured cold path; plugin-trust exception in rust-migration.md.
 embedded	lib/plugin-extensions.sh	bytes:9098-9262:jq	19ea424fededa49cad6c759f1a3df52b3c4b682a	dotfiles	plugin extension checks and VS Code doctor	exception	Unmeasured cold path; plugin-trust exception in rust-migration.md.
@@ -207,6 +208,8 @@ embedded	lib/weekly-metrics.sh	bytes:2978-3441:jq	fee76a4ea6e0bd7cfcb1ec2d3e3ea3
 embedded	lib/workspace-discovery.sh	bytes:2385-2643:jq	55e582ab32a5ce21a7ebf68bb25c60842b7fe72d	dotfiles	workspace command and doctor	exception	Unmeasured cold path; repository-discovery and doctor-core exception in rust-migration.md.
 embedded	macos-apps.sh	bytes:2217-2287:osascript	fd6a1b74b05dbeaf9787f319b0142ecbacb9b574	dotfiles	macOS app settings apply	exception	Unmeasured cold path; apply-install exception in rust-migration.md.
 embedded	modules/agentbrew/doctor.sh	bytes:18238-18454:jq	63a2820a915270bca8b8ac903e6afcfdebcbd131	dotfiles	dotfiles doctor module discovery	exception	Unmeasured cold path; doctor-core exception in rust-migration.md.
+embedded	modules/agentbrew/doctor.sh	bytes:20756-20972:jq	60aa47c50b5a9bc96d09fe690ebb28ac437ecc72	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
+embedded	modules/agentbrew/doctor.sh	bytes:517-688:jq	60aa47c50b5a9bc96d09fe690ebb28ac437ecc72	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
 embedded	modules/chrome/doctor.sh	bytes:2634-2663:jq	85ad0782be811c40b1795799f6b1d5f1e60559fc	dotfiles	dotfiles doctor module discovery	exception	Unmeasured cold path; doctor-core exception in rust-migration.md.
 embedded	modules/chrome/doctor.sh	bytes:2763-2807:jq	85ad0782be811c40b1795799f6b1d5f1e60559fc	dotfiles	dotfiles doctor module discovery	exception	Unmeasured cold path; doctor-core exception in rust-migration.md.
 embedded	modules/chrome/doctor.sh	bytes:2903-2936:jq	85ad0782be811c40b1795799f6b1d5f1e60559fc	dotfiles	dotfiles doctor module discovery	exception	Unmeasured cold path; doctor-core exception in rust-migration.md.
@@ -239,15 +242,17 @@ embedded	scripts/proof.sh	bytes:1678-1930:jq	4a32cf84718fe85d133ba7e39e34642e7a4
 embedded	scripts/proof.sh	bytes:1962-2124:jq	4a32cf84718fe85d133ba7e39e34642e7a437dfa	dotfiles	proof command	exception	Unmeasured cold path; developer-utilities exception in rust-migration.md.
 embedded	scripts/proof.sh	bytes:2681-7055:jq	4a32cf84718fe85d133ba7e39e34642e7a437dfa	dotfiles	proof command	exception	Unmeasured cold path; developer-utilities exception in rust-migration.md.
 embedded	scripts/proof.sh	bytes:7140-11425:jq	4a32cf84718fe85d133ba7e39e34642e7a437dfa	dotfiles	proof command	exception	Unmeasured cold path; developer-utilities exception in rust-migration.md.
+embedded	tests/fixtures/guard-repo-query-timing.sh	bytes:156-193:jq	a891fdcf530ed1575d790d84553ad67f4a701f6b	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
+embedded	tests/fixtures/guard-repo-query-timing.sh	bytes:251-686:jq	a891fdcf530ed1575d790d84553ad67f4a701f6b	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 embedded	tests/fixtures/heavy-run-429	bytes:11476-11580:perl	f7c345a9c6fd4eac7bec36a36e918cddc740c5c5	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 embedded	tests/fixtures/heavy-run-430	bytes:14417-14521:perl	32e591a590f56d4a4c1d8c7784082cbd125c2f05	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 embedded	tests/helpers/realtime-probe.bash	bytes:2471-2548:perl	47d609d6968a62fc66a0ae5bec1f75ddc88e66d6	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	.agents/local-models	tracked-file	0c421f3c2a8557fa4ec07451d08333c6b15201e7	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.agents/requirements.yaml	tracked-file	5d8bf55fbb15caeacba9f79756bde230bf0f7993	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	.chezmoi.yaml.tmpl	tracked-file	1541ca1b436d4e80bfab0af3e83b1c6f0fdc3abf	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	.chezmoi.yaml.tmpl	tracked-file	12487c2fe7f6ce13560a95a427f0d206066e3ad8	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.chezmoiignore	tracked-file	5b3f0d3a4bfefb35ed12bcb5b4be809afda39311	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.chezmoiscripts/run_after_agent-hooks.sh	tracked-file	ade88a06d9bce3b6802f0340f6a04b33780aa99a	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
-file	.chezmoiscripts/run_after_agentbrew-sync.sh	tracked-file	ce9c81159ed2be5be49602c8726d9a48a13d6558	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
+file	.chezmoiscripts/run_after_agentbrew-sync.sh	tracked-file	814af9e427c70957530b575a56e11c136b27ead8	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoiscripts/run_after_app-priority-native.sh.tmpl	tracked-file	4feabf058c9fc3ea7de3245d2d65a85d2871f1e8	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoiscripts/run_after_aws-gcloud.sh.tmpl	tracked-file	80c020080bd6da70029ef930cf74f35f5b06ea92	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoiscripts/run_after_cache-inits.sh	tracked-file	5ccf2dd21a370232b19836d4bc4a3d64a0fd2a83	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
@@ -275,7 +280,7 @@ file	.chezmoiscripts/run_onchange_after_chromework-install.sh.tmpl	tracked-file	
 file	.chezmoiscripts/run_onchange_after_chromework-open-url.sh.tmpl	tracked-file	8a712bd1ad60921b537a633ec92eb358085e7aee	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoiscripts/run_onchange_after_git-personal-includeif.sh.tmpl	tracked-file	d455b74be4981c7a3662842935b6266e06031abf	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoiscripts/run_onchange_brew.sh.tmpl	tracked-file	1c924cfea92c672e1f23e9dd5d460624fd26639a	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
-file	.chezmoiscripts/run_onchange_launchagents.sh.tmpl	tracked-file	2a403d51635dfb5081b84e421f08c3c2f4c5935e	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
+file	.chezmoiscripts/run_onchange_launchagents.sh.tmpl	tracked-file	8e63e1645cb45bedd7d1685fa447703ec848b351	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoiscripts/run_onchange_macos.sh.tmpl	tracked-file	480c3b014f6226e0c7b82b6a36c521460023bb4a	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	.chezmoitemplates/launchagent-path	tracked-file	2f02749561e76cad37931cdc0f658e23ba1bca9f	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/FUNDING.yml	tracked-file	06a535e6bea54f868ed8b36bf2434a7e4beb98c5	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
@@ -287,12 +292,12 @@ file	.github/scripts/check-tasks-lint-freshness.sh	tracked-file	b437a590d236404d
 file	.github/scripts/check-tasks-rule9-fields.sh	tracked-file	f3168a79e3f3068d6f021970092a34c03d1bcb5e	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	.github/scripts/check-tasks-stability.sh	tracked-file	86e069c72a63423573594dfeaab35b38bc79e533	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	.github/workflows/app-priority-build-budget.yml	tracked-file	d6b51e8d5e4b9e630db8d5fe8397463e5fde6f9a	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	.github/workflows/app-priority-fixture.yml	tracked-file	890f3dab27ae74086d96b5c2cdb7597457657108	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	.github/workflows/app-priority-fixture.yml	tracked-file	51b3b7eb0f9f00ee4fcef591ebf351c5d2da4ebe	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/app-priority-native-probe.yml	tracked-file	509887b1c73f66d278fa029319508afd2847e3d6	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/bats-selector-benchmark.yml	tracked-file	cfe638b1aba5ba8cf58a7c4eb7bf3148dc74fd23	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/brew-audit.yml	tracked-file	f04334b5613715397171ad9bbd17a76bdd623a67	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/ci.yml	tracked-file	241e7569bf5793770394e85aa5a783138071a960	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	.github/workflows/guard-standalone.yml	tracked-file	c762af028c35290c06bc6378dfae4f60e0a35fd9	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	.github/workflows/guard-standalone.yml	tracked-file	e9be7551f858b46b4ee33ec3cbc756b34c8b75dc	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/hook-build-budget.yml	tracked-file	49f39133eba365e73dc2a6c3c2e6ec0d3fa13217	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/hook-status-fixture.yml	tracked-file	bb4d4e2aef0e1fe6846303671bc3e7d647446404	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	.github/workflows/inventory-ledger-refresh.yml	tracked-file	8a38179a6a5fba2b5cd564a35d2756efcd50cc73	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
@@ -317,20 +322,20 @@ file	CONTRIBUTING.md	tracked-file	cd32499758dbe6d888fcac6e9cff3b36ca20bf79	dotfi
 file	INSTALL.md	tracked-file	332e10381b169de3c03de71b72f5c863c36dc06c	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	LICENSE	tracked-file	bbdc7862942cde25efe2dfe1f68bc66fceddff75	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	Makefile	tracked-file	df3d08fc361219a9787ce12fe330fbef715f4402	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	README.md	tracked-file	5d4acf921703162cd409075126ef18bde7659675	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	README.md	tracked-file	6045c5315b28d642f130bd9d8bdd1fc2fcfbf1a8	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	ROADMAP.md	tracked-file	d548b28eaeefdaf8f8bd9b5a759bc5014b8406f2	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	SECURITY.md	tracked-file	6bfeb14d286bf21b128bc34e33d0cee7eccf4354	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	TASKS.md	tracked-file	819df66e5b3114241367a0dc770a6fd31aa2b838	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	VISION.md	tracked-file	1fe6067ccc761a26b6baa1bf147f08fbf8366714	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	agent-hooks/block-dangerous-git.sh	tracked-file	d71c507de87b3d7c9477816c71d1045812600e80	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
+file	agent-hooks/block-dangerous-git.sh	tracked-file	ed45fb585292d15b4136827899c2463eefcd9f96	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	agent-hooks/block-local-tests.sh	tracked-file	6f77efb0d933c02cd9862da34e65b097d9ef144a	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
-file	agent-hooks/bootstrap-endpoint-path.sh	tracked-file	16139a7bc922c1a68d9a7bd8a0df9c47c848712b	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
+file	agent-hooks/bootstrap-endpoint-path.sh	tracked-file	463cb4b99c75947578d7cd43802be9fecd5c6a76	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	agent-hooks/native-dispatch.sh	tracked-file	b45e2f59888e8839651c402c174c59c73c7b4ab8	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
-file	agent-hooks/plain-document-write.jq	tracked-file	77037a392b002ab60beb22889957e4d230522a41	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
+file	agent-hooks/plain-document-write.jq	tracked-file	34ee59177a439e75e6e2061fa73460ecfbf7d0f9	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	agent-hooks/prepend-endpoint-path.sh	tracked-file	03f15347028c41f197f5c204788bd056235797cf	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	agent-hooks/python-document-boundaries.py	tracked-file	64718b5c7cbd69fb98cee3d71a8fd3296682f339	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	agent-hooks/require-heavy-run.sh	tracked-file	b837abdaa8793bd7b4c39257d4378f803c53e37a	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
-file	agent-hooks/session-endpoint-path.sh	tracked-file	c51c0005e5e26e603f80e26bb04f4d0e1e8e0f70	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
+file	agent-hooks/session-endpoint-path.sh	tracked-file	e7295cf6cc0c60fee8a0733a2a83db02c48f7ebd	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	agent-hooks/with-endpoint-path.sh	tracked-file	7ba38ee681a3a0dd1a7edca283394fa7f2e306f4	dotfiles	agent hook	exception	Recorded agent-hooks exception in rust-migration.md.
 file	bin/add-task	tracked-file	6f7738f6d96b451efac35078f5fd90c7fd7953fe	dotfiles	cli	exception	Recorded developer-utilities exception in rust-migration.md.
 file	bin/agent-browser-reap-strays	tracked-file	ecf81ee49d0be51bcc78983d818e65f78ab54a97	dotfiles	cli	exception	Recorded browser-native exception in rust-migration.md.
@@ -354,7 +359,7 @@ file	bin/chromework-fix-http-routing	tracked-file	bbb7adc526db749de715b051869bcc
 file	bin/chromework-install	tracked-file	d81e398b5147988d483d8a27ef92ca84fcb98c2d	dotfiles	cli	exception	Recorded browser-native exception in rust-migration.md.
 file	bin/chromework-open-url	tracked-file	9e99e957f9034a0615373e4d46d902f843abe9e6	dotfiles	cli	exception	Recorded browser-native exception in rust-migration.md.
 file	bin/cleanup	tracked-file	a5f15b2c698d66fc12dd571c1cbf0bd97cdd5a11	dotfiles	cli	exception	Recorded developer-utilities exception in rust-migration.md.
-file	bin/dotfiles	tracked-file	078126a19a021e12f687ed0c3e1cd735f24fc4e6	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
+file	bin/dotfiles	tracked-file	f3431626c98b2fd839ac97d3282509dc14cfa757	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	bin/dotfiles-actions	tracked-file	2753a23ab4d3b91789ddcb10b8af271c32c1d103	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	bin/dotfiles-add	tracked-file	cba5f318dc55df16c123d24417ef846e7a009502	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-adhoc-sign-bottles	tracked-file	2fff5dcb039c140ef3ac8877589e817dc23aa1e2	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
@@ -370,13 +375,13 @@ file	bin/dotfiles-amphetamine-sync	tracked-file	6303ced88d85ca7d96a9cd572fc6fc1b
 file	bin/dotfiles-audit	tracked-file	7671d50707fd7899ed97d94b6867a29e20a9d8c4	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 file	bin/dotfiles-brew-add	tracked-file	70cf31f2c4cb425e3fef109dc00286ab739dda68	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-chrome-dock-guard	tracked-file	42f2352e8b2ff6add3f02d90a87f61336816ad62	dotfiles	cli	exception	Recorded browser-native exception in rust-migration.md.
-file	bin/dotfiles-config	tracked-file	479866cf9ba2ede40b2aa4434ae078c4f4b97985	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
+file	bin/dotfiles-config	tracked-file	7a0fb640cc12e34a23cd267c98590f459b5b151f	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	bin/dotfiles-contribute	tracked-file	4540f80f742de2fe68ad1122eaaf60aa9dcd464b	dotfiles	cli	exception	Recorded gh-public-write-safety exception in rust-migration.md.
 file	bin/dotfiles-coverage	tracked-file	8114e57182bf76bfcf676f15815d718329b311b0	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 file	bin/dotfiles-defaults-add	tracked-file	e45adc12095e6e800088ee9215730b4fc18cf044	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-defaults-preview	tracked-file	291b47f8254cf2a1d7c2e538d2b94bc959a4c002	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-disable-blocked-node-automation	tracked-file	0d74e8fbef8f99afc187286cf855cfc2c51bd763	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
-file	bin/dotfiles-doctor	tracked-file	7aaa1776effb798b1fd18415aec7a1333d7f267c	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
+file	bin/dotfiles-doctor	tracked-file	e72ae7b4079c1c44d067fc6db7f1748bdd47b034	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
 file	bin/dotfiles-ensure-gui-path	tracked-file	215b12e611cebc7fd57da176b8362387894a5a6b	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-enterprise	tracked-file	d38b88278089a1d5259f43b0010e27ea858e36e4	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-fix-launchagent-endpoint-path	tracked-file	3067b16dae17e48c056a25d253cb0ff5c8ac49f8	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
@@ -412,6 +417,7 @@ file	bin/dotfiles-opencode	tracked-file	49ae52ffacba1a736af15327bcd96c561726b24b
 file	bin/dotfiles-plugin	tracked-file	d4a71175a53c7095a765b9ced2adad12c2f8e646	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
 file	bin/dotfiles-pmset-drift-watch	tracked-file	975785a2eb2c43d8c38d1cbc21e9a36fe1cccbb3	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
 file	bin/dotfiles-pnpm-global-update	tracked-file	036308a6da8f0acb391f092ed8fbaf526b9b079c	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
+file	bin/dotfiles-podman-idle-stop	tracked-file	a167b6d864ef851a2c350aec38c1b11889aeb900	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-profile	tracked-file	759d3c22b2222aa59972b1fa11315756dc24593d	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 file	bin/dotfiles-python-tls-relax	tracked-file	0139fd25bcc3c1beb826ef56ec28e4833b0929ae	dotfiles	cli	exception	Recorded python-host-extension exception in rust-migration.md.
 file	bin/dotfiles-quickstart	tracked-file	c6e270b4020259e4b4ee50482801bacdd371d75c	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
@@ -423,7 +429,7 @@ file	bin/dotfiles-restore-focus-after-chrome	tracked-file	b20b9e2f6d8d72c82f6e7d
 file	bin/dotfiles-set-persistent-chrome-themes	tracked-file	a73d3eac5b3c2657c86ae06d05487ceb26bb51d8	dotfiles	cli	exception	Recorded browser-native exception in rust-migration.md.
 file	bin/dotfiles-start	tracked-file	ee0524c63405773e8b587e98a783090c5eabbf2b	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	bin/dotfiles-stats	tracked-file	3ba0070542e3cc5c2d009a0992c61865f470b73b	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
-file	bin/dotfiles-sync	tracked-file	576cb224380b64bf6fdc7ae7b7b0a8f0b677f442	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
+file	bin/dotfiles-sync	tracked-file	697b51c0a8096b6293108c5e3067f19fa2413753	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
 file	bin/dotfiles-telemetry	tracked-file	f1dc152805898f4ec984b0431e9eab16b023b7a4	dotfiles	cli	exception	Recorded metrics-checkup exception in rust-migration.md.
 file	bin/dotfiles-uninstall	tracked-file	de2d50a177b854e7ad3a8c6e86f08808db361a18	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	bin/dotfiles-unmanage	tracked-file	3c1bb3a58c31d69039737a83ad7b36d3715269d2	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
@@ -472,7 +478,7 @@ file	bin/temp-browser	tracked-file	623b6f6eb724496d2c39579b65db059037a8784b	dotf
 file	bin/timer	tracked-file	846d680070af697a37c87eebc7a41e807e3d8ea3	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
 file	bin/tooling-sync	tracked-file	0ae5e2828577363b92acf0142cbc3110218ac9aa	dotfiles	launchd job	exception	Recorded services-power exception in rust-migration.md.
 file	cliff.toml	tracked-file	a58e9458987bbd9161f6bea1d00eeb9f5e61fe52	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	commands/dotfiles.md	tracked-file	85ee814b46e00a16fb705a47893c09e9bebcb02a	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	commands/dotfiles.md	tracked-file	bae135137b637b8ff46232bc50543cb2f15ad27e	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	commands/evals/dotfiles.evals.json	tracked-file	1526fdaed5990c8edd27478c723252b270586049	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	commands/evals/kimi-goal.evals.json	tracked-file	6adae90659c7cc5cd2f0a6582dac4f2c869940fb	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	commands/evals/kimi-usage.evals.json	tracked-file	70d04401dbba4d15466995a9068cb2b920d97d06	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
@@ -484,16 +490,16 @@ file	commands/kimi-usage.md	tracked-file	41f6cc00b0c664c71d3d0bcd1dbe983cbfae2f2
 file	commands/learn-repos.md	tracked-file	34f9c86835db8a52aea803b1dd8af72e9ec9e0a7	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	commands/research-url.md	tracked-file	259c5fd31bc6b9fc0921efaea6a6a6ab9a3a0085	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	commands/ship-it.md	tracked-file	6b87c1840a0b8d7ad3444a152eb441a9ebd44a24	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	config/agentfile-owner-rules.yaml	tracked-file	cfbf8ab5671ee8dc72a3120045a62c32eec77ba7	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	config/dotfiles-plugin.schema.json	tracked-file	b347cfcf6422a07fa57d2d18237c72aa7ca83482	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	config/agentfile-owner-rules.yaml	tracked-file	98a4bc3215e503e6f0d1e5f697a858baf41ef6cf	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	config/dotfiles-plugin.schema.json	tracked-file	259e1b08fb2a8d712c0f52ebeb5aa68b240ae5fa	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/glove80/LICENSE	tracked-file	c34a03df0989321e426a4a27df73e271f503fd94	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/glove80/SOURCE.md	tracked-file	109380886e1a5bc871ae1cd75b9c3ee1388513f1	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/glove80/factory.keymap	tracked-file	6f82cc9d06e147f89be70218ccd1b838511894c2	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/oss-readiness-min-version	tracked-file	d00491fd7e5bb6fa28c517a0bb32b8b506539d4d	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	config/perf-budget.tsv	tracked-file	7fbfb1566b71b06e4ec556e6e4d97c9c8d16540d	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	config/perf-budget.tsv	tracked-file	a0fdc99481bf3d6b21b36492cfc6ee1d8a7c4f8b	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/plugin-options.yaml	tracked-file	4bb11a846c3b832acdd98e9ad65151baf4900111	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/public-push-remotes.txt	tracked-file	7b691852b46a18a192aaaa7fae1529983b0ec94d	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	config/settings.yaml	tracked-file	dec4afab5cdf3236c01bd2a9bf1881c929ef8381	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	config/settings.yaml	tracked-file	48c9d53e63edc896f9d9c2e923a687d916f2700e	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/telemetry-key	tracked-file	e46294efa6fb4909455c20032ab01b3085cd7052	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	config/weekly-metrics.schema.json	tracked-file	e47bdf91e742580fa5e21e21cff9b03b0ef06261	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	data/amphetamine-prefs.json	tracked-file	51d9669fbed02297cb876cb730f72fd80f33196e	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
@@ -510,8 +516,8 @@ file	data/plugin-template/validate/example.sh	tracked-file	05290d7bcef926b663d76
 file	docs/README.md	tracked-file	34963d1c3cfdcbe99c2845fa4e749698e412ae4e	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/adoption-checklist.md	tracked-file	1f33fc22a37169351bb48e0f2720fd26f9112738	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/agent-browser-policy.md	tracked-file	e50566ceac5db1b83faa4a5b2caa4df1b152fd42	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/agent-hooks.md	tracked-file	b8f9619a9b06c6d9ff92788c230beac8a3dafc55	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/agentbrew-setup.md	tracked-file	9fdb28e000c03a1bf9163ee6287552a78395f8b5	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/agent-hooks.md	tracked-file	f933ad655a01d832782406996e9f807592812cb7	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/agentbrew-setup.md	tracked-file	8e80e08e52a486bbbdd91e766366fdc950e17e88	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/architecture.md	tracked-file	c724a9f72b58051cfda94756a8118fe5d27eb97b	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/archive/rfc-chezmoi-migration.md	tracked-file	3673f781871a0229744c3220f6bbeb57d3a49213	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/audits/local-ai-failure-modes.md	tracked-file	b2dc2776de31fc4c640166952f0768430e2fcef6	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -533,7 +539,7 @@ file	docs/decisions/0005-rule-9-fields-on-p0-p1-only.md	tracked-file	87b7a112d74
 file	docs/decisions/0006-rule-9-fields-on-every-task.md	tracked-file	a2f5d1df4ead09af13abd4b53d6e9e3ec6a7949e	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/decisions/README.md	tracked-file	1b84d194c9a50d6c5f8579861a6b12ceafe7602a	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/faq.md	tracked-file	07c01a3a4a3c175853b549ee85dccde45bc57dc7	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/forking-guide.md	tracked-file	c15d1de89a0bf9a7a7690c9f97ad2fc0742f3e10	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/forking-guide.md	tracked-file	2e0b88475c889884c2aded22eb9bf5baeb5fc6e9	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/home-theater.md	tracked-file	90e668bd137dab425189ad94e66e04c25f71323a	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/human-blocked-actions/pmset-ac-disk-sleep-2026-09-27.md	tracked-file	0176b6be58e61c9f88d29921c69cc301ea2019de	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/key-rotation.md	tracked-file	bebdbc36673948e4b1a173dd26054d938c323812	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -558,7 +564,7 @@ file	docs/plans/agent-guard-parser-470.md	tracked-file	38bc205842c26f0bdd3f5ee7c
 file	docs/plans/agent-hook-source-receipt.json	tracked-file	a9604830abb8a4c6dbda0157f6c2726dfeb805eb	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	docs/plans/agent-hook-source-receipt.md	tracked-file	7bade6802ccb808bfd3c172cea5b412d08f1d587	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/amphetamine-privacy-hint-475.md	tracked-file	885a0831c9d804cb80cb75f2d98c176b7d6ebbac	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/plans/app-priority-native-delivery.md	tracked-file	b1ff63ddadf4bc982209ff0dcfaf37082e7c8ea0	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/plans/app-priority-native-delivery.md	tracked-file	67751b4f3279b1353a1912d1951bd9f379ac34f7	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/app-priority-runtime-evidence.md	tracked-file	e250ffcbeea6e3067bb6f3065ad1058ac07bd9d0	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/app-priority-same-day.md	tracked-file	379f68a7d15bfc626caa0a44af3458c834e86dda	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/app-priority-snapshot-prediction.md	tracked-file	be70d2a2647d323d0b45f543d1966448435e0bd0	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -620,6 +626,7 @@ file	docs/plans/gh-admin-scope-default-475.md	tracked-file	536688b25746820366c9c
 file	docs/plans/gh-leak-target-host-hint.md	tracked-file	fe5a870c62d883126710c86d140200a45bb7e988	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/gh-scope-exact-475.md	tracked-file	ed0d059760bda2b2ccc90d2ace8469640abf9847	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/git-doctor-email-allowance-478.md	tracked-file	d03811afc57eeefc24629968d63a67ce6ee14ebb	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/plans/git-guard-command-boundaries-761.md	tracked-file	8aaab7f66884d684e2fe06f231b5afff62b52034	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/git-guard-dynamic-regressions-502.md	tracked-file	f0e410dca915b8fc2cb23c949d0e3f71e1d24903	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/git-guard-literal-search-472.md	tracked-file	85d9017618a722d80047bc9e1ea286d2dc0d897c	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/git-guard-literal-search-hardening-472.md	tracked-file	607d21f45353124548d9c9ded67352d7fce7a0ed	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -693,10 +700,12 @@ file	docs/plans/overnight-grind-summary-csv.md	tracked-file	2b78f33a57aa374c398c
 file	docs/plans/owner-pending-line.md	tracked-file	b4f91ec00e8b7c8f83447c084571c2d58a7969ae	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/per-module-rule9-hdd-audit.md	tracked-file	bc5e7f6fa3176092c0dc9f37f9e279a7b67efe20	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/perf-gate-local-links.md	tracked-file	58144366593b1879db2a1e28992b911bb2cf52af	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/plans/plugin-agentfile-layers-574.md	tracked-file	bb169bbe245638d40792196c696d1add9b33a116	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/plugin-fixture-source-prediction.md	tracked-file	c73c56f1a8e386f2092941732fc0f4fe0869fe7b	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/plugin-owner-executable.md	tracked-file	7406dff644c9514b1640eb259f2253523fd6febf	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/plugin-update-plan.md	tracked-file	851b5526720037fc4bbcf9d00b94094a29f04724	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/pmset-launchagent-tool-check.md	tracked-file	e708e13ce6580f2d3039c4fedf6f1272c5199ad8	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/plans/podman-idle-stop.md	tracked-file	7dc4b0f722ff30183d8339b2dbdb59830ef49c6d	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/power-protect-readiness-instrumentation.md	tracked-file	e364f6c837393c48362d4b6fcb8bcb6e02987c40	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/pre-push-history-pipe.md	tracked-file	a92e45c0c2d88324f325178ae6e7865753701d89	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/pre-push-ssh-host-false-alarm-escaped-regex.md	tracked-file	f426fc53166ebc649bd15adcbf311286b48349c3	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -815,8 +824,8 @@ file	docs/plans/workflow-source-inventory.json	tracked-file	853cb524189b8265305a
 file	docs/plans/workflow-source-inventory.py	tracked-file	2619b8ed9e7188342167e9d3c1cf149983302348	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	docs/plans/workspace-folder-doctor.md	tracked-file	f36298161138a35ee0ae39c7ac9699c2a41bee7c	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/plans/zsh-completion-audit-479.md	tracked-file	98a2bf292f8c75a61566b61625f3d1f629b1b4c1	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/plugins.md	tracked-file	3df2f718435ce0498106c8dd427127700826a141	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/privacy-gates.md	tracked-file	14c8f7706739c551e6122d4a27916d5f5db6ee15	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/plugins.md	tracked-file	ce1d935afd45dfbb1366f3dd13a7b9815ef0a3de	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/privacy-gates.md	tracked-file	02f5f21c0a3c6f2c03f114e862d458a4e9fcccfa	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/proof/metrics.json	tracked-file	d44c5d8f5b34ef9d675c8a2757e3b14a444b5596	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	docs/repo-map.md	tracked-file	0e3a6a57df96265d663888746c290824fa27f352	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/research-url-reference.md	tracked-file	40b4b2aa250b86101ca7647cc8d8cd9c280ef6db	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -826,7 +835,7 @@ file	docs/team-onboarding.md	tracked-file	b8233a96cffba6d4deb013876e0816d47b54e5
 file	docs/templates/plan-template.md	tracked-file	d050f8515e6e3d3a47389f37889a33d0fab39864	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/troubleshooting.md	tracked-file	a75dc4ba8d584ded0b61f49cd76d1f4608bd85c0	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/user-stories/01-fully-configured-mac.md	tracked-file	29744d41d3e11e83e733cf44da55e24f2470ab27	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/user-stories/02-start-day-ready-to-code.md	tracked-file	679809971b15e3bd98f8dd705120325ef8bacd55	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/user-stories/02-start-day-ready-to-code.md	tracked-file	93fd3b083f441eaa3777dba3d5c7ec94d9f154e4	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/user-stories/03-add-and-maintain-config.md	tracked-file	bf09ab0c7419dc7f35d426013dc3acf1e5de2e3c	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/user-stories/04-switch-profiles-and-customize.md	tracked-file	46df0b6865ccccdf92d1c242eeda1a09ea8d6187	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/user-stories/05-config-heals-itself.md	tracked-file	98de4d7e4461a983f33b7197b168c449f8bd5059	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
@@ -837,13 +846,13 @@ file	docs/user-stories/09-run-local-models-fast.md	tracked-file	cca03e0e23b102e9
 file	docs/user-stories/10-fork-for-your-company.md	tracked-file	bce51ab671f478befe961561beb506d4c529955a	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/user-stories/README.md	tracked-file	b0f6b82de56184584eac023cdfbaaac607c72f5b	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/verify-setup.md	tracked-file	74aa9e45b01c2e9490ff8756b30e8522c9037e75	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
-file	docs/what-gets-changed.md	tracked-file	566ba71816f3b3bc53f4a108f3b7cbaa3f833032	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
+file	docs/what-gets-changed.md	tracked-file	1ef0487930e15bc630cd1c682d5bbc3948657ef0	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	docs/workspace.md	tracked-file	ff4e85576630ad69ce8dafd6b92fa4fab3de8961	dotfiles	documentation	out-of-scope	Regular non-shebang Markdown documentation.
 file	dot_biome.json	tracked-file	64390c544417af5dd404f1418f9e41a32d5867ff	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl	tracked-file	7f20be4215cc0441e7c1d4ef81ac0bc0e4940266	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
+file	dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl	tracked-file	107d14b0db204c08ea9d7ad03e3ff332af83c9c0	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	dot_config/atuin/config.toml	tracked-file	003c8f66a61fda9812ae1b99682702457cf2fa7d	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
 file	dot_config/dotfiles/bash-env.sh.tmpl	tracked-file	76e24efa9b147d6fe711fe9704e6a537db2fc0d1	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
-file	dot_config/dotfiles/env.sh.tmpl	tracked-file	aedc11f1eae27ed2ad79ba17336860e04c712f6f	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
+file	dot_config/dotfiles/env.sh.tmpl	tracked-file	f026c6fc0a1bc02ede12a5a51c2cd54cb381b534	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
 file	dot_config/fastfetch/config.jsonc	tracked-file	de5e860fe319fd0c1a318dd695f61f1b46ba4673	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
 file	dot_config/ghostty/config	tracked-file	6208bfe9f54c0b6677a23040b83db87b7147f9f0	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
 file	dot_config/lazygit/config.yml	tracked-file	959fec573d438b035757083e33f51dac6f4977fa	dotfiles	shell session	out-of-scope	Interactive shell or editor configuration; shell must stay shell.
@@ -857,7 +866,7 @@ file	dot_gradle/gradle.properties	tracked-file	86adebb552cefb63fd18aa0a8bb82b4b3
 file	dot_hushlogin	tracked-file	067e6fbae2857d3ec64f35cfbbfdf0d93081031a	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	dot_tigrc	tracked-file	788fd8bb3bac9a6017062579278434894735427d	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	git-hooks/commit-msg	tracked-file	9db1ee134639bce86b54f2aff87d38f59583aacf	dotfiles	git hook	exception	Recorded git-security-guards exception in rust-migration.md.
-file	git-hooks/pre-commit	tracked-file	424e95f557ab537e0c84b024c75ad7f2e824f35a	dotfiles	git hook	exception	Recorded git-security-guards exception in rust-migration.md.
+file	git-hooks/pre-commit	tracked-file	c4e6e554548870bba397eaa3c8e1f420e041fec7	dotfiles	git hook	exception	Recorded git-security-guards exception in rust-migration.md.
 file	git-hooks/pre-push	tracked-file	4f98de9702b69642d61ebfea4007aef6c8cec8d3	dotfiles	git hook	exception	Recorded git-security-guards exception in rust-migration.md.
 file	gitconfig.local.example	tracked-file	d78f1dca5c9d3f97e64a26da773153387dde8d2f	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	home/git-editor	tracked-file	86a9784dc1a00bb5649cd1c39042a6924ee41c6d	dotfiles	git editor	exception	Recorded developer-utilities exception in rust-migration.md.
@@ -911,6 +920,7 @@ file	launchagents/com.dotfiles.network-resilience.plist.tmpl	tracked-file	e30153
 file	launchagents/com.dotfiles.ollama.plist.tmpl	tracked-file	55049a787c3f7bd65f575a247bb0f9f78e1ce555	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
 file	launchagents/com.dotfiles.opencode-serve.plist.tmpl	tracked-file	43a7e945f8427c5c647a86793646a6ca81e34429	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
 file	launchagents/com.dotfiles.pmset-drift-watch.plist.tmpl	tracked-file	7db0c8d06124555c81984f7d10efa8dc24577144	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
+file	launchagents/com.dotfiles.podman-idle-stop.plist.tmpl	tracked-file	8cd4bfbe249ec92619656fa3e34212595c4e52a5	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
 file	launchagents/com.dotfiles.rancher-desktop.plist.tmpl	tracked-file	196b71434c84474a8defb1b89511a1c53b4d56ba	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
 file	launchagents/com.dotfiles.sleepwatcher.plist.tmpl	tracked-file	3393fe283f800f75bd318be27a94899e411f572f	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
 file	launchagents/com.dotfiles.telemetry.plist.tmpl	tracked-file	1cd729c496fbf4a0cc7ec981ec00435889a1e9d7	dotfiles	launchd job	out-of-scope	Declarative launchd job template; its program has its own record.
@@ -920,9 +930,9 @@ file	lib/agent-keepawake.sh	tracked-file	5cfc45454724495242c6b8d27b5e2d36d09a0c8
 file	lib/agent-worktrees-noindex.sh	tracked-file	6abb690b4fc31edc09a23b007a56085ad3535bc9	dotfiles	cli	exception	Recorded repository-discovery exception in rust-migration.md.
 file	lib/agentbrew-locate.sh	tracked-file	37a6a8cac94db9f3f058f252a0eaf4103c6622d0	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/agentbrew-memory-readiness.sh	tracked-file	e4012079d3cf413a5965050b66f704795c24e61f	dotfiles	cli	exception	Recorded local-ai-runtime exception in rust-migration.md.
-file	lib/agentfile-layers.sh	tracked-file	dedce6bfde55c8ed0fb5961190517549640b54d2	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
+file	lib/agentfile-layers.sh	tracked-file	343f0d5f9ec1020cc5daad431bf435b027d55c27	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/apply-defaults.sh	tracked-file	89ce0a7c6a4518d7ac0e484ae6f4263354c3d09f	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
-file	lib/apply-state.sh	tracked-file	eaec46637100cd10ad468be18dbd41065765a6af	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
+file	lib/apply-state.sh	tracked-file	33ea40b4ffd331b00937472ad5d0a12ac3662a10	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/blocked-software.sh	tracked-file	2bfbfdacc1de259c41e4a4235b21b3436e1ec070	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/brew-bottle-audit.sh	tracked-file	469c821f51f2d3cd670a37bd6d81c49b5b4aead6	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/brew-cask-adoption.sh	tracked-file	d117213f6c9367dfa88abb55c82e848336d478c6	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
@@ -936,7 +946,7 @@ file	lib/coverage-trap.sh	tracked-file	62955471959ddcc0780f56bf98fd9a5e18473119	
 file	lib/dotfiles-agent-node.sh	tracked-file	8cda79d39e42641cf638eaa8638f82d573efec20	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/dotfiles-agent-session-env.py	tracked-file	336a9c07143e9c60d458673516eaf4c581ec3909	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/dotfiles-arch.sh	tracked-file	8f28fc52970dcf7b2c9fa963cc6570b7d2fd06f3	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
-file	lib/dotfiles-endpoint-paths.sh	tracked-file	115e579cf48f28e7f3f7b10f0d079f213dcf1a6b	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
+file	lib/dotfiles-endpoint-paths.sh	tracked-file	6eb47f3cf1ca2ab74337934c553d327cebafbc82	dotfiles	cli	exception	Recorded apply-install exception in rust-migration.md.
 file	lib/dotfiles-source-dir.sh	tracked-file	2b2d1c428ee43c2a9cffe974a01f55f2c5d12b3c	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	lib/errors-log.sh	tracked-file	57e0dbc96fab9b7d2160292c1d40871683291230	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	lib/focus-steal-audit.sh	tracked-file	9f633f2554c336cfc067d0868cef04bae1fb97d8	dotfiles	cli	exception	Recorded browser-native exception in rust-migration.md.
@@ -960,7 +970,7 @@ file	lib/opencode-version.sh	tracked-file	5e6987aa133e73427fc6a620d04e6df95d25c9
 file	lib/oss-readiness.sh	tracked-file	8287b7b06d7b786bf4b2a03be6944ef2d9652668	dotfiles	cli	exception	Recorded gh-public-write-safety exception in rust-migration.md.
 file	lib/output.sh	tracked-file	73dfdb65fbb64d4a044653a0ec977b09a8206917	dotfiles	cli	exception	Recorded cli-core exception in rust-migration.md.
 file	lib/plugin-capabilities.sh	tracked-file	3b547e1fea6400d96ad6a75a829f990c1b34b14a	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
-file	lib/plugin-extensions.sh	tracked-file	2e36c91a0aaadf18abfdfa72ccc5ed8684aaf380	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
+file	lib/plugin-extensions.sh	tracked-file	b4f14016630ddc7138aad15e4bec076560101caf	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
 file	lib/plugin-sandbox-runner.sh	tracked-file	b08be16e92ac2c1b9b4fe12203099495946c016c	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
 file	lib/plugin-signer-write.pl	tracked-file	2f442652546f1ec055c7f5f384a2020a425ae5f4	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
 file	lib/plugin-signers.sh	tracked-file	9ad40b026964689b51fe1655369c83cf7e70b529	dotfiles	plugin command	exception	Recorded plugin-trust exception in rust-migration.md.
@@ -990,7 +1000,7 @@ file	macos.sh	tracked-file	510e75f257e139447d965073654068ddc529497d	dotfiles	che
 file	modify_private_dot_npmrc	tracked-file	97ae537f26f29e9358e02eaefef0264f15ee2f4f	dotfiles	chezmoi lifecycle	exception	Recorded apply-install exception in rust-migration.md.
 file	modules/agent-browser/doctor.sh	tracked-file	818238e478fd7b5b68d5a6ee6fa28db12c6b7538	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
 file	modules/agent-browser/severity	tracked-file	ea5b3d7ee315eb4bb4ba741e629f7a048b77c9c1	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
-file	modules/agentbrew/doctor.sh	tracked-file	63a2820a915270bca8b8ac903e6afcfdebcbd131	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
+file	modules/agentbrew/doctor.sh	tracked-file	60aa47c50b5a9bc96d09fe690ebb28ac437ecc72	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
 file	modules/agentbrew/severity	tracked-file	ea5b3d7ee315eb4bb4ba741e629f7a048b77c9c1	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	modules/chezmoi/doctor.sh	tracked-file	c1a266047059406fadab5f39ebd948511ff11a9b	dotfiles	doctor	exception	Recorded doctor-core and the doctor module groups exception in rust-migration.md.
 file	modules/chezmoi/severity	tracked-file	ea5b3d7ee315eb4bb4ba741e629f7a048b77c9c1	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
@@ -2084,7 +2094,7 @@ file	tests/add-task.bats	tracked-file	b11b8b12d5365be44bedb7330ffee39fb2d06d6c	d
 file	tests/add-unmanage.bats	tracked-file	07c23f6e6d44804f907f6637a638c69eca7908ba	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/adhoc-sign-curl.bats	tracked-file	107ee8932f2764f8a3bf06b51b09438f207ec1b4	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/adhoc-sign-uv-pythons.bats	tracked-file	8fffd3dea26bd3e82537df18cc8fef47b6ba0631	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/agent-artifact-coverage.bats	tracked-file	d6037fb6d1520448be3393b7a53f103f64cb0dc3	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/agent-artifact-coverage.bats	tracked-file	de8bc81d412f82575007aa882879473d2518d418	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-browser-config.bats	tracked-file	f97a3d8e6c0048e9dd02ebde8a517d622e4798e3	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-browser-reap-strays.bats	tracked-file	e349a307c46f3a871ba546039e0e3ade5526c8b8	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-browser-singleton-preflight.bats	tracked-file	a32b35abc54be094ec237d8f7552f816475e7e74	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2092,7 +2102,7 @@ file	tests/agent-browser-stray-guidance.bats	tracked-file	8ca159f3021b306dd0c244
 file	tests/agent-browser-temp-route.bats	tracked-file	4e6353ec86c81fda873475ce2a53ab186548afbb	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-guard-doctor.bats	tracked-file	65ae304e5951c3100f0fba4e04bfdc9df8a0bf4e	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-hooks-block-dangerous-git-merged.bats	tracked-file	cbe4ab84506930f948bc7fa1ff86be72eacfd593	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/agent-hooks-block-dangerous-git.bats	tracked-file	0c2817e2494fa87f9281fe1308f0233d2dfce25c	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/agent-hooks-block-dangerous-git.bats	tracked-file	b4c1d5d47093353a09cce5f9e57a935007e0fefc	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-hooks-block-local-tests.bats	tracked-file	a39e068820b8a2e8c7fe3f094dd425ab965cf0e2	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-hooks-endpoint-bootstrap.bats	tracked-file	1d9755a079cf229c17e5d59915064c1b99da64c1	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agent-hooks-git-branch-preflight.bats	tracked-file	d84ff3ef3cb7a438a2f61a65a68087772090532a	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2107,7 +2117,7 @@ file	tests/agent-wake-recover.bats	tracked-file	e5800d77665a93d01b8231ca5e6a8ab2
 file	tests/agent-worktrees-noindex.bats	tracked-file	2078c8909f68259847d4793436fcdc63be2dbd16	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agentbrew-claude-model-layer.bats	tracked-file	b1c8c6c18d9fb936f9342489140891ffa0c19d3e	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agentbrew-command-sources.bats	tracked-file	088917a2feb3150bb312a87bbefa65ec7ac427e5	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/agentbrew-hooks-overlay.bats	tracked-file	aa2e4d81bb6381916a95b16dbd382888f96d353a	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/agentbrew-hooks-overlay.bats	tracked-file	4fa5a6e351a01f4659d177a8e1d6454b32af66f0	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agentbrew-memory-readiness.bats	tracked-file	67cc6f7a525377baefe0b9d70bde74e4035a6805	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agentbrew-shim.bats	tracked-file	2e05aae9aa926e5e53d1ac176f632e69e4884f79	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/agentfile-local-layer.bats	tracked-file	4524a4805803786b154290cbf5b34a4d2ed166e1	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2185,9 +2195,9 @@ file	tests/doctor.bats	tracked-file	f8563073d066f0f55b7a6ae7f28ad3fe351a9579	dot
 file	tests/dotfiles-actions.bats	tracked-file	4d614f4fe7d137ca123770edf96499dd75e8e3ab	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-add-family.bats	tracked-file	812ba2db3f7bf373d69fa2adf63bf60ac6d5dd14	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-agent-session-env.bats	tracked-file	7d29f5e21f72dcd4960e76b6a197cdeb9cccf941	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/dotfiles-apply-if-changed.bats	tracked-file	0cbe2c590f072c97740f299d8ee60879fa920e50	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/dotfiles-apply-if-changed.bats	tracked-file	ff4c7fae0c50dd0b819be77fd7df25601eb20295	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-brew-add.bats	tracked-file	29831d95d46d14f9fef513af47abeaba16b0606d	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/dotfiles-config.bats	tracked-file	bfe17ada8018864582a8800b25bde53a488f7be7	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/dotfiles-config.bats	tracked-file	69ec0890dbd9db0002c88f74c3efcb71b23801ee	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-contribute-metrics.bats	tracked-file	a67f915d264ca97f89aaedc2bed2e905594ab4b9	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-defaults-add.bats	tracked-file	7e8483fe317f3c561d5b028a92e68bd28eea3e71	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-install-aws-gcloud.bats	tracked-file	7ac27e691f658484ccf64ba2d24eaee27774e53b	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2203,7 +2213,7 @@ file	tests/dotfiles-python-tls-relax.bats	tracked-file	1c2299fea8839ae9d3e418d7a
 file	tests/dotfiles-quit-relay.bats	tracked-file	2286bfe736b51a41b0fd21dd80b8a95b325c77f6	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-reload-launchagents.bats	tracked-file	cf3c1f33394d50ac5f9eadfcd81adda99f3f9de4	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-restore-focus-after-chrome.bats	tracked-file	0b77d53c8cb3112f8e877c899ca4313e10958546	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/dotfiles-start.bats	tracked-file	7ccec4c3cb29459b9619b906af8f66f715f5f043	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/dotfiles-start.bats	tracked-file	d20cf0f95df5b2ef964aa3ff532f9df5d8a50260	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-sync-self-reload.bats	tracked-file	b49672be6af07b65cfd9a930bbc35c3717d3e15b	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-sync.bats	tracked-file	8ac547dc6ed429c36c66dcd69ae7e178d8f1fb4d	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/dotfiles-upgrade-plugins.bats	tracked-file	8d7655681e5c99d54f620da32c9fb32f1d4ca77a	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2244,6 +2254,7 @@ file	tests/fixtures/fake-slack-page.mjs	tracked-file	04ddcb47ecbe7e38efca63aa43f
 file	tests/fixtures/gate-attribution/controls.py	tracked-file	5607c80f7fbdfb1bc5e04473567cb6737f0ae0f1	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	tests/fixtures/gate-attribution/join.py	tracked-file	d75f9acf9bdef19dac4a143a36eb0328215116c9	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	tests/fixtures/guard-executable-document.sh.txt	tracked-file	e085df3899b6dbc9304ef3f4158ae2d5ce9347a6	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
+file	tests/fixtures/guard-repo-query-timing.sh	tracked-file	a891fdcf530ed1575d790d84553ad67f4a701f6b	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
 file	tests/fixtures/guard-safe-document.sh.txt	tracked-file	a0329d913e36579dcb9e1f37538163c6cb11cf48	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	tests/fixtures/guard-unsafe-document.sh.txt	tracked-file	e981ec2f6592cc2b35f6594dcd2e2b1b6734e245	dotfiles	declarative input	out-of-scope	Declarative data, configuration or documentation; no executable body.
 file	tests/fixtures/heavy-run-429	tracked-file	f7c345a9c6fd4eac7bec36a36e918cddc740c5c5	dotfiles	test tooling	exception	Recorded test-build-tooling exception in rust-migration.md.
@@ -2372,7 +2383,7 @@ file	tests/mcp-memory-launchagent.bats	tracked-file	48305d32c2ef5612ac55414c0202
 file	tests/memory-sync-projects.bats	tracked-file	152671aa311c904b44e0f8fb35effc17a7a957a3	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/mlx-shell-autostart.bats	tracked-file	925d1212fd6e162827ce839dde178e3fa959331b	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/module-agent-browser.bats	tracked-file	fbeaacaa6136760f9e340b5c3748a21f9689bc14	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/module-agentbrew.bats	tracked-file	5ac9449c11a9ce5a9235498663bda929cf7df495	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/module-agentbrew.bats	tracked-file	3049775faabb93e09f2202950ae143cb545339be	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/module-chezmoi-stale-symlinks.bats	tracked-file	88ce44456f3402bef652fdeaef7d3a9f98f9d014	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/module-chrome.bats	tracked-file	206c9f9b883cfbe475fff0385f62978c28182cec	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/module-claude-model.bats	tracked-file	613bb29dc896e6994d9f802a73da0638550b1c35	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2423,6 +2434,7 @@ file	tests/output.bats	tracked-file	c894505c41b190a82b2a4da42b48277a0f97a00c	dot
 file	tests/perf-gate.bats	tracked-file	5f5c7101fcff6c4f14a4641aad2e2c8a70d417d6	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/perl-alarm.bats	tracked-file	fdfa1fb0906e7b06e7fa95d9199c8e7a2d771fee	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/plugin-agentfile-hooks.bats	tracked-file	a4e998ab434e5c2c0d2f1f97c25323c2155e98eb	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/plugin-agentfile-layer-registration.bats	tracked-file	282eaca78a450232387b1b9cc6fccb3bd8e50a11	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/plugin-bash32.bats	tracked-file	48f492947478a9afa35c1e6768b0232d73858376	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/plugin-capabilities.bats	tracked-file	98f2f5132f340a358f617c8a2514f9a7f873dabe	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/plugin-contract-gaps.bats	tracked-file	da2b1b3183148a5e75d40be3fa41342ed78174d0	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
@@ -2433,14 +2445,15 @@ file	tests/plugin-v1-removed.bats	tracked-file	4012ef36ecca84823c78947af724cfad5
 file	tests/plugin-v2.bats	tracked-file	848d1e66b706b70b6bb4a88115bbc3a2ecdf5202	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/pmset-drift-watch.bats	tracked-file	b4ce92d27b88d11d5f329513b6641e51f0582dd0	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/pnpm-global-update.bats	tracked-file	054ebaa4e9921cfaa50be701d51bb67fe712997a	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/podman-idle-stop.bats	tracked-file	5c60c01d89a93e29616726c5367394f9a422ea4b	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/power-protect-readiness.bats	tracked-file	a8854a9a701df92c1ab73f9625a268429cbb914d	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/pr.bats	tracked-file	abd846955fa9053e394aec4fa0688201b78a458e	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/pre-commit-tasks-lint.bats	tracked-file	d69f1833401877f5534f679b6b5b2f4e30e343e6	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/pre-commit.bats	tracked-file	c999aebd456cc2e7fbe41d46095daf294a99211d	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/pre-commit.bats	tracked-file	29d17e04ef041672011961f3d3f77b5dec6ccf5a	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/pre-push.bats	tracked-file	02603a4c7fe47c279d9756f9b143d2ace1110ad6	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/proof.bats	tracked-file	d48b05a00350427e7f63d42d0256841129efdf3a	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/public-push-allowlist.bats	tracked-file	2690c80cdc5c97d7a3c4aaadc13eda6934b9ee9e	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
-file	tests/python-endpoint-safe-mode.bats	tracked-file	8e20c736cc7a429b9bb5b4057a1c81edf169d069	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
+file	tests/python-endpoint-safe-mode.bats	tracked-file	cfb5f71872a25634d3685dba28ac1321848bcd8b	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/quickstart.bats	tracked-file	ce140069177e724d5094a85602007ee70cd8f772	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/rancher-desktop.bats	tracked-file	7ffd143988d413824631c1a719d62e3f9d994586	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.
 file	tests/realtime-hold.bats	tracked-file	7bf1ff2230beeab39b14d0e15b1194141b1e2c2e	dotfiles	Bats test tooling	exception	Test tooling follows its component; embedded and generated programs remain unreviewed.

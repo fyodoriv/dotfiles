@@ -101,6 +101,8 @@ toolchain under App Priority's data directory and checks the copied binary
 without applying any priority changes before it selects it. The build, refresh,
 and rollback share a per-installation lock. A refresh keeps any hold set by
 rollback. The apply script prints the manual retry command if first setup fails.
+The downloaded installer keeps its `rustup-init` name inside a private
+temporary directory. Rustup chooses installer mode from that name.
 
 ## Hosted result and installation
 

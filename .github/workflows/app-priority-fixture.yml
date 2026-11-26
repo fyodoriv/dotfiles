@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      isolated_toolchain:
+        description: Provision pinned Rust when the native delivery check is enabled
+        required: false
+        type: boolean
+        default: false
       memory_comparison:
         description: Compare peak memory on owned processes
         required: false
@@ -102,10 +107,51 @@ jobs:
         run: |
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/app-priority-native.bats
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats -f 'README CLI reference|every task name' tests/dotfiles-actions.bats tests/telemetry.bats
+      - name: Provision pinned Rust in scratch directories
+        if: ${{ inputs.isolated_toolchain }}
+        run: |
+          umask 077
+          case "$EXPECTED_ARCHITECTURE" in
+            arm64)
+              target=aarch64-apple-darwin
+              digest=63752a1919a3a4793173ec70f8f212621a7ce38ba6a246095984482f4de20f9f
+              ;;
+            x86_64)
+              target=x86_64-apple-darwin
+              digest=bc107f1fb0228de7fa32413c89c1b305cea9cd256e94b01150cd054128145429
+              ;;
+            *) exit 2 ;;
+          esac
+          test "$(uname -m)" = "$EXPECTED_ARCHITECTURE"
+          release=1.100.0
+          scratch="$(mktemp -d "$RUNNER_TEMP/priority-toolchain.XXXXXXXX")"
+          export CARGO_HOME="$scratch/cargo"
+          export RUSTUP_HOME="$scratch/rustup"
+          installer="$scratch/rustup-init"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 15 --max-time 90 \
+            "https://static.rust-lang.org/rustup/archive/1.29.3/$target/rustup-init" --output "$installer"
+          printf '%s  %s\n' "$digest" "$installer" | shasum -a 256 --check
+          chmod 700 "$installer"
+          PATH=/usr/bin:/bin:/usr/sbin:/sbin "$installer" -y --no-modify-path --profile minimal \
+            --default-host "$target" --default-toolchain "$release"
+          printf 'CARGO_HOME=%s\nRUSTUP_HOME=%s\nRUSTUP_TOOLCHAIN=%s-%s\n' \
+            "$CARGO_HOME" "$RUSTUP_HOME" "$release" "$target" >> "$GITHUB_ENV"
+          printf '%s\n' "$CARGO_HOME/bin" >> "$GITHUB_PATH"
       - name: Build, install and roll back in a scratch home
+        env:
+          ISOLATED_TOOLCHAIN: ${{ inputs.isolated_toolchain }}
         run: |
           export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
           export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+          if [[ "$ISOLATED_TOOLCHAIN" == true ]]; then
+            test "$(command -v cargo)" = "$CARGO_HOME/bin/cargo"
+            compiler_bin="$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/bin"
+            test "$(cd rust && "$CARGO_HOME/bin/rustup" which cargo)" = "$compiler_bin/cargo"
+            test "$(cd rust && "$CARGO_HOME/bin/rustup" which rustc)" = "$compiler_bin/rustc"
+            unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+            export RUSTC="$compiler_bin/rustc"
+            "$RUSTC" --version
+          fi
           export HOME="$RUNNER_TEMP/priority-install-home"
           export XDG_DATA_HOME="$HOME/data"
           mkdir -p "$HOME"

@@ -79,8 +79,19 @@ concurrency:
 jobs:
   delivery-check:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.delivery_check }}
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,9 +110,26 @@ jobs:
           export XDG_DATA_HOME="$HOME/data"
           mkdir -p "$HOME"
           ./bin/app-priority-native install
-          test -L "$XDG_DATA_HOME/dotfiles/native/app-priority/current"
+          fixture_dir="$XDG_DATA_HOME/dotfiles/native/app-priority"
+          selected="$(readlink "$fixture_dir/current")"
+          [[ "$selected" =~ ^app-priority-[0-9a-f]{64}$ ]]
+          binary="$fixture_dir/$selected"
+          test -f "$binary"
+          test -x "$binary"
+          test ! -L "$binary"
+          digest="$(shasum -a 256 "$binary" | cut -d' ' -f1)"
+          test "$digest" = "${selected#app-priority-}"
+          architecture="$(xcrun lipo -archs "$binary")"
+          test "$architecture" = "$EXPECTED_ARCHITECTURE"
+          minimum_os="$(xcrun vtool -show-build "$binary" | awk '$1 == "minos" {print $2}')"
+          [[ "$minimum_os" = 13.0 || "$minimum_os" = 13.0.0 ]]
+          echo "Verified $architecture artifact with macOS target $minimum_os"
+          no_apply_status=0
+          "$binary" || no_apply_status=$?
+          test "$no_apply_status" -eq 2
+          echo "No-apply exit 2"
           ./bin/app-priority-native rollback
-          test ! -L "$XDG_DATA_HOME/dotfiles/native/app-priority/current"
+          test ! -L "$fixture_dir/current"
   owned-comparison:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.owned_comparison || inputs.memory_comparison) }}
     runs-on: macos-latest

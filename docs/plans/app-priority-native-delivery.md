@@ -64,6 +64,18 @@ directory. It measures a locked offline release build and repeats it warm
 inside one exclusive queue slot. Gate G limits the cold build to 120 seconds
 and the warm build to 15 seconds. Queue wait is excluded.
 
+## First native install on both architectures
+
+The manual `app-priority-fixture.yml` workflow uses `delivery_check=true`
+to install in a scratch home on Apple Silicon and Intel macOS 15.
+Both jobs verify the binary digest, architecture, macOS 13.0 deployment
+target, and exit code without `--apply`. Each job tests rollback in the
+same scratch home.
+
+The runner supplies a Rust toolchain. The check covers native artifact
+portability and the current installer. Fresh full-profile toolchain
+provisioning and native rollback after shell removal need their own proof.
+
 ## Hosted result and installation
 
 [Pull request 672](https://github.com/fyodoriv/dotfiles/pull/672) merged the

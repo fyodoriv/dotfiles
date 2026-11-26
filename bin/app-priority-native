@@ -144,6 +144,14 @@ case "${1:-}" in
     ;;
   ensure)
     [ "$(uname -s)" = Darwin ] || exit 1
+    # shellcheck source=../lib/app-priority-build.sh
+    source "$app_priority_root/lib/app-priority-build.sh"
+    app_priority_build_with_timeout "${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}" \
+      "$app_priority_root/bin/app-priority-native" ensure-worker "${2:-}"
+    ;;
+  ensure-worker)
+    [ "$(uname -s)" = Darwin ] || exit 1
+    # Keep the lock while the worker builds and publishes the first install.
     lock_install ensure
     if [ -e "$directory/current" ] || [ -L "$directory/current" ] ||
       [ -e "$directory/disabled" ] || [ -L "$directory/disabled" ]; then exit 0; fi
@@ -151,9 +159,7 @@ case "${1:-}" in
     for artifact in "$directory"/app-priority-*; do
       if [[ "${artifact##*/}" =~ ^app-priority-[0-9a-f]{64}$ ]]; then exit 0; fi
     done
-    # shellcheck source=../lib/app-priority-build.sh
-    source "$app_priority_root/lib/app-priority-build.sh"
-    app_priority_build_with_timeout "${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}" install_first_native "${2:-}"
+    install_first_native "${2:-}"
     echo 'Native app-priority installed.'
     ;;
   rollback)

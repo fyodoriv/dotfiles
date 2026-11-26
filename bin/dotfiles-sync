@@ -142,10 +142,11 @@ _move_zshrc_appends() {
 # A success updates the last-apply record (lib/apply-state.sh), so a later
 # `dotfiles apply --if-changed` can skip the same work.
 _chezmoi_apply() {
-  local out
+  local out before
   apply_state_clear
+  before="$(apply_state_fingerprint "$DOTFILES_DIR")" || before=""
   if out=$(chezmoi apply --source "$DOTFILES_DIR" 2>&1); then
-    apply_state_record "$DOTFILES_DIR"
+    apply_state_record "$DOTFILES_DIR" "$before"
     return 0
   fi
   warn "[sync] chezmoi apply failed: $(printf '%s\n' "$out" | tail -n 1)"

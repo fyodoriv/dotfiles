@@ -206,13 +206,14 @@ _agentfile_flat_q() {
 # Without mikefarah yq nothing can be checked: every plugin Agentfile is
 # skipped.
 agentfile_plugin_layers() {
-  local base="$1" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" name file before after err reasons
+  local base="$1" mode="${2:-}" ab="${AGENTFILE_AGENTBREW_CMD:-agentbrew}" name file before after err reasons
   local -a earlier=() kept=()
   [ -f "$base" ] && earlier=("$base")
   if ! _agentfile_mikefarah_yq; then
     while IFS=$'\t' read -r name file; do
       [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check it without mikefarah yq\n' "$name" >&2
     done
+    [ "$mode" != required ] || return 1
     return 0
   fi
   if ! _agentfile_can_merge "$ab"; then
@@ -234,6 +235,7 @@ agentfile_plugin_layers() {
     while IFS=$'\t' read -r name file; do
       [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check it (no temp file)\n' "$name" >&2
     done
+    [ "$mode" != required ] || return 1
     return 0
   fi
   # The merge of the earlier layers; after each kept plugin, its merge.
@@ -245,6 +247,7 @@ agentfile_plugin_layers() {
         [ -z "$file" ] || printf '⚠ Skipping the Agentfile of plugin %s: cannot check it: %s\n' "$name" "$(_agentfile_error_line "$err")" >&2
       done
       rm -f "$before" "$after"
+      [ "$mode" != required ] || return 1
       return 0
     fi
   fi
@@ -262,9 +265,12 @@ agentfile_plugin_layers() {
       printf '%s\n' "$reasons" | sed 's/^/    /' >&2
       continue
     fi
+    if ! cp "$after" "$before"; then
+      rm -f "$before" "$after"
+      return 1
+    fi
     printf '%s\n' "$file"
     earlier+=("$file")
-    cp "$after" "$before"
   done
   rm -f "$before" "$after"
 }

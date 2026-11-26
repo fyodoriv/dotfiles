@@ -25,6 +25,9 @@ and the guard against binary screenshots in Git. Run `dotfiles apply`
 and `agentbrew sync` to update the registration. The verifier-tier hooks
 stay opted out while Agentbrew works on its local-model verifier task.
 
+If `enabled:` has an inline list with entries, the renderer adds missing
+owner hooks inside that list. Entries under `disabled:` still take precedence.
+
 The shared rules ask agents to measure iteration time, use affected checks, bind relevant external state without exposing values, and keep the required final gate. While local checks wait, agents continue independent work and can use green hosted CI for equivalent checks on the current change and target base. Checks that require the local machine still need their own results.
 
 ### Agent time skills

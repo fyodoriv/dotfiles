@@ -39,19 +39,6 @@ them. -->
   - **Anchor**: agentbrew `hooks/manifest.yaml` (`defaultEnabled`); Claude Code hooks reference.
   - **Competitive-goal**: none — owner-machine policy coverage, not a scorecard metric.
 
-- [ ] Add owner hooks to an inline enabled list without creating a second key
-  - **ID**: hooks-overlay-inline-enabled
-  - **Tags**: hooks, chezmoi, yaml
-  - **Details**: The overlay accepts an existing nonempty inline enabled list, but its default insertion can write a second enabled key. Keep the existing hooks and add new defaults to the same list.
-  - **Files**: `dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl` and `tests/agentbrew-hooks-overlay.bats`.
-  - **Output**: code
-  - **Acceptance**: A hosted input with an inline enabled list yields one enabled key containing the old and new hooks. The disabled list stays intact.
-  - **Hypothesis**: A supported inline input renders one enabled key instead of two while preserving its existing entries.
-  - **Measurement**: `bats tests/agentbrew-hooks-overlay.bats` in hosted macOS CI. Check the enabled key count, the exact rendered list and comments, and a repeated render.
-  - **Success**: 1 enabled key, zero dropped entries or opt-outs, byte-stable repeat rendering, and all existing controls pass.
-  - **Pivot**: If 1 previously valid input changes its disabled choices or loses an enabled entry, reject the change.
-  - **Anchor**: [Default insertion on the recorded baseline](https://github.com/fyodoriv/dotfiles/blob/f6884dd2ac3ec3bb842ab505018054a48ea88caa/dot_config/agentbrew/hooks-overlay/modify_manifest.yaml.tmpl#L98).
-
 - [ ] Reconcile the gh wrapper PR body check with the owner PR opener rule
   - **ID**: gh-pr-body-shape-reconcile
   - **Tags**: gh, delivery, pr-body, owner-rules

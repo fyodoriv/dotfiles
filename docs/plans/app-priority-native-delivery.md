@@ -86,6 +86,16 @@ provisioning and native rollback after shell removal need their own proof.
 
 The current matrix uses the runner's Rust install. The added mode starts with empty Cargo and Rustup directories. It runs on macOS 15 and checks deployment metadata for macOS 13. Actual Ventura execution and apply-time integration need separate evidence.
 
+## First native install during apply
+
+- **Hypothesis:** A fresh eligible full-profile apply selects a verified native App Priority binary before it loads the LaunchAgent. An ineligible or previously rolled-back setup does not attempt that first install.
+- **Measurement:** Run `bats -f 'app-priority first apply' tests/chezmoiscripts.bats` in hosted CI. Record the order of the install and load calls in a scratch fixture. Run the isolated architecture fixture on the same source for the real compiler and artifact.
+- **Success:** All 5 fixture cases pass. A fresh eligible setup installs before load. Core profile, missing app, and explicit rollback make 0 install calls. A failed first install keeps the existing shell route. The real build passes artifact checks on both hosted architectures and changes 0 live priorities.
+- **Pivot:** If 1 fixture activates native code before artifact verification, attempts a fresh install on an excluded setup, or loses the existing route on failure, stop the rollout and fix the first-install boundary.
+- **Anchor:** [App Priority gate G](rust-migration.md), the existing LaunchAgent profile and app checks, and the isolated toolchain fixture above.
+
+This phase qualifies setup during apply. The native-to-native rollback and shell removal need their own measurements.
+
 ## Hosted result and installation
 
 [Pull request 672](https://github.com/fyodoriv/dotfiles/pull/672) merged the

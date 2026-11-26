@@ -151,6 +151,35 @@ _check_command_text() {
   [ "$status" -eq 2 ]
 }
 
+@test "a repo-scoped branch comparison does not change how later Git commands are read" {
+  run ./tests/fixtures/guard-repo-query-timing.sh
+  [ "$status" -eq 0 ]
+}
+
+@test "ordinary quoted text can mention Git branch deletion" {
+  _check_command_text "echo 'A note about git branch -D demo'"
+  [ "$status" -eq 0 ]
+}
+
+@test "a quoted jq argument can mention Git branch deletion" {
+  _check_command_text "jq -n --arg note 'A note about git branch -D demo' '\$note'"
+  [ "$status" -eq 0 ]
+}
+
+@test "quoted command substitutions still count as executable input" {
+  _check_command_text 'echo "$(git branch -D demo)"'
+  [ "$status" -eq 2 ]
+}
+
+@test "repo-scoped comparisons leave later destructive statements visible" {
+  local text
+  text="$(printf '%s\n' 'repo=/tmp/example-tooling' '[ "$(git -C "$repo" branch --show-current)" = main ]' 'git branch -D demo')"
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+  _check_command_text '[ "$(git -C "$repo" branch --show-current)" = main ];git branch --delete --force demo'
+  [ "$status" -eq 2 ]
+}
+
 @test "Git guard allows a literal GitHub issue body with its long flag" {
   _check_command_text "gh issue create --title 'Synthetic' --body 'A note about git branch -D topic'"
   [ "$status" -eq 0 ]

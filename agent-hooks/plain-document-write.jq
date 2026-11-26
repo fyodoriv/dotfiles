@@ -41,6 +41,62 @@ def issue_body_span:
   | select(length == 1)
   | [.[0].Pos.Offset, .[0].End.Offset] | @tsv;
 
+def simple_call:
+  select(.Background != true and .Coprocess != true and .Negated != true and
+    ((.Redirs // []) | length) == 0 and
+    .Cmd.Type == "CallExpr" and ((.Cmd.Assigns // []) | length) == 0);
+
+def literal_argument_spans:
+  standalone_call | .Stmts[0] | simple_call | .Cmd.Args
+  | if (.[0] | plain_word) == "echo" then
+      .[1:][] | select(quoted_issue_word)
+    elif length == 6 and ([.[0:3][] | plain_word] == ["jq", "-n", "--arg"]) and
+         (.[3] | plain_word | strings | test("^[A-Za-z_][A-Za-z0-9_]*$")) and
+         (.[4] | quoted_issue_word) and
+         (.[5].Parts | length == 1 and .[0].Type == "SglQuoted" and .[0].Dollar != true) and
+         (.[5].Parts[0].Value == ("$" + (.[3] | plain_word))) then
+      .[4]
+    else empty
+    end
+  | [.Pos.Offset, .End.Offset, "argument"];
+
+def static_repo_operand:
+  ((plain_word // "") | test("^[A-Za-z0-9_./-]+$")) or
+  ((.Parts | length) == 1 and .Parts[0].Type == "DblQuoted" and .Parts[0].Dollar != true and
+    (.Parts[0].Parts | length == 1 and
+      (.[0] | .Type == "ParamExp" and .Short == true and
+        (.Param.Value | test("^[A-Za-z_][A-Za-z0-9_]*$")))));
+
+def repo_branch_query:
+  select((.Parts | length) == 1 and .Parts[0].Type == "DblQuoted" and .Parts[0].Dollar != true)
+  | .Parts[0].Parts
+  | select(length == 1 and .[0].Type == "CmdSubst" and .[0].Backquotes != true)
+  | .[0].Stmts
+  | select(length == 1)
+  | .[0] | simple_call | .Cmd.Args
+  | select(length == 5 and
+      (.[0] | plain_word) == "git" and (.[1] | plain_word) == "-C" and
+      (.[2] | static_repo_operand) and
+      (.[3] | plain_word) == "branch" and (.[4] | plain_word) == "--show-current");
+
+def repo_branch_comparison_spans:
+  select(.Type == "File")
+  | select(all(.. | objects | select(.Type == "FuncDecl"); false))
+  | select(all(.. | objects | select(.Type == "CallExpr" and ((.Args // []) | length) > 0);
+      (.Args[0] | plain_word) as $name | $name != null and
+      ($name | IN("alias", "unalias", "eval", "source", ".", "builtin", "enable", "hash") | not)))
+  | .Stmts[] | simple_call
+  | select(.Cmd.Args | length == 5 and
+      (.[0] | plain_word) == "[" and (.[2] | plain_word) == "=" and
+      (.[3] | plain_word | strings | test("^[A-Za-z0-9][A-Za-z0-9._/-]*$")) and
+      (.[4] | plain_word) == "]" and
+      ((.[1] | repo_branch_query) != null))
+  | [.Pos.Offset, .Cmd.Args[-1].End.Offset, "comparison"];
+
+def inert_branch_spans:
+  [literal_argument_spans, repo_branch_comparison_spans]
+  | sort_by(.[0]) | reverse | .[] | @tsv;
+
 def plain_document:
 standalone_call
 | .Stmts[0] as $statement
@@ -63,4 +119,6 @@ standalone_call
     tree: ((.Stmts[0].Redirs[] | select(.Hdoc) | .Hdoc.Parts[].Value) = "")
   };
 
-if $ARGS.named.mode == "issue-body" then issue_body_span else plain_document end
+if $ARGS.named.mode == "issue-body" then issue_body_span
+elif $ARGS.named.mode == "branch-inert" then inert_branch_spans
+else plain_document end

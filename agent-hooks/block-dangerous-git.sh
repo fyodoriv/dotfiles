@@ -595,6 +595,34 @@ without_literal_issue_body() {
   printf "%s''%s" "${command:0:start}" "${command:end}"
 }
 
+without_inert_branch_text() {
+  local LC_ALL=C spans start end kind replacement suffix stripped="$command"
+  local semicolon='^[[:blank:]]*;'
+  case "$command" in
+    *echo*|*--arg*|*-C*--show-current*) ;;
+    *) return 1 ;;
+  esac
+  spans=$(printf '%s' "$command" | "$_boundary_shfmt" --to-json 2>/dev/null |
+    "$_boundary_jq" -er --arg mode branch-inert -f "$_hook_dir/plain-document-write.jq" 2>/dev/null) || return 1
+  while IFS=$'\t' read -r start end kind; do
+    [[ "$start" =~ ^[0-9]+$ && "$end" =~ ^[0-9]+$ ]] || return 1
+    [ "$start" -lt "$end" ] && [ "$end" -le "${#stripped}" ] || return 1
+    suffix="${stripped:end}"
+    case "$kind" in
+      argument) replacement="''" ;;
+      comparison)
+        replacement=' : ; '
+        if [[ "$suffix" =~ $semicolon ]]; then
+          suffix="${suffix:${#BASH_REMATCH[0]}}"
+        fi
+        ;;
+      *) return 1 ;;
+    esac
+    stripped="${stripped:0:start}$replacement$suffix"
+  done <<< "$spans"
+  printf '%s' "$stripped"
+}
+
 case "$command" in
   *gh*issue*create*)
     if find_boundary_parser && _without_issue_body=$(without_literal_issue_body); then
@@ -617,6 +645,13 @@ if looks_like_branch_delete; then
   # Keep every segment, including the Python body, in the branch detector.
   _segments=""
   find_boundary_parser || true
+  if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
+    _without_inert=$(without_inert_branch_text); then
+    _original_command="$command"
+    command="$_without_inert"
+    if ! looks_like_branch_delete; then exit 0; fi
+    command="$_original_command"
+  fi
   if [ -n "$_boundary_shfmt" ] && [ -n "$_boundary_jq" ] &&
     _prefix_end=$(read_only_branch_prefix_end "$_boundary_shfmt" "$_boundary_jq"); then
     _original_command="$command"

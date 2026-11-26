@@ -6,6 +6,7 @@ on:
     paths:
       - tests/agent-hooks-block-dangerous-git.bats
       - tests/fixtures/guard-*.sh.txt
+      - tests/fixtures/guard-repo-query-timing.sh
       - agent-hooks/block-dangerous-git.sh
       - agent-hooks/plain-document-write.jq
       - agent-hooks/python-document-boundaries.py

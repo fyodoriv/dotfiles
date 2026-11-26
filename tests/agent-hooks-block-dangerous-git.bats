@@ -151,6 +151,41 @@ _check_command_text() {
   [ "$status" -eq 2 ]
 }
 
+@test "a repo-scoped branch comparison does not change how later Git commands are read" {
+  local text
+  text="$(cat <<'COMMAND'
+set -eo pipefail
+repo="/tmp/example-tooling"
+base=old-revision
+candidate=new-revision
+git -C "$repo" fetch origin main
+[ "$(git -C "$repo" rev-parse origin/main)" = "$candidate" ]
+left="$(git -C "$repo" diff --name-only "$base" "$candidate" | sort)"
+git -C "$repo" diff --exit-code "$base" "$candidate"
+[ "$(git -C "$repo" branch --show-current)" = main ]
+git -C "$repo" diff --quiet
+git -C "$repo" merge --ff-only "$candidate"
+COMMAND
+  )"
+  _check_command_text "$text"
+  [ "$status" -eq 0 ]
+}
+
+@test "ordinary quoted text can mention Git branch deletion" {
+  _check_command_text "echo 'A note about git branch -D demo'"
+  [ "$status" -eq 0 ]
+}
+
+@test "a quoted jq argument can mention Git branch deletion" {
+  _check_command_text "jq -n --arg note 'A note about git branch -D demo' '\$note'"
+  [ "$status" -eq 0 ]
+}
+
+@test "quoted command substitutions still count as executable input" {
+  _check_command_text 'echo "$(git branch -D demo)"'
+  [ "$status" -eq 2 ]
+}
+
 @test "Git guard allows a literal GitHub issue body with its long flag" {
   _check_command_text "gh issue create --title 'Synthetic' --body 'A note about git branch -D topic'"
   [ "$status" -eq 0 ]

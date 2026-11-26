@@ -169,3 +169,26 @@ until an explicit install completes.
 The isolated architecture check builds the older App Priority source at
 `fa9c743c` and the current source with one pinned compiler. It verifies
 both binaries before checking rollback, the refresh hold, and re-enable.
+
+### Rollback after an interrupted first install
+
+- **Hypothesis:** If the first-install launcher exits while its build worker
+  is running, a successful later rollback prevents that build from selecting
+  a native binary afterward.
+- **Measurement:** Run the hosted fixture in `tests/app-priority-native.bats`.
+  Terminate only the fixture launcher after its worker starts. Start rollback
+  before releasing the scratch build and inspect the selection and hold after
+  both operations finish.
+- **Success:** The fixture leaves 0 current links, 1 rollback hold, and 0 live
+  priority changes. The existing first-install and concurrent-rollback cases
+  still pass.
+- **Pivot:** If 1 interrupted worker can select a binary after rollback
+  reports success, keep the shell route and move the installation lock to
+  the process that can select the binary.
+- **Anchor:** [App Priority gate G](rust-migration.md) and the first-install
+  concurrency case in `tests/app-priority-native.bats`.
+
+The first-install worker owns the per-installation lock. The launcher's
+time limit covers the worker's lock wait and build. If the launcher exits
+while the worker is still running, rollback waits for that worker before
+it removes the selection.

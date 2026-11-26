@@ -1,10 +1,19 @@
 #!/bin/bash
 # Shared, per-invocation install and rollback for owned native commands.
 
+native_delivery_select() (
+  local selection_dir="$1" selection="$2" link_temp
+  link_temp="$(mktemp "$selection_dir/.current.XXXXXXXX")" || exit 1
+  trap 'rm -f "$link_temp"' EXIT
+  rm -f "$link_temp" || exit 1
+  ln -s "$selection" "$link_temp" || exit 1
+  mv -f "$link_temp" "$selection_dir/current"
+)
+
 native_delivery_install() (
   local root="$1" crate="$2" binary="$3" directory="$4" prefix="$5" label="$6"
-  local verify_copy="${7:-}"
-  local source_file current_target temporary link_temp source_hash copy_hash destination
+  local verify_copy="${7:-}" before_select="${8:-}"
+  local source_file current_target temporary source_hash copy_hash destination
   [ "$(uname -s)" = Darwin ] || { echo "$label: macOS required" >&2; exit 1; }
   (cd "$root/rust" && "$root/bin/heavy-run" cargo build --locked --offline --release --manifest-path "$crate/Cargo.toml")
   source_file="$root/rust/$crate/target/release/$binary"
@@ -22,8 +31,7 @@ native_delivery_install() (
     fi
   fi
   temporary="$(mktemp "$directory/.binary.XXXXXXXX")"
-  link_temp=""
-  trap 'rm -f "$temporary" ${link_temp:+"$link_temp"}' EXIT
+  trap 'rm -f "$temporary"' EXIT
   cp "$source_file" "$temporary"
   chmod 700 "$temporary"
   source_hash="$(shasum -a 256 "$source_file" | cut -d' ' -f1)"
@@ -38,10 +46,10 @@ native_delivery_install() (
     exit 1
   fi
   mv -f "$temporary" "$directory/$destination"
-  link_temp="$(mktemp "$directory/.current.XXXXXXXX")"
-  rm -f "$link_temp"
-  ln -s "$destination" "$link_temp"
-  mv -f "$link_temp" "$directory/current"
+  if [ -n "$before_select" ]; then
+    "$before_select" "${current_target:-}" "$destination" || exit 1
+  fi
+  native_delivery_select "$directory" "$destination"
 )
 
 native_delivery_rollback() {

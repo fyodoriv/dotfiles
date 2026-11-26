@@ -149,6 +149,47 @@ jobs:
           test -f "$fixture_dir/disabled"
           ./bin/app-priority-native ensure ignored-fixture-source
           test ! -L "$fixture_dir/current"
+      - name: Roll back between two verified native binaries
+        if: ${{ inputs.isolated_toolchain }}
+        run: |
+          umask 077
+          previous_commit=fa9c743cd13a5ed18786bbf68d248b7143ea471d
+          git fetch --depth=1 origin "$previous_commit"
+          scratch="$(mktemp -d "$RUNNER_TEMP/priority-native-rollback.XXXXXXXX")"
+          mkdir "$scratch/previous" "$scratch/home"
+          git archive "$previous_commit" | tar -x -C "$scratch/previous"
+          export HOME="$scratch/home" XDG_DATA_HOME="$scratch/home/data"
+          fixture_dir="$XDG_DATA_HOME/dotfiles/native/app-priority"
+          source ./lib/app-priority-toolchain.sh
+          app_priority_toolchain_prepare "$RUNNER_TEMP/priority-install-home/data/dotfiles/native/app-priority/toolchain"
+
+          verify_artifact() {
+            local selected="$1" artifact="$fixture_dir/$1" digest probe_status=0
+            [[ "$selected" =~ ^app-priority-[0-9a-f]{64}$ ]]
+            test -f "$artifact" && test -x "$artifact" && test ! -L "$artifact"
+            digest="$(shasum -a 256 "$artifact" | cut -d' ' -f1)"
+            test "$digest" = "${selected#app-priority-}"
+            test "$(xcrun lipo -archs "$artifact")" = "$EXPECTED_ARCHITECTURE"
+            "$artifact" || probe_status=$?
+            test "$probe_status" -eq 2
+          }
+
+          "$scratch/previous/bin/app-priority-native" install
+          previous="$(readlink "$fixture_dir/current")"
+          verify_artifact "$previous"
+          ./bin/app-priority-native install
+          current="$(readlink "$fixture_dir/current")"
+          verify_artifact "$current"
+          test "$current" != "$previous"
+          ./bin/app-priority-native rollback --native
+          test "$(readlink "$fixture_dir/current")" = "$previous"
+          ./bin/app-priority-native refresh fixture-refresh
+          test "$(readlink "$fixture_dir/current")" = "$previous"
+          test -f "$fixture_dir/disabled"
+          ./bin/app-priority-native install
+          test "$(readlink "$fixture_dir/current")" = "$current"
+          test ! -e "$fixture_dir/disabled"
+          echo "Verified native rollback and re-enable on $EXPECTED_ARCHITECTURE"
   owned-comparison:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.owned_comparison || inputs.memory_comparison) }}
     runs-on: macos-latest

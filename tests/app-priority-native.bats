@@ -241,7 +241,7 @@ install_priority_variant() {
   [ "$(readlink "$DIRECTORY/current")" = "$first" ]
 }
 
-@test "native rollback preserves the predecessor after a failed build" {
+@test "native rollback preserves the predecessor after a failed build or selection" {
   install_priority_variant first
   first="$(readlink "$DIRECTORY/current")"
   install_priority_variant second
@@ -250,6 +250,29 @@ install_priority_variant() {
   run env FAIL_BUILD=1 "$INSTALLER" install
   [ "$status" -ne 0 ]
   [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+
+  printf '\n# candidate that never became current\n' >> "$TEST_ROOT/rust/app-priority/target/release/dotfiles-app-priority"
+  cat > "$TEST_DIR/mockbin/ln" <<'MOCK'
+#!/bin/bash
+if [[ "$1" == -s && "$3" == */.current.* ]]; then exit 1; fi
+exec /bin/ln "$@"
+MOCK
+  chmod +x "$TEST_DIR/mockbin/ln"
+  run "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$second" ]
+  [ ! -e "$DIRECTORY/disabled" ]
+  touch "$DIRECTORY/disabled"
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
+  [ "$status" -ne 0 ]
+  [ -f "$DIRECTORY/disabled" ]
+  rm "$DIRECTORY/disabled"
+  rm "$TEST_DIR/mockbin/ln"
+
   run env NATIVE_EXIT=2 "$INSTALLER" rollback --native
   [ "$status" -eq 0 ]
   [ "$(readlink "$DIRECTORY/current")" = "$first" ]
@@ -285,6 +308,26 @@ install_priority_variant() {
   install_priority_variant second
   env NATIVE_EXIT=2 "$INSTALLER" rollback --native
   first="$(readlink "$DIRECTORY/current")"
+  rm "$DIRECTORY/disabled"
+  mkdir "$DIRECTORY/disabled"
+  run "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  rmdir "$DIRECTORY/disabled"
+  touch "$DIRECTORY/disabled"
+
+  cat > "$TEST_DIR/mockbin/rm" <<'SCRIPT'
+#!/bin/bash
+if [[ "$1" == -f && "$2" == */disabled ]]; then exit 1; fi
+exec /bin/rm "$@"
+SCRIPT
+  chmod +x "$TEST_DIR/mockbin/rm"
+  run "$INSTALLER" install
+  [ "$status" -ne 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  [ -f "$DIRECTORY/disabled" ]
+  /bin/rm "$TEST_DIR/mockbin/rm"
+
   install_priority_variant third
   third="$(readlink "$DIRECTORY/current")"
   [ "$third" != "$first" ]

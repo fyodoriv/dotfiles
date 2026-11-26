@@ -159,3 +159,13 @@ The default rollback still restores the shell in this phase. Test the
 native rollback option through the existing CLI action and document it
 where the agent and command-line users look for rollback. Verify
 interruption separately before removing the shell implementation.
+
+Record the predecessor under the new binary's digest before changing the
+current link. A failed selection leaves the current link and its receipt
+in place. Native rollback checks the predecessor digest and runs a
+no-apply probe before selecting it. The rollback marker pauses refresh
+until an explicit install completes.
+
+The isolated architecture check builds the older App Priority source at
+`fa9c743c` and the current source with one pinned compiler. It verifies
+both binaries before checking rollback, the refresh hold, and re-enable.

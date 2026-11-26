@@ -45,8 +45,10 @@ If dotfiles fails, surprises you, or could clearly work better, offer once to re
 
 For Glove80 keyboard profiles or pairing, run `dotfiles glove80 --help`. Ask before `dotfiles glove80 pair --yes`; the default keymap is a factory-layout assumption.
 
-To enable native app priority, run `dotfiles priority-native install`. To
-restore the shell implementation, run `dotfiles priority-native rollback`.
+On a full-profile Mac with Ghostty or WebStorm, the first LaunchAgent setup
+during `dotfiles apply` tries the native App Priority install. To retry a
+failed setup or enable it manually, run `dotfiles priority-native install`.
+To keep using the shell implementation, run `dotfiles priority-native rollback`.
 
 To enable the native status guard, run `dotfiles hook-native install`. To
 restore the shell guard, run `dotfiles hook-native rollback`.

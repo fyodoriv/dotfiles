@@ -3,6 +3,7 @@
 
 native_delivery_install() (
   local root="$1" crate="$2" binary="$3" directory="$4" prefix="$5" label="$6"
+  local verify_copy="${7:-}"
   local source_file current_target temporary link_temp source_hash copy_hash destination
   [ "$(uname -s)" = Darwin ] || { echo "$label: macOS required" >&2; exit 1; }
   (cd "$root/rust" && "$root/bin/heavy-run" cargo build --locked --offline --release --manifest-path "$crate/Cargo.toml")
@@ -28,6 +29,9 @@ native_delivery_install() (
   source_hash="$(shasum -a 256 "$source_file" | cut -d' ' -f1)"
   copy_hash="$(shasum -a 256 "$temporary" | cut -d' ' -f1)"
   [ "$source_hash" = "$copy_hash" ] || { echo "$label: copy integrity check failed" >&2; exit 1; }
+  if [ -n "$verify_copy" ]; then
+    "$verify_copy" "$temporary" || exit 1
+  fi
   destination="$prefix-$copy_hash"
   if [ -L "$directory/$destination" ] || { [ -e "$directory/$destination" ] && [ ! -f "$directory/$destination" ]; }; then
     echo "$label: refusing to replace an unowned artifact" >&2

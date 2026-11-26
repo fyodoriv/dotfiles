@@ -5,19 +5,81 @@
 #   dotfiles priority-native rollback  Restore the shell dispatch
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
+app_priority_root="$(cd "$(dirname "$0")/.." && pwd)"
 directory="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/app-priority"
 # shellcheck source=../lib/native-delivery.sh
-source "$root/lib/native-delivery.sh"
+source "$app_priority_root/lib/native-delivery.sh"
+
+lock_install() {
+  (umask 077; mkdir -p "$directory")
+  # The sourced lock library reads this installation's lock path.
+  # shellcheck disable=SC2034
+  DOTFILES_LOCK="$directory/.install.lock"
+  # shellcheck source=../lib/lock.sh
+  source "$app_priority_root/lib/lock.sh"
+  wait_for_lock "app-priority-$1" "${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}"
+}
+
+verify_native_copy() {
+  local status=0
+  "$1" || status=$?
+  if [ "$status" -ne 2 ]; then
+    echo 'App Priority: expected exit 2 without --apply.' >&2
+    return 1
+  fi
+}
+
+prepare_toolchain() {
+  # shellcheck source=../lib/app-priority-toolchain.sh
+  source "$app_priority_root/lib/app-priority-toolchain.sh"
+  app_priority_toolchain_prepare "$directory/toolchain"
+}
+
+install_first_native() {
+  prepare_toolchain
+  native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native verify_native_copy
+  record_source_hash "${1:-}"
+}
+
+record_source_hash() {
+  if [ -n "${1:-}" ] && ! printf '%s\n' "$1" > "$directory/source-hash"; then
+    echo 'App Priority: could not record the build source.' >&2
+  fi
+}
 
 case "${1:-}" in
   --help|-h) echo 'Usage: dotfiles priority-native install|rollback'; exit 0 ;;
-  install)
-    native_delivery_install "$root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native
+  install|refresh)
+    lock_install "$1"
+    if [ "$1" = refresh ] && { [ ! -L "$directory/current" ] ||
+      [ -e "$directory/disabled" ] || [ -L "$directory/disabled" ]; }; then exit 0; fi
+    if [ -d "$directory/toolchain" ]; then prepare_toolchain; fi
+    native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native
+    if [ "$1" = install ]; then
+      rm -f "$directory/disabled"
+    else
+      record_source_hash "${2:-}"
+    fi
+    echo 'Native app-priority installed.'
+    ;;
+  ensure)
+    [ "$(uname -s)" = Darwin ] || exit 1
+    lock_install ensure
+    if [ -e "$directory/current" ] || [ -L "$directory/current" ] ||
+      [ -e "$directory/disabled" ] || [ -L "$directory/disabled" ]; then exit 0; fi
+    # Older rollback removed current and left the verified artifact in place.
+    for artifact in "$directory"/app-priority-*; do
+      if [[ "${artifact##*/}" =~ ^app-priority-[0-9a-f]{64}$ ]]; then exit 0; fi
+    done
+    # shellcheck source=../lib/app-priority-build.sh
+    source "$app_priority_root/lib/app-priority-build.sh"
+    app_priority_build_with_timeout "${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}" install_first_native "${2:-}"
     echo 'Native app-priority installed.'
     ;;
   rollback)
+    lock_install rollback
     native_delivery_rollback "$directory" app-priority app-priority-native
+    (umask 077; mkdir -p "$directory"; touch "$directory/disabled")
     echo 'Shell app-priority restored.'
     ;;
   *) echo 'Usage: app-priority-native install|rollback' >&2; exit 2 ;;

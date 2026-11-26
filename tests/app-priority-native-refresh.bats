@@ -9,7 +9,8 @@ setup() {
   SRC="$BATS_TEST_TMPDIR/src"
   DATA="$BATS_TEST_TMPDIR/data"
   NATIVE="$DATA/dotfiles/native/app-priority"
-  mkdir -p "$SRC/bin" "$NATIVE"
+  mkdir -p "$SRC/bin" "$SRC/lib" "$NATIVE"
+  cp "$ROOT/lib/app-priority-build.sh" "$SRC/lib/"
   sed -e "s|{{ .chezmoi.sourceDir }}|$SRC|g" -e 's/{{[^}]*}}/H/g' "$SCRIPT" > "$BATS_TEST_TMPDIR/refresh.sh"
 }
 
@@ -25,7 +26,7 @@ refresh() {
   local f rel
   while IFS= read -r f; do
     rel="${f#"$ROOT"/}"
-    grep -qF "include \"$rel\" | sha256sum" "$SCRIPT" || { echo "not hashed: $rel"; return 1; }
+    grep -qF "include \"$rel\" | sha256sum" "$ROOT/.chezmoitemplates/app-priority-source-hash" || { echo "not hashed: $rel"; return 1; }
   done < <(git -C "$ROOT" ls-files --full-name rust/.cargo rust/app-priority \
     | grep -v '/\.gitignore$' | sed "s|^|$ROOT/|")
 }
@@ -38,11 +39,11 @@ refresh() {
 }
 
 @test "a good rebuild records the source hash and the next apply skips it" {
-  fake_installer 'echo "ran $1"'
+  fake_installer 'echo "ran $1"; printf "%s\n" "$2" > "$XDG_DATA_HOME/dotfiles/native/app-priority/source-hash"'
   ln -s app-priority-x "$NATIVE/current"
   refresh
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ran install"* ]]
+  [[ "$output" == *"ran refresh"* ]]
   [ -f "$NATIVE/source-hash" ]
   refresh
   [ "$status" -eq 0 ]
@@ -58,7 +59,7 @@ refresh() {
   [[ "$output" == *"dotfiles priority-native install"* ]]
   [ ! -f "$NATIVE/source-hash" ]
   refresh
-  [[ "$output" == *"ran install"* ]]
+  [[ "$output" == *"ran refresh"* ]]
 }
 
 @test "a build stuck waiting for a slot stops after the time limit" {

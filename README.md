@@ -1484,9 +1484,12 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 | `dotfiles-agentfile-resync` | Rewrite `~/.config/agentbrew/Agentfile.yaml` from the merge apply writes, then the apply-time sync script in the background (the fix of `agentbrew.global_agentfile_in_sync`) | `dotfiles doctor --fix --module agentbrew` |
 | `dotfiles-load-sampler` | Keep a 7-day load history on disk; `--report [hours]` shows peaks and gaps | Every 30 seconds |
 
-Run `dotfiles priority-native install` to build the native candidate offline and
-switch the next run to it. Run `dotfiles priority-native rollback` to return to the
-shell implementation. The command checks the installed binary's digest before
+On the full profile with Ghostty or WebStorm, the first LaunchAgent setup tries
+to install native App Priority. It provisions a pinned Rust compiler in App
+Priority's data directory. A setup failure leaves the shell runtime active.
+Run `dotfiles priority-native install` to build and enable the native runtime
+manually. Run `dotfiles priority-native rollback` to keep using the shell runtime
+until the next manual install. The command checks the installed binary's digest before
 each use and keeps the normal timing record. A failed native run is not retried
 through the shell.
 

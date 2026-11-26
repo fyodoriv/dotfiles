@@ -10,6 +10,8 @@
 # duplicate rules: {{ include "lib/launchagent-duplicates.sh" | sha256sum }}
 # self-reload rules: {{ include "lib/self-reload.sh" | sha256sum }}
 # chrome options: {{ include "lib/chrome-purpose-options.sh" | sha256sum }}
+# App Priority installer: {{ include "bin/app-priority-native" | sha256sum }}
+# App Priority data root: {{ env "XDG_DATA_HOME" | sha256sum }}
 # The telemetry answer is read with grep, not `include`: a state file that
 # cannot be read (root-owned after an old sudo run) then means "not yes" and
 # never fails the render.
@@ -20,6 +22,7 @@ set -euo pipefail
 
 SOURCE_DIR="{{ .chezmoi.sourceDir }}"
 PROFILE="{{ .profile }}"
+APP_PRIORITY_SOURCE_HASH="{{ template "app-priority-source-hash" . }}"
 AUTO_UPGRADE="{{ dig "auto_upgrade" "false" . }}"
 AUTO_SYNC="{{ dig "auto_sync" true . }}"
 PODMAN_IDLE_ENABLED="{{ regexMatch "^[A-Za-z0-9][A-Za-z0-9_.-]*$" (dig "podman_idle_machine" $settings.podman_idle_machine.default . | toString) }}"
@@ -214,6 +217,17 @@ install_plist() {
     fi
     echo "⊘ Skipping $short (not applicable for current profile/config)"
     return 0
+  fi
+
+  if [ "$short" = app-priority ]; then
+    local native_dir="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/app-priority"
+    if [ ! -e "$native_dir/current" ] && [ ! -L "$native_dir/current" ] &&
+      [ ! -e "$native_dir/disabled" ] && [ ! -L "$native_dir/disabled" ]; then
+      if ! bash "$SOURCE_DIR/bin/app-priority-native" ensure "${APP_PRIORITY_SOURCE_HASH:-}"; then
+        echo "⚠ Native App Priority setup failed. The shell runtime stays active." >&2
+        echo "  Retry: dotfiles priority-native install" >&2
+      fi
+    fi
   fi
 
   local dst="$HOME/Library/LaunchAgents/$dst_name"

@@ -1,19 +1,14 @@
 #!/bin/bash
 # Rebuild the native app-priority when its Rust source changes, so a merged
-# fix reaches this Mac on the next `dotfiles apply`. Only on Macs that opted
-# in with `dotfiles priority-native install` (rollback removes the link).
+# fix reaches this Mac on the next `dotfiles apply`. Rebuild only when
+# a native binary is selected. Rollback removes the link.
 # Runs on every apply but builds only when the source hash differs from the
 # one the last good build recorded, so a failed or timed-out build is retried
 # on the next apply. tests/app-priority-native-refresh.bats checks that every
 # crate file is hashed here.
 set -euo pipefail
 
-want="{{ include "rust/.cargo/config.toml" | sha256sum }}
-{{ include "rust/app-priority/Cargo.toml" | sha256sum }}
-{{ include "rust/app-priority/Cargo.lock" | sha256sum }}
-{{ include "rust/app-priority/src/main.rs" | sha256sum }}
-{{ include "rust/app-priority/src/platform.rs" | sha256sum }}
-{{ include "rust/app-priority/src/selector.rs" | sha256sum }}"
+want="{{ template "app-priority-source-hash" . }}"
 
 directory="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/native/app-priority"
 stamp="$directory/source-hash"
@@ -25,29 +20,12 @@ stamp="$directory/source-hash"
 max_wait="${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}"
 
 echo "→ Rebuilding native app-priority (Rust source changed)..."
-# Job control puts the build in its own process group, so a timeout stops
-# the heavy-run waiter and cargo with it.
-set -m
-bash "{{ .chezmoi.sourceDir }}/bin/app-priority-native" install &
-pid=$!
-waited=0
-while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$max_wait" ]; do
-  sleep 1
-  waited=$((waited + 1))
-done
-if kill -0 "$pid" 2>/dev/null; then
-  kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
-  # Give it 5 seconds to stop, then force it.
-  grace=0
-  while kill -0 "$pid" 2>/dev/null && [ "$grace" -lt 5 ]; do sleep 1; grace=$((grace + 1)); done
-  kill -KILL -- "-$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  result="timed out after ${max_wait}s"
-elif wait "$pid"; then
-  printf '%s\n' "$want" > "$stamp"
+# shellcheck source=/dev/null
+source "{{ .chezmoi.sourceDir }}/lib/app-priority-build.sh"
+if app_priority_build_with_timeout "$max_wait" bash "{{ .chezmoi.sourceDir }}/bin/app-priority-native" refresh "$want"; then
   exit 0
 else
-  result="failed"
+  if [ "$?" -eq 124 ]; then result="timed out after ${max_wait}s"; else result="failed"; fi
 fi
 # The build runs before the link swap, so the previous build stays active.
 echo "⚠ native app-priority rebuild $result; the previous build stays active." >&2

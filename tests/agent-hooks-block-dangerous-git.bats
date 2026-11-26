@@ -152,22 +152,7 @@ _check_command_text() {
 }
 
 @test "a repo-scoped branch comparison does not change how later Git commands are read" {
-  local text
-  text="$(cat <<'COMMAND'
-set -eo pipefail
-repo="/tmp/example-tooling"
-base=old-revision
-candidate=new-revision
-git -C "$repo" fetch origin main
-[ "$(git -C "$repo" rev-parse origin/main)" = "$candidate" ]
-left="$(git -C "$repo" diff --name-only "$base" "$candidate" | sort)"
-git -C "$repo" diff --exit-code "$base" "$candidate"
-[ "$(git -C "$repo" branch --show-current)" = main ]
-git -C "$repo" diff --quiet
-git -C "$repo" merge --ff-only "$candidate"
-COMMAND
-  )"
-  _check_command_text "$text"
+  run ./tests/fixtures/guard-repo-query-timing.sh
   [ "$status" -eq 0 ]
 }
 

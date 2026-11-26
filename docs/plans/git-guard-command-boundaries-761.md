@@ -24,3 +24,7 @@ synthetic shell source to the hook and never run that source.
 - **Anchor:** [Dotfiles #761](https://github.com/fyodoriv/dotfiles/issues/761),
   [Dotfiles #824](https://github.com/fyodoriv/dotfiles/pull/824), and
   `git-guard-parsed-words-and-gaps` in TASKS.md.
+
+The standard performance row times `git status`. The repo-query row
+times the parser path with the same synthetic input the standalone test
+uses. The 100 ms fastest-run ceiling covers fixture setup and the guard.

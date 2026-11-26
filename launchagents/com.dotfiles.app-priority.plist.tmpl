@@ -27,6 +27,10 @@
         <string>{{ template "launchagent-path" . }}</string>
         <key>HOME</key>
         <string>{{ .chezmoi.homeDir }}</string>
+        {{ if env "XDG_DATA_HOME" -}}
+        <key>XDG_DATA_HOME</key>
+        <string>{{ env "XDG_DATA_HOME" | html }}</string>
+        {{ end -}}
     </dict>
 </dict>
 </plist>

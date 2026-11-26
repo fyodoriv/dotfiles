@@ -96,6 +96,12 @@ The current matrix uses the runner's Rust install. The added mode starts with em
 
 This phase qualifies setup during apply. The native-to-native rollback and shell removal need their own measurements.
 
+The first setup and refresh share a time limit. First setup uses a pinned
+toolchain under App Priority's data directory and checks the copied binary
+without applying any priority changes before it selects it. The build, refresh,
+and rollback share a per-installation lock. A refresh keeps any hold set by
+rollback. The apply script prints the manual retry command if first setup fails.
+
 ## Hosted result and installation
 
 [Pull request 672](https://github.com/fyodoriv/dotfiles/pull/672) merged the

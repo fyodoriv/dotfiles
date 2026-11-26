@@ -1,0 +1,6 @@
+{{ include "rust/.cargo/config.toml" | sha256sum }}
+{{ include "rust/app-priority/Cargo.toml" | sha256sum }}
+{{ include "rust/app-priority/Cargo.lock" | sha256sum }}
+{{ include "rust/app-priority/src/main.rs" | sha256sum }}
+{{ include "rust/app-priority/src/platform.rs" | sha256sum }}
+{{ include "rust/app-priority/src/selector.rs" | sha256sum -}}

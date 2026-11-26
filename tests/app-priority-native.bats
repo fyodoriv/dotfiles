@@ -10,6 +10,9 @@ setup() {
   mkdir -p "$HOME" "$TEST_ROOT/bin" "$TEST_ROOT/lib" "$TEST_ROOT/rust/app-priority/target/release" "$TEST_DIR/mockbin"
   cp "$BATS_TEST_DIRNAME/../bin/app-priority-native" "$TEST_ROOT/bin/"
   cp "$BATS_TEST_DIRNAME/../lib/native-delivery.sh" "$TEST_ROOT/lib/"
+  cp "$BATS_TEST_DIRNAME/../lib/app-priority-build.sh" "$TEST_ROOT/lib/"
+  cp "$BATS_TEST_DIRNAME/../lib/app-priority-toolchain.sh" "$TEST_ROOT/lib/"
+  cp "$BATS_TEST_DIRNAME/../lib/lock.sh" "$TEST_ROOT/lib/"
   cat > "$TEST_ROOT/bin/heavy-run" <<'MOCK'
 #!/bin/bash
 [ "${FAIL_BUILD:-0}" = 0 ]
@@ -21,7 +24,15 @@ exit "${NATIVE_EXIT:-0}"
 MOCK
   cat > "$TEST_DIR/mockbin/uname" <<'MOCK'
 #!/bin/bash
-printf '%s\n' Darwin
+case "$1" in
+  -s) printf '%s\n' Darwin ;;
+  -m) printf '%s\n' x86_64 ;;
+esac
+MOCK
+  cat > "$TEST_DIR/mockbin/curl" <<'MOCK'
+#!/bin/bash
+echo 'fixture must never fetch a toolchain' >&2
+exit 99
 MOCK
   cat > "$TEST_DIR/mockbin/pgrep" <<'MOCK'
 #!/bin/bash
@@ -89,6 +100,10 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$(readlink "$DIRECTORY/current")" = "$original" ]
   "$INSTALLER" rollback
   [ ! -L "$DIRECTORY/current" ]
+  [ -f "$DIRECTORY/disabled" ]
+  run "$INSTALLER" refresh
+  [ "$status" -eq 0 ]
+  [ ! -L "$DIRECTORY/current" ]
   run "$COMMAND"
   [ "$status" -eq 0 ]
   [ -s "$PGREP_LOG" ]
@@ -120,4 +135,71 @@ MOCK
   run "$INSTALLER" install
   [ "$status" -ne 0 ]
   [ "$(readlink "$DIRECTORY/current")" = "$original" ]
+}
+
+@test "first setup probes without applying and publishes only a verified binary" {
+  compiler="$DIRECTORY/toolchain/rustup/toolchains/1.100.0-x86_64-apple-darwin/bin"
+  mkdir -p "$compiler"
+  printf '#!/bin/bash\necho "rustc 1.100.0 (fixture)"\n' > "$compiler/rustc"
+  printf '#!/bin/bash\nexit 0\n' > "$compiler/cargo"
+  chmod +x "$compiler/rustc" "$compiler/cargo"
+
+  run env NATIVE_EXIT=9 "$INSTALLER" ensure fixture-source
+  [ "$status" -ne 0 ]
+  [ ! -L "$DIRECTORY/current" ]
+  [ ! -e "$DIRECTORY/source-hash" ]
+
+  run env NATIVE_EXIT=2 "$INSTALLER" ensure fixture-source
+  [ "$status" -eq 0 ]
+  [ -L "$DIRECTORY/current" ]
+  [ "$(cat "$DIRECTORY/source-hash")" = fixture-source ]
+  [ "$(wc -l < "$NATIVE_LOG" | tr -d ' ')" -eq 2 ]
+  [ -z "$(tr -d '\n' < "$NATIVE_LOG")" ]
+}
+
+@test "first setup respects a rollback from before the disabled marker" {
+  "$INSTALLER" install
+  rm "$DIRECTORY/current"
+  run "$INSTALLER" ensure fixture-source
+  [ "$status" -eq 0 ]
+  [ ! -L "$DIRECTORY/current" ]
+  [ ! -e "$DIRECTORY/toolchain" ]
+}
+
+@test "rollback waits for a first build and leaves shell selected" {
+  compiler="$DIRECTORY/toolchain/rustup/toolchains/1.100.0-x86_64-apple-darwin/bin"
+  mkdir -p "$compiler"
+  printf '#!/bin/bash\necho "rustc 1.100.0 (fixture)"\n' > "$compiler/rustc"
+  printf '#!/bin/bash\nexit 0\n' > "$compiler/cargo"
+  chmod +x "$compiler/rustc" "$compiler/cargo"
+  cat > "$TEST_ROOT/bin/heavy-run" <<'MOCK'
+#!/bin/bash
+touch "$TEST_ROOT/build-started"
+for ((try = 0; try < 50; try++)); do
+  [ ! -f "$TEST_ROOT/release-build" ] || exit 0
+  sleep 0.1
+done
+exit 1
+MOCK
+
+  NATIVE_EXIT=2 DOTFILES_NATIVE_BUILD_MAX_WAIT=10 "$INSTALLER" ensure fixture-source > "$TEST_ROOT/ensure.log" 2>&1 &
+  ensure_pid=$!
+  for ((try = 0; try < 30; try++)); do
+    [ ! -f "$TEST_ROOT/build-started" ] || break
+    sleep 0.1
+  done
+  [ -f "$TEST_ROOT/build-started" ]
+  DOTFILES_NATIVE_BUILD_MAX_WAIT=10 "$INSTALLER" rollback > "$TEST_ROOT/rollback.log" 2>&1 &
+  rollback_pid=$!
+  for ((try = 0; try < 30; try++)); do
+    if grep -q 'Waiting for the lock held by app-priority-ensure' "$TEST_ROOT/rollback.log"; then break; fi
+    sleep 0.1
+  done
+  grep -q 'Waiting for the lock held by app-priority-ensure' "$TEST_ROOT/rollback.log"
+  touch "$TEST_ROOT/release-build"
+  wait "$ensure_pid"
+  wait "$rollback_pid"
+  [ -f "$DIRECTORY/disabled" ]
+  [ ! -L "$DIRECTORY/current" ]
+  [ ! -e "$DIRECTORY/.install.lock" ]
 }

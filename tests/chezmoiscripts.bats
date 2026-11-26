@@ -781,8 +781,10 @@ app_priority_first_apply() {
   cat > "$fixture_source/bin/app-priority-native" <<'MOCK'
 #!/bin/bash
 printf 'install %s\n' "$1" >> "$PRIORITY_TEST_EVENTS"
-[ "$PRIORITY_TEST_INSTALL_RESULT" = ok ]
+[ "$PRIORITY_TEST_INSTALL_RESULT" = ok ] || exit 1
+ln -s app-priority-fixture "$XDG_DATA_HOME/dotfiles/native/app-priority/current"
 MOCK
+  chmod +x "$fixture_source/bin/app-priority-native"
   printf '<plist />\n' > "$fixture_source/priority.plist"
   awk '
     /^should_skip_agent\(\)|^install_plist\(\)/ { keep=1 }
@@ -798,7 +800,15 @@ MOCK
       pgrep() { return 1; }
       remove_skipped_agent() { return 1; }
       self_reload_should_defer() { return 1; }
-      launchctl() { printf "%s\n" "$1" >> "$PRIORITY_TEST_EVENTS"; }
+      launchctl() {
+        if [ "$1" != load ]; then
+          printf "%s\n" "$1" >> "$PRIORITY_TEST_EVENTS"
+        elif [ -L "$XDG_DATA_HOME/dotfiles/native/app-priority/current" ]; then
+          printf "load native\n" >> "$PRIORITY_TEST_EVENTS"
+        else
+          printf "load shell\n" >> "$PRIORITY_TEST_EVENTS"
+        fi
+      }
       install_plist "$SOURCE_DIR/priority.plist" com.dotfiles.app-priority.plist com.dotfiles.app-priority app-priority
     ' _ "$TEST_DIR/priority-activation.sh"
 }
@@ -806,7 +816,7 @@ MOCK
 @test "app-priority first apply selects native before loading an eligible agent" {
   app_priority_first_apply full installed ok
   [ "$status" -eq 0 ]
-  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload' ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload native' ]
 }
 
 @test "app-priority first apply skips a core profile" {
@@ -824,13 +834,13 @@ MOCK
 @test "app-priority first apply respects a previous explicit rollback" {
   app_priority_first_apply full installed disabled
   [ "$status" -eq 0 ]
-  [ "$(cat "$TEST_DIR/priority-events")" = $'unload\nload' ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'unload\nload shell' ]
 }
 
 @test "app-priority first apply keeps shell dispatch after a failed build" {
   app_priority_first_apply full installed failed
   [ "$status" -eq 0 ]
-  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload' ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload shell' ]
   [ ! -L "$TEST_DIR/priority-data/dotfiles/native/app-priority/current" ]
 }
 

@@ -325,6 +325,20 @@ them. -->
 
 ## P3
 
+- [ ] Qualify stripped App Priority builds with the pinned toolchain
+  - **ID**: app-priority-pinned-symbol-strip
+  - **Tags**: launchagents, rust, build
+  - **Details**: The hosted pinned Rust build reports that `rust-objcopy` cannot load `libLLVM.dylib` on both macOS architectures. Cargo completes, and both artifacts pass digest, load, and native rollback checks. Reproduce the warning before choosing a fix. Keep the pinned compiler and offline Cargo build.
+  - **Files**: `lib/app-priority-toolchain.sh`, `rust/app-priority/Cargo.toml`, hosted App Priority delivery fixture, native delivery plan.
+  - **Output**: code
+  - **Acceptance**: Both hosted architecture jobs verify the intended strip result, artifact digest, macOS target, and exit code without applying priorities.
+  - **Hypothesis**: Using a strip path that can load its libraries reduces pinned release builds with a strip warning from 2 of 2 architecture jobs to 0 of 2.
+  - **Measurement**: Compare the Intel and Apple Silicon logs from `app-priority-fixture.yml` with `delivery_check=true` and `isolated_toolchain=true`. Check the symbol table and run the existing artifact checks.
+  - **Success**: 0 strip warnings in 2 architecture jobs, 2 valid artifacts, and 0 live priority changes.
+  - **Pivot**: If either architecture cannot load or roll back its verified artifact, retain the current build and record the packaging limit.
+  - **Anchor**: [Hosted reproduction on Intel and Apple Silicon](https://github.com/fyodoriv/dotfiles/actions/runs/45907826150) and the [native delivery plan](docs/plans/app-priority-native-delivery.md).
+  - **Competitive-goal**: none — release artifact packaging, outside the scorecard.
+
 - [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback
   - **ID**: app-priority-field-check
   - **Tags**: performance, launchagents

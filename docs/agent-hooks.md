@@ -168,6 +168,12 @@ where that invocation ends. The guard reads the other commands separately
 from that query. It keeps the conservative result when the parser cannot
 prove a boundary.
 
+A repo-scoped `git -C` branch query inside a literal comparison can also
+stay separate from later Git commands. The parser can set aside quoted
+prose in a direct `echo` call and a quoted value in a direct
+`jq -n --arg` call that prints that value. Shell substitutions stay
+visible to the guard.
+
 Each branch word must match `^[A-Za-z0-9._/-]+$` and not start with `-`. Braces,
 quotes, `$`, globs, `@{}`, `^`, `~` and the like block. The branch must exist as
 `refs/heads/<name>` (checked with `git show-ref --verify`). The default branch

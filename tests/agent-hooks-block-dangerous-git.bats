@@ -186,6 +186,15 @@ COMMAND
   [ "$status" -eq 2 ]
 }
 
+@test "repo-scoped comparisons leave later destructive statements visible" {
+  local text
+  text="$(printf '%s\n' 'repo=/tmp/example-tooling' '[ "$(git -C "$repo" branch --show-current)" = main ]' 'git branch -D demo')"
+  _check_command_text "$text"
+  [ "$status" -eq 2 ]
+  _check_command_text '[ "$(git -C "$repo" branch --show-current)" = main ];git branch --delete --force demo'
+  [ "$status" -eq 2 ]
+}
+
 @test "Git guard allows a literal GitHub issue body with its long flag" {
   _check_command_text "gh issue create --title 'Synthetic' --body 'A note about git branch -D topic'"
   [ "$status" -eq 0 ]

@@ -106,6 +106,7 @@ jobs:
       - name: Test installation and rollback
         run: |
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats tests/app-priority-native.bats
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats -f 'app-priority first apply' tests/chezmoiscripts.bats
           PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run bats -f 'README CLI reference|every task name' tests/dotfiles-actions.bats tests/telemetry.bats
       - name: Provision pinned Rust in scratch directories
         if: ${{ inputs.isolated_toolchain }}

@@ -70,7 +70,7 @@ installed() {
 
 # The record that a full apply leaves (lib/apply-state.sh).
 recorded() {
-  bash -c 'source "$1/lib/apply-state.sh"; apply_state_record "$1"' _ "$REPO"
+  bash -c 'source "$1/lib/apply-state.sh"; apply_state_record "$1" "$(apply_state_fingerprint "$1")"' _ "$REPO"
 }
 
 doctor_ran() {

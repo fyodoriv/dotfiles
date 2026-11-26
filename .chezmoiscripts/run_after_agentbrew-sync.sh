@@ -117,10 +117,17 @@ else
 fi
 
 # ── Company plugin Agentfiles ─────────────────────────────────────
-# Verified plugins in plugins.lock add Agentfile layers through
-# contributes.agentbrew (docs/plugins.md). The v1 overlay was removed;
+# Verified plugins in plugins.lock add Agentfile layers (docs/plugins.md).
+# The v1 overlay was removed;
 # a leftover EXTRA_* setting stops here with one clear line.
 PLUGIN_AGENTFILES=()
+PLUGIN_AGENTFILE_RECEIPT=""
+CLAUDE_MODEL_LAYER=""
+_cleanup_agentfile_inputs() {
+  [ -z "$PLUGIN_AGENTFILE_RECEIPT" ] || plugin_agentfile_cleanup "$PLUGIN_AGENTFILE_RECEIPT"
+  [ -z "$CLAUDE_MODEL_LAYER" ] || rm -f "$CLAUDE_MODEL_LAYER"
+}
+trap _cleanup_agentfile_inputs EXIT
 if [ -f "$DOTFILES_DIR/lib/plugin.sh" ]; then
   # shellcheck source=../lib/plugin.sh
   source "$DOTFILES_DIR/lib/plugin.sh"
@@ -137,9 +144,23 @@ if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2
   # (lib/agentfile-layers.sh), checked with the agentbrew that merges it.
   # shellcheck source=../lib/agentfile-layers.sh
   source "$DOTFILES_DIR/lib/agentfile-layers.sh"
+  if [ -f "$(plugin_lock_file)" ]; then
+    PLUGIN_AGENTFILE_RECEIPT="$(_agentfile_local_tmp)" || PLUGIN_AGENTFILE_RECEIPT=""
+  fi
+  if ! _plugin_pairs="$(plugin_agentfile_pairs snapshot "$PLUGIN_AGENTFILE_RECEIPT")"; then
+    echo "Could not read the registered plugin Agentfiles. Check that their directories are writable, then retry apply." >&2
+    exit 1
+  fi
+  _plugin_guard_mode=""
+  [ ! -s "$PLUGIN_AGENTFILE_RECEIPT" ] || _plugin_guard_mode=required
+  if ! _plugin_kept="$(printf '%s\n' "$_plugin_pairs" |
+      AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_plugin_layers "$AGENTFILE" "$_plugin_guard_mode")"; then
+    echo "Could not check the plugin Agentfiles. The current global Agentfile was kept." >&2
+    exit 1
+  fi
   while IFS= read -r _pf; do
     [ -n "$_pf" ] && PLUGIN_AGENTFILES+=("$_pf") && echo "→ Including plugin Agentfile at $_pf"
-  done < <(plugin_agentfile_pairs | AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_plugin_layers "$AGENTFILE")
+  done <<< "$_plugin_kept"
 fi
 
 _agentbrew_supports_agentfile_merge() {
@@ -180,7 +201,6 @@ done < <(AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_optional_layers "$DO
 [ -f "$DOTFILES_DIR/lib/claude-model-layer.sh" ] && source "$DOTFILES_DIR/lib/claude-model-layer.sh"
 if [ "${#AGENTFILE_PATHS[@]}" -gt 0 ]; then
   CLAUDE_MODEL_LAYER="$(mktemp "${TMPDIR:-/tmp}/dotfiles-claude-model.XXXXXX")"
-  trap 'rm -f "$CLAUDE_MODEL_LAYER"' EXIT
   if declare -F claude_model_layer_write >/dev/null && claude_model_layer_write "$CLAUDE_MODEL_LAYER"; then
     AGENTFILE_PATHS+=("$CLAUDE_MODEL_LAYER")
   fi

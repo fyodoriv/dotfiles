@@ -102,6 +102,28 @@ for hook in $HOOKS; do
           done = 1
           continue
         }
+        if (!done && line ~ /^enabled:[[:space:]]*\[/) {
+          # The first pass validates the inline list and its scalar entries.
+          opening = index(line, "[")
+          closing = index(line, "]")
+          count = split(substr(line, opening + 1, closing - opening - 1), entries, ",")
+          present = 0
+          for (j = 1; j <= count; j++) {
+            item = entries[j]
+            sub(/^[[:space:]]+/, "", item)
+            sub(/[[:space:]]+$/, "", item)
+            if (item == hook || item == "\"" hook "\"" || item == "\047" hook "\047") {
+              present = 1
+              break
+            }
+          }
+          if (!present) {
+            prefix = substr(line, 1, closing - 1)
+            sub(/[[:space:]]+$/, "", prefix)
+            line = prefix ", " hook substr(line, length(prefix) + 1)
+          }
+          done = 1
+        }
         print line
         if (!done && line ~ /^enabled:[[:space:]]*(#.*)?$/) {
           indent = "  "

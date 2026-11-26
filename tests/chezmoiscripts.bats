@@ -770,6 +770,70 @@ CONFIG
   [[ "$app_priority_block" == *"WebStorm"* ]]
 }
 
+app_priority_first_apply() {
+  local profile="$1" app="$2" install_result="$3"
+  local fixture_source="$TEST_DIR/priority-source"
+  local fixture_data="$TEST_DIR/priority-data"
+  local template="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
+  mkdir -p "$fixture_source/bin" "$fixture_data/dotfiles/native/app-priority" "$HOME/Library/LaunchAgents"
+  if [ "$app" = installed ]; then mkdir -p "$TEST_DIR/apps/Ghostty.app"; fi
+  if [ "$install_result" = disabled ]; then touch "$fixture_data/dotfiles/native/app-priority/disabled"; fi
+  cat > "$fixture_source/bin/app-priority-native" <<'MOCK'
+#!/bin/bash
+printf 'install %s\n' "$1" >> "$PRIORITY_TEST_EVENTS"
+[ "$PRIORITY_TEST_INSTALL_RESULT" = ok ]
+MOCK
+  printf '<plist />\n' > "$fixture_source/priority.plist"
+  awk '
+    /^should_skip_agent\(\)|^install_plist\(\)/ { keep=1 }
+    keep { print }
+    /^}/ { keep=0 }
+  ' "$template" | sed "s|/Applications/|$TEST_DIR/apps/|g" > "$TEST_DIR/priority-activation.sh"
+  : > "$TEST_DIR/priority-events"
+  run env PROFILE="$profile" SOURCE_DIR="$fixture_source" XDG_DATA_HOME="$fixture_data" \
+    PRIORITY_TEST_EVENTS="$TEST_DIR/priority-events" PRIORITY_TEST_INSTALL_RESULT="$install_result" \
+    bash -euc '
+      source "$1"
+      failed=0
+      pgrep() { return 1; }
+      remove_skipped_agent() { return 1; }
+      self_reload_should_defer() { return 1; }
+      launchctl() { printf "%s\n" "$1" >> "$PRIORITY_TEST_EVENTS"; }
+      install_plist "$SOURCE_DIR/priority.plist" com.dotfiles.app-priority.plist com.dotfiles.app-priority app-priority
+    ' _ "$TEST_DIR/priority-activation.sh"
+}
+
+@test "app-priority first apply selects native before loading an eligible agent" {
+  app_priority_first_apply full installed ok
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload' ]
+}
+
+@test "app-priority first apply skips a core profile" {
+  app_priority_first_apply core installed ok
+  [ "$status" -eq 0 ]
+  [ ! -s "$TEST_DIR/priority-events" ]
+}
+
+@test "app-priority first apply skips when neither app is present" {
+  app_priority_first_apply full absent ok
+  [ "$status" -eq 0 ]
+  [ ! -s "$TEST_DIR/priority-events" ]
+}
+
+@test "app-priority first apply respects a previous explicit rollback" {
+  app_priority_first_apply full installed disabled
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'unload\nload' ]
+}
+
+@test "app-priority first apply keeps shell dispatch after a failed build" {
+  app_priority_first_apply full installed failed
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload' ]
+  [ ! -L "$TEST_DIR/priority-data/dotfiles/native/app-priority/current" ]
+}
+
 @test "launchagents template: upgrade agent requires auto_upgrade=true" {
   local script="$TEST_DOTFILES/.chezmoiscripts/run_onchange_launchagents.sh.tmpl"
   awk '/upgrade\)/,/;;/' "$script" | grep -q 'AUTO_UPGRADE.*!=.*true'

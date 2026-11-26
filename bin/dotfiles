@@ -208,7 +208,7 @@ case "$cmd" in
     ;;
 
   priority-native)
-    # agent: install the offline native candidate or roll back to the shell on request.
+    # agent: install the native candidate or restore shell or the prior verified binary on request.
     shift
     exec bash "$DOTFILES_DIR/bin/app-priority-native" "$@"
     ;;

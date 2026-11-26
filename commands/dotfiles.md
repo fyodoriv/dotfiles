@@ -49,6 +49,8 @@ On a full-profile Mac with Ghostty or WebStorm, the first LaunchAgent setup
 during `dotfiles apply` tries the native App Priority install. To retry a
 failed setup or enable it manually, run `dotfiles priority-native install`.
 To keep using the shell implementation, run `dotfiles priority-native rollback`.
+To stay on the previous native build, run `dotfiles priority-native rollback --native`.
+A successful manual install enables automatic refresh again.
 
 To enable the native status guard, run `dotfiles hook-native install`. To
 restore the shell guard, run `dotfiles hook-native rollback`.

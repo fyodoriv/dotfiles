@@ -134,3 +134,28 @@ These controlled measurements do not prove an in-use speedup. The shortened
 baseline was unstable, and live durations vary under load. The final migration
 audit remains open and must verify all gate G requirements before closing the
 task.
+
+### Roll back to a verified native binary
+
+- **Hypothesis:** Selecting the immediate prior verified binary restores
+  a usable native runtime and keeps it selected through later apply runs
+  until an explicit install succeeds.
+- **Measurement:** Use hosted `tests/app-priority-native.bats` and the
+  isolated Intel and Apple Silicon delivery jobs. Verify the selected
+  current and prior artifact digests after each changed or interrupted
+  selection. No fixture applies process priority changes.
+- **Success:** Both architectures select the prior verified generation and
+  keep it selected after apply. All seven controls pass: first install,
+  successful upgrade, persistent rollback, failed build, bad prior
+  artifact, identical build, and explicit re-enable. Zero live priority
+  changes and zero unverified artifact selections.
+- **Pivot:** If one case loses the current working artifact, clears the hold
+  implicitly, or selects an unverified artifact, retain the shell path and
+  repair the selection before either rollout or shell removal.
+- **Anchor:** App Priority gate G in [the migration plan](rust-migration.md)
+  and the existing atomic link selection and digest validation.
+
+The default rollback still restores the shell in this phase. Test the
+native rollback option through the existing CLI action and document it
+where the agent and command-line users look for rollback. Verify
+interruption separately before removing the shell implementation.

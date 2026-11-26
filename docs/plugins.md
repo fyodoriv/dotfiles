@@ -265,7 +265,18 @@ MCP server that is not written the same way, or a command, agent, or skill
 name as above (folders as agentbrew reads them when it applies the file on
 its own) skips it.
 
-#### Per-user Agentfiles
+The one exception: `defaultModel`, `defaultEffort`, and `modelOverrides`
+may change, because an overlay sets them on purpose
+([model-configuration.md](model-configuration.md)).
+
+The doctor check `agentbrew.plugin_agentfile_shared` finds agentbrew the way
+apply does (PATH, then the checkout's `dist/cli.js`, then its `tsx`) and
+names the plugin and what it would take. Give a plugin hook its own command,
+and a plugin MCP server, command, agent, or skill its own name. To keep
+people off an agent, use `blocked_software`.
+
+
+### Per-user Agentfiles
 
 A verified plugin can list optional Agentfiles in its manifest:
 
@@ -291,17 +302,6 @@ temporary files on exit. Write updates by replacing the file atomically.
 If apply or the doctor cannot copy a registered file, it keeps the current
 global Agentfile. Check that the file is readable and its directory is
 writable, then retry.
-
-The one exception: `defaultModel`, `defaultEffort`, and `modelOverrides`
-may change, because an overlay sets them on purpose
-([model-configuration.md](model-configuration.md)).
-
-The doctor check `agentbrew.plugin_agentfile_shared` finds agentbrew the way
-apply does (PATH, then the checkout's `dist/cli.js`, then its `tsx`) and
-names the plugin and what it would take. Give a plugin hook its own command,
-and a plugin MCP server, command, agent, or skill its own name. To keep
-people off an agent, use `blocked_software`.
-
 
 ### Plugin rules
 

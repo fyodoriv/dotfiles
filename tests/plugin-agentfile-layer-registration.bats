@@ -173,8 +173,8 @@ SHIM
   [ "$(yq -r '.mcp | join(",")' "$global")" = "shared-example,base-example,first-example,last-example" ]
   [ "$(yq -r 'has("excludeAgents")' "$global")" = false ]
   [ -f "$MUTATE_LAYER.mutated" ]
-  ! compgen -G "$EXTRA/.dotfiles-agentfile.*"
-  ! compgen -G "$EXTRA/nested/.dotfiles-agentfile.*"
+  [ -z "$(compgen -G "$EXTRA/.dotfiles-agentfile.*")" ]
+  [ -z "$(compgen -G "$EXTRA/nested/.dotfiles-agentfile.*")" ]
   # The fix rewrites the canonical file synchronously. Hold its fixture
   # lock to keep it from launching a duplicate apply in the background.
   mkdir -p "$HOME/.local/state/dotfiles/agentbrew-sync-fix.lock"
@@ -186,6 +186,6 @@ SHIM
   [ "$(yq -r '.mcp | join(",")' "$global")" = "shared-example,base-example,first-example,last-example" ]
   [ "$(yq -r 'has("excludeAgents")' "$global")" = false ]
   [ -f "$MUTATE_LAYER.mutated" ]
-  ! compgen -G "$EXTRA/.dotfiles-agentfile.*"
-  ! compgen -G "$EXTRA/nested/.dotfiles-agentfile.*"
+  [ -z "$(compgen -G "$EXTRA/.dotfiles-agentfile.*")" ]
+  [ -z "$(compgen -G "$EXTRA/nested/.dotfiles-agentfile.*")" ]
 }

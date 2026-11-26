@@ -19,7 +19,7 @@ setup() {
   REPO="$TEST_DIR/dotfiles"
   mkdir -p "$REPO/bin" "$REPO/lib"
   cp "$REPO_ROOT/bin/dotfiles" "$REPO/bin/"
-  for f in colors lock apply-state; do cp "$REPO_ROOT/lib/$f.sh" "$REPO/lib/"; done
+  for f in colors lock apply-state plugin plugin-extensions; do cp "$REPO_ROOT/lib/$f.sh" "$REPO/lib/"; done
   printf '#!/bin/bash\necho doctor >> "%s/calls.log"\n' "$TEST_DIR" > "$REPO/bin/dotfiles-doctor"
   chmod +x "$REPO/bin/dotfiles" "$REPO/bin/dotfiles-doctor"
   echo "a = 1" > "$REPO/dot_testrc"

@@ -208,7 +208,7 @@ MOCK
   [ ! -e "$DIRECTORY/.install.lock" ]
 }
 
-@test "an interrupted first install cannot select a binary after rollback succeeds" {
+start_fixture_first_build() {
   stub_in_progress_first_build
   NATIVE_EXIT=2 DOTFILES_NATIVE_BUILD_MAX_WAIT=12 "$INSTALLER" ensure fixture-source > "$TEST_ROOT/ensure.log" 2>&1 3>&- &
   ensure_pid=$!
@@ -219,9 +219,9 @@ MOCK
   worker_pid="$(cat "$TEST_ROOT/build-started")"
   [[ "$worker_pid" =~ ^[1-9][0-9]+$ && "$worker_pid" != "$ensure_pid" ]]
   kill -0 "$worker_pid"
-  kill -KILL "$ensure_pid"
-  wait "$ensure_pid" 2>/dev/null || true
+}
 
+start_fixture_rollback() {
   DOTFILES_NATIVE_BUILD_MAX_WAIT=12 "$INSTALLER" rollback > "$TEST_ROOT/rollback.log" 2>&1 3>&- &
   rollback_pid=$!
   for ((try = 0; try < 30; try++)); do
@@ -229,6 +229,14 @@ MOCK
     sleep 0.1
   done
   grep -Eq 'Waiting for the lock|Shell app-priority restored' "$TEST_ROOT/rollback.log"
+}
+
+@test "an interrupted first install cannot select a binary after rollback succeeds" {
+  start_fixture_first_build
+  kill -KILL "$ensure_pid"
+  wait "$ensure_pid" 2>/dev/null || true
+
+  start_fixture_rollback
   touch "$TEST_ROOT/release-build"
   wait "$rollback_pid"
   for ((try = 0; try < 50; try++)); do
@@ -237,6 +245,35 @@ MOCK
   done
   if kill -0 "$worker_pid" 2>/dev/null; then
     echo 'The first-install worker did not exit.' >&2
+    return 1
+  fi
+  [ -f "$DIRECTORY/disabled" ]
+  [ ! -L "$DIRECTORY/current" ]
+  [ ! -e "$DIRECTORY/.install.lock" ]
+}
+
+fixture_build_group_alive() {
+  ps -ax -o pgid= -o stat= | awk -v group="$worker_pid" '$1 == group && $2 !~ /^Z/ { found = 1 } END { exit !found }'
+}
+
+@test "a killed first-install worker cannot leave a later selection or running children" {
+  start_fixture_first_build
+  [ "$(head -1 "$DIRECTORY/.install.lock")" = "$worker_pid" ]
+  kill -KILL "$worker_pid"
+
+  start_fixture_rollback
+  touch "$TEST_ROOT/release-build"
+  if wait "$ensure_pid" 2>/dev/null; then
+    echo 'The launcher reported success after its worker was killed.' >&2
+    return 1
+  fi
+  wait "$rollback_pid"
+  for ((try = 0; try < 50; try++)); do
+    if ! fixture_build_group_alive; then break; fi
+    sleep 0.1
+  done
+  if fixture_build_group_alive; then
+    echo 'The first-install worker left running children.' >&2
     return 1
   fi
   [ -f "$DIRECTORY/disabled" ]

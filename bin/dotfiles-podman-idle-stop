@@ -1,0 +1,91 @@
+#!/bin/bash
+# Stop the selected local Podman machine after checking its idle window.
+set -euo pipefail
+
+machine="${1:-}"
+[ -n "$machine" ] || exit 0
+idle_minutes="${2:-}"
+if [[ $# -ne 2 || ! "$machine" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ||
+      ! "$idle_minutes" =~ ^[1-9][0-9]{0,3}$ ]] || (( idle_minutes > 1440 )); then
+  printf 'Use a local Podman machine name and an idle window from 1 to 1440 minutes.\n' >&2
+  exit 2
+fi
+
+command -v podman >/dev/null 2>&1 || exit 0
+timeout_bin="$(command -v gtimeout || command -v timeout)" || exit 0
+unset CONTAINER_HOST CONTAINER_CONNECTION
+
+repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+umask 077
+mkdir -p "$state_dir"
+# This instance uses its own lock in the shared lock library.
+# shellcheck disable=SC2034
+DOTFILES_LOCK="$state_dir/podman-idle-stop.lock"
+# shellcheck source=../lib/lock.sh
+source "$repo_dir/lib/lock.sh"
+acquire_lock podman-idle-stop || exit 0
+
+machine_identity() {
+  local record name state created boot guest_user extra
+  record="$("$timeout_bin" -k 2 10 podman machine inspect "$machine" \
+    --format '{{.Name}}|{{.State}}|{{.Created}}|{{.LastUp}}|{{.SSHConfig.RemoteUsername}}' 2>/dev/null)" || return 1
+  [[ "$record" != *$'\n'* ]] || return 1
+  IFS='|' read -r name state created boot guest_user extra <<< "$record"
+  [[ "$name" == "$machine" && "$state" == running && -n "$created" && -n "$boot" && -z "$extra" ]] || return 1
+  [[ "$guest_user" != root && "$guest_user" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || return 1
+  printf '%s\n' "$record"
+}
+
+guest_idle() {
+  # A rootful machine defaults to SSH as root. Select the managed user so
+  # the first probe always reads the rootless store.
+  "$timeout_bin" -k 2 20 podman machine ssh --username="$1" "$machine" sh -s -- "$idle_minutes" >/dev/null 2>&1 <<'GUEST'
+set -eu
+idle_minutes="$1"
+unset CONTAINER_HOST CONTAINER_CONNECTION
+
+has_history() {
+  old_entry="$("$@" -b -q --until="-${idle_minutes}min" -n 1 --output=short-unix --no-pager 2>&1)" || return 1
+  case "$old_entry" in *'
+'*) return 1 ;; esac
+  printf '%s\n' "$old_entry" | grep -Eq '^[0-9]+\.[0-9]+ '
+}
+
+check_store() {
+  logger="$("$@" info --format '{{.Host.EventLogger}}' 2>&1)" || return 1
+  [ "$logger" = journald ] || return 1
+  recent="$("$@" events --stream=false --since "${idle_minutes}m" --filter type=container --format '{{.Status}}' 2>&1)" || return 1
+  [ -z "$recent" ] || return 1
+  states="$("$@" ps --all --format '{{.State}}' 2>&1)" || return 1
+  [ -n "$states" ] || return 0
+  while IFS= read -r state; do
+    case "$state" in
+      configured|created|exited|stopped) ;;
+      *) return 1 ;;
+    esac
+  done <<STATES
+$states
+STATES
+}
+
+has_history journalctl --user &&
+  has_history sudo -n journalctl --system &&
+  check_store podman --remote=false &&
+  check_store sudo -n podman --remote=false
+GUEST
+}
+
+identity="$(machine_identity)" || exit 0
+guest_user="${identity##*|}"
+guest_idle "$guest_user" || exit 0
+[[ "$(machine_identity)" == "$identity" ]] || exit 0
+guest_idle "$guest_user" || exit 0
+[[ "$(machine_identity)" == "$identity" ]] || exit 0
+
+if ! "$timeout_bin" -k 2 30 podman machine stop "$machine" >/dev/null; then
+  printf 'Podman could not stop %s after the idle check.\n' "$machine" >&2
+  exit 1
+fi
+printf '%s stopped %s after %s idle minutes with no active containers or recent events.\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$machine" "$idle_minutes"

@@ -73,6 +73,7 @@ Even without running `morning`, managed LaunchAgents keep things healthy:
 | `gui-path` | Sync shell PATH to GUI apps | At login |
 | `pmset-drift-watch` | Log who changed power settings (read-only) | On power-plist write + every 5 min |
 | `rancher-desktop` | Start Rancher Desktop; wait until the Docker API answers | At login |
+| `podman-idle-stop` | Stop the selected Podman VM after the idle window when enabled | Every 10 minutes |
 | `network-resilience` | Network watchdog for marathon sessions | Every 5 min + after wake |
 | `sleepwatcher` | Run hooks on sleep/wake events | At login |
 | `agent-browser-chrome` | The one agents Chrome CDP for browser automation; manual close respected | At login, not kept alive |

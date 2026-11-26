@@ -37,6 +37,8 @@ To stop unattended uv Python downloads, run `dotfiles config set uv_python_downl
 
 To stop new shells from starting MLX, run `dotfiles config set shell_mlx_autostart false` and follow the apply step above. To check the installed launcher and package, run `dotfiles doctor --module local-llm`.
 
+To stop a local Podman VM after an idle window, list machine names with `podman machine list`. Set the chosen name with `dotfiles config set podman_idle_machine <name>` and the window with `dotfiles config set podman_idle_minutes <minutes>`. An empty name disables the job. Follow the apply step above.
+
 Every other command: run `dotfiles actions --json`. It lists every top-level `dotfiles` command, generated from `bin/dotfiles`: its usage `forms` and arguments, what it does, `subforms` (the sub-commands from the command's own usage header, for example `dotfiles config get <key>`), and four notes. `terminal_only`: why an agent cannot run it; give the user the command to run in their own terminal. `confirm`: what it changes that is hard to undo; say that in plain words and run it only after the user says yes. Each form with `needs_yes: true` takes `--yes`; pass it after the yes (without a terminal such a form refuses without `--yes`). `unattended`: why a confirm command takes no `--yes` (`apply`, `sync`); still ask first. `agent_note`: what to do differently. `dotfiles actions <name>` shows one command with its sub-forms; `dotfiles <name> --help` shows the rest.
 
 If dotfiles fails, surprises you, or could clearly work better, offer once to report it (CONTRIBUTING.md "Report problems and ideas"). Show the user the exact text, and post only after they say yes.

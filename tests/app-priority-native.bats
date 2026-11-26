@@ -166,7 +166,7 @@ MOCK
   [ ! -e "$DIRECTORY/toolchain" ]
 }
 
-@test "rollback waits for a first build and leaves shell selected" {
+stub_in_progress_first_build() {
   compiler="$DIRECTORY/toolchain/rustup/toolchains/1.100.0-x86_64-apple-darwin/bin"
   mkdir -p "$compiler"
   printf '#!/bin/bash\necho "rustc 1.100.0 (fixture)"\n' > "$compiler/rustc"
@@ -174,14 +174,18 @@ MOCK
   chmod +x "$compiler/rustc" "$compiler/cargo"
   cat > "$TEST_ROOT/bin/heavy-run" <<'MOCK'
 #!/bin/bash
-touch "$TEST_ROOT/build-started"
-for ((try = 0; try < 50; try++)); do
+ps -o pgid= -p "$$" | tr -d '[:space:]' > "$TEST_ROOT/worker-pid.tmp"
+mv "$TEST_ROOT/worker-pid.tmp" "$TEST_ROOT/build-started"
+for ((try = 0; try < 80; try++)); do
   [ ! -f "$TEST_ROOT/release-build" ] || exit 0
   sleep 0.1
 done
 exit 1
 MOCK
+}
 
+@test "rollback waits for a first build and leaves shell selected" {
+  stub_in_progress_first_build
   NATIVE_EXIT=2 DOTFILES_NATIVE_BUILD_MAX_WAIT=10 "$INSTALLER" ensure fixture-source > "$TEST_ROOT/ensure.log" 2>&1 &
   ensure_pid=$!
   for ((try = 0; try < 30; try++)); do
@@ -199,6 +203,42 @@ MOCK
   touch "$TEST_ROOT/release-build"
   wait "$ensure_pid"
   wait "$rollback_pid"
+  [ -f "$DIRECTORY/disabled" ]
+  [ ! -L "$DIRECTORY/current" ]
+  [ ! -e "$DIRECTORY/.install.lock" ]
+}
+
+@test "an interrupted first install cannot select a binary after rollback succeeds" {
+  stub_in_progress_first_build
+  NATIVE_EXIT=2 DOTFILES_NATIVE_BUILD_MAX_WAIT=12 "$INSTALLER" ensure fixture-source > "$TEST_ROOT/ensure.log" 2>&1 3>&- &
+  ensure_pid=$!
+  for ((try = 0; try < 30; try++)); do
+    [ ! -s "$TEST_ROOT/build-started" ] || break
+    sleep 0.1
+  done
+  worker_pid="$(cat "$TEST_ROOT/build-started")"
+  [[ "$worker_pid" =~ ^[1-9][0-9]+$ && "$worker_pid" != "$ensure_pid" ]]
+  kill -0 "$worker_pid"
+  kill -KILL "$ensure_pid"
+  wait "$ensure_pid" 2>/dev/null || true
+
+  DOTFILES_NATIVE_BUILD_MAX_WAIT=12 "$INSTALLER" rollback > "$TEST_ROOT/rollback.log" 2>&1 3>&- &
+  rollback_pid=$!
+  for ((try = 0; try < 30; try++)); do
+    if grep -Eq 'Waiting for the lock|Shell app-priority restored' "$TEST_ROOT/rollback.log"; then break; fi
+    sleep 0.1
+  done
+  grep -Eq 'Waiting for the lock|Shell app-priority restored' "$TEST_ROOT/rollback.log"
+  touch "$TEST_ROOT/release-build"
+  wait "$rollback_pid"
+  for ((try = 0; try < 50; try++)); do
+    ! kill -0 "$worker_pid" 2>/dev/null && break
+    sleep 0.1
+  done
+  if kill -0 "$worker_pid" 2>/dev/null; then
+    echo 'The first-install worker did not exit.' >&2
+    return 1
+  fi
   [ -f "$DIRECTORY/disabled" ]
   [ ! -L "$DIRECTORY/current" ]
   [ ! -e "$DIRECTORY/.install.lock" ]

@@ -8,7 +8,7 @@
 # fails when a key or a default here differs from a new-user render of it.
 #
 # type:     bool | int:<min>-<max> | enum:<a>,<b>,... | text | email | host |
-#           relpath | token | list
+#           relpath | token | machine-name | list
 # default:  a value; "@key" (the value of another setting); "@a|b" (true when
 #           either one is true); or "derived" (the template works it out; the
 #           description says how).
@@ -71,6 +71,16 @@ settings:
     type: bool
     default: "@owner_machine"
     description: Commit this checkout every 30 min (dotfiles-sync) and run tooling-sync hourly.
+  podman_idle_machine:
+    type: machine-name
+    default: ""
+    optional: true
+    description: Local Podman machine to stop after an idle window. Empty disables the job.
+  podman_idle_minutes:
+    type: int:1-1440
+    default: 30
+    optional: true
+    description: Minutes without container activity before the selected Podman machine may stop.
   owner_machine:
     type: bool
     default: derived

@@ -230,6 +230,26 @@ EOF
   [[ "$output" == *"does not exist yet"* ]]
 }
 
+@test "Podman idle settings validate and survive init until cleared" {
+  [ -n "$REAL_CHEZMOI" ] || skip "chezmoi not installed"
+  cfg get podman_idle_minutes
+  [ "$status" -eq 0 ] && [ "$output" = 30 ]
+  cfg set podman_idle_machine 'ssh://remote'
+  [ "$status" -ne 0 ]
+  cfg set podman_idle_minutes 1441
+  [ "$status" -ne 0 ]
+  cfg set podman_idle_machine local-fixture
+  [ "$status" -eq 0 ]
+  cfg set podman_idle_minutes 45
+  [ "$status" -eq 0 ]
+  "$REAL_CHEZMOI" init --source "$REPO_ROOT" --config "$CFG" --config-path "$CFG" --promptDefaults >/dev/null 2>&1
+  [ "$(yq -r '.data.podman_idle_machine' "$CFG")" = local-fixture ]
+  [ "$(yq -r '.data.podman_idle_minutes' "$CFG")" = 45 ]
+  cfg set podman_idle_machine ""
+  [ "$status" -eq 0 ]
+  [ "$(yq -r '.data | has("podman_idle_machine")' "$CFG")" = false ]
+}
+
 @test "settings table defaults match a new-user render of .chezmoi.yaml.tmpl" {
   [ -n "$REAL_CHEZMOI" ] || skip "chezmoi not installed"
   local render="$TEST_DIR/render.yaml" key type def opt got want ref refs

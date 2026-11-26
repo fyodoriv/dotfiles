@@ -132,6 +132,7 @@ _allowed() {
     host) ALLOWED="host name" ;;
     relpath) ALLOWED="path under ~" ;;
     token) ALLOWED="one word" ;;
+    machine-name) ALLOWED="letters, digits, dots, underscores, or hyphens, starting with a letter or digit" ;;
     list) ALLOWED="a,b,c or empty" ;;
     *) ALLOWED="$t" ;;
   esac
@@ -193,6 +194,10 @@ _validate() {
     token)
       re='^[][A-Za-z0-9._:@/+-]{1,100}$'
       [[ "$v" =~ $re ]] || WHY="use one word: letters, digits, and . _ : @ / [ ] + - (at most 100)"
+      ;;
+    machine-name)
+      re='^[A-Za-z0-9][A-Za-z0-9_.-]*$'
+      [[ "$v" =~ $re ]] || WHY="use letters, digits, dots, underscores, or hyphens, starting with a letter or digit"
       ;;
     list)
       re='^[A-Za-z0-9@._+/-]{1,100}$'

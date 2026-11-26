@@ -26,9 +26,13 @@ if [[ "${PODMAN_GUEST:-0}" == 1 ]]; then
       case "$PODMAN_SCENARIO:$store" in
         running:root) echo running ;;
         paused:managed) echo paused ;;
+        rootful-with-rootless-work:managed) echo running ;;
       esac ;;
     events)
-      if [[ "$PODMAN_SCENARIO" == recent-event && "$store" == managed ]]; then echo start; fi ;;
+      case "$PODMAN_SCENARIO:$store" in
+        recent-event:managed) echo start ;;
+        event-read-error:managed) echo 'Failed to read event' >&2 ;;
+      esac ;;
     *) exit 2 ;;
   esac
   exit 0
@@ -43,13 +47,20 @@ case "$1:$2" in
     if [[ "$PODMAN_SCENARIO" == reboot && "$(grep -c '^inspect ' "$calls")" -gt 1 ]]; then
       boot=2026-01-01T01:00:00Z
     fi
-    printf 'local-fixture|running|2025-12-01T00:00:00Z|%s\n' "$boot"
+    printf 'local-fixture|running|2025-12-01T00:00:00Z|%s|core\n' "$boot"
     ;;
   machine:ssh)
-    [[ "$3" == local-fixture && "$*" == "machine ssh local-fixture sh -s -- 30" ]] || exit 2
-    printf 'ssh %s\n' "$3" >> "$calls"
-    shift 3
-    PODMAN_GUEST=1 "$@"
+    shift 2
+    store=managed
+    if [[ "${1:-}" == --username=core ]]; then
+      shift
+    elif [[ "$PODMAN_SCENARIO" == rootful-with-rootless-work ]]; then
+      store=root
+    fi
+    [[ "$*" == "local-fixture sh -s -- 30" ]] || exit 2
+    printf 'ssh %s\n' "$1" >> "$calls"
+    shift
+    PODMAN_GUEST=1 PODMAN_STORE="$store" "$@"
     ;;
   machine:stop)
     [[ "$3" == local-fixture ]] || exit 2
@@ -67,8 +78,15 @@ PODMAN_STORE=root exec "$@"
 STUB
   cat > "$PODMAN_FIXTURE/bin/journalctl" <<'STUB'
 #!/bin/bash
-[[ "${PODMAN_STORE:-}" == root ]] || exit 2
-[[ "$PODMAN_SCENARIO" == short-history ]] || echo '1767225600.000000 guest journal entry'
+store="${PODMAN_STORE:-managed}"
+case "$store:$1" in
+  managed:--user|root:--system) ;;
+  *) exit 2 ;;
+esac
+case "$PODMAN_SCENARIO:$store" in
+  short-history:root|short-user-history:managed) ;;
+  *) echo '1767225600.000000 guest journal entry' ;;
+esac
 STUB
   chmod +x "$PODMAN_FIXTURE/bin/"*
   export PATH="$PODMAN_FIXTURE/bin:$PATH"
@@ -95,7 +113,7 @@ teardown() {
 }
 
 @test "Podman idle stop leaves busy or unverified machines running" {
-  for scenario in running paused recent-event down logger-off short-history reboot; do
+  for scenario in running paused recent-event event-read-error down logger-off short-history short-user-history reboot; do
     : > "$PODMAN_FIXTURE/calls"
     run env PODMAN_SCENARIO="$scenario" bash "$SCRIPT" local-fixture 30
     [ "$status" -eq 0 ]
@@ -108,6 +126,13 @@ teardown() {
   [ "$status" -ne 0 ]
   grep -Fxq 'stop local-fixture' "$PODMAN_FIXTURE/calls"
   [[ "$output" != *"stopped local-fixture"* ]]
+}
+
+@test "Podman idle stop reads the rootless store even when SSH defaults to root" {
+  run env PODMAN_SCENARIO=rootful-with-rootless-work bash "$SCRIPT" local-fixture 30
+  [ "$status" -eq 0 ]
+  grep -Fxq 'managed ps' "$PODMAN_FIXTURE/calls"
+  ! grep -q '^stop ' "$PODMAN_FIXTURE/calls"
 }
 
 @test "Podman LaunchAgent uses the selected machine and polls every ten minutes" {

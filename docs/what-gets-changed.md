@@ -168,6 +168,7 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `network-resilience` | Periodic | all | Monitor and recover network connectivity |
 | `atuin-daemon` | At load | all | Background shell history daemon (if atuin installed) |
 | `rancher-desktop` | At load | all | Rancher Desktop integration (if app installed); turns Kubernetes off unless `DOTFILES_RANCHER_KUBERNETES=1` |
+| `podman-idle-stop` | Every 10 minutes | opt-in | Stops one named local Podman machine after a verified idle window |
 | `chrome-dock-guard` | At load, always running | all | Raises or starts your own Chrome when a hidden agent Chrome takes the front; never touches the agent Chromes; skips without `swiftc` |
 | `pmset-drift-watch` | On power-plist write + every 5 min | all | Read-only log of power-settings changes and the processes alive at that moment |
 | `load-sampler` | Every 30s | all | Read-only 7-day load, memory, and top-process history in `~/.local/state/dotfiles/load-samples.tsv` |
@@ -178,6 +179,24 @@ Deployed to `~/Library/LaunchAgents/com.dotfiles.*` via `run_onchange_launchagen
 | `dotfiles-upgrade` | Sunday 9:00 AM | opt-in | Topgrade upgrade of Homebrew, casks and tools, and company plugins to their newest signed release (requires `auto_upgrade: true`) |
 
 Logs are written to `~/.local/share/dotfiles/logs/<agent-name>.log`.
+
+### Idle container VMs
+
+For Docker Desktop, enable Resource Saver under **Settings → Resources** and
+set the idle window to 30 minutes. Docker Desktop stops its Linux VM and
+starts it again when needed. [Docker Resource Saver](https://docs.docker.com/desktop/use-desktop/resource-saver/)
+
+For Podman, use `podman machine list` to find the local machine you control.
+Run `dotfiles config set podman_idle_machine <name>` and `dotfiles apply`.
+The idle window defaults to 30 minutes. Change it with
+`dotfiles config set podman_idle_minutes <minutes>` and apply again. To turn
+off the job, set the name to `""` and apply.
+
+The job requires both the current boot system journal and the managed
+user's journal to cover the window. It checks both Podman stores for recent
+events and active containers, and leaves the VM running if a check fails. Podman checks
+activity and stops the VM in separate commands, so use this on a machine
+you control. Successful stops appear in `~/.local/share/dotfiles/logs/podman-idle-stop.launchagent.log`.
 
 ---
 

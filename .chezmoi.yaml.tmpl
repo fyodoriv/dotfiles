@@ -253,6 +253,12 @@ data:
   samsung_tv_host: {{ $samsungTvHost | quote }}
   auto_upgrade: {{ $autoUpgrade }}
   auto_sync: {{ $autoSync }}
+{{- if hasKey . "podman_idle_machine" }}
+  podman_idle_machine: {{ .podman_idle_machine | quote }}
+{{- end }}
+{{- if hasKey . "podman_idle_minutes" }}
+  podman_idle_minutes: {{ .podman_idle_minutes | int }}
+{{- end }}
   owner_machine: {{ $ownerMachine }}
   endpoint_hardening: {{ $endpointHardening }}
   uv_python_downloads_never: {{ dig "uv_python_downloads_never" false . }}

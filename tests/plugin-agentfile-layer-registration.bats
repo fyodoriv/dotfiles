@@ -141,7 +141,15 @@ SHIM
   export REAL_MKTEMP="$(command -v mktemp)"
   cat > "$TEST_DIR/shims/mktemp" <<'SHIM'
 #!/bin/bash
-[[ "$1" != .dotfiles-agentfile.* || "${FAIL_SNAPSHOT:-0}" != 1 ]] || exit 1
+case "$1" in
+  .dotfiles-agentfile.*)
+    [ "${FAIL_SNAPSHOT:-0}" != 1 ] || exit 1
+    touch "$MUTATE_LAYER.snapshot-attempt"
+    ;;
+  */dotfiles-local-agentfile.*|*/local-agentfile.*|*/dotfiles-plugin-agentfiles.*)
+    [ "${FAIL_GUARD:-0}" != 1 ] || [ ! -f "$MUTATE_LAYER.snapshot-attempt" ] || exit 1
+    ;;
+esac
 exec "$REAL_MKTEMP" "$@"
 SHIM
   chmod +x "$TEST_DIR/shims/mktemp"
@@ -151,6 +159,13 @@ SHIM
   [ "$status" -ne 0 ]
   [ "$(yq -r '.mcp | join(",")' "$global")" = old-example ]
   run env FAIL_SNAPSHOT=1 DOTFILES_DIR="$source" bash "$source/bin/dotfiles-agentfile-resync"
+  [ "$status" -ne 0 ]
+  [ "$(yq -r '.mcp | join(",")' "$global")" = old-example ]
+  run env FAIL_GUARD=1 bash "$source/.chezmoiscripts/run_after_agentbrew-sync.sh"
+  [ "$status" -ne 0 ]
+  [ "$(yq -r '.mcp | join(",")' "$global")" = old-example ]
+  rm -f "$MUTATE_LAYER.snapshot-attempt"
+  run env FAIL_GUARD=1 DOTFILES_DIR="$source" bash "$source/bin/dotfiles-agentfile-resync"
   [ "$status" -ne 0 ]
   [ "$(yq -r '.mcp | join(",")' "$global")" = old-example ]
   run bash "$source/.chezmoiscripts/run_after_agentbrew-sync.sh"

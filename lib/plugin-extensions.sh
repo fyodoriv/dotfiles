@@ -584,6 +584,7 @@ _plugin_registered_agentfile_pairs() {
 _plugin_snapshot_agentfile() (
   local parent="${1%/*}" file="${1##*/}" receipt="$2" snapshot physical_config
   local config="${XDG_CONFIG_HOME:-$HOME/.config}"
+  receipt="$(cd -P -- "${receipt%/*}" && printf '%s/%s\n' "$PWD" "${receipt##*/}")" || return 1
   physical_config="$(cd -P -- "$config" && pwd -P)" || return 1
   cd -P -- "$parent" || return 1
   [ "$(pwd -P)" = "$physical_config/${parent#"$config"/}" ] || return 1

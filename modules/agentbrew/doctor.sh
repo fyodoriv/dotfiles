@@ -81,7 +81,7 @@ _agentbrew_doctor_cmd() {
 # _agentbrew_plugin_problem what it skips and why.
 _agentbrew_plugin_layers_done="" _agentbrew_plugin_kept="" _agentbrew_plugin_problem=""
 _agentbrew_plugin_layers_once() {
-  local _plib errf pairs
+  local _plib errf pairs mode=""
   [ -z "$_agentbrew_plugin_layers_done" ] || return 0
   _agentbrew_plugin_layers_done=1
   [ -f "$DOTFILES_DIR/lib/agentfile-layers.sh" ] && [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] &&
@@ -95,12 +95,18 @@ _agentbrew_plugin_layers_once() {
     return 1
   fi
   [ -n "$pairs" ] || return 0
+  [ "${1:-}" != snapshot ] || [ ! -s "${2:-}" ] || mode=required
   if ! errf="$(mktemp "${TMPDIR:-/tmp}/dotfiles-plugin-agentfiles.XXXXXX" 2>/dev/null)"; then
     _agentbrew_plugin_problem="cannot check plugin Agentfiles (no temp file)"
+    [ "$mode" != required ] || return 1
     return 0
   fi
-  _agentbrew_plugin_kept="$(printf '%s\n' "$pairs" |
-    AGENTFILE_AGENTBREW_CMD="$(_agentbrew_doctor_cmd)" agentfile_plugin_layers "$AGENTFILE" 2>"$errf")"
+  if ! _agentbrew_plugin_kept="$(printf '%s\n' "$pairs" |
+      AGENTFILE_AGENTBREW_CMD="$(_agentbrew_doctor_cmd)" agentfile_plugin_layers "$AGENTFILE" "$mode" 2>"$errf")"; then
+    rm -f "$errf"
+    _agentbrew_plugin_problem="cannot check the plugin Agentfiles"
+    return 1
+  fi
   _agentbrew_plugin_problem="$(sed 's/^⚠ //' "$errf" | paste -sd ' ' - | sed 's/  */ /g')"
   rm -f "$errf"
 }

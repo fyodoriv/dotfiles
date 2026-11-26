@@ -151,10 +151,16 @@ if [ -f "$DOTFILES_DIR/lib/plugin-extensions.sh" ] && command -v yq >/dev/null 2
     echo "Could not read the registered plugin Agentfiles. Check that their directories are writable, then retry apply." >&2
     exit 1
   fi
+  _plugin_guard_mode=""
+  [ ! -s "$PLUGIN_AGENTFILE_RECEIPT" ] || _plugin_guard_mode=required
+  if ! _plugin_kept="$(printf '%s\n' "$_plugin_pairs" |
+      AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_plugin_layers "$AGENTFILE" "$_plugin_guard_mode")"; then
+    echo "Could not check the plugin Agentfiles. The current global Agentfile was kept." >&2
+    exit 1
+  fi
   while IFS= read -r _pf; do
     [ -n "$_pf" ] && PLUGIN_AGENTFILES+=("$_pf") && echo "→ Including plugin Agentfile at $_pf"
-  done < <(printf '%s\n' "$_plugin_pairs" |
-    AGENTFILE_AGENTBREW_CMD="$AGENTBREW_CMD" agentfile_plugin_layers "$AGENTFILE")
+  done <<< "$_plugin_kept"
 fi
 
 _agentbrew_supports_agentfile_merge() {

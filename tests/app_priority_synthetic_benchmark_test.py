@@ -104,6 +104,7 @@ class RustFixtureTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-rust-")
         self.root = Path(self.temporary.name)
         self.home, self.config, self.mockbin = benchmark.prepare(self.root)
+        self.baseline = reviewed_shell(self.root / "baseline")
         self.candidate = self.root / "candidate"
         (self.candidate / "bin").mkdir(parents=True)
         shutil.copyfile(os.environ["APP_PRIORITY_RUST_FIXTURE_BINARY"],
@@ -116,8 +117,7 @@ class RustFixtureTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_default_fixture_keeps_ordered_actions(self):
-        baseline = reviewed_shell(self.root / "baseline")
-        base = benchmark.sample(baseline, self.root, self.home, self.config, self.mockbin)[1:]
+        base = benchmark.sample(self.baseline, self.root, self.home, self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
                                      self.config, self.mockbin)[1:]
         benchmark.compare(base, candidate)
@@ -132,7 +132,7 @@ class RustFixtureTests(unittest.TestCase):
         config = self.config / "dotfiles/priority-apps.txt"
         config.parent.mkdir()
         config.write_text("  Slack # foreground\nnode.*runner\n  # ignored\n\n")
-        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+        base = benchmark.sample(self.baseline, self.root, self.home,
                                 self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
                                      self.config, self.mockbin)[1:]
@@ -144,7 +144,7 @@ class RustFixtureTests(unittest.TestCase):
         config = self.config / "dotfiles/priority-apps.txt"
         config.parent.mkdir()
         config.write_text("")
-        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+        base = benchmark.sample(self.baseline, self.root, self.home,
                                 self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
                                      self.config, self.mockbin)[1:]

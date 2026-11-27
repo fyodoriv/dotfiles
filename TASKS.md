@@ -325,19 +325,33 @@ them. -->
 
 ## P3
 
-- [ ] Check the app-priority daily numbers after the single-scan change, then delete the shell fallback
-  - **ID**: app-priority-field-check
-  - **Tags**: performance, launchagents
-  - **Blocked**: needs-owner-mac — due 2026-11-23: the check reads `~/.dotfiles-stats.jsonl` on the owner's Mac and needs the native build of the single-scan commit (`dotfiles priority-native install`). An agent on another machine cannot run it.
-  - **Details**: Follow-up from `app-priority-rust-tail` (closed by the single-scan fix; replay mean 301 to 111 ms, 751 to 246 ms under load). Run the command in [the tail analysis](docs/plans/app-priority-same-day.md#tail-analysis-and-fix-2026-11-16). On success, delete the shell fallback in `bin/app-priority` and its rollback tests in a separate PR. On a miss, file a new task with the numbers.
+- [ ] Report the actual action count from the App Priority benchmark
+  - **ID**: app-priority-owned-action-count
+  - **Tags**: performance, fixtures, reporting
+  - **Details**: On 2026-11-27, the owned-child fixture at e438e7c4 and native-only candidate 5b7faccd both verify eight ordered lines per invocation. Their timing JSON reports a fixed count of 10. The equality check uses the eight-line trace, so the reported count differs by 2. Check the exact source for each older run before editing the migration record.
+  - **Files**: `scripts/app-priority-owned-benchmark.py`, its hosted check, and `docs/plans/app-priority-same-day.md`.
   - **Output**: code
-  - **Acceptance**: the command prints n above 5,000, mean at most 400 ms and p95 at most 1,500 ms for Rust runs since the install time; then `bin/app-priority` has no shell fallback and `tests/app-priority.bats` keeps the same ordered actions.
-  - **Hypothesis**: the Rust daily mean falls from 540 ms (2026-11-14 to 2026-11-16, n=2,511) to at most 400 ms because the process table is read once per run instead of 17 times.
-  - **Measurement**: the command in the tail analysis (needs `~/.dotfiles-stats.jsonl`; it prints `{n:0}` when no rows match).
-  - **Success**: n above 5,000, mean at most 400 ms, p95 at most 1,500 ms.
-  - **Pivot**: mean above 540 ms (no better than before) -> revert to the previous lookup and record the mean as a measured exception in the migration plan. A mean between 400 and 540 ms -> keep the fix and record the mean as a measured exception.
-  - **Anchor**: Basili, Caldiera, Rombach 1994 (GQM); Kohavi, Tang, Xu 2020 (guard metrics).
-  - **Competitive-goal**: none — background CPU (docs/metrics.md), not a scorecard metric.
+  - **Acceptance**: The timing report derives its count from the expected action trace. A hosted fixture checks the reported 8 actions and all 30 pairs. Existing order, timing, and memory gates keep their thresholds.
+  - **Hypothesis**: The difference between the reported count and the checked trace falls from 2 actions to 0.
+  - **Measurement**: Read the JSON record from `gh run view <owned-comparison-run> -R fyodoriv/dotfiles --log` and check the `actions_per_pair` field against the expected trace with `jq -e '.actions_per_pair == 8 and .pairs == 30'`.
+  - **Success**: 0 count difference on a hosted run with 30 verified pairs.
+  - **Pivot**: If 1 report still disagrees with its checked trace after the change, omit the numeric count from conclusions until the fixture reports it reliably.
+  - **Anchor**: `scripts/app-priority-owned-benchmark.py` at e438e7c4 and Basili, Caldiera and Rombach (1994), GQM.
+  - **Competitive-goal**: none. This improves benchmark reporting.
+
+- [ ] Qualify stripped App Priority builds with the pinned toolchain
+  - **ID**: app-priority-pinned-symbol-strip
+  - **Tags**: launchagents, rust, build
+  - **Details**: The hosted pinned Rust build reports that `rust-objcopy` cannot load `libLLVM.dylib` on both macOS architectures. Cargo completes, and both artifacts pass digest, load, and native rollback checks. Reproduce the warning before choosing a fix. Keep the pinned compiler and offline Cargo build.
+  - **Files**: `lib/app-priority-toolchain.sh`, `rust/app-priority/Cargo.toml`, hosted App Priority delivery fixture, native delivery plan.
+  - **Output**: code
+  - **Acceptance**: Both hosted architecture jobs verify the intended strip result, artifact digest, macOS target, and exit code without applying priorities.
+  - **Hypothesis**: Using a strip path that can load its libraries reduces pinned release builds with a strip warning from 2 of 2 architecture jobs to 0 of 2.
+  - **Measurement**: Compare the Intel and Apple Silicon logs from `app-priority-fixture.yml` with `delivery_check=true` and `isolated_toolchain=true`. Check the symbol table and run the existing artifact checks.
+  - **Success**: 0 strip warnings in 2 architecture jobs, 2 valid artifacts, and 0 live priority changes.
+  - **Pivot**: If either architecture cannot load or roll back its verified artifact, retain the current build and record the packaging limit.
+  - **Anchor**: [Hosted reproduction on Intel and Apple Silicon](https://github.com/fyodoriv/dotfiles/actions/runs/45907826150) and the [native delivery plan](docs/plans/app-priority-native-delivery.md).
+  - **Competitive-goal**: none — release artifact packaging, outside the scorecard.
 
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
   - **ID**: dashboard-chart-gate-hardening

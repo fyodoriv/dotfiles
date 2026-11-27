@@ -55,7 +55,7 @@ acquire_lock() {
   local scope="${2:-process}" scope_record="" lock_parent
   if [ "$scope" = group ]; then
     if [ "$(ps -o pgid= -p "$$" | tr -d '[:space:]')" != "$$" ]; then
-      warn "[lock] Cannot acquire — the lock owner must lead its process group"
+      warn "[lock] Cannot acquire — the lock owner must lead its process group — fix: run the command through its normal launcher"
       return 1
     fi
     scope_record=$'group\n'
@@ -133,7 +133,7 @@ acquire_lock() {
       IFS= read -r lock_scope || true
     } 2>/dev/null < "$DOTFILES_LOCK" || {
       [ -e "$DOTFILES_LOCK" ] || continue
-      warn "[lock] Cannot read lock at $DOTFILES_LOCK"
+      warn "[lock] Cannot read lock at $DOTFILES_LOCK — fix: check the lock file owner and read permissions"
       return 1
     }
     lock_caller="${lock_caller:-unknown}"

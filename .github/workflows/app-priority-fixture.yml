@@ -122,7 +122,9 @@ jobs:
           test "$(uname -m)" = "$EXPECTED_ARCHITECTURE"
           if [[ "$ISOLATED_TOOLCHAIN" == true ]]; then
             test ! -e "$fixture_dir/toolchain"
-            ./bin/app-priority-native ensure delivered-fixture-source
+            set -o pipefail
+            build_log="$RUNNER_TEMP/priority-pinned-build.log"
+            ./bin/app-priority-native ensure delivered-fixture-source 2>&1 | tee "$build_log"
             test "$(cat "$fixture_dir/source-hash")" = delivered-fixture-source
             test -d "$fixture_dir/toolchain/rustup/toolchains"
           else
@@ -154,6 +156,18 @@ jobs:
           test -f "$fixture_dir/disabled"
           ./bin/app-priority-native ensure ignored-fixture-source
           test ! -L "$fixture_dir/current"
+          if [[ "$ISOLATED_TOOLCHAIN" == true ]]; then
+            if grep -Fq 'stripping debug info with `rust-objcopy` failed' "$build_log"; then
+              echo 'Pinned compiler reported a strip warning' >&2
+              exit 1
+            fi
+            load_commands="$(xcrun otool -l "$binary")"
+            if grep -Fq 'segname __DWARF' <<< "$load_commands"; then
+              echo 'The installed artifact still has a Mach-O DWARF segment' >&2
+              exit 1
+            fi
+            echo 'Pinned compiler reported no strip warning and the artifact has no DWARF segment'
+          fi
       - name: Roll back between two verified native binaries
         if: ${{ inputs.isolated_toolchain }}
         run: |

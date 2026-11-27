@@ -27,6 +27,13 @@ if [ "$_AUTO_SYNC_ENABLED" != "false" ]; then
 fi
 
 # ── No uncommitted dotfiles changes lingering ───────────────────────
-check "sync.clean" "no uncommitted dotfiles changes" \
-  "[ -z \"\$(git -C '${DOTFILES_LINK_DIR:-$DOTFILES_DIR}' status --porcelain 2>/dev/null)\" ]" \
-  ""
+_check_sync_worktree() {
+  local check_fn=check
+  if [ "${DOTFILES_UPDATE_DOCTOR:-0}" = 1 ]; then
+    check_fn=check_advisory
+  fi
+  "$check_fn" "sync.clean" "no uncommitted dotfiles changes" \
+    "[ -z \"\$(git -C '${DOTFILES_LINK_DIR:-$DOTFILES_DIR}' status --porcelain 2>/dev/null)\" ]" \
+    ""
+}
+_check_sync_worktree

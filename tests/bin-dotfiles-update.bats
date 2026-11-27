@@ -51,6 +51,7 @@ STUB
   [[ "$output" == *"DRY-RUN: agentbrew sync --pull --agentfile $REPO/Agentfile.yaml"* ]]
   [[ "$output" == *"DRY-RUN: dotfiles-upgrade"* ]]
   [[ "$output" == *"DRY-RUN: dotfiles-doctor --fix"* ]]
+  [[ "$output" != *"Phase durations:"* ]]
 }
 
 @test "normal run executes phases in order" {
@@ -118,6 +119,9 @@ STUB
   [ "$status" -eq 42 ]
   [[ "$output" == *"✗ Phase failed: apply (exit 42)"* ]]
   [ "$(cat "$invocations")" = "$expected" ]
+  grep -Eq '^  pull: [0-9]+s$' <<< "$output"
+  grep -Eq '^  apply: [0-9]+s$' <<< "$output"
+  ! grep -Eq '^  (agents|packages|doctor):' <<< "$output"
 }
 
 @test "update reports a dirty checkout as advisory without hiding another doctor failure" {
@@ -155,6 +159,11 @@ STUB
     SYNC_DOCTOR_SOURCE="$REPO/modules/sync/doctor.sh" "$TEST_DOTFILES/bin/dotfiles-update" --yes
   [ "$status" -eq 1 ]
   [[ "$output" == *"failure: fixture.other"* ]]
+
+  run env -u DOTFILES_UPDATE_DOCTOR PATH="$stub_bin:/usr/bin:/bin" DOTFILES_LINK_DIR="$TEST_DOTFILES" \
+    SYNC_DOCTOR_SOURCE="$REPO/modules/sync/doctor.sh" "$stub_bin/dotfiles-doctor" --fix
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"failure: sync.clean"* ]]
 }
 
 @test "without a terminal and without --yes it refuses and runs no phase" {

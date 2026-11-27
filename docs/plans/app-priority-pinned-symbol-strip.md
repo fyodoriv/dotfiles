@@ -23,3 +23,14 @@ Use the proxies already installed by pinned Rustup. They add the selected
 toolchain's library directory before starting the compiler and its bundled
 LLVM tools. Keep the same compiler pin and locked offline Cargo command.
 [Rustup 1.29.3 loader setup](https://github.com/rust-lang/rustup/blob/1.29.3/src/toolchain.rs#L157-L226).
+
+## Hosted results (2026-11-27)
+
+Both [baseline jobs](https://github.com/fyodoriv/dotfiles/actions/runs/46061877737)
+reproduced the LLVM loader warning under the pinned toolchain. The
+[verified candidate](https://github.com/fyodoriv/dotfiles/actions/runs/46071777204)
+built both architecture artifacts with macOS target 13.0. Each job reported
+zero strip warnings and no DWARF segment. Both passed the digest, no-apply,
+rollback, and re-enable checks. The verified tree merged as `83459348`.
+
+The test installs and rollbacks ran in scratch homes on hosted macOS 15.

@@ -181,6 +181,9 @@ jobs:
           fixture_dir="$XDG_DATA_HOME/dotfiles/native/app-priority"
           source ./lib/app-priority-toolchain.sh
           app_priority_toolchain_prepare "$RUNNER_TEMP/priority-install-home/data/dotfiles/native/app-priority/toolchain"
+          test "$(command -v cargo)" = "$CARGO_HOME/bin/cargo"
+          test "$RUSTC" = "$CARGO_HOME/bin/rustc"
+          test "$RUSTUP_AUTO_INSTALL" = 0
 
           verify_artifact() {
             local selected="$1" artifact="$fixture_dir/$1" digest probe_status=0

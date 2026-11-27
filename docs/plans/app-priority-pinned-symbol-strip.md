@@ -18,3 +18,8 @@ and roll back the artifact, keep the task open and keep the current build.
 **Anchor:** [Pinned build on Intel and Apple Silicon](https://github.com/fyodoriv/dotfiles/actions/runs/45907826150).
 
 The existing offline build and compiler pin are part of the gate.
+
+Use the proxies already installed by pinned Rustup. They add the selected
+toolchain's library directory before starting the compiler and its bundled
+LLVM tools. Keep the same compiler pin and locked offline Cargo command.
+[Rustup 1.29.3 loader setup](https://github.com/rust-lang/rustup/blob/1.29.3/src/toolchain.rs#L157-L226).

@@ -72,6 +72,10 @@ STUB
 ""dotfiles-doctor --fix"
   [ "$status" -eq 0 ]
   [ "$(cat "$invocations")" = "$expected" ]
+  [[ "$output" == *"Phase durations:"* ]]
+  for phase in pull apply agents packages doctor; do
+    grep -Eq "^  $phase: [0-9]+s$" <<< "$output"
+  done
 }
 
 @test "missing agentbrew skips refresh and continues" {
@@ -114,6 +118,43 @@ STUB
   [ "$status" -eq 42 ]
   [[ "$output" == *"✗ Phase failed: apply (exit 42)"* ]]
   [ "$(cat "$invocations")" = "$expected" ]
+}
+
+@test "update reports a dirty checkout as advisory without hiding another doctor failure" {
+  local stub_bin="$TEST_DIR/bin" invocations="$TEST_DIR/invocations" name
+  mkdir -p "$stub_bin"
+  for name in dotfiles agentbrew dotfiles-upgrade; do
+    make_recording_stub "$stub_bin/$name" "$name" "$invocations"
+  done
+  copy_script_to_test_repo
+  cat > "$stub_bin/git" <<'STUB'
+#!/bin/bash
+if [ "${3:-}" = status ]; then printf ' M fixture.txt\n'; fi
+STUB
+  cat > "$stub_bin/dotfiles-doctor" <<'STUB'
+#!/bin/bash
+chezmoi() { printf 'false\n'; }
+check() { eval "$3" || { printf 'failure: %s\n' "$1"; return 1; }; }
+check_advisory() { eval "$3" || printf 'warning: %s\n' "$1"; }
+source "$SYNC_DOCTOR_SOURCE"
+result=$?
+if [ "${FIXTURE_OTHER_FAILURE:-0}" = 1 ]; then
+  check fixture.other "separate failure" false ""
+  exit $?
+fi
+exit "$result"
+STUB
+  chmod +x "$stub_bin/git" "$stub_bin/dotfiles-doctor"
+
+  run env PATH="$stub_bin:/usr/bin:/bin" DOTFILES_LINK_DIR="$TEST_DOTFILES" \
+    SYNC_DOCTOR_SOURCE="$REPO/modules/sync/doctor.sh" "$TEST_DOTFILES/bin/dotfiles-update" --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"warning: sync.clean"* ]]
+
+  run env PATH="$stub_bin:/usr/bin:/bin" DOTFILES_LINK_DIR="$TEST_DOTFILES" FIXTURE_OTHER_FAILURE=1 \
+    SYNC_DOCTOR_SOURCE="$REPO/modules/sync/doctor.sh" "$TEST_DOTFILES/bin/dotfiles-update" --yes
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"failure: fixture.other"* ]]
 }
 
 @test "without a terminal and without --yes it refuses and runs no phase" {

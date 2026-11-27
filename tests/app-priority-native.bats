@@ -73,6 +73,34 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
 }
 
+@test "a missing native selection requests install and runs no priority actions" {
+  run "$COMMAND"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"dotfiles priority-native install"* ]]
+  [ ! -e "$NATIVE_LOG" ]
+  [ ! -s "$PGREP_LOG" ]
+}
+
+@test "a missing selection with a legacy rollback hold stays inactive" {
+  mkdir -p "$DIRECTORY"
+  touch "$DIRECTORY/disabled"
+  run "$COMMAND"
+  [ "$status" -eq 0 ]
+  [ ! -e "$NATIVE_LOG" ]
+  [ ! -s "$PGREP_LOG" ]
+  [ -f "$DIRECTORY/disabled" ]
+}
+
+@test "a corrupt native selection requests install and runs no priority actions" {
+  "$INSTALLER" install
+  printf 'corrupt\n' >> "$DIRECTORY/$(readlink "$DIRECTORY/current")"
+  run "$COMMAND"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"dotfiles priority-native install"* ]]
+  [ ! -e "$NATIVE_LOG" ]
+  [ ! -s "$PGREP_LOG" ]
+}
+
 @test "failed native execution never repeats actions through the shell" {
   "$INSTALLER" install
   export NATIVE_EXIT=9
@@ -323,6 +351,20 @@ install_priority_variant() {
   [ "$status" -eq 0 ]
   [ "$(readlink "$DIRECTORY/current")" = "$first" ]
   [ -x "$DIRECTORY/$second" ]
+}
+
+@test "plain rollback selects the verified predecessor for the next launch" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  [ -f "$DIRECTORY/disabled" ]
+  run "$COMMAND"
+  [ "$status" -eq 0 ]
+  [ "$(tail -1 "$NATIVE_LOG")" = --apply ]
+  [ ! -s "$PGREP_LOG" ]
 }
 
 @test "native rollback stays selected across an automatic refresh" {

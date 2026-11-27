@@ -325,6 +325,20 @@ them. -->
 
 ## P3
 
+- [ ] Report the actual action count from the App Priority benchmark
+  - **ID**: app-priority-owned-action-count
+  - **Tags**: performance, fixtures, reporting
+  - **Details**: On 2026-11-27, the owned-child fixture at e438e7c4 and native-only candidate 5b7faccd both verify eight ordered lines per invocation. Their timing JSON reports a fixed count of 10. The equality check uses the eight-line trace, so the reported count differs by 2. Check the exact source for each older run before editing the migration record.
+  - **Files**: `scripts/app-priority-owned-benchmark.py`, its hosted check, and `docs/plans/app-priority-same-day.md`.
+  - **Output**: code
+  - **Acceptance**: The timing report derives its count from the expected action trace. A hosted fixture checks the reported 8 actions and all 30 pairs. Existing order, timing, and memory gates keep their thresholds.
+  - **Hypothesis**: The difference between the reported count and the checked trace falls from 2 actions to 0.
+  - **Measurement**: Read the JSON record from `gh run view <owned-comparison-run> -R fyodoriv/dotfiles --log` and check the `actions_per_pair` field against the expected trace with `jq -e '.actions_per_pair == 8 and .pairs == 30'`.
+  - **Success**: 0 count difference on a hosted run with 30 verified pairs.
+  - **Pivot**: If 1 report still disagrees with its checked trace after the change, omit the numeric count from conclusions until the fixture reports it reliably.
+  - **Anchor**: `scripts/app-priority-owned-benchmark.py` at e438e7c4 and Basili, Caldiera and Rombach (1994), GQM.
+  - **Competitive-goal**: none. This improves benchmark reporting.
+
 - [ ] Qualify stripped App Priority builds with the pinned toolchain
   - **ID**: app-priority-pinned-symbol-strip
   - **Tags**: launchagents, rust, build

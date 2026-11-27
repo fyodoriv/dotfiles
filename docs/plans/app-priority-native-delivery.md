@@ -213,3 +213,37 @@ The install lock tracks the worker's group when it can publish after that
 worker is killed. Rollback waits until the group exits. A failed build
 launcher also stops the remaining processes in its owned group before it
 returns. The fixture checks that cleanup while the build is still blocked.
+
+### Remove the shell priority rules
+
+- **Hypothesis:** The supported launcher runs only a verified native artifact.
+  Every owned fixture process receives the same ordered actions, and a
+  machine without a usable native binary makes zero priority changes.
+- **Measurement:** Run `tests/app-priority.bats` and
+  `tests/app-priority-native.bats` in hosted CI. Compare 30 ordered pairs
+  against the last reviewed shell implementation at `e438e7c4` using
+  `app-priority-fixture.yml` with `owned_comparison=true`. Run the memory
+  comparison and the isolated architecture delivery checks. Record field
+  latency from the registered daily measurement in the tail analysis.
+- **Success:** 100% ordered action parity. Zero actions after a missing or
+  corrupt native selection. A prior verified release can replace a newer
+  one using the normal rollback command. The candidate median is at most
+  400 ms and at most 0.40 of the shell median. The memory ratio stays at most
+  1.10 under gate G. Cold and warm builds stay at most 120 and 15 seconds
+  respectively. The field record has more than 5,000 valid Rust runs, a mean
+  at most 400 ms, and a p95 at most 1,500 ms.
+- **Pivot:** If any action differs, an invalid artifact runs, a setup
+  loses its working selection, or a resource bound fails, keep the shell
+  route and leave the migration task open.
+- **Anchor:** [App Priority gate G](rust-migration.md), the
+  [field measurement](app-priority-same-day.md#tail-analysis-and-fix-2026-11-16),
+  and the earlier architecture and interruption checks in this plan.
+
+Plain rollback selects the previous verified release. The existing
+`--native` option selects the same operation. Use `rollback --disable`
+to pause priority changes, including after an in-flight first install.
+An older hold with no selection stays inactive. A successful manual
+install resumes priority changes and automatic refresh.
+
+Each native-only timing and memory sample must record exactly one successful
+Rust dispatch. The comparison reads that receipt after the timed command.

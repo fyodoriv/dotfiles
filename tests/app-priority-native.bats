@@ -62,15 +62,33 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ "$status" -eq 0 ]
 }
 
-@test "a corrupted binary falls back before it can run" {
-  "$INSTALLER" install
-  printf 'corrupt\n' >> "$DIRECTORY/$(readlink "$DIRECTORY/current")"
+@test "a missing native selection requests install and runs no priority actions" {
+  run "$COMMAND"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"dotfiles priority-native install"* ]]
+  [ ! -e "$NATIVE_LOG" ]
+  [ ! -s "$PGREP_LOG" ]
+}
+
+@test "a missing selection with a legacy rollback hold stays inactive" {
+  mkdir -p "$DIRECTORY"
+  touch "$DIRECTORY/disabled"
   run "$COMMAND"
   [ "$status" -eq 0 ]
   [ ! -e "$NATIVE_LOG" ]
-  [ -s "$PGREP_LOG" ]
-  run jq -e 'select(.task == "app-priority" and .runtime == "shell")' "$DOTFILES_STATS_FILE"
-  [ "$status" -eq 0 ]
+  [ ! -s "$PGREP_LOG" ]
+  [ -f "$DIRECTORY/disabled" ]
+}
+
+@test "a corrupt native selection requests install and runs no priority actions" {
+  "$INSTALLER" install
+  printf 'corrupt\n' >> "$DIRECTORY/$(readlink "$DIRECTORY/current")"
+  run "$COMMAND"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"dotfiles priority-native install"* ]]
+  [ ! -e "$NATIVE_LOG" ]
+  [ ! -s "$PGREP_LOG" ]
+  [ ! -e "$DOTFILES_STATS_FILE" ]
 }
 
 @test "failed native execution never repeats actions through the shell" {
@@ -91,14 +109,14 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -e "$DOTFILES_STATS_FILE" ]
 }
 
-@test "a failed build keeps the prior install and rollback restores shell" {
+@test "a failed build keeps the prior install and disable pauses App Priority" {
   "$INSTALLER" install
   original="$(readlink "$DIRECTORY/current")"
   export FAIL_BUILD=1
   run "$INSTALLER" install
   [ "$status" -ne 0 ]
   [ "$(readlink "$DIRECTORY/current")" = "$original" ]
-  "$INSTALLER" rollback
+  "$INSTALLER" rollback --disable
   [ ! -L "$DIRECTORY/current" ]
   [ -f "$DIRECTORY/disabled" ]
   run "$INSTALLER" refresh
@@ -106,15 +124,16 @@ teardown() { rm -rf "$TEST_DIR"; }
   [ ! -L "$DIRECTORY/current" ]
   run "$COMMAND"
   [ "$status" -eq 0 ]
-  [ -s "$PGREP_LOG" ]
+  [ ! -s "$PGREP_LOG" ]
 }
 
-@test "rollback refuses to remove an unrelated link" {
+@test "disable refuses to remove an unrelated link" {
   mkdir -p "$DIRECTORY"
   ln -s elsewhere "$DIRECTORY/current"
-  run "$INSTALLER" rollback
+  run "$INSTALLER" rollback --disable
   [ "$status" -ne 0 ]
   [ -L "$DIRECTORY/current" ]
+  [ ! -e "$DIRECTORY/disabled" ]
 }
 
 @test "Cargo outputs are ignored but source stays visible" {
@@ -185,7 +204,7 @@ exit 1
 MOCK
 }
 
-@test "rollback waits for a first build and leaves shell selected" {
+@test "disable waits for a first build and leaves App Priority paused" {
   stub_in_progress_first_build
   NATIVE_EXIT=2 DOTFILES_NATIVE_BUILD_MAX_WAIT=10 "$INSTALLER" ensure fixture-source > "$TEST_ROOT/ensure.log" 2>&1 &
   ensure_pid=$!
@@ -194,7 +213,7 @@ MOCK
     sleep 0.1
   done
   [ -f "$TEST_ROOT/build-started" ]
-  DOTFILES_NATIVE_BUILD_MAX_WAIT=10 "$INSTALLER" rollback > "$TEST_ROOT/rollback.log" 2>&1 &
+  DOTFILES_NATIVE_BUILD_MAX_WAIT=10 "$INSTALLER" rollback --disable > "$TEST_ROOT/rollback.log" 2>&1 &
   rollback_pid=$!
   for ((try = 0; try < 30; try++)); do
     if grep -q 'Waiting for the lock held by app-priority-ensure' "$TEST_ROOT/rollback.log"; then break; fi
@@ -223,13 +242,13 @@ start_fixture_first_build() {
 }
 
 start_fixture_rollback() {
-  DOTFILES_NATIVE_BUILD_MAX_WAIT=12 "$INSTALLER" rollback > "$TEST_ROOT/rollback.log" 2>&1 3>&- &
+  DOTFILES_NATIVE_BUILD_MAX_WAIT=12 "$INSTALLER" rollback --disable > "$TEST_ROOT/rollback.log" 2>&1 3>&- &
   rollback_pid=$!
   for ((try = 0; try < 30; try++)); do
-    if grep -Eq 'Waiting for the lock|Shell app-priority restored' "$TEST_ROOT/rollback.log"; then break; fi
+    if grep -Eq 'Waiting for the lock|App Priority paused' "$TEST_ROOT/rollback.log"; then break; fi
     sleep 0.1
   done
-  grep -Eq 'Waiting for the lock|Shell app-priority restored' "$TEST_ROOT/rollback.log"
+  grep -Eq 'Waiting for the lock|App Priority paused' "$TEST_ROOT/rollback.log"
 }
 
 @test "an interrupted first install cannot select a binary after rollback succeeds" {
@@ -323,6 +342,20 @@ install_priority_variant() {
   [ "$status" -eq 0 ]
   [ "$(readlink "$DIRECTORY/current")" = "$first" ]
   [ -x "$DIRECTORY/$second" ]
+}
+
+@test "plain rollback selects the verified predecessor for the next launch" {
+  install_priority_variant first
+  first="$(readlink "$DIRECTORY/current")"
+  install_priority_variant second
+  run env NATIVE_EXIT=2 "$INSTALLER" rollback
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$DIRECTORY/current")" = "$first" ]
+  [ -f "$DIRECTORY/disabled" ]
+  run "$COMMAND"
+  [ "$status" -eq 0 ]
+  [ "$(tail -1 "$NATIVE_LOG")" = --apply ]
+  [ ! -s "$PGREP_LOG" ]
 }
 
 @test "native rollback stays selected across an automatic refresh" {

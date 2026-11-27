@@ -806,7 +806,7 @@ MOCK
         elif [ -L "$XDG_DATA_HOME/dotfiles/native/app-priority/current" ]; then
           printf "load native\n" >> "$PRIORITY_TEST_EVENTS"
         else
-          printf "load shell\n" >> "$PRIORITY_TEST_EVENTS"
+          printf "load inactive\n" >> "$PRIORITY_TEST_EVENTS"
         fi
       }
       install_plist "$SOURCE_DIR/priority.plist" com.dotfiles.app-priority.plist com.dotfiles.app-priority app-priority
@@ -834,13 +834,14 @@ MOCK
 @test "app-priority first apply respects a previous explicit rollback" {
   app_priority_first_apply full installed disabled
   [ "$status" -eq 0 ]
-  [ "$(cat "$TEST_DIR/priority-events")" = $'unload\nload shell' ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'unload\nload inactive' ]
 }
 
-@test "app-priority first apply keeps shell dispatch after a failed build" {
+@test "app-priority first apply leaves priority changes inactive after a failed build" {
   app_priority_first_apply full installed failed
   [ "$status" -eq 0 ]
-  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload shell' ]
+  [ "$(cat "$TEST_DIR/priority-events")" = $'install ensure\nunload\nload inactive' ]
+  [[ "$output" == *"dotfiles priority-native install"* ]]
   [ ! -L "$TEST_DIR/priority-data/dotfiles/native/app-priority/current" ]
 }
 

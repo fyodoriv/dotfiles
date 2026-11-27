@@ -19,6 +19,19 @@ def allowed():
             and os.environ.get("RUNNER_OS") == "macOS")
 
 
+def native_receipt_end(receipt, offset):
+    with receipt.open("rb") as handle:
+        handle.seek(offset)
+        rows = handle.readlines()
+        end = handle.tell()
+    if len(rows) != 1:
+        raise RuntimeError("expected one native App Priority receipt per candidate sample")
+    row = json.loads(rows[0])
+    if row.get("task") != "app-priority" or row.get("runtime") != "rust" or row.get("ok") is not True:
+        raise RuntimeError("candidate sample did not record successful native App Priority dispatch")
+    return end
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", type=Path, required=True)
@@ -48,15 +61,21 @@ def main():
                "DOTFILES_STATS_LOG": "0", "ACTION_LOG": str(action_log)}
         candidate_env = env.copy()
         delivery_binary = os.environ.get("APP_PRIORITY_DELIVERY_BINARY")
+        require_native = os.environ.get("APP_PRIORITY_WITHOUT_LEGACY") == "1"
+        if require_native and not delivery_binary:
+            raise RuntimeError("native-only comparison requires a delivery binary")
+        receipt = root / "native-stats.jsonl"
+        receipt_offset = 0
         if delivery_binary:
-            if os.environ.get("APP_PRIORITY_WITHOUT_LEGACY") == "1":
+            if require_native:
                 entry = args.candidate / "bin/app-priority"
                 text = entry.read_text()
                 start = "# BEGIN TEMPORARY SHELL PRIORITY RULES"
                 end = "# END TEMPORARY SHELL PRIORITY RULES"
-                if text.count(start) != 1 or text.count(end) != 1 or text.index(start) >= text.index(end):
-                    raise RuntimeError("legacy rule boundaries are invalid")
-                entry.write_text(text[:text.index(start)] + "exit 90\n" + text[text.index(end) + len(end):])
+                if start in text or end in text:
+                    if text.count(start) != 1 or text.count(end) != 1 or text.index(start) >= text.index(end):
+                        raise RuntimeError("legacy rule boundaries are invalid")
+                    entry.write_text(text[:text.index(start)] + "exit 90\n" + text[text.index(end) + len(end):])
             native_dir = home / "data" / "dotfiles" / "native" / "app-priority"
             native_dir.mkdir(parents=True)
             binary = Path(delivery_binary)
@@ -66,6 +85,8 @@ def main():
             env["DOTFILES_STATS_LOG"] = "1"
             candidate_env = env.copy()
             candidate_env["XDG_DATA_HOME"] = str(home / "data")
+            if require_native:
+                candidate_env["DOTFILES_STATS_FILE"] = str(receipt)
         cases = [("Slack", "slack"), ("claude", "claude"), ("codex", "codex"),
                  ("bats", "bats"), ("node", "node_modules/vitest")]
         try:
@@ -95,6 +116,8 @@ def main():
                         sample = re.search(rb"^\s*(\d+)\s+maximum resident set size\s*$", result.stderr, re.MULTILINE)
                         if result.returncode != 0 or result.stdout or sample is None or action_log.read_bytes() != expected:
                             raise RuntimeError("memory sample or ordered actions invalid")
+                        if require_native and label == "candidate":
+                            receipt_offset = native_receipt_end(receipt, receipt_offset)
                         memory[label].append(int(sample.group(1)))
                 first = statistics.median(memory["base_first"])
                 second = statistics.median(memory["base_second"])
@@ -116,6 +139,8 @@ def main():
                             raise RuntimeError("command or output mismatch")
                         if action_log.read_bytes() != expected:
                             raise RuntimeError("ordered actions or target ownership differ")
+                        if require_native and label == "candidate":
+                            receipt_offset = native_receipt_end(receipt, receipt_offset)
                 base = statistics.median(times["base"])
                 candidate = statistics.median(times["candidate"])
                 ratio = candidate / base
@@ -127,13 +152,15 @@ def main():
                 if child.wait(timeout=10) != 0:
                     raise RuntimeError("owned child cleanup failed")
         if args.memory:
-            print(json.dumps({"samples": memory, "baseline_ratio": base_ratio, "candidate_ratio": ratio}))
+            print(json.dumps({"samples": memory, "baseline_ratio": base_ratio, "candidate_ratio": ratio,
+                              "native_receipts": len(memory["candidate"]) if require_native else 0}))
             if not 0.95 <= base_ratio <= 1.05 or ratio > 1.10:
                 raise SystemExit("memory threshold missed or baseline unstable")
             return
         print(json.dumps({"pairs": 30, "actions_per_pair": 10,
                           "base_ms": times["base"], "candidate_ms": times["candidate"],
                           "base_median_ms": base, "candidate_median_ms": candidate,
+                          "native_receipts": len(times["candidate"]) if require_native else 0,
                           "ratio": ratio}))
         if ratio > 0.40 or candidate > 400:
             raise SystemExit("timing threshold missed")

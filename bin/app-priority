@@ -15,12 +15,12 @@ start_ms=$(clock_ms) || start_ms=""
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/stats.sh"
 
 finish_priority_run() {
-  local outcome="${1:-ok}" runtime="${2:-shell}" end_ms
+  local outcome="$1" end_ms
   end_ms=$(clock_ms) || end_ms=""
   if [[ "$start_ms" =~ ^[0-9]{1,12}$ && "$end_ms" =~ ^[0-9]{1,12}$ ]] && (( end_ms >= start_ms && end_ms - start_ms <= 9999999999 )); then
-    log_run app-priority 1 "$outcome" "$((end_ms - start_ms))" "" monotonic-ms "$runtime"
+    log_run app-priority 1 "$outcome" "$((end_ms - start_ms))" "" monotonic-ms rust
   else
-    log_run app-priority 1 "$outcome" "" "" "" "$runtime"
+    log_run app-priority 1 "$outcome" "" "" "" rust
   fi
 }
 
@@ -37,163 +37,15 @@ if [ -L "$native_dir/current" ]; then
     if [ "$native_hash" = "${native_name#app-priority-}" ]; then
       native_status=0
       "$native_dir/$native_name" --apply || native_status=$?
-      if [ "$native_status" -eq 0 ]; then finish_priority_run ok rust; else finish_priority_run error rust; fi
+      if [ "$native_status" -eq 0 ]; then finish_priority_run ok; else finish_priority_run error; fi
       exit "$native_status"
     fi
   fi
 fi
 
-# BEGIN TEMPORARY SHELL PRIORITY RULES
-set_process_priority() {
-  local process_name="$1"
-  local process_ids
-  process_ids=$(pgrep -x "$process_name" 2>/dev/null || true)
-  [ -z "$process_ids" ] && return
-
-  while IFS= read -r process_id; do
-    [ -z "$process_id" ] && continue
-    taskpolicy -B -t 0 -l 0 -p "$process_id" >/dev/null 2>&1 || true
-  done <<< "$process_ids"
-}
-
-set_process_priority_pattern() {
-  local pattern="$1"
-  local process_ids
-  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
-  [ -z "$process_ids" ] && return
-
-  while IFS= read -r process_id; do
-    [ -z "$process_id" ] && continue
-    taskpolicy -B -t 0 -l 0 -p "$process_id" >/dev/null 2>&1 || true
-  done <<< "$process_ids"
-}
-
-set_process_background() {
-  local process_name="$1"
-  local process_ids
-  process_ids=$(pgrep -x "$process_name" 2>/dev/null || true)
-  [ -z "$process_ids" ] && return
-
-  while IFS= read -r process_id; do
-    [ -z "$process_id" ] && continue
-    taskpolicy -b -p "$process_id" >/dev/null 2>&1 || true
-    renice 10 -p "$process_id" >/dev/null 2>&1 || true
-  done <<< "$process_ids"
-}
-
-set_process_background_pattern() {
-  local pattern="$1"
-  local process_ids
-  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
-  [ -z "$process_ids" ] && return
-
-  while IFS= read -r process_id; do
-    [ -z "$process_id" ] && continue
-    taskpolicy -b -p "$process_id" >/dev/null 2>&1 || true
-    renice 10 -p "$process_id" >/dev/null 2>&1 || true
-  done <<< "$process_ids"
-}
-
-set_process_nice_pattern() {
-  local pattern="$1"
-  local process_ids
-  process_ids=$(pgrep -f "$pattern" 2>/dev/null || true)
-  [ -z "$process_ids" ] && return
-
-  while IFS= read -r process_id; do
-    [ -z "$process_id" ] && continue
-    renice 10 -p "$process_id" >/dev/null 2>&1 || true
-  done <<< "$process_ids"
-}
-
-is_descendant_of_interactive_app() {
-  local current_pid="$1"
-  local depth=0
-  local parent_pid command_path
-
-  while [[ "$current_pid" =~ ^[0-9]+$ && "$current_pid" -gt 1 && "$depth" -lt 16 ]]; do
-    command_path=$(ps -p "$current_pid" -o comm= 2>/dev/null || true)
-    case "$command_path" in
-      *"/WebStorm.app/"*|*"/Ghostty.app/"*|*"/Terminal.app/"*|*"/iTerm.app/"*|\
-      *"/WezTerm.app/"*|*"/kitty.app/"*|*"/Alacritty.app/"*|*"/Warp.app/"*|\
-      *"/Claude.app/"*|*"/ChatGPT.app/"*|*"/Codex.app/"*) return 0 ;;
-    esac
-
-    parent_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null || true)
-    parent_pid="${parent_pid//[[:space:]]/}"
-    [[ "$parent_pid" =~ ^[0-9]+$ && "$parent_pid" -ne "$current_pid" ]] || break
-    current_pid="$parent_pid"
-    depth=$((depth + 1))
-  done
-
-  return 1
-}
-
-set_agent_priority() {
-  local process_name="$1"
-  local process_ids
-  process_ids=$(pgrep -x "$process_name" 2>/dev/null || true)
-  [ -z "$process_ids" ] && return
-
-  local process_id
-  while IFS= read -r process_id; do
-    [ -z "$process_id" ] && continue
-    if is_descendant_of_interactive_app "$process_id"; then
-      taskpolicy -B -t 0 -l 0 -p "$process_id" >/dev/null 2>&1 || true
-      renice 0 -p "$process_id" >/dev/null 2>&1 || true
-    else
-      taskpolicy -b -p "$process_id" >/dev/null 2>&1 || true
-      renice 10 -p "$process_id" >/dev/null 2>&1 || true
-    fi
-  done <<< "$process_ids"
-}
-
-CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/priority-apps.txt"
-
-if [ -f "$CONFIG_FILE" ]; then
-  # Read process names from config file (one per line, # comments allowed)
-  while IFS= read -r line; do
-    line="${line%%#*}"            # strip inline comments
-    line="${line#"${line%%[! ]*}"}" # strip leading whitespace
-    line="${line%"${line##*[! ]}"}" # strip trailing whitespace
-    [ -z "$line" ] && continue
-    if [[ "$line" == *"*"* || "$line" == *"."* ]]; then
-      set_process_priority_pattern "$line"
-    else
-      set_process_priority "$line"
-    fi
-  done < "$CONFIG_FILE"
-else
-  # Default process list when no config file exists
-  # Interactive apps
-  set_process_priority "Slack"
-  set_process_priority "Google Chrome"
-  set_process_priority "Microsoft Outlook"
-  # Ghostty's macOS process name is lowercase; WebStorm retains its app name.
-  set_process_priority "ghostty"
-  set_process_priority "WebStorm"
-
-  # Agent/model workers must yield to interactive apps under CPU contention.
-  # Claude Code and Codex launched from a terminal or desktop app are
-  # interactive sessions, so keep them responsive. Background the other agent
-  # workers (launchd jobs, Remote Control, headless runs).
-  set_agent_priority "claude"
-  set_agent_priority "codex"
-  set_process_background "ollama"
-  set_process_background_pattern "mlx_lm.server"
-
-  # Verification remains available but cannot starve the desktop.
-  set_process_background "bats"
-  set_process_background "shellcheck"
-  set_process_background "parallel"
-  # Test runners that agents start run as node or bash, so `pgrep -x` misses
-  # them. Eleven parallel gates froze the desktop on 2026-10-15. Renice only:
-  # background QoS throttled their I/O and stretched a gate to 2.5 hours.
-  set_process_nice_pattern "node_modules/vitest"
-  set_process_nice_pattern "node_modules/typescript/bin/tsc"
-  set_process_nice_pattern "bats-core"
-  set_process_nice_pattern "/biome "
+if [ ! -e "$native_dir/current" ] && [ ! -L "$native_dir/current" ] &&
+  { [ -e "$native_dir/disabled" ] || [ -L "$native_dir/disabled" ]; }; then
+  exit 0
 fi
-
-# END TEMPORARY SHELL PRIORITY RULES
-finish_priority_run
+echo "App Priority: verified native binary unavailable. Run dotfiles priority-native install." >&2
+exit 1

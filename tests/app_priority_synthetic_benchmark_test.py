@@ -1,12 +1,16 @@
 """Safety checks for the fixture benchmark without starting a process."""
 
+from contextlib import redirect_stdout
 import importlib.util
+from io import BytesIO, StringIO
 import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -15,6 +19,52 @@ SHELL_BASELINE = "e438e7c45825ee9d70ce7609a19f374478d11966"
 SPEC = importlib.util.spec_from_file_location("app_priority_benchmark", SCRIPT)
 benchmark = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(benchmark)
+
+OWNED_SPEC = importlib.util.spec_from_file_location(
+    "app_priority_owned_benchmark", SCRIPT.with_name("app-priority-owned-benchmark.py")
+)
+owned_benchmark = importlib.util.module_from_spec(OWNED_SPEC)
+OWNED_SPEC.loader.exec_module(owned_benchmark)
+
+
+class OwnedBenchmarkTests(unittest.TestCase):
+    def test_timing_report_counts_the_checked_actions(self):
+        trace = (
+            b"taskpolicy -B -t 0 -l 0 -p 101\n"
+            b"taskpolicy -b -p 102\nrenice 10 -p 102\n"
+            b"taskpolicy -b -p 103\nrenice 10 -p 103\n"
+            b"taskpolicy -b -p 104\nrenice 10 -p 104\n"
+            b"renice 10 -p 105\n"
+        )
+        children = [
+            SimpleNamespace(pid=pid, stdin=BytesIO(), stdout=BytesIO(b"R"), wait=lambda timeout: 0)
+            for pid in range(101, 106)
+        ]
+        elapsed_ns = 0
+
+        def launcher(command, *, env, **_):
+            nonlocal elapsed_ns
+            launcher_path = Path(command[-1])
+            self.assertEqual(launcher_path.name, "app-priority")
+            tree = launcher_path.parents[1].name
+            self.assertIn(tree, {"base", "candidate"})
+            elapsed_ns += 2_000_000 if tree == "candidate" else 10_000_000
+            Path(env["ACTION_LOG"]).write_bytes(trace)
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+        args = ["owned-benchmark", "--base", "base", "--candidate", "candidate", "--child", "probe"]
+        runner = {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "RUNNER_OS": "macOS"}
+        output = StringIO()
+        with (patch.object(sys, "argv", args), patch.dict(os.environ, runner, clear=True),
+              patch.object(owned_benchmark.subprocess, "Popen", side_effect=children),
+              patch.object(owned_benchmark.subprocess, "run", side_effect=launcher) as launch,
+              patch.object(owned_benchmark.time, "perf_counter_ns", side_effect=lambda: elapsed_ns),
+              redirect_stdout(output)):
+            owned_benchmark.main()
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["pairs"], 30)
+        self.assertEqual(launch.call_count, 60)
+        self.assertEqual(result["actions_per_pair"], len(trace.splitlines()))
 
 
 class BenchmarkTests(unittest.TestCase):

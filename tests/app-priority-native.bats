@@ -174,6 +174,7 @@ stub_in_progress_first_build() {
   chmod +x "$compiler/rustc" "$compiler/cargo"
   cat > "$TEST_ROOT/bin/heavy-run" <<'MOCK'
 #!/bin/bash
+if [ "${FIXTURE_IGNORE_BUILD_TERM:-0}" = 1 ]; then trap '' TERM; fi
 ps -o pgid= -p "$$" | tr -d '[:space:]' > "$TEST_ROOT/worker-pid.tmp"
 mv "$TEST_ROOT/worker-pid.tmp" "$TEST_ROOT/build-started"
 for ((try = 0; try < 80; try++)); do
@@ -279,6 +280,23 @@ fixture_build_group_alive() {
   [ -f "$DIRECTORY/disabled" ]
   [ ! -L "$DIRECTORY/current" ]
   [ ! -e "$DIRECTORY/.install.lock" ]
+}
+
+@test "the first-install launcher drains its group on worker failure" {
+  export FIXTURE_IGNORE_BUILD_TERM=1
+  start_fixture_first_build
+  [ "$(head -1 "$DIRECTORY/.install.lock")" = "$worker_pid" ]
+  kill -KILL "$worker_pid"
+  if wait "$ensure_pid" 2>/dev/null; then
+    echo 'The launcher reported success after its worker was killed.' >&2
+    return 1
+  fi
+  if fixture_build_group_alive; then
+    touch "$TEST_ROOT/release-build"
+    echo 'The launcher returned with its build processes still running.' >&2
+    return 1
+  fi
+  [ ! -L "$DIRECTORY/current" ]
 }
 
 install_priority_variant() {

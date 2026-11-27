@@ -17,7 +17,7 @@ lock_install() {
   DOTFILES_LOCK="$directory/.install.lock"
   # shellcheck source=../lib/lock.sh
   source "$app_priority_root/lib/lock.sh"
-  wait_for_lock "app-priority-$1" "${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}"
+  wait_for_lock "app-priority-$1" "${DOTFILES_NATIVE_BUILD_MAX_WAIT:-600}" "${2:-process}"
 }
 
 verify_native_copy() {
@@ -95,10 +95,18 @@ prepare_toolchain() {
   app_priority_toolchain_prepare "$directory/toolchain"
 }
 
-install_first_native() {
+ensure_first_native() {
+  local artifact
+  if [ -e "$directory/current" ] || [ -L "$directory/current" ] ||
+    [ -e "$directory/disabled" ] || [ -L "$directory/disabled" ]; then return 0; fi
+  # Older rollback removed current and left the verified artifact in place.
+  for artifact in "$directory"/app-priority-*; do
+    if [[ "${artifact##*/}" =~ ^app-priority-[0-9a-f]{64}$ ]]; then return 0; fi
+  done
   prepare_toolchain
   native_delivery_install "$app_priority_root" app-priority dotfiles-app-priority "$directory" app-priority app-priority-native verify_native_copy record_native_predecessor
   record_source_hash "${1:-}"
+  echo 'Native app-priority installed.'
 }
 
 record_source_hash() {
@@ -152,15 +160,9 @@ case "${1:-}" in
   ensure-worker)
     [ "$(uname -s)" = Darwin ] || exit 1
     # Keep the lock while the worker builds and publishes the first install.
-    lock_install ensure
-    if [ -e "$directory/current" ] || [ -L "$directory/current" ] ||
-      [ -e "$directory/disabled" ] || [ -L "$directory/disabled" ]; then exit 0; fi
-    # Older rollback removed current and left the verified artifact in place.
-    for artifact in "$directory"/app-priority-*; do
-      if [[ "${artifact##*/}" =~ ^app-priority-[0-9a-f]{64}$ ]]; then exit 0; fi
-    done
-    install_first_native "${2:-}"
-    echo 'Native app-priority installed.'
+    lock_install ensure group
+    ensure_first_native "${2:-}"
+    release_lock
     ;;
   rollback)
     if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != --native ]; }; then

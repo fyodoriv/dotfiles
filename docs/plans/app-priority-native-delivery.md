@@ -208,3 +208,8 @@ it removes the selection.
   shell path and protect the build group until its remaining writers exit.
 - **Anchor:** [App Priority gate G](rust-migration.md), the launcher-loss
   fixture, and the install lock's stale-owner handling in `lib/lock.sh`.
+
+The install lock tracks the worker's group when it can publish after that
+worker is killed. Rollback waits until the group exits. A failed build
+launcher also stops the remaining processes in its owned group before it
+returns. The fixture checks that cleanup while the build is still blocked.

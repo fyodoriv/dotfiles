@@ -700,6 +700,9 @@ Keep the existing shell entry point active. The earlier native selector and
 offline delivery remain separate work; the fixture result is not an in-use
 performance claim.
 
+The timing report's `actions_per_pair` counts the ordered trace checked on
+each side of a pair. Both invocations must match that trace.
+
 The bounded root-ancestor correction passed all seven hosted Rust tests. In
 30 owned-child pairs it preserved all ten ordered actions, with a 118.10 ms
 candidate median and 442.00 ms shell median, ratio 0.267. See the

@@ -9,6 +9,7 @@ on:
       - lib/stats.sh
       - lib/colors.sh
       - scripts/app-priority-synthetic-benchmark.py
+      - scripts/app-priority-owned-benchmark.py
       - scripts/app-priority-candidate.sh
       - scripts/app-priority-rust-fixture.rs
       - tests/app_priority_synthetic_benchmark_test.py

@@ -157,7 +157,7 @@ def main():
             if not 0.95 <= base_ratio <= 1.05 or ratio > 1.10:
                 raise SystemExit("memory threshold missed or baseline unstable")
             return
-        print(json.dumps({"pairs": 30, "actions_per_pair": 10,
+        print(json.dumps({"pairs": 30, "actions_per_pair": len(expected.splitlines()),
                           "base_ms": times["base"], "candidate_ms": times["candidate"],
                           "base_median_ms": base, "candidate_median_ms": candidate,
                           "native_receipts": len(times["candidate"]) if require_native else 0,

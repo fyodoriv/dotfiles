@@ -208,7 +208,7 @@ case "$cmd" in
     ;;
 
   priority-native)
-    # agent: install the native candidate or restore shell or the prior verified binary on request.
+    # agent: install App Priority, restore its prior verified release or pause priority changes.
     shift
     exec bash "$DOTFILES_DIR/bin/app-priority-native" "$@"
     ;;

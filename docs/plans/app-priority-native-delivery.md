@@ -169,3 +169,81 @@ until an explicit install completes.
 The isolated architecture check builds the older App Priority source at
 `fa9c743c` and the current source with one pinned compiler. It verifies
 both binaries before checking rollback, the refresh hold, and re-enable.
+
+### Rollback after an interrupted first install
+
+- **Hypothesis:** If the first-install launcher exits while its build worker
+  is running, a successful later rollback prevents that build from selecting
+  a native binary afterward.
+- **Measurement:** Run the hosted fixture in `tests/app-priority-native.bats`.
+  Terminate only the fixture launcher after its worker starts. Start rollback
+  before releasing the scratch build and inspect the selection and hold after
+  both operations finish.
+- **Success:** The fixture leaves 0 current links, 1 rollback hold, and 0 live
+  priority changes. The existing first-install and concurrent-rollback cases
+  still pass.
+- **Pivot:** If 1 interrupted worker can select a binary after rollback
+  reports success, keep the shell route and move the installation lock to
+  the process that can select the binary.
+- **Anchor:** [App Priority gate G](rust-migration.md) and the first-install
+  concurrency case in `tests/app-priority-native.bats`.
+
+The first-install worker owns the per-installation lock. The launcher's
+time limit covers the worker's lock wait and build. If the launcher exits
+while the worker is still running, rollback waits for that worker before
+it removes the selection.
+
+### First-install build worker loss
+
+- **Hypothesis:** Killing the first-install worker during its build cannot
+  leave a descendant that publishes a binary after rollback succeeds.
+- **Measurement:** In the hosted App Priority fixture, block the scratch
+  build beneath the lock-owning worker. Kill only that worker, start rollback,
+  then let any remaining build process exit. Inspect the worker's process
+  group and the rollback state on Intel and Apple Silicon.
+- **Success:** Both architectures show 0 surviving fixture processes, 0
+  current links, and 1 rollback hold. All 19 existing cases pass and no
+  fixture applies process priorities.
+- **Pivot:** If 1 process can publish after rollback succeeds, keep the
+  shell path and protect the build group until its remaining writers exit.
+- **Anchor:** [App Priority gate G](rust-migration.md), the launcher-loss
+  fixture, and the install lock's stale-owner handling in `lib/lock.sh`.
+
+The install lock tracks the worker's group when it can publish after that
+worker is killed. Rollback waits until the group exits. A failed build
+launcher also stops the remaining processes in its owned group before it
+returns. The fixture checks that cleanup while the build is still blocked.
+
+### Remove the shell priority rules
+
+- **Hypothesis:** The supported launcher runs only a verified native artifact.
+  Every owned fixture process receives the same ordered actions, and a
+  machine without a usable native binary makes zero priority changes.
+- **Measurement:** Run `tests/app-priority.bats` and
+  `tests/app-priority-native.bats` in hosted CI. Compare 30 ordered pairs
+  against the last reviewed shell implementation at `e438e7c4` using
+  `app-priority-fixture.yml` with `owned_comparison=true`. Run the memory
+  comparison and the isolated architecture delivery checks. Record field
+  latency from the registered daily measurement in the tail analysis.
+- **Success:** 100% ordered action parity. Zero actions after a missing or
+  corrupt native selection. A prior verified release can replace a newer
+  one using the normal rollback command. The candidate median is at most
+  400 ms and at most 0.40 of the shell median. The memory ratio stays at most
+  1.10 under gate G. Cold and warm builds stay at most 120 and 15 seconds
+  respectively. The field record has more than 5,000 valid Rust runs, a mean
+  at most 400 ms, and a p95 at most 1,500 ms.
+- **Pivot:** If any action differs, an invalid artifact runs, a setup
+  loses its working selection, or a resource bound fails, keep the shell
+  route and leave the migration task open.
+- **Anchor:** [App Priority gate G](rust-migration.md), the
+  [field measurement](app-priority-same-day.md#tail-analysis-and-fix-2026-11-16),
+  and the earlier architecture and interruption checks in this plan.
+
+Plain rollback selects the previous verified release. The existing
+`--native` option selects the same operation. Use `rollback --disable`
+to pause priority changes, including after an in-flight first install.
+An older hold with no selection stays inactive. A successful manual
+install resumes priority changes and automatic refresh.
+
+Each native-only timing and memory sample must record exactly one successful
+Rust dispatch. The comparison reads that receipt after the timed command.

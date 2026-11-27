@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/app-priority-synthetic-benchmark.py"
+SHELL_BASELINE = "e438e7c45825ee9d70ce7609a19f374478d11966"
 SPEC = importlib.util.spec_from_file_location("app_priority_benchmark", SCRIPT)
 benchmark = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(benchmark)
@@ -86,6 +87,16 @@ def hosted_fixture():
             and os.environ.get("RUNNER_OS") in {"Linux", "macOS"})
 
 
+def reviewed_shell(tree):
+    for relative in ("bin/app-priority", "lib/stats.sh", "lib/colors.sh"):
+        target = tree / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(subprocess.check_output(
+            ["git", "show", f"{SHELL_BASELINE}:{relative}"], cwd=SCRIPT.parents[1]
+        ))
+    return tree
+
+
 @unittest.skipUnless(hosted_fixture() and os.environ.get("APP_PRIORITY_RUST_FIXTURE_BINARY"),
                      "compiled Rust fixture runs only on hosted runners")
 class RustFixtureTests(unittest.TestCase):
@@ -93,6 +104,7 @@ class RustFixtureTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix="app-priority-rust-")
         self.root = Path(self.temporary.name)
         self.home, self.config, self.mockbin = benchmark.prepare(self.root)
+        self.baseline = reviewed_shell(self.root / "baseline")
         self.candidate = self.root / "candidate"
         (self.candidate / "bin").mkdir(parents=True)
         shutil.copyfile(os.environ["APP_PRIORITY_RUST_FIXTURE_BINARY"],
@@ -105,8 +117,7 @@ class RustFixtureTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_default_fixture_keeps_ordered_actions(self):
-        repo = SCRIPT.parents[1]
-        base = benchmark.sample(repo, self.root, self.home, self.config, self.mockbin)[1:]
+        base = benchmark.sample(self.baseline, self.root, self.home, self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
                                      self.config, self.mockbin)[1:]
         benchmark.compare(base, candidate)
@@ -121,7 +132,7 @@ class RustFixtureTests(unittest.TestCase):
         config = self.config / "dotfiles/priority-apps.txt"
         config.parent.mkdir()
         config.write_text("  Slack # foreground\nnode.*runner\n  # ignored\n\n")
-        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+        base = benchmark.sample(self.baseline, self.root, self.home,
                                 self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
                                      self.config, self.mockbin)[1:]
@@ -133,7 +144,7 @@ class RustFixtureTests(unittest.TestCase):
         config = self.config / "dotfiles/priority-apps.txt"
         config.parent.mkdir()
         config.write_text("")
-        base = benchmark.sample(SCRIPT.parents[1], self.root, self.home,
+        base = benchmark.sample(self.baseline, self.root, self.home,
                                 self.config, self.mockbin)[1:]
         candidate = benchmark.sample(self.candidate, self.root, self.home,
                                      self.config, self.mockbin)[1:]
@@ -148,6 +159,7 @@ class CandidateFixtureTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.home, self.config, self.mockbin = benchmark.prepare(self.root)
         self.repo = SCRIPT.parents[1]
+        self.baseline = reviewed_shell(self.root / "baseline")
         self.candidate = self.root / "candidate"
         (self.candidate / "bin").mkdir(parents=True)
         (self.candidate / "lib").mkdir()
@@ -163,7 +175,7 @@ class CandidateFixtureTests(unittest.TestCase):
         return benchmark.sample(tree, self.root, self.home, self.config, self.mockbin)[1:]
 
     def test_default_fixture_keeps_all_actions_and_output(self):
-        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+        benchmark.compare(self.observe(self.baseline), self.observe(self.candidate))
 
     def test_malformed_grouped_output_falls_back_to_individual_queries(self):
         pgrep = self.mockbin / "pgrep"
@@ -172,7 +184,7 @@ class CandidateFixtureTests(unittest.TestCase):
                                 'printf "invalid\\n"')
         self.assertNotEqual(source, pgrep.read_text())
         pgrep.write_text(source)
-        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+        benchmark.compare(self.observe(self.baseline), self.observe(self.candidate))
 
     def test_duplicate_grouped_pid_falls_back_to_individual_queries(self):
         pgrep = self.mockbin / "pgrep"
@@ -181,7 +193,7 @@ class CandidateFixtureTests(unittest.TestCase):
         replacement = 'printf "101 claude\\n101 claude\\n"'
         self.assertIn(expected, source)
         pgrep.write_text(source.replace(expected, replacement))
-        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+        benchmark.compare(self.observe(self.baseline), self.observe(self.candidate))
 
     def test_malformed_grouped_pattern_output_falls_back(self):
         pgrep = self.mockbin / "pgrep"
@@ -189,13 +201,13 @@ class CandidateFixtureTests(unittest.TestCase):
         expected = 'printf "601 node_modules/vitest\\n"'
         self.assertIn(expected, source)
         pgrep.write_text(source.replace(expected, 'printf "invalid\\n"'))
-        benchmark.compare(self.observe(self.repo), self.observe(self.candidate))
+        benchmark.compare(self.observe(self.baseline), self.observe(self.candidate))
 
     def test_explicit_config_uses_original_selection(self):
         folder = self.config / "dotfiles"
         folder.mkdir()
         (folder / "priority-apps.txt").write_text("Slack\n")
-        self.assertEqual(self.observe(self.repo), self.observe(self.candidate))
+        self.assertEqual(self.observe(self.baseline), self.observe(self.candidate))
         self.assertEqual(self.observe(self.candidate)[0], b"taskpolicy -B -t 0 -l 0 -p 301\n")
 
 

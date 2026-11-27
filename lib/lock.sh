@@ -5,8 +5,8 @@
 # acquire_lock "caller-name"  →  returns 0 if acquired, 1 if locked by another
 # release_lock                →  removes the lock file
 #
-# Lock includes PID for stale-lock detection. If the PID is dead, the lock
-# is considered stale and automatically stolen. A live PID also loses the lock
+# Lock includes PID for stale-lock detection. A process-group lock stays held
+# until its group has exited. A live process can lose a process lock
 # when the lock is older than DOTFILES_LOCK_MAX_AGE seconds (default 6 hours)
 # and the PID's command is not a dotfiles process: the OS reused the PID.
 
@@ -34,7 +34,11 @@ _lock_age() {
 # or a young lock whose owner is alive. Returns 1 when the owner is gone or the
 # PID was reused by an unrelated process (old lock, non-dotfiles command).
 _lock_owner_alive() {
-  local pid="$1" cmd
+  local pid="$1" scope="${2:-process}" cmd
+  if [ "$scope" = group ] && [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+    kill -0 -- "-$pid" 2>/dev/null
+    return
+  fi
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null || return 1
   [ "$(_lock_age)" -ge "$(_lock_max_age)" ] || return 0
   cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
@@ -48,7 +52,14 @@ _lock_owner_alive() {
 
 acquire_lock() {
   local caller="${1:-unknown}"
-  local lock_parent
+  local scope="${2:-process}" scope_record="" lock_parent
+  if [ "$scope" = group ]; then
+    if [ "$(ps -o pgid= -p "$$" | tr -d '[:space:]')" != "$$" ]; then
+      warn "[lock] Cannot acquire — the lock owner must lead its process group — fix: run the command through its normal launcher"
+      return 1
+    fi
+    scope_record=$'group\n'
+  fi
   lock_parent=$(dirname "$DOTFILES_LOCK")
 
   while true; do
@@ -69,7 +80,7 @@ acquire_lock() {
       warn "[lock] Cannot acquire — $DOTFILES_LOCK is a directory — fix: rmdir \"$DOTFILES_LOCK\" (it should be a file)"
       return 1
     fi
-    if printf '%s\n%s\n' "$$" "$caller" > "$tmp_lock" 2>/dev/null &&
+    if printf '%s\n%s\n%s' "$$" "$caller" "$scope_record" > "$tmp_lock" 2>/dev/null &&
       ln "$tmp_lock" "$DOTFILES_LOCK" 2>/dev/null; then
       if [ -d "$DOTFILES_LOCK" ]; then
         rm -f "$DOTFILES_LOCK/${tmp_lock##*/}" "$tmp_lock"
@@ -77,8 +88,10 @@ acquire_lock() {
         return 1
       fi
       rm -f "$tmp_lock"
-      # shellcheck disable=SC2064 # expand $DOTFILES_LOCK at registration so cleanup still works after the variable is unset
-      trap "rm -f '$DOTFILES_LOCK'" EXIT
+      if [ "$scope" != group ]; then
+        # shellcheck disable=SC2064 # expand $DOTFILES_LOCK at registration so cleanup still works after the variable is unset
+        trap "rm -f '$DOTFILES_LOCK'" EXIT
+      fi
       return 0
     fi
     rm -f "$tmp_lock"
@@ -96,7 +109,7 @@ acquire_lock() {
       return 1
     fi
 
-    local lock_pid lock_caller tries=0 fresh_empty
+    local lock_pid lock_caller lock_scope tries=0 fresh_empty
     lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "")
     # An empty, fresh file is a write in progress (older dotfiles versions
     # created the file before writing its PID), not a stale lock: wait briefly for the PID, and
@@ -114,11 +127,19 @@ acquire_lock() {
       tries=$((tries + 1))
       lock_pid=$(head -1 "$DOTFILES_LOCK" 2>/dev/null || echo "")
     done
-    lock_caller=$(sed -n '2p' "$DOTFILES_LOCK" 2>/dev/null || echo "unknown")
+    {
+      IFS= read -r lock_pid || true
+      IFS= read -r lock_caller || true
+      IFS= read -r lock_scope || true
+    } 2>/dev/null < "$DOTFILES_LOCK" || {
+      [ -e "$DOTFILES_LOCK" ] || continue
+      warn "[lock] Cannot read lock at $DOTFILES_LOCK — fix: check the lock file owner and read permissions"
+      return 1
+    }
     lock_caller="${lock_caller:-unknown}"
 
     # Check if the locking process is still alive
-    if _lock_owner_alive "$lock_pid"; then
+    if _lock_owner_alive "$lock_pid" "$lock_scope"; then
       [ "${_LOCK_QUIET:-0}" = 1 ] ||
         warn "[lock] Skipping — locked by $lock_caller (pid $lock_pid) — fix: wait for it to finish, then run again"
       return 1
@@ -150,9 +171,8 @@ lock_inherited() {
 }
 
 release_lock() {
-  # Not used in normal operation — locks are auto-released via the EXIT trap
-  # set in acquire_lock(). Kept for manual emergency cleanup in interactive shells:
-  #   source lib/lock.sh && release_lock
+  # Process locks use the EXIT trap. Group owners release only after joining
+  # their work. An aborted group lock stays until a waiting caller reclaims it.
   rm -f "$DOTFILES_LOCK"
 }
 
@@ -164,13 +184,14 @@ release_lock() {
 wait_for_lock() {
   local caller="${1:-unknown}"
   local max_wait="${2:-120}"
+  local scope="${3:-process}"
   local every="${DOTFILES_LOCK_NOTE_EVERY:-30}"
   local waited=0 noted=-1 lock_pid lock_caller
   local _LOCK_QUIET=1
   case "$max_wait" in '' | *[!0-9]*) max_wait=120 ;; esac
   case "$every" in '' | *[!0-9]* | 0) every=30 ;; esac
 
-  while ! acquire_lock "$caller"; do
+  while ! acquire_lock "$caller" "$scope"; do
     # No lock file after a failed try means it cannot be made (no folder,
     # no write access, a folder in its place); acquire_lock said why.
     [ -f "$DOTFILES_LOCK" ] || return 1

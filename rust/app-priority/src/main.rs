@@ -240,8 +240,62 @@ mod tests {
         let mut b = Fake::default();
         b.ids.insert(key(false, "Slack"), vec![1]);
         b.ids.insert(key(true, "node.*runner"), vec![2]);
+        b.ids.insert(key(false, "Google Chrome"), vec![3]);
         custom(&mut b, b" Slack # comment\nnode.*runner\n# skip\nSlack");
         assert_eq!(b.actions, vec![(1,"foreground".into()), (2,"foreground".into())]);
+    }
+
+    #[test]
+    fn default_apps_and_test_runners_keep_their_ordered_actions() {
+        let mut backend = Fake::default();
+        for (pid, query) in [(1, "Google Chrome"), (2, "ghostty"), (3, "WebStorm"), (4, "ollama")] {
+            backend.ids.insert(key(false, query), vec![pid]);
+        }
+        for (pid, query) in [
+            (5, "node_modules/vitest"),
+            (6, "node_modules/typescript/bin/tsc"),
+            (7, "bats-core"),
+            (8, "/biome "),
+        ] {
+            backend.ids.insert(key(true, query), vec![pid]);
+        }
+        defaults(&mut backend);
+        let expected = [
+            (1, "foreground"), (2, "foreground"), (3, "foreground"),
+            (4, "background"), (4, "nice:10"), (5, "nice:10"),
+            (6, "nice:10"), (7, "nice:10"), (8, "nice:10"),
+        ];
+        assert_eq!(
+            backend.actions,
+            expected.into_iter().map(|(pid, action)| (pid, action.to_owned())).collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn desktop_and_terminal_ancestors_keep_agents_interactive() {
+        for (agent, desktop) in [
+            ("codex", "ChatGPT"),
+            ("codex", "Codex"),
+            ("codex", "Terminal"),
+            ("claude", "WebStorm"),
+            ("claude", "Terminal"),
+            ("claude", "Claude"),
+        ] {
+            let mut backend = Fake::default();
+            backend.ids.insert(key(false, agent), vec![101]);
+            backend.info.insert((101, "ppid=".into()), b"202\n".to_vec());
+            let command = format!("/Applications/{desktop}.app/Contents/MacOS/{desktop}\n");
+            backend.info.insert((202, "comm=".into()), command.into_bytes());
+            defaults(&mut backend);
+            assert_eq!(backend.actions, vec![(101, "foreground".into()), (101, "nice:0".into())]);
+        }
+        for agent in ["claude", "codex"] {
+            let mut backend = Fake::default();
+            backend.ids.insert(key(false, agent), vec![101]);
+            backend.info.insert((101, "ppid=".into()), b"1\n".to_vec());
+            defaults(&mut backend);
+            assert_eq!(backend.actions, vec![(101, "background".into()), (101, "nice:10".into())]);
+        }
     }
 
     #[cfg(target_os = "macos")]

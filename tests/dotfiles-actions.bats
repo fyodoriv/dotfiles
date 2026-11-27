@@ -213,6 +213,7 @@ copy_cli() {
   done
   printf '%s' "$output" | jq -e '.[] | select(.name == "sync") | any(.subforms[]; .usage == "dotfiles sync [--dry-run]")'
   printf '%s' "$output" | jq -e '.[] | select(.name == "priority-native") | any(.subforms[]; .usage == "dotfiles priority-native rollback [--native]" and any(.args[]; .flag == "--native"))'
+  printf '%s' "$output" | jq -e '.[] | select(.name == "priority-native") | any(.subforms[]; .usage == "dotfiles priority-native rollback --disable" and any(.args[]; .flag == "--disable"))'
   printf '%s' "$output" | jq -e '.[] | select(.name == "install") | any(.subforms[]; (.usage | startswith("dotfiles install run --yes")))'
   # Each sub-form belongs to its command.
   printf '%s' "$output" | jq -e 'all(.[]; .name as $n | all(.subforms[]; .usage | startswith(if $n == "start" then "dotfiles" else "dotfiles " + $n end)))'

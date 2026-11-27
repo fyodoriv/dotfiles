@@ -1486,14 +1486,13 @@ These scripts are added to `PATH` via `bin/` and can be run directly. Scripts ma
 
 On the full profile with Ghostty or WebStorm, the first LaunchAgent setup tries
 to install native App Priority. It provisions a pinned Rust compiler in App
-Priority's data directory. A setup failure leaves the shell runtime active.
-Run `dotfiles priority-native install` to build and enable the native runtime
-manually. Run `dotfiles priority-native rollback` to keep using the shell runtime
-until the next manual install. Run `dotfiles priority-native rollback --native`
-to select the verified prior native binary and pause automatic refresh. A
-successful manual install enables updates again. The command checks the installed binary's digest before
-each use and keeps the normal timing record. A failed native run is not retried
-through the shell.
+Priority's data directory. App Priority waits for a verified binary before it
+changes priorities. Run `dotfiles priority-native install` to retry setup.
+Run `dotfiles priority-native rollback` to select the verified previous binary
+and pause automatic refresh. Run `dotfiles priority-native rollback --disable`
+to pause priority changes. A successful manual install enables updates and
+priority changes again. Each run checks the binary's digest and keeps its
+timing record.
 
 **Git workflow**
 

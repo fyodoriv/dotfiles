@@ -18,3 +18,12 @@ pinned runtime, keep the current PATH order and inspect the routing.
 
 **Anchor:** [Current managed PATH function](https://github.com/fyodoriv/dotfiles/blob/06f775667093b26c682bf55465a17ed1dc3132f0/lib/dotfiles-endpoint-paths.sh)
 and [Agentbrew packaged hook drift](https://github.com/fyodoriv/agentbrew/pull/1347).
+
+## Session PATH
+
+The managed session adds `agent-hooks/bin` before the fnm directory when
+its Agentbrew link resolves to an executable file. That directory holds the
+checkout's Agentbrew entry point. The fnm directory still comes before the
+general Dotfiles commands, so its Node selection stays the same. An explicit
+path to the installed Agentbrew still selects that copy. If the checkout link
+is unavailable, the session uses its previous PATH order.

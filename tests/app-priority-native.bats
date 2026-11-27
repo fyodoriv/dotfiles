@@ -156,12 +156,23 @@ MOCK
   [ "$(readlink "$DIRECTORY/current")" = "$original" ]
 }
 
-@test "first setup probes without applying and publishes only a verified binary" {
-  compiler="$DIRECTORY/toolchain/rustup/toolchains/1.100.0-x86_64-apple-darwin/bin"
-  mkdir -p "$compiler"
-  printf '#!/bin/bash\necho "rustc 1.100.0 (fixture)"\n' > "$compiler/rustc"
+stub_pinned_toolchain() {
+  local compiler="$DIRECTORY/toolchain/rustup/toolchains/1.100.0-x86_64-apple-darwin/bin"
+  local proxy="$DIRECTORY/toolchain/cargo/bin"
+  mkdir -p "$compiler" "$proxy"
+  printf '#!/bin/bash\nexit 97\n' > "$compiler/rustc"
   printf '#!/bin/bash\nexit 0\n' > "$compiler/cargo"
-  chmod +x "$compiler/rustc" "$compiler/cargo"
+  cp "$compiler/cargo" "$proxy/cargo"
+  cat > "$proxy/rustc" <<'MOCK'
+#!/bin/bash
+[ "$RUSTUP_TOOLCHAIN" = 1.100.0-x86_64-apple-darwin ] && [ "$RUSTUP_AUTO_INSTALL" = 0 ] || exit 98
+echo "rustc 1.100.0 (fixture)"
+MOCK
+  chmod +x "$compiler/rustc" "$compiler/cargo" "$proxy/cargo" "$proxy/rustc"
+}
+
+@test "first setup probes without applying and publishes only a verified binary" {
+  stub_pinned_toolchain
 
   run env NATIVE_EXIT=9 "$INSTALLER" ensure fixture-source
   [ "$status" -ne 0 ]
@@ -186,11 +197,7 @@ MOCK
 }
 
 stub_in_progress_first_build() {
-  compiler="$DIRECTORY/toolchain/rustup/toolchains/1.100.0-x86_64-apple-darwin/bin"
-  mkdir -p "$compiler"
-  printf '#!/bin/bash\necho "rustc 1.100.0 (fixture)"\n' > "$compiler/rustc"
-  printf '#!/bin/bash\nexit 0\n' > "$compiler/cargo"
-  chmod +x "$compiler/rustc" "$compiler/cargo"
+  stub_pinned_toolchain
   cat > "$TEST_ROOT/bin/heavy-run" <<'MOCK'
 #!/bin/bash
 if [ "${FIXTURE_IGNORE_BUILD_TERM:-0}" = 1 ]; then trap '' TERM; fi

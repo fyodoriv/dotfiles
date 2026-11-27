@@ -825,3 +825,18 @@ Success: n above 5,000 (about 3.5 days of minute runs), mean at most 400 ms
 and p95 at most 1,500 ms. If it misses, reopen with the new numbers. The
 shell fallback in `bin/app-priority` stays until that check passes; it is the
 rollback.
+
+## Owned-action count check (2026-11-27)
+
+The ordered trace at benchmark revision `06f77566` has eight actions per
+invocation. The report now derives `actions_per_pair` from that trace.
+The [hosted comparison](https://github.com/fyodoriv/dotfiles/actions/runs/46059349991)
+reported eight actions per pair, 30 pairs, and 30 native receipts. The
+candidate median was 150.13 ms and the shell median was 514.92 ms, for
+a ratio of 0.292.
+
+The full suite at that revision still used a removed shell test name for the
+App Priority isolation fixture. The successor `c657266f` repaired the nested
+test selection. The same isolation check passed in both the
+[affected suite](https://github.com/fyodoriv/dotfiles/actions/runs/46063809619)
+and the [full test job](https://github.com/fyodoriv/dotfiles/actions/runs/46063801078/job/140724161176).

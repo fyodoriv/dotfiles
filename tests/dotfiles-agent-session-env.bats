@@ -13,6 +13,27 @@ load test_helper
   [[ "$node_pos" == *"fnm"* ]]
 }
 
+@test "managed agent PATH selects the checkout Agentbrew and keeps fnm Node" {
+  local fnm_bin="$TEST_HOME/.local/share/fnm/node-versions/v22.22.0/installation/bin"
+  mkdir -p "$fnm_bin" "$TEST_DOTFILES/bin" "$TEST_DOTFILES/agent-hooks/bin"
+  printf 'v22.22.0\n' > "$TEST_HOME/.node-version"
+  printf '#!/bin/sh\necho pinned-agentbrew\n' > "$fnm_bin/agentbrew"
+  printf '#!/bin/sh\necho fnm-node\n' > "$fnm_bin/node"
+  printf '#!/bin/sh\necho checkout-agentbrew\n' > "$TEST_DOTFILES/bin/agentbrew"
+  chmod +x "$fnm_bin/agentbrew" "$fnm_bin/node" "$TEST_DOTFILES/bin/agentbrew"
+  ln -s ../../bin/agentbrew "$TEST_DOTFILES/agent-hooks/bin/agentbrew"
+
+  run bash -c '
+    source "$1"
+    prefix="$(dotfiles_agent_path_prefix "$2" "$3")" || exit 1
+    PATH="$prefix:/usr/bin:/bin"
+    export PATH
+    agentbrew && node && "$4"
+  ' _ "$PWD/lib/dotfiles-endpoint-paths.sh" "$TEST_DOTFILES" "$TEST_HOME" "$fnm_bin/agentbrew"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'checkout-agentbrew\nfnm-node\npinned-agentbrew' ]
+}
+
 @test "dotfiles-agent-session-env.py builds PATH with prefix" {
   mkdir -p "$TEST_DOTFILES/bin"
   run python3 ./lib/dotfiles-agent-session-env.py "$TEST_DOTFILES" "$TEST_HOME" "$TEST_DOTFILES/bin"

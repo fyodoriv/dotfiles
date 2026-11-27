@@ -190,6 +190,8 @@ for file in "${changed_files[@]}"; do
   # ── Test files themselves ────────────────────────────────────────
   if [[ "$file" == tests/*.bats ]]; then
     [ -f "$DOTFILES_DIR/$file" ] && affected+=("$DOTFILES_DIR/$file")
+    # The isolation fixture invokes a named test from this file.
+    [[ "$file" != tests/app-priority.bats ]] || affected+=("$TESTS_DIR/app-priority-isolation.bats")
     continue
   fi
 

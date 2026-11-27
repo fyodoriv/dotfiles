@@ -192,3 +192,24 @@ The first-install worker owns the per-installation lock. The launcher's
 time limit covers the worker's lock wait and build. If the launcher exits
 while the worker is still running, rollback waits for that worker before
 it removes the selection.
+
+### First-install build worker loss
+
+- **Hypothesis:** Killing the first-install worker during its build cannot
+  leave a descendant that publishes a binary after rollback succeeds.
+- **Measurement:** In the hosted App Priority fixture, block the scratch
+  build beneath the lock-owning worker. Kill only that worker, start rollback,
+  then let any remaining build process exit. Inspect the worker's process
+  group and the rollback state on Intel and Apple Silicon.
+- **Success:** Both architectures show 0 surviving fixture processes, 0
+  current links, and 1 rollback hold. All 19 existing cases pass and no
+  fixture applies process priorities.
+- **Pivot:** If 1 process can publish after rollback succeeds, keep the
+  shell path and protect the build group until its remaining writers exit.
+- **Anchor:** [App Priority gate G](rust-migration.md), the launcher-loss
+  fixture, and the install lock's stale-owner handling in `lib/lock.sh`.
+
+The install lock tracks the worker's group when it can publish after that
+worker is killed. Rollback waits until the group exits. A failed build
+launcher also stops the remaining processes in its owned group before it
+returns. The fixture checks that cleanup while the build is still blocked.

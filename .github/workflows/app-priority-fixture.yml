@@ -196,15 +196,21 @@ jobs:
             test "$probe_status" -eq 2
           }
 
-          "$scratch/previous/bin/app-priority-native" install
+          set -o pipefail
+          build_log="$scratch/rollbacks-build.log"
+          "$scratch/previous/bin/app-priority-native" install 2>&1 | tee "$build_log"
           previous="$(readlink "$fixture_dir/current")"
           verify_artifact "$previous"
-          ./bin/app-priority-native install
+          ./bin/app-priority-native install 2>&1 | tee -a "$build_log"
           current="$(readlink "$fixture_dir/current")"
           verify_artifact "$current"
           test "$current" != "$previous"
           ./bin/app-priority-native rollback
           test "$(readlink "$fixture_dir/current")" = "$previous"
+          if grep -Fq 'stripping debug info with `rust-objcopy` failed' "$build_log"; then
+            echo 'Pinned rollback build reported a strip warning' >&2
+            exit 1
+          fi
           ./bin/app-priority-native refresh fixture-refresh
           test "$(readlink "$fixture_dir/current")" = "$previous"
           test -f "$fixture_dir/disabled"

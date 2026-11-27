@@ -247,3 +247,31 @@ install resumes priority changes and automatic refresh.
 
 Each native-only timing and memory sample must record exactly one successful
 Rust dispatch. The comparison reads that receipt after the timed command.
+
+### Native-only qualification
+
+[#863](https://github.com/fyodoriv/dotfiles/pull/863) qualified the native-only
+launcher. The accepted head `5b7faccd` and resulting squash `1eea5e5c` have
+the same tree.
+
+- [Intel and Apple Silicon delivery](https://github.com/fyodoriv/dotfiles/actions/runs/46035814748)
+  each passed the installer and first-apply cases. Both restored a prior
+  digest-verified artifact and re-enabled the newer one in a scratch home.
+- [The timing comparison](https://github.com/fyodoriv/dotfiles/actions/runs/46035901746)
+  passed the ordered trace for 30 paired runs. Native median was 142.402 ms
+  and shell median was 467.568 ms, a ratio of 0.305. Each native run had a
+  successful Rust receipt.
+- [The memory comparison](https://github.com/fyodoriv/dotfiles/actions/runs/46035947291)
+  recorded a native-to-shell ratio of 0.990 against a limit of 1.10. It
+  checked the same ordered trace and all 15 native receipts. The two shell
+  cohorts had a ratio of 1.003.
+- [Offline build budget](https://github.com/fyodoriv/dotfiles/actions/runs/46035679700)
+  passed with 7.963 seconds cold and 0.074 seconds warm.
+- The recorded field window contained 9,004 logged native runs since the
+  verified install, with a 181.323 ms mean and 223 ms p95.
+
+The current comparison checks eight actions in order per invocation. Its
+timing JSON still prints the old count of ten. The task queue records that
+reporting correction and the pinned toolchain's nonfatal strip warning.
+The hosted delivery jobs ran on macOS 15. An actual Ventura run remains
+unverified.

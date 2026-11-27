@@ -18,7 +18,9 @@ app_priority_toolchain_prepare() {
   export CARGO_HOME="$scope/cargo" RUSTUP_HOME="$scope/rustup"
   export RUSTUP_TOOLCHAIN="$release-$target"
   local compiler_bin="$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/bin"
-  if [ ! -x "$compiler_bin/cargo" ] || [ ! -x "$compiler_bin/rustc" ]; then
+  local proxy_bin="$CARGO_HOME/bin"
+  if [ ! -x "$compiler_bin/cargo" ] || [ ! -x "$compiler_bin/rustc" ] ||
+    [ ! -x "$proxy_bin/cargo" ] || [ ! -x "$proxy_bin/rustc" ]; then
     (umask 077; mkdir -p "$scope")
     download_dir="$(mktemp -d "$scope/.installer.XXXXXXXX")"
     # Rustup uses the executable name to choose installer or proxy mode.
@@ -34,8 +36,10 @@ app_priority_toolchain_prepare() {
         --default-host "$target" --default-toolchain "$release"
     )
   fi
-  "$compiler_bin/rustc" --version | grep -F "rustc $release "
-  export PATH="$compiler_bin:$PATH" RUSTC="$compiler_bin/rustc"
+  # Rustup supplies the library path for the bundled LLVM tools.
+  export RUSTUP_AUTO_INSTALL=0
+  "$proxy_bin/rustc" --version | grep -F "rustc $release " || return 1
+  export PATH="$proxy_bin:$PATH" RUSTC="$proxy_bin/rustc"
   export MACOSX_DEPLOYMENT_TARGET=13.0
   unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
 }

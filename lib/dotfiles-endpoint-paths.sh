@@ -133,11 +133,14 @@ dotfiles_corporate_node_ca() {
   return 1
 }
 
-# Prefix for agent session PATH: fnm node, dotfiles shims, ~/.local/bin.
+# Put the Agentbrew-only shim first. Keep fnm ahead of the general shims.
 dotfiles_agent_path_prefix() {
   local dotfiles_dir="${1:-}" home="${2:-${HOME:-}}"
   local -a parts=()
-  local fnm_bin
+  local fnm_bin agentbrew_bin="$dotfiles_dir/agent-hooks/bin"
+  if [ -n "$dotfiles_dir" ] && [ -f "$agentbrew_bin/agentbrew" ] && [ -x "$agentbrew_bin/agentbrew" ]; then
+    parts+=("$agentbrew_bin")
+  fi
   fnm_bin="$(dotfiles_resolve_fnm_node_bin "$home" 2>/dev/null || true)"
   [ -n "$fnm_bin" ] && parts+=("$fnm_bin")
   if [ -n "$dotfiles_dir" ] && [ -d "$dotfiles_dir/bin" ]; then

@@ -238,3 +238,12 @@ returns. The fixture checks that cleanup while the build is still blocked.
 - **Anchor:** [App Priority gate G](rust-migration.md), the
   [field measurement](app-priority-same-day.md#tail-analysis-and-fix-2026-11-16),
   and the earlier architecture and interruption checks in this plan.
+
+Plain rollback selects the previous verified release. The existing
+`--native` option selects the same operation. Use `rollback --disable`
+to pause priority changes, including after an in-flight first install.
+An older hold with no selection stays inactive. A successful manual
+install resumes priority changes and automatic refresh.
+
+Each native-only timing and memory sample must record exactly one successful
+Rust dispatch. The comparison reads that receipt after the timed command.

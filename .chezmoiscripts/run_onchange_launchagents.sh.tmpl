@@ -224,7 +224,7 @@ install_plist() {
     if [ ! -e "$native_dir/current" ] && [ ! -L "$native_dir/current" ] &&
       [ ! -e "$native_dir/disabled" ] && [ ! -L "$native_dir/disabled" ]; then
       if ! bash "$SOURCE_DIR/bin/app-priority-native" ensure "${APP_PRIORITY_SOURCE_HASH:-}"; then
-        echo "⚠ Native App Priority setup failed. The shell runtime stays active." >&2
+        echo "⚠ Native App Priority setup failed. Priorities will stay as they are until install succeeds." >&2
         echo "  Retry: dotfiles priority-native install" >&2
       fi
     fi

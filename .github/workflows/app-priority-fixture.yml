@@ -144,7 +144,11 @@ jobs:
           "$binary" || no_apply_status=$?
           test "$no_apply_status" -eq 2
           echo "No-apply exit 2"
-          ./bin/app-priority-native rollback
+          rollback_status=0
+          ./bin/app-priority-native rollback || rollback_status=$?
+          test "$rollback_status" -ne 0
+          test "$(readlink "$fixture_dir/current")" = "$selected"
+          ./bin/app-priority-native rollback --disable
           test ! -L "$fixture_dir/current"
           test -f "$fixture_dir/disabled"
           ./bin/app-priority-native ensure ignored-fixture-source
@@ -181,7 +185,7 @@ jobs:
           current="$(readlink "$fixture_dir/current")"
           verify_artifact "$current"
           test "$current" != "$previous"
-          ./bin/app-priority-native rollback --native
+          ./bin/app-priority-native rollback
           test "$(readlink "$fixture_dir/current")" = "$previous"
           ./bin/app-priority-native refresh fixture-refresh
           test "$(readlink "$fixture_dir/current")" = "$previous"
@@ -330,7 +334,10 @@ jobs:
           APP_PRIORITY_RUST_FIXTURE_BINARY="$RUNNER_TEMP/app-priority-rust-fixture" python3 -m unittest discover -s tests -p app_priority_synthetic_benchmark_test.py
       - name: Check one same-source fixture pair
         run: |
-          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$GITHUB_WORKSPACE" --candidate "$GITHUB_WORKSPACE" --pairs 1
+          baseline="$RUNNER_TEMP/app-priority-reviewed-shell"
+          mkdir -p "$baseline"
+          git archive e438e7c45825ee9d70ce7609a19f374478d11966 | tar -x -C "$baseline"
+          PATH="$GITHUB_WORKSPACE/bin:$PATH" heavy-run --exclusive python3 scripts/app-priority-synthetic-benchmark.py --base "$baseline" --candidate "$baseline" --pairs 1
       - name: Compare reviewed source trees
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.baseline_sha != '' || inputs.candidate_sha != '') }}
         shell: bash

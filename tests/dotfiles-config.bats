@@ -250,6 +250,17 @@ EOF
   [ "$(yq -r '.data | has("podman_idle_machine")' "$CFG")" = false ]
 }
 
+@test "browser connection settings survive init" {
+  [ -n "$REAL_CHEZMOI" ] || skip "chezmoi not installed"
+  cfg set browser_connect_port 9333
+  [ "$status" -eq 0 ]
+  cfg set browser_connect_attempts 4
+  [ "$status" -eq 0 ]
+  "$REAL_CHEZMOI" init --source "$REPO_ROOT" --config "$CFG" --config-path "$CFG" --promptDefaults >/dev/null 2>&1
+  [ "$(yq -r '.data.browser_connect_port' "$CFG")" = 9333 ]
+  [ "$(yq -r '.data.browser_connect_attempts' "$CFG")" = 4 ]
+}
+
 @test "settings table defaults match a new-user render of .chezmoi.yaml.tmpl" {
   [ -n "$REAL_CHEZMOI" ] || skip "chezmoi not installed"
   local render="$TEST_DIR/render.yaml" key type def opt got want ref refs

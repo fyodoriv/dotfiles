@@ -180,6 +180,8 @@ During `chezmoi init`, you'll be prompted for these values. They're stored in `~
 | Git personal email | `git_personal_email` | _(empty, only if split enabled)_ | Commit email for `github.com` remotes — consider `<username>@users.noreply.github.com` for privacy |
 | *(not prompted)* | `login_apps` | `Ghostty` | Single-word app names in `/Applications` (no spaces) that `macos-apps.sh` (full profile) adds as login items: `dotfiles config set login_apps Ghostty,Claude`. A leading `-` removes an app from login items: `dotfiles config set login_apps -Ghostty,Claude`. Other login items stay untouched. Empty = manage none. The `DOTFILES_LOGIN_APPS` env var (comma list) wins. |
 | *(not prompted)* | `brew_skip` | `[]` | List of Homebrew package names to skip during install: `dotfiles config set brew_skip watchman,rancher`, or edit the file (example below). |
+| *(not prompted)* | `browser_connect_port` | `9223` | Local debug port that the browser helper reads when it connects. |
+| *(not prompted)* | `browser_connect_attempts` | `3` | Maximum readiness probes for a browser connection. |
 | *(not prompted)* | `heavy_run_slots` | 1 | How many heavy commands `heavy-run` runs at once on this Mac. Raise it only if the Mac has memory to spare: 4 at once froze a 32 GB Mac twice. `dotfiles config set heavy_run_slots 2`; the scheduler applies the new count to runs already waiting within about a second. The `HEAVY_RUN_SLOTS` env var wins. |
 | *(not prompted)* | `heavy_run_ramp_seconds` | `15` | Seconds between `heavy-run` starts while other runs are active, so each new gate shows its memory use before the next starts. The `HEAVY_RUN_RAMP` env var wins. |
 | *(env only)* | `HEAVY_RUN_PAUSE_APPS` | `GeForceNOW` | Real-time apps (process names, comma-separated) that hold `heavy-run`: no run starts while one runs, and a running one is stopped until the app quits. The periodic `dotfiles-sync`, `tooling-sync` and `agent-scratch-prune` jobs also skip their run while one runs (`DOTFILES_REALTIME_HOLD=0` turns that off). A game stream next to heavy runs crashed a Mac 5 times (2026-11-01). Empty turns it off. |
@@ -1256,12 +1258,6 @@ the "Usage:" header of the script an arm runs gives the sub-forms
 dispatch arm add the notes. `terminal_only` says why an agent cannot run it
 (an editor, a wizard, a person-only step).
 
-Use `dotfiles browser-connect <session>` when the agents browser takes time
-to become ready. The standalone `browser-connect <session>` uses the same
-helper. It probes the local port and pins the named session after the browser
-answers. Set the port and probe count with `dotfiles config set` using
-`browser_connect_port` and `browser_connect_attempts`.
-
 `confirm` says what it changes that
 is hard to undo, so agents ask first. Each form that needs a yes
 (`needs_yes`; `# yes-for:` narrows it to some sub-commands, such as `plugin
@@ -1404,6 +1400,8 @@ dotfiles [--yes] [--health]                       Start screen: set up, applied,
 dotfiles glove80 [<command>] [--yes]              Check or pair a Glove80 keyboard
 dotfiles priority-native <install|rollback>       Enable or roll back native app priority
 dotfiles hook-native <install|rollback>           Enable or roll back the native status guard
+dotfiles browser-connect <session>                Wait for the local browser and pin the named session
+browser-connect <session>                         Standalone form of the same browser action
 dotfiles config [<key>]                           Every setting (value, source, allowed values), or one
 dotfiles config get <key>                         Print one value
 dotfiles config set <key> <value>                 Check a value against config/settings.yaml and save it

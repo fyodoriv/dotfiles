@@ -18,3 +18,9 @@ browser, profile, or network.
 ran all four cases. The missing PATH command returned exit 127 in each
 case. They expected the normal attach, exhaustion, invalid settings, and
 help results. The new helper uses the existing browser client for attach.
+
+The first candidate passed all four browser cases. The full gate also checks
+the CLI reference, initial settings and the content-free command name. The
+configuration template reads both defaults from the settings table with
+[include](https://www.chezmoi.io/reference/templates/functions/include/) and
+[fromYaml](https://www.chezmoi.io/reference/templates/functions/fromYaml/).

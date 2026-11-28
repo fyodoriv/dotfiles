@@ -11,3 +11,10 @@
 Keep the port and attempt count in the Dotfiles settings table. Leave an
 isolated browser under its existing lease. The hosted fixtures use no live
 browser, profile, or network.
+
+## Baseline
+
+[Hosted test job](https://github.com/fyodoriv/dotfiles/actions/runs/46097508876/job/140832164281)
+ran all four cases. The missing PATH command returned exit 127 in each
+case. They expected the normal attach, exhaustion, invalid settings, and
+help results. The new helper uses the existing browser client for attach.

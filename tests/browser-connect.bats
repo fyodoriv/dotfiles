@@ -22,7 +22,11 @@ EOF
 #!/bin/bash
 exit 0
 EOF
-  chmod +x "$bin_dir/curl" "$bin_dir/agent-browser" "$bin_dir/sleep"
+  cat > "$bin_dir/git" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+  chmod +x "$bin_dir/curl" "$bin_dir/agent-browser" "$bin_dir/sleep" "$bin_dir/git"
   export PATH="$bin_dir:$BATS_TEST_DIRNAME/../bin:$PATH"
 }
 
@@ -84,6 +88,10 @@ write_browser_settings() {
   run "$BATS_TEST_DIRNAME/../bin/dotfiles" browser-connect --help
   [ "$status" -eq 0 ]
   [ "$output" = "$helper_usage" ]
+  run "$BATS_TEST_DIRNAME/../bin/dotfiles" actions browser-connect --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"browser-connect <session>"* ]]
+  grep -Fq 'dotfiles browser-connect <session>' "$BATS_TEST_DIRNAME/../commands/dotfiles.md"
   [ ! -s "$PROBES" ]
   [ ! -s "$ATTACHES" ]
 }

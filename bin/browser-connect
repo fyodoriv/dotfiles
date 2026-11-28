@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  printf '%s\n' 'Usage: browser-connect <session>' \
+    'Wait for the configured local browser, then attach and pin the named session.'
+}
+
+if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
+  usage
+  exit 0
+fi
+if [ "$#" -ne 1 ] || ! [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+  usage >&2
+  exit 2
+fi
+session="$1"
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+port="$("$root/bin/dotfiles-config" get browser_connect_port)"
+attempts="$("$root/bin/dotfiles-config" get browser_connect_attempts)"
+
+valid_number() {
+  [[ "$1" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$1" -le "$2" ]
+}
+
+if ! valid_number "$port" 65535; then
+  printf '%s\n' 'browser_connect_port must be an integer from 1 to 65535.' >&2
+  exit 2
+fi
+if ! valid_number "$attempts" 10; then
+  printf '%s\n' 'browser_connect_attempts must be an integer from 1 to 10.' >&2
+  exit 2
+fi
+
+for ((attempt = 1; attempt <= attempts; attempt++)); do
+  if curl --noproxy '*' --fail --silent --max-time 2 --output /dev/null \
+    "http://127.0.0.1:$port/json/version"; then
+    unset AGENT_BROWSER_ARGS AGENT_BROWSER_PROFILE
+    exec agent-browser --session "$session" --pin-tab connect "$port"
+  else
+    probe_exit=$?
+  fi
+  printf 'Browser at 127.0.0.1:%s is not ready (attempt %s of %s, curl exit %s).\n' \
+    "$port" "$attempt" "$attempts" "$probe_exit" >&2
+  if [ "$attempt" -lt "$attempts" ]; then
+    sleep 1
+  fi
+done
+exit 1

@@ -1256,6 +1256,12 @@ the "Usage:" header of the script an arm runs gives the sub-forms
 dispatch arm add the notes. `terminal_only` says why an agent cannot run it
 (an editor, a wizard, a person-only step).
 
+Use `dotfiles browser-connect <session>` when the agents browser takes time
+to become ready. The standalone `browser-connect <session>` uses the same
+helper. It probes the local port and pins the named session after the browser
+answers. Set the port and probe count with `dotfiles config set` using
+`browser_connect_port` and `browser_connect_attempts`.
+
 `confirm` says what it changes that
 is hard to undo, so agents ask first. Each form that needs a yes
 (`needs_yes`; `# yes-for:` narrows it to some sub-commands, such as `plugin

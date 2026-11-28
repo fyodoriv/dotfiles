@@ -34,8 +34,7 @@ teardown() { rm -rf "$TEST_DIR"; }
 
 _init_config() {
   local email="$1"
-  mkdir -p "$TEST_DIR/src"
-  cp "$REPO_ROOT/.chezmoi.yaml.tmpl" "$TEST_DIR/src/"
+  copy_init_config_template "$REPO_ROOT" "$TEST_DIR/src"
   HOME="$TEST_HOME" chezmoi init --source "$TEST_DIR/src" --config-path "$TEST_DIR/cfg.yaml" \
     --promptDefaults \
     --promptString "Git commit name for work/default identity=Alex Example" \
@@ -57,8 +56,7 @@ _init_config() {
 @test "endpoint_hardening override wins over owner_machine" {
   # A new user on a Mac with an endpoint agent sets the key by hand.
   printf 'data:\n  endpoint_hardening: true\n' > "$TEST_DIR/cfg.yaml"
-  mkdir -p "$TEST_DIR/src"
-  cp "$REPO_ROOT/.chezmoi.yaml.tmpl" "$TEST_DIR/src/"
+  copy_init_config_template "$REPO_ROOT" "$TEST_DIR/src"
   HOME="$TEST_HOME" chezmoi init --source "$TEST_DIR/src" --config "$TEST_DIR/cfg.yaml" \
     --config-path "$TEST_DIR/cfg.yaml" --promptDefaults \
     --promptString "Git commit email for work/default identity=alex@example.com" >/dev/null 2>&1

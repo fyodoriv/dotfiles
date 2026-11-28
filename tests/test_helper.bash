@@ -33,6 +33,13 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
+copy_init_config_template() {
+  local repo_root="$1" source_dir="$2"
+  mkdir -p "$source_dir/config"
+  cp "$repo_root/.chezmoi.yaml.tmpl" "$source_dir/"
+  cp "$repo_root/config/settings.yaml" "$source_dir/config/"
+}
+
 # Build two physically distinct checkouts for tests that must separate the
 # applied chezmoi source from a development checkout or linked worktree.
 setup_distinct_dotfiles_checkouts() {

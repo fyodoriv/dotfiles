@@ -24,3 +24,7 @@ the CLI reference, initial settings and the content-free command name. The
 configuration template reads both defaults from the settings table with
 [include](https://www.chezmoi.io/reference/templates/functions/include/) and
 [fromYaml](https://www.chezmoi.io/reference/templates/functions/fromYaml/).
+
+The next hosted run passed the browser and settings checks. Six existing
+config-render cases used scratch sources that lacked the settings table.
+Those fixtures now copy the template and its settings table together.

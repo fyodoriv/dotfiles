@@ -24,8 +24,7 @@ _render_gate_value() {
 }
 
 _init_config() {
-  mkdir -p "$TEST_DIR/src"
-  cp "$REPO_ROOT/.chezmoi.yaml.tmpl" "$TEST_DIR/src/"
+  copy_init_config_template "$REPO_ROOT" "$TEST_DIR/src"
   HOME="$TEST_HOME" chezmoi init --source "$TEST_DIR/src" --config-path "$TEST_DIR/init.yaml" \
     --promptDefaults \
     --promptString "Git commit name for work/default identity=Alex Example" \

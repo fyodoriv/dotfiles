@@ -325,34 +325,6 @@ them. -->
 
 ## P3
 
-- [ ] Report the actual action count from the App Priority benchmark
-  - **ID**: app-priority-owned-action-count
-  - **Tags**: performance, fixtures, reporting
-  - **Details**: On 2026-11-27, the owned-child fixture at e438e7c4 and native-only candidate 5b7faccd both verify eight ordered lines per invocation. Their timing JSON reports a fixed count of 10. The equality check uses the eight-line trace, so the reported count differs by 2. Check the exact source for each older run before editing the migration record.
-  - **Files**: `scripts/app-priority-owned-benchmark.py`, its hosted check, and `docs/plans/app-priority-same-day.md`.
-  - **Output**: code
-  - **Acceptance**: The timing report derives its count from the expected action trace. A hosted fixture checks the reported 8 actions and all 30 pairs. Existing order, timing, and memory gates keep their thresholds.
-  - **Hypothesis**: The difference between the reported count and the checked trace falls from 2 actions to 0.
-  - **Measurement**: Read the JSON record from `gh run view <owned-comparison-run> -R fyodoriv/dotfiles --log` and check the `actions_per_pair` field against the expected trace with `jq -e '.actions_per_pair == 8 and .pairs == 30'`.
-  - **Success**: 0 count difference on a hosted run with 30 verified pairs.
-  - **Pivot**: If 1 report still disagrees with its checked trace after the change, omit the numeric count from conclusions until the fixture reports it reliably.
-  - **Anchor**: `scripts/app-priority-owned-benchmark.py` at e438e7c4 and Basili, Caldiera and Rombach (1994), GQM.
-  - **Competitive-goal**: none. This improves benchmark reporting.
-
-- [ ] Qualify stripped App Priority builds with the pinned toolchain
-  - **ID**: app-priority-pinned-symbol-strip
-  - **Tags**: launchagents, rust, build
-  - **Details**: The hosted pinned Rust build reports that `rust-objcopy` cannot load `libLLVM.dylib` on both macOS architectures. Cargo completes, and both artifacts pass digest, load, and native rollback checks. Reproduce the warning before choosing a fix. Keep the pinned compiler and offline Cargo build.
-  - **Files**: `lib/app-priority-toolchain.sh`, `rust/app-priority/Cargo.toml`, hosted App Priority delivery fixture, native delivery plan.
-  - **Output**: code
-  - **Acceptance**: Both hosted architecture jobs verify the intended strip result, artifact digest, macOS target, and exit code without applying priorities.
-  - **Hypothesis**: Using a strip path that can load its libraries reduces pinned release builds with a strip warning from 2 of 2 architecture jobs to 0 of 2.
-  - **Measurement**: Compare the Intel and Apple Silicon logs from `app-priority-fixture.yml` with `delivery_check=true` and `isolated_toolchain=true`. Check the symbol table and run the existing artifact checks.
-  - **Success**: 0 strip warnings in 2 architecture jobs, 2 valid artifacts, and 0 live priority changes.
-  - **Pivot**: If either architecture cannot load or roll back its verified artifact, retain the current build and record the packaging limit.
-  - **Anchor**: [Hosted reproduction on Intel and Apple Silicon](https://github.com/fyodoriv/dotfiles/actions/runs/45907826150) and the [native delivery plan](docs/plans/app-priority-native-delivery.md).
-  - **Competitive-goal**: none — release artifact packaging, outside the scorecard.
-
 - [ ] Harden the tooling-checkup dashboard chart checks (round-2 review of dotfiles #379)
   - **ID**: dashboard-chart-gate-hardening
   - **Blocked**: needs-deployed-test-host — 2026-11-01: runtime and browser-gate changes are prepared together but excluded from ready delivery. The existing dashboard remained on a browser-verification page after more than 120 seconds, and no Dashboard writer capability is available. Synthetic-host screenshots are unit proof only. Unblock: use an accessible dedicated deployed test dashboard with fabricated datasets; capture labeled before/after proof for hourly binding and line contrast on phone/desktop in light/dark, then complete independent review and required local gates. Keep [draft PR #423](https://github.com/fyodoriv/dotfiles/pull/423) as a draft until then. Its local full gate exited 0 and all 11 browser controls passed; these do not replace deployed-host proof.

@@ -208,6 +208,14 @@ settings:
     type: list
     default: ""
     description: agentbrew Claude Code mods (from its mods/ folder) that dotfiles apply installs, comma-separated. Empty (the default) = none.
+  browser_connect_port:
+    type: int:1-65535
+    default: 9223
+    description: Local debug port for browser-connect. Use the agents browser or a browser you hold through temp-browser.
+  browser_connect_attempts:
+    type: int:1-10
+    default: 3
+    description: Maximum readiness probes before browser-connect reports failure.
   heavy_run_slots:
     type: int:1-64
     default: ""

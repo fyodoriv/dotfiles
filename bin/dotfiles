@@ -82,6 +82,7 @@ Start:
   glove80 [<command>] [--yes]  Check or pair a Glove80 keyboard
   priority-native <command>  Install or roll back native app priority
   hook-native <command>      Install or roll back the native status guard
+  browser-connect <session>  Attach a named session to the configured local browser
   config [<key>]              Show every setting (value, source, allowed) or one
   config set <key> <value>    Check a value against config/settings.yaml and save it
   actions [<name>] [--json]   Every command for agents: usage, arguments, notes
@@ -217,6 +218,12 @@ case "$cmd" in
     # agent: install the offline native status shortcut or restore the shell guard on request.
     shift
     exec bash "$DOTFILES_DIR/bin/hook-status-native" "$@"
+    ;;
+
+  browser-connect)
+    # agent: attach to the existing agents browser and pin the named session.
+    shift
+    exec bash "$DOTFILES_DIR/bin/browser-connect" "$@"
     ;;
 
   config)

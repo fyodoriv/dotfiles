@@ -34,7 +34,7 @@ if ! valid_number "$attempts" 10; then
 fi
 
 for ((attempt = 1; attempt <= attempts; attempt++)); do
-  if curl --noproxy '*' --fail --silent --max-time 2 --output /dev/null \
+  if curl --disable --noproxy '*' --fail --silent --max-time 2 --output /dev/null \
     "http://127.0.0.1:$port/json/version"; then
     unset AGENT_BROWSER_ARGS AGENT_BROWSER_PROFILE
     exec agent-browser --session "$session" --pin-tab connect "$port"

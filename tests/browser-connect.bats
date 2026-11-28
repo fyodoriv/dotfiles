@@ -11,6 +11,7 @@ browser_stubs() {
   : > "$ATTACHES"
   cat > "$bin_dir/curl" <<'EOF'
 #!/bin/bash
+[ "$1" = --disable ] || exit 9
 printf '%s\n' "${!#}" >> "$PROBES"
 [ "$(wc -l < "$PROBES")" -ge "$READY_AT" ]
 EOF

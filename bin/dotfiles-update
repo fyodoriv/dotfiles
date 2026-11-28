@@ -10,6 +10,7 @@ fi
 DRY_RUN=0
 VERBOSE=0
 YES=0
+PHASE_DURATIONS=()
 
 usage() {
   cat <<USAGE
@@ -36,8 +37,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+print_phase_durations() {
+  printf 'Phase durations:\n'
+  printf '  %s\n' "${PHASE_DURATIONS[@]}"
+}
+
 phase() {
-  local name="$1" rc
+  local name="$1" start rc
   shift
   if [ "$DRY_RUN" -eq 1 ]; then
     printf 'DRY-RUN: %s\n' "$*"
@@ -48,15 +54,18 @@ phase() {
   else
     printf '→ Phase: %s\n' "$name"
   fi
+  start=$SECONDS
   set +e
   "$@"
   rc=$?
   set -e
+  PHASE_DURATIONS+=("$name: $((SECONDS - start))s")
   if [ "$rc" -eq 0 ]; then
     printf '✓ Phase complete: %s\n' "$name"
     return 0
   fi
   printf '✗ Phase failed: %s (exit %s)\n' "$name" "$rc" >&2
+  print_phase_durations >&2
   exit "$rc"
 }
 
@@ -91,4 +100,7 @@ phase apply dotfiles apply
 agentbrew_phase
 # The person said yes to the whole update, the package upgrade included.
 phase packages dotfiles-upgrade --yes
-phase doctor dotfiles-doctor --fix
+DOTFILES_UPDATE_DOCTOR=1 phase doctor dotfiles-doctor --fix
+if [ "$DRY_RUN" -eq 0 ]; then
+  print_phase_durations
+fi

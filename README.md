@@ -469,6 +469,9 @@ dotfiles apply --if-changed # skip the apply when nothing changed and chezmoi st
 dotfiles diff               # preview pending changes without writing
 ```
 
+The update prints the duration of each phase it ran. Its final doctor check
+warns if the checkout has uncommitted changes. Other failures keep their exit code.
+
 Commands such as `dotfiles --help` check for updates (fetching at most once per
 hour). When behind:
 ```
